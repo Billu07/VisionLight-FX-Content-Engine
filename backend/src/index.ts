@@ -49,6 +49,33 @@ app.post("/api/generate-script", async (req, res) => {
       .json({ error: "Failed to generate script", details: error.message });
   }
 });
+// Save Script as Post
+app.post("/api/posts", async (req, res) => {
+  const { prompt, script, platform = "INSTAGRAM" } = req.body;
+
+  if (!prompt || !script) {
+    return res.status(400).json({ error: "Prompt and script are required" });
+  }
+
+  try {
+    const post = await prisma.post.create({
+      data: {
+        prompt,
+        script,
+        platform,
+        status: "NEW",
+        mediaType: null,
+        user: { connect: { id: "demo-user-1" } }, // Temp: use demo user
+      },
+    });
+    res.json({ success: true, post });
+  } catch (error: any) {
+    console.error("DB Error:", error);
+    res
+      .status(500)
+      .json({ error: "Failed to save post", details: error.message });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`);
