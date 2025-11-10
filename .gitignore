@@ -1,0 +1,18 @@
+# Node
+node_modules
+*.log
+dist
+build
+
+# Env
+.env
+.env.local
+.env.development
+.env.production
+
+# Docker
+*.dockerignore
+
+# Misc
+.DS_Store
+Thumbs.db
