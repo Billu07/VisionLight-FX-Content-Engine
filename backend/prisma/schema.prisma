@@ -1,0 +1,78 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String?
+  role        Role     @default(DEMO)
+  demoCredits Json     // { "sora": 2, "gemini": 2, "bannerbear": 2 }
+  createdAt   DateTime @default(now())
+
+  posts       Post[]
+}
+
+model Post {
+  id             String      @id @default(cuid())
+  userId         String
+  prompt         String
+  script         Json?
+  mediaType      MediaType?
+  mediaUrl       String?
+  thumbnailUrl   String?
+  status         PostStatus  @default(NEW)
+  platform       Platform
+  scheduledAt    DateTime?
+  bufferUpdateId String?
+
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  user           User        @relation(fields: [userId], references: [id])
+  metric         Metric?
+}
+
+model Metric {
+  id        String  @id @default(cuid())
+  postId    String  @unique
+  likes     Int     @default(0)
+  comments  Int     @default(0)
+  reach     Int     @default(0)
+  roi       Float   @default(0)
+  updatedAt DateTime @updatedAt
+
+  post      Post    @relation(fields: [postId], references: [id])
+}
+
+enum Role {
+  DEMO
+  CLIENT
+  ADMIN
+}
+
+enum MediaType {
+  VIDEO
+  CAROUSEL
+  IMAGE
+}
+
+enum PostStatus {
+  NEW
+  GENERATING
+  READY
+  APPROVED
+  POSTED
+  FAILED
+}
+
+enum Platform {
+  INSTAGRAM
+  LINKEDIN
+}
