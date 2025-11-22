@@ -236,6 +236,23 @@ export const airtableService = {
     }
   },
 
+  async deleteSession(token: string): Promise<void> {
+    try {
+      const records = await base("Sessions")
+        .select({
+          filterByFormula: `{token} = '${token}'`,
+        })
+        .firstPage();
+
+      if (records.length > 0) {
+        await base("Sessions").destroy(records.map((record) => record.id));
+      }
+    } catch (error) {
+      console.error("Airtable deleteSession error:", error);
+      throw error;
+    }
+  },
+
   // BrandConfig operations
   async getBrandConfig(userId: string): Promise<BrandConfig | null> {
     try {
@@ -249,11 +266,24 @@ export const airtableService = {
 
       if (!userConfig) return null;
 
+      const userIdField = userConfig.get("userId");
+      let actualUserId: string;
+
+      if (Array.isArray(userIdField) && userIdField.length > 0) {
+        const firstElement = userIdField[0];
+        actualUserId =
+          typeof firstElement === "string"
+            ? firstElement
+            : String(firstElement);
+      } else if (typeof userIdField === "string") {
+        actualUserId = userIdField;
+      } else {
+        actualUserId = String(userIdField || "");
+      }
+
       return {
         id: userConfig.id,
-        userId: Array.isArray(userConfig.get("userId"))
-          ? userConfig.get("userId")[0]
-          : (userConfig.get("userId") as string),
+        userId: actualUserId,
         companyName: userConfig.get("companyName") as string,
         primaryColor: userConfig.get("primaryColor") as string,
         secondaryColor: userConfig.get("secondaryColor") as string,
@@ -290,12 +320,17 @@ export const airtableService = {
         const userIdField = record.get("userId");
         let actualUserId: string;
 
-        if (
-          Array.isArray(userIdField) &&
-          userIdField.length > 0 &&
-          typeof userIdField[0] === "string"
-        ) {
-          actualUserId = userIdField[0];
+        if (Array.isArray(userIdField) && userIdField.length > 0) {
+          const firstElement = userIdField[0];
+          if (typeof firstElement === "string") {
+            actualUserId = firstElement;
+          } else {
+            console.warn(
+              "❌ Unexpected userId format in upsertBrandConfig:",
+              userIdField
+            );
+            actualUserId = configData.userId;
+          }
         } else if (typeof userIdField === "string") {
           actualUserId = userIdField;
         } else {
@@ -366,17 +401,22 @@ export const airtableService = {
       const userIdField = record.get("userId");
       let actualUserId: string;
 
-      if (
-        Array.isArray(userIdField) &&
-        userIdField.length > 0 &&
-        typeof userIdField[0] === "string"
-      ) {
-        actualUserId = userIdField[0]; // Take first user ID from linked records
+      if (Array.isArray(userIdField) && userIdField.length > 0) {
+        const firstElement = userIdField[0];
+        if (typeof firstElement === "string") {
+          actualUserId = firstElement;
+        } else {
+          console.warn(
+            "❌ Unexpected userId format in createPost:",
+            userIdField
+          );
+          actualUserId = postData.userId;
+        }
       } else if (typeof userIdField === "string") {
         actualUserId = userIdField;
       } else {
         console.warn("❌ Unexpected userId format in createPost:", userIdField);
-        actualUserId = postData.userId; // Fallback to original
+        actualUserId = postData.userId;
       }
 
       return {
@@ -425,17 +465,22 @@ export const airtableService = {
       const userIdField = record.get("userId");
       let actualUserId: string;
 
-      if (
-        Array.isArray(userIdField) &&
-        userIdField.length > 0 &&
-        typeof userIdField[0] === "string"
-      ) {
-        actualUserId = userIdField[0]; // Take first user ID from linked records
+      if (Array.isArray(userIdField) && userIdField.length > 0) {
+        const firstElement = userIdField[0];
+        if (typeof firstElement === "string") {
+          actualUserId = firstElement;
+        } else {
+          console.warn(
+            "❌ Unexpected userId format in updatePost:",
+            userIdField
+          );
+          actualUserId = "";
+        }
       } else if (typeof userIdField === "string") {
         actualUserId = userIdField;
       } else {
         console.warn("❌ Unexpected userId format in updatePost:", userIdField);
-        actualUserId = ""; // Fallback
+        actualUserId = "";
       }
 
       return {
@@ -498,9 +543,22 @@ export const airtableService = {
           mediaType: record.get("mediaType"),
         });
 
+        let actualUserId: string;
+        if (Array.isArray(userIdField) && userIdField.length > 0) {
+          const firstElement = userIdField[0];
+          actualUserId =
+            typeof firstElement === "string"
+              ? firstElement
+              : String(firstElement);
+        } else if (typeof userIdField === "string") {
+          actualUserId = userIdField;
+        } else {
+          actualUserId = String(userIdField || "");
+        }
+
         return {
           id: record.id,
-          userId: Array.isArray(userIdField) ? userIdField[0] : userIdField,
+          userId: actualUserId,
           prompt: record.get("prompt") as string,
           mediaType: record.get("mediaType") as "VIDEO" | "IMAGE" | "CAROUSEL",
           platform: record.get("platform") as string,
@@ -554,11 +612,24 @@ export const airtableService = {
         };
       }
 
+      const userIdField = userMetrics.get("userId");
+      let actualUserId: string;
+
+      if (Array.isArray(userIdField) && userIdField.length > 0) {
+        const firstElement = userIdField[0];
+        actualUserId =
+          typeof firstElement === "string"
+            ? firstElement
+            : String(firstElement);
+      } else if (typeof userIdField === "string") {
+        actualUserId = userIdField;
+      } else {
+        actualUserId = String(userIdField || "");
+      }
+
       return {
         id: userMetrics.id,
-        userId: Array.isArray(userMetrics.get("userId"))
-          ? userMetrics.get("userId")[0]
-          : (userMetrics.get("userId") as string),
+        userId: actualUserId,
         postsCreated: userMetrics.get("postsCreated") as number,
         timeSaved: userMetrics.get("timeSaved") as number,
         mediaGenerated: userMetrics.get("mediaGenerated") as number,
