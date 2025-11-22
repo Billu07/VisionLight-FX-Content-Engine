@@ -25,7 +25,7 @@ export const Hero = () => {
             {/* Logo & Navigation */}
             <div className="flex justify-between items-center mb-8">
               <img
-                src="/visionlight-fx/logo.png"
+                src="/frontend/public/logo.png"
                 alt="Visionlight AI Logo"
                 className="w-56 h-56 object-contain"
               />
