@@ -202,12 +202,17 @@ export const airtableService = {
       const userIdField = record.get("userId");
       let actualUserId: string;
 
-      if (
-        Array.isArray(userIdField) &&
-        userIdField.length > 0 &&
-        typeof userIdField[0] === "string"
-      ) {
-        actualUserId = userIdField[0];
+      if (Array.isArray(userIdField) && userIdField.length > 0) {
+        const firstElement = userIdField[0];
+        if (typeof firstElement === "string") {
+          actualUserId = firstElement;
+        } else {
+          console.warn(
+            "❌ Unexpected userId format in findSessionByToken:",
+            userIdField
+          );
+          actualUserId = "";
+        }
       } else if (typeof userIdField === "string") {
         actualUserId = userIdField;
       } else {
@@ -227,23 +232,6 @@ export const airtableService = {
       };
     } catch (error) {
       console.error("Airtable findSessionByToken error:", error);
-      throw error;
-    }
-  },
-
-  async deleteSession(token: string): Promise<void> {
-    try {
-      const records = await base("Sessions")
-        .select({
-          filterByFormula: `{token} = '${token}'`,
-        })
-        .firstPage();
-
-      if (records.length > 0) {
-        await base("Sessions").destroy(records.map((record) => record.id));
-      }
-    } catch (error) {
-      console.error("Airtable deleteSession error:", error);
       throw error;
     }
   },
@@ -607,12 +595,17 @@ export const airtableService = {
       const userIdField = record.get("userId");
       let actualUserId: string;
 
-      if (
-        Array.isArray(userIdField) &&
-        userIdField.length > 0 &&
-        typeof userIdField[0] === "string"
-      ) {
-        actualUserId = userIdField[0];
+      if (Array.isArray(userIdField) && userIdField.length > 0) {
+        const firstElement = userIdField[0];
+        if (typeof firstElement === "string") {
+          actualUserId = firstElement;
+        } else {
+          console.warn(
+            "❌ Unexpected userId format in updateROIMetrics:",
+            userIdField
+          );
+          actualUserId = userId;
+        }
       } else if (typeof userIdField === "string") {
         actualUserId = userIdField;
       } else {
