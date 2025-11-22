@@ -21,7 +21,7 @@ export const Hero = () => {
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl"></div>
         </div>
 
-        <div className="container mx-auto px-6 pt-20 pb-0 relative z-10">
+        <div className="container mx-auto px-6 pt-20 pb-8 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             {/* Logo & Navigation */}
             <div className="flex justify-between items-center mb-0">
