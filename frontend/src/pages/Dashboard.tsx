@@ -8,22 +8,85 @@ import { ErrorAlert } from "../components/ErrorAlert";
 import { PostCard } from "../components/PostCard";
 import { BrandConfigModal } from "../components/BrandConfigModal";
 import { WelcomeTour } from "../components/WelcomeTour";
+import { ProductionStudio } from "../components/ProductionStudio";
+
+type MediaType = "video" | "image" | "carousel";
+
+interface GenerationState {
+  status: "idle" | "generating" | "completed" | "error";
+  progress?: number;
+  result?: any;
+  error?: string;
+}
 
 function Dashboard() {
   const [prompt, setPrompt] = useState("");
-  const [selectedMediaType, setSelectedMediaType] = useState<
-    "video" | "image" | "carousel"
-  >("image");
-  const [result, setResult] = useState<any>(null);
-  const [generatingMedia, setGeneratingMedia] = useState<
-    Record<string, string>
-  >({});
+  const [selectedMediaType, setSelectedMediaType] =
+    useState<MediaType>("video");
+  const [videoDuration, setVideoDuration] = useState<4 | 8 | 12>(12);
+  const [referenceImage, setReferenceImage] = useState<File | null>(null);
+  const [referenceImageUrl, setReferenceImageUrl] = useState("");
+  const [generationState, setGenerationState] = useState<GenerationState>({
+    status: "idle",
+  });
   const [publishingPost, setPublishingPost] = useState<string | null>(null);
   const [showBrandModal, setShowBrandModal] = useState(false);
   const [showWelcomeTour, setShowWelcomeTour] = useState(false);
+  const [isProductionActive, setIsProductionActive] = useState(false);
+
+  // Async UX state
+  const [queuedPostId, setQueuedPostId] = useState<string | null>(null);
+  const [showQueuedModal, setShowQueuedModal] = useState(false);
+  const [readyPostId, setReadyPostId] = useState<string | null>(null);
+  const [showReadyModal, setShowReadyModal] = useState(false);
+
   const queryClient = useQueryClient();
   const { user, isLoading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
+
+  // Initialize auth check on component mount
+  useEffect(() => {
+    const { checkAuth } = useAuth.getState();
+    checkAuth();
+  }, []);
+
+  // === Fetch Brand Config ===
+  const { data: brandConfig } = useQuery({
+    queryKey: ["brand-config"],
+    queryFn: async () => {
+      const response = await apiEndpoints.getBrandConfig();
+      return response.data.config;
+    },
+    enabled: !!user,
+  });
+
+  // Apply brand colors globally using CSS variables
+  useEffect(() => {
+    const applyBrandColors = () => {
+      const primary = brandConfig?.primaryColor || "#6366f1";
+      const secondary = brandConfig?.secondaryColor || "#8b5cf6";
+
+      document.documentElement.style.setProperty("--primary-brand", primary);
+      document.documentElement.style.setProperty(
+        "--secondary-brand",
+        secondary
+      );
+
+      // Also update meta theme color for mobile browsers
+      const metaThemeColor = document.querySelector("meta[name=theme-color]");
+      if (metaThemeColor) {
+        metaThemeColor.setAttribute("content", primary);
+      }
+    };
+
+    applyBrandColors();
+
+    // Re-apply on window focus (in case of updates)
+    const handleFocus = () => applyBrandColors();
+    window.addEventListener("focus", handleFocus);
+
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [brandConfig]);
 
   // Check if first-time user
   useEffect(() => {
@@ -36,21 +99,12 @@ function Dashboard() {
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
+      console.log("No user found, redirecting to login");
       navigate("/");
     }
   }, [user, authLoading, navigate]);
 
-  // === Fetch Brand Config ===
-  const { data: brandConfig } = useQuery({
-    queryKey: ["brand-config"],
-    queryFn: async () => {
-      const response = await apiEndpoints.getBrandConfig();
-      return response.data.config;
-    },
-    enabled: !!user,
-  });
-
-  // === Fetch Posts ===
+  // === Fetch Posts with auto-refresh ===
   const {
     data: posts = [],
     isLoading: postsLoading,
@@ -59,14 +113,82 @@ function Dashboard() {
     queryKey: ["posts"],
     queryFn: async () => {
       const response = await apiEndpoints.getPosts();
+      console.log("📦 Posts fetched:", response.data.posts); // Debug log
       return response.data.posts;
     },
     enabled: !!user,
+    refetchIntervalInBackground: true,
+    staleTime: 0,
   });
+
+  // Add this useEffect to monitor post status changes
+  useEffect(() => {
+    if (posts.length > 0) {
+      const processingPosts = posts.filter(
+        (p: any) => p.status === "PROCESSING"
+      );
+      const readyPosts = posts.filter((p: any) => p.status === "READY");
+      const failedPosts = posts.filter((p: any) => p.status === "FAILED");
+
+      console.log("📊 Post Status Summary:", {
+        total: posts.length,
+        processing: processingPosts.length,
+        ready: readyPosts.length,
+        failed: failedPosts.length,
+      });
+
+      // Log media URLs for debugging
+      readyPosts.forEach((post: any) => {
+        if (post.mediaUrl) {
+          console.log(`🎬 Ready post ${post.id}:`, post.mediaUrl);
+        }
+      });
+    }
+  }, [posts]);
+
+  // Add this useEffect to see if posts are coming through
+  useEffect(() => {
+    console.log("🎯 Dashboard Posts State:", {
+      postsCount: posts.length,
+      posts: posts.map((p: any) => ({
+        id: p.id,
+        status: p.status,
+        hasMedia: !!p.mediaUrl,
+        mediaType: p.mediaType,
+      })),
+    });
+  }, [posts]);
+  // === Watch for newly READY posts and show "video ready" popup ===
+  useEffect(() => {
+    if (!posts || posts.length === 0) return;
+
+    const readyPosts = posts.filter((p: any) => p.status === "READY");
+    if (readyPosts.length === 0) return;
+
+    const seenRaw =
+      localStorage.getItem("visionlight_seen_ready_posts") || "[]";
+    let seen: string[] = [];
+    try {
+      seen = JSON.parse(seenRaw);
+    } catch {
+      seen = [];
+    }
+
+    const newReady = readyPosts.find((p: any) => !seen.includes(p.id));
+    if (newReady) {
+      setReadyPostId(newReady.id);
+      setShowReadyModal(true);
+      const updated = [...seen, newReady.id];
+      localStorage.setItem(
+        "visionlight_seen_ready_posts",
+        JSON.stringify(updated)
+      );
+    }
+  }, [posts]);
 
   // === Fetch User Credits ===
   const {
-    data: userCredits = { sora: 0, gemini: 0, bannerbear: 0 },
+    data: userCredits = { video: 2, image: 2, carousel: 2 },
     isLoading: creditsLoading,
   } = useQuery({
     queryKey: ["user-credits"],
@@ -80,7 +202,6 @@ function Dashboard() {
   // === Fetch ROI Metrics ===
   const {
     data: roiMetrics = { postsCreated: 0, timeSaved: 0, mediaGenerated: 0 },
-    isLoading: roiLoading,
   } = useQuery({
     queryKey: ["roi-metrics"],
     queryFn: async () => {
@@ -90,52 +211,45 @@ function Dashboard() {
     enabled: !!user,
   });
 
-  // === Generate Script Mutation ===
-  const generateMutation = useMutation({
-    mutationFn: (data: { prompt: string; mediaType: string }) =>
-      apiEndpoints.generateScript(data),
-    onMutate: () => {
-      setResult(null);
-    },
-    onSuccess: (data) => {
-      setResult(data.data.script);
-    },
-  });
-
-  // === Save Post Mutation ===
-  const saveMutation = useMutation({
-    mutationFn: (data: { prompt: string; script: any }) =>
-      apiEndpoints.createPost({
-        prompt: data.prompt,
-        script: data.script,
-        platform: "INSTAGRAM",
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-      queryClient.invalidateQueries({ queryKey: ["roi-metrics"] });
-      setResult(null);
-      setPrompt("");
-    },
-  });
-
-  // === Generate Media Mutation ===
+  // === Direct Media Generation Mutation (async, fire-and-forget) ===
   const generateMediaMutation = useMutation({
-    mutationFn: ({ postId, provider }: { postId: string; provider: string }) =>
-      apiEndpoints.generateMedia(postId, provider),
-    onMutate: ({ postId, provider }) => {
-      setGeneratingMedia((prev) => ({ ...prev, [postId]: provider }));
+    mutationFn: async (formData: FormData) => {
+      setIsProductionActive(true);
+      return apiEndpoints.generateMediaDirect(formData);
     },
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const data = (response as any)?.data ?? response;
+
+      console.log("🔍 /api/generate-media response:", data);
+
+      if (data?.success && data.status === "processing" && data.postId) {
+        setGenerationState({
+          status: "generating",
+          result: { postId: data.postId },
+          progress: 10,
+        });
+        setQueuedPostId(data.postId);
+        setShowQueuedModal(true);
+      } else {
+        setGenerationState({
+          status: "error",
+          error:
+            "Unexpected response from server while starting generation. Please try again.",
+        });
+      }
+
+      setIsProductionActive(false);
       queryClient.invalidateQueries({ queryKey: ["posts"] });
       queryClient.invalidateQueries({ queryKey: ["user-credits"] });
       queryClient.invalidateQueries({ queryKey: ["roi-metrics"] });
     },
-    onSettled: (_data, _error, { postId }) => {
-      setGeneratingMedia((prev) => {
-        const newState = { ...prev };
-        delete newState[postId];
-        return newState;
+    onError: (error: any) => {
+      console.error("Generate media error:", error);
+      setGenerationState({
+        status: "error",
+        error: error.message || "Failed to start generation",
       });
+      setIsProductionActive(false);
     },
   });
 
@@ -154,31 +268,41 @@ function Dashboard() {
     },
   });
 
-  const generateMedia = (postId: string, provider: string) => {
-    generateMediaMutation.mutate({ postId, provider });
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setReferenceImage(file);
+      const imageUrl = URL.createObjectURL(file);
+      setReferenceImageUrl(imageUrl);
+      console.log("Reference image selected:", file.name);
+    }
   };
 
-  const publishPost = (postId: string, platform: string = "INSTAGRAM") => {
-    publishMutation.mutate({ postId, platform });
+  const buildFormData = () => {
+    const formData = new FormData();
+    formData.append("prompt", prompt);
+    formData.append("mediaType", selectedMediaType);
+
+    if (selectedMediaType === "video" && videoDuration) {
+      formData.append("duration", videoDuration.toString());
+    }
+
+    if (referenceImage) {
+      formData.append("referenceImage", referenceImage);
+    }
+
+    return formData;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt.trim()) return;
-    generateMutation.mutate({ prompt, mediaType: selectedMediaType });
-  };
-
-  const handleSave = () => {
-    if (!result) return;
-    saveMutation.mutate({ prompt, script: result });
+    if (!prompt.trim() || userCredits[selectedMediaType] <= 0) return;
+    const formData = buildFormData();
+    generateMediaMutation.mutate(formData);
   };
 
   const handleRetryPosts = () => {
     queryClient.invalidateQueries({ queryKey: ["posts"] });
-  };
-
-  const handleRetryCredits = () => {
-    queryClient.invalidateQueries({ queryKey: ["user-credits"] });
   };
 
   const handleLogout = () => {
@@ -187,25 +311,22 @@ function Dashboard() {
   };
 
   // Apply brand colors dynamically
-  const primaryColor = brandConfig?.primaryColor || "#3B82F6";
-  const secondaryColor = brandConfig?.secondaryColor || "#1E40AF";
+  const primaryColor = brandConfig?.primaryColor || "#6366f1";
+  const secondaryColor = brandConfig?.secondaryColor || "#8b5cf6";
   const companyName = brandConfig?.companyName || "Visionlight AI";
 
   // Show loading state while checking authentication
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 flex items-center justify-center p-4">
         <div className="text-center">
           <div className="relative">
-            <LoadingSpinner size="lg" />
-            <div className="absolute inset-0 animate-ping">
-              <LoadingSpinner size="lg" />
-            </div>
+            <LoadingSpinner size="lg" variant="neon" />
           </div>
-          <p className="mt-6 text-gray-600 text-lg font-medium">
+          <p className="mt-6 text-purple-200 text-lg font-medium">
             Loading your creative studio...
           </p>
-          <p className="mt-2 text-gray-400 text-sm">
+          <p className="mt-2 text-purple-400 text-sm">
             Preparing your AI content dashboard
           </p>
         </div>
@@ -213,469 +334,509 @@ function Dashboard() {
     );
   }
 
-  // Don't render if not authenticated (will redirect)
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900">
+      {/* Video queued modal */}
+      {showQueuedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="bg-gray-900 rounded-2xl border border-cyan-400/40 shadow-2xl max-w-sm w-full p-6">
+            <h3 className="text-lg font-semibold text-white mb-2">
+              Your video is in the queue 🎬
+            </h3>
+            <p className="text-sm text-purple-200 mb-4">
+              We&apos;ve started generating your video. It will typically be
+              ready in a couple of minutes and will appear in your content
+              library once it&apos;s done.
+            </p>
+            {queuedPostId && (
+              <p className="text-xs text-purple-400 mb-4">
+                Post ID: <span className="font-mono">{queuedPostId}</span>
+              </p>
+            )}
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowQueuedModal(false)}
+                className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Video ready modal */}
+      {showReadyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="bg-gray-900 rounded-2xl border border-green-400/40 shadow-2xl max-w-sm w-full p-6">
+            <h3 className="text-lg font-semibold text-green-400 mb-2">
+              Your video is ready ✅
+            </h3>
+            <p className="text-sm text-purple-200 mb-4">
+              Your generated video has finished processing. You can preview it
+              from your content library below.
+            </p>
+            {readyPostId && (
+              <p className="text-xs text-purple-400 mb-4">
+                Post ID: <span className="font-mono">{readyPostId}</span>
+              </p>
+            )}
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowReadyModal(false)}
+                className="px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm font-medium"
+              >
+                Awesome
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Welcome Tour */}
       {showWelcomeTour && (
         <WelcomeTour onClose={() => setShowWelcomeTour(false)} />
       )}
 
       <div className="container mx-auto px-4 py-6 max-w-7xl">
-        {/* Header with Branding & User Info */}
-        <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        {/* Premium Header */}
+        <div className="mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div className="flex-1">
-            <h1
-              className="text-3xl md:text-4xl font-bold text-gray-900 mb-2 leading-tight"
-              style={{ color: primaryColor }}
-            >
-              {companyName}
-            </h1>
-            <p className="text-gray-600 text-lg">
-              Welcome back,{" "}
-              <span className="font-semibold text-gray-800">
-                {user.name || user.email}
-              </span>
-              ! 👋
-            </p>
+            <div className="flex items-center gap-4 mb-3">
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
+                style={{
+                  background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                }}
+              >
+                <span className="text-white font-bold text-lg">✨</span>
+              </div>
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold mb-1 leading-tight brand-gradient-text">
+                  {companyName}
+                </h1>
+                <p className="text-purple-300 text-sm">
+                  Welcome back,{" "}
+                  <span className="font-semibold text-white">
+                    {user.name || user.email}
+                  </span>
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setShowBrandModal(true)}
-              className="px-4 py-2.5 border border-gray-300 rounded-xl hover:bg-white transition-all duration-200 font-medium flex items-center gap-2 text-sm"
-              style={{ borderColor: primaryColor, color: primaryColor }}
-            >
-              <span>🎨</span>
-              Brand Settings
-            </button>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2.5 border border-gray-300 bg-white rounded-xl hover:bg-gray-50 transition-all duration-200 font-medium text-gray-700 text-sm"
-            >
-              Logout
-            </button>
+
+          {/* Premium Stats & Actions Bar */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            {/* Credits Display - Compact & Elegant */}
+            <div className="bg-gray-800/60 backdrop-blur-lg rounded-2xl px-4 py-3 border border-purple-500/20">
+              <div className="flex items-center gap-4">
+                {!creditsLoading ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
+                      <span className="text-white text-sm font-medium">
+                        Credits:
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {[
+                        {
+                          key: "video" as MediaType,
+                          icon: "🎬",
+                          color: "bg-pink-500",
+                        },
+                        {
+                          key: "image" as MediaType,
+                          icon: "🖼️",
+                          color: "bg-blue-500",
+                        },
+                        {
+                          key: "carousel" as MediaType,
+                          icon: "📱",
+                          color: "bg-green-500",
+                        },
+                      ].map((credit) => (
+                        <div
+                          key={credit.key}
+                          className="flex items-center gap-1.5"
+                        >
+                          <span className="text-sm">{credit.icon}</span>
+                          <span
+                            className={`text-xs font-semibold ${
+                              userCredits[credit.key] > 0
+                                ? "text-white"
+                                : "text-gray-400"
+                            }`}
+                          >
+                            {userCredits[credit.key]}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <LoadingSpinner size="sm" variant="neon" />
+                    <span className="text-purple-300 text-sm">
+                      Loading credits...
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowBrandModal(true)}
+                className="px-4 py-2.5 bg-gray-800/60 backdrop-blur-lg border border-cyan-400/30 rounded-xl hover:bg-cyan-400/10 transition-all duration-200 font-medium flex items-center gap-2 text-sm text-cyan-400 hover:scale-105"
+              >
+                <span>🎨</span>
+                Brand
+              </button>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2.5 bg-gray-800/60 backdrop-blur-lg border border-purple-400/30 rounded-xl hover:bg-purple-400/10 transition-all duration-200 font-medium text-purple-300 text-sm hover:scale-105"
+              >
+                Logout
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* ROI Metrics Dashboard */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        {/* ROI Metrics - Compact & Visual */}
+        <div className="grid grid-cols-3 gap-3 mb-8">
           {[
             {
-              label: "Content Created",
+              label: "Content",
               value: roiMetrics.postsCreated,
-              subtitle: "Posts Generated",
+              subtitle: "Posts",
               icon: "📝",
+              gradient: "from-blue-500 to-cyan-500",
             },
             {
               label: "Time Saved",
               value: `${Math.floor(roiMetrics.timeSaved / 60)}h`,
-              subtitle: "Estimated",
+              subtitle: "Efficiency",
               icon: "⏱️",
+              gradient: "from-purple-500 to-pink-500",
             },
             {
-              label: "Media Generated",
+              label: "Media",
               value: roiMetrics.mediaGenerated,
-              subtitle: "Videos & Images",
+              subtitle: "Generated",
               icon: "🎬",
+              gradient: "from-green-500 to-emerald-500",
             },
           ].map((metric, index) => (
             <div
               key={index}
-              className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200"
+              className="bg-gray-800/40 backdrop-blur-sm rounded-xl p-4 border border-white/5 hover:border-white/10 transition-all duration-300 group"
             >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-2xl">{metric.icon}</span>
-                {roiLoading && <LoadingSpinner size="sm" />}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-purple-300 font-medium mb-1">
+                    {metric.label}
+                  </p>
+                  <p
+                    className={`text-2xl font-bold bg-gradient-to-r ${metric.gradient} bg-clip-text text-transparent`}
+                  >
+                    {metric.value}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {metric.subtitle}
+                  </p>
+                </div>
+                <div className="text-2xl opacity-80 group-hover:scale-110 transition-transform">
+                  {metric.icon}
+                </div>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                {metric.label}
-              </h3>
-              <p
-                className="text-3xl font-bold mb-1"
-                style={{ color: primaryColor }}
-              >
-                {metric.value}
-              </p>
-              <p className="text-sm text-gray-500">{metric.subtitle}</p>
             </div>
           ))}
         </div>
 
-        {/* Demo Credits */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">
-              Your Demo Credits
-            </h2>
-            <div className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-medium">
-              {Object.values(userCredits).reduce((a, b) => a + b, 0)} remaining
-            </div>
-          </div>
-          {creditsLoading ? (
-            <div className="flex items-center gap-3 text-gray-600 bg-white rounded-2xl p-4">
-              <LoadingSpinner size="sm" />
-              <span>Loading your credits...</span>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {[
-                {
-                  key: "sora",
-                  label: "Sora Video",
-                  icon: "🎬",
-                  description: "15-second AI video",
-                },
-                {
-                  key: "gemini",
-                  label: "Gemini Image",
-                  icon: "🖼️",
-                  description: "AI-generated image",
-                },
-                {
-                  key: "bannerbear",
-                  label: "Bannerbear Carousel",
-                  icon: "🎪",
-                  description: "4-slide carousel",
-                },
-              ].map((credit) => (
-                <div
-                  key={credit.key}
-                  className="bg-white rounded-xl p-4 border-2 transition-all duration-200 hover:scale-105"
-                  style={{
-                    borderColor:
-                      userCredits[credit.key as keyof typeof userCredits] > 0
-                        ? primaryColor
-                        : "#E5E7EB",
-                    opacity:
-                      userCredits[credit.key as keyof typeof userCredits] > 0
-                        ? 1
-                        : 0.6,
-                  }}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xl">{credit.icon}</span>
-                    <span
-                      className={`text-sm font-semibold px-2 py-1 rounded-full ${
-                        userCredits[credit.key as keyof typeof userCredits] > 0
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-800"
+        {/* Main Content Generation Engine - Premium Focus */}
+        <div className="grid lg:grid-cols-3 gap-8 mb-8">
+          {/* Generation Panel - Takes 2/3 space */}
+          <div className="lg:col-span-2">
+            <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-8 shadow-2xl">
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-8">
+                <div className="w-3 h-8 rounded-full gradient-brand"></div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">
+                    Create Magic
+                  </h2>
+                  <p className="text-purple-300 text-sm">
+                    Transform your ideas into stunning content
+                  </p>
+                </div>
+              </div>
+
+              {/* Media Type Selection - Premium Toggle */}
+              <div className="mb-8">
+                <label className="block text-sm font-semibold text-white mb-4">
+                  🎬 Select Content Type
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    {
+                      type: "video" as MediaType,
+                      label: "Sora Video",
+                      icon: "🎬",
+                      description: "AI video generation",
+                      gradient: "from-pink-500 to-rose-500",
+                    },
+                    {
+                      type: "image" as MediaType,
+                      label: "Gemini Image",
+                      icon: "🖼️",
+                      description: "AI image generation",
+                      gradient: "from-blue-500 to-cyan-500",
+                    },
+                    {
+                      type: "carousel" as MediaType,
+                      label: "AI Carousel",
+                      icon: "📱",
+                      description: "Multi-image posts",
+                      gradient: "from-green-500 to-emerald-500",
+                    },
+                  ].map(({ type, label, icon, gradient }) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setSelectedMediaType(type)}
+                      disabled={userCredits[type] <= 0}
+                      className={`p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
+                        selectedMediaType === type
+                          ? `border-white/20 bg-gradient-to-br ${gradient} shadow-2xl scale-105`
+                          : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
+                      } ${
+                        userCredits[type] <= 0
+                          ? "opacity-40 cursor-not-allowed grayscale"
+                          : ""
                       }`}
                     >
-                      {userCredits[credit.key as keyof typeof userCredits]} left
-                    </span>
-                  </div>
-                  <h3 className="font-medium text-gray-900 text-sm mb-1">
-                    {credit.label}
-                  </h3>
-                  <p className="text-xs text-gray-500">{credit.description}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Prompt Form with Media Type Selection */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div
-              className="w-2 h-6 rounded-full"
-              style={{ backgroundColor: primaryColor }}
-            ></div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              Create New Content
-            </h2>
-          </div>
-
-          {/* Media Type Selection */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              🎬 Select Media Type
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {[
-                {
-                  type: "video" as const,
-                  label: "Sora Video",
-                  icon: "🎬",
-                  description: "15-second AI video",
-                },
-                {
-                  type: "image" as const,
-                  label: "Gemini Image",
-                  icon: "🖼️",
-                  description: "AI-generated image",
-                },
-                {
-                  type: "carousel" as const,
-                  label: "Bannerbear Carousel",
-                  icon: "🎪",
-                  description: "4-slide carousel",
-                },
-              ].map(({ type, label, icon, description }) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setSelectedMediaType(type)}
-                  className={`p-4 rounded-xl border-2 transition-all duration-200 text-left ${
-                    selectedMediaType === type
-                      ? "border-blue-500 bg-blue-50 shadow-sm"
-                      : "border-gray-200 bg-white hover:border-gray-300"
-                  }`}
-                  style={{
-                    borderColor:
-                      selectedMediaType === type ? primaryColor : undefined,
-                  }}
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-2xl">{icon}</span>
-                    <div className="flex-1">
-                      <div className="font-semibold text-gray-900 text-sm">
-                        {label}
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl group-hover:scale-110 transition-transform">
+                          {icon}
+                        </span>
+                        <div className="flex-1">
+                          <div
+                            className={`font-semibold text-sm ${
+                              selectedMediaType === type
+                                ? "text-white"
+                                : "text-white"
+                            }`}
+                          >
+                            {label}
+                          </div>
+                          <div
+                            className={`text-xs ${
+                              selectedMediaType === type
+                                ? "text-white/80"
+                                : "text-purple-300"
+                            }`}
+                          >
+                            {userCredits[type]} credits
+                          </div>
+                        </div>
+                        {selectedMediaType === type && (
+                          <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                        )}
                       </div>
-                      <div className="text-xs text-gray-500">{description}</div>
-                    </div>
-                    {selectedMediaType === type && (
-                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                <span className="flex items-center gap-2">
-                  💡 Your Creative Prompt
-                  <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-                    Required
-                  </span>
-                </span>
-              </label>
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder={`Describe your ${selectedMediaType}... e.g., "A happy couple on vacation at sunset" or "Tech team collaborating in modern office"`}
-                className="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none"
-                rows={4}
-              />
-              <p className="text-xs text-gray-500 mt-2">
-                Be specific! The AI will create a detailed script optimized for{" "}
-                {selectedMediaType} creation.
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={generateMutation.isPending || !prompt.trim()}
-              className="w-full text-white py-4 px-6 rounded-xl hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-semibold text-lg flex items-center justify-center gap-3"
-              style={{
-                backgroundColor: primaryColor,
-                transform:
-                  generateMutation.isPending || !prompt.trim()
-                    ? "none"
-                    : "translateY(-2px)",
-              }}
-            >
-              {generateMutation.isPending ? (
-                <>
-                  <LoadingSpinner size="sm" />
-                  <span>Generating {selectedMediaType} Script...</span>
-                </>
-              ) : (
-                <>
-                  <span>✨</span>
-                  <span>
-                    Generate{" "}
-                    {selectedMediaType.charAt(0).toUpperCase() +
-                      selectedMediaType.slice(1)}{" "}
-                    Script
-                  </span>
-                </>
-              )}
-            </button>
-          </form>
-        </div>
-
-        {/* Generate Script Error */}
-        {generateMutation.isError && (
-          <ErrorAlert
-            message={generateMutation.error.message}
-            onRetry={() =>
-              generateMutation.mutate({ prompt, mediaType: selectedMediaType })
-            }
-            type="error"
-          />
-        )}
-
-        {/* Generated Script */}
-        {result && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8 animate-fade-in">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-                <span>🎭</span>
-                Generated{" "}
-                {result.mediaType?.charAt(0).toUpperCase() +
-                  result.mediaType?.slice(1)}{" "}
-                Script
-              </h2>
-              <div className="bg-green-100 text-green-800 text-sm px-3 py-1 rounded-full font-medium">
-                Ready to Save
-              </div>
-            </div>
-
-            <div className="space-y-6 mb-6">
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-                  <span>📝</span>
-                  Caption Lines
-                </h3>
-                <div className="space-y-3">
-                  {result.caption.map((line: string, i: number) => (
-                    <div
-                      key={i}
-                      className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200"
-                    >
-                      <span className="text-xs bg-white border border-gray-300 rounded px-2 py-1 font-mono text-gray-600 mt-1 flex-shrink-0">
-                        {i + 1}
-                      </span>
-                      <p className="text-gray-800 leading-relaxed">{line}</p>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
 
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                  <span>🎯</span>
-                  Call-to-Action
-                </h3>
-                <div
-                  className="p-4 rounded-lg border-2 font-medium"
-                  style={{
-                    backgroundColor: `${primaryColor}10`,
-                    borderColor: primaryColor,
-                    color: primaryColor,
-                  }}
-                >
-                  {result.cta}
-                </div>
-              </div>
-
-              {result.imageReference && (
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Prompt Input - Premium Styling */}
                 <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                    <span>🎨</span>
-                    AI Visual Reference
-                  </h3>
-                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <p className="text-sm text-blue-800 leading-relaxed">
-                      {result.imageReference}
-                    </p>
-                    <p className="text-xs text-blue-600 mt-2">
-                      This detailed description will be used to generate your{" "}
-                      {result.mediaType} with AI.
-                    </p>
+                  <label className="block text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>
+                    💡 Your Creative Vision
+                  </label>
+                  <textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder={`Describe your ${selectedMediaType} vision...\nExample: "A futuristic cityscape at dusk with flying vehicles and neon-lit skyscrapers"`}
+                    className="w-full p-5 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all duration-300 resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-lg leading-relaxed"
+                    rows={4}
+                  />
+                </div>
+
+                {/* Video Duration - Premium Toggle */}
+                {selectedMediaType === "video" && (
+                  <div className="space-y-3">
+                    <label className="block text-sm font-semibold text-white">
+                      ⏱️ Video Duration
+                    </label>
+                    <div className="flex gap-2">
+                      {[4, 8, 12].map((sec) => (
+                        <button
+                          key={sec}
+                          type="button"
+                          onClick={() => setVideoDuration(sec as 4 | 8 | 12)}
+                          className={`px-5 py-3 rounded-xl border text-sm font-semibold transition-all duration-300 ${
+                            videoDuration === sec
+                              ? "bg-cyan-500 border-cyan-500 text-white shadow-lg shadow-cyan-500/25"
+                              : "bg-gray-800/50 border-white/10 text-purple-200 hover:border-cyan-400/50 hover:bg-cyan-400/10"
+                          }`}
+                        >
+                          {sec} seconds
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Reference Image Upload - Premium Styling */}
+                <div className="space-y-3">
+                  <label className="block text-sm font-semibold text-white">
+                    🎨 Reference Image (Optional)
+                  </label>
+                  <div className="flex gap-4 items-start">
+                    <div className="flex-1">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-gradient-to-r file:from-cyan-500 file:to-blue-500 file:text-white hover:file:from-cyan-600 hover:file:to-blue-600 transition-all duration-300 backdrop-blur-sm"
+                      />
+                    </div>
+                    {referenceImageUrl && (
+                      <div className="w-24 h-24 rounded-xl overflow-hidden border-2 border-cyan-400/30 shadow-lg">
+                        <img
+                          src={referenceImageUrl}
+                          alt="Reference"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
-            </div>
 
-            <button
-              onClick={handleSave}
-              disabled={saveMutation.isPending}
-              className="w-full bg-green-600 text-white py-4 px-6 rounded-xl hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200 font-semibold text-lg flex items-center justify-center gap-3"
-            >
-              {saveMutation.isPending ? (
-                <>
-                  <LoadingSpinner size="sm" />
-                  <span>Saving Post...</span>
-                </>
-              ) : (
-                <>
-                  <span>💾</span>
-                  <span>Save as Post</span>
-                </>
-              )}
-            </button>
-          </div>
-        )}
+                {/* Generate Button - Premium CTA */}
+                <button
+                  type="submit"
+                  disabled={
+                    generateMediaMutation.isPending ||
+                    !prompt.trim() ||
+                    userCredits[selectedMediaType] <= 0
+                  }
+                  className="w-full gradient-brand text-white py-5 px-8 rounded-2xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-bold text-lg flex items-center justify-center gap-3 group relative overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
 
-        {/* Save Post Error */}
-        {saveMutation.isError && (
-          <ErrorAlert
-            message={saveMutation.error.message}
-            onRetry={handleSave}
-            type="error"
-          />
-        )}
+                  {generateMediaMutation.isPending ? (
+                    <>
+                      <LoadingSpinner size="sm" variant="light" />
+                      <span>Starting {selectedMediaType} generation...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="group-hover:scale-110 transition-transform text-xl">
+                        ✨
+                      </span>
+                      <span>
+                        Generate{" "}
+                        {selectedMediaType.charAt(0).toUpperCase() +
+                          selectedMediaType.slice(1)}
+                      </span>
+                    </>
+                  )}
+                </button>
+              </form>
 
-        {/* Generate Media Error */}
-        {generateMediaMutation.isError && (
-          <ErrorAlert
-            message={generateMediaMutation.error.message}
-            type="error"
-          />
-        )}
+              {/* AI Production Studio */}
+              <ProductionStudio
+                mediaType={selectedMediaType}
+                prompt={prompt}
+                isGenerating={isProductionActive}
+              />
 
-        {/* Publish Post Error */}
-        {publishMutation.isError && (
-          <ErrorAlert message={publishMutation.error.message} type="error" />
-        )}
+              {/* Generation Status */}
+              {generationState.status === "generating" &&
+                generationState.result && (
+                  <div className="mt-6 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-2xl border border-cyan-400/20 p-6 backdrop-blur-sm">
+                    <h3 className="text-lg font-semibold text-cyan-400 mb-2 flex items-center gap-2">
+                      <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
+                      We&apos;re creating your masterpiece...
+                    </h3>
+                    <p className="text-purple-200 text-sm">
+                      Your content is being generated. It will appear in your
+                      library automatically when ready.
+                    </p>
+                  </div>
+                )}
 
-        {/* Saved Posts Section */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-              <span>📚</span>
-              Your Content Library
-            </h2>
-            {postsLoading && (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <LoadingSpinner size="sm" />
-                <span>Loading posts...</span>
-              </div>
-            )}
-          </div>
-
-          {postsError ? (
-            <ErrorAlert
-              message="Failed to load your content"
-              onRetry={handleRetryPosts}
-              type="error"
-            />
-          ) : posts.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">📝</div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                No content yet
-              </h3>
-              <p className="text-gray-600 max-w-md mx-auto">
-                Start by generating your first AI script above. Your created
-                posts will appear here ready for media generation.
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-6">
-              {posts.map((post: any) => (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                  onGenerateMedia={generateMedia}
-                  onPublishPost={publishPost}
-                  generatingMedia={generatingMedia}
-                  publishingPost={publishingPost}
-                  userCredits={userCredits}
-                  primaryColor={primaryColor}
+              {/* Generation Error */}
+              {generationState.status === "error" && (
+                <ErrorAlert
+                  message={generationState.error || "Generation failed"}
+                  onRetry={() => {
+                    if (!prompt.trim()) return;
+                    const formData = buildFormData();
+                    generateMediaMutation.mutate(formData);
+                  }}
+                  type="error"
                 />
-              ))}
+              )}
             </div>
-          )}
+          </div>
+
+          {/* Content Library Sidebar - Takes 1/3 space */}
+          <div className="lg:col-span-1">
+            <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-6 shadow-2xl sticky top-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <span>📚</span>
+                  Your Library
+                </h2>
+                {postsLoading && (
+                  <div className="flex items-center gap-2 text-sm text-purple-300">
+                    <LoadingSpinner size="sm" variant="neon" />
+                  </div>
+                )}
+              </div>
+
+              {postsError ? (
+                <div className="text-center py-8">
+                  <ErrorAlert
+                    message="Failed to load your content"
+                    onRetry={handleRetryPosts}
+                    type="error"
+                  />
+                  <button
+                    onClick={() => {
+                      console.log("Current posts error:", postsError);
+                      handleRetryPosts();
+                    }}
+                    className="mt-4 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600"
+                  >
+                    Debug: Retry & Log
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-[600px] overflow-y-auto">
+                  {posts.map((post: any) => (
+                    <PostCard
+                      key={post.id}
+                      post={post}
+                      onPublishPost={publishMutation.mutate}
+                      publishingPost={publishingPost}
+                      userCredits={userCredits} // Add this
+                      primaryColor={primaryColor} // Add this
+                      compact={true}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Brand Config Modal */}

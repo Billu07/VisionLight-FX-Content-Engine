@@ -1,0 +1,48 @@
+/* Brand System - Dynamically Updated */
+:root {
+  --primary-brand: #6366f1;
+  --secondary-brand: #8b5cf6;
+}
+
+.brand-gradient-text {
+  background: linear-gradient(
+    135deg,
+    var(--primary-brand),
+    var(--secondary-brand)
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.brand-gradient-bg {
+  background: linear-gradient(
+    135deg,
+    var(--primary-brand),
+    var(--secondary-brand)
+  );
+}
+
+.brand-primary-bg {
+  background-color: var(--primary-brand);
+}
+
+.brand-secondary-bg {
+  background-color: var(--secondary-brand);
+}
+
+.brand-primary-text {
+  color: var(--primary-brand);
+}
+
+.brand-secondary-text {
+  color: var(--secondary-brand);
+}
+
+.brand-primary-border {
+  border-color: var(--primary-brand);
+}
+
+.brand-secondary-border {
+  border-color: var(--secondary-brand);
+}

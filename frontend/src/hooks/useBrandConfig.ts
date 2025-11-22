@@ -16,6 +16,7 @@ export const useBrandConfig = () => {
       const response = await apiEndpoints.getBrandConfig();
       return response.data.config;
     },
+    staleTime: 0, // Always consider stale
   });
 };
 
@@ -28,7 +29,17 @@ export const useUpdateBrandConfig = () => {
       return response.data;
     },
     onSuccess: () => {
+      // Aggressive cache invalidation
       queryClient.invalidateQueries({ queryKey: ["brand-config"] });
+      queryClient.removeQueries({ queryKey: ["brand-config"] });
+
+      // Force refetch
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ["brand-config"] });
+      }, 100);
+    },
+    onError: (error) => {
+      console.error("Failed to update brand config:", error);
     },
   });
 };

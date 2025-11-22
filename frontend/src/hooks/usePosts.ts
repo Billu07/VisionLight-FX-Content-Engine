@@ -14,8 +14,8 @@ export const usePosts = () => {
 
 export const useGenerateScript = () => {
   return useMutation({
-    mutationFn: async (prompt: string) => {
-      const response = await apiEndpoints.generateScript(prompt);
+    mutationFn: async (data: { prompt: string; mediaType: string }) => {
+      const response = await apiEndpoints.generateScript(data);
       return response.data;
     },
   });
@@ -27,7 +27,8 @@ export const useCreatePost = () => {
   return useMutation({
     mutationFn: async (data: {
       prompt: string;
-      script: any;
+      mediaType: string; // Add this required field
+      script?: any; // Make script optional
       platform?: string;
     }) => {
       const response = await apiEndpoints.createPost(data);

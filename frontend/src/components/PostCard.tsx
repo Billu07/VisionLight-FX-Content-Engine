@@ -3,218 +3,369 @@ import { LoadingSpinner } from "./LoadingSpinner";
 
 interface PostCardProps {
   post: any;
-  onGenerateMedia: (postId: string, provider: string) => void;
-  generatingMedia: Record<string, string>;
-  userCredits: { sora: number; gemini: number; bannerbear: number };
+  // Just change this line - keep everything else exactly as you have it
+  onPublishPost: (variables: { postId: string; platform?: string }) => void;
+  publishingPost: string | null;
+  userCredits: any;
   primaryColor: string;
+  compact?: boolean;
 }
 
-export const PostCard = ({
+export function PostCard({
   post,
-  onGenerateMedia,
-  generatingMedia,
-  userCredits,
-  primaryColor,
-}: PostCardProps) => {
-  const [showTooltip, setShowTooltip] = useState<string | null>(null);
-  const isGenerating = generatingMedia[post.id];
+  onPublishPost,
+  publishingPost,
+  compact = false,
+}: PostCardProps) {
+  const [mediaError, setMediaError] = useState(false);
+  const [videoLoading, setVideoLoading] = useState(true);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "READY":
-        return "text-green-600 bg-green-100";
-      case "PROCESSING":
-        return "text-blue-600 bg-blue-100";
-      case "FAILED":
-        return "text-red-600 bg-red-100";
-      default:
-        return "text-gray-600 bg-gray-100";
-    }
+  const handleMediaError = () => {
+    console.error("❌ Failed to load media:", post.mediaUrl);
+    setMediaError(true);
   };
 
-  const getMediaTypeIcon = (type: string) => {
-    switch (type) {
-      case "VIDEO":
-        return "🎬";
-      case "IMAGE":
-        return "🖼️";
-      case "CAROUSEL":
-        return "🎪";
-      default:
-        return "📄";
-    }
+  const handleVideoLoad = () => {
+    setVideoLoading(false);
   };
 
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-all duration-200">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-            <span className="font-medium text-gray-700">Prompt:</span>{" "}
-            {post.prompt}
-          </p>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span
-              className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                post.status
-              )}`}
-            >
-              {post.status}
-            </span>
-            {post.mediaType && (
-              <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium flex items-center gap-1">
-                {getMediaTypeIcon(post.mediaType)}{" "}
-                {post.mediaType.toLowerCase()}
-              </span>
-            )}
-            <span className="text-xs text-gray-500">
-              {new Date(post.createdAt).toLocaleDateString()}
-            </span>
-          </div>
-        </div>
-      </div>
+  const handleVideoError = () => {
+    console.error("❌ Video failed to load:", post.mediaUrl);
+    setVideoLoading(false);
+    setMediaError(true);
+  };
 
-      {/* Script Content */}
-      <div className="mb-4">
-        <div className="space-y-2 mb-3">
-          {post.script.caption.map((line: string, i: number) => (
-            <p
-              key={i}
-              className="text-sm text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-200"
-            >
-              {line}
-            </p>
-          ))}
-        </div>
-        <p className="text-xs font-medium text-blue-600 bg-blue-50 p-2 rounded-lg">
-          <span className="font-semibold">CTA:</span> {post.script.cta}
-        </p>
-      </div>
+  const renderMedia = () => {
+    console.log("🎬 Rendering media for post:", {
+      id: post.id,
+      mediaUrl: post.mediaUrl,
+      status: post.status,
+      mediaType: post.mediaType,
+      mediaProvider: post.mediaProvider,
+    });
 
-      {/* Media Preview or Generation Buttons */}
-      {post.mediaUrl ? (
-        <div className="mt-4">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-sm font-medium text-gray-700">
-              Generated Media:
-            </span>
-            <span className="text-lg">{getMediaTypeIcon(post.mediaType)}</span>
-          </div>
-          {post.mediaType === "VIDEO" ? (
-            <video
-              src={post.mediaUrl}
-              controls
-              className="w-full rounded-lg shadow-sm max-h-64 object-cover"
-            />
-          ) : post.mediaType === "CAROUSEL" ? (
+    if (!post.mediaUrl) {
+      if (post.status === "PROCESSING") {
+        return (
+          <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl flex items-center justify-center border border-cyan-400/20">
             <div className="text-center">
-              <img
-                src={post.mediaUrl}
-                alt="Carousel"
-                className="max-h-64 mx-auto rounded-lg border-2 border-gray-300"
-              />
-              <p className="text-xs text-gray-500 mt-2">
-                4-slide carousel template
+              <LoadingSpinner size="md" variant="neon" />
+              <p className="text-cyan-400 text-sm mt-3 font-medium">
+                Creating your masterpiece...
+              </p>
+              <p className="text-purple-300 text-xs mt-1">
+                This usually takes 1-2 minutes
               </p>
             </div>
-          ) : (
-            <img
-              src={post.mediaUrl}
-              alt="Generated"
-              className="w-full max-h-64 object-cover rounded-lg border-2 border-gray-300"
-            />
-          )}
+          </div>
+        );
+      }
+
+      return (
+        <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl flex items-center justify-center border border-white/10">
+          <div className="text-center">
+            <div className="text-4xl mb-3 opacity-60">🎬</div>
+            <p className="text-purple-300 text-sm">Ready for generation</p>
+          </div>
         </div>
-      ) : (
-        <div className="mt-4">
-          <p className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-            <span>🎨</span>
-            Generate Media for this Post
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            {[
-              {
-                provider: "sora",
-                label: "Sora Video",
-                icon: "🎬",
-                description: "15-sec animated video",
-              },
-              {
-                provider: "gemini",
-                label: "Gemini Image",
-                icon: "🖼️",
-                description: "High-quality image",
-              },
-              {
-                provider: "bannerbear",
-                label: "Bannerbear",
-                icon: "🎪",
-                description: "4-slide carousel",
-              },
-            ].map(({ provider, label, icon, description }) => {
-              const hasCredits =
-                userCredits[provider as keyof typeof userCredits] > 0;
-              const isCurrentlyGenerating = isGenerating === provider;
+      );
+    }
 
-              return (
-                <div
-                  key={provider}
-                  className="relative"
-                  onMouseEnter={() => setShowTooltip(provider)}
-                  onMouseLeave={() => setShowTooltip(null)}
-                >
-                  <button
-                    onClick={() => onGenerateMedia(post.id, provider)}
-                    disabled={!!isGenerating || !hasCredits}
-                    className={`w-full py-3 px-4 rounded-xl text-sm font-medium transition-all duration-200 flex flex-col items-center gap-2 ${
-                      !hasCredits
-                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                        : isCurrentlyGenerating
-                        ? "bg-blue-100 text-blue-700 border-2 border-blue-300"
-                        : "bg-white text-gray-700 border-2 border-gray-300 hover:border-blue-500 hover:shadow-md"
-                    }`}
-                    style={{
-                      borderColor:
-                        hasCredits && !isCurrentlyGenerating
-                          ? primaryColor
-                          : undefined,
-                    }}
-                  >
-                    <span className="text-lg">{icon}</span>
-                    <span>{label}</span>
-                    {isCurrentlyGenerating && (
-                      <LoadingSpinner size="sm" color="blue" />
-                    )}
-                  </button>
+    if (mediaError) {
+      return (
+        <div className="aspect-video bg-gradient-to-br from-red-900/20 to-red-800/20 rounded-xl flex items-center justify-center border border-red-400/30">
+          <div className="text-center">
+            <div className="text-4xl mb-3">❌</div>
+            <p className="text-red-400 text-sm mb-2">Failed to load media</p>
+            <button
+              onClick={() => {
+                setMediaError(false);
+                setVideoLoading(true);
+              }}
+              className="px-3 py-1 bg-red-500/20 text-red-400 text-xs rounded-lg border border-red-400/30 hover:bg-red-500/30 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      );
+    }
 
-                  {/* Tooltip */}
-                  {showTooltip === provider && (
-                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-10">
-                      {description}
-                      {!hasCredits && " - No credits left"}
-                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+    // Determine media type - FIXED LOGIC
+    const isVideo = post.mediaType === "VIDEO" || post.mediaProvider === "sora";
+    const isImage =
+      post.mediaType === "IMAGE" || post.mediaProvider === "gemini";
+    const isCarousel = post.mediaType === "CAROUSEL";
+
+    console.log("📊 Media type detection:", {
+      isVideo,
+      isImage,
+      isCarousel,
+      mediaType: post.mediaType,
+      provider: post.mediaProvider,
+    });
+
+    if (isVideo) {
+      return (
+        <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-cyan-400/30">
+          {videoLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+              <LoadingSpinner size="md" variant="neon" />
+              <span className="ml-3 text-cyan-400 text-sm">
+                Loading video...
+              </span>
+            </div>
+          )}
+          <video
+            controls
+            className="w-full h-full object-contain"
+            onLoadedData={handleVideoLoad}
+            onError={handleVideoError}
+            preload="metadata"
+            playsInline
+          >
+            <source src={post.mediaUrl} type="video/mp4" />
+            <source src={post.mediaUrl} type="video/webm" />
+            Your browser does not support the video tag.
+          </video>
+        </div>
+      );
+    }
+
+    if (isImage || isCarousel) {
+      return (
+        <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl overflow-hidden border border-white/10">
+          <img
+            src={post.mediaUrl}
+            alt="Generated content"
+            className="w-full h-full object-cover"
+            onError={handleMediaError}
+            loading="lazy"
+          />
+        </div>
+      );
+    }
+
+    // Fallback for unknown types
+    return (
+      <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl flex items-center justify-center border border-white/10">
+        <div className="text-center">
+          <div className="text-4xl mb-3 opacity-60">📁</div>
+          <p className="text-purple-300 text-sm mb-2">Media preview</p>
+          <a
+            href={post.mediaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-cyan-400 text-sm hover:underline block"
+          >
+            Open link
+          </a>
+        </div>
+      </div>
+    );
+  };
+
+  const getStatusInfo = () => {
+    switch (post.status) {
+      case "PROCESSING":
+        return {
+          color: "bg-yellow-500/20 text-yellow-400 border-yellow-400/30",
+          text: "Processing",
+        };
+      case "READY":
+        return {
+          color: "bg-green-500/20 text-green-400 border-green-400/30",
+          text: "Ready",
+        };
+      case "FAILED":
+        return {
+          color: "bg-red-500/20 text-red-400 border-red-400/30",
+          text: "Failed",
+        };
+      default:
+        return {
+          color: "bg-gray-500/20 text-gray-400 border-gray-400/30",
+          text: "Draft",
+        };
+    }
+  };
+
+  const getProviderInfo = () => {
+    const provider = post.mediaProvider;
+    const mediaType = post.mediaType;
+
+    if (mediaType === "VIDEO" || provider === "sora") {
+      return { name: "Sora Video", icon: "🎬", color: "text-pink-400" };
+    }
+    if (mediaType === "IMAGE" || provider === "gemini") {
+      return { name: "AI Image", icon: "🖼️", color: "text-blue-400" };
+    }
+    if (mediaType === "CAROUSEL") {
+      return { name: "AI Carousel", icon: "📱", color: "text-green-400" };
+    }
+    return { name: "Media", icon: "📁", color: "text-gray-400" };
+  };
+
+  const statusInfo = getStatusInfo();
+  const providerInfo = getProviderInfo();
+  const script = post.script;
+
+  if (compact) {
+    return (
+      <div className="bg-gray-800/40 backdrop-blur-sm rounded-xl border border-white/10 p-4 hover:border-white/20 transition-all duration-300">
+        {/* Media Preview */}
+        <div className="mb-3">{renderMedia()}</div>
+
+        {/* Post Info */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className={providerInfo.color}>{providerInfo.icon}</span>
+              <span className={`text-xs font-medium ${providerInfo.color}`}>
+                {providerInfo.name}
+              </span>
+            </div>
+            <span
+              className={`text-xs px-2 py-1 rounded-full border ${statusInfo.color}`}
+            >
+              {statusInfo.text}
+            </span>
           </div>
 
-          {/* Credit Status */}
-          <div className="mt-3 text-xs text-gray-500 text-center">
-            {Object.values(userCredits).every((v) => v === 0) ? (
-              <span className="text-orange-600 font-medium">
-                🎯 Demo credits exhausted. Upgrade to continue creating!
-              </span>
-            ) : (
-              <span>
-                Click any media type to generate content using your demo credits
-              </span>
+          {/* Prompt */}
+          <div>
+            <p className="text-white text-sm line-clamp-2 font-medium">
+              {post.prompt}
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2 pt-2">
+            {post.mediaUrl && post.status === "READY" && (
+              <>
+                <a
+                  href={post.mediaUrl}
+                  download
+                  className="flex-1 px-3 py-2 bg-cyan-500/20 text-cyan-400 text-xs rounded-lg border border-cyan-400/30 hover:bg-cyan-500/30 transition-colors flex items-center justify-center gap-1"
+                >
+                  <span>📥</span>
+                  <span>Save</span>
+                </a>
+
+                <button
+                  onClick={() =>
+                    onPublishPost({ postId: post.id, platform: "INSTAGRAM" })
+                  }
+                  disabled={publishingPost === post.id}
+                  className="flex-1 px-3 py-2 gradient-brand text-white text-xs rounded-lg hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-1"
+                >
+                  {publishingPost === post.id ? (
+                    <LoadingSpinner size="sm" variant="light" />
+                  ) : (
+                    <span>📤</span>
+                  )}
+                  <span>Post</span>
+                </button>
+              </>
             )}
           </div>
         </div>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-gray-800/40 backdrop-blur-sm rounded-xl border border-white/10 p-6 hover:border-white/20 transition-all duration-300">
+      {/* Media Preview */}
+      <div className="mb-4">{renderMedia()}</div>
+
+      {/* Post Info */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className={providerInfo.color}>{providerInfo.icon}</span>
+            <span className={`text-sm font-medium ${providerInfo.color}`}>
+              {providerInfo.name}
+            </span>
+            <span
+              className={`text-xs px-2 py-1 rounded-full border ${statusInfo.color}`}
+            >
+              {statusInfo.text}
+            </span>
+          </div>
+          <div className="text-xs text-purple-300">
+            {new Date(post.createdAt).toLocaleDateString()}
+          </div>
+        </div>
+
+        {/* Prompt */}
+        <div>
+          <p className="text-white text-sm leading-relaxed">{post.prompt}</p>
+        </div>
+
+        {/* Script Preview */}
+        {script && (
+          <div className="text-xs text-purple-300 space-y-2 p-3 bg-gray-700/30 rounded-lg border border-white/5">
+            <div className="font-medium text-cyan-400">
+              AI-Generated Script:
+            </div>
+            {script.caption && (
+              <div>
+                <div className="font-medium mb-1">Caption:</div>
+                <div className="space-y-1">
+                  {script.caption.map((line: string, index: number) => (
+                    <div key={index} className="text-white/80">
+                      • {line}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {script.cta && (
+              <div>
+                <div className="font-medium">Call to Action:</div>
+                <div className="text-green-400 font-medium">{script.cta}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex flex-wrap gap-2 pt-3">
+          {post.mediaUrl && post.status === "READY" && (
+            <>
+              <a
+                href={post.mediaUrl}
+                download
+                className="flex-1 min-w-[120px] px-4 py-2.5 bg-cyan-500/20 text-cyan-400 rounded-lg border border-cyan-400/30 hover:bg-cyan-500/30 transition-colors flex items-center justify-center gap-2"
+              >
+                <span>📥</span>
+                <span>Download</span>
+              </a>
+
+              <button
+                onClick={() =>
+                  onPublishPost({ postId: post.id, platform: "INSTAGRAM" })
+                }
+                disabled={publishingPost === post.id}
+                className="flex-1 min-w-[120px] px-4 py-2.5 gradient-brand text-white rounded-lg hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
+              >
+                {publishingPost === post.id ? (
+                  <>
+                    <LoadingSpinner size="sm" variant="light" />
+                    <span>Publishing...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>📤</span>
+                    <span>Publish to Instagram</span>
+                  </>
+                )}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
-};
+}

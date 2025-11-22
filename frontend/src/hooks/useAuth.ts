@@ -40,7 +40,7 @@ export const useAuth = create<AuthState>((set, get) => ({
       apiEndpoints.logout({ token }).catch(console.error);
     }
     localStorage.removeItem("visionlight_token");
-    set({ user: null, token: null });
+    set({ user: null, token: null, isLoading: false });
   },
 
   checkAuth: async () => {
@@ -55,8 +55,12 @@ export const useAuth = create<AuthState>((set, get) => ({
       const response = await apiEndpoints.getCurrentUser();
       set({ user: response.data.user, token, isLoading: false });
     } catch (error) {
+      console.error("Auth check failed:", error);
       localStorage.removeItem("visionlight_token");
       set({ user: null, token: null, isLoading: false });
     }
   },
 }));
+
+// Initialize auth check on hook creation
+useAuth.getState().checkAuth();

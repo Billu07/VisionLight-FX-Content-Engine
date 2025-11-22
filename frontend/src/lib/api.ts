@@ -1,10 +1,15 @@
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:4000/api";
+// Dynamic API base URL for production/development
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
+
+console.log("🔧 API Base URL:", API_BASE_URL);
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,
+  withCredentials: true,
 });
 
 // Add auth header to all requests
@@ -56,14 +61,28 @@ export const apiEndpoints = {
   generateScript: (data: { prompt: string; mediaType: string }) =>
     api.post("/generate-script", data),
 
-  // New endpoints
   publishPost: (data: { postId: string; platform?: string }) =>
     api.post("/publish-post", data),
 
-  createPost: (data: { prompt: string; script: any; platform?: string }) =>
-    api.post("/posts", data),
+  createPost: (data: {
+    prompt: string;
+    mediaType: string;
+    platform?: string;
+    generatedMedia?: any;
+  }) => api.post("/posts", data),
+
   generateMedia: (postId: string, provider: string) =>
     api.post("/generate-media", { postId, provider }),
+
+  // Direct media generation endpoint with file upload
+  generateMediaDirect: (formData: FormData) => {
+    return api.post("/generate-media", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
+
   getPosts: () => api.get("/posts"),
   getUserCredits: () => api.get("/user-credits"),
 

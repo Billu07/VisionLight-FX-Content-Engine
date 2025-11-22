@@ -1,32 +1,59 @@
-// backend/src/middleware/errorHandler.ts
 import { Request, Response, NextFunction } from "express";
 
-export class AppError extends Error {
-  constructor(
-    public statusCode: number,
-    public message: string,
-    public isOperational = true
-  ) {
-    super(message);
-  }
+export interface CustomError extends Error {
+  statusCode?: number;
+  details?: any;
 }
 
-export const errorHandler = (
-  err: Error,
+export function errorHandler(
+  error: CustomError,
   req: Request,
   res: Response,
   next: NextFunction
-) => {
-  if (err instanceof AppError) {
-    return res.status(err.statusCode).json({
-      success: false,
-      error: err.message,
-    });
+) {
+  console.error("🚨 Application Error:", {
+    message: error.message,
+    stack: error.stack,
+    url: req.url,
+    method: req.method,
+    timestamp: new Date().toISOString(),
+  });
+
+  // Default error
+  let statusCode = error.statusCode || 500;
+  let message = error.message || "Internal Server Error";
+  let details = error.details;
+
+  // Handle specific error types
+  if (
+    error.message.includes("API key") ||
+    error.message.includes("credentials")
+  ) {
+    statusCode = 401;
+    message = "Authentication failed - please check your API keys";
+  } else if (
+    error.message.includes("rate limit") ||
+    error.message.includes("quota")
+  ) {
+    statusCode = 429;
+    message = "Service limit exceeded - please try again later";
+  } else if (error.message.includes("timeout")) {
+    statusCode = 408;
+    message = "Request timeout - please try again";
+  } else if (error.message.includes("not found")) {
+    statusCode = 404;
   }
 
-  console.error("Unexpected Error:", err);
-  res.status(500).json({
+  res.status(statusCode).json({
     success: false,
-    error: "Internal server error",
+    error: message,
+    details: process.env.NODE_ENV === "development" ? details : undefined,
+    timestamp: new Date().toISOString(),
   });
-};
+}
+
+// Async error handler wrapper
+export const asyncHandler =
+  (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
