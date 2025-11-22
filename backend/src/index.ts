@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import multer from "multer";
 import axios from "axios";
@@ -24,12 +24,32 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const upload = multer({ storage: multer.memoryStorage() });
 
+// Enhanced CORS configuration
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "https://visionlight-fx.vercel.app",
+  "https://*.vercel.app",
+];
+
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        console.log("🔒 CORS blocked origin:", origin);
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
@@ -43,7 +63,16 @@ app.get("/", (req, res) => {
 });
 
 // ==================== AUTHENTICATION MIDDLEWARE ====================
-const authenticateToken = async (req: any, res: any, next: any) => {
+interface AuthenticatedRequest extends Request {
+  user?: any;
+  token?: string;
+}
+
+const authenticateToken = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
   const token = req.headers.authorization?.replace("Bearer ", "");
 
   if (!token) {
@@ -95,152 +124,183 @@ app.post("/api/auth/demo-login", async (req, res) => {
 });
 
 // Logout
-app.post("/api/auth/logout", authenticateToken, async (req, res) => {
-  try {
-    await AuthService.deleteSession(req.token);
-    res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+app.post(
+  "/api/auth/logout",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      await AuthService.deleteSession(req.token!);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   }
-});
+);
 
 // Validate session
-app.get("/api/auth/me", authenticateToken, async (req, res) => {
-  try {
-    const user = await airtableService.findUserByEmail(req.user.email);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
+app.get(
+  "/api/auth/me",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = await airtableService.findUserByEmail(req.user!.email);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
 
-    res.json({
-      success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-      },
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   }
-});
+);
 
 // ==================== PROTECTED ROUTES ====================
 
 // Get brand config
-app.get("/api/brand-config", authenticateToken, async (req, res) => {
-  try {
-    const config = await airtableService.getBrandConfig(req.user.id);
-    res.json({ success: true, config });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+app.get(
+  "/api/brand-config",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const config = await airtableService.getBrandConfig(req.user!.id);
+      res.json({ success: true, config });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   }
-});
+);
 
 // Update brand config
-app.put("/api/brand-config", authenticateToken, async (req, res) => {
-  const { companyName, primaryColor, secondaryColor, logoUrl } = req.body;
+app.put(
+  "/api/brand-config",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    const { companyName, primaryColor, secondaryColor, logoUrl } = req.body;
 
-  try {
-    const config = await airtableService.upsertBrandConfig({
-      userId: req.user.id,
-      companyName,
-      primaryColor,
-      secondaryColor,
-      logoUrl,
-    });
-    res.json({ success: true, config });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    try {
+      const config = await airtableService.upsertBrandConfig({
+        userId: req.user!.id,
+        companyName,
+        primaryColor,
+        secondaryColor,
+        logoUrl,
+      });
+      res.json({ success: true, config });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   }
-});
+);
 
 // Get ROI Metrics
-app.get("/api/roi-metrics", authenticateToken, async (req, res) => {
-  try {
-    const metrics = await ROIService.getMetrics(req.user.id);
-    res.json({ success: true, metrics });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+app.get(
+  "/api/roi-metrics",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const metrics = await ROIService.getMetrics(req.user!.id);
+      res.json({ success: true, metrics });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   }
-});
+);
 
 // ==================== POST & MEDIA GENERATION ROUTES ====================
 
 // Create Post
-app.post("/api/posts", authenticateToken, async (req, res) => {
-  const {
-    prompt,
-    mediaType = "IMAGE",
-    platform = "INSTAGRAM",
-    script,
-  } = req.body;
-
-  if (!prompt) {
-    return res.status(400).json({ error: "Prompt is required" });
-  }
-
-  try {
-    const post = await airtableService.createPost({
-      userId: req.user.id,
+app.post(
+  "/api/posts",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    const {
       prompt,
-      mediaType: mediaType.toUpperCase() as any,
-      platform,
+      mediaType = "IMAGE",
+      platform = "INSTAGRAM",
       script,
-    });
+    } = req.body;
 
-    await ROIService.incrementPostsCreated(req.user.id);
+    if (!prompt) {
+      return res.status(400).json({ error: "Prompt is required" });
+    }
 
-    res.json({ success: true, post });
-  } catch (error: any) {
-    console.error("Create post error:", error);
-    res.status(500).json({ error: "Failed to create post" });
+    try {
+      const post = await airtableService.createPost({
+        userId: req.user!.id,
+        prompt,
+        mediaType: mediaType.toUpperCase() as any,
+        platform,
+        script,
+      });
+
+      await ROIService.incrementPostsCreated(req.user!.id);
+
+      res.json({ success: true, post });
+    } catch (error: any) {
+      console.error("Create post error:", error);
+      res.status(500).json({ error: "Failed to create post" });
+    }
   }
-});
+);
 
 // Get user posts
-app.get("/api/posts", authenticateToken, async (req, res) => {
-  try {
-    const posts = await airtableService.getUserPosts(req.user.id);
-    res.json({ success: true, posts });
-  } catch (error: any) {
-    console.error("Fetch posts error:", error);
-    res.status(500).json({ error: "Failed to fetch posts" });
+app.get(
+  "/api/posts",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const posts = await airtableService.getUserPosts(req.user!.id);
+      res.json({ success: true, posts });
+    } catch (error: any) {
+      console.error("Fetch posts error:", error);
+      res.status(500).json({ error: "Failed to fetch posts" });
+    }
   }
-});
+);
 
 // Generate Script
-app.post("/api/generate-script", authenticateToken, async (req, res) => {
-  const { prompt, mediaType } = req.body;
+app.post(
+  "/api/generate-script",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    const { prompt, mediaType } = req.body;
 
-  if (!prompt?.trim()) {
-    return res.status(400).json({ error: "Prompt is required" });
+    if (!prompt?.trim()) {
+      return res.status(400).json({ error: "Prompt is required" });
+    }
+
+    if (!["video", "image", "carousel"].includes(mediaType)) {
+      return res.status(400).json({ error: "Valid mediaType is required" });
+    }
+
+    try {
+      const script = await generateScript({
+        prompt: prompt.trim(),
+        mediaType,
+      });
+
+      res.json({ success: true, script });
+    } catch (error: any) {
+      console.error("Script generation error:", error);
+      res.status(500).json({ error: error.message });
+    }
   }
+);
 
-  if (!["video", "image", "carousel"].includes(mediaType)) {
-    return res.status(400).json({ error: "Valid mediaType is required" });
-  }
-
-  try {
-    const script = await generateScript({
-      prompt: prompt.trim(),
-      mediaType,
-    });
-
-    res.json({ success: true, script });
-  } catch (error: any) {
-    console.error("Script generation error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Direct Media Generation (async fire-and-forget to n8n)
 // Direct Media Generation (async fire-and-forget to n8n)
 app.post(
   "/api/generate-media",
   authenticateToken,
   upload.single("referenceImage"),
-  async (req, res) => {
+  async (req: AuthenticatedRequest, res) => {
     try {
       const { prompt, mediaType, duration } = req.body;
       const referenceImageFile = req.file;
@@ -252,7 +312,7 @@ app.post(
       }
 
       // Check user credits
-      const user = await airtableService.findUserByEmail(req.user.email);
+      const user = await airtableService.findUserByEmail(req.user!.email);
       if (
         !user ||
         user.demoCredits[mediaType as keyof typeof user.demoCredits] <= 0
@@ -264,7 +324,7 @@ app.post(
 
       // Create post with PROCESSING status immediately
       const post = await airtableService.createPost({
-        userId: req.user.id,
+        userId: req.user!.id,
         prompt,
         mediaType: mediaType.toUpperCase() as any,
         platform: "INSTAGRAM",
@@ -278,7 +338,7 @@ app.post(
       // Deduct credit immediately
       const updatedCredits = { ...user.demoCredits };
       updatedCredits[mediaType as keyof typeof user.demoCredits] -= 1;
-      await airtableService.updateUserCredits(req.user.id, updatedCredits);
+      await airtableService.updateUserCredits(req.user!.id, updatedCredits);
 
       const webhookUrl =
         mediaType === "video"
@@ -300,7 +360,7 @@ app.post(
       formData.append("postId", post.id);
       formData.append("type", mediaType);
       formData.append("prompt", prompt);
-      formData.append("userId", req.user.id);
+      formData.append("userId", req.user!.id);
       formData.append(
         "hasReferenceImage",
         referenceImageFile ? "true" : "false"
@@ -353,34 +413,42 @@ app.post(
 );
 
 // Get user credits
-app.get("/api/user-credits", authenticateToken, async (req, res) => {
-  try {
-    const user = await airtableService.findUserByEmail(req.user.email);
+app.get(
+  "/api/user-credits",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = await airtableService.findUserByEmail(req.user!.email);
 
-    if (!user) {
-      return res.json({ credits: { video: 0, image: 0, carousel: 0 } });
+      if (!user) {
+        return res.json({ credits: { video: 0, image: 0, carousel: 0 } });
+      }
+
+      res.json({ credits: user.demoCredits });
+    } catch (error: any) {
+      console.error("Credits fetch error:", error);
+      res.status(500).json({ error: "Failed to fetch credits" });
     }
-
-    res.json({ credits: user.demoCredits });
-  } catch (error: any) {
-    console.error("Credits fetch error:", error);
-    res.status(500).json({ error: "Failed to fetch credits" });
   }
-});
+);
 
 // Reset demo credits
-app.post("/api/reset-demo-credits", authenticateToken, async (req, res) => {
-  try {
-    await airtableService.updateUserCredits(req.user.id, {
-      video: 2,
-      image: 2,
-      carousel: 2,
-    });
-    res.json({ success: true, message: "Demo credits reset" });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+app.post(
+  "/api/reset-demo-credits",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      await airtableService.updateUserCredits(req.user!.id, {
+        video: 2,
+        image: 2,
+        carousel: 2,
+      });
+      res.json({ success: true, message: "Demo credits reset" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   }
-});
+);
 
 // ==================== MEDIA READY WEBHOOK (called by n8n) ====================
 
@@ -419,7 +487,7 @@ app.use((req, res) => {
 });
 
 // Global error handler - must be last
-app.use((error: any, req: any, res: any, next: any) => {
+app.use((error: any, req: Request, res: Response, next: NextFunction) => {
   console.error("Global Error Handler:", error);
   res.status(error.status || 500).json({
     success: false,
@@ -430,114 +498,17 @@ app.use((error: any, req: any, res: any, next: any) => {
   });
 });
 
-// ==================== DEBUG LINKED FIELDS ====================
+// For Vercel deployment
+const vercelHandler = app;
 
-app.get("/api/debug/linked-fields", async (req, res) => {
-  try {
-    console.log("🔍 DEBUG: Testing linked fields filtering");
+// Only listen on PORT if we're not in a serverless environment
+if (process.env.NODE_ENV !== "production" || process.env.VERCEL !== "1") {
+  app.listen(PORT, () => {
+    console.log(`🚀 Visionlight FX Backend running on port ${PORT}`);
+    console.log(`🌐 Environment: ${process.env.NODE_ENV || "development"}`);
+    console.log(`📊 Database: Airtable`);
+    console.log(`🔐 Auth: Demo mode enabled`);
+  });
+}
 
-    // Get ALL posts to see the actual data structure
-    const allRecords = await base("Posts")
-      .select({
-        sort: [{ field: "createdAt", direction: "desc" }],
-      })
-      .firstPage();
-
-    console.log("📊 Total posts in Airtable:", allRecords.length);
-
-    // Analyze the userId field structure
-    const userIdAnalysis = allRecords.map((record, index) => {
-      const userIdField = record.get("userId");
-      return {
-        recordIndex: index,
-        postId: record.id,
-        userIdRaw: userIdField,
-        userIdType: typeof userIdField,
-        isArray: Array.isArray(userIdField),
-        arrayLength: Array.isArray(userIdField) ? userIdField.length : 0,
-        firstElement:
-          Array.isArray(userIdField) && userIdField.length > 0
-            ? userIdField[0]
-            : "N/A",
-        status: record.get("status"),
-        prompt: (record.get("prompt") as string)?.substring(0, 30) + "...",
-      };
-    });
-
-    console.log("🔍 UserId Field Analysis:");
-    userIdAnalysis.forEach((analysis) => {
-      console.log(`  Post ${analysis.recordIndex}:`, {
-        postId: analysis.postId,
-        userIdStructure: analysis.userIdRaw,
-        type: analysis.userIdType,
-        isArray: analysis.isArray,
-        firstElement: analysis.firstElement,
-      });
-    });
-
-    // Test different filter methods
-    const testUserId = "recHkKs5fb6wX4ZgB";
-
-    // Method 1: Direct equality
-    const method1 = await base("Posts")
-      .select({
-        filterByFormula: `{userId} = '${testUserId}'`,
-        maxRecords: 10,
-      })
-      .firstPage();
-
-    // Method 2: FIND function
-    const method2 = await base("Posts")
-      .select({
-        filterByFormula: `FIND('${testUserId}', {userId})`,
-        maxRecords: 10,
-      })
-      .firstPage();
-
-    // Method 3: ARRAYJOIN
-    const method3 = await base("Posts")
-      .select({
-        filterByFormula: `FIND('${testUserId}', ARRAYJOIN({userId})) > 0`,
-        maxRecords: 10,
-      })
-      .firstPage();
-
-    // Method 4: Manual filtering in code
-    const method4 = allRecords.filter((record) => {
-      const userIdField = record.get("userId");
-      return (
-        Array.isArray(userIdField) &&
-        userIdField.length > 0 &&
-        userIdField[0] === testUserId
-      );
-    });
-
-    res.json({
-      success: true,
-      totalPosts: allRecords.length,
-      userIdAnalysis,
-      filterResults: {
-        method1_directEquality: method1.length,
-        method2_findFunction: method2.length,
-        method3_arrayJoin: method3.length,
-        method4_manualFilter: method4.length,
-      },
-      samplePosts: allRecords.slice(0, 3).map((record) => ({
-        id: record.id,
-        userId: record.get("userId"),
-        status: record.get("status"),
-        prompt: record.get("prompt"),
-      })),
-    });
-  } catch (error: any) {
-    console.error("Debug linked fields error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`🚀 Visionlight FX Backend running on port ${PORT}`);
-  console.log(`🌐 Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`📊 Database: Airtable`);
-  console.log(`🔐 Auth: Demo mode enabled`);
-});
+export default vercelHandler;

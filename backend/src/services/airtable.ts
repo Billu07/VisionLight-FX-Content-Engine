@@ -202,8 +202,14 @@ export const airtableService = {
       const userIdField = record.get("userId");
       let actualUserId: string;
 
-      if (Array.isArray(userIdField) && userIdField.length > 0) {
+      if (
+        Array.isArray(userIdField) &&
+        userIdField.length > 0 &&
+        typeof userIdField[0] === "string"
+      ) {
         actualUserId = userIdField[0];
+      } else if (typeof userIdField === "string") {
+        actualUserId = userIdField;
       } else {
         console.warn(
           "❌ Unexpected userId format in findSessionByToken:",
@@ -296,8 +302,14 @@ export const airtableService = {
         const userIdField = record.get("userId");
         let actualUserId: string;
 
-        if (Array.isArray(userIdField) && userIdField.length > 0) {
+        if (
+          Array.isArray(userIdField) &&
+          userIdField.length > 0 &&
+          typeof userIdField[0] === "string"
+        ) {
           actualUserId = userIdField[0];
+        } else if (typeof userIdField === "string") {
+          actualUserId = userIdField;
         } else {
           console.warn(
             "❌ Unexpected userId format in upsertBrandConfig:",
@@ -366,8 +378,14 @@ export const airtableService = {
       const userIdField = record.get("userId");
       let actualUserId: string;
 
-      if (Array.isArray(userIdField) && userIdField.length > 0) {
+      if (
+        Array.isArray(userIdField) &&
+        userIdField.length > 0 &&
+        typeof userIdField[0] === "string"
+      ) {
         actualUserId = userIdField[0]; // Take first user ID from linked records
+      } else if (typeof userIdField === "string") {
+        actualUserId = userIdField;
       } else {
         console.warn("❌ Unexpected userId format in createPost:", userIdField);
         actualUserId = postData.userId; // Fallback to original
@@ -419,8 +437,14 @@ export const airtableService = {
       const userIdField = record.get("userId");
       let actualUserId: string;
 
-      if (Array.isArray(userIdField) && userIdField.length > 0) {
+      if (
+        Array.isArray(userIdField) &&
+        userIdField.length > 0 &&
+        typeof userIdField[0] === "string"
+      ) {
         actualUserId = userIdField[0]; // Take first user ID from linked records
+      } else if (typeof userIdField === "string") {
+        actualUserId = userIdField;
       } else {
         console.warn("❌ Unexpected userId format in updatePost:", userIdField);
         actualUserId = ""; // Fallback
@@ -583,8 +607,14 @@ export const airtableService = {
       const userIdField = record.get("userId");
       let actualUserId: string;
 
-      if (Array.isArray(userIdField) && userIdField.length > 0) {
+      if (
+        Array.isArray(userIdField) &&
+        userIdField.length > 0 &&
+        typeof userIdField[0] === "string"
+      ) {
         actualUserId = userIdField[0];
+      } else if (typeof userIdField === "string") {
+        actualUserId = userIdField;
       } else {
         console.warn(
           "❌ Unexpected userId format in updateROIMetrics:",
