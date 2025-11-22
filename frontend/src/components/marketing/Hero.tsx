@@ -20,18 +20,20 @@ export const Hero = () => {
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl"></div>
         </div>
 
-        <div className="container mx-auto px-6 py-20 relative z-10">
+        <div className="container mx-auto px-6 pt-20 pb-2 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
             {/* Logo & Navigation */}
-            <div className="flex justify-between items-center mb-16">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center shadow-lg">
-                  <span className="text-white font-bold text-lg">✨</span>
-                </div>
-                <span className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-                  Visionlight AI
-                </span>
-              </div>
+            <div className="flex justify-between items-center mb-8">
+              <img
+                src="/logo.png"
+                alt="Visionlight AI Logo"
+                className="w-56 h-56 object-contain"
+                onError={(e) => {
+                  // Fallback to emoji if logo doesn't load
+                  e.currentTarget.style.display = "none";
+                  // You might want to handle the fallback differently now
+                }}
+              />
               <button
                 onClick={() => setShowLogin(true)}
                 className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white rounded-xl font-semibold transition-all duration-300 hover:shadow-2xl hover:scale-105"
