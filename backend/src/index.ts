@@ -25,21 +25,29 @@ const PORT = process.env.PORT || 4000;
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Enhanced CORS configuration
+// Enhanced CORS configuration
 const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
-  "https://visionlight-fx.vercel.app",
+  "https://visionlight-frontend.vercel.app",
   "https://*.vercel.app",
 ];
-
-if (process.env.FRONTEND_URL) {
-  allowedOrigins.push(process.env.FRONTEND_URL);
-}
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+
+      // Check if the origin is in the allowed list or is a Vercel preview domain
+      if (
+        allowedOrigins.some(
+          (allowedOrigin) =>
+            origin === allowedOrigin ||
+            (allowedOrigin.includes("*") &&
+              origin.endsWith(allowedOrigin.split("*")[1]))
+        )
+      ) {
         callback(null, true);
       } else {
         console.log("🔒 CORS blocked origin:", origin);
@@ -47,6 +55,18 @@ app.use(
       }
     },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+  })
+);
+
+// Handle pre-flight requests for all routes
+app.options(
+  "*",
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   })
 );
 
