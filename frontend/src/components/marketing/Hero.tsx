@@ -25,13 +25,9 @@ export const Hero = () => {
             {/* Logo & Navigation */}
             <div className="flex justify-between items-center mb-8">
               <img
-                src="./logo.png"
+                src="/visionlight-fx/logo.png"
                 alt="Visionlight AI Logo"
                 className="w-56 h-56 object-contain"
-                onError={(e) => {
-                  console.log("Logo failed to load");
-                  e.currentTarget.style.display = "none";
-                }}
               />
               <button
                 onClick={() => setShowLogin(true)}
