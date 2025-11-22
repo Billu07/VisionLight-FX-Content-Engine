@@ -43,12 +43,21 @@ export const FAQ = () => {
   ];
 
   return (
-    <div className="py-20 bg-gray-50">
-      <div className="container mx-auto px-6">
+    <div className="py-20 bg-gradient-to-br from-gray-50 to-gray-100 relative overflow-hidden">
+      {/* Background Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="container mx-auto px-6 relative z-10">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Frequently Asked Questions
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+              Frequently Asked{" "}
+              <span className="bg-gradient-to-r from-cyan-500 to-blue-500 bg-clip-text text-transparent">
+                Questions
+              </span>
             </h2>
             <p className="text-xl text-gray-600">
               Everything you need to know about getting started with Visionlight
@@ -60,9 +69,10 @@ export const FAQ = () => {
             {faqs.map((faq, index) => (
               <div
                 key={index}
-                className="bg-white rounded-2xl p-6 border border-gray-200"
+                className="group bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-white/50 hover:border-cyan-200 shadow-lg hover:shadow-xl transition-all duration-300"
               >
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-3">
+                  <div className="w-2 h-2 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full flex-shrink-0"></div>
                   {faq.question}
                 </h3>
                 <p className="text-gray-600 leading-relaxed">{faq.answer}</p>
@@ -71,18 +81,22 @@ export const FAQ = () => {
           </div>
 
           <div className="text-center mt-12">
-            <div className="bg-blue-600 text-white rounded-2xl p-8">
-              <h3 className="text-2xl font-bold mb-4">Still have questions?</h3>
-              <p className="text-blue-100 mb-6">
+            <div className="bg-gradient-to-r from-cyan-500 to-blue-500 rounded-2xl p-8 shadow-2xl">
+              <h3 className="text-2xl font-bold text-white mb-4">
+                Still have questions?
+              </h3>
+              <p className="text-cyan-100 mb-6">
                 We're here to help you get started with your automated content
                 studio.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <button className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
-                  📞 Schedule a Call
+                <button className="bg-white text-cyan-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-all duration-300 hover:scale-105 flex items-center gap-2">
+                  <span>📞</span>
+                  Schedule a Call
                 </button>
-                <button className="border border-white text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/10 transition-colors">
-                  ✉️ Contact Support
+                <button className="border border-white text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/10 transition-all duration-300 flex items-center gap-2">
+                  <span>✉️</span>
+                  Contact Support
                 </button>
               </div>
             </div>

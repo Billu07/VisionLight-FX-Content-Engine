@@ -14,6 +14,8 @@ export const Features = () => {
         "Step-by-step guidance",
         "Grows with your needs",
       ],
+      icon: "🎛️",
+      gradient: "from-orange-500 to-red-500",
     },
     {
       title: "Creative Bundle",
@@ -27,6 +29,8 @@ export const Features = () => {
         "ROI FX - tracks performance & time saved",
         "Demo credits to test everything",
       ],
+      icon: "🎨",
+      gradient: "from-green-500 to-emerald-500",
     },
     {
       title: "Social Bundle",
@@ -40,24 +44,35 @@ export const Features = () => {
         "Metric FX - tracks engagement & growth",
         "Optimize FX - improves future campaigns",
       ],
+      icon: "📊",
+      gradient: "from-purple-500 to-violet-500",
     },
   ];
 
   const getColorClasses = (color: string) => {
     const colors = {
-      orange: "bg-orange-500 text-white",
-      green: "bg-green-500 text-white",
-      purple: "bg-purple-500 text-white",
+      orange: "bg-gradient-to-r from-orange-500 to-red-500",
+      green: "bg-gradient-to-r from-green-500 to-emerald-500",
+      purple: "bg-gradient-to-r from-purple-500 to-violet-500",
     };
     return colors[color as keyof typeof colors] || colors.orange;
   };
 
   return (
-    <div className="py-20 bg-white">
-      <div className="container mx-auto px-6">
+    <div className="py-20 bg-gradient-to-br from-gray-50 to-gray-100 relative overflow-hidden">
+      {/* Background Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="container mx-auto px-6 relative z-10">
         <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">
-            The Complete Content Engine
+          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+            The Complete{" "}
+            <span className="bg-gradient-to-r from-cyan-500 to-blue-500 bg-clip-text text-transparent">
+              Content Engine
+            </span>
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
             Everything you need to automate your content creation, from initial
@@ -69,27 +84,47 @@ export const Features = () => {
           {features.map((feature, index) => (
             <div
               key={index}
-              className="bg-gray-50 rounded-2xl p-8 border border-gray-200 hover:shadow-lg transition-shadow"
+              className="group bg-white/80 backdrop-blur-sm rounded-2xl p-8 border border-white/50 hover:border-cyan-200 shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105"
             >
-              <div
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-6 ${getColorClasses(
-                  feature.color
-                )}`}
-              >
-                {feature.title}
+              {/* Feature Header */}
+              <div className="flex items-center gap-4 mb-6">
+                <div
+                  className={`w-12 h-12 rounded-xl ${getColorClasses(
+                    feature.color
+                  )} flex items-center justify-center text-white text-xl shadow-lg`}
+                >
+                  {feature.icon}
+                </div>
+                <div>
+                  <div
+                    className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold text-white ${getColorClasses(
+                      feature.color
+                    )}`}
+                  >
+                    {feature.title}
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mt-2">
+                    {feature.subtitle}
+                  </h3>
+                </div>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">
-                {feature.subtitle}
-              </h3>
-              <p className="text-gray-600 mb-6">{feature.description}</p>
+
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                {feature.description}
+              </p>
+
               <ul className="space-y-3">
                 {feature.items.map((item, itemIndex) => (
                   <li
                     key={itemIndex}
-                    className="flex items-center gap-3 text-gray-700"
+                    className="flex items-center gap-3 text-gray-700 group-hover:text-gray-900 transition-colors"
                   >
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    {item}
+                    <div
+                      className={`w-2 h-2 rounded-full ${getColorClasses(
+                        feature.color
+                      )} flex-shrink-0`}
+                    ></div>
+                    <span className="leading-relaxed">{item}</span>
                   </li>
                 ))}
               </ul>
@@ -100,9 +135,10 @@ export const Features = () => {
         <div className="text-center">
           <Link
             to="/demo"
-            className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-blue-700 transition-colors inline-flex items-center gap-2"
+            className="inline-flex items-center gap-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all duration-300 hover:shadow-2xl hover:scale-105"
           >
-            🚀 Experience All Features in Demo
+            <span>🚀</span>
+            Experience All Features in Demo
           </Link>
           <p className="text-gray-500 mt-4 text-sm">
             No credit card required • 7-day free trial • Setup included

@@ -19,6 +19,8 @@ export const Pricing = () => {
       ],
       cta: "Start Free Demo",
       popular: false,
+      gradient: "from-orange-500 to-red-500",
+      icon: "🎨",
     },
     {
       name: "Complete System",
@@ -37,6 +39,8 @@ export const Pricing = () => {
       ],
       cta: "Get Complete System",
       popular: true,
+      gradient: "from-blue-500 to-cyan-500",
+      icon: "🚀",
     },
   ];
 
@@ -46,27 +50,39 @@ export const Pricing = () => {
       price: "$1,000",
       description: "Add later during Creative upgrade",
       note: "$0/month hosting forever",
+      gradient: "from-green-500 to-emerald-500",
     },
     {
       name: "Custom FX Integration",
       price: "$500-1,500",
       description: "Add Runway, Pika, ElevenLabs, etc.",
       note: "One-time setup fee",
+      gradient: "from-purple-500 to-violet-500",
     },
     {
       name: "Agency Client Dashboard",
       price: "$200/month",
       description: "Per client white-label dashboard",
       note: "Setup included",
+      gradient: "from-cyan-500 to-blue-500",
     },
   ];
 
   return (
-    <div className="py-20 bg-gray-50">
-      <div className="container mx-auto px-6">
+    <div className="py-20 bg-gradient-to-br from-gray-50 to-gray-100 relative overflow-hidden">
+      {/* Background Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="container mx-auto px-6 relative z-10">
         <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">
-            Simple, Transparent Pricing
+          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+            Simple,{" "}
+            <span className="bg-gradient-to-r from-cyan-500 to-blue-500 bg-clip-text text-transparent">
+              Transparent Pricing
+            </span>
           </h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
             Get a $20,000 connected automation system for a fraction of the
@@ -78,24 +94,37 @@ export const Pricing = () => {
           {plans.map((plan, index) => (
             <div
               key={index}
-              className={`bg-white rounded-2xl p-8 border-2 ${
-                plan.popular ? "border-blue-500 relative" : "border-gray-200"
+              className={`group bg-white/80 backdrop-blur-sm rounded-2xl p-8 border-2 transition-all duration-300 hover:scale-105 ${
+                plan.popular
+                  ? "border-cyan-400 shadow-2xl relative"
+                  : "border-white/50 shadow-lg hover:shadow-xl"
               }`}
             >
               {plan.popular && (
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                  <span className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white px-6 py-2 rounded-full text-sm font-semibold shadow-lg">
                     Most Popular
                   </span>
                 </div>
               )}
 
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                {plan.name}
-              </h3>
-              <p className="text-gray-600 mb-6">{plan.description}</p>
+              {/* Plan Header */}
+              <div className="flex items-center gap-4 mb-6">
+                <div
+                  className={`w-12 h-12 rounded-xl bg-gradient-to-r ${plan.gradient} flex items-center justify-center text-white text-xl shadow-lg`}
+                >
+                  {plan.icon}
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900">
+                    {plan.name}
+                  </h3>
+                  <p className="text-gray-600">{plan.description}</p>
+                </div>
+              </div>
 
-              <div className="mb-6">
+              {/* Pricing */}
+              <div className="mb-6 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200">
                 <span className="text-4xl font-bold text-gray-900">
                   {plan.price}
                 </span>
@@ -104,10 +133,16 @@ export const Pricing = () => {
                 </span>
               </div>
 
+              {/* Features */}
               <ul className="space-y-4 mb-8">
                 {plan.features.map((feature, featureIndex) => (
-                  <li key={featureIndex} className="flex items-center gap-3">
-                    <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                  <li
+                    key={featureIndex}
+                    className="flex items-start gap-3 group-hover:text-gray-900 transition-colors"
+                  >
+                    <div
+                      className={`w-5 h-5 rounded-full bg-gradient-to-r ${plan.gradient} flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm`}
+                    >
                       <svg
                         className="w-3 h-3 text-white"
                         fill="none"
@@ -122,17 +157,19 @@ export const Pricing = () => {
                         ></path>
                       </svg>
                     </div>
-                    <span className="text-gray-700">{feature}</span>
+                    <span className="text-gray-700 leading-relaxed">
+                      {feature}
+                    </span>
                   </li>
                 ))}
               </ul>
 
               <Link
                 to="/demo"
-                className={`w-full py-4 px-6 rounded-xl font-bold text-lg text-center block transition-colors ${
+                className={`w-full py-4 px-6 rounded-xl font-bold text-lg text-center block transition-all duration-300 hover:shadow-xl ${
                   plan.popular
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "bg-gray-900 text-white hover:bg-gray-800"
+                    ? "bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
+                    : "bg-gradient-to-r from-gray-900 to-gray-800 hover:from-gray-800 hover:to-gray-700 text-white"
                 }`}
               >
                 {plan.cta}
@@ -141,6 +178,7 @@ export const Pricing = () => {
           ))}
         </div>
 
+        {/* Add-ons */}
         <div className="max-w-3xl mx-auto">
           <h3 className="text-2xl font-bold text-center text-gray-900 mb-8">
             Add-ons & Extras
@@ -149,24 +187,37 @@ export const Pricing = () => {
             {addons.map((addon, index) => (
               <div
                 key={index}
-                className="bg-white rounded-xl p-6 border border-gray-200 flex justify-between items-center"
+                className="group bg-white/80 backdrop-blur-sm rounded-xl p-6 border border-white/50 hover:border-cyan-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-102"
               >
-                <div>
-                  <h4 className="font-semibold text-gray-900">{addon.name}</h4>
-                  <p className="text-gray-600 text-sm">{addon.description}</p>
-                </div>
-                <div className="text-right">
-                  <div className="font-bold text-gray-900">{addon.price}</div>
-                  <div className="text-sm text-gray-500">{addon.note}</div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`w-3 h-8 rounded-full bg-gradient-to-b ${addon.gradient}`}
+                    ></div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900">
+                        {addon.name}
+                      </h4>
+                      <p className="text-gray-600 text-sm">
+                        {addon.description}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-gray-900">{addon.price}</div>
+                    <div className="text-sm text-gray-500">{addon.note}</div>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
+        {/* Limited Time Offer */}
         <div className="text-center mt-12">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 inline-block">
-            <p className="text-yellow-800 font-semibold">
+          <div className="bg-gradient-to-r from-amber-400 to-orange-400 border border-amber-300 rounded-2xl p-6 inline-block shadow-lg">
+            <p className="text-amber-900 font-semibold flex items-center gap-2 justify-center">
+              <div className="w-2 h-2 bg-amber-700 rounded-full animate-pulse"></div>
               ⚡ Prices will rise once our first client capacity is filled —
               secure your rate now.
             </p>
