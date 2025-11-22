@@ -12,6 +12,7 @@ console.log("🔧 Environment Check:", {
   airtableKey: process.env.AIRTABLE_API_KEY ? "✅ Loaded" : "❌ Missing",
   airtableBase: process.env.AIRTABLE_BASE_ID ? "✅ Loaded" : "❌ Missing",
   nodeEnv: process.env.NODE_ENV,
+  frontendUrl: process.env.FRONTEND_URL,
 });
 
 // Now import other modules
@@ -24,8 +25,7 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Enhanced CORS configuration
-// Enhanced CORS configuration
+// ==================== CORS CONFIGURATION ====================
 const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
@@ -33,42 +33,51 @@ const allowedOrigins = [
   "https://*.vercel.app",
 ];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
+// Add FRONTEND_URL from environment if it exists
+if (
+  process.env.FRONTEND_URL &&
+  !allowedOrigins.includes(process.env.FRONTEND_URL)
+) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
 
-      // Check if the origin is in the allowed list or is a Vercel preview domain
-      if (
-        allowedOrigins.some(
-          (allowedOrigin) =>
-            origin === allowedOrigin ||
-            (allowedOrigin.includes("*") &&
-              origin.endsWith(allowedOrigin.split("*")[1]))
-        )
-      ) {
-        callback(null, true);
-      } else {
-        console.log("🔒 CORS blocked origin:", origin);
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Accept"],
-  })
-);
+const corsOptions = {
+  origin: function (
+    origin: string | undefined,
+    callback: (err: Error | null, allow?: boolean) => void
+  ) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    if (
+      allowedOrigins.some(
+        (allowedOrigin) =>
+          origin === allowedOrigin ||
+          (allowedOrigin.includes("*") &&
+            origin.endsWith(allowedOrigin.split("*")[1]))
+      )
+    ) {
+      callback(null, true);
+    } else {
+      console.log("🔒 CORS blocked origin:", origin);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "Accept",
+    "X-Requested-With",
+  ],
+};
+
+// Apply CORS middleware
+app.use(cors(corsOptions));
 
 // Handle pre-flight requests for all routes
-app.options(
-  "*",
-  cors({
-    origin: allowedOrigins,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  })
-);
+app.options("*", cors(corsOptions));
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
@@ -79,6 +88,21 @@ app.get("/", (req, res) => {
     message: "Visionlight FX Backend - Running!",
     version: "2.0.0",
     database: "Airtable",
+    cors: {
+      allowedOrigins: allowedOrigins,
+      frontendUrl: process.env.FRONTEND_URL,
+    },
+  });
+});
+
+// Test CORS endpoint
+app.get("/api/test-cors", (req, res) => {
+  res.json({
+    success: true,
+    message: "CORS is working!",
+    origin: req.headers.origin,
+    allowedOrigins: allowedOrigins,
+    timestamp: new Date().toISOString(),
   });
 });
 
