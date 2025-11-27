@@ -54,6 +54,20 @@ export const apiEndpoints = {
   getBrandConfig: () => api.get("/brand-config"),
   updateBrandConfig: (data: any) => api.put("/brand-config", data),
 
+  getJobStatus: (postId: string) => api.get(`/job-status/${postId}`),
+  cancelPrompt: (postId: string) => api.post("/cancel-prompt", { postId }),
+  // NEW: Prompt approval endpoints
+  updateEnhancedPrompt: (data: {
+    postId: string;
+    enhancedPrompt: string;
+    imageReference?: string;
+  }) => api.post("/update-enhanced-prompt", data),
+
+  approvePrompt: (data: { postId: string; finalPrompt: string }) =>
+    api.post("/approve-prompt", data),
+
+  getPost: (postId: string) => api.get(`/post/${postId}`),
+
   // ROI endpoints
   getROIMetrics: () => api.get("/roi-metrics"),
 

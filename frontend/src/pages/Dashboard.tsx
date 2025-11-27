@@ -8,7 +8,8 @@ import { ErrorAlert } from "../components/ErrorAlert";
 import { PostCard } from "../components/PostCard";
 import { BrandConfigModal } from "../components/BrandConfigModal";
 import { WelcomeTour } from "../components/WelcomeTour";
-import { ProductionStudio } from "../components/ProductionStudio";
+import { JobStatusTracker } from "../components/JobStatusTracker";
+import { PromptApprovalModal } from "../components/PromptApprovalModal";
 
 type MediaType = "video" | "image" | "carousel";
 
@@ -24,6 +25,18 @@ function Dashboard() {
   const [selectedMediaType, setSelectedMediaType] =
     useState<MediaType>("video");
   const [videoDuration, setVideoDuration] = useState<4 | 8 | 12>(12);
+  const [videoModel, setVideoModel] = useState<"sora-2" | "sora-2-pro">(
+    "sora-2"
+  );
+  const [showPromptApproval, setShowPromptApproval] = useState(false);
+  const [pendingApprovalPostId, setPendingApprovalPostId] = useState<
+    string | null
+  >(null);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16">("16:9");
+  const [videoSize, setVideoSize] = useState<
+    "1280x720" | "1792x1024" | "720x1280" | "1024x1792"
+  >("1280x720");
   const [referenceImage, setReferenceImage] = useState<File | null>(null);
   const [referenceImageUrl, setReferenceImageUrl] = useState("");
   const [generationState, setGenerationState] = useState<GenerationState>({
@@ -32,13 +45,17 @@ function Dashboard() {
   const [publishingPost, setPublishingPost] = useState<string | null>(null);
   const [showBrandModal, setShowBrandModal] = useState(false);
   const [showWelcomeTour, setShowWelcomeTour] = useState(false);
-  const [isProductionActive, setIsProductionActive] = useState(false);
 
   // Async UX state
   const [queuedPostId, setQueuedPostId] = useState<string | null>(null);
   const [showQueuedModal, setShowQueuedModal] = useState(false);
   const [readyPostId, setReadyPostId] = useState<string | null>(null);
   const [showReadyModal, setShowReadyModal] = useState(false);
+
+  // Track posts generated during this session
+  const [sessionGeneratedPosts, setSessionGeneratedPosts] = useState<
+    Set<string>
+  >(new Set());
 
   const queryClient = useQueryClient();
   const { user, isLoading: authLoading, logout } = useAuth();
@@ -72,7 +89,6 @@ function Dashboard() {
         secondary
       );
 
-      // Also update meta theme color for mobile browsers
       const metaThemeColor = document.querySelector("meta[name=theme-color]");
       if (metaThemeColor) {
         metaThemeColor.setAttribute("content", primary);
@@ -80,12 +96,8 @@ function Dashboard() {
     };
 
     applyBrandColors();
-
-    // Re-apply on window focus (in case of updates)
-    const handleFocus = () => applyBrandColors();
-    window.addEventListener("focus", handleFocus);
-
-    return () => window.removeEventListener("focus", handleFocus);
+    window.addEventListener("focus", applyBrandColors);
+    return () => window.removeEventListener("focus", applyBrandColors);
   }, [brandConfig]);
 
   // Check if first-time user
@@ -113,78 +125,120 @@ function Dashboard() {
     queryKey: ["posts"],
     queryFn: async () => {
       const response = await apiEndpoints.getPosts();
-      console.log("📦 Posts fetched:", response.data.posts); // Debug log
+      console.log("📦 Posts fetched:", response.data.posts);
       return response.data.posts;
     },
     enabled: !!user,
+    refetchInterval: (query) => {
+      const posts = query.state.data || [];
+      const hasProcessing = posts.some((p: any) => p.status === "PROCESSING");
+      return hasProcessing ? 80000 : false;
+    },
     refetchIntervalInBackground: true,
     staleTime: 0,
   });
 
-  // Add this useEffect to monitor post status changes
+  // === Track newly generated posts ===
   useEffect(() => {
     if (posts.length > 0) {
+      // Add any processing posts to our session tracking
       const processingPosts = posts.filter(
-        (p: any) => p.status === "PROCESSING"
+        (p: any) => p.status === "PROCESSING" || p.status === "QUEUED"
       );
-      const readyPosts = posts.filter((p: any) => p.status === "READY");
-      const failedPosts = posts.filter((p: any) => p.status === "FAILED");
 
-      console.log("📊 Post Status Summary:", {
-        total: posts.length,
-        processing: processingPosts.length,
-        ready: readyPosts.length,
-        failed: failedPosts.length,
+      processingPosts.forEach((post: any) => {
+        setSessionGeneratedPosts((prev) => new Set(prev).add(post.id));
       });
 
-      // Log media URLs for debugging
-      readyPosts.forEach((post: any) => {
-        if (post.mediaUrl) {
-          console.log(`🎬 Ready post ${post.id}:`, post.mediaUrl);
-        }
-      });
+      console.log(
+        "🔄 Session generated posts:",
+        Array.from(sessionGeneratedPosts)
+      );
     }
   }, [posts]);
 
-  // Add this useEffect to see if posts are coming through
+  // === Improved Modal Detection Logic ===
   useEffect(() => {
-    console.log("🎯 Dashboard Posts State:", {
+    console.log("🔍 DEBUG: Checking for approval posts", {
       postsCount: posts.length,
-      posts: posts.map((p: any) => ({
-        id: p.id,
-        status: p.status,
-        hasMedia: !!p.mediaUrl,
-        mediaType: p.mediaType,
-      })),
+      showPromptApproval,
+      showReadyModal,
+      showQueuedModal,
     });
-  }, [posts]);
-  // === Watch for newly READY posts and show "video ready" popup ===
-  useEffect(() => {
-    if (!posts || posts.length === 0) return;
 
-    const readyPosts = posts.filter((p: any) => p.status === "READY");
-    if (readyPosts.length === 0) return;
+    if (posts.length === 0) return;
 
-    const seenRaw =
-      localStorage.getItem("visionlight_seen_ready_posts") || "[]";
-    let seen: string[] = [];
-    try {
-      seen = JSON.parse(seenRaw);
-    } catch {
-      seen = [];
-    }
+    // Priority 1: Check for posts needing approval
+    const needsApproval = posts.find(
+      (p: any) =>
+        p.generationStep === "AWAITING_APPROVAL" &&
+        p.requiresApproval === true &&
+        !sessionGeneratedPosts.has(p.id)
+    );
 
-    const newReady = readyPosts.find((p: any) => !seen.includes(p.id));
-    if (newReady) {
-      setReadyPostId(newReady.id);
-      setShowReadyModal(true);
-      const updated = [...seen, newReady.id];
-      localStorage.setItem(
-        "visionlight_seen_ready_posts",
-        JSON.stringify(updated)
+    console.log(
+      "🎯 Posts needing approval:",
+      needsApproval ? needsApproval.id : "none"
+    );
+
+    if (
+      needsApproval &&
+      !showPromptApproval &&
+      !showReadyModal &&
+      !showQueuedModal
+    ) {
+      console.log(
+        "✅ OPENING PROMPT APPROVAL MODAL for post:",
+        needsApproval.id
       );
+      setPendingApprovalPostId(needsApproval.id);
+      setShowPromptApproval(true);
+
+      // Add to session tracking to prevent duplicate modals
+      setSessionGeneratedPosts((prev) => new Set(prev).add(needsApproval.id));
+      return;
     }
-  }, [posts]);
+  }, [
+    posts,
+    showPromptApproval,
+    showReadyModal,
+    showQueuedModal,
+    sessionGeneratedPosts,
+  ]);
+
+  // === Handle post updates for automatic modal display ===
+  useEffect(() => {
+    if (posts.length > 0) {
+      // Check if any posts changed to AWAITING_APPROVAL state
+      const newApprovalPosts = posts.filter(
+        (p: any) =>
+          p.generationStep === "AWAITING_APPROVAL" &&
+          p.requiresApproval === true &&
+          !sessionGeneratedPosts.has(p.id)
+      );
+
+      if (newApprovalPosts.length > 0 && !showPromptApproval) {
+        const post = newApprovalPosts[0];
+        console.log("🔄 New post awaiting approval detected:", post.id);
+        setPendingApprovalPostId(post.id);
+        setShowPromptApproval(true);
+        setSessionGeneratedPosts((prev) => new Set(prev).add(post.id));
+      }
+    }
+  }, [posts, sessionGeneratedPosts, showPromptApproval]);
+
+  // === Clean up modal states when posts change ===
+  useEffect(() => {
+    // If the pending approval post is no longer in AWAITING_APPROVAL state, close the modal
+    if (pendingApprovalPostId && showPromptApproval) {
+      const post = posts.find((p: any) => p.id === pendingApprovalPostId);
+      if (post && post.generationStep !== "AWAITING_APPROVAL") {
+        console.log("🔄 Closing approval modal - post state changed");
+        setShowPromptApproval(false);
+        setPendingApprovalPostId(null);
+      }
+    }
+  }, [posts, pendingApprovalPostId, showPromptApproval]);
 
   // === Fetch User Credits ===
   const {
@@ -211,10 +265,9 @@ function Dashboard() {
     enabled: !!user,
   });
 
-  // === Direct Media Generation Mutation (async, fire-and-forget) ===
+  // === Direct Media Generation Mutation ===
   const generateMediaMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      setIsProductionActive(true);
       return apiEndpoints.generateMediaDirect(formData);
     },
     onSuccess: (response) => {
@@ -222,26 +275,26 @@ function Dashboard() {
 
       console.log("🔍 /api/generate-media response:", data);
 
-      if (data?.success && data.status === "processing" && data.postId) {
+      if (data?.success && data.status === "queued" && data.postId) {
         setGenerationState({
           status: "generating",
           result: { postId: data.postId },
-          progress: 10,
         });
+        setActiveJobId(data.postId);
         setQueuedPostId(data.postId);
         setShowQueuedModal(true);
+
+        // Add to session tracking
+        setSessionGeneratedPosts((prev) => new Set(prev).add(data.postId));
       } else {
         setGenerationState({
           status: "error",
-          error:
-            "Unexpected response from server while starting generation. Please try again.",
+          error: "Unexpected response from server",
         });
       }
 
-      setIsProductionActive(false);
       queryClient.invalidateQueries({ queryKey: ["posts"] });
       queryClient.invalidateQueries({ queryKey: ["user-credits"] });
-      queryClient.invalidateQueries({ queryKey: ["roi-metrics"] });
     },
     onError: (error: any) => {
       console.error("Generate media error:", error);
@@ -249,9 +302,76 @@ function Dashboard() {
         status: "error",
         error: error.message || "Failed to start generation",
       });
-      setIsProductionActive(false);
+      setActiveJobId(null);
     },
   });
+
+  // === Approve Prompt Mutation ===
+  const approvePromptMutation = useMutation({
+    mutationFn: async (data: { postId: string; finalPrompt: string }) => {
+      return apiEndpoints.approvePrompt(data);
+    },
+    onSuccess: (response) => {
+      console.log("✅ Prompt approved successfully");
+      setShowPromptApproval(false);
+      setPendingApprovalPostId(null);
+
+      // Force immediate refresh of posts
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+
+      // Also remove from session tracking since we've handled this post
+      if (pendingApprovalPostId) {
+        setSessionGeneratedPosts((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(pendingApprovalPostId);
+          return newSet;
+        });
+      }
+    },
+    onError: (error: any) => {
+      console.error("Error approving prompt:", error);
+    },
+  });
+
+  // === Cancel Prompt Mutation ===
+  const cancelPromptMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      return apiEndpoints.cancelPrompt(postId);
+    },
+    onSuccess: () => {
+      console.log("✅ Prompt cancelled successfully");
+      setShowPromptApproval(false);
+      setPendingApprovalPostId(null);
+
+      // Force immediate refresh of posts
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+
+      // Remove from session tracking
+      if (pendingApprovalPostId) {
+        setSessionGeneratedPosts((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(pendingApprovalPostId);
+          return newSet;
+        });
+      }
+    },
+    onError: (error: any) => {
+      console.error("Error cancelling prompt:", error);
+    },
+  });
+
+  const handleJobCompletion = () => {
+    console.log("🎉 Job completed!");
+    setActiveJobId(null);
+    queryClient.invalidateQueries({ queryKey: ["posts"] });
+    queryClient.invalidateQueries({ queryKey: ["user-credits"] });
+  };
+
+  const handleJobError = (error: string) => {
+    console.error("❌ Job error:", error);
+    setGenerationState({ status: "error", error: error });
+    setActiveJobId(null);
+  };
 
   // === Publish Post Mutation ===
   const publishMutation = useMutation({
@@ -274,7 +394,6 @@ function Dashboard() {
       setReferenceImage(file);
       const imageUrl = URL.createObjectURL(file);
       setReferenceImageUrl(imageUrl);
-      console.log("Reference image selected:", file.name);
     }
   };
 
@@ -283,13 +402,32 @@ function Dashboard() {
     formData.append("prompt", prompt);
     formData.append("mediaType", selectedMediaType);
 
-    if (selectedMediaType === "video" && videoDuration) {
+    // Add ALL generation parameters for video
+    if (selectedMediaType === "video") {
       formData.append("duration", videoDuration.toString());
+      formData.append("model", videoModel);
+      formData.append("aspectRatio", aspectRatio);
+      formData.append("size", videoSize);
+
+      const [width, height] = videoSize.split("x").map(Number);
+      formData.append("width", width.toString());
+      formData.append("height", height.toString());
     }
 
+    // Add reference image if provided
     if (referenceImage) {
       formData.append("referenceImage", referenceImage);
     }
+
+    console.log("📋 FormData parameters:", {
+      prompt,
+      mediaType: selectedMediaType,
+      duration: selectedMediaType === "video" ? videoDuration : undefined,
+      model: selectedMediaType === "video" ? videoModel : undefined,
+      aspectRatio: selectedMediaType === "video" ? aspectRatio : undefined,
+      size: selectedMediaType === "video" ? videoSize : undefined,
+      hasReferenceImage: !!referenceImage,
+    });
 
     return formData;
   };
@@ -297,12 +435,12 @@ function Dashboard() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || userCredits[selectedMediaType] <= 0) return;
+
+    setActiveJobId(null);
+    setGenerationState({ status: "idle" });
+
     const formData = buildFormData();
     generateMediaMutation.mutate(formData);
-  };
-
-  const handleRetryPosts = () => {
-    queryClient.invalidateQueries({ queryKey: ["posts"] });
   };
 
   const handleLogout = () => {
@@ -315,19 +453,13 @@ function Dashboard() {
   const secondaryColor = brandConfig?.secondaryColor || "#8b5cf6";
   const companyName = brandConfig?.companyName || "Visionlight AI";
 
-  // Show loading state while checking authentication
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="relative">
-            <LoadingSpinner size="lg" variant="neon" />
-          </div>
+          <LoadingSpinner size="lg" variant="neon" />
           <p className="mt-6 text-purple-200 text-lg font-medium">
             Loading your creative studio...
-          </p>
-          <p className="mt-2 text-purple-400 text-sm">
-            Preparing your AI content dashboard
           </p>
         </div>
       </div>
@@ -346,15 +478,9 @@ function Dashboard() {
               Your video is in the queue 🎬
             </h3>
             <p className="text-sm text-purple-200 mb-4">
-              We&apos;ve started generating your video. It will typically be
-              ready in a couple of minutes and will appear in your content
-              library once it&apos;s done.
+              We've started generating your video. It will appear in your
+              content library when ready.
             </p>
-            {queuedPostId && (
-              <p className="text-xs text-purple-400 mb-4">
-                Post ID: <span className="font-mono">{queuedPostId}</span>
-              </p>
-            )}
             <div className="flex justify-end">
               <button
                 onClick={() => setShowQueuedModal(false)}
@@ -367,7 +493,7 @@ function Dashboard() {
         </div>
       )}
 
-      {/* Video ready modal */}
+      {/* Video ready modal - ONLY for session-generated posts */}
       {showReadyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="bg-gray-900 rounded-2xl border border-green-400/40 shadow-2xl max-w-sm w-full p-6">
@@ -378,11 +504,6 @@ function Dashboard() {
               Your generated video has finished processing. You can preview it
               from your content library below.
             </p>
-            {readyPostId && (
-              <p className="text-xs text-purple-400 mb-4">
-                Post ID: <span className="font-mono">{readyPostId}</span>
-              </p>
-            )}
             <div className="flex justify-end">
               <button
                 onClick={() => setShowReadyModal(false)}
@@ -400,8 +521,31 @@ function Dashboard() {
         <WelcomeTour onClose={() => setShowWelcomeTour(false)} />
       )}
 
+      {/* Prompt Approval Modal */}
+      <PromptApprovalModal
+        postId={pendingApprovalPostId || ""}
+        isOpen={showPromptApproval}
+        onClose={() => setShowPromptApproval(false)}
+        onApprove={(finalPrompt) => {
+          if (pendingApprovalPostId) {
+            approvePromptMutation.mutate({
+              postId: pendingApprovalPostId,
+              finalPrompt,
+            });
+          }
+        }}
+        onCancel={(postId) => {
+          if (postId) {
+            cancelPromptMutation.mutate(postId);
+          }
+        }}
+        isLoading={
+          approvePromptMutation.isPending || cancelPromptMutation.isPending
+        }
+      />
+
       <div className="container mx-auto px-4 py-6 max-w-7xl">
-        {/* Premium Header */}
+        {/* Header */}
         <div className="mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
           <div className="flex-1">
             <div className="flex items-center gap-4 mb-3">
@@ -427,9 +571,7 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* Premium Stats & Actions Bar */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            {/* Credits Display - Compact & Elegant */}
             <div className="bg-gray-800/60 backdrop-blur-lg rounded-2xl px-4 py-3 border border-purple-500/20">
               <div className="flex items-center gap-4">
                 {!creditsLoading ? (
@@ -441,36 +583,23 @@ function Dashboard() {
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
-                      {[
-                        {
-                          key: "video" as MediaType,
-                          icon: "🎬",
-                          color: "bg-pink-500",
-                        },
-                        {
-                          key: "image" as MediaType,
-                          icon: "🖼️",
-                          color: "bg-blue-500",
-                        },
-                        {
-                          key: "carousel" as MediaType,
-                          icon: "📱",
-                          color: "bg-green-500",
-                        },
-                      ].map((credit) => (
-                        <div
-                          key={credit.key}
-                          className="flex items-center gap-1.5"
-                        >
-                          <span className="text-sm">{credit.icon}</span>
+                      {["video", "image", "carousel"].map((type) => (
+                        <div key={type} className="flex items-center gap-1.5">
+                          <span className="text-sm">
+                            {type === "video"
+                              ? "🎬"
+                              : type === "image"
+                              ? "🖼️"
+                              : "📱"}
+                          </span>
                           <span
                             className={`text-xs font-semibold ${
-                              userCredits[credit.key] > 0
+                              userCredits[type as MediaType] > 0
                                 ? "text-white"
                                 : "text-gray-400"
                             }`}
                           >
-                            {userCredits[credit.key]}
+                            {userCredits[type as MediaType]}
                           </span>
                         </div>
                       ))}
@@ -487,14 +616,12 @@ function Dashboard() {
               </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex gap-2">
               <button
                 onClick={() => setShowBrandModal(true)}
                 className="px-4 py-2.5 bg-gray-800/60 backdrop-blur-lg border border-cyan-400/30 rounded-xl hover:bg-cyan-400/10 transition-all duration-200 font-medium flex items-center gap-2 text-sm text-cyan-400 hover:scale-105"
               >
-                <span>🎨</span>
-                Brand
+                <span>🎨</span> Brand
               </button>
               <button
                 onClick={handleLogout}
@@ -506,7 +633,7 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* ROI Metrics - Compact & Visual */}
+        {/* ROI Metrics */}
         <div className="grid grid-cols-3 gap-3 mb-8">
           {[
             {
@@ -557,12 +684,10 @@ function Dashboard() {
           ))}
         </div>
 
-        {/* Main Content Generation Engine - Premium Focus */}
+        {/* Main Content */}
         <div className="grid lg:grid-cols-3 gap-8 mb-8">
-          {/* Generation Panel - Takes 2/3 space */}
           <div className="lg:col-span-2">
             <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-8 shadow-2xl">
-              {/* Header */}
               <div className="flex items-center gap-3 mb-8">
                 <div className="w-3 h-8 rounded-full gradient-brand"></div>
                 <div>
@@ -575,7 +700,7 @@ function Dashboard() {
                 </div>
               </div>
 
-              {/* Media Type Selection - Premium Toggle */}
+              {/* Media Type Selection */}
               <div className="mb-8">
                 <label className="block text-sm font-semibold text-white mb-4">
                   🎬 Select Content Type
@@ -586,21 +711,18 @@ function Dashboard() {
                       type: "video" as MediaType,
                       label: "Sora Video",
                       icon: "🎬",
-                      description: "AI video generation",
                       gradient: "from-pink-500 to-rose-500",
                     },
                     {
                       type: "image" as MediaType,
                       label: "Gemini Image",
                       icon: "🖼️",
-                      description: "AI image generation",
                       gradient: "from-blue-500 to-cyan-500",
                     },
                     {
                       type: "carousel" as MediaType,
                       label: "AI Carousel",
                       icon: "📱",
-                      description: "Multi-image posts",
                       gradient: "from-green-500 to-emerald-500",
                     },
                   ].map(({ type, label, icon, gradient }) => (
@@ -653,7 +775,7 @@ function Dashboard() {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Prompt Input - Premium Styling */}
+                {/* Prompt Input */}
                 <div>
                   <label className="block text-sm font-semibold text-white mb-3 flex items-center gap-2">
                     <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>
@@ -668,32 +790,166 @@ function Dashboard() {
                   />
                 </div>
 
-                {/* Video Duration - Premium Toggle */}
+                {/* Enhanced Video Controls */}
                 {selectedMediaType === "video" && (
-                  <div className="space-y-3">
-                    <label className="block text-sm font-semibold text-white">
-                      ⏱️ Video Duration
-                    </label>
-                    <div className="flex gap-2">
-                      {[4, 8, 12].map((sec) => (
-                        <button
-                          key={sec}
-                          type="button"
-                          onClick={() => setVideoDuration(sec as 4 | 8 | 12)}
-                          className={`px-5 py-3 rounded-xl border text-sm font-semibold transition-all duration-300 ${
-                            videoDuration === sec
-                              ? "bg-cyan-500 border-cyan-500 text-white shadow-lg shadow-cyan-500/25"
-                              : "bg-gray-800/50 border-white/10 text-purple-200 hover:border-cyan-400/50 hover:bg-cyan-400/10"
-                          }`}
-                        >
-                          {sec} seconds
-                        </button>
-                      ))}
+                  <div className="space-y-6">
+                    {/* Video Model Selection */}
+                    <div className="space-y-3">
+                      <label className="block text-sm font-semibold text-white">
+                        🤖 AI Model
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          {
+                            id: "sora-2",
+                            label: "Sora 2",
+                            description: "Standard quality",
+                          },
+                          {
+                            id: "sora-2-pro",
+                            label: "Sora 2 Pro",
+                            description: "Enhanced quality",
+                          },
+                        ].map((model) => (
+                          <button
+                            key={model.id}
+                            type="button"
+                            onClick={() =>
+                              setVideoModel(model.id as "sora-2" | "sora-2-pro")
+                            }
+                            className={`p-4 rounded-2xl border-2 transition-all duration-300 text-left ${
+                              videoModel === model.id
+                                ? "border-cyan-400 bg-cyan-500/20 shadow-lg shadow-cyan-500/25"
+                                : "border-white/10 bg-gray-800/50 hover:border-cyan-400/50"
+                            }`}
+                          >
+                            <div className="font-semibold text-white text-sm">
+                              {model.label}
+                            </div>
+                            <div className="text-xs text-purple-300 mt-1">
+                              {model.description}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Aspect Ratio Selection */}
+                    <div className="space-y-3">
+                      <label className="block text-sm font-semibold text-white">
+                        📐 Aspect Ratio
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { ratio: "16:9", label: "Landscape", icon: "🖥️" },
+                          { ratio: "9:16", label: "Portrait", icon: "📱" },
+                        ].map(({ ratio, label, icon }) => (
+                          <button
+                            key={ratio}
+                            type="button"
+                            onClick={() => {
+                              setAspectRatio(ratio as "16:9" | "9:16");
+                              setVideoSize(
+                                ratio === "16:9" ? "1280x720" : "720x1280"
+                              );
+                            }}
+                            className={`p-4 rounded-2xl border-2 transition-all duration-300 text-center ${
+                              aspectRatio === ratio
+                                ? "border-purple-400 bg-purple-500/20 shadow-lg shadow-purple-500/25"
+                                : "border-white/10 bg-gray-800/50 hover:border-purple-400/50"
+                            }`}
+                          >
+                            <div className="text-2xl mb-2">{icon}</div>
+                            <div className="font-semibold text-white text-sm">
+                              {label}
+                            </div>
+                            <div className="text-xs text-purple-300">
+                              {ratio}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Video Size Selection */}
+                    <div className="space-y-3">
+                      <label className="block text-sm font-semibold text-white">
+                        📏 Video Size
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {(aspectRatio === "16:9"
+                          ? [
+                              {
+                                size: "1280x720",
+                                label: "720p HD",
+                                resolution: "1280 × 720",
+                              },
+                              {
+                                size: "1792x1024",
+                                label: "1024p",
+                                resolution: "1792 × 1024",
+                              },
+                            ]
+                          : [
+                              {
+                                size: "720x1280",
+                                label: "720p HD",
+                                resolution: "720 × 1280",
+                              },
+                              {
+                                size: "1024x1792",
+                                label: "1024p",
+                                resolution: "1024 × 1792",
+                              },
+                            ]
+                        ).map(({ size, label, resolution }) => (
+                          <button
+                            key={size}
+                            type="button"
+                            onClick={() => setVideoSize(size as any)}
+                            className={`p-4 rounded-2xl border-2 transition-all duration-300 text-left ${
+                              videoSize === size
+                                ? "border-green-400 bg-green-500/20 shadow-lg shadow-green-500/25"
+                                : "border-white/10 bg-gray-800/50 hover:border-green-400/50"
+                            }`}
+                          >
+                            <div className="font-semibold text-white text-sm">
+                              {label}
+                            </div>
+                            <div className="text-xs text-purple-300">
+                              {resolution}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Duration Selection */}
+                    <div className="space-y-3">
+                      <label className="block text-sm font-semibold text-white">
+                        ⏱️ Video Duration
+                      </label>
+                      <div className="flex gap-2">
+                        {[4, 8, 12].map((sec) => (
+                          <button
+                            key={sec}
+                            type="button"
+                            onClick={() => setVideoDuration(sec as 4 | 8 | 12)}
+                            className={`px-5 py-3 rounded-xl border text-sm font-semibold transition-all duration-300 ${
+                              videoDuration === sec
+                                ? "bg-cyan-500 border-cyan-500 text-white shadow-lg shadow-cyan-500/25"
+                                : "bg-gray-800/50 border-white/10 text-purple-200 hover:border-cyan-400/50 hover:bg-cyan-400/10"
+                            }`}
+                          >
+                            {sec} seconds
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
 
-                {/* Reference Image Upload - Premium Styling */}
+                {/* Reference Image Upload */}
                 <div className="space-y-3">
                   <label className="block text-sm font-semibold text-white">
                     🎨 Reference Image (Optional)
@@ -719,7 +975,7 @@ function Dashboard() {
                   </div>
                 </div>
 
-                {/* Generate Button - Premium CTA */}
+                {/* Generate Button */}
                 <button
                   type="submit"
                   disabled={
@@ -730,7 +986,6 @@ function Dashboard() {
                   className="w-full gradient-brand text-white py-5 px-8 rounded-2xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-bold text-lg flex items-center justify-center gap-3 group relative overflow-hidden"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
-
                   {generateMediaMutation.isPending ? (
                     <>
                       <LoadingSpinner size="sm" variant="light" />
@@ -751,27 +1006,17 @@ function Dashboard() {
                 </button>
               </form>
 
-              {/* AI Production Studio */}
-              <ProductionStudio
-                mediaType={selectedMediaType}
-                prompt={prompt}
-                isGenerating={isProductionActive}
-              />
-
-              {/* Generation Status */}
-              {generationState.status === "generating" &&
-                generationState.result && (
-                  <div className="mt-6 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-2xl border border-cyan-400/20 p-6 backdrop-blur-sm">
-                    <h3 className="text-lg font-semibold text-cyan-400 mb-2 flex items-center gap-2">
-                      <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
-                      We&apos;re creating your masterpiece...
-                    </h3>
-                    <p className="text-purple-200 text-sm">
-                      Your content is being generated. It will appear in your
-                      library automatically when ready.
-                    </p>
-                  </div>
-                )}
+              {/* Job Status Tracker */}
+              {activeJobId && (
+                <div className="mt-6">
+                  <JobStatusTracker
+                    postId={activeJobId}
+                    mediaType={selectedMediaType}
+                    onCompletion={handleJobCompletion}
+                    onError={handleJobError}
+                  />
+                </div>
+              )}
 
               {/* Generation Error */}
               {generationState.status === "error" && (
@@ -779,8 +1024,7 @@ function Dashboard() {
                   message={generationState.error || "Generation failed"}
                   onRetry={() => {
                     if (!prompt.trim()) return;
-                    const formData = buildFormData();
-                    generateMediaMutation.mutate(formData);
+                    generateMediaMutation.mutate(buildFormData());
                   }}
                   type="error"
                 />
@@ -788,13 +1032,12 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* Content Library Sidebar - Takes 1/3 space */}
+          {/* Content Library Sidebar */}
           <div className="lg:col-span-1">
             <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-6 shadow-2xl sticky top-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <span>📚</span>
-                  Your Library
+                  <span>📚</span> Your Library
                 </h2>
                 {postsLoading && (
                   <div className="flex items-center gap-2 text-sm text-purple-300">
@@ -802,23 +1045,30 @@ function Dashboard() {
                   </div>
                 )}
               </div>
-
+              <div className="space-y-4 max-h-[600px] overflow-y-auto">
+                {posts
+                  .filter((post: any) => post.status !== "CANCELLED") // ← Add this filter
+                  .map((post: any) => (
+                    <PostCard
+                      key={post.id}
+                      post={post}
+                      onPublishPost={publishMutation.mutate}
+                      publishingPost={publishingPost}
+                      userCredits={userCredits}
+                      primaryColor={primaryColor}
+                      compact={true}
+                    />
+                  ))}
+              </div>
               {postsError ? (
                 <div className="text-center py-8">
                   <ErrorAlert
                     message="Failed to load your content"
-                    onRetry={handleRetryPosts}
+                    onRetry={() =>
+                      queryClient.invalidateQueries({ queryKey: ["posts"] })
+                    }
                     type="error"
                   />
-                  <button
-                    onClick={() => {
-                      console.log("Current posts error:", postsError);
-                      handleRetryPosts();
-                    }}
-                    className="mt-4 px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600"
-                  >
-                    Debug: Retry & Log
-                  </button>
                 </div>
               ) : (
                 <div className="space-y-4 max-h-[600px] overflow-y-auto">
@@ -828,8 +1078,8 @@ function Dashboard() {
                       post={post}
                       onPublishPost={publishMutation.mutate}
                       publishingPost={publishingPost}
-                      userCredits={userCredits} // Add this
-                      primaryColor={primaryColor} // Add this
+                      userCredits={userCredits}
+                      primaryColor={primaryColor}
                       compact={true}
                     />
                   ))}

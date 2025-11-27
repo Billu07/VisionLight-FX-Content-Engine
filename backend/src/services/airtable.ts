@@ -5,7 +5,6 @@ import dotenv from "dotenv";
 // Load environment variables FIRST
 dotenv.config();
 
-// Debug: Check if env vars are loading
 console.log("🔑 Airtable Config Check:", {
   hasApiKey: !!process.env.AIRTABLE_API_KEY,
   hasBaseId: !!process.env.AIRTABLE_BASE_ID,
@@ -47,13 +46,23 @@ export interface Post {
   id: string;
   userId: string;
   prompt: string;
+  enhancedPrompt?: string;
+  imageReference?: string;
+  userEditedPrompt?: string;
+  generationStep?:
+    | "PROMPT_ENHANCEMENT"
+    | "AWAITING_APPROVAL"
+    | "GENERATION"
+    | "COMPLETED";
+  requiresApproval?: boolean;
   mediaType?: "VIDEO" | "IMAGE" | "CAROUSEL";
   mediaUrl?: string;
   mediaProvider?: string;
-  status: "NEW" | "PROCESSING" | "READY" | "PUBLISHED" | "FAILED";
+  status: "NEW" | "PROCESSING" | "READY" | "PUBLISHED" | "FAILED" | "CANCELLED";
   platform: string;
   script?: any;
   bufferPostId?: string;
+  generationParams?: any; // NEW
   createdAt: Date;
   updatedAt: Date;
 }
@@ -198,7 +207,6 @@ export const airtableService = {
 
       const record = records[0];
 
-      // Handle linked field properly
       const userIdField = record.get("userId");
       let actualUserId: string;
 
@@ -256,7 +264,6 @@ export const airtableService = {
   // BrandConfig operations
   async getBrandConfig(userId: string): Promise<BrandConfig | null> {
     try {
-      // Get all records and filter manually
       const allRecords = await base("BrandConfig").select().firstPage();
 
       const userConfig = allRecords.find((record) => {
@@ -316,7 +323,6 @@ export const airtableService = {
           updatedAt: now,
         });
 
-        // Handle linked field properly
         const userIdField = record.get("userId");
         let actualUserId: string;
 
@@ -383,21 +389,32 @@ export const airtableService = {
     mediaType?: "VIDEO" | "IMAGE" | "CAROUSEL";
     platform: string;
     script?: any;
+    enhancedPrompt?: string;
+    imageReference?: string;
+    generationStep?: string;
+    requiresApproval?: boolean;
+    generationParams?: any; // NEW
   }): Promise<Post> {
     try {
       const now = new Date().toISOString();
       const record = await base("Posts").create({
-        userId: [postData.userId], // Keep as array for linked field
+        userId: [postData.userId],
         prompt: postData.prompt,
         mediaType: postData.mediaType,
         platform: postData.platform,
         script: postData.script ? JSON.stringify(postData.script) : undefined,
+        enhancedPrompt: postData.enhancedPrompt,
+        imageReference: postData.imageReference,
+        generationStep: postData.generationStep || "PROMPT_ENHANCEMENT",
+        requiresApproval: postData.requiresApproval !== false,
+        generationParams: postData.generationParams
+          ? JSON.stringify(postData.generationParams)
+          : undefined, // NEW
         status: "NEW",
         createdAt: now,
         updatedAt: now,
       });
 
-      // Handle linked field properly
       const userIdField = record.get("userId");
       let actualUserId: string;
 
@@ -423,6 +440,14 @@ export const airtableService = {
         id: record.id,
         userId: actualUserId,
         prompt: record.get("prompt") as string,
+        enhancedPrompt: record.get("enhancedPrompt") as string,
+        generationStep: record.get("generationStep") as string,
+        requiresApproval: record.get("requiresApproval") as boolean,
+        userEditedPrompt: record.get("userEditedPrompt") as string,
+        imageReference: record.get("imageReference") as string,
+        generationParams: record.get("generationParams")
+          ? JSON.parse(record.get("generationParams") as string)
+          : undefined, // NEW
         mediaType: record.get("mediaType") as "VIDEO" | "IMAGE" | "CAROUSEL",
         mediaUrl: record.get("mediaUrl") as string,
         mediaProvider: record.get("mediaProvider") as string,
@@ -447,6 +472,7 @@ export const airtableService = {
         updatedAt: new Date().toISOString(),
       };
 
+      // Existing fields
       if (updates.mediaUrl !== undefined)
         updateData.mediaUrl = updates.mediaUrl;
       if (updates.mediaType !== undefined)
@@ -459,9 +485,22 @@ export const airtableService = {
       if (updates.script !== undefined)
         updateData.script = JSON.stringify(updates.script);
 
+      // NEW fields
+      if (updates.enhancedPrompt !== undefined)
+        updateData.enhancedPrompt = updates.enhancedPrompt;
+      if (updates.imageReference !== undefined)
+        updateData.imageReference = updates.imageReference;
+      if (updates.userEditedPrompt !== undefined)
+        updateData.userEditedPrompt = updates.userEditedPrompt;
+      if (updates.generationStep !== undefined)
+        updateData.generationStep = updates.generationStep;
+      if (updates.requiresApproval !== undefined)
+        updateData.requiresApproval = updates.requiresApproval;
+      if (updates.generationParams !== undefined)
+        updateData.generationParams = JSON.stringify(updates.generationParams); // NEW
+
       const record = await base("Posts").update(postId, updateData);
 
-      // Handle linked field properly
       const userIdField = record.get("userId");
       let actualUserId: string;
 
@@ -505,11 +544,59 @@ export const airtableService = {
     }
   },
 
+  async getPostById(postId: string): Promise<Post | null> {
+    try {
+      const record = await base("Posts").find(postId);
+
+      const userIdField = record.get("userId");
+      let actualUserId: string;
+
+      if (Array.isArray(userIdField) && userIdField.length > 0) {
+        const firstElement = userIdField[0];
+        actualUserId =
+          typeof firstElement === "string"
+            ? firstElement
+            : String(firstElement);
+      } else if (typeof userIdField === "string") {
+        actualUserId = userIdField;
+      } else {
+        actualUserId = String(userIdField || "");
+      }
+
+      return {
+        id: record.id,
+        userId: actualUserId,
+        prompt: record.get("prompt") as string,
+        enhancedPrompt: record.get("enhancedPrompt") as string,
+        generationStep: record.get("generationStep") as string,
+        requiresApproval: record.get("requiresApproval") as boolean,
+        userEditedPrompt: record.get("userEditedPrompt") as string,
+        imageReference: record.get("imageReference") as string,
+        generationParams: record.get("generationParams")
+          ? JSON.parse(record.get("generationParams") as string)
+          : undefined, // NEW
+        mediaType: record.get("mediaType") as "VIDEO" | "IMAGE" | "CAROUSEL",
+        mediaUrl: record.get("mediaUrl") as string,
+        mediaProvider: record.get("mediaProvider") as string,
+        status: record.get("status") as any,
+        platform: record.get("platform") as string,
+        script: record.get("script")
+          ? JSON.parse(record.get("script") as string)
+          : undefined,
+        bufferPostId: record.get("bufferPostId") as string,
+        createdAt: new Date(record.get("createdAt") as string),
+        updatedAt: new Date(record.get("updatedAt") as string),
+      };
+    } catch (error) {
+      console.error("Airtable getPostById error:", error);
+      return null;
+    }
+  },
+
   async getUserPosts(userId: string): Promise<any[]> {
     try {
       console.log("🔍 Fetching ALL posts to filter for user:", userId);
 
-      // Get all posts and filter manually
       const allRecords = await base("Posts")
         .select({
           sort: [{ field: "createdAt", direction: "desc" }],
@@ -518,16 +605,10 @@ export const airtableService = {
 
       console.log(`📊 Total posts in Airtable: ${allRecords.length}`);
 
-      // Filter posts where the userId array contains our target userId
       const userPosts = allRecords.filter((record) => {
         const userIdField = record.get("userId");
         const isUserPost =
           Array.isArray(userIdField) && userIdField.includes(userId);
-
-        if (isUserPost) {
-          console.log(`✅ Post ${record.id} belongs to user ${userId}`);
-        }
-
         return isUserPost;
       });
 
@@ -536,12 +617,6 @@ export const airtableService = {
       const posts = userPosts.map((record) => {
         const userIdField = record.get("userId");
         const mediaUrl = record.get("mediaUrl");
-
-        console.log(`📝 Processing post ${record.id}:`, {
-          status: record.get("status"),
-          mediaUrl: mediaUrl ? "✅ Has URL" : "❌ No URL",
-          mediaType: record.get("mediaType"),
-        });
 
         let actualUserId: string;
         if (Array.isArray(userIdField) && userIdField.length > 0) {
@@ -560,6 +635,14 @@ export const airtableService = {
           id: record.id,
           userId: actualUserId,
           prompt: record.get("prompt") as string,
+          enhancedPrompt: record.get("enhancedPrompt") as string,
+          generationStep: record.get("generationStep") as string,
+          requiresApproval: record.get("requiresApproval") as boolean,
+          userEditedPrompt: record.get("userEditedPrompt") as string,
+          imageReference: record.get("imageReference") as string,
+          generationParams: record.get("generationParams")
+            ? JSON.parse(record.get("generationParams") as string)
+            : undefined, // NEW
           mediaType: record.get("mediaType") as "VIDEO" | "IMAGE" | "CAROUSEL",
           platform: record.get("platform") as string,
           status: record.get("status") as any,
@@ -583,7 +666,6 @@ export const airtableService = {
   // ROI Metrics operations
   async getROIMetrics(userId: string): Promise<ROIMetrics> {
     try {
-      // Get all records and filter manually
       const allRecords = await base("ROIMetrics").select().firstPage();
 
       const userMetrics = allRecords.find((record) => {
@@ -592,7 +674,6 @@ export const airtableService = {
       });
 
       if (!userMetrics) {
-        // Create default metrics
         const now = new Date().toISOString();
         const record = await base("ROIMetrics").create({
           userId: [userId],
@@ -662,7 +743,6 @@ export const airtableService = {
 
       const record = await base("ROIMetrics").update(existing.id, updateData);
 
-      // Handle linked field properly
       const userIdField = record.get("userId");
       let actualUserId: string;
 
