@@ -1,6 +1,5 @@
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
-import multer from "multer";
 import axios from "axios";
 import dotenv from "dotenv";
 import { jobService } from "./services/jobService";
@@ -35,7 +34,6 @@ const allowedOrigins = [
   "https://*.vercel.app",
   "https://*.ngrok.io",
   "https://*.ngrok-free.app",
-  "https://nonvertebral-unsearchably-katie.ngrok-free.dev",
 ];
 
 if (process.env.FRONTEND_URL) {
@@ -543,10 +541,9 @@ app.post("/api/update-enhanced-prompt", async (req, res) => {
       enhancedPrompt,
       imageReference: imageReference || "",
       generationStep: "AWAITING_APPROVAL",
-      status: "PROCESSING", // Keep as processing until user approves
+      status: "PROCESSING",
     });
 
-    // If job tracking exists, update phase
     try {
       const job = jobService.getJobStatus(postId);
       if (job) {
@@ -554,7 +551,7 @@ app.post("/api/update-enhanced-prompt", async (req, res) => {
           postId,
           "processing",
           30,
-          "Prompt enhanced - awaiting your approval"
+          "Your Prompt is Ready, Please REFRESH the page"
         );
       }
     } catch (jobError) {
