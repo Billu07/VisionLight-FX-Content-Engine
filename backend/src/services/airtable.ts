@@ -63,7 +63,9 @@ export interface Post {
   script?: any;
   bufferPostId?: string;
   generationParams?: any;
-  // REMOVED: jobStatus, jobProgress, jobMessage
+  jobStatus?: string;
+  jobProgress?: number;
+  jobMessage?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -394,7 +396,7 @@ export const airtableService = {
     imageReference?: string;
     generationStep?: string;
     requiresApproval?: boolean;
-    generationParams?: any;
+    generationParams?: any; // NEW
   }): Promise<Post> {
     try {
       const now = new Date().toISOString();
@@ -410,7 +412,7 @@ export const airtableService = {
         requiresApproval: postData.requiresApproval !== false,
         generationParams: postData.generationParams
           ? JSON.stringify(postData.generationParams)
-          : undefined,
+          : undefined, // NEW
         status: "NEW",
         createdAt: now,
         updatedAt: now,
@@ -453,7 +455,7 @@ export const airtableService = {
         imageReference: record.get("imageReference") as string,
         generationParams: record.get("generationParams")
           ? JSON.parse(record.get("generationParams") as string)
-          : undefined,
+          : undefined, // NEW
         mediaType: record.get("mediaType") as "VIDEO" | "IMAGE" | "CAROUSEL",
         mediaUrl: record.get("mediaUrl") as string,
         mediaProvider: record.get("mediaProvider") as string,
@@ -491,7 +493,7 @@ export const airtableService = {
       if (updates.script !== undefined)
         updateData.script = JSON.stringify(updates.script);
 
-      // Other fields
+      // NEW fields
       if (updates.enhancedPrompt !== undefined)
         updateData.enhancedPrompt = updates.enhancedPrompt;
       if (updates.imageReference !== undefined)
@@ -503,7 +505,7 @@ export const airtableService = {
       if (updates.requiresApproval !== undefined)
         updateData.requiresApproval = updates.requiresApproval;
       if (updates.generationParams !== undefined)
-        updateData.generationParams = JSON.stringify(updates.generationParams);
+        updateData.generationParams = JSON.stringify(updates.generationParams); // NEW
 
       const record = await base("Posts").update(postId, updateData);
 
@@ -585,7 +587,7 @@ export const airtableService = {
         imageReference: record.get("imageReference") as string,
         generationParams: record.get("generationParams")
           ? JSON.parse(record.get("generationParams") as string)
-          : undefined,
+          : undefined, // NEW
         mediaType: record.get("mediaType") as "VIDEO" | "IMAGE" | "CAROUSEL",
         mediaUrl: record.get("mediaUrl") as string,
         mediaProvider: record.get("mediaProvider") as string,
@@ -658,7 +660,7 @@ export const airtableService = {
           imageReference: record.get("imageReference") as string,
           generationParams: record.get("generationParams")
             ? JSON.parse(record.get("generationParams") as string)
-            : undefined,
+            : undefined, // NEW
           mediaType: record.get("mediaType") as "VIDEO" | "IMAGE" | "CAROUSEL",
           platform: record.get("platform") as string,
           status: record.get("status") as any,
