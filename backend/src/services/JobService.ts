@@ -1,4 +1,3 @@
-// backend/src/services/jobService.ts
 import { airtableService } from "./airtable";
 
 export interface JobStatus {
@@ -56,10 +55,6 @@ export class JobService {
       jobStatus: job.status,
       jobProgress: job.progress,
       jobMessage: job.phase,
-      jobStartedAt: job.startedAt.toISOString(),
-      jobEstimatedCompletion: job.estimatedCompletion.toISOString(),
-      jobMediaType: job.mediaType,
-      jobLastUpdate: job.updatedAt.toISOString(),
     });
   }
 
@@ -72,14 +67,14 @@ export class JobService {
         postId,
         status: post.jobStatus as JobStatus["status"],
         progress: post.jobProgress || 0,
-        startedAt: new Date(post.jobStartedAt || post.createdAt),
-        updatedAt: new Date(post.jobLastUpdate || post.updatedAt),
-        estimatedCompletion: new Date(
-          post.jobEstimatedCompletion || new Date()
+        startedAt: new Date(post.createdAt),
+        updatedAt: new Date(post.updatedAt),
+        estimatedCompletion: this.calculateEstimatedCompletion(
+          post.mediaType?.toLowerCase() || "video"
         ),
-        mediaType: post.jobMediaType || "video",
+        mediaType: post.mediaType?.toLowerCase() || "video",
         phase: post.jobMessage || "Starting...",
-        lastPhaseUpdate: new Date(post.jobLastUpdate || post.updatedAt),
+        lastPhaseUpdate: new Date(post.updatedAt),
       };
     } catch (error) {
       console.error("Error getting job from Airtable:", error);
@@ -207,11 +202,9 @@ export class JobService {
         jobStatus: status,
         jobProgress: progress !== undefined ? progress : currentJob.progress,
         jobMessage: phase,
-        jobLastUpdate: new Date().toISOString(),
-        ...(error && { jobError: error }),
       });
 
-      // 🛠️ FIX: Map job status to correct Airtable status values
+      // Map to Airtable status
       let airtableStatus: string;
       switch (status) {
         case "completed":

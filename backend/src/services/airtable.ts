@@ -62,7 +62,10 @@ export interface Post {
   platform: string;
   script?: any;
   bufferPostId?: string;
-  generationParams?: any; // NEW
+  generationParams?: any;
+  jobStatus?: string;
+  jobProgress?: number;
+  jobMessage?: string;
   createdAt: Date;
   updatedAt: Date;
 }
