@@ -468,7 +468,7 @@ app.post(
         });
 
       // Return immediate response with job info
-      const job = jobService.getJobStatus(post.id);
+      const job = await jobService.getJobStatus(postId);
       return res.json({
         success: true,
         status: "queued",

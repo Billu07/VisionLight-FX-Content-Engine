@@ -238,7 +238,22 @@ export class JobService {
 
   async getJobStatus(postId: string): Promise<JobStatus | null> {
     try {
-      return await this.getJobFromAirtable(postId);
+      const post = await airtableService.getPostById(postId);
+      if (!post || !post.jobStatus) return null;
+
+      return {
+        postId,
+        status: post.jobStatus as JobStatus["status"],
+        progress: post.jobProgress || 0,
+        startedAt: new Date(post.createdAt),
+        updatedAt: new Date(post.updatedAt),
+        estimatedCompletion: this.calculateEstimatedCompletion(
+          post.mediaType?.toLowerCase() || "video"
+        ),
+        mediaType: post.mediaType?.toLowerCase() || "video",
+        phase: post.jobMessage || "Starting...",
+        lastPhaseUpdate: new Date(post.updatedAt),
+      };
     } catch (error) {
       console.error("Error getting job status:", error);
       return null;
