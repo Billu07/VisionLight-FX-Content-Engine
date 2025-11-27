@@ -8,14 +8,12 @@ import { ErrorAlert } from "../components/ErrorAlert";
 import { PostCard } from "../components/PostCard";
 import { BrandConfigModal } from "../components/BrandConfigModal";
 import { WelcomeTour } from "../components/WelcomeTour";
-import { JobStatusTracker } from "../components/JobStatusTracker";
 import { PromptApprovalModal } from "../components/PromptApprovalModal";
 
 type MediaType = "video" | "image" | "carousel";
 
 interface GenerationState {
   status: "idle" | "generating" | "completed" | "error";
-  progress?: number;
   result?: any;
   error?: string;
 }
@@ -32,7 +30,6 @@ function Dashboard() {
   const [pendingApprovalPostId, setPendingApprovalPostId] = useState<
     string | null
   >(null);
-  const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16">("16:9");
   const [videoSize, setVideoSize] = useState<
     "1280x720" | "1792x1024" | "720x1280" | "1024x1792"
@@ -48,7 +45,6 @@ function Dashboard() {
 
   // Async UX state
   const [showQueuedModal, setShowQueuedModal] = useState(false);
-  const [showReadyModal, setShowReadyModal] = useState(false);
 
   // Track posts generated during this session
   const [sessionGeneratedPosts, setSessionGeneratedPosts] = useState<
@@ -161,7 +157,6 @@ function Dashboard() {
     console.log("🔍 DEBUG: Checking for approval posts", {
       postsCount: posts.length,
       showPromptApproval,
-      showReadyModal,
       showQueuedModal,
       sessionGeneratedPosts: Array.from(sessionGeneratedPosts),
     });
@@ -184,12 +179,7 @@ function Dashboard() {
         : "none"
     );
 
-    if (
-      needsApproval &&
-      !showPromptApproval &&
-      !showReadyModal &&
-      !showQueuedModal
-    ) {
+    if (needsApproval && !showPromptApproval && !showQueuedModal) {
       console.log(
         "✅ OPENING PROMPT APPROVAL MODAL for post:",
         needsApproval.id
@@ -199,13 +189,7 @@ function Dashboard() {
 
       setSessionGeneratedPosts((prev) => new Set(prev).add(needsApproval.id));
     }
-  }, [
-    posts,
-    showPromptApproval,
-    showReadyModal,
-    showQueuedModal,
-    sessionGeneratedPosts,
-  ]);
+  }, [posts, showPromptApproval, showQueuedModal, sessionGeneratedPosts]);
 
   // === Handle post updates for automatic modal display ===
   useEffect(() => {
@@ -288,12 +272,11 @@ function Dashboard() {
 
       console.log("🔍 /api/generate-media response:", data);
 
-      if (data?.success && data.status === "queued" && data.postId) {
+      if (data?.success && data.status === "processing" && data.postId) {
         setGenerationState({
           status: "generating",
           result: { postId: data.postId },
         });
-        setActiveJobId(data.postId);
         setShowQueuedModal(true);
 
         // Add to session tracking
@@ -314,7 +297,6 @@ function Dashboard() {
         status: "error",
         error: error.message || "Failed to start generation",
       });
-      setActiveJobId(null);
     },
   });
 
@@ -371,19 +353,6 @@ function Dashboard() {
       console.error("Error cancelling prompt:", error);
     },
   });
-
-  const handleJobCompletion = () => {
-    console.log("🎉 Job completed!");
-    setActiveJobId(null);
-    queryClient.invalidateQueries({ queryKey: ["posts"] });
-    queryClient.invalidateQueries({ queryKey: ["user-credits"] });
-  };
-
-  const handleJobError = (error: string) => {
-    console.error("❌ Job error:", error);
-    setGenerationState({ status: "error", error: error });
-    setActiveJobId(null);
-  };
 
   // === Publish Post Mutation ===
   const publishMutation = useMutation({
@@ -448,7 +417,6 @@ function Dashboard() {
     e.preventDefault();
     if (!prompt.trim() || userCredits[selectedMediaType] <= 0) return;
 
-    setActiveJobId(null);
     setGenerationState({ status: "idle" });
 
     const formData = buildFormData();
@@ -487,11 +455,11 @@ function Dashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="bg-gray-900 rounded-2xl border border-cyan-400/40 shadow-2xl max-w-sm w-full p-6">
             <h3 className="text-lg font-semibold text-white mb-2">
-              Your video is in the queue 🎬
+              Your content is being generated 🎬
             </h3>
             <p className="text-sm text-purple-200 mb-4">
-              We've started generating your video. It will appear in your
-              content library when ready.
+              We've started generating your {selectedMediaType}. It will appear
+              in your content library when ready.
             </p>
             <div className="flex justify-end">
               <button
@@ -499,29 +467,6 @@ function Dashboard() {
                 className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium"
               >
                 Got it
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Video ready modal - ONLY for session-generated posts */}
-      {showReadyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="bg-gray-900 rounded-2xl border border-green-400/40 shadow-2xl max-w-sm w-full p-6">
-            <h3 className="text-lg font-semibold text-green-400 mb-2">
-              Your video is ready ✅
-            </h3>
-            <p className="text-sm text-purple-200 mb-4">
-              Your generated video has finished processing. You can preview it
-              from your content library below.
-            </p>
-            <div className="flex justify-end">
-              <button
-                onClick={() => setShowReadyModal(false)}
-                className="px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm font-medium"
-              >
-                Awesome
               </button>
             </div>
           </div>
@@ -1018,18 +963,6 @@ function Dashboard() {
                 </button>
               </form>
 
-              {/* Job Status Tracker */}
-              {activeJobId && (
-                <div className="mt-6">
-                  <JobStatusTracker
-                    postId={activeJobId}
-                    mediaType={selectedMediaType}
-                    onCompletion={handleJobCompletion}
-                    onError={handleJobError}
-                  />
-                </div>
-              )}
-
               {/* Generation Error */}
               {generationState.status === "error" && (
                 <ErrorAlert
@@ -1059,7 +992,7 @@ function Dashboard() {
               </div>
               <div className="space-y-4 max-h-[600px] overflow-y-auto">
                 {posts
-                  .filter((post: any) => post.status !== "CANCELLED") // ← Add this filter
+                  .filter((post: any) => post.status !== "CANCELLED")
                   .map((post: any) => (
                     <PostCard
                       key={post.id}

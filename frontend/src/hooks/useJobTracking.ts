@@ -21,7 +21,8 @@ export const useJobTracking = (postId: string | null) => {
       if (!postId) return null;
 
       try {
-        const response = await apiEndpoints.getJobStatus(postId);
+        // Use the new getPostStatus endpoint instead of getJobStatus
+        const response = await apiEndpoints.getPostStatus(postId);
         return response.data;
       } catch (error: any) {
         console.error("Job status fetch error:", error);
@@ -35,18 +36,18 @@ export const useJobTracking = (postId: string | null) => {
     refetchInterval: (query) => {
       const data = query.state.data;
 
-      if (
-        data?.job?.status === "queued" ||
-        data?.job?.status === "processing"
-      ) {
+      // Check post status instead of job status
+      if (data?.post?.status === "PROCESSING" || data?.post?.status === "NEW") {
         return 5000;
       }
 
+      // Stop polling when post is ready or completed
       if (
-        data?.job?.status === "completed" &&
-        Date.now() - new Date(data.job.updatedAt).getTime() < 30000
+        data?.post?.status === "READY" ||
+        data?.post?.status === "COMPLETED" ||
+        data?.post?.status === "FAILED"
       ) {
-        return 10000;
+        return false;
       }
 
       return false;
