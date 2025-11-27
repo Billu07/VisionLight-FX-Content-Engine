@@ -47,9 +47,7 @@ function Dashboard() {
   const [showWelcomeTour, setShowWelcomeTour] = useState(false);
 
   // Async UX state
-  const [queuedPostId, setQueuedPostId] = useState<string | null>(null);
   const [showQueuedModal, setShowQueuedModal] = useState(false);
-  const [readyPostId, setReadyPostId] = useState<string | null>(null);
   const [showReadyModal, setShowReadyModal] = useState(false);
 
   // Track posts generated during this session
@@ -281,7 +279,6 @@ function Dashboard() {
           result: { postId: data.postId },
         });
         setActiveJobId(data.postId);
-        setQueuedPostId(data.postId);
         setShowQueuedModal(true);
 
         // Add to session tracking
@@ -311,7 +308,7 @@ function Dashboard() {
     mutationFn: async (data: { postId: string; finalPrompt: string }) => {
       return apiEndpoints.approvePrompt(data);
     },
-    onSuccess: (response) => {
+    onSuccess: () => {
       console.log("✅ Prompt approved successfully");
       setShowPromptApproval(false);
       setPendingApprovalPostId(null);

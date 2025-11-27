@@ -1,5 +1,4 @@
-// frontend/src/hooks/useJobTracking.ts
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { apiEndpoints } from "../lib/api";
 
 export interface JobStatus {
@@ -16,8 +15,6 @@ export interface JobStatus {
 }
 
 export const useJobTracking = (postId: string | null) => {
-  const queryClient = useQueryClient();
-
   return useQuery({
     queryKey: ["job-status", postId],
     queryFn: async () => {

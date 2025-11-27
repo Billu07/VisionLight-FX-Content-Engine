@@ -2,7 +2,7 @@ import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import axios from "axios";
 import dotenv from "dotenv";
-import { jobService } from "./services/jobService";
+import { jobService } from "./services/JobService";
 import { upload, uploadToCloudinary } from "./utils/fileUpload";
 
 // Load environment variables FIRST
@@ -389,7 +389,7 @@ app.post(
       // Initialize job tracking
       await jobService.createJob(post.id, mediaType);
       await airtableService.updatePost(post.id, {
-        status: "QUEUED",
+        status: "NEW",
       });
 
       // Deduct credit immediately

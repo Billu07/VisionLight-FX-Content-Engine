@@ -441,7 +441,12 @@ export const airtableService = {
         userId: actualUserId,
         prompt: record.get("prompt") as string,
         enhancedPrompt: record.get("enhancedPrompt") as string,
-        generationStep: record.get("generationStep") as string,
+        generationStep: record.get("generationStep") as
+          | "PROMPT_ENHANCEMENT"
+          | "AWAITING_APPROVAL"
+          | "GENERATION"
+          | "COMPLETED"
+          | undefined,
         requiresApproval: record.get("requiresApproval") as boolean,
         userEditedPrompt: record.get("userEditedPrompt") as string,
         imageReference: record.get("imageReference") as string,
@@ -568,7 +573,12 @@ export const airtableService = {
         userId: actualUserId,
         prompt: record.get("prompt") as string,
         enhancedPrompt: record.get("enhancedPrompt") as string,
-        generationStep: record.get("generationStep") as string,
+        generationStep: record.get("generationStep") as
+          | "PROMPT_ENHANCEMENT"
+          | "AWAITING_APPROVAL"
+          | "GENERATION"
+          | "COMPLETED"
+          | undefined,
         requiresApproval: record.get("requiresApproval") as boolean,
         userEditedPrompt: record.get("userEditedPrompt") as string,
         imageReference: record.get("imageReference") as string,
@@ -636,7 +646,12 @@ export const airtableService = {
           userId: actualUserId,
           prompt: record.get("prompt") as string,
           enhancedPrompt: record.get("enhancedPrompt") as string,
-          generationStep: record.get("generationStep") as string,
+          generationStep: record.get("generationStep") as
+            | "PROMPT_ENHANCEMENT"
+            | "AWAITING_APPROVAL"
+            | "GENERATION"
+            | "COMPLETED"
+            | undefined,
           requiresApproval: record.get("requiresApproval") as boolean,
           userEditedPrompt: record.get("userEditedPrompt") as string,
           imageReference: record.get("imageReference") as string,
