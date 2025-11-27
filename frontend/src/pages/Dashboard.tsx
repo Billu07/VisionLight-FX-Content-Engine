@@ -123,15 +123,16 @@ function Dashboard() {
     queryKey: ["posts"],
     queryFn: async () => {
       const response = await apiEndpoints.getPosts();
-      console.log("📦 Posts fetched:", response.data.posts);
+      const approvalPosts = response.data.posts.filter(
+        (p: any) =>
+          p.generationStep === "AWAITING_APPROVAL" &&
+          p.requiresApproval === true
+      );
+      console.log("📦 Posts fetched - approval posts:", approvalPosts.length);
       return response.data.posts;
     },
     enabled: !!user,
-    refetchInterval: (query) => {
-      const posts = query.state.data || [];
-      const hasProcessing = posts.some((p: any) => p.status === "PROCESSING");
-      return hasProcessing ? 80000 : false;
-    },
+    refetchInterval: 5000, // Check every 5 seconds regardless of status
     refetchIntervalInBackground: true,
     staleTime: 0,
   });
@@ -155,28 +156,32 @@ function Dashboard() {
     }
   }, [posts]);
 
-  // === Improved Modal Detection Logic ===
+  // === Fixed Modal Detection Logic ===
   useEffect(() => {
     console.log("🔍 DEBUG: Checking for approval posts", {
       postsCount: posts.length,
       showPromptApproval,
       showReadyModal,
       showQueuedModal,
+      sessionGeneratedPosts: Array.from(sessionGeneratedPosts),
     });
 
-    if (posts.length === 0) return;
+    if (posts.length === 0 || showPromptApproval) return;
 
     // Priority 1: Check for posts needing approval
     const needsApproval = posts.find(
       (p: any) =>
-        p.generationStep === "AWAITING_APPROVAL" &&
-        p.requiresApproval === true &&
-        !sessionGeneratedPosts.has(p.id)
+        p.generationStep === "AWAITING_APPROVAL" && p.requiresApproval === true
     );
 
     console.log(
       "🎯 Posts needing approval:",
-      needsApproval ? needsApproval.id : "none"
+      needsApproval
+        ? {
+            id: needsApproval.id,
+            inSession: sessionGeneratedPosts.has(needsApproval.id),
+          }
+        : "none"
     );
 
     if (
@@ -192,9 +197,7 @@ function Dashboard() {
       setPendingApprovalPostId(needsApproval.id);
       setShowPromptApproval(true);
 
-      // Add to session tracking to prevent duplicate modals
       setSessionGeneratedPosts((prev) => new Set(prev).add(needsApproval.id));
-      return;
     }
   }, [
     posts,
@@ -237,6 +240,18 @@ function Dashboard() {
       }
     }
   }, [posts, pendingApprovalPostId, showPromptApproval]);
+
+  // === Real-time Approval Polling ===
+  useEffect(() => {
+    if (!user || showPromptApproval) return;
+
+    // Poll every 3 seconds specifically for new approval posts
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [user, showPromptApproval, queryClient]);
 
   // === Fetch User Credits ===
   const {

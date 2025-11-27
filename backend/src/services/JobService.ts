@@ -16,7 +16,6 @@ export interface JobStatus {
 
 export class JobService {
   private static instance: JobService;
-  private activeJobs = new Map<string, JobStatus>();
   private jobTimeouts = new Map<string, NodeJS.Timeout>();
   private progressIntervals = new Map<string, NodeJS.Timeout>();
 
@@ -40,7 +39,8 @@ export class JobService {
       lastPhaseUpdate: new Date(),
     };
 
-    this.activeJobs.set(postId, job);
+    // Store job in Airtable
+    await this.saveJobToAirtable(job);
 
     // Start progress simulation
     this.startProgressSimulation(postId, mediaType);
@@ -51,28 +51,67 @@ export class JobService {
     return job;
   }
 
+  private async saveJobToAirtable(job: JobStatus): Promise<void> {
+    await airtableService.updatePost(job.postId, {
+      jobStatus: job.status,
+      jobProgress: job.progress,
+      jobMessage: job.phase,
+      jobStartedAt: job.startedAt.toISOString(),
+      jobEstimatedCompletion: job.estimatedCompletion.toISOString(),
+      jobMediaType: job.mediaType,
+      jobLastUpdate: job.updatedAt.toISOString(),
+    });
+  }
+
+  private async getJobFromAirtable(postId: string): Promise<JobStatus | null> {
+    try {
+      const post = await airtableService.getPostById(postId);
+      if (!post || !post.jobStatus) return null;
+
+      return {
+        postId,
+        status: post.jobStatus as JobStatus["status"],
+        progress: post.jobProgress || 0,
+        startedAt: new Date(post.jobStartedAt || post.createdAt),
+        updatedAt: new Date(post.jobLastUpdate || post.updatedAt),
+        estimatedCompletion: new Date(
+          post.jobEstimatedCompletion || new Date()
+        ),
+        mediaType: post.jobMediaType || "video",
+        phase: post.jobMessage || "Starting...",
+        lastPhaseUpdate: new Date(post.jobLastUpdate || post.updatedAt),
+      };
+    } catch (error) {
+      console.error("Error getting job from Airtable:", error);
+      return null;
+    }
+  }
+
   private startProgressSimulation(postId: string, mediaType: string): void {
     this.clearProgressInterval(postId);
 
     const interval = setInterval(async () => {
-      const job = this.activeJobs.get(postId);
-      if (!job || job.status === "completed" || job.status === "failed") {
+      try {
+        const job = await this.getJobFromAirtable(postId);
+        if (!job || job.status === "completed" || job.status === "failed") {
+          this.clearProgressInterval(postId);
+          return;
+        }
+
+        const newProgress = this.calculateSmartProgress(job);
+        const newPhase = this.getPhaseForProgress(newProgress, job.mediaType);
+
+        if (newProgress !== job.progress || newPhase !== job.phase) {
+          await this.updateJobStatus(
+            postId,
+            job.status, // Keep same status
+            newProgress,
+            job.error
+          );
+        }
+      } catch (error) {
+        console.error("Progress simulation error:", error);
         this.clearProgressInterval(postId);
-        return;
-      }
-
-      const newProgress = this.calculateSmartProgress(job);
-      const newPhase = this.getPhaseForProgress(newProgress, job.mediaType);
-
-      if (newProgress !== job.progress || newPhase !== job.phase) {
-        job.progress = newProgress;
-        job.phase = newPhase;
-        job.lastPhaseUpdate = new Date();
-        job.updatedAt = new Date();
-
-        console.log(
-          `🔄 Job ${postId} progress: ${newProgress}% - Phase: ${newPhase}`
-        );
       }
     }, 5000);
 
@@ -149,27 +188,34 @@ export class JobService {
     progress?: number,
     error?: string
   ): Promise<void> {
-    const job = this.activeJobs.get(postId);
-    if (job) {
-      job.status = status;
-      if (progress !== undefined) job.progress = progress;
-      job.error = error;
-      job.updatedAt = new Date();
-
-      if (status === "completed") {
-        job.progress = 100;
-        job.phase = "✅ Generation complete!";
-        this.clearProgressInterval(postId);
-      } else if (status === "failed") {
-        job.phase = "❌ Generation failed";
-        this.clearProgressInterval(postId);
+    try {
+      const currentJob = await this.getJobFromAirtable(postId);
+      if (!currentJob) {
+        console.warn(`Job ${postId} not found in Airtable`);
+        return;
       }
+
+      const phase =
+        status === "completed"
+          ? "✅ Generation complete!"
+          : status === "failed"
+          ? "❌ Generation failed"
+          : currentJob.phase;
+
+      // Update job in Airtable
+      await airtableService.updatePost(postId, {
+        jobStatus: status,
+        jobProgress: progress !== undefined ? progress : currentJob.progress,
+        jobMessage: phase,
+        jobLastUpdate: new Date().toISOString(),
+        ...(error && { jobError: error }),
+      });
 
       // 🛠️ FIX: Map job status to correct Airtable status values
       let airtableStatus: string;
       switch (status) {
         case "completed":
-          airtableStatus = "READY"; // Use "READY" for completed posts
+          airtableStatus = "READY";
           break;
         case "failed":
           airtableStatus = "FAILED";
@@ -178,7 +224,7 @@ export class JobService {
           airtableStatus = "PROCESSING";
           break;
         case "queued":
-          airtableStatus = "NEW"; // Or "PROCESSING" depending on your workflow
+          airtableStatus = "NEW";
           break;
         default:
           airtableStatus = "PROCESSING";
@@ -190,12 +236,20 @@ export class JobService {
 
       if (status === "completed" || status === "failed") {
         this.clearJobTimeout(postId);
+        this.clearProgressInterval(postId);
       }
+    } catch (error) {
+      console.error("Error updating job status:", error);
     }
   }
 
-  getJobStatus(postId: string): JobStatus | undefined {
-    return this.activeJobs.get(postId);
+  async getJobStatus(postId: string): Promise<JobStatus | null> {
+    try {
+      return await this.getJobFromAirtable(postId);
+    } catch (error) {
+      console.error("Error getting job status:", error);
+      return null;
+    }
   }
 
   private setJobTimeout(postId: string, mediaType: string): void {
@@ -209,7 +263,6 @@ export class JobService {
         undefined,
         "Generation timeout - process took too long"
       );
-      this.activeJobs.delete(postId);
     }, timeoutMinutes * 60 * 1000);
 
     this.jobTimeouts.set(postId, timeoutId);
@@ -233,7 +286,7 @@ export class JobService {
 
   private calculateEstimatedCompletion(mediaType: string): Date {
     const baseTimes = {
-      video: 10 * 60 * 1000, // 3 minutes for video
+      video: 10 * 60 * 1000, // 10 minutes for video
       image: 1.5 * 60 * 1000, // 1.5 minutes for image
       carousel: 2 * 60 * 1000, // 2 minutes for carousel
     };

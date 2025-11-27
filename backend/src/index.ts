@@ -523,7 +523,6 @@ app.post(
 
 // ==================== PROMPT APPROVAL WORKFLOW ROUTES ====================
 
-// NEW: Update enhanced prompt (called by n8n after AI enhancement)
 app.post("/api/update-enhanced-prompt", async (req, res) => {
   try {
     const { postId, enhancedPrompt, imageReference } = req.body;
@@ -540,25 +539,19 @@ app.post("/api/update-enhanced-prompt", async (req, res) => {
     await airtableService.updatePost(postId, {
       enhancedPrompt,
       imageReference: imageReference || "",
-      generationStep: "AWAITING_APPROVAL",
+      generationStep: "AWAITING_APPROVAL", // ← This is what triggers the modal
       status: "PROCESSING",
     });
 
-    try {
-      const job = jobService.getJobStatus(postId);
-      if (job) {
-        await jobService.updateJobStatus(
-          postId,
-          "processing",
-          30,
-          "Your Prompt is Ready, Please REFRESH the page"
-        );
-      }
-    } catch (jobError) {
-      console.log("No job tracking found for post:", postId);
-    }
+    console.log(
+      "✅ Enhanced prompt saved to Airtable - modal should appear soon"
+    );
 
-    return res.json({ success: true, message: "Enhanced prompt updated" });
+    return res.json({
+      success: true,
+      message:
+        "Enhanced prompt updated - user should see approval modal shortly",
+    });
   } catch (error: any) {
     console.error("Error updating enhanced prompt:", error);
     return res.status(500).json({ success: false, error: error.message });
@@ -856,7 +849,7 @@ app.post("/api/media-webhook", async (req, res) => {
       mediaUrl: media.url,
       mediaProvider: mediaType === "video" ? "sora" : "gemini",
       status: "READY",
-      generationStep: undefined,
+      generationStep: "COMPLETED",
     });
 
     await ROIService.incrementMediaGenerated(userId);
