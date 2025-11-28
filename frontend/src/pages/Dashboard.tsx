@@ -386,10 +386,10 @@ function Dashboard() {
 
     if (!file) return;
 
-    const maxSize = 4 * 1024 * 1024; // 4MB in bytes
+    const maxSize = 10 * 1024 * 1024; // 4MB in bytes
     if (file.size > maxSize) {
       alert(
-        "❌ Image size must be less than 4MB. Please choose a smaller file."
+        "❌ Image size must be less than 10MB. Please choose a smaller file."
       );
       e.target.value = "";
       return;
@@ -976,7 +976,8 @@ function Dashboard() {
                       />
                       {/* 🆕 ADD FILE SIZE VALIDATION MESSAGE */}
                       <p className="text-xs text-purple-300 mt-2">
-                        Maximum file size: 4MB. Supported formats: JPG, PNG
+                        Maximum file size: 10MB. Supported formats: JPG, PNG(PNG
+                        Preferred)
                       </p>
                     </div>
                     {referenceImageUrl && (
