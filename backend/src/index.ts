@@ -387,7 +387,6 @@ app.post(
 );
 
 // Enhanced Direct Media Generation with Cloudinary and Generation Parameters
-// Enhanced Direct Media Generation with Cloudinary and Generation Parameters
 app.post(
   "/api/generate-media",
   authenticateToken,
@@ -405,17 +404,9 @@ app.post(
         size,
         width,
         height,
-        title, // 🆕 ADD TITLE EXTRACTION
+        title,
       } = req.body;
       const referenceImageFile = req.file;
-
-      // 🆕 ADD DEBUG LOG to see if title is received
-      console.log("📝 Received form data:", {
-        prompt: prompt?.substring(0, 50) + (prompt?.length > 50 ? "..." : ""),
-        mediaType,
-        title, // This should show your title
-        hasReferenceImage: !!referenceImageFile,
-      });
 
       if (!prompt || !mediaType) {
         return res
@@ -468,11 +459,10 @@ app.post(
 
       console.log("📋 Storing generation parameters:", generationParams);
 
-      // Create post with generation parameters, initial progress, AND TITLE
+      // Create post with generation parameters and initial progress
       const post = await airtableService.createPost({
         userId: req.user!.id,
         prompt,
-        title: title || undefined, // 🆕 PASS THE TITLE TO AIRTABLE
         mediaType: mediaType.toUpperCase() as any,
         platform: "INSTAGRAM",
         generationParams: generationParams, // Store all parameters for second workflow
@@ -481,12 +471,7 @@ app.post(
         requiresApproval: true,
       });
 
-      // 🆕 ADD DEBUG LOG to confirm title was saved
-      console.log("💾 Post created:", {
-        id: post.id,
-        title: post.title,
-        prompt: post.prompt?.substring(0, 30) + "...",
-      });
+      console.log("📝 Post created with generation params:", post.id);
 
       // Update post with initial progress
       await airtableService.updatePost(post.id, {
@@ -524,11 +509,6 @@ app.post(
         "hasReferenceImage",
         referenceImageFile ? "true" : "false"
       );
-
-      // 🆕 OPTIONAL: Include title in n8n workflow if needed
-      if (title) {
-        formData.append("title", title);
-      }
 
       // Add enhanced video parameters
       if (mediaType === "video") {
