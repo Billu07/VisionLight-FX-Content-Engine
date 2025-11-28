@@ -382,16 +382,23 @@ function Dashboard() {
   });
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  
-  if (!file) return;
+    const file = e.target.files?.[0];
 
-  const maxSize = 4 * 1024 * 1024; // 4MB in bytes
-  if (file.size > maxSize) {
-    alert("❌ Image size must be less than 4MB. Please choose a smaller file.");
-    e.target.value = "";
-    return;
-  };
+    if (!file) return;
+
+    const maxSize = 4 * 1024 * 1024; // 4MB in bytes
+    if (file.size > maxSize) {
+      alert(
+        "❌ Image size must be less than 4MB. Please choose a smaller file."
+      );
+      e.target.value = "";
+      return;
+    }
+
+    // If we get here, the file is valid
+    setReferenceImage(file);
+    setReferenceImageUrl(URL.createObjectURL(file));
+  }; // <-- This was missing
 
   const buildFormData = () => {
     const formData = new FormData();
