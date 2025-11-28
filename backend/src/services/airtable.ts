@@ -403,7 +403,7 @@ export const airtableService = {
       const now = new Date().toISOString();
       const record = await base("Posts").create({
         userId: [postData.userId],
-        title: postData.title || null,
+        title: postData.title,
         prompt: postData.prompt,
         mediaType: postData.mediaType,
         platform: postData.platform,
