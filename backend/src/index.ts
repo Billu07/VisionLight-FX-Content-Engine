@@ -404,7 +404,6 @@ app.post(
         size,
         width,
         height,
-        title,
       } = req.body;
       const referenceImageFile = req.file;
 

@@ -416,7 +416,7 @@ export const airtableService = {
           ? JSON.stringify(postData.generationParams)
           : undefined,
         status: "NEW",
-        progress: 0,
+        progress: 0, // Initialize progress at 0%
         createdAt: now,
         updatedAt: now,
       });
