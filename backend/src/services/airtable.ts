@@ -388,8 +388,8 @@ export const airtableService = {
   // Post operations
   async createPost(postData: {
     userId: string;
-    title?: string;
     prompt: string;
+    title?: string;
     mediaType?: "VIDEO" | "IMAGE" | "CAROUSEL";
     platform: string;
     script?: any;
@@ -403,8 +403,8 @@ export const airtableService = {
       const now = new Date().toISOString();
       const record = await base("Posts").create({
         userId: [postData.userId],
-        title: postData.title || null,
         prompt: postData.prompt,
+        title: postData.title || null,
         mediaType: postData.mediaType,
         platform: postData.platform,
         script: postData.script ? JSON.stringify(postData.script) : undefined,
@@ -421,7 +421,10 @@ export const airtableService = {
         updatedAt: now,
       });
 
-      const userIdField = record.get("userId");
+      // FIXED: Properly type the record and use field access
+      const recordFields = record.fields;
+
+      const userIdField = recordFields.userId;
       let actualUserId: string;
 
       if (Array.isArray(userIdField) && userIdField.length > 0) {
@@ -444,34 +447,34 @@ export const airtableService = {
 
       return {
         id: record.id,
-        title: record.get("title") as string,
         userId: actualUserId,
-        prompt: record.get("prompt") as string,
-        enhancedPrompt: record.get("enhancedPrompt") as string,
-        generationStep: record.get("generationStep") as
+        title: recordFields.title as string,
+        prompt: recordFields.prompt as string,
+        enhancedPrompt: recordFields.enhancedPrompt as string,
+        generationStep: recordFields.generationStep as
           | "PROMPT_ENHANCEMENT"
           | "AWAITING_APPROVAL"
           | "GENERATION"
           | "COMPLETED"
           | undefined,
-        requiresApproval: record.get("requiresApproval") as boolean,
-        userEditedPrompt: record.get("userEditedPrompt") as string,
-        imageReference: record.get("imageReference") as string,
-        generationParams: record.get("generationParams")
-          ? JSON.parse(record.get("generationParams") as string)
+        requiresApproval: recordFields.requiresApproval as boolean,
+        userEditedPrompt: recordFields.userEditedPrompt as string,
+        imageReference: recordFields.imageReference as string,
+        generationParams: recordFields.generationParams
+          ? JSON.parse(recordFields.generationParams as string)
           : undefined,
-        mediaType: record.get("mediaType") as "VIDEO" | "IMAGE" | "CAROUSEL",
-        mediaUrl: record.get("mediaUrl") as string,
-        mediaProvider: record.get("mediaProvider") as string,
-        status: record.get("status") as any,
-        platform: record.get("platform") as string,
-        script: record.get("script")
-          ? JSON.parse(record.get("script") as string)
+        mediaType: recordFields.mediaType as "VIDEO" | "IMAGE" | "CAROUSEL",
+        mediaUrl: recordFields.mediaUrl as string,
+        mediaProvider: recordFields.mediaProvider as string,
+        status: recordFields.status as any,
+        platform: recordFields.platform as string,
+        script: recordFields.script
+          ? JSON.parse(recordFields.script as string)
           : undefined,
-        bufferPostId: record.get("bufferPostId") as string,
-        progress: (record.get("progress") as number) || 0, // Include progress
-        createdAt: new Date(record.get("createdAt") as string),
-        updatedAt: new Date(record.get("updatedAt") as string),
+        bufferPostId: recordFields.bufferPostId as string,
+        progress: (recordFields.progress as number) || 0,
+        createdAt: new Date(recordFields.createdAt as string),
+        updatedAt: new Date(recordFields.updatedAt as string),
       };
     } catch (error) {
       console.error("Airtable createPost error:", error);
@@ -486,7 +489,6 @@ export const airtableService = {
       };
 
       // Existing fields
-      if (updates.title !== undefined) updateData.title = updates.title;
       if (updates.mediaUrl !== undefined)
         updateData.mediaUrl = updates.mediaUrl;
       if (updates.mediaType !== undefined)
@@ -500,6 +502,7 @@ export const airtableService = {
         updateData.script = JSON.stringify(updates.script);
 
       // Enhanced workflow fields
+      if (updates.title !== undefined) updateData.title = updates.title;
       if (updates.enhancedPrompt !== undefined)
         updateData.enhancedPrompt = updates.enhancedPrompt;
       if (updates.imageReference !== undefined)
@@ -513,13 +516,14 @@ export const airtableService = {
       if (updates.generationParams !== undefined)
         updateData.generationParams = JSON.stringify(updates.generationParams);
 
-      // NEW: Progress field
+      // Progress field
       if (updates.progress !== undefined)
         updateData.progress = updates.progress;
 
       const record = await base("Posts").update(postId, updateData);
+      const recordFields = record.fields; // FIXED: Use fields property
 
-      const userIdField = record.get("userId");
+      const userIdField = recordFields.userId;
       let actualUserId: string;
 
       if (Array.isArray(userIdField) && userIdField.length > 0) {
@@ -542,21 +546,21 @@ export const airtableService = {
 
       return {
         id: record.id,
-        title: record.get("title") as string,
         userId: actualUserId,
-        prompt: record.get("prompt") as string,
-        mediaType: record.get("mediaType") as "VIDEO" | "IMAGE" | "CAROUSEL",
-        mediaUrl: record.get("mediaUrl") as string,
-        mediaProvider: record.get("mediaProvider") as string,
-        status: record.get("status") as any,
-        platform: record.get("platform") as string,
-        script: record.get("script")
-          ? JSON.parse(record.get("script") as string)
+        title: recordFields.title as string,
+        prompt: recordFields.prompt as string,
+        mediaType: recordFields.mediaType as "VIDEO" | "IMAGE" | "CAROUSEL",
+        mediaUrl: recordFields.mediaUrl as string,
+        mediaProvider: recordFields.mediaProvider as string,
+        status: recordFields.status as any,
+        platform: recordFields.platform as string,
+        script: recordFields.script
+          ? JSON.parse(recordFields.script as string)
           : undefined,
-        bufferPostId: record.get("bufferPostId") as string,
-        progress: (record.get("progress") as number) || 0, // Include progress
-        createdAt: new Date(record.get("createdAt") as string),
-        updatedAt: new Date(record.get("updatedAt") as string),
+        bufferPostId: recordFields.bufferPostId as string,
+        progress: (recordFields.progress as number) || 0,
+        createdAt: new Date(recordFields.createdAt as string),
+        updatedAt: new Date(recordFields.updatedAt as string),
       };
     } catch (error) {
       console.error("Airtable updatePost error:", error);
