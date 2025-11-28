@@ -403,7 +403,7 @@ export const airtableService = {
       const now = new Date().toISOString();
       const record = await base("Posts").create({
         userId: [postData.userId],
-        title: postData.title,
+        title: postData.title || null,
         prompt: postData.prompt,
         mediaType: postData.mediaType,
         platform: postData.platform,
@@ -416,7 +416,7 @@ export const airtableService = {
           ? JSON.stringify(postData.generationParams)
           : undefined,
         status: "NEW",
-        progress: 0, // Initialize progress at 0%
+        progress: 0,
         createdAt: now,
         updatedAt: now,
       });
