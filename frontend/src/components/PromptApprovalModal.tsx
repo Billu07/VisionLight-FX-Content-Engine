@@ -22,6 +22,7 @@ interface PostData {
   requiresApproval: boolean;
   mediaType: string;
   status: string;
+  progress?: number; // Added progress field
   generationParams?: any;
   createdAt: string;
 }

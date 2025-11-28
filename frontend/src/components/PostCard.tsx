@@ -3,7 +3,6 @@ import { LoadingSpinner } from "./LoadingSpinner";
 
 interface PostCardProps {
   post: any;
-  // Just change this line - keep everything else exactly as you have it
   onPublishPost: (variables: { postId: string; platform?: string }) => void;
   publishingPost: string | null;
   userCredits: any;
@@ -35,27 +34,73 @@ export function PostCard({
     setMediaError(true);
   };
 
+  // Use real progress from post data
+  const progress = post.progress || 0;
+  const isProcessing = post.status === "PROCESSING";
+  const isFailed = post.status === "FAILED";
+  const isNew = post.status === "NEW";
+
   const renderMedia = () => {
     console.log("🎬 Rendering media for post:", {
       id: post.id,
       mediaUrl: post.mediaUrl,
       status: post.status,
+      progress: progress,
       mediaType: post.mediaType,
       mediaProvider: post.mediaProvider,
     });
 
     if (!post.mediaUrl) {
-      if (post.status === "PROCESSING") {
+      if (isProcessing || isNew) {
         return (
           <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl flex items-center justify-center border border-cyan-400/20">
-            <div className="text-center">
+            <div className="text-center w-full p-4">
               <LoadingSpinner size="md" variant="neon" />
               <p className="text-cyan-400 text-sm mt-3 font-medium">
-                Creating your masterpiece...
+                {isFailed
+                  ? "Generation failed"
+                  : "Creating your masterpiece..."}
               </p>
-              <p className="text-purple-300 text-xs mt-1">
-                This usually takes 1-2 minutes
-              </p>
+
+              {/* Real Progress Bar */}
+              {isProcessing && (
+                <div className="mt-4 space-y-2">
+                  <div className="flex justify-between text-xs text-purple-300">
+                    <span>Progress</span>
+                    <span>{progress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-2">
+                    <div
+                      className="bg-gradient-to-r from-cyan-500 to-blue-500 h-2 rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${progress}%` }}
+                    ></div>
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {progress < 30 && "🔄 Initializing generation..."}
+                    {progress >= 30 &&
+                      progress < 70 &&
+                      "🎨 Creating your content..."}
+                    {progress >= 70 &&
+                      progress < 100 &&
+                      "✨ Adding final touches..."}
+                    {progress === 100 && "✅ Ready to use!"}
+                  </div>
+                </div>
+              )}
+
+              {isFailed && (
+                <p className="text-red-400 text-xs mt-1">
+                  Please try again with a different prompt
+                </p>
+              )}
+
+              {!isFailed && (
+                <p className="text-purple-300 text-xs mt-1">
+                  {progress < 50
+                    ? "This may take a few minutes..."
+                    : "Almost there..."}
+                </p>
+              )}
             </div>
           </div>
         );
@@ -170,7 +215,7 @@ export function PostCard({
       case "PROCESSING":
         return {
           color: "bg-yellow-500/20 text-yellow-400 border-yellow-400/30",
-          text: "Processing",
+          text: `Processing ${progress}%`,
         };
       case "READY":
         return {
@@ -181,6 +226,11 @@ export function PostCard({
         return {
           color: "bg-red-500/20 text-red-400 border-red-400/30",
           text: "Failed",
+        };
+      case "NEW":
+        return {
+          color: "bg-blue-500/20 text-blue-400 border-blue-400/30",
+          text: "Queued",
         };
       default:
         return {

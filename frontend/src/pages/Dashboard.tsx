@@ -110,7 +110,7 @@ function Dashboard() {
     }
   }, [user, authLoading, navigate]);
 
-  // === Fetch Posts with auto-refresh ===
+  // === Fetch Posts with smart auto-refresh ===
   const {
     data: posts = [],
     isLoading: postsLoading,
@@ -128,8 +128,14 @@ function Dashboard() {
       return response.data.posts;
     },
     enabled: !!user,
-    refetchInterval: 5000, // Check every 5 seconds regardless of status
-    refetchIntervalInBackground: true,
+    refetchInterval: (query) => {
+      // Only refetch if there are processing posts
+      const posts = query.state.data || [];
+      const hasProcessing = posts.some(
+        (p: any) => p.status === "PROCESSING" && (p.progress || 0) < 100
+      );
+      return hasProcessing ? 3000 : false; // Poll every 3 seconds if processing
+    },
     staleTime: 0,
   });
 
@@ -138,7 +144,7 @@ function Dashboard() {
     if (posts.length > 0) {
       // Add any processing posts to our session tracking
       const processingPosts = posts.filter(
-        (p: any) => p.status === "PROCESSING" || p.status === "QUEUED"
+        (p: any) => p.status === "PROCESSING" || p.status === "NEW"
       );
 
       processingPosts.forEach((post: any) => {
@@ -272,7 +278,7 @@ function Dashboard() {
 
       console.log("🔍 /api/generate-media response:", data);
 
-      if (data?.success && data.status === "processing" && data.postId) {
+      if (data?.success && data.postId) {
         setGenerationState({
           status: "generating",
           result: { postId: data.postId },
@@ -1015,21 +1021,13 @@ function Dashboard() {
                     type="error"
                   />
                 </div>
-              ) : (
-                <div className="space-y-4 max-h-[600px] overflow-y-auto">
-                  {posts.map((post: any) => (
-                    <PostCard
-                      key={post.id}
-                      post={post}
-                      onPublishPost={publishMutation.mutate}
-                      publishingPost={publishingPost}
-                      userCredits={userCredits}
-                      primaryColor={primaryColor}
-                      compact={true}
-                    />
-                  ))}
+              ) : posts.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-purple-300 text-sm">
+                    No content yet. Start creating above! ✨
+                  </div>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         </div>

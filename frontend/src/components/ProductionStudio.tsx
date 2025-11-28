@@ -6,12 +6,14 @@ interface ProductionStudioProps {
   mediaType: "video" | "image" | "carousel";
   prompt: string;
   isGenerating: boolean;
+  progress?: number; // Added progress prop
 }
 
 export const ProductionStudio: React.FC<ProductionStudioProps> = ({
   mediaType,
   prompt,
   isGenerating,
+  progress = 0, // Default progress to 0
 }) => {
   const [currentScene, setCurrentScene] = useState(0);
 
@@ -106,15 +108,19 @@ export const ProductionStudio: React.FC<ProductionStudioProps> = ({
 
   const scenes = productionScenes[mediaType];
 
+  // Calculate current scene based on real progress
   useEffect(() => {
     if (!isGenerating) return;
 
-    const interval = setInterval(() => {
-      setCurrentScene((prev) => (prev + 1) % scenes.length);
-    }, 3000);
+    // Map progress to scenes (0-100% maps to scene indices)
+    const progressPerScene = 100 / scenes.length;
+    const calculatedScene = Math.min(
+      Math.floor(progress / progressPerScene),
+      scenes.length - 1
+    );
 
-    return () => clearInterval(interval);
-  }, [isGenerating, scenes.length]);
+    setCurrentScene(calculatedScene);
+  }, [progress, isGenerating, scenes.length]);
 
   if (!isGenerating) return null;
 
@@ -129,6 +135,20 @@ export const ProductionStudio: React.FC<ProductionStudioProps> = ({
             Creating: "{prompt.substring(0, 50)}
             {prompt.length > 50 ? "..." : ""}"
           </p>
+        </div>
+      </div>
+
+      {/* Real Progress Bar */}
+      <div className="mb-6">
+        <div className="flex justify-between text-sm text-purple-300 mb-2">
+          <span>Generation Progress</span>
+          <span>{progress}%</span>
+        </div>
+        <div className="w-full bg-gray-700 rounded-full h-3">
+          <div
+            className="bg-gradient-to-r from-cyan-500 to-blue-500 h-3 rounded-full transition-all duration-500 ease-out"
+            style={{ width: `${progress}%` }}
+          ></div>
         </div>
       </div>
 
@@ -165,7 +185,10 @@ export const ProductionStudio: React.FC<ProductionStudioProps> = ({
           <div className="flex items-center gap-3">
             <LoadingSpinner size="sm" variant="neon" />
             <span className="text-purple-300 text-sm">
-              AI Directors at work
+              {progress < 30 && "Initializing generation..."}
+              {progress >= 30 && progress < 70 && "Creating your content..."}
+              {progress >= 70 && progress < 100 && "Adding final touches..."}
+              {progress === 100 && "Generation complete!"}
             </span>
           </div>
           <div className="text-cyan-400 text-sm font-mono">

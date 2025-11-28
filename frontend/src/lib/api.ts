@@ -54,9 +54,11 @@ export const apiEndpoints = {
   getBrandConfig: () => api.get("/brand-config"),
   updateBrandConfig: (data: any) => api.put("/brand-config", data),
 
+  // Progress endpoint (for real progress from n8n)
   getJobStatus: (postId: string) => api.get(`/job-status/${postId}`),
   cancelPrompt: (postId: string) => api.post("/cancel-prompt", { postId }),
-  // NEW: Prompt approval endpoints
+
+  // Prompt approval endpoints
   updateEnhancedPrompt: (data: {
     postId: string;
     enhancedPrompt: string;

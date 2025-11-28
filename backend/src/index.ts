@@ -2,7 +2,6 @@ import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import axios from "axios";
 import dotenv from "dotenv";
-import { jobService } from "./services/JobService";
 import { upload, uploadToCloudinary } from "./utils/fileUpload";
 
 // Load environment variables FIRST
@@ -22,7 +21,6 @@ import { ROIService } from "./services/roi";
 import { AuthService } from "./services/auth";
 import { airtableService } from "./services/airtable";
 
-const activeTimeouts = new Map<string, NodeJS.Timeout>();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -372,7 +370,7 @@ app.post(
 
       console.log("📋 Storing generation parameters:", generationParams);
 
-      // Create post with generation parameters
+      // Create post with generation parameters and initial progress
       const post = await airtableService.createPost({
         userId: req.user!.id,
         prompt,
@@ -386,10 +384,10 @@ app.post(
 
       console.log("📝 Post created with generation params:", post.id);
 
-      // Initialize job tracking
-      await jobService.createJob(post.id, mediaType);
+      // Update post with initial progress
       await airtableService.updatePost(post.id, {
         status: "NEW",
+        progress: 0, // Start at 0%
       });
 
       // Deduct credit immediately
@@ -403,12 +401,10 @@ app.post(
           : process.env.N8N_GEMINI_WEBHOOK_URL;
 
       if (!webhookUrl) {
-        await jobService.updateJobStatus(
-          post.id,
-          "failed",
-          undefined,
-          "Webhook URL not configured"
-        );
+        await airtableService.updatePost(post.id, {
+          status: "FAILED",
+          progress: 0,
+        });
         return res
           .status(500)
           .json({ error: "Media generation service not configured" });
@@ -455,25 +451,23 @@ app.post(
         })
         .then(async (response) => {
           console.log("✅ n8n workflow triggered successfully!");
-          await jobService.updateJobStatus(post.id, "processing", 10);
+          await airtableService.updatePost(post.id, {
+            status: "PROCESSING",
+            progress: 10, // Initial progress when workflow starts
+          });
         })
         .catch(async (error) => {
           console.error("❌ Error triggering n8n workflow:", error.message);
-          await jobService.updateJobStatus(
-            post.id,
-            "failed",
-            undefined,
-            `Failed to start generation: ${error.message}`
-          );
+          await airtableService.updatePost(post.id, {
+            status: "FAILED",
+            progress: 0,
+          });
         });
-      // Return immediate response with job info
-      const job = await jobService.getJobStatus(post.id);
+      // Return immediate response with post info
       return res.json({
         success: true,
-        status: "queued",
         postId: post.id,
         message: "Media generation queued successfully",
-        estimatedCompletion: job?.estimatedCompletion,
       });
     } catch (error: any) {
       console.error("💥 Media generation error:", error);
@@ -540,6 +534,7 @@ app.post("/api/update-enhanced-prompt", async (req, res) => {
       imageReference: imageReference || "",
       generationStep: "AWAITING_APPROVAL", // ← This is what triggers the modal
       status: "PROCESSING",
+      progress: 30, // Progress when prompt is enhanced
     });
 
     console.log(
@@ -585,33 +580,24 @@ app.post(
         generationParamsImageRef: post.generationParams?.imageReference,
       });
 
-      // Update with final prompt
+      // Update with final prompt and progress
       await airtableService.updatePost(postId, {
         userEditedPrompt: finalPrompt,
         generationStep: "GENERATION",
         requiresApproval: false,
         status: "PROCESSING",
+        progress: 40, // Progress when final generation starts
       });
-
-      // Update job status
-      await jobService.updateJobStatus(
-        postId,
-        "processing",
-        50,
-        "Starting final generation with your approved prompt"
-      );
 
       // 🚀 TRIGGER SECOND N8N WORKFLOW
       const secondWorkflowUrl = process.env.N8N_FINAL_GENERATION_WEBHOOK_URL;
 
       if (!secondWorkflowUrl) {
         console.error("❌ No final generation webhook URL configured");
-        await jobService.updateJobStatus(
-          postId,
-          "failed",
-          undefined,
-          "Final generation service not configured"
-        );
+        await airtableService.updatePost(postId, {
+          status: "FAILED",
+          progress: 0,
+        });
         return res
           .status(500)
           .json({ error: "Generation service not configured" });
@@ -665,25 +651,16 @@ app.post(
         })
         .then(async (response) => {
           console.log("✅ Final generation workflow triggered successfully!");
-          await jobService.updateJobStatus(
-            postId,
-            "processing",
-            60,
-            `Final generation started ${
-              hasReferenceImage
-                ? "with reference image"
-                : "without reference image"
-            }`
-          );
+          await airtableService.updatePost(postId, {
+            progress: 50, // Progress when final generation is confirmed
+          });
         })
         .catch(async (error) => {
           console.error("❌ Error triggering final generation:", error.message);
-          await jobService.updateJobStatus(
-            postId,
-            "failed",
-            undefined,
-            `Failed to start final generation: ${error.message}`
-          );
+          await airtableService.updatePost(postId, {
+            status: "FAILED",
+            progress: 0,
+          });
         });
 
       res.json({
@@ -730,7 +707,8 @@ app.get(
           requiresApproval: post.requiresApproval,
           mediaType: post.mediaType,
           status: post.status,
-          generationParams: post.generationParams, // Include generation params
+          progress: post.progress, // Include progress
+          generationParams: post.generationParams,
           createdAt: post.createdAt,
         },
       });
@@ -765,19 +743,8 @@ app.post(
         status: "CANCELLED",
         generationStep: "COMPLETED",
         requiresApproval: false,
+        progress: 0,
       });
-
-      // Update job status
-      try {
-        await jobService.updateJobStatus(
-          postId,
-          "failed",
-          undefined,
-          "User cancelled prompt approval"
-        );
-      } catch (jobError) {
-        console.log("No job tracking found for post:", postId);
-      }
 
       res.json({
         success: true,
@@ -785,44 +752,6 @@ app.post(
       });
     } catch (error: any) {
       console.error("Error cancelling prompt:", error);
-      res.status(500).json({ error: error.message });
-    }
-  }
-);
-
-// ==================== JOB STATUS ENDPOINT ====================
-
-// Get job status
-app.get(
-  "/api/job-status/:postId",
-  authenticateToken,
-  async (req: AuthenticatedRequest, res) => {
-    try {
-      const { postId } = req.params;
-
-      const jobStatus = jobService.getJobStatus(postId);
-      const post = await airtableService.getPostById(postId);
-
-      if (!post) {
-        return res.status(404).json({ error: "Post not found" });
-      }
-
-      // Verify user owns this post
-      if (post.userId !== req.user!.id) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      res.json({
-        success: true,
-        job: jobStatus,
-        post: {
-          id: post.id,
-          status: post.status,
-          mediaUrl: post.mediaUrl,
-          updatedAt: post.updatedAt,
-        },
-      });
-    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   }
@@ -840,15 +769,13 @@ app.post("/api/media-webhook", async (req, res) => {
 
     console.log("📩 Enhanced media webhook received for post:", postId);
 
-    // Update job status to completed
-    await jobService.updateJobStatus(postId, "completed", 100);
-
-    // Update Airtable
+    // Update Airtable with completed status and 100% progress
     await airtableService.updatePost(postId, {
       mediaUrl: media.url,
       mediaProvider: mediaType === "video" ? "sora" : "gemini",
       status: "READY",
       generationStep: "COMPLETED",
+      progress: 100, // Complete!
     });
 
     await ROIService.incrementMediaGenerated(userId);

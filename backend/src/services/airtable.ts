@@ -63,9 +63,8 @@ export interface Post {
   script?: any;
   bufferPostId?: string;
   generationParams?: any;
-  jobStatus?: string;
-  jobProgress?: number;
-  jobMessage?: string;
+  // NEW: Real progress field
+  progress?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -396,7 +395,7 @@ export const airtableService = {
     imageReference?: string;
     generationStep?: string;
     requiresApproval?: boolean;
-    generationParams?: any; // NEW
+    generationParams?: any;
   }): Promise<Post> {
     try {
       const now = new Date().toISOString();
@@ -412,8 +411,9 @@ export const airtableService = {
         requiresApproval: postData.requiresApproval !== false,
         generationParams: postData.generationParams
           ? JSON.stringify(postData.generationParams)
-          : undefined, // NEW
+          : undefined,
         status: "NEW",
+        progress: 0, // Initialize progress at 0%
         createdAt: now,
         updatedAt: now,
       });
@@ -455,7 +455,7 @@ export const airtableService = {
         imageReference: record.get("imageReference") as string,
         generationParams: record.get("generationParams")
           ? JSON.parse(record.get("generationParams") as string)
-          : undefined, // NEW
+          : undefined,
         mediaType: record.get("mediaType") as "VIDEO" | "IMAGE" | "CAROUSEL",
         mediaUrl: record.get("mediaUrl") as string,
         mediaProvider: record.get("mediaProvider") as string,
@@ -465,6 +465,7 @@ export const airtableService = {
           ? JSON.parse(record.get("script") as string)
           : undefined,
         bufferPostId: record.get("bufferPostId") as string,
+        progress: (record.get("progress") as number) || 0, // Include progress
         createdAt: new Date(record.get("createdAt") as string),
         updatedAt: new Date(record.get("updatedAt") as string),
       };
@@ -493,7 +494,7 @@ export const airtableService = {
       if (updates.script !== undefined)
         updateData.script = JSON.stringify(updates.script);
 
-      // NEW fields
+      // Enhanced workflow fields
       if (updates.enhancedPrompt !== undefined)
         updateData.enhancedPrompt = updates.enhancedPrompt;
       if (updates.imageReference !== undefined)
@@ -505,7 +506,10 @@ export const airtableService = {
       if (updates.requiresApproval !== undefined)
         updateData.requiresApproval = updates.requiresApproval;
       if (updates.generationParams !== undefined)
-        updateData.generationParams = JSON.stringify(updates.generationParams); // NEW
+        updateData.generationParams = JSON.stringify(updates.generationParams);
+
+      // NEW: Progress field
+      if (updates.progress !== undefined) updateData.progress = updates.progress;
 
       const record = await base("Posts").update(postId, updateData);
 
@@ -543,6 +547,7 @@ export const airtableService = {
           ? JSON.parse(record.get("script") as string)
           : undefined,
         bufferPostId: record.get("bufferPostId") as string,
+        progress: (record.get("progress") as number) || 0, // Include progress
         createdAt: new Date(record.get("createdAt") as string),
         updatedAt: new Date(record.get("updatedAt") as string),
       };
@@ -587,7 +592,7 @@ export const airtableService = {
         imageReference: record.get("imageReference") as string,
         generationParams: record.get("generationParams")
           ? JSON.parse(record.get("generationParams") as string)
-          : undefined, // NEW
+          : undefined,
         mediaType: record.get("mediaType") as "VIDEO" | "IMAGE" | "CAROUSEL",
         mediaUrl: record.get("mediaUrl") as string,
         mediaProvider: record.get("mediaProvider") as string,
@@ -597,6 +602,7 @@ export const airtableService = {
           ? JSON.parse(record.get("script") as string)
           : undefined,
         bufferPostId: record.get("bufferPostId") as string,
+        progress: (record.get("progress") as number) || 0, // Include progress
         createdAt: new Date(record.get("createdAt") as string),
         updatedAt: new Date(record.get("updatedAt") as string),
       };
@@ -660,7 +666,7 @@ export const airtableService = {
           imageReference: record.get("imageReference") as string,
           generationParams: record.get("generationParams")
             ? JSON.parse(record.get("generationParams") as string)
-            : undefined, // NEW
+            : undefined,
           mediaType: record.get("mediaType") as "VIDEO" | "IMAGE" | "CAROUSEL",
           platform: record.get("platform") as string,
           status: record.get("status") as any,
@@ -669,6 +675,7 @@ export const airtableService = {
           script: record.get("script")
             ? JSON.parse(record.get("script") as string)
             : undefined,
+          progress: (record.get("progress") as number) || 0, // Include progress
           createdAt: new Date(record.get("createdAt") as string),
           updatedAt: new Date(record.get("updatedAt") as string),
         };
