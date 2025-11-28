@@ -350,7 +350,7 @@ export function PostCard({
                   className="flex-1 px-3 py-2 bg-cyan-500/20 text-cyan-400 text-xs rounded-lg border border-cyan-400/30 hover:bg-cyan-500/30 transition-colors flex items-center justify-center gap-1"
                 >
                   <span>📥</span>
-                  <span>Save</span>
+                  <span>Download</span>
                 </a>
 
                 <button

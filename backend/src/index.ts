@@ -294,6 +294,46 @@ app.put(
   }
 );
 
+//download with custom filename
+app.get(
+  "/api/posts/:postId/download",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { postId } = req.params;
+      const post = await airtableService.getPostById(postId);
+
+      // Verify user owns this post
+      if (!post || post.userId !== req.user!.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      // Get the original media URL
+      const mediaUrl = post.mediaUrl;
+
+      // Create a clean filename from the title or prompt
+      const cleanTitle = post.title
+        ? post.title.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 50)
+        : post.prompt.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 50);
+
+      const filename = `${cleanTitle}.mp4`;
+
+      // Set headers for download with custom filename
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${filename}"`
+      );
+      res.setHeader("Content-Type", "video/mp4");
+
+      // Stream the file from Cloudinary/your storage
+      const response = await axios.get(mediaUrl, { responseType: "stream" });
+      response.data.pipe(res);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
 // Generate Script
 app.post(
   "/api/generate-script",
