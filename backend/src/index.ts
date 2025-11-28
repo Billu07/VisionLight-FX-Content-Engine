@@ -541,7 +541,7 @@ app.post(
           console.log("✅ n8n workflow triggered successfully!");
           await airtableService.updatePost(post.id, {
             status: "PROCESSING",
-            progress: 10, // Initial progress when workflow starts
+            progress: 1, // Initial progress when workflow starts
           });
         })
         .catch(async (error) => {
@@ -674,7 +674,7 @@ app.post(
         generationStep: "GENERATION",
         requiresApproval: false,
         status: "PROCESSING",
-        progress: 40, // Progress when final generation starts
+        progress: 2, // Progress when final generation starts
       });
 
       // 🚀 TRIGGER SECOND N8N WORKFLOW
@@ -740,7 +740,7 @@ app.post(
         .then(async (response) => {
           console.log("✅ Final generation workflow triggered successfully!");
           await airtableService.updatePost(postId, {
-            progress: 50, // Progress when final generation is confirmed
+            progress: 2, // Progress when final generation is confirmed
           });
         })
         .catch(async (error) => {
