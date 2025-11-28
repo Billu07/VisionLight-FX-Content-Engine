@@ -43,58 +43,60 @@ export const FAQ = () => {
   ];
 
   return (
-    <div className="py-20 bg-gradient-to-br from-gray-50 to-gray-100 relative overflow-hidden">
+    <div className="py-12 sm:py-20 bg-gradient-to-br from-gray-50 to-gray-100 relative overflow-hidden">
       {/* Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl"></div>
+        <div className="absolute top-0 right-0 w-32 h-32 sm:w-64 sm:h-64 bg-cyan-500/5 rounded-full blur-2xl sm:blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 w-32 h-32 sm:w-64 sm:h-64 bg-purple-500/5 rounded-full blur-2xl sm:blur-3xl"></div>
       </div>
 
-      <div className="container mx-auto px-6 relative z-10">
+      <div className="container mx-auto px-4 sm:px-6 relative z-10">
         <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+          <div className="text-center mb-8 sm:mb-16">
+            <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-3 sm:mb-4">
               Frequently Asked{" "}
               <span className="bg-gradient-to-r from-cyan-500 to-blue-500 bg-clip-text text-transparent">
                 Questions
               </span>
             </h2>
-            <p className="text-xl text-gray-600">
+            <p className="text-base sm:text-xl text-gray-600 px-2 sm:px-0">
               Everything you need to know about getting started with Visionlight
               AI.
             </p>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {faqs.map((faq, index) => (
               <div
                 key={index}
-                className="group bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-white/50 hover:border-cyan-200 shadow-lg hover:shadow-xl transition-all duration-300"
+                className="group bg-white/80 backdrop-blur-sm rounded-2xl p-4 sm:p-6 border border-white/50 hover:border-cyan-200 shadow-lg hover:shadow-xl transition-all duration-300"
               >
-                <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-3">
-                  <div className="w-2 h-2 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full flex-shrink-0"></div>
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3 flex items-center gap-2 sm:gap-3">
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full flex-shrink-0"></div>
                   {faq.question}
                 </h3>
-                <p className="text-gray-600 leading-relaxed">{faq.answer}</p>
+                <p className="text-gray-600 leading-relaxed text-sm sm:text-base">
+                  {faq.answer}
+                </p>
               </div>
             ))}
           </div>
 
-          <div className="text-center mt-12">
-            <div className="bg-gradient-to-r from-cyan-500 to-blue-500 rounded-2xl p-8 shadow-2xl">
-              <h3 className="text-2xl font-bold text-white mb-4">
+          <div className="text-center mt-8 sm:mt-12">
+            <div className="bg-gradient-to-r from-cyan-500 to-blue-500 rounded-2xl p-4 sm:p-6 md:p-8 shadow-2xl">
+              <h3 className="text-xl sm:text-2xl font-bold text-white mb-3 sm:mb-4">
                 Still have questions?
               </h3>
-              <p className="text-cyan-100 mb-6">
+              <p className="text-cyan-100 mb-4 sm:mb-6 text-sm sm:text-base">
                 We're here to help you get started with your automated content
                 studio.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <button className="bg-white text-cyan-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-all duration-300 hover:scale-105 flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+                <button className="bg-white text-cyan-600 px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold hover:bg-gray-100 transition-all duration-300 hover:scale-105 flex items-center gap-2 text-sm sm:text-base justify-center">
                   <span>📞</span>
                   Schedule a Call
                 </button>
-                <button className="border border-white text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/10 transition-all duration-300 flex items-center gap-2">
+                <button className="border border-white text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold hover:bg-white/10 transition-all duration-300 flex items-center gap-2 text-sm sm:text-base justify-center">
                   <span>✉️</span>
                   Contact Support
                 </button>

@@ -59,68 +59,68 @@ export const Features = () => {
   };
 
   return (
-    <div className="py-20 bg-gradient-to-br from-gray-50 to-gray-100 relative overflow-hidden">
+    <div className="py-12 sm:py-20 bg-gradient-to-br from-gray-50 to-gray-100 relative overflow-hidden">
       {/* Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl"></div>
+        <div className="absolute top-0 right-0 w-32 h-32 sm:w-64 sm:h-64 bg-cyan-500/5 rounded-full blur-2xl sm:blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 w-32 h-32 sm:w-64 sm:h-64 bg-purple-500/5 rounded-full blur-2xl sm:blur-3xl"></div>
       </div>
 
-      <div className="container mx-auto px-6 relative z-10">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+      <div className="container mx-auto px-4 sm:px-6 relative z-10">
+        <div className="text-center mb-8 sm:mb-16">
+          <h2 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-3 sm:mb-4">
             The Complete{" "}
             <span className="bg-gradient-to-r from-cyan-500 to-blue-500 bg-clip-text text-transparent">
               Content Engine
             </span>
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-base sm:text-xl text-gray-600 max-w-3xl mx-auto px-2 sm:px-0">
             Everything you need to automate your content creation, from initial
             idea to published post and performance analytics.
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8 mb-16">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 mb-8 sm:mb-16">
           {features.map((feature, index) => (
             <div
               key={index}
-              className="group bg-white/80 backdrop-blur-sm rounded-2xl p-8 border border-white/50 hover:border-cyan-200 shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105"
+              className="group bg-white/80 backdrop-blur-sm rounded-2xl p-4 sm:p-6 md:p-8 border border-white/50 hover:border-cyan-200 shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105"
             >
               {/* Feature Header */}
-              <div className="flex items-center gap-4 mb-6">
+              <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
                 <div
-                  className={`w-12 h-12 rounded-xl ${getColorClasses(
+                  className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl ${getColorClasses(
                     feature.color
-                  )} flex items-center justify-center text-white text-xl shadow-lg`}
+                  )} flex items-center justify-center text-white text-lg sm:text-xl shadow-lg`}
                 >
                   {feature.icon}
                 </div>
                 <div>
                   <div
-                    className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold text-white ${getColorClasses(
+                    className={`inline-flex items-center gap-2 px-2 sm:px-3 py-1 rounded-full text-xs font-semibold text-white ${getColorClasses(
                       feature.color
                     )}`}
                   >
                     {feature.title}
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mt-2">
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 sm:mt-2">
                     {feature.subtitle}
                   </h3>
                 </div>
               </div>
 
-              <p className="text-gray-600 mb-6 leading-relaxed">
+              <p className="text-gray-600 mb-4 sm:mb-6 leading-relaxed text-sm sm:text-base">
                 {feature.description}
               </p>
 
-              <ul className="space-y-3">
+              <ul className="space-y-2 sm:space-y-3">
                 {feature.items.map((item, itemIndex) => (
                   <li
                     key={itemIndex}
-                    className="flex items-center gap-3 text-gray-700 group-hover:text-gray-900 transition-colors"
+                    className="flex items-center gap-2 sm:gap-3 text-gray-700 group-hover:text-gray-900 transition-colors text-sm sm:text-base"
                   >
                     <div
-                      className={`w-2 h-2 rounded-full ${getColorClasses(
+                      className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${getColorClasses(
                         feature.color
                       )} flex-shrink-0`}
                     ></div>
@@ -135,12 +135,12 @@ export const Features = () => {
         <div className="text-center">
           <Link
             to="/demo"
-            className="inline-flex items-center gap-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all duration-300 hover:shadow-2xl hover:scale-105"
+            className="inline-flex items-center gap-2 sm:gap-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white px-4 sm:px-6 md:px-8 py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg transition-all duration-300 hover:shadow-2xl hover:scale-105 w-full sm:w-auto justify-center"
           >
             <span>🚀</span>
             Experience All Features in Demo
           </Link>
-          <p className="text-gray-500 mt-4 text-sm">
+          <p className="text-gray-500 mt-3 sm:mt-4 text-xs sm:text-sm">
             No credit card required • 7-day free trial • Setup included
           </p>
         </div>

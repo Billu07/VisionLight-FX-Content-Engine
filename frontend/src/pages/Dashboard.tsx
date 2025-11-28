@@ -43,6 +43,7 @@ function Dashboard() {
   const [publishingPost, setPublishingPost] = useState<string | null>(null);
   const [showBrandModal, setShowBrandModal] = useState(false);
   const [showWelcomeTour, setShowWelcomeTour] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Async UX state
   const [showQueuedModal, setShowQueuedModal] = useState(false);
@@ -55,6 +56,17 @@ function Dashboard() {
   const queryClient = useQueryClient();
   const { user, isLoading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
+
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // Initialize auth check on component mount
   useEffect(() => {
@@ -130,12 +142,11 @@ function Dashboard() {
     },
     enabled: !!user,
     refetchInterval: (query) => {
-      // Only refetch if there are processing posts
       const posts = query.state.data || [];
       const hasProcessing = posts.some(
         (p: any) => p.status === "PROCESSING" && (p.progress || 0) < 100
       );
-      return hasProcessing ? 3000 : false; // Poll every 3 seconds if processing
+      return hasProcessing ? 3000 : false;
     },
     staleTime: 0,
   });
@@ -143,57 +154,27 @@ function Dashboard() {
   // === Track newly generated posts ===
   useEffect(() => {
     if (posts.length > 0) {
-      // Add any processing posts to our session tracking
       const processingPosts = posts.filter(
         (p: any) => p.status === "PROCESSING" || p.status === "NEW"
       );
-
       processingPosts.forEach((post: any) => {
         setSessionGeneratedPosts((prev) => new Set(prev).add(post.id));
       });
-
-      console.log(
-        "🔄 Session generated posts:",
-        Array.from(sessionGeneratedPosts)
-      );
     }
   }, [posts]);
 
   // === Fixed Modal Detection Logic ===
   useEffect(() => {
-    console.log("🔍 DEBUG: Checking for approval posts", {
-      postsCount: posts.length,
-      showPromptApproval,
-      showQueuedModal,
-      sessionGeneratedPosts: Array.from(sessionGeneratedPosts),
-    });
-
     if (posts.length === 0 || showPromptApproval) return;
 
-    // Priority 1: Check for posts needing approval
     const needsApproval = posts.find(
       (p: any) =>
         p.generationStep === "AWAITING_APPROVAL" && p.requiresApproval === true
     );
 
-    console.log(
-      "🎯 Posts needing approval:",
-      needsApproval
-        ? {
-            id: needsApproval.id,
-            inSession: sessionGeneratedPosts.has(needsApproval.id),
-          }
-        : "none"
-    );
-
     if (needsApproval && !showPromptApproval && !showQueuedModal) {
-      console.log(
-        "✅ OPENING PROMPT APPROVAL MODAL for post:",
-        needsApproval.id
-      );
       setPendingApprovalPostId(needsApproval.id);
       setShowPromptApproval(true);
-
       setSessionGeneratedPosts((prev) => new Set(prev).add(needsApproval.id));
     }
   }, [posts, showPromptApproval, showQueuedModal, sessionGeneratedPosts]);
@@ -201,7 +182,6 @@ function Dashboard() {
   // === Handle post updates for automatic modal display ===
   useEffect(() => {
     if (posts.length > 0) {
-      // Check if any posts changed to AWAITING_APPROVAL state
       const newApprovalPosts = posts.filter(
         (p: any) =>
           p.generationStep === "AWAITING_APPROVAL" &&
@@ -211,7 +191,6 @@ function Dashboard() {
 
       if (newApprovalPosts.length > 0 && !showPromptApproval) {
         const post = newApprovalPosts[0];
-        console.log("🔄 New post awaiting approval detected:", post.id);
         setPendingApprovalPostId(post.id);
         setShowPromptApproval(true);
         setSessionGeneratedPosts((prev) => new Set(prev).add(post.id));
@@ -221,11 +200,9 @@ function Dashboard() {
 
   // === Clean up modal states when posts change ===
   useEffect(() => {
-    // If the pending approval post is no longer in AWAITING_APPROVAL state, close the modal
     if (pendingApprovalPostId && showPromptApproval) {
       const post = posts.find((p: any) => p.id === pendingApprovalPostId);
       if (post && post.generationStep !== "AWAITING_APPROVAL") {
-        console.log("🔄 Closing approval modal - post state changed");
         setShowPromptApproval(false);
         setPendingApprovalPostId(null);
       }
@@ -236,7 +213,6 @@ function Dashboard() {
   useEffect(() => {
     if (!user || showPromptApproval) return;
 
-    // Poll every 3 seconds specifically for new approval posts
     const interval = setInterval(() => {
       queryClient.invalidateQueries({ queryKey: ["posts"] });
     }, 3000);
@@ -277,16 +253,12 @@ function Dashboard() {
     onSuccess: (response) => {
       const data = (response as any)?.data ?? response;
 
-      console.log("🔍 /api/generate-media response:", data);
-
       if (data?.success && data.postId) {
         setGenerationState({
           status: "generating",
           result: { postId: data.postId },
         });
         setShowQueuedModal(true);
-
-        // Add to session tracking
         setSessionGeneratedPosts((prev) => new Set(prev).add(data.postId));
       } else {
         setGenerationState({
@@ -313,19 +285,13 @@ function Dashboard() {
       return apiEndpoints.approvePrompt(data);
     },
     onSuccess: () => {
-      console.log("✅ Prompt approved successfully");
       setShowPromptApproval(false);
       setPendingApprovalPostId(null);
-
-      // 🆕 CLEAR THE FORM AFTER FINAL APPROVAL
-      setPrompt(""); // Clear the prompt
-      setReferenceImage(null); // Clear reference image
-      setReferenceImageUrl(""); // Clear preview
-
-      // Force immediate refresh of posts
+      setPrompt("");
+      setReferenceImage(null);
+      setReferenceImageUrl("");
       queryClient.invalidateQueries({ queryKey: ["posts"] });
 
-      // Also remove from session tracking since we've handled this post
       if (pendingApprovalPostId) {
         setSessionGeneratedPosts((prev) => {
           const newSet = new Set(prev);
@@ -345,14 +311,10 @@ function Dashboard() {
       return apiEndpoints.cancelPrompt(postId);
     },
     onSuccess: () => {
-      console.log("✅ Prompt cancelled successfully");
       setShowPromptApproval(false);
       setPendingApprovalPostId(null);
-
-      // Force immediate refresh of posts
       queryClient.invalidateQueries({ queryKey: ["posts"] });
 
-      // Remove from session tracking
       if (pendingApprovalPostId) {
         setSessionGeneratedPosts((prev) => {
           const newSet = new Set(prev);
@@ -383,10 +345,9 @@ function Dashboard() {
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-
     if (!file) return;
 
-    const maxSize = 10 * 1024 * 1024; // 4MB in bytes
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
       alert(
         "❌ Image size must be less than 10MB. Please choose a smaller file."
@@ -395,10 +356,9 @@ function Dashboard() {
       return;
     }
 
-    // If we get here, the file is valid
     setReferenceImage(file);
     setReferenceImageUrl(URL.createObjectURL(file));
-  }; // <-- This was missing
+  };
 
   const buildFormData = () => {
     const formData = new FormData();
@@ -406,32 +366,19 @@ function Dashboard() {
     formData.append("mediaType", selectedMediaType);
     formData.append("title", videoTitle);
 
-    // Add ALL generation parameters for video
     if (selectedMediaType === "video") {
       formData.append("duration", videoDuration.toString());
       formData.append("model", videoModel);
       formData.append("aspectRatio", aspectRatio);
       formData.append("size", videoSize);
-
       const [width, height] = videoSize.split("x").map(Number);
       formData.append("width", width.toString());
       formData.append("height", height.toString());
     }
 
-    // Add reference image if provided
     if (referenceImage) {
       formData.append("referenceImage", referenceImage);
     }
-
-    console.log("📋 FormData parameters:", {
-      prompt,
-      mediaType: selectedMediaType,
-      duration: selectedMediaType === "video" ? videoDuration : undefined,
-      model: selectedMediaType === "video" ? videoModel : undefined,
-      aspectRatio: selectedMediaType === "video" ? aspectRatio : undefined,
-      size: selectedMediaType === "video" ? videoSize : undefined,
-      hasReferenceImage: !!referenceImage,
-    });
 
     return formData;
   };
@@ -441,7 +388,6 @@ function Dashboard() {
     if (!prompt.trim() || userCredits[selectedMediaType] <= 0) return;
 
     setGenerationState({ status: "idle" });
-
     const formData = buildFormData();
     generateMediaMutation.mutate(formData);
   };
@@ -524,24 +470,26 @@ function Dashboard() {
         }
       />
 
-      <div className="container mx-auto px-4 py-6 max-w-7xl">
-        {/* Header */}
-        <div className="mb-8 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-          <div className="flex-1">
-            <div className="flex items-center gap-4 mb-3">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
+        {/* Enhanced Mobile Header */}
+        <div className="mb-6 sm:mb-8 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
+                className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shadow-lg"
                 style={{
                   background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
                 }}
               >
-                <span className="text-white font-bold text-lg">✨</span>
+                <span className="text-white font-bold text-sm sm:text-lg">
+                  ✨
+                </span>
               </div>
               <div>
-                <h1 className="text-3xl md:text-4xl font-bold mb-1 leading-tight brand-gradient-text">
+                <h1 className="text-xl sm:text-3xl md:text-4xl font-bold leading-tight brand-gradient-text">
                   {companyName}
                 </h1>
-                <p className="text-purple-300 text-sm">
+                <p className="text-purple-300 text-xs sm:text-sm">
                   Welcome back,{" "}
                   <span className="font-semibold text-white">
                     {user.name || user.email}
@@ -549,11 +497,30 @@ function Dashboard() {
                 </p>
               </div>
             </div>
+
+            {/* Mobile Menu Button */}
+            {isMobile && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowBrandModal(true)}
+                  className="p-2 bg-gray-800/60 backdrop-blur-lg border border-cyan-400/30 rounded-xl hover:bg-cyan-400/10 transition-all"
+                >
+                  <span className="text-cyan-400">🎨</span>
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="p-2 bg-gray-800/60 backdrop-blur-lg border border-purple-400/30 rounded-xl hover:bg-purple-400/10 transition-all"
+                >
+                  <span className="text-purple-300">🚪</span>
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <div className="bg-gray-800/60 backdrop-blur-lg rounded-2xl px-4 py-3 border border-purple-500/20">
-              <div className="flex items-center gap-4">
+          {/* Enhanced Credits Display */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="bg-gray-800/60 backdrop-blur-lg rounded-2xl px-3 sm:px-4 py-2 sm:py-3 border border-purple-500/20 w-full sm:w-auto">
+              <div className="flex items-center justify-between sm:justify-start gap-4">
                 {!creditsLoading ? (
                   <>
                     <div className="flex items-center gap-2">
@@ -596,25 +563,28 @@ function Dashboard() {
               </div>
             </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowBrandModal(true)}
-                className="px-4 py-2.5 bg-gray-800/60 backdrop-blur-lg border border-cyan-400/30 rounded-xl hover:bg-cyan-400/10 transition-all duration-200 font-medium flex items-center gap-2 text-sm text-cyan-400 hover:scale-105"
-              >
-                <span>🎨</span> Brand
-              </button>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2.5 bg-gray-800/60 backdrop-blur-lg border border-purple-400/30 rounded-xl hover:bg-purple-400/10 transition-all duration-200 font-medium text-purple-300 text-sm hover:scale-105"
-              >
-                Logout
-              </button>
-            </div>
+            {/* Desktop Buttons */}
+            {!isMobile && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowBrandModal(true)}
+                  className="px-4 py-2.5 bg-gray-800/60 backdrop-blur-lg border border-cyan-400/30 rounded-xl hover:bg-cyan-400/10 transition-all duration-200 font-medium flex items-center gap-2 text-sm text-cyan-400 hover:scale-105"
+                >
+                  <span>🎨</span> Brand
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="px-4 py-2.5 bg-gray-800/60 backdrop-blur-lg border border-purple-400/30 rounded-xl hover:bg-purple-400/10 transition-all duration-200 font-medium text-purple-300 text-sm hover:scale-105"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ROI Metrics */}
-        <div className="grid grid-cols-3 gap-3 mb-8">
+        {/* Enhanced ROI Metrics - Mobile Optimized */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-6 sm:mb-8">
           {[
             {
               label: "Content",
@@ -640,7 +610,7 @@ function Dashboard() {
           ].map((metric, index) => (
             <div
               key={index}
-              className="bg-gray-800/40 backdrop-blur-sm rounded-xl p-4 border border-white/5 hover:border-white/10 transition-all duration-300 group"
+              className="bg-gray-800/40 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-white/5 hover:border-white/10 transition-all duration-300 group"
             >
               <div className="flex items-center justify-between">
                 <div>
@@ -648,7 +618,7 @@ function Dashboard() {
                     {metric.label}
                   </p>
                   <p
-                    className={`text-2xl font-bold bg-gradient-to-r ${metric.gradient} bg-clip-text text-transparent`}
+                    className={`text-xl sm:text-2xl font-bold bg-gradient-to-r ${metric.gradient} bg-clip-text text-transparent`}
                   >
                     {metric.value}
                   </p>
@@ -656,7 +626,7 @@ function Dashboard() {
                     {metric.subtitle}
                   </p>
                 </div>
-                <div className="text-2xl opacity-80 group-hover:scale-110 transition-transform">
+                <div className="text-xl sm:text-2xl opacity-80 group-hover:scale-110 transition-transform">
                   {metric.icon}
                 </div>
               </div>
@@ -664,14 +634,16 @@ function Dashboard() {
           ))}
         </div>
 
-        {/* Main Content */}
-        <div className="grid lg:grid-cols-3 gap-8 mb-8">
-          <div className="lg:col-span-2">
-            <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-8 shadow-2xl">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-3 h-8 rounded-full gradient-brand"></div>
+        {/* Enhanced Main Content Layout */}
+        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
+          {/* Premium Video Generation Panel */}
+          <div className="flex-1">
+            <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 lg:p-8 shadow-2xl">
+              {/* Premium Header */}
+              <div className="flex items-center gap-3 mb-6 sm:mb-8">
+                <div className="w-2 h-6 sm:h-8 rounded-full bg-gradient-to-b from-cyan-400 to-purple-500"></div>
                 <div>
-                  <h2 className="text-2xl font-bold text-white">
+                  <h2 className="text-xl sm:text-2xl font-bold text-white">
                     Create Magic
                   </h2>
                   <p className="text-purple-300 text-sm">
@@ -680,12 +652,12 @@ function Dashboard() {
                 </div>
               </div>
 
-              {/* Media Type Selection */}
-              <div className="mb-8">
-                <label className="block text-sm font-semibold text-white mb-4">
+              {/* Enhanced Media Type Selection */}
+              <div className="mb-6 sm:mb-8">
+                <label className="block text-sm font-semibold text-white mb-3 sm:mb-4">
                   🎬 Select Content Type
                 </label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
                   {[
                     {
                       type: "video" as MediaType,
@@ -711,7 +683,7 @@ function Dashboard() {
                       type="button"
                       onClick={() => setSelectedMediaType(type)}
                       disabled={userCredits[type] <= 0}
-                      className={`p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
+                      className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
                         selectedMediaType === type
                           ? `border-white/20 bg-gradient-to-br ${gradient} shadow-2xl scale-105`
                           : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
@@ -721,8 +693,8 @@ function Dashboard() {
                           : ""
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl group-hover:scale-110 transition-transform">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <span className="text-xl sm:text-2xl group-hover:scale-110 transition-transform">
                           {icon}
                         </span>
                         <div className="flex-1">
@@ -754,10 +726,10 @@ function Dashboard() {
                 </div>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Prompt Input */}
+              <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+                {/* Enhanced Prompt Input */}
                 <div>
-                  <label className="block text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                  <label className="block text-sm font-semibold text-white mb-2 sm:mb-3 flex items-center gap-2">
                     <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>
                     💡 Your Creative Vision
                   </label>
@@ -765,13 +737,13 @@ function Dashboard() {
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     placeholder={`Describe your ${selectedMediaType} vision...\nExample: "A futuristic cityscape at dusk with flying vehicles and neon-lit skyscrapers"`}
-                    className="w-full p-5 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all duration-300 resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-lg leading-relaxed"
-                    rows={4}
+                    className="w-full p-4 sm:p-5 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all duration-300 resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base sm:text-lg leading-relaxed"
+                    rows={isMobile ? 3 : 4}
                   />
                 </div>
 
-                {/* 🆕 ADD TITLE INPUT RIGHT HERE: */}
-                <div className="space-y-3">
+                {/* Enhanced Title Input */}
+                <div className="space-y-2 sm:space-y-3">
                   <label className="block text-sm font-semibold text-white">
                     🏷️ Video Title (Optional)
                   </label>
@@ -780,29 +752,31 @@ function Dashboard() {
                     value={videoTitle}
                     onChange={(e) => setVideoTitle(e.target.value)}
                     placeholder="Give your video a memorable name..."
-                    className="w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-purple-300/60 backdrop-blur-sm"
+                    className="w-full p-3 sm:p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-purple-300/60 backdrop-blur-sm"
                   />
                 </div>
 
-                {/* Enhanced Video Controls */}
+                {/* Premium Video Controls */}
                 {selectedMediaType === "video" && (
-                  <div className="space-y-6">
-                    {/* Video Model Selection */}
-                    <div className="space-y-3">
+                  <div className="space-y-4 sm:space-y-6">
+                    {/* Enhanced Video Model Selection */}
+                    <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
                         🤖 AI Model
                       </label>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                         {[
                           {
                             id: "sora-2",
                             label: "Sora 2",
                             description: "Standard quality",
+                            badge: "✨",
                           },
                           {
                             id: "sora-2-pro",
                             label: "Sora 2 Pro",
                             description: "Enhanced quality",
+                            badge: "🚀",
                           },
                         ].map((model) => (
                           <button
@@ -811,33 +785,50 @@ function Dashboard() {
                             onClick={() =>
                               setVideoModel(model.id as "sora-2" | "sora-2-pro")
                             }
-                            className={`p-4 rounded-2xl border-2 transition-all duration-300 text-left ${
+                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
                               videoModel === model.id
                                 ? "border-cyan-400 bg-cyan-500/20 shadow-lg shadow-cyan-500/25"
                                 : "border-white/10 bg-gray-800/50 hover:border-cyan-400/50"
                             }`}
                           >
-                            <div className="font-semibold text-white text-sm">
-                              {model.label}
-                            </div>
-                            <div className="text-xs text-purple-300 mt-1">
-                              {model.description}
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="font-semibold text-white text-sm flex items-center gap-2">
+                                  {model.badge} {model.label}
+                                </div>
+                                <div className="text-xs text-purple-300 mt-1">
+                                  {model.description}
+                                </div>
+                              </div>
+                              {videoModel === model.id && (
+                                <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
+                              )}
                             </div>
                           </button>
                         ))}
                       </div>
                     </div>
 
-                    {/* Aspect Ratio Selection */}
-                    <div className="space-y-3">
+                    {/* Enhanced Aspect Ratio Selection */}
+                    <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
                         📐 Aspect Ratio
                       </label>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-2 sm:gap-3">
                         {[
-                          { ratio: "16:9", label: "Landscape", icon: "🖥️" },
-                          { ratio: "9:16", label: "Portrait", icon: "📱" },
-                        ].map(({ ratio, label, icon }) => (
+                          {
+                            ratio: "16:9",
+                            label: "Landscape",
+                            icon: "🖥️",
+                            desc: "Widescreen",
+                          },
+                          {
+                            ratio: "9:16",
+                            label: "Portrait",
+                            icon: "📱",
+                            desc: "Mobile",
+                          },
+                        ].map(({ ratio, label, icon, desc }) => (
                           <button
                             key={ratio}
                             type="button"
@@ -847,44 +838,50 @@ function Dashboard() {
                                 ratio === "16:9" ? "1280x720" : "720x1280"
                               );
                             }}
-                            className={`p-4 rounded-2xl border-2 transition-all duration-300 text-center ${
+                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center group ${
                               aspectRatio === ratio
                                 ? "border-purple-400 bg-purple-500/20 shadow-lg shadow-purple-500/25"
                                 : "border-white/10 bg-gray-800/50 hover:border-purple-400/50"
                             }`}
                           >
-                            <div className="text-2xl mb-2">{icon}</div>
+                            <div className="text-xl sm:text-2xl mb-2 group-hover:scale-110 transition-transform">
+                              {icon}
+                            </div>
                             <div className="font-semibold text-white text-sm">
                               {label}
                             </div>
                             <div className="text-xs text-purple-300">
                               {ratio}
                             </div>
+                            <div className="text-xs text-gray-400 mt-1">
+                              {desc}
+                            </div>
                           </button>
                         ))}
                       </div>
                     </div>
 
-                    {/* Video Size Selection */}
-                    <div className="space-y-3">
+                    {/* Enhanced Video Size Selection */}
+                    <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
                         📏 Video Size
                       </label>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                         {(aspectRatio === "16:9"
                           ? [
                               {
                                 size: "1280x720",
                                 label: "720p HD",
                                 resolution: "1280 × 720",
+                                quality: "Standard",
                               },
-                              // 🆕 CONDITIONALLY SHOW 1024p ONLY FOR SORA-2-PRO
                               ...(videoModel === "sora-2-pro"
                                 ? [
                                     {
                                       size: "1792x1024",
                                       label: "1024p",
                                       resolution: "1792 × 1024",
+                                      quality: "Premium",
                                     },
                                   ]
                                 : []),
@@ -894,66 +891,74 @@ function Dashboard() {
                                 size: "720x1280",
                                 label: "720p HD",
                                 resolution: "720 × 1280",
+                                quality: "Standard",
                               },
-                              // 🆕 CONDITIONALLY SHOW 1024p ONLY FOR SORA-2-PRO
                               ...(videoModel === "sora-2-pro"
                                 ? [
                                     {
                                       size: "1024x1792",
                                       label: "1024p",
                                       resolution: "1024 × 1792",
+                                      quality: "Premium",
                                     },
                                   ]
                                 : []),
                             ]
-                        ).map(({ size, label, resolution }) => (
+                        ).map(({ size, label, resolution, quality }) => (
                           <button
                             key={size}
                             type="button"
                             onClick={() => setVideoSize(size as any)}
-                            className={`p-4 rounded-2xl border-2 transition-all duration-300 text-left ${
+                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
                               videoSize === size
                                 ? "border-green-400 bg-green-500/20 shadow-lg shadow-green-500/25"
                                 : "border-white/10 bg-gray-800/50 hover:border-green-400/50"
                             }`}
                           >
-                            <div className="font-semibold text-white text-sm">
-                              {label}
-                            </div>
-                            <div className="text-xs text-purple-300">
-                              {resolution}
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="font-semibold text-white text-sm">
+                                  {label}
+                                </div>
+                                <div className="text-xs text-purple-300">
+                                  {resolution}
+                                </div>
+                                <div className="text-xs text-gray-400 mt-1">
+                                  {quality}
+                                </div>
+                              </div>
+                              {videoSize === size && (
+                                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                              )}
                             </div>
                           </button>
                         ))}
                       </div>
-
-                      {/* 🆕 ADD HELPER TEXT */}
                       {videoModel === "sora-2" && (
                         <p className="text-xs text-purple-300 mt-2">
-                          💡 Sora-2 supports up to 720p resolution. Upgrade to
-                          Sora-2 Pro for 1024p.
+                          💡 Upgrade to Sora-2 Pro for enhanced 1024p resolution
                         </p>
                       )}
                     </div>
 
-                    {/* Duration Selection */}
-                    <div className="space-y-3">
+                    {/* Enhanced Duration Selection */}
+                    <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
                         ⏱️ Video Duration
                       </label>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         {[4, 8, 12].map((sec) => (
                           <button
                             key={sec}
                             type="button"
                             onClick={() => setVideoDuration(sec as 4 | 8 | 12)}
-                            className={`px-5 py-3 rounded-xl border text-sm font-semibold transition-all duration-300 ${
+                            className={`px-3 sm:px-5 py-2 sm:py-3 rounded-xl border text-sm font-semibold transition-all duration-300 flex-1 min-w-[80px] ${
                               videoDuration === sec
                                 ? "bg-cyan-500 border-cyan-500 text-white shadow-lg shadow-cyan-500/25"
                                 : "bg-gray-800/50 border-white/10 text-purple-200 hover:border-cyan-400/50 hover:bg-cyan-400/10"
                             }`}
                           >
-                            {sec} seconds
+                            {sec}s
                           </button>
                         ))}
                       </div>
@@ -961,27 +966,26 @@ function Dashboard() {
                   </div>
                 )}
 
-                {/* Reference Image Upload */}
-                <div className="space-y-3">
+                {/* Enhanced Reference Image Upload */}
+                <div className="space-y-2 sm:space-y-3">
                   <label className="block text-sm font-semibold text-white">
                     🎨 Reference Image (Optional)
                   </label>
-                  <div className="flex gap-4 items-start">
-                    <div className="flex-1">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start">
+                    <div className="flex-1 w-full">
                       <input
                         type="file"
                         accept="image/*"
                         onChange={handleImageUpload}
-                        className="w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-gradient-to-r file:from-cyan-500 file:to-blue-500 file:text-white hover:file:from-cyan-600 hover:file:to-blue-600 transition-all duration-300 backdrop-blur-sm"
+                        className="w-full p-3 sm:p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white file:mr-3 file:py-2 file:px-4 sm:file:py-3 sm:file:px-6 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-gradient-to-r file:from-cyan-500 file:to-blue-500 file:text-white hover:file:from-cyan-600 hover:file:to-blue-600 transition-all duration-300 backdrop-blur-sm"
                       />
-                      {/* 🆕 ADD FILE SIZE VALIDATION MESSAGE */}
                       <p className="text-xs text-purple-300 mt-2">
-                        Maximum file size: 10MB. Supported formats: JPG, PNG(PNG
-                        Preferred)
+                        Maximum file size: 10MB. Supported formats: JPG, PNG
+                        (PNG Preferred)
                       </p>
                     </div>
                     {referenceImageUrl && (
-                      <div className="w-24 h-24 rounded-xl overflow-hidden border-2 border-cyan-400/30 shadow-lg">
+                      <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-xl overflow-hidden border-2 border-cyan-400/30 shadow-lg flex-shrink-0">
                         <img
                           src={referenceImageUrl}
                           alt="Reference"
@@ -992,7 +996,7 @@ function Dashboard() {
                   </div>
                 </div>
 
-                {/* Generate Button */}
+                {/* Premium Generate Button */}
                 <button
                   type="submit"
                   disabled={
@@ -1000,7 +1004,7 @@ function Dashboard() {
                     !prompt.trim() ||
                     userCredits[selectedMediaType] <= 0
                   }
-                  className="w-full gradient-brand text-white py-5 px-8 rounded-2xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-bold text-lg flex items-center justify-center gap-3 group relative overflow-hidden"
+                  className="w-full gradient-brand text-white py-4 sm:py-5 px-6 sm:px-8 rounded-2xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-bold text-base sm:text-lg flex items-center justify-center gap-3 group relative overflow-hidden"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
                   {generateMediaMutation.isPending ? (
@@ -1010,7 +1014,7 @@ function Dashboard() {
                     </>
                   ) : (
                     <>
-                      <span className="group-hover:scale-110 transition-transform text-xl">
+                      <span className="group-hover:scale-110 transition-transform text-lg sm:text-xl">
                         ✨
                       </span>
                       <span>
@@ -1037,12 +1041,15 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* Content Library Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-6 shadow-2xl sticky top-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          {/* Sophisticated Content Library */}
+          <div className="lg:w-96">
+            <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 shadow-2xl sticky top-4">
+              <div className="flex items-center justify-between mb-4 sm:mb-6">
+                <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
                   <span>📚</span> Your Library
+                  <span className="bg-purple-500/20 text-purple-300 text-xs px-2 py-1 rounded-full ml-2">
+                    {posts.filter((p: any) => p.status !== "CANCELLED").length}
+                  </span>
                 </h2>
                 {postsLoading && (
                   <div className="flex items-center gap-2 text-sm text-purple-300">
@@ -1050,9 +1057,16 @@ function Dashboard() {
                   </div>
                 )}
               </div>
-              <div className="space-y-4 max-h-[600px] overflow-y-auto">
+
+              {/* Enhanced Gallery Organization */}
+              <div className="space-y-3 max-h-[500px] sm:max-h-[600px] overflow-y-auto custom-scrollbar">
                 {posts
                   .filter((post: any) => post.status !== "CANCELLED")
+                  .sort(
+                    (a: any, b: any) =>
+                      new Date(b.createdAt).getTime() -
+                      new Date(a.createdAt).getTime()
+                  )
                   .map((post: any) => (
                     <PostCard
                       key={post.id}
@@ -1065,8 +1079,9 @@ function Dashboard() {
                     />
                   ))}
               </div>
+
               {postsError ? (
-                <div className="text-center py-8">
+                <div className="text-center py-6">
                   <ErrorAlert
                     message="Failed to load your content"
                     onRetry={() =>
@@ -1077,8 +1092,12 @@ function Dashboard() {
                 </div>
               ) : posts.length === 0 ? (
                 <div className="text-center py-8">
-                  <div className="text-purple-300 text-sm">
-                    No content yet. Start creating above! ✨
+                  <div className="text-purple-300 text-sm mb-3">
+                    No content yet
+                  </div>
+                  <div className="text-4xl mb-2">✨</div>
+                  <div className="text-gray-400 text-xs">
+                    Start creating above!
                   </div>
                 </div>
               ) : null}
