@@ -391,7 +391,7 @@ function Dashboard() {
     alert("❌ Image size must be less than 4MB. Please choose a smaller file.");
     e.target.value = "";
     return;
-  }
+  };
 
   const buildFormData = () => {
     const formData = new FormData();
