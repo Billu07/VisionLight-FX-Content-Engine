@@ -294,6 +294,20 @@ app.put(
   }
 );
 
+// Make sure this helper function accepts string (not string | undefined)
+const getContentType = (mediaType: string) => {
+  switch (mediaType) {
+    case "VIDEO":
+      return "video/mp4";
+    case "IMAGE":
+      return "image/jpeg";
+    case "CAROUSEL":
+      return "image/jpeg";
+    default:
+      return "application/octet-stream";
+  }
+};
+
 //download with custom filename
 app.get(
   "/api/posts/:postId/download",
@@ -308,27 +322,36 @@ app.get(
         return res.status(403).json({ error: "Access denied" });
       }
 
-      // Get the original media URL
-      const mediaUrl = post.mediaUrl;
+      if (!post.mediaUrl) {
+        return res.status(404).json({ error: "Media not available" });
+      }
 
       // Create a clean filename from the title or prompt
       const cleanTitle = post.title
         ? post.title.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 50)
         : post.prompt.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 50);
 
-      const filename = `${cleanTitle}.mp4`;
+      // Determine file extension based on media type (with fallback)
+      const mediaType = post.mediaType || "VIDEO"; // Default to video if undefined
+      const extension =
+        mediaType === "VIDEO" ? "mp4" : mediaType === "IMAGE" ? "jpg" : "png";
+
+      const filename = `${cleanTitle}.${extension}`;
 
       // Set headers for download with custom filename
       res.setHeader(
         "Content-Disposition",
         `attachment; filename="${filename}"`
       );
-      res.setHeader("Content-Type", "video/mp4");
+      res.setHeader("Content-Type", getContentType(mediaType));
 
       // Stream the file from Cloudinary/your storage
-      const response = await axios.get(mediaUrl, { responseType: "stream" });
+      const response = await axios.get(post.mediaUrl, {
+        responseType: "stream",
+      });
       response.data.pipe(res);
     } catch (error: any) {
+      console.error("Download error:", error);
       res.status(500).json({ error: error.message });
     }
   }
