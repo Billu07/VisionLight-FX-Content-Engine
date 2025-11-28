@@ -26,6 +26,7 @@ function Dashboard() {
   const [videoModel, setVideoModel] = useState<"sora-2" | "sora-2-pro">(
     "sora-2"
   );
+  const [videoTitle, setVideoTitle] = useState("");
   const [showPromptApproval, setShowPromptApproval] = useState(false);
   const [pendingApprovalPostId, setPendingApprovalPostId] = useState<
     string | null
@@ -316,6 +317,11 @@ function Dashboard() {
       setShowPromptApproval(false);
       setPendingApprovalPostId(null);
 
+      // 🆕 CLEAR THE FORM AFTER FINAL APPROVAL
+      setPrompt(""); // Clear the prompt
+      setReferenceImage(null); // Clear reference image
+      setReferenceImageUrl(""); // Clear preview
+
       // Force immediate refresh of posts
       queryClient.invalidateQueries({ queryKey: ["posts"] });
 
@@ -388,6 +394,7 @@ function Dashboard() {
     const formData = new FormData();
     formData.append("prompt", prompt);
     formData.append("mediaType", selectedMediaType);
+    formData.append("title", videoTitle);
 
     // Add ALL generation parameters for video
     if (selectedMediaType === "video") {
@@ -750,6 +757,20 @@ function Dashboard() {
                     placeholder={`Describe your ${selectedMediaType} vision...\nExample: "A futuristic cityscape at dusk with flying vehicles and neon-lit skyscrapers"`}
                     className="w-full p-5 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all duration-300 resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-lg leading-relaxed"
                     rows={4}
+                  />
+                </div>
+
+                {/* 🆕 ADD TITLE INPUT RIGHT HERE: */}
+                <div className="space-y-3">
+                  <label className="block text-sm font-semibold text-white">
+                    🏷️ Video Title (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={videoTitle}
+                    onChange={(e) => setVideoTitle(e.target.value)}
+                    placeholder="Give your video a memorable name..."
+                    className="w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-purple-300/60 backdrop-blur-sm"
                   />
                 </div>
 

@@ -269,6 +269,31 @@ app.get(
   }
 );
 
+// Update post title
+app.put(
+  "/api/posts/:postId/title",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { postId } = req.params;
+      const { title } = req.body;
+
+      const post = await airtableService.getPostById(postId);
+
+      // Verify user owns this post
+      if (!post || post.userId !== req.user!.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await airtableService.updatePost(postId, { title });
+
+      res.json({ success: true, message: "Title updated" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
 // Generate Script
 app.post(
   "/api/generate-script",
@@ -534,7 +559,7 @@ app.post("/api/update-enhanced-prompt", async (req, res) => {
       imageReference: imageReference || "",
       generationStep: "AWAITING_APPROVAL", // ← This is what triggers the modal
       status: "PROCESSING",
-      progress: 30, // Progress when prompt is enhanced
+      progress: 2, // Progress when prompt is enhanced
     });
 
     console.log(

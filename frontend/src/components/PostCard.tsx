@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { LoadingSpinner } from "./LoadingSpinner";
+import { apiEndpoints } from "../lib/api";
 
 interface PostCardProps {
   post: any;
@@ -18,10 +19,26 @@ export function PostCard({
 }: PostCardProps) {
   const [mediaError, setMediaError] = useState(false);
   const [videoLoading, setVideoLoading] = useState(true);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(post.title || "");
 
   const handleMediaError = () => {
     console.error("❌ Failed to load media:", post.mediaUrl);
     setMediaError(true);
+  };
+
+  const handleTitleSave = async () => {
+    try {
+      await apiEndpoints.updatePostTitle(post.id, editedTitle);
+      setIsEditingTitle(false);
+    } catch (error) {
+      console.error("Error updating title:", error);
+    }
+  };
+
+  const handleTitleCancel = () => {
+    setEditedTitle(post.title || "");
+    setIsEditingTitle(false);
   };
 
   const handleVideoLoad = () => {
@@ -282,11 +299,45 @@ export function PostCard({
             </span>
           </div>
 
-          {/* Prompt */}
+          {/* Title/Prompt Section */}
           <div>
-            <p className="text-white text-sm line-clamp-2 font-medium">
-              {post.prompt}
-            </p>
+            {isEditingTitle ? (
+              <div className="flex gap-2 mb-2">
+                <input
+                  value={editedTitle}
+                  onChange={(e) => setEditedTitle(e.target.value)}
+                  className="flex-1 p-2 bg-gray-700 border border-cyan-400/30 rounded text-white text-xs"
+                  placeholder="Enter video title..."
+                />
+                <button
+                  onClick={handleTitleSave}
+                  className="px-2 py-1 bg-cyan-500 hover:bg-cyan-600 text-white rounded text-xs"
+                >
+                  ✅
+                </button>
+                <button
+                  onClick={handleTitleCancel}
+                  className="px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-xs"
+                >
+                  ❌
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between group">
+                <p className="text-white text-sm line-clamp-2 font-medium">
+                  {post.title || post.prompt}
+                </p>
+                <button
+                  onClick={() => {
+                    setEditedTitle(post.title || post.prompt);
+                    setIsEditingTitle(true);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-white text-xs transition-opacity ml-2"
+                >
+                  ✏️
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Actions */}
@@ -348,9 +399,50 @@ export function PostCard({
           </div>
         </div>
 
-        {/* Prompt */}
+        {/* Title/Prompt Section */}
         <div>
-          <p className="text-white text-sm leading-relaxed">{post.prompt}</p>
+          {isEditingTitle ? (
+            <div className="flex gap-2 mb-3">
+              <input
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                className="flex-1 p-2 bg-gray-700 border border-cyan-400/30 rounded text-white text-sm"
+                placeholder="Enter video title..."
+              />
+              <button
+                onClick={handleTitleSave}
+                className="px-3 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded text-sm"
+              >
+                ✅
+              </button>
+              <button
+                onClick={handleTitleCancel}
+                className="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm"
+              >
+                ❌
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between group mb-2">
+              <h3 className="text-white font-semibold text-lg cursor-default">
+                {post.title || post.prompt}
+              </h3>
+              <button
+                onClick={() => {
+                  setEditedTitle(post.title || post.prompt);
+                  setIsEditingTitle(true);
+                }}
+                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-white text-sm transition-opacity"
+              >
+                ✏️ Edit
+              </button>
+            </div>
+          )}
+
+          {/* Show original prompt below title if custom title exists */}
+          {post.title && post.title !== post.prompt && (
+            <p className="text-purple-300 text-sm mt-1">{post.prompt}</p>
+          )}
         </div>
 
         {/* Script Preview */}

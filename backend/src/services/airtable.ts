@@ -45,6 +45,7 @@ export interface BrandConfig {
 export interface Post {
   id: string;
   userId: string;
+  title?: string;
   prompt: string;
   enhancedPrompt?: string;
   imageReference?: string;
@@ -387,6 +388,7 @@ export const airtableService = {
   // Post operations
   async createPost(postData: {
     userId: string;
+    title?: string;
     prompt: string;
     mediaType?: "VIDEO" | "IMAGE" | "CAROUSEL";
     platform: string;
@@ -401,6 +403,7 @@ export const airtableService = {
       const now = new Date().toISOString();
       const record = await base("Posts").create({
         userId: [postData.userId],
+        title: postData.title,
         prompt: postData.prompt,
         mediaType: postData.mediaType,
         platform: postData.platform,
@@ -441,6 +444,7 @@ export const airtableService = {
 
       return {
         id: record.id,
+        title: record.get("title") as string,
         userId: actualUserId,
         prompt: record.get("prompt") as string,
         enhancedPrompt: record.get("enhancedPrompt") as string,
@@ -482,6 +486,7 @@ export const airtableService = {
       };
 
       // Existing fields
+      if (updates.title !== undefined) updateData.title = updates.title;
       if (updates.mediaUrl !== undefined)
         updateData.mediaUrl = updates.mediaUrl;
       if (updates.mediaType !== undefined)
@@ -509,7 +514,8 @@ export const airtableService = {
         updateData.generationParams = JSON.stringify(updates.generationParams);
 
       // NEW: Progress field
-      if (updates.progress !== undefined) updateData.progress = updates.progress;
+      if (updates.progress !== undefined)
+        updateData.progress = updates.progress;
 
       const record = await base("Posts").update(postId, updateData);
 
@@ -536,6 +542,7 @@ export const airtableService = {
 
       return {
         id: record.id,
+        title: record.get("title") as string,
         userId: actualUserId,
         prompt: record.get("prompt") as string,
         mediaType: record.get("mediaType") as "VIDEO" | "IMAGE" | "CAROUSEL",
@@ -578,6 +585,7 @@ export const airtableService = {
 
       return {
         id: record.id,
+        title: record.get("title") as string,
         userId: actualUserId,
         prompt: record.get("prompt") as string,
         enhancedPrompt: record.get("enhancedPrompt") as string,
