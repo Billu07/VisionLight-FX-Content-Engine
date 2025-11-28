@@ -382,13 +382,16 @@ function Dashboard() {
   });
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setReferenceImage(file);
-      const imageUrl = URL.createObjectURL(file);
-      setReferenceImageUrl(imageUrl);
-    }
-  };
+  const file = e.target.files?.[0];
+  
+  if (!file) return;
+
+  const maxSize = 4 * 1024 * 1024; // 4MB in bytes
+  if (file.size > maxSize) {
+    alert("❌ Image size must be less than 4MB. Please choose a smaller file.");
+    e.target.value = "";
+    return;
+  }
 
   const buildFormData = () => {
     const formData = new FormData();
@@ -868,11 +871,16 @@ function Dashboard() {
                                 label: "720p HD",
                                 resolution: "1280 × 720",
                               },
-                              {
-                                size: "1792x1024",
-                                label: "1024p",
-                                resolution: "1792 × 1024",
-                              },
+                              // 🆕 CONDITIONALLY SHOW 1024p ONLY FOR SORA-2-PRO
+                              ...(videoModel === "sora-2-pro"
+                                ? [
+                                    {
+                                      size: "1792x1024",
+                                      label: "1024p",
+                                      resolution: "1792 × 1024",
+                                    },
+                                  ]
+                                : []),
                             ]
                           : [
                               {
@@ -880,11 +888,16 @@ function Dashboard() {
                                 label: "720p HD",
                                 resolution: "720 × 1280",
                               },
-                              {
-                                size: "1024x1792",
-                                label: "1024p",
-                                resolution: "1024 × 1792",
-                              },
+                              // 🆕 CONDITIONALLY SHOW 1024p ONLY FOR SORA-2-PRO
+                              ...(videoModel === "sora-2-pro"
+                                ? [
+                                    {
+                                      size: "1024x1792",
+                                      label: "1024p",
+                                      resolution: "1024 × 1792",
+                                    },
+                                  ]
+                                : []),
                             ]
                         ).map(({ size, label, resolution }) => (
                           <button
@@ -906,6 +919,14 @@ function Dashboard() {
                           </button>
                         ))}
                       </div>
+
+                      {/* 🆕 ADD HELPER TEXT */}
+                      {videoModel === "sora-2" && (
+                        <p className="text-xs text-purple-300 mt-2">
+                          💡 Sora-2 supports up to 720p resolution. Upgrade to
+                          Sora-2 Pro for 1024p.
+                        </p>
+                      )}
                     </div>
 
                     {/* Duration Selection */}
@@ -946,6 +967,10 @@ function Dashboard() {
                         onChange={handleImageUpload}
                         className="w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-gradient-to-r file:from-cyan-500 file:to-blue-500 file:text-white hover:file:from-cyan-600 hover:file:to-blue-600 transition-all duration-300 backdrop-blur-sm"
                       />
+                      {/* 🆕 ADD FILE SIZE VALIDATION MESSAGE */}
+                      <p className="text-xs text-purple-300 mt-2">
+                        Maximum file size: 4MB. Supported formats: JPG, PNG
+                      </p>
                     </div>
                     {referenceImageUrl && (
                       <div className="w-24 h-24 rounded-xl overflow-hidden border-2 border-cyan-400/30 shadow-lg">
