@@ -404,6 +404,7 @@ app.post(
         size,
         width,
         height,
+        title,
       } = req.body;
       const referenceImageFile = req.file;
 
@@ -462,6 +463,7 @@ app.post(
       const post = await airtableService.createPost({
         userId: req.user!.id,
         prompt,
+        title: title || "",
         mediaType: mediaType.toUpperCase() as any,
         platform: "INSTAGRAM",
         generationParams: generationParams, // Store all parameters for second workflow
