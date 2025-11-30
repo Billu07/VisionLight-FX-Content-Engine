@@ -73,6 +73,9 @@ export const apiEndpoints = {
 
   getPost: (postId: string) => api.get(`/post/${postId}`),
 
+  // Post status endpoint
+  getPostStatus: (postId: string) => api.get(`/post/${postId}/status`),
+
   // ROI endpoints
   getROIMetrics: () => api.get("/roi-metrics"),
 

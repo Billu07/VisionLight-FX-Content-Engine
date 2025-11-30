@@ -474,10 +474,10 @@ app.post(
 
       console.log("📝 Post created with generation params:", post.id);
 
-      // Update post with initial progress
+      // Update post with initial progress - START AT 0%
       await airtableService.updatePost(post.id, {
         status: "NEW",
-        progress: 0, // Start at 0%
+        progress: 0,
       });
 
       // Deduct credit immediately
@@ -624,7 +624,7 @@ app.post("/api/update-enhanced-prompt", async (req, res) => {
       imageReference: imageReference || "",
       generationStep: "AWAITING_APPROVAL", // ← This is what triggers the modal
       status: "PROCESSING",
-      progress: 2, // Progress when prompt is enhanced
+      progress: 2, // Progress when prompt is enhanced (0-2% range)
     });
 
     console.log(
@@ -670,13 +670,13 @@ app.post(
         generationParamsImageRef: post.generationParams?.imageReference,
       });
 
-      // Update with final prompt and progress
+      // 🚨 CRITICAL: Update with final prompt and progress - START FINAL GENERATION AT 3%
       await airtableService.updatePost(postId, {
         userEditedPrompt: finalPrompt,
         generationStep: "GENERATION",
         requiresApproval: false,
         status: "PROCESSING",
-        progress: 2, // Progress when final generation starts
+        progress: 3, // Final generation starts at 3%
       });
 
       // 🚀 TRIGGER SECOND N8N WORKFLOW
@@ -731,34 +731,47 @@ app.post(
         mediaType: webhookData.mediaType,
       });
 
-      // Send to second n8n workflow as JSON
-      axios
-        .post(secondWorkflowUrl, webhookData, {
-          timeout: 20000,
+      // ✅ IMPROVED: Use async/await with proper error handling
+      try {
+        const response = await axios.post(secondWorkflowUrl, webhookData, {
+          timeout: 30000, // Increased timeout
           headers: {
             "Content-Type": "application/json",
           },
-        })
-        .then(async (response) => {
-          console.log("✅ Final generation workflow triggered successfully!");
-          await airtableService.updatePost(postId, {
-            progress: 2, // Progress when final generation is confirmed
-          });
-        })
-        .catch(async (error) => {
-          console.error("❌ Error triggering final generation:", error.message);
-          await airtableService.updatePost(postId, {
-            status: "FAILED",
-            progress: 0,
-          });
         });
 
-      res.json({
-        success: true,
-        message:
-          "Prompt approved. Final generation starting with all your original settings...",
-        hasReferenceImage,
-      });
+        console.log("✅ Final generation workflow triggered successfully!");
+
+        // Update progress to indicate workflow accepted
+        await airtableService.updatePost(postId, {
+          progress: 5, // Progress when final generation is confirmed
+        });
+
+        res.json({
+          success: true,
+          message:
+            "Prompt approved. Final generation starting with all your original settings...",
+          hasReferenceImage,
+          postId: postId,
+        });
+      } catch (webhookError: any) {
+        console.error(
+          "❌ Error triggering final generation:",
+          webhookError.message
+        );
+
+        // Mark as failed immediately if webhook call fails
+        await airtableService.updatePost(postId, {
+          status: "FAILED",
+          progress: 0,
+          error: `Failed to trigger generation: ${webhookError.message}`,
+        });
+
+        res.status(500).json({
+          error: "Failed to start final generation. Please try again.",
+          details: webhookError.message,
+        });
+      }
     } catch (error: any) {
       console.error("Error approving prompt:", error);
       res.status(500).json({ error: error.message });
@@ -797,7 +810,7 @@ app.get(
           requiresApproval: post.requiresApproval,
           mediaType: post.mediaType,
           status: post.status,
-          progress: post.progress, // Include progress
+          progress: post.progress,
           generationParams: post.generationParams,
           createdAt: post.createdAt,
         },
@@ -842,6 +855,40 @@ app.post(
       });
     } catch (error: any) {
       console.error("Error cancelling prompt:", error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// ==================== POST STATUS VERIFICATION ====================
+app.get(
+  "/api/post/:postId/status",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { postId } = req.params;
+
+      const post = await airtableService.getPostById(postId);
+
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+
+      // Verify user owns this post
+      if (post.userId !== req.user!.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      res.json({
+        success: true,
+        status: post.status,
+        progress: post.progress || 0,
+        generationStep: post.generationStep,
+        mediaUrl: post.mediaUrl,
+        requiresApproval: post.requiresApproval,
+        lastUpdated: post.updatedAt,
+      });
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   }

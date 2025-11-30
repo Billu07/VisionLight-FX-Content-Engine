@@ -123,7 +123,7 @@ function Dashboard() {
     }
   }, [user, authLoading, navigate]);
 
-  // === Fetch Posts with smart auto-refresh ===
+  // === Enhanced Posts Query with Better Status Monitoring ===
   const {
     data: posts = [],
     isLoading: postsLoading,
@@ -132,19 +132,30 @@ function Dashboard() {
     queryKey: ["posts"],
     queryFn: async () => {
       const response = await apiEndpoints.getPosts();
-      const approvalPosts = response.data.posts.filter(
-        (p: any) =>
-          p.generationStep === "AWAITING_APPROVAL" &&
-          p.requiresApproval === true
-      );
-      console.log("📦 Posts fetched - approval posts:", approvalPosts.length);
-      return response.data.posts;
+      const posts = response.data.posts;
+
+      // Log status for debugging
+      posts.forEach((post: any) => {
+        if (post.status === "PROCESSING" || post.status === "NEW") {
+          console.log(`📊 Post ${post.id}:`, {
+            status: post.status,
+            progress: post.progress,
+            generationStep: post.generationStep,
+            mediaUrl: !!post.mediaUrl,
+          });
+        }
+      });
+
+      return posts;
     },
     enabled: !!user,
     refetchInterval: (query) => {
       const posts = query.state.data || [];
       const hasProcessing = posts.some(
-        (p: any) => p.status === "PROCESSING" && (p.progress || 0) < 100
+        (p: any) =>
+          (p.status === "PROCESSING" || p.status === "NEW") &&
+          (p.progress || 0) < 100 &&
+          !p.mediaUrl // Only refetch if no media yet
       );
       return hasProcessing ? 3000 : false;
     },
@@ -1072,8 +1083,8 @@ function Dashboard() {
                       key={post.id}
                       post={post}
                       onPublishPost={publishMutation.mutate}
-                      publishingPost={publishingPost}
                       userCredits={userCredits}
+                      publishingPost={publishingPost}
                       primaryColor={primaryColor}
                       compact={true}
                     />

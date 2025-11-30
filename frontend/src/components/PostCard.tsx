@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { apiEndpoints } from "../lib/api";
 
@@ -21,6 +21,24 @@ export function PostCard({
   const [videoLoading, setVideoLoading] = useState(true);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(post.title || "");
+  const [isPossiblyStuck, setIsPossiblyStuck] = useState(false);
+
+  // Stuck detection for posts that seem to be processing indefinitely
+  useEffect(() => {
+    if (
+      (post.status === "PROCESSING" || post.status === "NEW") &&
+      (post.progress || 0) < 10
+    ) {
+      // If processing but very low progress for too long, might be stuck
+      const timer = setTimeout(() => {
+        setIsPossiblyStuck(true);
+      }, 120000); // 2 minutes
+
+      return () => clearTimeout(timer);
+    } else {
+      setIsPossiblyStuck(false);
+    }
+  }, [post.status, post.progress]);
 
   const handleMediaError = () => {
     console.error("❌ Failed to load media:", post.mediaUrl);
@@ -49,6 +67,17 @@ export function PostCard({
     console.error("❌ Video failed to load:", post.mediaUrl);
     setVideoLoading(false);
     setMediaError(true);
+  };
+
+  // Manual status check function
+  const manuallyCheckPostStatus = async () => {
+    try {
+      const response = await apiEndpoints.getPostStatus(post.id);
+      console.log(`🔍 Manual status check for ${post.id}:`, response.data);
+      // The query will automatically refetch posts due to the invalidation
+    } catch (error) {
+      console.error("Manual status check failed:", error);
+    }
   };
 
   // Use real progress from post data
@@ -80,7 +109,7 @@ export function PostCard({
               </p>
 
               {/* Real Progress Bar */}
-              {isProcessing && (
+              {(isProcessing || isNew) && (
                 <div className="mt-4 space-y-2">
                   <div className="flex justify-between text-xs text-purple-300">
                     <span>Progress</span>
@@ -92,8 +121,28 @@ export function PostCard({
                       style={{ width: `${progress}%` }}
                     ></div>
                   </div>
+
+                  {/* Stuck Detection Warning */}
+                  {isPossiblyStuck && (
+                    <div className="mt-2 p-2 bg-yellow-500/20 border border-yellow-500/30 rounded-lg">
+                      <p className="text-yellow-400 text-xs">
+                        ⚠️ Generation seems to be taking longer than expected.
+                        This might be due to high demand.
+                      </p>
+                      <button
+                        onClick={manuallyCheckPostStatus}
+                        className="text-yellow-300 text-xs underline mt-1 hover:text-yellow-200"
+                      >
+                        Check status
+                      </button>
+                    </div>
+                  )}
+
                   <div className="text-xs text-gray-400">
-                    {progress < 30 && "🔄 Initializing generation..."}
+                    {progress <= 2 && "🔄 Prompt enhancement in progress..."}
+                    {progress > 2 &&
+                      progress < 30 &&
+                      "🎬 Starting final generation..."}
                     {progress >= 30 &&
                       progress < 70 &&
                       "🎨 Creating your content..."}

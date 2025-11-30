@@ -63,8 +63,8 @@ export interface Post {
   platform: string;
   script?: any;
   bufferPostId?: string;
+  error?: string;
   generationParams?: any;
-  // NEW: Real progress field
   progress?: number;
   createdAt: Date;
   updatedAt: Date;
@@ -416,7 +416,7 @@ export const airtableService = {
           ? JSON.stringify(postData.generationParams)
           : undefined,
         status: "NEW",
-        progress: 0,
+        progress: 0, // Start at 0%
         createdAt: now,
         updatedAt: now,
       });
@@ -469,7 +469,9 @@ export const airtableService = {
           ? JSON.parse(record.get("script") as string)
           : undefined,
         bufferPostId: record.get("bufferPostId") as string,
-        progress: (record.get("progress") as number) || 0, // Include progress
+        progress: (record.get("progress") as number) || 0,
+        // ADD THIS:
+        error: record.get("error") as string,
         createdAt: new Date(record.get("createdAt") as string),
         updatedAt: new Date(record.get("updatedAt") as string),
       };
@@ -479,13 +481,14 @@ export const airtableService = {
     }
   },
 
+  // In the updatePost method in airtable.ts, add this to the updateData section:
   async updatePost(postId: string, updates: Partial<Post>): Promise<Post> {
     try {
       const updateData: any = {
         updatedAt: new Date().toISOString(),
       };
 
-      // Existing fields
+      // Existing fields...
       if (updates.title !== undefined) updateData.title = updates.title;
       if (updates.mediaUrl !== undefined)
         updateData.mediaUrl = updates.mediaUrl;
@@ -499,7 +502,7 @@ export const airtableService = {
       if (updates.script !== undefined)
         updateData.script = JSON.stringify(updates.script);
 
-      // Enhanced workflow fields
+      // Enhanced workflow fields...
       if (updates.enhancedPrompt !== undefined)
         updateData.enhancedPrompt = updates.enhancedPrompt;
       if (updates.imageReference !== undefined)
@@ -513,10 +516,14 @@ export const airtableService = {
       if (updates.generationParams !== undefined)
         updateData.generationParams = JSON.stringify(updates.generationParams);
 
-      // NEW: Progress field
+      // Progress field...
       if (updates.progress !== undefined)
         updateData.progress = updates.progress;
 
+      // ADD THIS: Handle error field
+      if (updates.error !== undefined) updateData.error = updates.error;
+
+      // Rest of the method remains the same...
       const record = await base("Posts").update(postId, updateData);
 
       const userIdField = record.get("userId");
@@ -554,7 +561,9 @@ export const airtableService = {
           ? JSON.parse(record.get("script") as string)
           : undefined,
         bufferPostId: record.get("bufferPostId") as string,
-        progress: (record.get("progress") as number) || 0, // Include progress
+        progress: (record.get("progress") as number) || 0,
+        // ADD THIS: Include error field in return
+        error: record.get("error") as string,
         createdAt: new Date(record.get("createdAt") as string),
         updatedAt: new Date(record.get("updatedAt") as string),
       };
@@ -610,7 +619,9 @@ export const airtableService = {
           ? JSON.parse(record.get("script") as string)
           : undefined,
         bufferPostId: record.get("bufferPostId") as string,
-        progress: (record.get("progress") as number) || 0, // Include progress
+        progress: (record.get("progress") as number) || 0,
+        // ADD THIS:
+        error: record.get("error") as string,
         createdAt: new Date(record.get("createdAt") as string),
         updatedAt: new Date(record.get("updatedAt") as string),
       };
@@ -683,7 +694,9 @@ export const airtableService = {
           script: record.get("script")
             ? JSON.parse(record.get("script") as string)
             : undefined,
-          progress: (record.get("progress") as number) || 0, // Include progress
+          progress: (record.get("progress") as number) || 0,
+          // ADD THIS:
+          error: record.get("error") as string,
           createdAt: new Date(record.get("createdAt") as string),
           updatedAt: new Date(record.get("updatedAt") as string),
         };

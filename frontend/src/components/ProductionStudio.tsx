@@ -23,31 +23,37 @@ export const ProductionStudio: React.FC<ProductionStudioProps> = ({
         icon: "🎬",
         title: "SCRIPT BREAKDOWN",
         description: "Analyzing your cinematic vision...",
+        progressRange: [0, 2], // 0-2%: Prompt enhancement
       },
       {
         icon: "🎭",
         title: "CASTING AI ACTORS",
         description: "Selecting digital performers...",
+        progressRange: [3, 20], // 3-20%: Early generation
       },
       {
         icon: "🎥",
         title: "SET DESIGN",
         description: "Building virtual environments...",
+        progressRange: [21, 40], // 21-40%: Environment creation
       },
       {
         icon: "💡",
         title: "LIGHTING SETUP",
         description: "Setting mood and atmosphere...",
+        progressRange: [41, 60], // 41-60%: Lighting and effects
       },
       {
         icon: "🎞️",
         title: "FILMING IN PROGRESS",
         description: "Capturing each frame...",
+        progressRange: [61, 80], // 61-80%: Main generation
       },
       {
         icon: "🎛️",
         title: "POST-PRODUCTION",
         description: "Adding final touches...",
+        progressRange: [81, 99], // 81-99%: Final processing
       },
     ],
     image: [
@@ -55,26 +61,31 @@ export const ProductionStudio: React.FC<ProductionStudioProps> = ({
         icon: "🖼️",
         title: "CONCEPT ART",
         description: "Sketching your vision...",
+        progressRange: [0, 2], // 0-2%: Prompt enhancement
       },
       {
         icon: "🎨",
         title: "COLOR PALETTE",
         description: "Selecting perfect hues...",
+        progressRange: [3, 30], // 3-30%: Early generation
       },
       {
         icon: "🖌️",
         title: "DIGITAL PAINTING",
         description: "Brushing in details...",
+        progressRange: [31, 60], // 31-60%: Main generation
       },
       {
         icon: "✨",
         title: "LIGHTING EFFECTS",
         description: "Adding depth and mood...",
+        progressRange: [61, 85], // 61-85%: Enhancement
       },
       {
         icon: "🔍",
         title: "QUALITY ENHANCEMENT",
         description: "Perfecting every pixel...",
+        progressRange: [86, 99], // 86-99%: Final processing
       },
     ],
     carousel: [
@@ -82,26 +93,31 @@ export const ProductionStudio: React.FC<ProductionStudioProps> = ({
         icon: "📱",
         title: "STORYBOARDING",
         description: "Planning your narrative flow...",
+        progressRange: [0, 2], // 0-2%: Prompt enhancement
       },
       {
         icon: "🎯",
         title: "SLIDE DESIGN",
         description: "Crafting each frame...",
+        progressRange: [3, 40], // 3-40%: Early generation
       },
       {
         icon: "🔄",
         title: "FLOW OPTIMIZATION",
         description: "Ensuring smooth transitions...",
+        progressRange: [41, 70], // 41-70%: Main generation
       },
       {
         icon: "🎨",
         title: "VISUAL CONSISTENCY",
         description: "Maintaining brand style...",
+        progressRange: [71, 90], // 71-90%: Enhancement
       },
       {
         icon: "📖",
         title: "FINAL REVIEW",
         description: "Polishing the story...",
+        progressRange: [91, 99], // 91-99%: Final processing
       },
     ],
   };
@@ -112,15 +128,17 @@ export const ProductionStudio: React.FC<ProductionStudioProps> = ({
   useEffect(() => {
     if (!isGenerating) return;
 
-    // Map progress to scenes (0-100% maps to scene indices)
-    const progressPerScene = 100 / scenes.length;
-    const calculatedScene = Math.min(
-      Math.floor(progress / progressPerScene),
-      scenes.length - 1
-    );
+    // Find the current scene based on progress ranges
+    const currentSceneIndex = scenes.findIndex((scene) => {
+      const [start, end] = scene.progressRange;
+      return progress >= start && progress <= end;
+    });
 
+    // If no scene found for current progress, use the last scene
+    const calculatedScene =
+      currentSceneIndex >= 0 ? currentSceneIndex : scenes.length - 1;
     setCurrentScene(calculatedScene);
-  }, [progress, isGenerating, scenes.length]);
+  }, [progress, isGenerating, scenes]);
 
   if (!isGenerating) return null;
 
@@ -185,10 +203,13 @@ export const ProductionStudio: React.FC<ProductionStudioProps> = ({
           <div className="flex items-center gap-3">
             <LoadingSpinner size="sm" variant="neon" />
             <span className="text-purple-300 text-sm">
-              {progress < 30 && "Initializing generation..."}
-              {progress >= 30 && progress < 70 && "Creating your content..."}
-              {progress >= 70 && progress < 100 && "Adding final touches..."}
-              {progress === 100 && "Generation complete!"}
+              {progress <= 2 && "🔄 Enhancing your prompt..."}
+              {progress > 2 &&
+                progress < 30 &&
+                "🎬 Starting final generation..."}
+              {progress >= 30 && progress < 70 && "🎨 Creating your content..."}
+              {progress >= 70 && progress < 100 && "✨ Adding final touches..."}
+              {progress === 100 && "✅ Generation complete!"}
             </span>
           </div>
           <div className="text-cyan-400 text-sm font-mono">
