@@ -663,7 +663,7 @@ function Dashboard() {
               {/* PICDRIFT Header with subtitle BELOW */}
               <div className="mb-6 sm:mb-8">
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="h-10 sm:h-12 flex items-center justify-center">
+                  <div className="h-12 sm:h-14 flex items-center justify-center">
                     <img
                       src={picdriftLogo}
                       alt="PICDRIFT"
