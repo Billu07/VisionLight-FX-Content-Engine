@@ -10,6 +10,10 @@ import { BrandConfigModal } from "../components/BrandConfigModal";
 import { WelcomeTour } from "../components/WelcomeTour";
 import { PromptApprovalModal } from "../components/PromptApprovalModal";
 
+// Import your logo images
+import fxLogo from "../assets/fx.png";
+import picdriftLogo from "../assets/picdrift.png";
+
 type MediaType = "video" | "image" | "carousel";
 
 interface GenerationState {
@@ -410,7 +414,6 @@ function Dashboard() {
 
   // Apply brand colors dynamically
   const primaryColor = brandConfig?.primaryColor || "#6366f1";
-  const secondaryColor = brandConfig?.secondaryColor || "#8b5cf6";
   const companyName = brandConfig?.companyName || "Visionlight AI";
 
   if (authLoading) {
@@ -482,20 +485,11 @@ function Dashboard() {
       />
 
       <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
-        {/* Enhanced Mobile Header */}
+        {/* Enhanced Mobile Header with FX Logo at same height */}
         <div className="mb-6 sm:mb-8 flex flex-col gap-4">
           <div className="flex items-center justify-between">
+            {/* Left side: Visionlight AI with user info */}
             <div className="flex items-center gap-3">
-              <div
-                className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shadow-lg"
-                style={{
-                  background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                }}
-              >
-                <span className="text-white font-bold text-sm sm:text-lg">
-                  ✨
-                </span>
-              </div>
               <div>
                 <h1 className="text-xl sm:text-3xl md:text-4xl font-bold leading-tight brand-gradient-text">
                   {companyName}
@@ -507,6 +501,22 @@ function Dashboard() {
                   </span>
                 </p>
               </div>
+            </div>
+
+            {/* Right side: FX Logo - Top Center with subtitle */}
+            <div className="absolute left-1/2 transform -translate-x-1/2 flex flex-col items-center mt-16">
+              {/* Larger FX Logo */}
+              <div className="h-16 sm:h-20 flex items-center justify-center mb-1">
+                <img
+                  src={fxLogo}
+                  alt="FX Creation Engine"
+                  className="h-full w-auto object-contain"
+                />
+              </div>
+              {/* FX Subtitle */}
+              <p className="text-purple-300 text-xs sm:text-sm text-center">
+                Your AI-Powered Creation Engine
+              </p>
             </div>
 
             {/* Mobile Menu Button */}
@@ -650,17 +660,20 @@ function Dashboard() {
           {/* Premium Video Generation Panel */}
           <div className="flex-1">
             <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 lg:p-8 shadow-2xl">
-              {/* Premium Header */}
-              <div className="flex items-center gap-3 mb-6 sm:mb-8">
-                <div className="w-2 h-6 sm:h-8 rounded-full bg-gradient-to-b from-cyan-400 to-purple-500"></div>
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-bold text-white">
-                    Create Magic
-                  </h2>
-                  <p className="text-purple-300 text-sm">
-                    Transform your ideas into stunning content
-                  </p>
+              {/* PICDRIFT Header with subtitle BELOW */}
+              <div className="mb-6 sm:mb-8">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="h-16 sm:h-18 flex items-center justify-center">
+                    <img
+                      src={picdriftLogo}
+                      alt="PICDRIFT"
+                      className="h-full w-auto object-contain"
+                    />
+                  </div>
                 </div>
+                <p className="text-purple-300 text-sm ml-1">
+                  Imagine anything — move effortlessly between AI tools
+                </p>
               </div>
 
               {/* Enhanced Media Type Selection */}
