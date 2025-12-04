@@ -1,3 +1,4 @@
+// backend/src/services/contentEngine.ts
 import OpenAI from "openai";
 import FormData from "form-data";
 import sharp from "sharp";
@@ -9,10 +10,9 @@ import {
   SORA_MOTION_DIRECTOR,
   SORA_CINEMATIC_DIRECTOR,
   GEMINI_RESIZE_PROMPT,
-  IMAGE_PROMPT_ENHANCER,
 } from "../utils/systemPrompts";
 
-// Initialize Clients
+// Initialize OpenAI Client (Used for Visual Analysis & Video Gen)
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Configure Cloudinary explicitly
@@ -26,20 +26,50 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const contentEngine = {
   // ===========================================================================
-  // WORKFLOW 1: PROMPT ENHANCEMENT (Unchanged)
+  // WORKFLOW 1: PROMPT ENHANCEMENT
+  // - IMAGES & CAROUSELS: Pass-through (No AI enhancement)
+  // - VIDEOS: Hybrid Analysis (OpenAI Eyes + Gemini Brain)
   // ===========================================================================
+
   async enhanceUserPrompt(
     userPrompt: string,
     mediaType: string,
-    duration: number,
+    options: { duration?: number; aspectRatio?: string; size?: string },
     referenceImageBuffer?: Buffer,
     referenceImageMimeType?: string
   ): Promise<string> {
-    console.log(`🚀 Starting Prompt Enhancement for [${mediaType}]...`);
+    console.log(`🚀 Starting Prompt Enhancement check for [${mediaType}]...`);
+
+    // --- CHANGE: BYPASS ENHANCEMENT FOR IMAGES AND CAROUSELS ---
+    if (mediaType === "image" || mediaType === "carousel") {
+      console.log(
+        `🎨 ${mediaType} detected: Skipping AI enhancement. Using raw user prompt.`
+      );
+      return userPrompt;
+    }
+
+    // --- VIDEO ENHANCEMENT LOGIC STARTS HERE ---
+
+    // Defaults
+    const duration = options.duration || 8;
+    const ratio = options.aspectRatio || "16:9";
+    const resolution = options.size || "1280x720";
+
     try {
+      // 1. VISUAL ANALYSIS (OPENAI)
       let imageDescription = "";
+
       if (referenceImageBuffer && referenceImageMimeType) {
-        console.log("📸 Analyzing reference image...");
+        console.log(
+          "📸 1. Sending image to OpenAI (GPT-4o-mini) for analysis..."
+        );
+
+        // Resize for speed
+        const analysisBuffer = await sharp(referenceImageBuffer)
+          .resize(1024, 1024, { fit: "inside" })
+          .toFormat("jpeg", { quality: 70 })
+          .toBuffer();
+
         const analysisResponse = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
@@ -48,12 +78,12 @@ export const contentEngine = {
               content: [
                 {
                   type: "text",
-                  text: "Describe this image in clear detail. Focus on objects, characters, environment, colors, mood, style, and anything visually distinctive. Keep it concise but descriptive.",
+                  text: "Analyze this image. Describe the subject, environment, lighting, art style, and mood in high detail. Keep it factual and descriptive.",
                 },
                 {
                   type: "image_url",
                   image_url: {
-                    url: `data:${referenceImageMimeType};base64,${referenceImageBuffer.toString(
+                    url: `data:image/jpeg;base64,${analysisBuffer.toString(
                       "base64"
                     )}`,
                   },
@@ -61,47 +91,90 @@ export const contentEngine = {
               ],
             },
           ],
-          max_tokens: 300,
+          max_tokens: 400,
         });
         imageDescription = analysisResponse.choices[0].message.content || "";
+        console.log("✅ Visual Analysis Complete.");
       }
 
-      let systemPrompt = "";
-      let userContext = "";
+      // 2. CREATIVE WRITING (GEMINI 2.5 PRO)
+      console.log(
+        "🧠 2. Sending context to Gemini 2.5 Pro for video scripting..."
+      );
 
-      if (mediaType === "image" || mediaType === "carousel") {
-        systemPrompt = IMAGE_PROMPT_ENHANCER;
-        userContext = `User Idea: ${userPrompt}`;
-        if (imageDescription) {
-          userContext += `\n\nReference Image Style/Content: ${imageDescription}\nInstruction: Merge the user idea with the visual style of the reference image.`;
-        }
+      let systemPersona = "";
+      let taskContext = "";
+
+      // Video Logic Only (Since Images/Carousels returned early)
+      if (imageDescription) {
+        // Image-to-Video
+        systemPersona = SORA_MOTION_DIRECTOR;
+        taskContext = `
+USER MOTION IDEA: "${userPrompt}"
+REFERENCE IMAGE ANALYSIS: "${imageDescription}"
+
+MANDATORY METADATA SETTINGS:
+- Duration: ${duration}s
+- Aspect Ratio: ${ratio}
+- Resolution: ${resolution}
+`;
       } else {
-        if (imageDescription) {
-          systemPrompt = SORA_MOTION_DIRECTOR;
-          userContext = `Idea: ${userPrompt}\nVideo length: ${duration}\nimage description: ${imageDescription}`;
-        } else {
-          systemPrompt = SORA_CINEMATIC_DIRECTOR;
-          userContext = `idea: ${userPrompt}\nvideo length: ${duration} seconds`;
-        }
+        // Text-to-Video
+        systemPersona = SORA_CINEMATIC_DIRECTOR;
+        taskContext = `
+USER CONCEPT: "${userPrompt}"
+
+MANDATORY METADATA SETTINGS:
+- Duration: ${duration}s
+- Aspect Ratio: ${ratio}
+- Resolution: ${resolution}
+`;
       }
 
-      const completion = await openai.chat.completions.create({
-        model: "chatgpt-4o-latest",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userContext },
+      // Call Gemini 2.5 Pro via REST
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
+
+      const payload = {
+        contents: [
+          {
+            parts: [
+              { text: systemPersona }, // Role & Rules
+              { text: taskContext }, // User Input + OpenAI Analysis
+            ],
+          },
         ],
+        generationConfig: { temperature: 0.7 },
+      };
+
+      const response = await axios.post(geminiUrl, payload, {
+        headers: { "Content-Type": "application/json" },
       });
 
-      return completion.choices[0].message.content || userPrompt;
-    } catch (error) {
-      console.error("❌ Prompt Enhancement Failed:", error);
-      throw error;
+      // Extract Text
+      const candidates = response.data?.candidates;
+      if (candidates && candidates[0]?.content?.parts) {
+        const textResponse = candidates[0].content.parts[0].text;
+        if (textResponse) {
+          console.log("✅ Gemini generated the final video script.");
+          return textResponse;
+        }
+      }
+
+      // Fallback
+      console.warn("⚠️ Gemini returned empty response. Using original prompt.");
+      return userPrompt;
+    } catch (error: any) {
+      console.error(
+        "❌ Prompt Enhancement Failed:",
+        error.response?.data || error.message
+      );
+      // Return original prompt on error so the workflow doesn't break
+      return userPrompt;
     }
   },
 
   // ===========================================================================
-  // WORKFLOW 2a: VIDEO GENERATION (Fixed Binary Handling)
+  // WORKFLOW 2a: VIDEO GENERATION (Gemini Outpaint -> OpenAI Video)
   // ===========================================================================
   async startVideoGeneration(postId: string, finalPrompt: string, params: any) {
     console.log(`🎬 Starting Video Generation for ${postId}`);
@@ -117,26 +190,32 @@ export const contentEngine = {
 
       console.log(`🎯 Target Resolution: ${targetWidth}x${targetHeight}`);
 
-      // 2. IMAGE PROCESSING
+      // 2. IMAGE PROCESSING (Gemini Outpainting)
       if (params.imageReference && params.hasReferenceImage) {
         console.log("📐 Processing reference image...");
+
         const imageResponse = await axios.get(params.imageReference, {
           responseType: "arraybuffer",
         });
         const originalImageBuffer = Buffer.from(imageResponse.data);
+        const originalMimeType =
+          imageResponse.headers["content-type"] || "image/jpeg";
 
+        console.log("🖼️ Generating transparent guide frame...");
         const guideFrameBuffer = await sharp({
           create: {
             width: targetWidth,
             height: targetHeight,
             channels: 4,
-            background: { r: 0, g: 0, b: 0, alpha: 0 },
+            background: { r: 0, g: 0, b: 0, alpha: 0 }, // Transparent
           },
         })
           .png()
           .toBuffer();
 
-        console.log(`🖌️ Sending to Gemini...`);
+        console.log(
+          `🖌️ Sending to Gemini (2.5-flash-image-preview) for outpainting...`
+        );
         const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
 
         const geminiPayload = {
@@ -146,7 +225,7 @@ export const contentEngine = {
                 { text: GEMINI_RESIZE_PROMPT },
                 {
                   inline_data: {
-                    mime_type: "image/png",
+                    mime_type: originalMimeType,
                     data: originalImageBuffer.toString("base64"),
                   },
                 },
@@ -161,28 +240,38 @@ export const contentEngine = {
           ],
         };
 
-        let bufferToProcess = originalImageBuffer;
+        let bufferToProcess = originalImageBuffer; // Fallback
+
         try {
           const geminiResponse = await axios.post(geminiUrl, geminiPayload, {
             headers: { "Content-Type": "application/json" },
+            maxBodyLength: Infinity,
+            maxContentLength: Infinity,
           });
+
           const candidates = geminiResponse.data?.candidates;
           if (candidates && candidates[0]?.content?.parts) {
             const imagePart = candidates[0].content.parts.find(
               (p: any) => p.inline_data || p.inlineData
             );
+
             if (imagePart) {
               const base64Data =
                 imagePart.inline_data?.data || imagePart.inlineData?.data;
-              if (base64Data)
+              if (base64Data) {
+                console.log("✅ Gemini successfully returned adapted image.");
                 bufferToProcess = Buffer.from(base64Data, "base64");
+              }
             }
           }
-        } catch (e) {
-          console.warn("Gemini outpaint failed, using original.");
+        } catch (geminiError: any) {
+          console.warn(
+            "⚠️ Gemini Outpainting failed, falling back to original.",
+            geminiError.message
+          );
         }
 
-        console.log(`✂️ Final resize...`);
+        console.log(`✂️ Final resize to ${targetWidth}x${targetHeight}...`);
         finalInputImageBuffer = await sharp(bufferToProcess)
           .resize(targetWidth, targetHeight, { fit: "fill" })
           .toBuffer();
@@ -190,12 +279,16 @@ export const contentEngine = {
 
       // 3. CALL OPENAI VIDEO API
       console.log("🎥 Calling OpenAI Video API...");
+
       const form = new FormData();
       form.append("prompt", finalPrompt);
       form.append("model", params.model || "sora-2-pro");
       form.append("seconds", params.duration || 8);
       form.append("size", targetSize);
+
+      // --- CONFIRMATION: Passing image to Sora ---
       if (finalInputImageBuffer) {
+        console.log("✅ Attaching 'input_reference' image to video request.");
         form.append("input_reference", finalInputImageBuffer, {
           filename: "reference.png",
         });
@@ -214,14 +307,13 @@ export const contentEngine = {
       console.log(`⏳ Video queued. ID: ${generationId}`);
 
       // 4. ROBUST POLLING LOOP
-      const POLLING_INTERVAL = 40000; // 40s
-      const MAX_ATTEMPTS = 45; // ~30 mins
+      const POLLING_INTERVAL = 40000;
+      const MAX_ATTEMPTS = 45;
 
       let status = "queued";
       let resultData: string | Buffer | null = null;
       let attempts = 0;
 
-      // Initial wait
       console.log("⏳ Initial wait for generation...");
       await sleep(30000);
 
@@ -235,19 +327,13 @@ export const contentEngine = {
           const statusRes = await axios.get(`${videoApiUrl}/${generationId}`, {
             headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
           });
-
           status = statusRes.data.status;
           console.log(`🔄 Check #${attempts}: Status is '${status}'`);
 
           if (status === "completed") {
-            // Case A: URL is in status response
             if (statusRes.data.content && statusRes.data.content.url) {
               resultData = statusRes.data.content.url;
-            }
-            // Case B: Need to fetch content manually
-            else {
-              console.log("📥 Fetching content payload...");
-              // CRITICAL: Request arraybuffer to handle Binary Video correctly
+            } else {
               const contentRes = await axios.get(
                 `${videoApiUrl}/${generationId}/content`,
                 {
@@ -257,35 +343,28 @@ export const contentEngine = {
                   responseType: "arraybuffer",
                 }
               );
-
-              // Check if it's JSON (URL) or Binary (File)
               try {
                 const textData = Buffer.from(contentRes.data).toString("utf-8");
-                const json = JSON.parse(textData);
-                if (json.url || json.content?.url) {
-                  resultData = json.url || json.content.url; // It was a URL inside JSON
+                if (textData.trim().startsWith("{")) {
+                  const json = JSON.parse(textData);
+                  resultData = json.url || json.content?.url;
                 } else {
-                  // JSON but no URL? Fallback to assuming buffer
                   resultData = Buffer.from(contentRes.data);
                 }
               } catch (e) {
-                // Not JSON -> It is the Raw Video File (Binary)
-                console.log("📦 Received raw binary video file.");
                 resultData = Buffer.from(contentRes.data);
               }
             }
           } else if (status === "failed") {
             throw new Error(
               `API reported failure: ${JSON.stringify(
-                statusRes.data.error || "Unknown error"
+                statusRes.data.error || "Unknown"
               )}`
             );
           }
         } catch (pollError: any) {
           const errStatus = pollError.response?.status;
-          console.warn(
-            `⚠️ Polling error (Attempt ${attempts}): ${pollError.message}`
-          );
+          console.warn(`⚠️ Polling: ${pollError.message}`);
           if (errStatus === 401 || errStatus === 403)
             throw new Error("Auth failed.");
           if (errStatus === 429) {
@@ -305,10 +384,10 @@ export const contentEngine = {
       }
 
       if (status !== "completed" || !resultData) {
-        throw new Error("Video generation timed out or returned no data.");
+        throw new Error("Video generation timed out.");
       }
 
-      // 5. CLOUDINARY UPLOAD (Handles URL or Buffer)
+      // 5. CLOUDINARY UPLOAD
       console.log("☁️ Uploading result to Cloudinary...");
       const videoTitle = params.title || "Untitled Video";
 
@@ -329,22 +408,19 @@ export const contentEngine = {
       });
 
       await ROIService.incrementMediaGenerated(params.userId);
-      console.log("✅ Video workflow finished successfully!");
+      console.log(`✅ Video workflow finished! URL: ${cloudinaryUrl}`);
     } catch (error: any) {
       console.error("❌ Video Generation Workflow Failed:", error);
       await airtableService.updatePost(postId, {
         status: "FAILED",
-        error:
-          error.response?.data?.error?.message ||
-          error.message ||
-          "Unknown API Error",
+        error: error.response?.data?.error?.message || error.message,
         progress: 0,
       });
     }
   },
 
   // ===========================================================================
-  // WORKFLOW 2b: IMAGE GENERATION
+  // WORKFLOW 2b: IMAGE GENERATION (Gemini 2.5 Flash Image)
   // ===========================================================================
   async startImageGeneration(postId: string, finalPrompt: string, params: any) {
     console.log(`🎨 Starting Image Generation for ${postId}`);
@@ -358,16 +434,18 @@ export const contentEngine = {
           responseType: "arraybuffer",
         });
         const imageBase64 = Buffer.from(imageResponse.data).toString("base64");
-        parts.push({
-          inline_data: { mime_type: "image/png", data: imageBase64 },
-        });
+        const mimeType = imageResponse.headers["content-type"] || "image/png";
+        parts.push({ inline_data: { mime_type: mimeType, data: imageBase64 } });
       }
 
       console.log("🖌️ Calling Gemini 2.5 Flash Image...");
       const response = await axios.post(
         geminiImageUrl,
         { contents: [{ parts }] },
-        { headers: { "Content-Type": "application/json" } }
+        {
+          headers: { "Content-Type": "application/json" },
+          maxBodyLength: Infinity,
+        }
       );
 
       let generatedImageBuffer: Buffer | null = null;
@@ -418,7 +496,129 @@ export const contentEngine = {
   },
 
   // ===========================================================================
-  // UNIVERSAL UPLOADER (Supports URL & Buffer)
+  // WORKFLOW 2c: CAROUSEL GENERATION
+  // ===========================================================================
+  async startCarouselGeneration(
+    postId: string,
+    finalPrompt: string,
+    params: any
+  ) {
+    console.log(`🎠 Starting Carousel Generation for ${postId}`);
+
+    try {
+      const buffers: Buffer[] = [];
+      // Create 3 distinct variations
+      const prompts = [
+        `Slide 1/3 (Introduction): ${finalPrompt}. High impact visual, clear subject.`,
+        `Slide 2/3 (Details/Action): ${finalPrompt}. Close up detail or action shot.`,
+        `Slide 3/3 (Conclusion): ${finalPrompt}. Artistic resolution.`,
+      ];
+
+      // 1. Generate 3 Images
+      for (let i = 0; i < prompts.length; i++) {
+        console.log(`📸 Generating Slide ${i + 1}/3...`);
+        const buf = await this.generateGeminiImage(
+          prompts[i],
+          params.imageReference
+        );
+        const resized = await sharp(buf).resize(1024, 1024).toBuffer();
+        buffers.push(resized);
+        await airtableService.updatePost(postId, { progress: (i + 1) * 30 });
+      }
+
+      // 2. Stitch them horizontally
+      console.log("🧵 Stitching carousel strip...");
+      const compositeBuffer = await sharp({
+        create: {
+          width: 1024 * 3,
+          height: 1024,
+          channels: 4,
+          background: { r: 255, g: 255, b: 255, alpha: 0 },
+        },
+      })
+        .composite([
+          { input: buffers[0], left: 0, top: 0 },
+          { input: buffers[1], left: 1024, top: 0 },
+          { input: buffers[2], left: 2048, top: 0 },
+        ])
+        .jpeg({ quality: 90 })
+        .toBuffer();
+
+      // 3. Upload
+      const cloudinaryUrl = await this.uploadToCloudinary(
+        compositeBuffer,
+        postId,
+        params.userId,
+        params.title || "Carousel",
+        "image"
+      );
+
+      await airtableService.updatePost(postId, {
+        mediaUrl: cloudinaryUrl,
+        mediaProvider: "gemini-carousel",
+        status: "READY",
+        progress: 100,
+        generationStep: "COMPLETED",
+      });
+
+      await ROIService.incrementMediaGenerated(params.userId);
+      console.log("✅ Carousel workflow finished!");
+    } catch (error: any) {
+      console.error("Carousel Failed:", error);
+      await airtableService.updatePost(postId, {
+        status: "FAILED",
+        error: error.message,
+        progress: 0,
+      });
+    }
+  },
+
+  // HELPER for Carousel
+  async generateGeminiImage(
+    promptText: string,
+    refImageUrl?: string
+  ): Promise<Buffer> {
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
+    const parts: any[] = [{ text: promptText }];
+
+    if (refImageUrl) {
+      try {
+        const imgRes = await axios.get(refImageUrl, {
+          responseType: "arraybuffer",
+        });
+        const b64 = Buffer.from(imgRes.data).toString("base64");
+        const mime = imgRes.headers["content-type"] || "image/png";
+        parts.push({ inline_data: { mime_type: mime, data: b64 } });
+      } catch (e) {
+        console.warn("Ref image load failed, skipping");
+      }
+    }
+
+    const response = await axios.post(
+      geminiUrl,
+      { contents: [{ parts }] },
+      {
+        headers: { "Content-Type": "application/json" },
+        maxBodyLength: Infinity,
+      }
+    );
+
+    const candidates = response.data?.candidates;
+    if (candidates && candidates[0]?.content?.parts) {
+      const imagePart = candidates[0].content.parts.find(
+        (p: any) => p.inline_data || p.inlineData
+      );
+      if (imagePart) {
+        const base64Data =
+          imagePart.inline_data?.data || imagePart.inlineData?.data;
+        if (base64Data) return Buffer.from(base64Data, "base64");
+      }
+    }
+    throw new Error("Gemini returned no image data");
+  },
+
+  // ===========================================================================
+  // UNIVERSAL UPLOADER
   // ===========================================================================
   async uploadToCloudinary(
     file: string | Buffer,
@@ -436,7 +636,6 @@ export const contentEngine = {
         context: { caption: title, alt: title },
       };
 
-      // Case 1: Input is a Buffer (Binary) -> Use Stream
       if (Buffer.isBuffer(file)) {
         const stream = cloudinary.uploader.upload_stream(
           uploadOptions,
@@ -446,19 +645,13 @@ export const contentEngine = {
           }
         );
         stream.end(file);
-      }
-      // Case 2: Input is a String (URL or Path) -> Use Upload
-      else if (typeof file === "string") {
+      } else if (typeof file === "string") {
         cloudinary.uploader.upload(file, uploadOptions, (error, result) => {
           if (error) reject(error);
           else resolve(result!.secure_url);
         });
       } else {
-        reject(
-          new Error(
-            "Invalid file format for upload. Expected string or Buffer."
-          )
-        );
+        reject(new Error("Invalid file format for upload."));
       }
     });
   },
