@@ -1,3 +1,4 @@
+// backend/src/index.ts
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import axios from "axios";
@@ -12,14 +13,17 @@ console.log("🔧 Environment Check:", {
   airtableKey: process.env.AIRTABLE_API_KEY ? "✅ Loaded" : "❌ Missing",
   airtableBase: process.env.AIRTABLE_BASE_ID ? "✅ Loaded" : "❌ Missing",
   cloudinary: process.env.CLOUDINARY_CLOUD_NAME ? "✅ Loaded" : "❌ Missing",
+  openai: process.env.OPENAI_API_KEY ? "✅ Loaded" : "❌ Missing",
+  google: process.env.GOOGLE_AI_API_KEY ? "✅ Loaded" : "❌ Missing",
   nodeEnv: process.env.NODE_ENV,
 });
 
-// Now import other modules
-import { generateScript } from "./services/script";
+// Import Services
+import { generateScript } from "./services/script"; // (Kept if you still use text scripts)
 import { ROIService } from "./services/roi";
 import { AuthService } from "./services/auth";
 import { airtableService } from "./services/airtable";
+import { contentEngine } from "./services/contentEngine"; // <--- THE NEW ENGINE
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -59,9 +63,13 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.get("/", (req, res) => {
   res.json({
     message: "Visionlight FX Backend - Running!",
-    version: "2.0.0",
+    version: "3.0.0 (Native Workflow Edition)",
     database: "Airtable",
-    features: ["Cloudinary", "Generation Parameters", "Two-Workflow System"],
+    features: [
+      "Cloudinary",
+      "Native Content Engine",
+      "Sora/Gemini Integration",
+    ],
   });
 });
 
@@ -219,41 +227,6 @@ app.get(
 
 // ==================== POST & MEDIA GENERATION ROUTES ====================
 
-// Create Post
-app.post(
-  "/api/posts",
-  authenticateToken,
-  async (req: AuthenticatedRequest, res) => {
-    const {
-      prompt,
-      mediaType = "IMAGE",
-      platform = "INSTAGRAM",
-      script,
-    } = req.body;
-
-    if (!prompt) {
-      return res.status(400).json({ error: "Prompt is required" });
-    }
-
-    try {
-      const post = await airtableService.createPost({
-        userId: req.user!.id,
-        prompt,
-        mediaType: mediaType.toUpperCase() as any,
-        platform,
-        script,
-      });
-
-      await ROIService.incrementPostsCreated(req.user!.id);
-
-      res.json({ success: true, post });
-    } catch (error: any) {
-      console.error("Create post error:", error);
-      res.status(500).json({ error: "Failed to create post" });
-    }
-  }
-);
-
 // Get user posts
 app.get(
   "/api/posts",
@@ -294,7 +267,7 @@ app.put(
   }
 );
 
-// Make sure this helper function accepts string (not string | undefined)
+// Helper for content types
 const getContentType = (mediaType: string) => {
   switch (mediaType) {
     case "VIDEO":
@@ -308,7 +281,7 @@ const getContentType = (mediaType: string) => {
   }
 };
 
-//download with custom filename
+// Download with custom filename
 app.get(
   "/api/posts/:postId/download",
   authenticateToken,
@@ -326,74 +299,58 @@ app.get(
         return res.status(404).json({ error: "Media not available" });
       }
 
-      // Create a clean filename from the title or prompt
-      const cleanTitle = post.title
-        ? post.title.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 50)
-        : post.prompt.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 50);
+      // Determine Extension
+      let extension = "mp4";
+      if (post.mediaType === "IMAGE") extension = "jpg";
+      if (post.mediaType === "CAROUSEL") extension = "jpg";
 
-      // Determine file extension based on media type (with fallback)
-      const mediaType = post.mediaType || "VIDEO"; // Default to video if undefined
-      const extension =
-        mediaType === "VIDEO" ? "mp4" : mediaType === "IMAGE" ? "jpg" : "png";
+      // Sanitize Filename: Allow alphanumeric, spaces, dashes, underscores.
+      // E.g. "My Cool Video!" -> "My Cool Video.mp4"
+      let cleanTitle = "visionlight-" + postId;
+
+      if (post.title) {
+        // Replace non-safe characters with nothing, keep spaces/dashes
+        cleanTitle = post.title.replace(/[^a-zA-Z0-9 \-_]/g, "").trim();
+        // Fallback if the title becomes empty after sanitization
+        if (cleanTitle.length === 0) cleanTitle = "visionlight-" + postId;
+      }
 
       const filename = `${cleanTitle}.${extension}`;
 
-      // Set headers for download with custom filename
+      // Fetch the file from Cloudinary as a stream
+      const response = await axios({
+        url: post.mediaUrl,
+        method: "GET",
+        responseType: "stream",
+      });
+
+      // Set headers for browser download
+      res.setHeader("Content-Type", response.headers["content-type"]);
+      res.setHeader("Content-Length", response.headers["content-length"]);
+      // Quotes around filename handle spaces correctly
       res.setHeader(
         "Content-Disposition",
         `attachment; filename="${filename}"`
       );
-      res.setHeader("Content-Type", getContentType(mediaType));
 
-      // Stream the file from Cloudinary/your storage
-      const response = await axios.get(post.mediaUrl, {
-        responseType: "stream",
-      });
+      // Pipe stream to response
       response.data.pipe(res);
     } catch (error: any) {
       console.error("Download error:", error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: "Failed to download media" });
     }
   }
 );
 
-// Generate Script
-app.post(
-  "/api/generate-script",
-  authenticateToken,
-  async (req: AuthenticatedRequest, res) => {
-    const { prompt, mediaType } = req.body;
-
-    if (!prompt?.trim()) {
-      return res.status(400).json({ error: "Prompt is required" });
-    }
-
-    if (!["video", "image", "carousel"].includes(mediaType)) {
-      return res.status(400).json({ error: "Valid mediaType is required" });
-    }
-
-    try {
-      const script = await generateScript({
-        prompt: prompt.trim(),
-        mediaType,
-      });
-
-      res.json({ success: true, script });
-    } catch (error: any) {
-      console.error("Script generation error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  }
-);
-
-// Enhanced Direct Media Generation with Cloudinary and Generation Parameters
+// ==================== WORKFLOW 1 REPLACEMENT: PROMPT ENHANCEMENT ====================
+// This endpoint starts the prompt enhancement process (replaces n8n Workflow 1)
 app.post(
   "/api/generate-media",
   authenticateToken,
   upload.single("referenceImage"),
   async (req: AuthenticatedRequest, res) => {
     try {
-      console.log("🎬 Enhanced /api/generate-media endpoint hit!");
+      console.log("🎬 Native /api/generate-media endpoint hit!");
 
       const {
         prompt,
@@ -414,7 +371,7 @@ app.post(
           .json({ error: "Prompt and mediaType are required" });
       }
 
-      // Check user credits
+      // 1. Check user credits
       const user = await airtableService.findUserByEmail(req.user!.email);
       if (
         !user ||
@@ -425,7 +382,7 @@ app.post(
           .json({ error: "No credits available for this media type" });
       }
 
-      // Upload reference image to Cloudinary if provided
+      // 2. Upload reference image to Cloudinary if provided (Persistence)
       let imageReferenceUrl: string | undefined;
       if (referenceImageFile) {
         try {
@@ -443,7 +400,7 @@ app.post(
         }
       }
 
-      // Capture ALL generation parameters for second workflow
+      // 3. Capture generation parameters
       const generationParams = {
         mediaType,
         duration: duration ? parseInt(duration) : undefined,
@@ -452,108 +409,71 @@ app.post(
         size,
         width: width ? parseInt(width) : undefined,
         height: height ? parseInt(height) : undefined,
-        imageReference: imageReferenceUrl, // Store Cloudinary URL, not the file
+        imageReference: imageReferenceUrl, // Store Cloudinary URL
         hasReferenceImage: !!referenceImageFile,
         timestamp: new Date().toISOString(),
       };
 
-      console.log("📋 Storing generation parameters:", generationParams);
-
-      // Create post with generation parameters and initial progress
+      // 4. Create post in Airtable
       const post = await airtableService.createPost({
         userId: req.user!.id,
         prompt,
         title: title || "",
         mediaType: mediaType.toUpperCase() as any,
         platform: "INSTAGRAM",
-        generationParams: generationParams, // Store all parameters for second workflow
+        generationParams: generationParams,
         imageReference: imageReferenceUrl,
         generationStep: "PROMPT_ENHANCEMENT",
         requiresApproval: true,
       });
 
-      console.log("📝 Post created with generation params:", post.id);
-
-      // Update post with initial progress - START AT 0%
+      // 5. Update post with initial progress
       await airtableService.updatePost(post.id, {
-        status: "NEW",
-        progress: 0,
+        status: "PROCESSING", // Changed from NEW to PROCESSING immediately
+        progress: 1,
       });
 
-      // Deduct credit immediately
+      // 6. Deduct credit immediately
       const updatedCredits = { ...user.demoCredits };
       updatedCredits[mediaType as keyof typeof user.demoCredits] -= 1;
       await airtableService.updateUserCredits(req.user!.id, updatedCredits);
 
-      const webhookUrl =
-        mediaType === "video"
-          ? process.env.N8N_SORA_WEBHOOK_URL
-          : process.env.N8N_GEMINI_WEBHOOK_URL;
-
-      if (!webhookUrl) {
-        await airtableService.updatePost(post.id, {
-          status: "FAILED",
-          progress: 0,
-        });
-        return res
-          .status(500)
-          .json({ error: "Media generation service not configured" });
-      }
-
-      // Prepare form data for n8n - include all parameters
-      const formData = new FormData();
-      formData.append("postId", post.id);
-      formData.append("type", mediaType);
-      formData.append("prompt", prompt);
-      formData.append("userId", req.user!.id);
-      formData.append(
-        "hasReferenceImage",
-        referenceImageFile ? "true" : "false"
+      // 7. TRIGGER NATIVE WORKFLOW 1 (Async/Background)
+      // Logic: Enhance prompt using GPT-4o / GPT-4o-mini logic defined in contentEngine
+      console.log(
+        `🚀 Starting background prompt enhancement for Post: ${post.id}`
       );
 
-      // Add enhanced video parameters
-      if (mediaType === "video") {
-        if (duration) formData.append("duration", duration.toString());
-        if (model) formData.append("model", model);
-        if (aspectRatio) formData.append("aspectRatio", aspectRatio);
-        if (size) formData.append("size", size);
-        if (width) formData.append("width", width);
-        if (height) formData.append("height", height);
-      }
+      (async () => {
+        try {
+          // Replicate "Workflow 1" Logic
+          const enhancedPrompt = await contentEngine.enhanceUserPrompt(
+            prompt,
+            mediaType,
+            duration ? parseInt(duration) : 8, // Default 8s
+            referenceImageFile?.buffer, // Pass Buffer directly for analysis (faster than downloading URL)
+            referenceImageFile?.mimetype
+          );
 
-      if (referenceImageFile) {
-        formData.append(
-          "referenceImage",
-          new Blob([referenceImageFile.buffer], {
-            type: referenceImageFile.mimetype,
-          }),
-          referenceImageFile.originalname
-        );
-      }
+          console.log(`✨ Prompt enhanced successfully for ${post.id}`);
 
-      // Fire and forget to n8n
-      console.log("🚀 Sending to n8n webhook...");
-
-      axios
-        .post(webhookUrl, formData, {
-          timeout: 15000,
-          headers: { "Content-Type": "multipart/form-data" },
-        })
-        .then(async (response) => {
-          console.log("✅ n8n workflow triggered successfully!");
+          // Update Airtable to trigger the "Approval Modal" on frontend
           await airtableService.updatePost(post.id, {
-            status: "PROCESSING",
-            progress: 1, // Initial progress when workflow starts
+            enhancedPrompt: enhancedPrompt,
+            generationStep: "AWAITING_APPROVAL",
+            progress: 2, // 2% means enhancement done, waiting for user
           });
-        })
-        .catch(async (error) => {
-          console.error("❌ Error triggering n8n workflow:", error.message);
+        } catch (err: any) {
+          console.error("❌ Enhancement Workflow Failed:", err);
           await airtableService.updatePost(post.id, {
             status: "FAILED",
             progress: 0,
+            error: err.message || "Prompt enhancement failed",
           });
-        });
-      // Return immediate response with post info
+        }
+      })();
+
+      // Return immediate response to UI
       return res.json({
         success: true,
         postId: post.id,
@@ -604,50 +524,13 @@ app.post(
   }
 );
 
-// ==================== PROMPT APPROVAL WORKFLOW ROUTES ====================
-
-app.post("/api/update-enhanced-prompt", async (req, res) => {
-  try {
-    const { postId, enhancedPrompt, imageReference } = req.body;
-
-    if (!postId || !enhancedPrompt) {
-      return res.status(400).json({
-        success: false,
-        error: "Post ID and enhanced prompt are required",
-      });
-    }
-
-    console.log("📝 Updating enhanced prompt for post:", postId);
-
-    await airtableService.updatePost(postId, {
-      enhancedPrompt,
-      imageReference: imageReference || "",
-      generationStep: "AWAITING_APPROVAL", // ← This is what triggers the modal
-      status: "PROCESSING",
-      progress: 2, // Progress when prompt is enhanced (0-2% range)
-    });
-
-    console.log(
-      "✅ Enhanced prompt saved to Airtable - modal should appear soon"
-    );
-
-    return res.json({
-      success: true,
-      message:
-        "Enhanced prompt updated - user should see approval modal shortly",
-    });
-  } catch (error: any) {
-    console.error("Error updating enhanced prompt:", error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// ==================== APPROVE PROMPT ENDPOINT ====================
+// ==================== WORKFLOW 2 REPLACEMENT: APPROVE PROMPT ====================
 app.post(
   "/api/approve-prompt",
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
+      // 1. Receive data (Note: finalPrompt comes from UI, user could have chosen Original or Enhanced)
       const { postId, finalPrompt } = req.body;
 
       if (!postId || !finalPrompt) {
@@ -656,120 +539,58 @@ app.post(
           .json({ error: "Post ID and final prompt are required" });
       }
 
-      console.log("✅ User approving prompt for post:", postId);
+      console.log("✅ User approved prompt for post:", postId);
 
-      // Verify user owns this post and get the stored generation parameters
+      // 2. Verify Ownership
       const post = await airtableService.getPostById(postId);
       if (!post || post.userId !== req.user!.id) {
         return res.status(403).json({ error: "Access denied" });
       }
 
-      console.log("📋 Retrieved post data:", {
-        imageReference: post.imageReference,
-        hasGenerationParams: !!post.generationParams,
-        generationParamsImageRef: post.generationParams?.imageReference,
-      });
-
-      // 🚨 CRITICAL: Update with final prompt and progress - START FINAL GENERATION AT 3%
+      // 3. Update Status to 'PROCESSING'
       await airtableService.updatePost(postId, {
-        userEditedPrompt: finalPrompt,
+        userEditedPrompt: finalPrompt, // Save the choice
         generationStep: "GENERATION",
         requiresApproval: false,
         status: "PROCESSING",
-        progress: 3, // Final generation starts at 3%
+        progress: 5,
       });
 
-      // 🚀 TRIGGER SECOND N8N WORKFLOW
-      const secondWorkflowUrl = process.env.N8N_FINAL_GENERATION_WEBHOOK_URL;
-
-      if (!secondWorkflowUrl) {
-        console.error("❌ No final generation webhook URL configured");
-        await airtableService.updatePost(postId, {
-          status: "FAILED",
-          progress: 0,
-        });
-        return res
-          .status(500)
-          .json({ error: "Generation service not configured" });
-      }
-
-      // Get image reference from both possible locations
+      // 4. Prepare Logic Params
       const imageReference =
         post.imageReference || post.generationParams?.imageReference || "";
       const hasReferenceImage = !!(
         imageReference && imageReference.startsWith("http")
       );
 
-      // Prepare JSON data for webhook
-      const webhookData = {
-        // Basic parameters
-        postId: postId,
-        finalPrompt: finalPrompt,
-        mediaType: post.mediaType?.toLowerCase() || "video",
-        userId: post.userId,
-
-        // Include ALL generation parameters from the first workflow
+      const params = {
         ...(post.generationParams || {}),
-
-        // Add prompt history
-        originalPrompt: post.prompt,
-        enhancedPrompt: post.enhancedPrompt || "",
-
-        // ✅ CRITICAL: Force include the image reference (overwrite if needed)
+        userId: req.user!.id,
         imageReference: imageReference,
-
-        // ✅ CRITICAL: Set hasReferenceImage based on actual image presence
         hasReferenceImage: hasReferenceImage,
-
-        approvalTimestamp: new Date().toISOString(),
+        title: post.title, // Pass title for metadata
       };
 
-      console.log("🚀 Sending to final generation:", {
-        postId,
-        hasReferenceImage: webhookData.hasReferenceImage,
-        imageReference: webhookData.imageReference || "none",
-        mediaType: webhookData.mediaType,
-      });
+      // 5. ROUTING LOGIC: Video vs Image
+      const mediaType = post.mediaType?.toLowerCase() || "video";
 
-      // ✅ IMPROVED: Use async/await with proper error handling
-      try {
-        const response = await axios.post(secondWorkflowUrl, webhookData, {
-          timeout: 30000, // Increased timeout
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-
-        console.log("✅ Final generation workflow triggered successfully!");
-
-        // Update progress to indicate workflow accepted
-        await airtableService.updatePost(postId, {
-          progress: 5, // Progress when final generation is confirmed
-        });
+      if (mediaType === "video") {
+        // -> Workflow 2a: Video
+        contentEngine.startVideoGeneration(postId, finalPrompt, params);
 
         res.json({
           success: true,
-          message:
-            "Prompt approved. Final generation starting with all your original settings...",
-          hasReferenceImage,
+          message: "Video generation started...",
           postId: postId,
         });
-      } catch (webhookError: any) {
-        console.error(
-          "❌ Error triggering final generation:",
-          webhookError.message
-        );
+      } else {
+        // -> Workflow 2b: Image (Gemini 2.5)
+        contentEngine.startImageGeneration(postId, finalPrompt, params);
 
-        // Mark as failed immediately if webhook call fails
-        await airtableService.updatePost(postId, {
-          status: "FAILED",
-          progress: 0,
-          error: `Failed to trigger generation: ${webhookError.message}`,
-        });
-
-        res.status(500).json({
-          error: "Failed to start final generation. Please try again.",
-          details: webhookError.message,
+        res.json({
+          success: true,
+          message: "Image generation started...",
+          postId: postId,
         });
       }
     } catch (error: any) {
@@ -779,7 +600,7 @@ app.post(
   }
 );
 
-// NEW: Get post details for prompt editing
+// Get post details for prompt editing
 app.get(
   "/api/post/:postId",
   authenticateToken,
@@ -821,7 +642,7 @@ app.get(
   }
 );
 
-// NEW: Cancel prompt approval and mark as failed
+// Cancel prompt approval and mark as failed
 app.post(
   "/api/cancel-prompt",
   authenticateToken,
@@ -833,15 +654,13 @@ app.post(
         return res.status(400).json({ error: "Post ID is required" });
       }
 
-      console.log("❌ User cancelling prompt approval for post:", postId);
+      console.log("❌ User cancelled prompt for post:", postId);
 
-      // Verify user owns this post
       const post = await airtableService.getPostById(postId);
       if (!post || post.userId !== req.user!.id) {
         return res.status(403).json({ error: "Access denied" });
       }
 
-      // Update post status to failed/cancelled
       await airtableService.updatePost(postId, {
         status: "CANCELLED",
         generationStep: "COMPLETED",
@@ -860,7 +679,7 @@ app.post(
   }
 );
 
-// ==================== POST STATUS VERIFICATION ====================
+// Post Status Verification
 app.get(
   "/api/post/:postId/status",
   authenticateToken,
@@ -894,38 +713,6 @@ app.get(
   }
 );
 
-// ==================== MEDIA READY WEBHOOK (called by n8n) ====================
-
-app.post("/api/media-webhook", async (req, res) => {
-  try {
-    const { postId, media, mediaType, userId } = req.body;
-
-    if (!postId || !media || !media.url || !mediaType || !userId) {
-      return res.status(400).json({ success: false, error: "Invalid payload" });
-    }
-
-    console.log("📩 Enhanced media webhook received for post:", postId);
-
-    // Update Airtable with completed status and 100% progress
-    await airtableService.updatePost(postId, {
-      mediaUrl: media.url,
-      mediaProvider: mediaType === "video" ? "sora" : "gemini",
-      status: "READY",
-      generationStep: "COMPLETED",
-      progress: 100, // Complete!
-    });
-
-    await ROIService.incrementMediaGenerated(userId);
-
-    console.log("✅ Media generation completed for post:", postId);
-
-    return res.json({ success: true });
-  } catch (err: any) {
-    console.error("❌ Error in enhanced media-webhook:", err);
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
-
 // ==================== ERROR HANDLING ====================
 
 app.use((req, res) => {
@@ -935,7 +722,7 @@ app.use((req, res) => {
   });
 });
 
-// Global error handler - must be last
+// Global error handler
 app.use((error: any, req: Request, res: Response, next: NextFunction) => {
   console.error("Global Error Handler:", error);
   res.status(error.status || 500).json({
@@ -957,7 +744,7 @@ if (process.env.NODE_ENV !== "production" || process.env.VERCEL !== "1") {
     console.log(`🌐 Environment: ${process.env.NODE_ENV || "development"}`);
     console.log(`📊 Database: Airtable`);
     console.log(`☁️  File Storage: Cloudinary`);
-    console.log(`🔐 Auth: Demo mode enabled`);
+    console.log(`🧠 AI Engine: Native (OpenAI + Gemini)`);
   });
 }
 

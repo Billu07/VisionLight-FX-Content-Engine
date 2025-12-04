@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
@@ -23,6 +23,7 @@ interface GenerationState {
 }
 
 function Dashboard() {
+  // === Form State ===
   const [prompt, setPrompt] = useState("");
   const [selectedMediaType, setSelectedMediaType] =
     useState<MediaType>("video");
@@ -52,11 +53,6 @@ function Dashboard() {
   // Async UX state
   const [showQueuedModal, setShowQueuedModal] = useState(false);
 
-  // Track posts generated during this session
-  const [sessionGeneratedPosts, setSessionGeneratedPosts] = useState<
-    Set<string>
-  >(new Set());
-
   const queryClient = useQueryClient();
   const { user, isLoading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
@@ -66,17 +62,23 @@ function Dashboard() {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 1024);
     };
-
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Initialize auth check on component mount
+  // Initialize auth check
   useEffect(() => {
     const { checkAuth } = useAuth.getState();
     checkAuth();
   }, []);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/");
+    }
+  }, [user, authLoading, navigate]);
 
   // === Fetch Brand Config ===
   const { data: brandConfig } = useQuery({
@@ -88,24 +90,21 @@ function Dashboard() {
     enabled: !!user,
   });
 
-  // Apply brand colors globally using CSS variables
+  // Apply brand colors globally
   useEffect(() => {
     const applyBrandColors = () => {
       const primary = brandConfig?.primaryColor || "#6366f1";
       const secondary = brandConfig?.secondaryColor || "#8b5cf6";
-
       document.documentElement.style.setProperty("--primary-brand", primary);
       document.documentElement.style.setProperty(
         "--secondary-brand",
         secondary
       );
-
       const metaThemeColor = document.querySelector("meta[name=theme-color]");
       if (metaThemeColor) {
         metaThemeColor.setAttribute("content", primary);
       }
     };
-
     applyBrandColors();
     window.addEventListener("focus", applyBrandColors);
     return () => window.removeEventListener("focus", applyBrandColors);
@@ -119,15 +118,7 @@ function Dashboard() {
     }
   }, [user]);
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!authLoading && !user) {
-      console.log("No user found, redirecting to login");
-      navigate("/");
-    }
-  }, [user, authLoading, navigate]);
-
-  // === Enhanced Posts Query with Better Status Monitoring ===
+  // === Enhanced Posts Query (Crash Proofed) ===
   const {
     data: posts = [],
     isLoading: postsLoading,
@@ -135,115 +126,60 @@ function Dashboard() {
   } = useQuery({
     queryKey: ["posts"],
     queryFn: async () => {
-      const response = await apiEndpoints.getPosts();
-      const posts = response.data.posts;
-
-      // Log status for debugging
-      posts.forEach((post: any) => {
-        if (post.status === "PROCESSING" || post.status === "NEW") {
-          console.log(`📊 Post ${post.id}:`, {
-            status: post.status,
-            progress: post.progress,
-            generationStep: post.generationStep,
-            mediaUrl: !!post.mediaUrl,
-          });
-        }
-      });
-
-      return posts;
+      try {
+        const response = await apiEndpoints.getPosts();
+        // Ensure we always return an array
+        return Array.isArray(response.data.posts) ? response.data.posts : [];
+      } catch (e) {
+        return [];
+      }
     },
     enabled: !!user,
+    // Polling every 5s to prevent heavy load, only if something is processing
     refetchInterval: (query) => {
-      const posts = query.state.data || [];
-      const hasProcessing = posts.some(
+      const currentPosts = query.state.data;
+      if (!currentPosts || !Array.isArray(currentPosts)) return false;
+      const hasProcessing = currentPosts.some(
         (p: any) =>
           (p.status === "PROCESSING" || p.status === "NEW") &&
           (p.progress || 0) < 100 &&
-          !p.mediaUrl // Only refetch if no media yet
+          !p.mediaUrl
       );
-      return hasProcessing ? 3000 : false;
+      return hasProcessing ? 5000 : false;
     },
-    staleTime: 0,
+    staleTime: 1000,
   });
 
-  // === Track newly generated posts ===
-  useEffect(() => {
-    if (posts.length > 0) {
-      const processingPosts = posts.filter(
-        (p: any) => p.status === "PROCESSING" || p.status === "NEW"
-      );
-      processingPosts.forEach((post: any) => {
-        setSessionGeneratedPosts((prev) => new Set(prev).add(post.id));
-      });
-    }
+  // === Safe Modal Logic (Prevents Infinite Loops) ===
+  const postNeedingApproval = useMemo(() => {
+    if (!posts || !Array.isArray(posts) || posts.length === 0) return null;
+    return posts.find(
+      (p: any) =>
+        p.generationStep === "AWAITING_APPROVAL" &&
+        p.requiresApproval === true &&
+        p.status !== "CANCELLED"
+    );
   }, [posts]);
 
-  // === Fixed Modal Detection Logic ===
   useEffect(() => {
-    if (posts.length === 0 || showPromptApproval) return;
-
-    const needsApproval = posts.find(
-      (p: any) =>
-        p.generationStep === "AWAITING_APPROVAL" && p.requiresApproval === true
-    );
-
-    if (needsApproval && !showPromptApproval && !showQueuedModal) {
-      setPendingApprovalPostId(needsApproval.id);
+    if (postNeedingApproval && !showPromptApproval && !showQueuedModal) {
+      setPendingApprovalPostId(postNeedingApproval.id);
       setShowPromptApproval(true);
-      setSessionGeneratedPosts((prev) => new Set(prev).add(needsApproval.id));
+    } else if (!postNeedingApproval && showPromptApproval) {
+      setShowPromptApproval(false);
+      setPendingApprovalPostId(null);
     }
-  }, [posts, showPromptApproval, showQueuedModal, sessionGeneratedPosts]);
-
-  // === Handle post updates for automatic modal display ===
-  useEffect(() => {
-    if (posts.length > 0) {
-      const newApprovalPosts = posts.filter(
-        (p: any) =>
-          p.generationStep === "AWAITING_APPROVAL" &&
-          p.requiresApproval === true &&
-          !sessionGeneratedPosts.has(p.id)
-      );
-
-      if (newApprovalPosts.length > 0 && !showPromptApproval) {
-        const post = newApprovalPosts[0];
-        setPendingApprovalPostId(post.id);
-        setShowPromptApproval(true);
-        setSessionGeneratedPosts((prev) => new Set(prev).add(post.id));
-      }
-    }
-  }, [posts, sessionGeneratedPosts, showPromptApproval]);
-
-  // === Clean up modal states when posts change ===
-  useEffect(() => {
-    if (pendingApprovalPostId && showPromptApproval) {
-      const post = posts.find((p: any) => p.id === pendingApprovalPostId);
-      if (post && post.generationStep !== "AWAITING_APPROVAL") {
-        setShowPromptApproval(false);
-        setPendingApprovalPostId(null);
-      }
-    }
-  }, [posts, pendingApprovalPostId, showPromptApproval]);
-
-  // === Real-time Approval Polling ===
-  useEffect(() => {
-    if (!user || showPromptApproval) return;
-
-    const interval = setInterval(() => {
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [user, showPromptApproval, queryClient]);
+  }, [postNeedingApproval, showPromptApproval, showQueuedModal]);
 
   // === Fetch User Credits ===
   const {
-    data: userCredits = { video: 2, image: 2, carousel: 2 },
+    data: userCredits = { video: 0, image: 0, carousel: 0 },
     isLoading: creditsLoading,
   } = useQuery({
     queryKey: ["user-credits"],
     queryFn: async () => {
       const response = await apiEndpoints.getUserCredits();
-      return response.data.credits;
+      return response.data.credits || { video: 0, image: 0, carousel: 0 };
     },
     enabled: !!user,
   });
@@ -255,7 +191,13 @@ function Dashboard() {
     queryKey: ["roi-metrics"],
     queryFn: async () => {
       const response = await apiEndpoints.getROIMetrics();
-      return response.data.metrics;
+      return (
+        response.data.metrics || {
+          postsCreated: 0,
+          timeSaved: 0,
+          mediaGenerated: 0,
+        }
+      );
     },
     enabled: !!user,
   });
@@ -273,17 +215,31 @@ function Dashboard() {
           status: "generating",
           result: { postId: data.postId },
         });
+
+        // Show success modal
         setShowQueuedModal(true);
-        setSessionGeneratedPosts((prev) => new Set(prev).add(data.postId));
+
+        // Clear Inputs (UX Fix)
+        setPrompt("");
+        setVideoTitle("");
+        setReferenceImage(null);
+        setReferenceImageUrl("");
+
+        // Smart Refetching
+        queryClient.invalidateQueries({ queryKey: ["posts"] });
+        queryClient.invalidateQueries({ queryKey: ["user-credits"] });
+
+        // Refetch again in 2s to catch Airtable latency
+        setTimeout(
+          () => queryClient.invalidateQueries({ queryKey: ["posts"] }),
+          2000
+        );
       } else {
         setGenerationState({
           status: "error",
           error: "Unexpected response from server",
         });
       }
-
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-      queryClient.invalidateQueries({ queryKey: ["user-credits"] });
     },
     onError: (error: any) => {
       console.error("Generate media error:", error);
@@ -306,14 +262,6 @@ function Dashboard() {
       setReferenceImage(null);
       setReferenceImageUrl("");
       queryClient.invalidateQueries({ queryKey: ["posts"] });
-
-      if (pendingApprovalPostId) {
-        setSessionGeneratedPosts((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(pendingApprovalPostId);
-          return newSet;
-        });
-      }
     },
     onError: (error: any) => {
       console.error("Error approving prompt:", error);
@@ -329,14 +277,6 @@ function Dashboard() {
       setShowPromptApproval(false);
       setPendingApprovalPostId(null);
       queryClient.invalidateQueries({ queryKey: ["posts"] });
-
-      if (pendingApprovalPostId) {
-        setSessionGeneratedPosts((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(pendingApprovalPostId);
-          return newSet;
-        });
-      }
     },
     onError: (error: any) => {
       console.error("Error cancelling prompt:", error);
@@ -400,7 +340,10 @@ function Dashboard() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt.trim() || userCredits[selectedMediaType] <= 0) return;
+    // Safe check for credits
+    const currentCredits = userCredits?.[selectedMediaType] ?? 0;
+
+    if (!prompt.trim() || currentCredits <= 0) return;
 
     setGenerationState({ status: "idle" });
     const formData = buildFormData();
@@ -412,7 +355,6 @@ function Dashboard() {
     navigate("/");
   };
 
-  // Apply brand colors dynamically
   const primaryColor = brandConfig?.primaryColor || "#6366f1";
   const companyName = brandConfig?.companyName || "Visionlight AI";
 
@@ -441,8 +383,8 @@ function Dashboard() {
               Your content is being generated 🎬
             </h3>
             <p className="text-sm text-purple-200 mb-4">
-              We've started generating your {selectedMediaType}. It will appear
-              in your content library when ready.
+              We've started enhancing your prompt. Check your library shortly
+              for approval!
             </p>
             <div className="flex justify-end">
               <button
@@ -485,7 +427,7 @@ function Dashboard() {
       />
 
       <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
-        {/* Enhanced Mobile Header with FX Logo at same height */}
+        {/* --- HEADER --- */}
         <div className="mb-6 sm:mb-8 flex flex-col gap-4">
           <div className="flex items-center justify-between">
             {/* Left side: Visionlight AI with user info */}
@@ -505,7 +447,6 @@ function Dashboard() {
 
             {/* Right side: FX Logo - Top Center with subtitle */}
             <div className="absolute left-1/2 transform -translate-x-1/2 flex flex-col items-center mt-14">
-              {/* Larger FX Logo */}
               <div className="h-14 sm:h-16 flex items-center justify-center mb-1">
                 <img
                   src={fxLogo}
@@ -513,7 +454,6 @@ function Dashboard() {
                   className="h-full w-auto object-contain"
                 />
               </div>
-              {/* FX Subtitle */}
               <p className="text-purple-300 text-xs sm:text-sm text-center">
                 Your AI-Powered Creation Engine
               </p>
@@ -538,7 +478,7 @@ function Dashboard() {
             )}
           </div>
 
-          {/* Enhanced Credits Display */}
+          {/* Credits Display */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="bg-gray-800/60 backdrop-blur-lg rounded-2xl px-3 sm:px-4 py-2 sm:py-3 border border-purple-500/20 w-full sm:w-auto">
               <div className="flex items-center justify-between sm:justify-start gap-4">
@@ -562,12 +502,12 @@ function Dashboard() {
                           </span>
                           <span
                             className={`text-xs font-semibold ${
-                              userCredits[type as MediaType] > 0
+                              (userCredits[type as MediaType] || 0) > 0
                                 ? "text-white"
                                 : "text-gray-400"
                             }`}
                           >
-                            {userCredits[type as MediaType]}
+                            {userCredits[type as MediaType] || 0}
                           </span>
                         </div>
                       ))}
@@ -604,7 +544,7 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Enhanced ROI Metrics - Mobile Optimized */}
+        {/* --- ROI METRICS --- */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-6 sm:mb-8">
           {[
             {
@@ -655,12 +595,12 @@ function Dashboard() {
           ))}
         </div>
 
-        {/* Enhanced Main Content Layout */}
+        {/* --- MAIN LAYOUT --- */}
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
-          {/* Premium Video Generation Panel */}
+          {/* Generation Panel */}
           <div className="flex-1">
             <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 lg:p-8 shadow-2xl">
-              {/* PICDRIFT Header with subtitle BELOW */}
+              {/* PICDRIFT Header */}
               <div className="mb-6 sm:mb-8">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="h-12 sm:h-14 flex items-center justify-center">
@@ -706,13 +646,13 @@ function Dashboard() {
                       key={type}
                       type="button"
                       onClick={() => setSelectedMediaType(type)}
-                      disabled={userCredits[type] <= 0}
+                      disabled={(userCredits[type] || 0) <= 0}
                       className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
                         selectedMediaType === type
                           ? `border-white/20 bg-gradient-to-br ${gradient} shadow-2xl scale-105`
                           : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
                       } ${
-                        userCredits[type] <= 0
+                        (userCredits[type] || 0) <= 0
                           ? "opacity-40 cursor-not-allowed grayscale"
                           : ""
                       }`}
@@ -722,13 +662,7 @@ function Dashboard() {
                           {icon}
                         </span>
                         <div className="flex-1">
-                          <div
-                            className={`font-semibold text-sm ${
-                              selectedMediaType === type
-                                ? "text-white"
-                                : "text-white"
-                            }`}
-                          >
+                          <div className={`font-semibold text-sm text-white`}>
                             {label}
                           </div>
                           <div
@@ -738,7 +672,7 @@ function Dashboard() {
                                 : "text-purple-300"
                             }`}
                           >
-                            {userCredits[type]} credits
+                            {userCredits[type] || 0} credits
                           </div>
                         </div>
                         {selectedMediaType === type && (
@@ -751,7 +685,7 @@ function Dashboard() {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-                {/* Enhanced Prompt Input */}
+                {/* Prompt Input */}
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2 sm:mb-3 flex items-center gap-2">
                     <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>
@@ -766,16 +700,16 @@ function Dashboard() {
                   />
                 </div>
 
-                {/* Enhanced Title Input */}
+                {/* DYNAMIC TITLE INPUT */}
                 <div className="space-y-2 sm:space-y-3">
-                  <label className="block text-sm font-semibold text-white">
-                    🏷️ Video Title (Optional)
+                  <label className="block text-sm font-semibold text-white capitalize">
+                    🏷️ {selectedMediaType} Title (Optional)
                   </label>
                   <input
                     type="text"
                     value={videoTitle}
                     onChange={(e) => setVideoTitle(e.target.value)}
-                    placeholder="Give your video a memorable name..."
+                    placeholder={`Give your ${selectedMediaType} a memorable name...`}
                     className="w-full p-3 sm:p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-purple-300/60 backdrop-blur-sm"
                   />
                 </div>
@@ -783,7 +717,6 @@ function Dashboard() {
                 {/* Premium Video Controls */}
                 {selectedMediaType === "video" && (
                   <div className="space-y-4 sm:space-y-6">
-                    {/* Enhanced Video Model Selection */}
                     <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
                         🤖 AI Model
@@ -833,7 +766,6 @@ function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Enhanced Aspect Ratio Selection */}
                     <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
                         📐 Aspect Ratio
@@ -885,7 +817,6 @@ function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Enhanced Video Size Selection */}
                     <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
                         📏 Video Size
@@ -965,7 +896,6 @@ function Dashboard() {
                       )}
                     </div>
 
-                    {/* Enhanced Duration Selection */}
                     <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
                         ⏱️ Video Duration
@@ -990,7 +920,7 @@ function Dashboard() {
                   </div>
                 )}
 
-                {/* Enhanced Reference Image Upload */}
+                {/* Reference Image */}
                 <div className="space-y-2 sm:space-y-3">
                   <label className="block text-sm font-semibold text-white">
                     🎨 Reference Image (Optional)
@@ -1020,13 +950,13 @@ function Dashboard() {
                   </div>
                 </div>
 
-                {/* Premium Generate Button */}
+                {/* Generate Button */}
                 <button
                   type="submit"
                   disabled={
                     generateMediaMutation.isPending ||
                     !prompt.trim() ||
-                    userCredits[selectedMediaType] <= 0
+                    (userCredits[selectedMediaType] || 0) <= 0
                   }
                   className="w-full gradient-brand text-white py-4 sm:py-5 px-6 sm:px-8 rounded-2xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-bold text-base sm:text-lg flex items-center justify-center gap-3 group relative overflow-hidden"
                 >
@@ -1051,7 +981,6 @@ function Dashboard() {
                 </button>
               </form>
 
-              {/* Generation Error */}
               {generationState.status === "error" && (
                 <ErrorAlert
                   message={generationState.error || "Generation failed"}
@@ -1065,14 +994,17 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* Sophisticated Content Library */}
+          {/* Content Library (Restored Layout) */}
           <div className="lg:w-96">
             <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 shadow-2xl sticky top-4">
               <div className="flex items-center justify-between mb-4 sm:mb-6">
                 <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
                   <span>📚</span> Your Library
                   <span className="bg-purple-500/20 text-purple-300 text-xs px-2 py-1 rounded-full ml-2">
-                    {posts.filter((p: any) => p.status !== "CANCELLED").length}
+                    {posts && Array.isArray(posts)
+                      ? posts.filter((p: any) => p.status !== "CANCELLED")
+                          .length
+                      : 0}
                   </span>
                 </h2>
                 {postsLoading && (
@@ -1082,29 +1014,42 @@ function Dashboard() {
                 )}
               </div>
 
-              {/* Enhanced Gallery Organization */}
               <div className="space-y-3 max-h-[500px] sm:max-h-[600px] overflow-y-auto custom-scrollbar">
-                {posts
-                  .filter((post: any) => post.status !== "CANCELLED")
-                  .sort(
-                    (a: any, b: any) =>
-                      new Date(b.createdAt).getTime() -
-                      new Date(a.createdAt).getTime()
-                  )
-                  .map((post: any) => (
-                    <PostCard
-                      key={post.id}
-                      post={post}
-                      onPublishPost={publishMutation.mutate}
-                      userCredits={userCredits}
-                      publishingPost={publishingPost}
-                      primaryColor={primaryColor}
-                      compact={true}
-                    />
-                  ))}
+                {posts && Array.isArray(posts) && posts.length > 0 ? (
+                  posts
+                    .filter((post: any) => post.status !== "CANCELLED")
+                    .sort(
+                      (a: any, b: any) =>
+                        new Date(b.createdAt).getTime() -
+                        new Date(a.createdAt).getTime()
+                    )
+                    .map((post: any) => (
+                      <PostCard
+                        key={post.id}
+                        post={post}
+                        onPublishPost={publishMutation.mutate}
+                        userCredits={
+                          userCredits || { video: 0, image: 0, carousel: 0 }
+                        }
+                        publishingPost={publishingPost}
+                        primaryColor={primaryColor}
+                        compact={true}
+                      />
+                    ))
+                ) : !postsLoading ? (
+                  <div className="text-center py-8">
+                    <div className="text-purple-300 text-sm mb-3">
+                      No content yet
+                    </div>
+                    <div className="text-4xl mb-2">✨</div>
+                    <div className="text-gray-400 text-xs">
+                      Start creating above!
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
-              {postsError ? (
+              {postsError && (
                 <div className="text-center py-6">
                   <ErrorAlert
                     message="Failed to load your content"
@@ -1114,22 +1059,11 @@ function Dashboard() {
                     type="error"
                   />
                 </div>
-              ) : posts.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="text-purple-300 text-sm mb-3">
-                    No content yet
-                  </div>
-                  <div className="text-4xl mb-2">✨</div>
-                  <div className="text-gray-400 text-xs">
-                    Start creating above!
-                  </div>
-                </div>
-              ) : null}
+              )}
             </div>
           </div>
         </div>
 
-        {/* Brand Config Modal */}
         {showBrandModal && (
           <BrandConfigModal
             onClose={() => setShowBrandModal(false)}

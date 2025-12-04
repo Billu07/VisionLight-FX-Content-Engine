@@ -672,6 +672,7 @@ export const airtableService = {
         return {
           id: record.id,
           userId: actualUserId,
+          title: record.get("title") as string, // <--- THIS WAS MISSING
           prompt: record.get("prompt") as string,
           enhancedPrompt: record.get("enhancedPrompt") as string,
           generationStep: record.get("generationStep") as

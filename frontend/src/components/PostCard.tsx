@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { LoadingSpinner } from "./LoadingSpinner";
-import { apiEndpoints } from "../lib/api";
+import { apiEndpoints, api } from "../lib/api";
 
 interface PostCardProps {
   post: any;
   onPublishPost: (variables: { postId: string; platform?: string }) => void;
   publishingPost: string | null;
   userCredits: any;
-  primaryColor: string;
+  primaryColor?: string;
   compact?: boolean;
 }
 
@@ -19,36 +19,37 @@ export function PostCard({
 }: PostCardProps) {
   const [mediaError, setMediaError] = useState(false);
   const [videoLoading, setVideoLoading] = useState(true);
+
+  // Title State
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(post.title || "");
-  const [isPossiblyStuck, setIsPossiblyStuck] = useState(false);
 
-  // Stuck detection for posts that seem to be processing indefinitely
+  const [isPossiblyStuck, setIsPossiblyStuck] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  // Sync state if prop changes
+  useEffect(() => {
+    setEditedTitle(post.title || "");
+  }, [post.title]);
+
+  // Stuck detection logic
   useEffect(() => {
     if (
       (post.status === "PROCESSING" || post.status === "NEW") &&
       (post.progress || 0) < 10
     ) {
-      // If processing but very low progress for too long, might be stuck
-      const timer = setTimeout(() => {
-        setIsPossiblyStuck(true);
-      }, 120000); // 2 minutes
-
+      const timer = setTimeout(() => setIsPossiblyStuck(true), 120000);
       return () => clearTimeout(timer);
     } else {
       setIsPossiblyStuck(false);
     }
   }, [post.status, post.progress]);
 
-  const handleMediaError = () => {
-    console.error("❌ Failed to load media:", post.mediaUrl);
-    setMediaError(true);
-  };
-
   const handleTitleSave = async () => {
     try {
       await apiEndpoints.updatePostTitle(post.id, editedTitle);
       setIsEditingTitle(false);
+      // Optimistically update UI could be handled here or via refetch
     } catch (error) {
       console.error("Error updating title:", error);
     }
@@ -59,503 +60,323 @@ export function PostCard({
     setIsEditingTitle(false);
   };
 
-  const handleVideoLoad = () => {
-    setVideoLoading(false);
-  };
+  const handleVideoLoad = () => setVideoLoading(false);
 
-  const handleVideoError = () => {
-    console.error("❌ Video failed to load:", post.mediaUrl);
-    setVideoLoading(false);
-    setMediaError(true);
-  };
-
-  // Manual status check function
-  const manuallyCheckPostStatus = async () => {
-    try {
-      const response = await apiEndpoints.getPostStatus(post.id);
-      console.log(`🔍 Manual status check for ${post.id}:`, response.data);
-      // The query will automatically refetch posts due to the invalidation
-    } catch (error) {
-      console.error("Manual status check failed:", error);
+  const handleMediaError = () => {
+    // Only log if it's not a temporary loading state
+    if (post.status === "READY") {
+      console.warn(`⚠️ Media failed to load for post ${post.id}`);
+      setMediaError(true);
+      setVideoLoading(false);
     }
   };
 
-  // Use real progress from post data
+  const manuallyCheckPostStatus = async () => {
+    try {
+      await apiEndpoints.getPostStatus(post.id);
+    } catch (error) {
+      console.error("Status check failed:", error);
+    }
+  };
+
+  // --- DOWNLOAD LOGIC ---
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!post.mediaUrl) return;
+
+    try {
+      setIsDownloading(true);
+
+      const response = await api.get(`/posts/${post.id}/download`, {
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+
+      // 1. Try to get filename from backend header
+      const contentDisposition = response.headers["content-disposition"];
+      let filename = `visionlight-${post.id}.${
+        post.mediaType === "VIDEO" ? "mp4" : "jpg"
+      }`;
+
+      if (contentDisposition) {
+        // Regex to handle filenames with spaces/quotes
+        const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(
+          contentDisposition
+        );
+        if (matches != null && matches[1]) {
+          filename = matches[1].replace(/['"]/g, "");
+        }
+      }
+      // 2. Fallback to constructing from title locally
+      else if (post.title) {
+        const ext = post.mediaType === "VIDEO" ? "mp4" : "jpg";
+        filename = `${post.title.trim().replace(/\s+/g, "_")}.${ext}`;
+      }
+
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Download proxy failed, using direct link", error);
+      window.open(post.mediaUrl, "_blank");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const progress = post.progress || 0;
   const isProcessing = post.status === "PROCESSING";
   const isFailed = post.status === "FAILED";
   const isNew = post.status === "NEW";
+  const isReady = post.status === "READY" || post.status === "PUBLISHED";
 
+  // --- RENDER HELPERS ---
   const renderMedia = () => {
-    console.log("🎬 Rendering media for post:", {
-      id: post.id,
-      mediaUrl: post.mediaUrl,
-      status: post.status,
-      progress: progress,
-      mediaType: post.mediaType,
-      mediaProvider: post.mediaProvider,
-    });
-
-    if (!post.mediaUrl) {
-      if (isProcessing || isNew) {
-        return (
-          <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl flex items-center justify-center border border-cyan-400/20">
-            <div className="text-center w-full p-4">
-              <LoadingSpinner size="md" variant="neon" />
-              <p className="text-cyan-400 text-sm mt-3 font-medium">
-                {isFailed
-                  ? "Generation failed"
-                  : "Creating your masterpiece..."}
-              </p>
-
-              {/* Real Progress Bar */}
-              {(isProcessing || isNew) && (
-                <div className="mt-4 space-y-2">
-                  <div className="flex justify-between text-xs text-purple-300">
-                    <span>Progress</span>
-                    <span>{progress}%</span>
-                  </div>
-                  <div className="w-full bg-gray-700 rounded-full h-2">
-                    <div
-                      className="bg-gradient-to-r from-cyan-500 to-blue-500 h-2 rounded-full transition-all duration-500 ease-out"
-                      style={{ width: `${progress}%` }}
-                    ></div>
-                  </div>
-
-                  {/* Stuck Detection Warning */}
-                  {isPossiblyStuck && (
-                    <div className="mt-2 p-2 bg-yellow-500/20 border border-yellow-500/30 rounded-lg">
-                      <p className="text-yellow-400 text-xs">
-                        ⚠️ Generation seems to be taking longer than expected.
-                        This might be due to high demand.
-                      </p>
-                      <button
-                        onClick={manuallyCheckPostStatus}
-                        className="text-yellow-300 text-xs underline mt-1 hover:text-yellow-200"
-                      >
-                        Check status
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="text-xs text-gray-400">
-                    {progress <= 2 && "🔄 Prompt enhancement in progress..."}
-                    {progress > 2 &&
-                      progress < 30 &&
-                      "🎬 Starting final generation..."}
-                    {progress >= 30 &&
-                      progress < 70 &&
-                      "🎨 Creating your content..."}
-                    {progress >= 70 &&
-                      progress < 100 &&
-                      "✨ Adding final touches..."}
-                    {progress === 100 && "✅ Ready to use!"}
-                  </div>
-                </div>
-              )}
-
-              {isFailed && (
-                <p className="text-red-400 text-xs mt-1">
-                  Please try again with a different prompt
-                </p>
-              )}
-
-              {!isFailed && (
-                <p className="text-purple-300 text-xs mt-1">
-                  {progress < 50
-                    ? "This may take a few minutes..."
-                    : "Almost there..."}
-                </p>
-              )}
-            </div>
-          </div>
-        );
-      }
-
+    // 1. Processing State
+    if (!post.mediaUrl || isProcessing || isNew) {
       return (
-        <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl flex items-center justify-center border border-white/10">
-          <div className="text-center">
-            <div className="text-4xl mb-3 opacity-60">🎬</div>
-            <p className="text-purple-300 text-sm">Ready for generation</p>
+        <div className="aspect-video bg-gray-900 rounded-xl flex items-center justify-center border border-white/5 relative overflow-hidden">
+          <div className="text-center w-full p-4 relative z-10">
+            {isFailed ? (
+              <div className="text-red-400">
+                <span className="text-2xl block mb-2">⚠️</span>
+                <span className="text-xs">Generation Failed</span>
+              </div>
+            ) : (
+              <>
+                <LoadingSpinner size="md" variant="neon" />
+                <p className="text-purple-300 text-xs mt-3 font-medium tracking-wide">
+                  Generating Your Content...
+                </p>
+                <div className="mt-3 w-32 mx-auto h-1 bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-cyan-500 transition-all duration-500"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                {isPossiblyStuck && (
+                  <button
+                    onClick={manuallyCheckPostStatus}
+                    className="mt-4 text-[10px] text-yellow-500 underline"
+                  >
+                    Check Status
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </div>
       );
     }
 
+    // 2. Error State
     if (mediaError) {
       return (
-        <div className="aspect-video bg-gradient-to-br from-red-900/20 to-red-800/20 rounded-xl flex items-center justify-center border border-red-400/30">
+        <div className="aspect-video bg-gray-900 rounded-xl flex items-center justify-center border border-red-500/20">
           <div className="text-center">
-            <div className="text-4xl mb-3">❌</div>
-            <p className="text-red-400 text-sm mb-2">Failed to load media</p>
+            <span className="text-xl block mb-2">❌</span>
+            <p className="text-gray-500 text-xs">Media Unavailable</p>
             <button
               onClick={() => {
                 setMediaError(false);
                 setVideoLoading(true);
               }}
-              className="px-3 py-1 bg-red-500/20 text-red-400 text-xs rounded-lg border border-red-400/30 hover:bg-red-500/30 transition-colors"
+              className="mt-2 text-xs text-blue-400 hover:text-blue-300 underline"
             >
-              Retry
+              Retry Load
             </button>
           </div>
         </div>
       );
     }
 
-    // Determine media type - FIXED LOGIC
+    // 3. Video
     const isVideo = post.mediaType === "VIDEO" || post.mediaProvider === "sora";
-    const isImage =
-      post.mediaType === "IMAGE" || post.mediaProvider === "gemini";
-    const isCarousel = post.mediaType === "CAROUSEL";
-
-    console.log("📊 Media type detection:", {
-      isVideo,
-      isImage,
-      isCarousel,
-      mediaType: post.mediaType,
-      provider: post.mediaProvider,
-    });
-
     if (isVideo) {
       return (
-        <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-cyan-400/30">
+        <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-white/10 group">
           {videoLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
               <LoadingSpinner size="md" variant="neon" />
-              <span className="ml-3 text-cyan-400 text-sm">
-                Loading video...
-              </span>
             </div>
           )}
           <video
-            controls
+            controls={!compact}
+            muted={compact}
+            loop={compact}
+            autoPlay={compact}
             className="w-full h-full object-contain"
             onLoadedData={handleVideoLoad}
-            onError={handleVideoError}
+            onError={handleMediaError} // Catches the 404s
             preload="metadata"
             playsInline
           >
             <source src={post.mediaUrl} type="video/mp4" />
             <source src={post.mediaUrl} type="video/webm" />
-            Your browser does not support the video tag.
           </video>
         </div>
       );
     }
 
-    if (isImage || isCarousel) {
-      return (
-        <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl overflow-hidden border border-white/10">
-          <img
-            src={post.mediaUrl}
-            alt="Generated content"
-            className="w-full h-full object-cover"
-            onError={handleMediaError}
-            loading="lazy"
-          />
-        </div>
-      );
-    }
-
-    // Fallback for unknown types
+    // 4. Image
     return (
-      <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl flex items-center justify-center border border-white/10">
-        <div className="text-center">
-          <div className="text-4xl mb-3 opacity-60">📁</div>
-          <p className="text-purple-300 text-sm mb-2">Media preview</p>
-          <a
-            href={post.mediaUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-cyan-400 text-sm hover:underline block"
-          >
-            Open link
-          </a>
-        </div>
+      <div className="aspect-video bg-gray-900 rounded-xl overflow-hidden border border-white/10">
+        <img
+          src={post.mediaUrl}
+          alt={post.title || "Generated Image"}
+          className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
+          onError={handleMediaError}
+          loading="lazy"
+        />
       </div>
     );
   };
 
-  const getStatusInfo = () => {
-    switch (post.status) {
-      case "PROCESSING":
-        return {
-          color: "bg-yellow-500/20 text-yellow-400 border-yellow-400/30",
-          text: `Processing ${progress}%`,
-        };
-      case "READY":
-        return {
-          color: "bg-green-500/20 text-green-400 border-green-400/30",
-          text: "Ready",
-        };
-      case "FAILED":
-        return {
-          color: "bg-red-500/20 text-red-400 border-red-400/30",
-          text: "Failed",
-        };
-      case "NEW":
-        return {
-          color: "bg-blue-500/20 text-blue-400 border-blue-400/30",
-          text: "Queued",
-        };
-      default:
-        return {
-          color: "bg-gray-500/20 text-gray-400 border-gray-400/30",
-          text: "Draft",
-        };
-    }
+  // --- METADATA ---
+  const getProviderIcon = () => {
+    if (post.mediaType === "VIDEO") return "🎬";
+    if (post.mediaType === "IMAGE") return "🖼️";
+    return "📁";
   };
 
-  const getProviderInfo = () => {
-    const provider = post.mediaProvider;
-    const mediaType = post.mediaType;
-
-    if (mediaType === "VIDEO" || provider === "sora") {
-      return { name: "Sora Video", icon: "🎬", color: "text-pink-400" };
-    }
-    if (mediaType === "IMAGE" || provider === "gemini") {
-      return { name: "AI Image", icon: "🖼️", color: "text-blue-400" };
-    }
-    if (mediaType === "CAROUSEL") {
-      return { name: "AI Carousel", icon: "📱", color: "text-green-400" };
-    }
-    return { name: "Media", icon: "📁", color: "text-gray-400" };
-  };
-
-  const statusInfo = getStatusInfo();
-  const providerInfo = getProviderInfo();
-  const script = post.script;
-
-  if (compact) {
-    return (
-      <div className="bg-gray-800/40 backdrop-blur-sm rounded-xl border border-white/10 p-4 hover:border-white/20 transition-all duration-300">
-        {/* Media Preview */}
-        <div className="mb-3">{renderMedia()}</div>
-
-        {/* Post Info */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className={providerInfo.color}>{providerInfo.icon}</span>
-              <span className={`text-xs font-medium ${providerInfo.color}`}>
-                {providerInfo.name}
-              </span>
-            </div>
-            <span
-              className={`text-xs px-2 py-1 rounded-full border ${statusInfo.color}`}
-            >
-              {statusInfo.text}
-            </span>
-          </div>
-
-          {/* Title/Prompt Section */}
-          <div>
-            {isEditingTitle ? (
-              <div className="flex gap-2 mb-2">
-                <input
-                  value={editedTitle}
-                  onChange={(e) => setEditedTitle(e.target.value)}
-                  className="flex-1 p-2 bg-gray-700 border border-cyan-400/30 rounded text-white text-xs"
-                  placeholder="Enter video title..."
-                />
-                <button
-                  onClick={handleTitleSave}
-                  className="px-2 py-1 bg-cyan-500 hover:bg-cyan-600 text-white rounded text-xs"
-                >
-                  ✅
-                </button>
-                <button
-                  onClick={handleTitleCancel}
-                  className="px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-xs"
-                >
-                  ❌
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between group">
-                <p className="text-white text-sm line-clamp-2 font-medium">
-                  {post.title || post.prompt}
-                </p>
-                <button
-                  onClick={() => {
-                    setEditedTitle(post.title || post.prompt);
-                    setIsEditingTitle(true);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-white text-xs transition-opacity ml-2"
-                >
-                  ✏️
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-2 pt-2">
-            {post.mediaUrl && post.status === "READY" && (
-              <>
-                <a
-                  href={post.mediaUrl}
-                  download
-                  className="flex-1 px-3 py-2 bg-cyan-500/20 text-cyan-400 text-xs rounded-lg border border-cyan-400/30 hover:bg-cyan-500/30 transition-colors flex items-center justify-center gap-1"
-                >
-                  <span>📥</span>
-                  <span>Download</span>
-                </a>
-
-                <button
-                  onClick={() =>
-                    onPublishPost({ postId: post.id, platform: "INSTAGRAM" })
-                  }
-                  disabled={publishingPost === post.id}
-                  className="flex-1 px-3 py-2 gradient-brand text-white text-xs rounded-lg hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-1"
-                >
-                  {publishingPost === post.id ? (
-                    <LoadingSpinner size="sm" variant="light" />
-                  ) : (
-                    <span>📤</span>
-                  )}
-                  <span>Post</span>
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const formattedDate = new Date(post.createdAt).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 
   return (
-    <div className="bg-gray-800/40 backdrop-blur-sm rounded-xl border border-white/10 p-6 hover:border-white/20 transition-all duration-300">
-      {/* Media Preview */}
-      <div className="mb-4">{renderMedia()}</div>
+    <div
+      className={`bg-gray-800/40 backdrop-blur-sm rounded-xl border border-white/10 p-4 hover:border-white/20 transition-all duration-300 ${
+        compact ? "mb-3" : "mb-6"
+      }`}
+    >
+      {/* Media Area */}
+      <div className="mb-3 relative">
+        {renderMedia()}
 
-      {/* Post Info */}
+        {/* Status Badge */}
+        {isReady && (
+          <div className="absolute top-2 right-2 bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded-full font-bold border border-green-500/30 backdrop-blur-md">
+            READY
+          </div>
+        )}
+        {post.status === "AWAITING_APPROVAL" && (
+          <div className="absolute top-2 right-2 bg-yellow-500/20 text-yellow-400 text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse border border-yellow-500/30">
+            APPROVE
+          </div>
+        )}
+      </div>
+
+      {/* Info Area */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className={providerInfo.color}>{providerInfo.icon}</span>
-            <span className={`text-sm font-medium ${providerInfo.color}`}>
-              {providerInfo.name}
+        {/* Header Row */}
+        <div className="flex justify-between items-center text-xs text-gray-500">
+          <div className="flex items-center gap-1.5">
+            <span>{getProviderIcon()}</span>
+            <span className="uppercase tracking-wider font-semibold opacity-70">
+              {post.mediaType}
             </span>
-            <span
-              className={`text-xs px-2 py-1 rounded-full border ${statusInfo.color}`}
+          </div>
+          <span>{formattedDate}</span>
+        </div>
+
+        {/* Title Editing Section */}
+        {isEditingTitle ? (
+          <div className="flex gap-2">
+            <input
+              value={editedTitle}
+              onChange={(e) => setEditedTitle(e.target.value)}
+              className="flex-1 bg-gray-900 border border-cyan-500/50 rounded px-2 py-1 text-sm text-white focus:outline-none"
+              placeholder="Enter a title..."
+              autoFocus
+            />
+            <button
+              onClick={handleTitleSave}
+              className="text-cyan-400 hover:text-cyan-300"
             >
-              {statusInfo.text}
-            </span>
+              ✅
+            </button>
+            <button
+              onClick={handleTitleCancel}
+              className="text-gray-500 hover:text-gray-300"
+            >
+              ❌
+            </button>
           </div>
-          <div className="text-xs text-purple-300">
-            {new Date(post.createdAt).toLocaleDateString()}
-          </div>
-        </div>
-
-        {/* Title/Prompt Section */}
-        <div>
-          {isEditingTitle ? (
-            <div className="flex gap-2 mb-3">
-              <input
-                value={editedTitle}
-                onChange={(e) => setEditedTitle(e.target.value)}
-                className="flex-1 p-2 bg-gray-700 border border-cyan-400/30 rounded text-white text-sm"
-                placeholder="Enter video title..."
-              />
-              <button
-                onClick={handleTitleSave}
-                className="px-3 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded text-sm"
-              >
-                ✅
-              </button>
-              <button
-                onClick={handleTitleCancel}
-                className="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm"
-              >
-                ❌
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between group mb-2">
-              <h3 className="text-white font-semibold text-lg cursor-default">
-                {post.title || post.prompt}
-              </h3>
-              <button
-                onClick={() => {
-                  setEditedTitle(post.title || post.prompt);
-                  setIsEditingTitle(true);
-                }}
-                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-white text-sm transition-opacity"
-              >
-                ✏️ Edit
-              </button>
-            </div>
-          )}
-
-          {/* Show original prompt below title if custom title exists */}
-          {post.title && post.title !== post.prompt && (
-            <p className="text-purple-300 text-sm mt-1">{post.prompt}</p>
-          )}
-        </div>
-
-        {/* Script Preview */}
-        {script && (
-          <div className="text-xs text-purple-300 space-y-2 p-3 bg-gray-700/30 rounded-lg border border-white/5">
-            <div className="font-medium text-cyan-400">
-              AI-Generated Script:
-            </div>
-            {script.caption && (
-              <div>
-                <div className="font-medium mb-1">Caption:</div>
-                <div className="space-y-1">
-                  {script.caption.map((line: string, index: number) => (
-                    <div key={index} className="text-white/80">
-                      • {line}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {script.cta && (
-              <div>
-                <div className="font-medium">Call to Action:</div>
-                <div className="text-green-400 font-medium">{script.cta}</div>
-              </div>
-            )}
+        ) : (
+          <div className="group relative pr-6">
+            <h3
+              className="text-white font-bold text-sm truncate cursor-pointer"
+              onClick={() => setIsEditingTitle(true)}
+            >
+              {post.title ? (
+                post.title
+              ) : (
+                <span className="text-gray-500 italic">Untitled Creation</span>
+              )}
+            </h3>
+            {/* Pencil Icon triggers edit */}
+            <button
+              onClick={() => {
+                setEditedTitle(post.title || "");
+                setIsEditingTitle(true);
+              }}
+              className="absolute right-0 top-0 text-gray-600 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              ✏️
+            </button>
           </div>
         )}
 
-        {/* Actions */}
-        <div className="flex flex-wrap gap-2 pt-3">
-          {post.mediaUrl && post.status === "READY" && (
-            <>
-              <a
-                href={post.mediaUrl}
-                download
-                className="flex-1 min-w-[120px] px-4 py-2.5 bg-cyan-500/20 text-cyan-400 rounded-lg border border-cyan-400/30 hover:bg-cyan-500/30 transition-colors flex items-center justify-center gap-2"
-              >
-                <span>📥</span>
-                <span>Download</span>
-              </a>
+        {/* Prompt Preview (Separate from title) */}
+        {!compact && (
+          <div className="bg-gray-900/50 rounded-lg p-2 border border-white/5">
+            <p className="text-gray-400 text-[10px] line-clamp-2 leading-relaxed italic">
+              "{post.prompt}"
+            </p>
+          </div>
+        )}
 
-              <button
-                onClick={() =>
-                  onPublishPost({ postId: post.id, platform: "INSTAGRAM" })
-                }
-                disabled={publishingPost === post.id}
-                className="flex-1 min-w-[120px] px-4 py-2.5 gradient-brand text-white rounded-lg hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
-              >
-                {publishingPost === post.id ? (
-                  <>
-                    <LoadingSpinner size="sm" variant="light" />
-                    <span>Publishing...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>📤</span>
-                    <span>Publish to Instagram</span>
-                  </>
-                )}
-              </button>
-            </>
-          )}
-        </div>
+        {/* Action Buttons */}
+        {isReady && post.mediaUrl && (
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-cyan-400 text-xs py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              {isDownloading ? (
+                <LoadingSpinner size="sm" />
+              ) : (
+                <span>⬇️ Download</span>
+              )}
+            </button>
+            <button
+              onClick={() => onPublishPost({ postId: post.id })}
+              disabled={publishingPost === post.id}
+              className="flex-1 gradient-brand text-white text-xs py-2 rounded-lg hover:shadow-lg disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+            >
+              {publishingPost === post.id ? (
+                <LoadingSpinner size="sm" variant="light" />
+              ) : (
+                <span>🚀 Post</span>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Error Details */}
+        {isFailed && post.error && (
+          <div className="p-2 bg-red-900/20 border border-red-500/20 rounded text-[10px] text-red-300">
+            {post.error}
+          </div>
+        )}
       </div>
     </div>
   );
