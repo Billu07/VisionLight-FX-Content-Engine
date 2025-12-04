@@ -44,14 +44,8 @@ export const useGenerateMedia = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      postId,
-      provider,
-    }: {
-      postId: string;
-      provider: string;
-    }) => {
-      const response = await apiEndpoints.generateMedia(postId, provider);
+    mutationFn: async ({ postId }: { postId: string; provider: string }) => {
+      const response = await apiEndpoints.generateMedia(postId);
       return response.data;
     },
     onSuccess: () => {

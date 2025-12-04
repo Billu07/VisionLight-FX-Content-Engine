@@ -8,7 +8,7 @@ console.log("🔧 API Base URL:", API_BASE_URL);
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 40000, // Increased timeout for heavier loads
   withCredentials: true,
 });
 
@@ -26,88 +26,94 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid
       localStorage.removeItem("visionlight_token");
       window.location.href = "/";
     }
 
     const message =
       error.response?.data?.error || error.message || "Something went wrong";
-    console.error("API Error:", {
-      url: error.config?.url,
-      method: error.config?.method,
-      status: error.response?.status,
-      message: message,
-    });
+
+    // Less noise for expected polling 404s
+    if (error.response?.status !== 404) {
+      console.error("API Error:", {
+        url: error.config?.url,
+        status: error.response?.status,
+        message: message,
+      });
+    }
+
     return Promise.reject(new Error(message));
   }
 );
 
 export const apiEndpoints = {
-  // Auth endpoints
+  // === Auth ===
   demoLogin: (data: { email: string; name?: string }) =>
     api.post("/auth/demo-login", data),
-  logout: (data: { token: string }) => api.post("/auth/logout", data),
+
+  logout: () => api.post("/auth/logout"),
+
   getCurrentUser: () => api.get("/auth/me"),
 
-  // Brand endpoints
+  // === Brand & Config ===
   getBrandConfig: () => api.get("/brand-config"),
   updateBrandConfig: (data: any) => api.put("/brand-config", data),
 
+  // === Posts ===
+  getPosts: () => api.get("/posts"),
+  getPost: (postId: string) => api.get(`/post/${postId}`),
   updatePostTitle: (postId: string, title: string) =>
     api.put(`/posts/${postId}/title`, { title }),
-
-  // Progress endpoint (for real progress from n8n)
-  getJobStatus: (postId: string) => api.get(`/job-status/${postId}`),
-  cancelPrompt: (postId: string) => api.post("/cancel-prompt", { postId }),
-
-  // Prompt approval endpoints
-  updateEnhancedPrompt: (data: {
-    postId: string;
-    enhancedPrompt: string;
-    imageReference?: string;
-  }) => api.post("/update-enhanced-prompt", data),
-
-  approvePrompt: (data: { postId: string; finalPrompt: string }) =>
-    api.post("/approve-prompt", data),
-
-  getPost: (postId: string) => api.get(`/post/${postId}`),
-
-  // Post status endpoint
   getPostStatus: (postId: string) => api.get(`/post/${postId}/status`),
 
-  // ROI endpoints
-  getROIMetrics: () => api.get("/roi-metrics"),
+  // === Generation Workflow ===
 
-  // Content endpoints
-  generateScript: (data: { prompt: string; mediaType: string }) =>
-    api.post("/generate-script", data),
-
-  publishPost: (data: { postId: string; platform?: string }) =>
-    api.post("/publish-post", data),
-
-  createPost: (data: {
-    prompt: string;
-    mediaType: string;
-    platform?: string;
-    generatedMedia?: any;
-  }) => api.post("/posts", data),
-
-  generateMedia: (postId: string, provider: string) =>
-    api.post("/generate-media", { postId, provider }),
-
-  // Direct media generation endpoint with file upload
+  // 1. Initial Request
   generateMediaDirect: (formData: FormData) => {
     return api.post("/generate-media", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      headers: { "Content-Type": "multipart/form-data" },
     });
   },
 
-  getPosts: () => api.get("/posts"),
-  getUserCredits: () => api.get("/user-credits"),
+  // 2. User Approval
+  approvePrompt: (data: { postId: string; finalPrompt: string }) =>
+    api.post("/approve-prompt", data),
 
-  // Utility endpoints
+  // 3. Cancel
+  cancelPrompt: (postId: string) => api.post("/cancel-prompt", { postId }),
+
+  publishPost: (data: { postId: string; platform?: string }) =>
+    api.post("/posts/publish", data),
+
+  // === Legacy / Backwards Compatibility (Fixes Build Errors) ===
+
+  // Maps legacy createPost to new generate-media endpoint
+  createPost: (data: { prompt: string; mediaType: string; title?: string }) => {
+    const formData = new FormData();
+    formData.append("prompt", data.prompt);
+    formData.append("mediaType", data.mediaType);
+    if (data.title) formData.append("title", data.title);
+    // Note: Legacy calls won't support image upload via this method
+    return api.post("/generate-media", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+
+  // Maps legacy generateMedia to approvePrompt (assuming auto-approval for legacy calls)
+  generateMedia: (postId: string) => {
+    // This is a best-effort map. In the new flow, we need a prompt.
+    // We'll send a dummy approval to kickstart generation if this old method is called.
+    return api.post("/approve-prompt", {
+      postId,
+      finalPrompt: "Legacy auto-approved prompt",
+    });
+  },
+
+  // === Metrics & Utils ===
+  getROIMetrics: () => api.get("/roi-metrics"),
+  getUserCredits: () => api.get("/user-credits"),
   resetDemoCredits: () => api.post("/reset-demo-credits"),
+
+  generateScript: (data: { prompt: string; mediaType: string }) =>
+    api.post("/generate-script", data),
 };

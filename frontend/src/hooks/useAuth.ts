@@ -1,53 +1,55 @@
 import { create } from "zustand";
 import { apiEndpoints } from "../lib/api";
 
-interface User {
-  id: string;
-  email: string;
-  name?: string;
-}
-
 interface AuthState {
-  user: User | null;
+  user: any | null;
   token: string | null;
   isLoading: boolean;
+  error: string | null;
   login: (email: string, name?: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
 }
 
-export const useAuth = create<AuthState>((set, get) => ({
+export const useAuth = create<AuthState>((set) => ({
   user: null,
   token: localStorage.getItem("visionlight_token"),
   isLoading: true,
+  error: null,
 
   login: async (email: string, name?: string) => {
+    set({ isLoading: true, error: null });
     try {
       const response = await apiEndpoints.demoLogin({ email, name });
       const { user, token } = response.data;
 
       localStorage.setItem("visionlight_token", token);
       set({ user, token, isLoading: false });
-    } catch (error) {
-      set({ isLoading: false });
+    } catch (error: any) {
+      set({
+        error: error.response?.data?.error || "Login failed",
+        isLoading: false,
+      });
       throw error;
     }
   },
 
-  logout: () => {
-    const { token } = get();
-    if (token) {
-      apiEndpoints.logout({ token }).catch(console.error);
+  logout: async () => {
+    try {
+      // FIX: No arguments needed here anymore
+      await apiEndpoints.logout();
+    } catch (error) {
+      console.error("Logout failed", error);
+    } finally {
+      localStorage.removeItem("visionlight_token");
+      set({ user: null, token: null });
     }
-    localStorage.removeItem("visionlight_token");
-    set({ user: null, token: null, isLoading: false });
   },
 
   checkAuth: async () => {
     const token = localStorage.getItem("visionlight_token");
-
     if (!token) {
-      set({ isLoading: false });
+      set({ user: null, token: null, isLoading: false });
       return;
     }
 
@@ -55,12 +57,8 @@ export const useAuth = create<AuthState>((set, get) => ({
       const response = await apiEndpoints.getCurrentUser();
       set({ user: response.data.user, token, isLoading: false });
     } catch (error) {
-      console.error("Auth check failed:", error);
       localStorage.removeItem("visionlight_token");
       set({ user: null, token: null, isLoading: false });
     }
   },
 }));
-
-// Initialize auth check on hook creation
-useAuth.getState().checkAuth();
