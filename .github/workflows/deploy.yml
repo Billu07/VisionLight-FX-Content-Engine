@@ -1,0 +1,40 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: ["main"] # Or "master" if that's your branch name
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # 1. Navigate to project folder
+            cd /var/www/myapp
+
+            # 2. Pull latest code
+            # We reset purely to avoid merge conflicts with local changes on server
+            # Note: This won't delete your .env files if they are in .gitignore
+            git reset --hard origin/main
+            git pull origin main
+
+            # 3. Update Backend
+            echo "--------- UPDATING BACKEND ---------"
+            cd backend
+            npm install
+            npm run build
+            pm2 restart my-backend
+
+            # 4. Update Frontend
+            echo "--------- UPDATING FRONTEND ---------"
+            cd ../frontend
+            npm install
+            npm run build
+
+            echo "--------- DEPLOYMENT COMPLETE ---------"

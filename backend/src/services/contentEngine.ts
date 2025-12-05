@@ -1,4 +1,3 @@
-// backend/src/services/contentEngine.ts
 import OpenAI from "openai";
 import FormData from "form-data";
 import sharp from "sharp";
@@ -10,6 +9,7 @@ import {
   SORA_MOTION_DIRECTOR,
   SORA_CINEMATIC_DIRECTOR,
   GEMINI_RESIZE_PROMPT,
+  IMAGE_PROMPT_ENHANCER,
 } from "../utils/systemPrompts";
 
 // Initialize OpenAI Client (Used for Visual Analysis & Video Gen)
@@ -26,9 +26,10 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const contentEngine = {
   // ===========================================================================
-  // WORKFLOW 1: PROMPT ENHANCEMENT
-  // - IMAGES & CAROUSELS: Pass-through (No AI enhancement)
-  // - VIDEOS: Hybrid Analysis (OpenAI Eyes + Gemini Brain)
+  // WORKFLOW 1: PROMPT ENHANCEMENT (Hybrid Pipeline)
+  // - Text-Only Image/Carousel: Pass-through (Efficiency)
+  // - Image/Carousel + Ref: OpenAI Eyes + Gemini Brain
+  // - Video: OpenAI Eyes + Gemini Brain
   // ===========================================================================
 
   async enhanceUserPrompt(
@@ -40,15 +41,15 @@ export const contentEngine = {
   ): Promise<string> {
     console.log(`🚀 Starting Prompt Enhancement check for [${mediaType}]...`);
 
-    // --- CHANGE: BYPASS ENHANCEMENT FOR IMAGES AND CAROUSELS ---
-    if (mediaType === "image" || mediaType === "carousel") {
+    const isImageOrCarousel = mediaType === "image" || mediaType === "carousel";
+
+    // --- BYPASS: If it's Image/Carousel AND NO Reference Image ---
+    if (isImageOrCarousel && !referenceImageBuffer) {
       console.log(
-        `🎨 ${mediaType} detected: Skipping AI enhancement. Using raw user prompt.`
+        `⚡ Text-only ${mediaType}: Skipping AI enhancement. Using raw user prompt.`
       );
       return userPrompt;
     }
-
-    // --- VIDEO ENHANCEMENT LOGIC STARTS HERE ---
 
     // Defaults
     const duration = options.duration || 8;
@@ -56,15 +57,14 @@ export const contentEngine = {
     const resolution = options.size || "1280x720";
 
     try {
-      // 1. VISUAL ANALYSIS (OPENAI)
+      // 1. VISUAL ANALYSIS (OPENAI GPT-4o-mini)
+      // We use OpenAI here because it's currently best-in-class for describing visual details.
       let imageDescription = "";
 
       if (referenceImageBuffer && referenceImageMimeType) {
-        console.log(
-          "📸 1. Sending image to OpenAI (GPT-4o-mini) for analysis..."
-        );
+        console.log("📸 1. Analyzing reference image (GPT-4o-mini)...");
 
-        // Resize for speed
+        // Resize for speed/cost
         const analysisBuffer = await sharp(referenceImageBuffer)
           .resize(1024, 1024, { fit: "inside" })
           .toFormat("jpeg", { quality: 70 })
@@ -78,7 +78,7 @@ export const contentEngine = {
               content: [
                 {
                   type: "text",
-                  text: "Analyze this image. Describe the subject, environment, lighting, art style, and mood in high detail. Keep it factual and descriptive.",
+                  text: "Analyze this image. Describe the subject, environment, lighting, art style, and mood in high detail.",
                 },
                 {
                   type: "image_url",
@@ -98,18 +98,23 @@ export const contentEngine = {
       }
 
       // 2. CREATIVE WRITING (GEMINI 2.5 PRO)
-      console.log(
-        "🧠 2. Sending context to Gemini 2.5 Pro for video scripting..."
-      );
+      // Gemini creates the structured "Director" prompt based on the analysis.
+      console.log("🧠 2. Sending context to Gemini 2.5 Pro for scripting...");
 
       let systemPersona = "";
       let taskContext = "";
 
-      // Video Logic Only (Since Images/Carousels returned early)
-      if (imageDescription) {
-        // Image-to-Video
-        systemPersona = SORA_MOTION_DIRECTOR;
-        taskContext = `
+      if (isImageOrCarousel) {
+        systemPersona = IMAGE_PROMPT_ENHANCER;
+        taskContext = `USER CONCEPT: "${userPrompt}"\nTARGET ASPECT RATIO: ${ratio}`;
+        if (imageDescription) {
+          taskContext += `\n\nVISUAL REFERENCE CONTEXT: ${imageDescription}\nINSTRUCTION: Merge the user concept with the visual style of the reference image.`;
+        }
+      } else {
+        // Video Logic
+        if (imageDescription) {
+          systemPersona = SORA_MOTION_DIRECTOR;
+          taskContext = `
 USER MOTION IDEA: "${userPrompt}"
 REFERENCE IMAGE ANALYSIS: "${imageDescription}"
 
@@ -118,10 +123,9 @@ MANDATORY METADATA SETTINGS:
 - Aspect Ratio: ${ratio}
 - Resolution: ${resolution}
 `;
-      } else {
-        // Text-to-Video
-        systemPersona = SORA_CINEMATIC_DIRECTOR;
-        taskContext = `
+        } else {
+          systemPersona = SORA_CINEMATIC_DIRECTOR;
+          taskContext = `
 USER CONCEPT: "${userPrompt}"
 
 MANDATORY METADATA SETTINGS:
@@ -129,18 +133,15 @@ MANDATORY METADATA SETTINGS:
 - Aspect Ratio: ${ratio}
 - Resolution: ${resolution}
 `;
+        }
       }
 
-      // Call Gemini 2.5 Pro via REST
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
 
       const payload = {
         contents: [
           {
-            parts: [
-              { text: systemPersona }, // Role & Rules
-              { text: taskContext }, // User Input + OpenAI Analysis
-            ],
+            parts: [{ text: systemPersona }, { text: taskContext }],
           },
         ],
         generationConfig: { temperature: 0.7 },
@@ -150,17 +151,15 @@ MANDATORY METADATA SETTINGS:
         headers: { "Content-Type": "application/json" },
       });
 
-      // Extract Text
       const candidates = response.data?.candidates;
       if (candidates && candidates[0]?.content?.parts) {
         const textResponse = candidates[0].content.parts[0].text;
         if (textResponse) {
-          console.log("✅ Gemini generated the final video script.");
+          console.log("✅ Gemini generated the final prompt.");
           return textResponse;
         }
       }
 
-      // Fallback
       console.warn("⚠️ Gemini returned empty response. Using original prompt.");
       return userPrompt;
     } catch (error: any) {
@@ -168,7 +167,6 @@ MANDATORY METADATA SETTINGS:
         "❌ Prompt Enhancement Failed:",
         error.response?.data || error.message
       );
-      // Return original prompt on error so the workflow doesn't break
       return userPrompt;
     }
   },
@@ -207,7 +205,7 @@ MANDATORY METADATA SETTINGS:
             width: targetWidth,
             height: targetHeight,
             channels: 4,
-            background: { r: 0, g: 0, b: 0, alpha: 0 }, // Transparent
+            background: { r: 0, g: 0, b: 0, alpha: 0 },
           },
         })
           .png()
@@ -240,7 +238,7 @@ MANDATORY METADATA SETTINGS:
           ],
         };
 
-        let bufferToProcess = originalImageBuffer; // Fallback
+        let bufferToProcess = originalImageBuffer;
 
         try {
           const geminiResponse = await axios.post(geminiUrl, geminiPayload, {
@@ -286,7 +284,6 @@ MANDATORY METADATA SETTINGS:
       form.append("seconds", params.duration || 8);
       form.append("size", targetSize);
 
-      // --- CONFIRMATION: Passing image to Sora ---
       if (finalInputImageBuffer) {
         console.log("✅ Attaching 'input_reference' image to video request.");
         form.append("input_reference", finalInputImageBuffer, {
@@ -308,7 +305,7 @@ MANDATORY METADATA SETTINGS:
 
       // 4. ROBUST POLLING LOOP
       const POLLING_INTERVAL = 40000;
-      const MAX_ATTEMPTS = 45;
+      const MAX_ATTEMPTS = 60;
 
       let status = "queued";
       let resultData: string | Buffer | null = null;
@@ -358,7 +355,7 @@ MANDATORY METADATA SETTINGS:
           } else if (status === "failed") {
             throw new Error(
               `API reported failure: ${JSON.stringify(
-                statusRes.data.error || "Unknown"
+                statusRes.data.error || "Unknown error"
               )}`
             );
           }
@@ -496,7 +493,7 @@ MANDATORY METADATA SETTINGS:
   },
 
   // ===========================================================================
-  // WORKFLOW 2c: CAROUSEL GENERATION
+  // WORKFLOW 2c: CAROUSEL GENERATION (3 SEPARATE IMAGES)
   // ===========================================================================
   async startCarouselGeneration(
     postId: string,
@@ -506,55 +503,49 @@ MANDATORY METADATA SETTINGS:
     console.log(`🎠 Starting Carousel Generation for ${postId}`);
 
     try {
-      const buffers: Buffer[] = [];
-      // Create 3 distinct variations
+      const imageUrls: string[] = [];
       const prompts = [
         `Slide 1/3 (Introduction): ${finalPrompt}. High impact visual, clear subject.`,
         `Slide 2/3 (Details/Action): ${finalPrompt}. Close up detail or action shot.`,
         `Slide 3/3 (Conclusion): ${finalPrompt}. Artistic resolution.`,
       ];
 
-      // 1. Generate 3 Images
       for (let i = 0; i < prompts.length; i++) {
         console.log(`📸 Generating Slide ${i + 1}/3...`);
+
+        // Use helper to generate Buffer
         const buf = await this.generateGeminiImage(
           prompts[i],
           params.imageReference
         );
-        const resized = await sharp(buf).resize(1024, 1024).toBuffer();
-        buffers.push(resized);
-        await airtableService.updatePost(postId, { progress: (i + 1) * 30 });
+
+        // Resize to standard Portrait (4:5 or 9:16)
+        const resized = await sharp(buf)
+          .resize(1080, 1350, { fit: "cover" })
+          .toBuffer();
+
+        // Upload individual slide
+        const slideTitle = `${params.title || "Carousel"} - Slide ${i + 1}`;
+        const url = await this.uploadToCloudinary(
+          resized,
+          `${postId}_slide_${i + 1}`, // Unique ID per slide
+          params.userId,
+          slideTitle,
+          "image"
+        );
+
+        imageUrls.push(url);
+
+        // Update progress: 33%, 66%, 90%
+        await airtableService.updatePost(postId, {
+          progress: Math.round(((i + 1) / 3) * 90),
+        });
       }
 
-      // 2. Stitch them horizontally
-      console.log("🧵 Stitching carousel strip...");
-      const compositeBuffer = await sharp({
-        create: {
-          width: 1024 * 3,
-          height: 1024,
-          channels: 4,
-          background: { r: 255, g: 255, b: 255, alpha: 0 },
-        },
-      })
-        .composite([
-          { input: buffers[0], left: 0, top: 0 },
-          { input: buffers[1], left: 1024, top: 0 },
-          { input: buffers[2], left: 2048, top: 0 },
-        ])
-        .jpeg({ quality: 90 })
-        .toBuffer();
-
-      // 3. Upload
-      const cloudinaryUrl = await this.uploadToCloudinary(
-        compositeBuffer,
-        postId,
-        params.userId,
-        params.title || "Carousel",
-        "image"
-      );
-
+      // Store Array of URLs as JSON String in Airtable
+      // e.g. '["https://res.cloudinary...", "https://..."]'
       await airtableService.updatePost(postId, {
-        mediaUrl: cloudinaryUrl,
+        mediaUrl: JSON.stringify(imageUrls),
         mediaProvider: "gemini-carousel",
         status: "READY",
         progress: 100,
@@ -573,7 +564,7 @@ MANDATORY METADATA SETTINGS:
     }
   },
 
-  // HELPER for Carousel
+  // HELPER: Call Gemini for Carousel/Slides
   async generateGeminiImage(
     promptText: string,
     refImageUrl?: string

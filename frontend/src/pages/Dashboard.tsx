@@ -45,7 +45,10 @@ function Dashboard() {
   const [generationState, setGenerationState] = useState<GenerationState>({
     status: "idle",
   });
-  const [publishingPost, setPublishingPost] = useState<string | null>(null);
+
+  // "Publishing" is now "Copying" state
+  const [copyingPostId, setCopyingPostId] = useState<string | null>(null);
+
   const [showBrandModal, setShowBrandModal] = useState(false);
   const [showWelcomeTour, setShowWelcomeTour] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -128,14 +131,12 @@ function Dashboard() {
     queryFn: async () => {
       try {
         const response = await apiEndpoints.getPosts();
-        // Ensure we always return an array
         return Array.isArray(response.data.posts) ? response.data.posts : [];
       } catch (e) {
         return [];
       }
     },
     enabled: !!user,
-    // Polling every 5s to prevent heavy load, only if something is processing
     refetchInterval: (query) => {
       const currentPosts = query.state.data;
       if (!currentPosts || !Array.isArray(currentPosts)) return false;
@@ -150,7 +151,7 @@ function Dashboard() {
     staleTime: 1000,
   });
 
-  // === Safe Modal Logic (Prevents Infinite Loops) ===
+  // === Safe Modal Logic ===
   const postNeedingApproval = useMemo(() => {
     if (!posts || !Array.isArray(posts) || posts.length === 0) return null;
     return posts.find(
@@ -184,24 +185,6 @@ function Dashboard() {
     enabled: !!user,
   });
 
-  // === Fetch ROI Metrics ===
-  const {
-    data: roiMetrics = { postsCreated: 0, timeSaved: 0, mediaGenerated: 0 },
-  } = useQuery({
-    queryKey: ["roi-metrics"],
-    queryFn: async () => {
-      const response = await apiEndpoints.getROIMetrics();
-      return (
-        response.data.metrics || {
-          postsCreated: 0,
-          timeSaved: 0,
-          mediaGenerated: 0,
-        }
-      );
-    },
-    enabled: !!user,
-  });
-
   // === Direct Media Generation Mutation ===
   const generateMediaMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -216,20 +199,15 @@ function Dashboard() {
           result: { postId: data.postId },
         });
 
-        // Show success modal
         setShowQueuedModal(true);
 
-        // Clear Inputs (UX Fix)
         setPrompt("");
         setVideoTitle("");
         setReferenceImage(null);
         setReferenceImageUrl("");
 
-        // Smart Refetching
         queryClient.invalidateQueries({ queryKey: ["posts"] });
         queryClient.invalidateQueries({ queryKey: ["user-credits"] });
-
-        // Refetch again in 2s to catch Airtable latency
         setTimeout(
           () => queryClient.invalidateQueries({ queryKey: ["posts"] }),
           2000
@@ -283,20 +261,18 @@ function Dashboard() {
     },
   });
 
-  // === Publish Post Mutation ===
-  const publishMutation = useMutation({
-    mutationFn: ({ postId, platform }: { postId: string; platform?: string }) =>
-      apiEndpoints.publishPost({ postId, platform }),
-    onMutate: ({ postId }) => {
-      setPublishingPost(postId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-    },
-    onSettled: () => {
-      setPublishingPost(null);
-    },
-  });
+  // === Copy Prompt Logic (Replaces Publish) ===
+  const handleCopyPrompt = async (data: { prompt: string; postId: string }) => {
+    try {
+      setCopyingPostId(data.postId);
+      await navigator.clipboard.writeText(data.prompt);
+      // Optional: Add a toast notification here
+      setTimeout(() => setCopyingPostId(null), 1000); // Reset after 1s
+    } catch (err) {
+      console.error("Failed to copy:", err);
+      setCopyingPostId(null);
+    }
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -304,9 +280,7 @@ function Dashboard() {
 
     const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
-      alert(
-        "❌ Image size must be less than 10MB. Please choose a smaller file."
-      );
+      alert("❌ Image size must be less than 10MB.");
       e.target.value = "";
       return;
     }
@@ -340,9 +314,7 @@ function Dashboard() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Safe check for credits
     const currentCredits = userCredits?.[selectedMediaType] ?? 0;
-
     if (!prompt.trim() || currentCredits <= 0) return;
 
     setGenerationState({ status: "idle" });
@@ -398,12 +370,10 @@ function Dashboard() {
         </div>
       )}
 
-      {/* Welcome Tour */}
       {showWelcomeTour && (
         <WelcomeTour onClose={() => setShowWelcomeTour(false)} />
       )}
 
-      {/* Prompt Approval Modal */}
       <PromptApprovalModal
         postId={pendingApprovalPostId || ""}
         isOpen={showPromptApproval}
@@ -417,9 +387,7 @@ function Dashboard() {
           }
         }}
         onCancel={(postId) => {
-          if (postId) {
-            cancelPromptMutation.mutate(postId);
-          }
+          if (postId) cancelPromptMutation.mutate(postId);
         }}
         isLoading={
           approvePromptMutation.isPending || cancelPromptMutation.isPending
@@ -430,7 +398,6 @@ function Dashboard() {
         {/* --- HEADER --- */}
         <div className="mb-6 sm:mb-8 flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            {/* Left side: Visionlight AI with user info */}
             <div className="flex items-center gap-3">
               <div>
                 <h1 className="text-xl sm:text-3xl md:text-4xl font-bold leading-tight brand-gradient-text">
@@ -445,7 +412,6 @@ function Dashboard() {
               </div>
             </div>
 
-            {/* Right side: FX Logo - Top Center with subtitle */}
             <div className="absolute left-1/2 transform -translate-x-1/2 flex flex-col items-center mt-14">
               <div className="h-14 sm:h-16 flex items-center justify-center mb-1">
                 <img
@@ -459,7 +425,6 @@ function Dashboard() {
               </p>
             </div>
 
-            {/* Mobile Menu Button */}
             {isMobile && (
               <div className="flex gap-2">
                 <button
@@ -478,7 +443,6 @@ function Dashboard() {
             )}
           </div>
 
-          {/* Credits Display */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="bg-gray-800/60 backdrop-blur-lg rounded-2xl px-3 sm:px-4 py-2 sm:py-3 border border-purple-500/20 w-full sm:w-auto">
               <div className="flex items-center justify-between sm:justify-start gap-4">
@@ -524,7 +488,6 @@ function Dashboard() {
               </div>
             </div>
 
-            {/* Desktop Buttons */}
             {!isMobile && (
               <div className="flex gap-2">
                 <button
@@ -544,63 +507,13 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* --- ROI METRICS --- */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-6 sm:mb-8">
-          {[
-            {
-              label: "Content",
-              value: roiMetrics.postsCreated,
-              subtitle: "Posts",
-              icon: "📝",
-              gradient: "from-blue-500 to-cyan-500",
-            },
-            {
-              label: "Time Saved",
-              value: `${Math.floor(roiMetrics.timeSaved / 60)}h`,
-              subtitle: "Efficiency",
-              icon: "⏱️",
-              gradient: "from-purple-500 to-pink-500",
-            },
-            {
-              label: "Media",
-              value: roiMetrics.mediaGenerated,
-              subtitle: "Generated",
-              icon: "🎬",
-              gradient: "from-green-500 to-emerald-500",
-            },
-          ].map((metric, index) => (
-            <div
-              key={index}
-              className="bg-gray-800/40 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-white/5 hover:border-white/10 transition-all duration-300 group"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-purple-300 font-medium mb-1">
-                    {metric.label}
-                  </p>
-                  <p
-                    className={`text-xl sm:text-2xl font-bold bg-gradient-to-r ${metric.gradient} bg-clip-text text-transparent`}
-                  >
-                    {metric.value}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {metric.subtitle}
-                  </p>
-                </div>
-                <div className="text-xl sm:text-2xl opacity-80 group-hover:scale-110 transition-transform">
-                  {metric.icon}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* --- ROI METRICS REMOVED --- */}
 
         {/* --- MAIN LAYOUT --- */}
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
           {/* Generation Panel */}
           <div className="flex-1">
             <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 lg:p-8 shadow-2xl">
-              {/* PICDRIFT Header */}
               <div className="mb-6 sm:mb-8">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="h-12 sm:h-14 flex items-center justify-center">
@@ -616,7 +529,7 @@ function Dashboard() {
                 </p>
               </div>
 
-              {/* Enhanced Media Type Selection */}
+              {/* Media Type Selection */}
               <div className="mb-6 sm:mb-8">
                 <label className="block text-sm font-semibold text-white mb-3 sm:mb-4">
                   🎬 Select Content Type
@@ -685,7 +598,6 @@ function Dashboard() {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-                {/* Prompt Input */}
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2 sm:mb-3 flex items-center gap-2">
                     <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>
@@ -694,7 +606,7 @@ function Dashboard() {
                   <textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    placeholder={`Describe your ${selectedMediaType} vision...\nExample: "A futuristic cityscape at dusk with flying vehicles and neon-lit skyscrapers"`}
+                    placeholder={`Describe your ${selectedMediaType} vision...`}
                     className="w-full p-4 sm:p-5 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all duration-300 resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base sm:text-lg leading-relaxed"
                     rows={isMobile ? 3 : 4}
                   />
@@ -714,7 +626,7 @@ function Dashboard() {
                   />
                 </div>
 
-                {/* Premium Video Controls */}
+                {/* Video Controls */}
                 {selectedMediaType === "video" && (
                   <div className="space-y-4 sm:space-y-6">
                     <div className="space-y-2 sm:space-y-3">
@@ -920,7 +832,6 @@ function Dashboard() {
                   </div>
                 )}
 
-                {/* Reference Image */}
                 <div className="space-y-2 sm:space-y-3">
                   <label className="block text-sm font-semibold text-white">
                     🎨 Reference Image (Optional)
@@ -950,7 +861,6 @@ function Dashboard() {
                   </div>
                 </div>
 
-                {/* Generate Button */}
                 <button
                   type="submit"
                   disabled={
@@ -994,7 +904,7 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* Content Library (Restored Layout) */}
+          {/* Content Library */}
           <div className="lg:w-96">
             <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 shadow-2xl sticky top-4">
               <div className="flex items-center justify-between mb-4 sm:mb-6">
@@ -1027,11 +937,12 @@ function Dashboard() {
                       <PostCard
                         key={post.id}
                         post={post}
-                        onPublishPost={publishMutation.mutate}
+                        // NOTE: onPublishPost is used to copy prompt now
+                        onPublishPost={handleCopyPrompt}
                         userCredits={
                           userCredits || { video: 0, image: 0, carousel: 0 }
                         }
-                        publishingPost={publishingPost}
+                        publishingPost={copyingPostId} // Use copying state
                         primaryColor={primaryColor}
                         compact={true}
                       />

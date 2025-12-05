@@ -4,7 +4,7 @@ import { apiEndpoints, api } from "../lib/api";
 
 interface PostCardProps {
   post: any;
-  onPublishPost: (variables: { postId: string; platform?: string }) => void;
+  onPublishPost: (variables: { postId: string; prompt: string }) => void;
   publishingPost: string | null;
   userCredits: any;
   primaryColor?: string;
@@ -19,20 +19,20 @@ export function PostCard({
 }: PostCardProps) {
   const [mediaError, setMediaError] = useState(false);
   const [videoLoading, setVideoLoading] = useState(true);
-
-  // Title State
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(post.title || "");
-
   const [isPossiblyStuck, setIsPossiblyStuck] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // Sync state if prop changes
+  // Carousel State
+  const [slideIndex, setSlideIndex] = useState(0);
+
+  // Sync title
   useEffect(() => {
     setEditedTitle(post.title || "");
   }, [post.title]);
 
-  // Stuck detection logic
+  // Stuck detection
   useEffect(() => {
     if (
       (post.status === "PROCESSING" || post.status === "NEW") &&
@@ -49,7 +49,6 @@ export function PostCard({
     try {
       await apiEndpoints.updatePostTitle(post.id, editedTitle);
       setIsEditingTitle(false);
-      // Optimistically update UI could be handled here or via refetch
     } catch (error) {
       console.error("Error updating title:", error);
     }
@@ -63,9 +62,7 @@ export function PostCard({
   const handleVideoLoad = () => setVideoLoading(false);
 
   const handleMediaError = () => {
-    // Only log if it's not a temporary loading state
     if (post.status === "READY") {
-      console.warn(`⚠️ Media failed to load for post ${post.id}`);
       setMediaError(true);
       setVideoLoading(false);
     }
@@ -79,14 +76,12 @@ export function PostCard({
     }
   };
 
-  // --- DOWNLOAD LOGIC ---
   const handleDownload = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (!post.mediaUrl) return;
 
     try {
       setIsDownloading(true);
-
       const response = await api.get(`/posts/${post.id}/download`, {
         responseType: "blob",
       });
@@ -95,35 +90,29 @@ export function PostCard({
       const link = document.createElement("a");
       link.href = url;
 
-      // 1. Try to get filename from backend header
       const contentDisposition = response.headers["content-disposition"];
-      let filename = `visionlight-${post.id}.${
-        post.mediaType === "VIDEO" ? "mp4" : "jpg"
-      }`;
+      let filename = `visionlight-${post.id}`;
 
       if (contentDisposition) {
-        // Regex to handle filenames with spaces/quotes
-        const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(
-          contentDisposition
-        );
-        if (matches != null && matches[1]) {
-          filename = matches[1].replace(/['"]/g, "");
-        }
-      }
-      // 2. Fallback to constructing from title locally
-      else if (post.title) {
-        const ext = post.mediaType === "VIDEO" ? "mp4" : "jpg";
-        filename = `${post.title.trim().replace(/\s+/g, "_")}.${ext}`;
+        const matches = /filename="([^"]*)"/.exec(contentDisposition);
+        if (matches != null && matches[1]) filename = matches[1];
+      } else {
+        // Fallback based on type
+        const ext =
+          post.mediaType === "CAROUSEL"
+            ? "zip"
+            : post.mediaType === "VIDEO"
+            ? "mp4"
+            : "jpg";
+        filename = `${filename}.${ext}`;
       }
 
       link.setAttribute("download", filename);
       document.body.appendChild(link);
       link.click();
-
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Download proxy failed, using direct link", error);
       window.open(post.mediaUrl, "_blank");
     } finally {
       setIsDownloading(false);
@@ -136,34 +125,40 @@ export function PostCard({
   const isNew = post.status === "NEW";
   const isReady = post.status === "READY" || post.status === "PUBLISHED";
 
-  // --- RENDER HELPERS ---
+  // --- MEDIA RENDERER ---
   const renderMedia = () => {
-    // 1. Processing State
     if (!post.mediaUrl || isProcessing || isNew) {
       return (
-        <div className="aspect-video bg-gray-900 rounded-xl flex items-center justify-center border border-white/5 relative overflow-hidden">
+        <div className="aspect-video bg-gray-900 rounded-xl flex items-center justify-center border border-white/10 relative overflow-hidden">
+          {/* ... (Loading State UI - same as before) ... */}
           <div className="text-center w-full p-4 relative z-10">
             {isFailed ? (
               <div className="text-red-400">
                 <span className="text-2xl block mb-2">⚠️</span>
-                <span className="text-xs">Generation Failed</span>
+                <span className="text-xs font-bold">Generation Failed</span>
               </div>
             ) : (
               <>
                 <LoadingSpinner size="md" variant="neon" />
                 <p className="text-purple-300 text-xs mt-3 font-medium tracking-wide">
-                  Generating Your Content...
+                  Generating...
                 </p>
-                <div className="mt-3 w-32 mx-auto h-1 bg-gray-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-cyan-500 transition-all duration-500"
-                    style={{ width: `${progress}%` }}
-                  />
+                <div className="mt-3 w-full max-w-[140px] mx-auto">
+                  <div className="flex justify-between text-[10px] text-purple-300 mb-1">
+                    <span>Progress</span>
+                    <span>{progress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${progress}%` }}
+                    ></div>
+                  </div>
                 </div>
                 {isPossiblyStuck && (
                   <button
                     onClick={manuallyCheckPostStatus}
-                    className="mt-4 text-[10px] text-yellow-500 underline"
+                    className="mt-3 text-[10px] text-yellow-500 underline"
                   >
                     Check Status
                   </button>
@@ -175,28 +170,106 @@ export function PostCard({
       );
     }
 
-    // 2. Error State
     if (mediaError) {
       return (
-        <div className="aspect-video bg-gray-900 rounded-xl flex items-center justify-center border border-red-500/20">
+        <div className="aspect-video bg-red-900/10 rounded-xl flex items-center justify-center border border-red-500/20">
           <div className="text-center">
             <span className="text-xl block mb-2">❌</span>
-            <p className="text-gray-500 text-xs">Media Unavailable</p>
             <button
               onClick={() => {
                 setMediaError(false);
                 setVideoLoading(true);
               }}
-              className="mt-2 text-xs text-blue-400 hover:text-blue-300 underline"
+              className="mt-2 text-xs underline text-red-300"
             >
-              Retry Load
+              Retry
             </button>
           </div>
         </div>
       );
     }
 
-    // 3. Video
+    // === CAROUSEL STACKED CARD DISPLAY ===
+    if (post.mediaType === "CAROUSEL" && post.mediaUrl.startsWith("[")) {
+      let slides: string[] = [];
+      try {
+        slides = JSON.parse(post.mediaUrl);
+      } catch (e) {}
+
+      const nextSlide = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setSlideIndex((prev) => (prev + 1) % slides.length);
+      };
+      const prevSlide = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setSlideIndex((prev) => (prev - 1 + slides.length) % slides.length);
+      };
+
+      if (slides.length > 0) {
+        return (
+          <div className="relative aspect-video group perspective-1000">
+            {/* Stack Effect: Card 3 (Bottom) */}
+            {slides.length > 2 && (
+              <div
+                className="absolute inset-0 bg-gray-800 rounded-xl border border-white/5 transform scale-90 translate-y-3 opacity-40 z-0 transition-all duration-300"
+                style={{
+                  backgroundImage: `url(${
+                    slides[(slideIndex + 2) % slides.length]
+                  })`,
+                  backgroundSize: "cover",
+                  filter: "blur(2px)",
+                }}
+              />
+            )}
+
+            {/* Stack Effect: Card 2 (Middle) */}
+            {slides.length > 1 && (
+              <div
+                className="absolute inset-0 bg-gray-800 rounded-xl border border-white/10 transform scale-95 translate-y-1.5 opacity-70 z-10 transition-all duration-300"
+                style={{
+                  backgroundImage: `url(${
+                    slides[(slideIndex + 1) % slides.length]
+                  })`,
+                  backgroundSize: "cover",
+                }}
+              />
+            )}
+
+            {/* Main Card (Top) */}
+            <div className="absolute inset-0 bg-gray-900 rounded-xl border border-white/20 overflow-hidden z-20 shadow-xl transition-transform duration-300 group-hover:-translate-y-1">
+              <img
+                src={slides[slideIndex]}
+                alt={`Slide ${slideIndex + 1}`}
+                className="w-full h-full object-cover"
+              />
+
+              {/* Navigation Overlay (On Hover) */}
+              <div className="absolute inset-0 flex justify-between items-center px-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black/10">
+                <button
+                  onClick={prevSlide}
+                  className="p-1.5 rounded-full bg-black/50 hover:bg-black/70 text-white backdrop-blur-sm transition-colors"
+                >
+                  ←
+                </button>
+                <button
+                  onClick={nextSlide}
+                  className="p-1.5 rounded-full bg-black/50 hover:bg-black/70 text-white backdrop-blur-sm transition-colors"
+                >
+                  →
+                </button>
+              </div>
+
+              {/* Counter Badge */}
+              <div className="absolute bottom-2 right-2 bg-black/70 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-bold text-white border border-white/10">
+                {slideIndex + 1} / {slides.length}
+              </div>
+            </div>
+          </div>
+        );
+      }
+    }
+
+    // Video
     const isVideo = post.mediaType === "VIDEO" || post.mediaProvider === "sora";
     if (isVideo) {
       return (
@@ -207,30 +280,28 @@ export function PostCard({
             </div>
           )}
           <video
-            controls={!compact}
-            muted={compact}
-            loop={compact}
-            autoPlay={compact}
-            className="w-full h-full object-contain"
+            controls={true}
+            muted={false}
+            loop
+            className="w-full h-full object-contain cursor-pointer"
             onLoadedData={handleVideoLoad}
-            onError={handleMediaError} // Catches the 404s
+            onError={handleMediaError}
             preload="metadata"
             playsInline
           >
             <source src={post.mediaUrl} type="video/mp4" />
-            <source src={post.mediaUrl} type="video/webm" />
           </video>
         </div>
       );
     }
 
-    // 4. Image
+    // Single Image
     return (
       <div className="aspect-video bg-gray-900 rounded-xl overflow-hidden border border-white/10">
         <img
           src={post.mediaUrl}
-          alt={post.title || "Generated Image"}
-          className="w-full h-full object-cover hover:scale-105 transition-transform duration-700"
+          alt={post.title}
+          className="w-full h-full object-cover transition-transform hover:scale-105"
           onError={handleMediaError}
           loading="lazy"
         />
@@ -238,10 +309,10 @@ export function PostCard({
     );
   };
 
-  // --- METADATA ---
   const getProviderIcon = () => {
     if (post.mediaType === "VIDEO") return "🎬";
     if (post.mediaType === "IMAGE") return "🖼️";
+    if (post.mediaType === "CAROUSEL") return "📱";
     return "📁";
   };
 
@@ -249,6 +320,9 @@ export function PostCard({
     month: "short",
     day: "numeric",
   });
+  const displayTitle =
+    post.title ||
+    (post.prompt ? post.prompt.substring(0, 50) + "..." : "Untitled");
 
   return (
     <div
@@ -256,26 +330,21 @@ export function PostCard({
         compact ? "mb-3" : "mb-6"
       }`}
     >
-      {/* Media Area */}
       <div className="mb-3 relative">
         {renderMedia()}
-
-        {/* Status Badge */}
         {isReady && (
-          <div className="absolute top-2 right-2 bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded-full font-bold border border-green-500/30 backdrop-blur-md">
+          <div className="absolute top-2 right-2 bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded-full font-bold border border-green-500/30 backdrop-blur-md shadow-sm z-30">
             READY
           </div>
         )}
         {post.status === "AWAITING_APPROVAL" && (
-          <div className="absolute top-2 right-2 bg-yellow-500/20 text-yellow-400 text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse border border-yellow-500/30">
+          <div className="absolute top-2 right-2 bg-yellow-500/20 text-yellow-400 text-[10px] px-2 py-0.5 rounded-full font-bold animate-pulse border border-yellow-500/30 shadow-sm z-30">
             APPROVE
           </div>
         )}
       </div>
 
-      {/* Info Area */}
       <div className="space-y-3">
-        {/* Header Row */}
         <div className="flex justify-between items-center text-xs text-gray-500">
           <div className="flex items-center gap-1.5">
             <span>{getProviderIcon()}</span>
@@ -286,25 +355,23 @@ export function PostCard({
           <span>{formattedDate}</span>
         </div>
 
-        {/* Title Editing Section */}
         {isEditingTitle ? (
           <div className="flex gap-2">
             <input
               value={editedTitle}
               onChange={(e) => setEditedTitle(e.target.value)}
-              className="flex-1 bg-gray-900 border border-cyan-500/50 rounded px-2 py-1 text-sm text-white focus:outline-none"
-              placeholder="Enter a title..."
+              className="flex-1 p-1.5 bg-gray-900 border border-cyan-500/50 rounded text-white text-xs focus:outline-none"
               autoFocus
             />
             <button
               onClick={handleTitleSave}
-              className="text-cyan-400 hover:text-cyan-300"
+              className="text-cyan-400 hover:text-cyan-300 px-1"
             >
               ✅
             </button>
             <button
               onClick={handleTitleCancel}
-              className="text-gray-500 hover:text-gray-300"
+              className="text-gray-500 hover:text-gray-300 px-1"
             >
               ❌
             </button>
@@ -312,29 +379,24 @@ export function PostCard({
         ) : (
           <div className="group relative pr-6">
             <h3
-              className="text-white font-bold text-sm truncate cursor-pointer"
+              className="text-white font-bold text-sm truncate cursor-pointer hover:text-cyan-400 transition-colors"
               onClick={() => setIsEditingTitle(true)}
+              title={post.title || post.prompt}
             >
-              {post.title ? (
-                post.title
-              ) : (
-                <span className="text-gray-500 italic">Untitled Creation</span>
-              )}
+              {displayTitle}
             </h3>
-            {/* Pencil Icon triggers edit */}
             <button
               onClick={() => {
                 setEditedTitle(post.title || "");
                 setIsEditingTitle(true);
               }}
-              className="absolute right-0 top-0 text-gray-600 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute right-0 top-0 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
             >
               ✏️
             </button>
           </div>
         )}
 
-        {/* Prompt Preview (Separate from title) */}
         {!compact && (
           <div className="bg-gray-900/50 rounded-lg p-2 border border-white/5">
             <p className="text-gray-400 text-[10px] line-clamp-2 leading-relaxed italic">
@@ -343,13 +405,12 @@ export function PostCard({
           </div>
         )}
 
-        {/* Action Buttons */}
         {isReady && post.mediaUrl && (
           <div className="flex gap-2 pt-1">
             <button
               onClick={handleDownload}
               disabled={isDownloading}
-              className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-cyan-400 text-xs py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-cyan-400 text-xs py-2 rounded-lg transition-colors flex items-center justify-center gap-1"
             >
               {isDownloading ? (
                 <LoadingSpinner size="sm" />
@@ -358,22 +419,23 @@ export function PostCard({
               )}
             </button>
             <button
-              onClick={() => onPublishPost({ postId: post.id })}
+              onClick={() =>
+                onPublishPost({ prompt: post.prompt, postId: post.id })
+              }
               disabled={publishingPost === post.id}
-              className="flex-1 gradient-brand text-white text-xs py-2 rounded-lg hover:shadow-lg disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+              className="flex-1 bg-gray-700 hover:bg-gray-600 border border-white/10 text-white text-xs py-2 rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm"
             >
               {publishingPost === post.id ? (
-                <LoadingSpinner size="sm" variant="light" />
+                <span className="text-green-400">✔ Copied!</span>
               ) : (
-                <span>🚀 Post</span>
+                <span>📋 Copy Prompt</span>
               )}
             </button>
           </div>
         )}
 
-        {/* Error Details */}
         {isFailed && post.error && (
-          <div className="p-2 bg-red-900/20 border border-red-500/20 rounded text-[10px] text-red-300">
+          <div className="p-2 bg-red-900/20 border border-red-500/20 rounded text-[10px] text-red-300 break-words">
             {post.error}
           </div>
         )}
