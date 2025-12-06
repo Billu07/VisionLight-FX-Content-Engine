@@ -20,7 +20,7 @@ export const MarketingSite = () => {
         <div className="container mx-auto px-6">
           <div className="text-center">
             <h3 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent mb-4">
-              Visionlight AI
+              PicDrift Studio
             </h3>
             <p className="text-purple-300 mb-6 max-w-md mx-auto">
               Transform your content creation with AI-powered video, image, and
@@ -47,7 +47,7 @@ export const MarketingSite = () => {
               </a>
             </div>
             <p className="text-purple-400 text-sm">
-              © 2024 Visionlight AI. All rights reserved.
+              © 2026 PicDrift Studio | ALL RIGHTS RESERVED.
             </p>
           </div>
         </div>

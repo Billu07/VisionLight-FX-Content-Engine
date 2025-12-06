@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LoginModal } from "../LoginModal";
-import logo from "../../assets/logo.png";
+import fxLogo from "../../assets/fx.png";
+import picdriftLogo from "../../assets/picdrift.png";
 
 export const Hero = () => {
   const [showLogin, setShowLogin] = useState(false);
@@ -21,85 +22,109 @@ export const Hero = () => {
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 h-48 sm:w-96 sm:h-96 bg-blue-500/5 rounded-full blur-2xl sm:blur-3xl"></div>
         </div>
 
-        <div className="container mx-auto px-4 sm:px-6 pt-8 sm:pt-20 pb-6 sm:pb-8 relative z-10">
+        <div className="container mx-auto px-4 sm:px-6 pt-8 sm:pt-12 pb-6 sm:pb-8 relative z-10">
           <div className="max-w-4xl mx-auto text-center">
-            {/* Enhanced Logo & Navigation */}
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-4 sm:mb-0 gap-4 sm:gap-0">
-              <img
-                src={logo}
-                alt="Visionlight AI Logo"
-                className="w-32 h-32 sm:w-56 sm:h-56 object-contain transition-all duration-300 hover:scale-105"
-              />
+            {/* Enhanced Navigation Bar */}
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-12 sm:mb-16 gap-6 sm:gap-0">
+              {/* Dual Logos (Side by Side) */}
+              <div className="flex items-center gap-4 sm:gap-6">
+                {/* 1. FX Logo (Left) */}
+                <img
+                  src={fxLogo}
+                  alt="FX"
+                  className="h-12 sm:h-16 w-auto object-contain transition-transform hover:scale-105"
+                />
+
+                {/* 2. Divider */}
+                <div className="h-8 w-px bg-white/20"></div>
+
+                {/* 3. PicDrift Logo (Right) */}
+                <img
+                  src={picdriftLogo}
+                  alt="PicDrift"
+                  className="h-10 sm:h-14 w-auto object-contain transition-transform hover:scale-105"
+                />
+              </div>
+
+              {/* Login Button */}
               <button
                 onClick={() => setShowLogin(true)}
-                className="px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white rounded-xl font-semibold transition-all duration-300 hover:shadow-2xl hover:scale-105 text-sm sm:text-base w-full sm:w-auto"
+                className="px-6 sm:px-8 py-2 sm:py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl font-semibold transition-all duration-300 hover:shadow-lg backdrop-blur-sm text-sm sm:text-base w-full sm:w-auto"
               >
-                Start Free Demo
+                Login
               </button>
             </div>
 
-            {/* Enhanced Main Hero Content */}
-            <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
-              Imagine Your Creative Studio
-              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-300 mt-2 sm:mt-0">
-                — Automated.
-              </span>
-            </h1>
+            {/* Main Hero Content */}
+            <div className="mt-8 sm:mt-12">
+              <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
+                <span className="text-white">Welcome to</span>
+                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 mt-2">
+                  Your Creative Studio
+                </span>
+              </h1>
 
-            <p className="text-lg sm:text-xl md:text-2xl text-purple-200 mb-6 sm:mb-8 leading-relaxed px-2 sm:px-0">
-              Your branded AI content studio — hosted by Visionlight, powered by
-              the world's best creative tools, and built to grow as AI evolves.
-            </p>
-
-            <div className="text-base sm:text-lg text-purple-200 mb-8 sm:mb-12 space-y-2">
-              <p>
-                🎯 <strong>Plan it.</strong> Create it. Post it.
-              </p>
-              <p className="text-white font-semibold">
-                All from one dashboard.
-              </p>
-            </div>
-
-            {/* Enhanced CTA Section */}
-            <div className="bg-gray-800/30 backdrop-blur-lg rounded-2xl p-4 sm:p-6 md:p-8 mb-8 sm:mb-12 border border-white/10 hover:border-cyan-400/30 transition-all duration-300">
-              <p className="text-purple-300 mb-3 sm:mb-4 text-sm sm:text-base">
-                No credit card. No contracts. No commitment
-              </p>
-              <p className="text-white font-semibold mb-4 sm:mb-6 text-base sm:text-lg">
-                Try it, love it, and upgrade only when you're ready.
+              <p className="text-lg sm:text-xl md:text-2xl text-purple-200 mb-6 sm:mb-8 leading-relaxed px-2 sm:px-0">
+                Start Generating Cinematic Stories
               </p>
 
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
-                <button
-                  onClick={() => setShowLogin(true)}
-                  className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white px-4 sm:px-6 md:px-8 py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg transition-all duration-300 hover:shadow-2xl hover:scale-105 flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-center"
-                >
-                  <span>🚀</span>
-                  Start Your Free 7-Day Creative Demo
-                </button>
-                <button className="border border-white/20 bg-white/5 hover:bg-white/10 text-white px-4 sm:px-6 md:px-8 py-3 sm:py-4 rounded-xl font-semibold text-base sm:text-lg transition-all duration-300 backdrop-blur-sm flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-center">
-                  <span>📺</span>
-                  Watch Demo Video
-                </button>
+              <div className="text-base sm:text-lg text-purple-200 mb-8 sm:mb-12 space-y-2">
+                <p>
+                  <strong>Imagine it.</strong> Create it.
+                </p>
+                <p className="text-white font-semibold">
+                  All from one dashboard.
+                </p>
               </div>
-            </div>
 
-            {/* Enhanced Credits & Limited Offer */}
-            <div className="bg-gradient-to-r from-yellow-500 to-amber-500 text-yellow-900 inline-flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-full text-xs sm:text-sm font-semibold mb-4 sm:mb-6 shadow-lg max-w-sm sm:max-w-none mx-auto">
-              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-yellow-700 rounded-full animate-pulse"></div>
-              ⚡ Only 20 free demo builds available this month
-            </div>
+              {/* Enhanced CTA Section */}
+              <div className="bg-gray-800/30 backdrop-blur-lg rounded-2xl p-4 sm:p-6 md:p-8 mb-8 sm:mb-12 border border-white/10 hover:border-cyan-400/30 transition-all duration-300">
+                <p className="text-white font-semibold mb-4 sm:mb-6 text-base sm:text-lg">
+                  Try it, love it, and upgrade only when you're ready.
+                </p>
 
-            {/* Enhanced Feature Points */}
-            <div className="text-purple-300 text-xs sm:text-sm space-y-1 px-2 sm:px-0">
-              <p className="flex items-center justify-center gap-2">
-                <span>🎥</span>
-                Use demo credits to create real videos, images, and graphics
-              </p>
-              <p className="flex items-center justify-center gap-2">
-                <span>💡</span>
-                Your logo. Your branding. Your automations.
-              </p>
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
+                  {/* Button 1: SignUp Now */}
+                  <a
+                    href="https://www.picdrift.com/studio-signup"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white px-4 sm:px-6 md:px-8 py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg transition-all duration-300 hover:shadow-2xl hover:scale-105 flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-center"
+                  >
+                    <span>🚀</span>
+                    SignUp Now
+                  </a>
+
+                  {/* Button 2: Try Free Demo */}
+                  <a
+                    href="https://www.picdrift.com/fx-demo"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="border border-white/20 bg-white/5 hover:bg-white/10 text-white px-4 sm:px-6 md:px-8 py-3 sm:py-4 rounded-xl font-semibold text-base sm:text-lg transition-all duration-300 backdrop-blur-sm flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-center"
+                  >
+                    <span>📺</span>
+                    Try Free Demo
+                  </a>
+                </div>
+              </div>
+
+              {/* Enhanced Credits & Limited Offer */}
+              <div className="bg-gradient-to-r from-yellow-500 to-amber-500 text-yellow-900 inline-flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-full text-xs sm:text-sm font-semibold mb-4 sm:mb-6 shadow-lg max-w-sm sm:max-w-none mx-auto">
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-yellow-700 rounded-full animate-pulse"></div>
+                ⚡ Only 20 free demo builds available this month
+              </div>
+
+              {/* Enhanced Feature Points */}
+              <div className="text-purple-300 text-xs sm:text-sm space-y-1 px-2 sm:px-0">
+                <p className="flex items-center justify-center gap-2">
+                  <span>🎥</span>
+                  Use demo credits to create real videos, images, and graphics
+                </p>
+                <p className="flex items-center justify-center gap-2">
+                  <span>💡</span>
+                  Your logo. Your branding. Your automations.
+                </p>
+              </div>
             </div>
           </div>
         </div>

@@ -11,6 +11,25 @@ interface PostCardProps {
   compact?: boolean;
 }
 
+// --- NEW HELPER FUNCTION TO FIX THE BUG ---
+const getCleanUrl = (url: string) => {
+  if (!url) return "";
+  const trimmed = url.trim();
+
+  // If it's a JSON array string ["http...", "http..."]
+  if (trimmed.startsWith("[") && trimmed.includes("]")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed[0]; // Return the first image
+      }
+    } catch (e) {
+      console.warn("Failed to parse array URL:", trimmed);
+    }
+  }
+  return trimmed;
+};
+
 export function PostCard({
   post,
   onPublishPost,
@@ -113,7 +132,7 @@ export function PostCard({
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      window.open(post.mediaUrl, "_blank");
+      window.open(getCleanUrl(post.mediaUrl), "_blank");
     } finally {
       setIsDownloading(false);
     }
@@ -130,7 +149,6 @@ export function PostCard({
     if (!post.mediaUrl || isProcessing || isNew) {
       return (
         <div className="aspect-video bg-gray-900 rounded-xl flex items-center justify-center border border-white/10 relative overflow-hidden">
-          {/* ... (Loading State UI - same as before) ... */}
           <div className="text-center w-full p-4 relative z-10">
             {isFailed ? (
               <div className="text-red-400">
@@ -190,19 +208,24 @@ export function PostCard({
     }
 
     // === CAROUSEL STACKED CARD DISPLAY ===
-    if (post.mediaType === "CAROUSEL" && post.mediaUrl.startsWith("[")) {
+    if (post.mediaType === "CAROUSEL" && post.mediaUrl.trim().startsWith("[")) {
       let slides: string[] = [];
       try {
         slides = JSON.parse(post.mediaUrl);
       } catch (e) {}
 
+      // If parsing failed or empty, fallback to empty array
+      if (!Array.isArray(slides)) slides = [];
+
       const nextSlide = (e: React.MouseEvent) => {
         e.stopPropagation();
-        setSlideIndex((prev) => (prev + 1) % slides.length);
+        if (slides.length > 0)
+          setSlideIndex((prev) => (prev + 1) % slides.length);
       };
       const prevSlide = (e: React.MouseEvent) => {
         e.stopPropagation();
-        setSlideIndex((prev) => (prev - 1 + slides.length) % slides.length);
+        if (slides.length > 0)
+          setSlideIndex((prev) => (prev - 1 + slides.length) % slides.length);
       };
 
       if (slides.length > 0) {
@@ -289,17 +312,19 @@ export function PostCard({
             preload="metadata"
             playsInline
           >
-            <source src={post.mediaUrl} type="video/mp4" />
+            {/* USE getCleanUrl HERE TOO JUST IN CASE */}
+            <source src={getCleanUrl(post.mediaUrl)} type="video/mp4" />
           </video>
         </div>
       );
     }
 
-    // Single Image
+    // Single Image (FALLBACK)
+    // This is where your bug was happening. We now use getCleanUrl()
     return (
       <div className="aspect-video bg-gray-900 rounded-xl overflow-hidden border border-white/10">
         <img
-          src={post.mediaUrl}
+          src={getCleanUrl(post.mediaUrl)}
           alt={post.title}
           className="w-full h-full object-cover transition-transform hover:scale-105"
           onError={handleMediaError}

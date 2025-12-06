@@ -41,14 +41,17 @@ function Dashboard() {
     "1280x720" | "1792x1024" | "720x1280" | "1024x1792"
   >("1280x720");
 
-  // MULTI-IMAGE STATE
+  // MULTI-IMAGE STATE (Replaces single file state)
   const [referenceImages, setReferenceImages] = useState<File[]>([]);
   const [referenceImageUrls, setReferenceImageUrls] = useState<string[]>([]);
 
   const [generationState, setGenerationState] = useState<GenerationState>({
     status: "idle",
   });
+
+  // "Copying" state for button feedback
   const [copyingPostId, setCopyingPostId] = useState<string | null>(null);
+
   const [showBrandModal, setShowBrandModal] = useState(false);
   const [showWelcomeTour, setShowWelcomeTour] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -59,9 +62,9 @@ function Dashboard() {
   const navigate = useNavigate();
 
   // --- LOGIC FIX: Enforce Single Image for Video ---
+  // If user switches to video but has multiple images, keep only the first one
   useEffect(() => {
     if (selectedMediaType === "video" && referenceImages.length > 1) {
-      // Keep only the first image if user switches to Video
       setReferenceImages([referenceImages[0]]);
       setReferenceImageUrls([referenceImageUrls[0]]);
     }
@@ -175,13 +178,6 @@ function Dashboard() {
     enabled: !!user,
   });
 
-  // ROI Metrics logic was removed per your request, keeping data fetch just in case needed later
-  useQuery({
-    queryKey: ["roi-metrics"],
-    queryFn: async () => (await apiEndpoints.getROIMetrics()).data.metrics,
-    enabled: !!user,
-  });
-
   const generateMediaMutation = useMutation({
     mutationFn: async (formData: FormData) =>
       apiEndpoints.generateMediaDirect(formData),
@@ -193,10 +189,12 @@ function Dashboard() {
           result: { postId: data.postId },
         });
         setShowQueuedModal(true);
+        // Clear Form
         setPrompt("");
         setVideoTitle("");
         setReferenceImages([]);
         setReferenceImageUrls([]);
+
         queryClient.invalidateQueries({ queryKey: ["posts"] });
         queryClient.invalidateQueries({ queryKey: ["user-credits"] });
         setTimeout(
@@ -233,6 +231,7 @@ function Dashboard() {
     },
   });
 
+  // Handle Copy Prompt logic
   const handleCopyPrompt = async (data: { prompt: string; postId: string }) => {
     try {
       setCopyingPostId(data.postId);
@@ -244,7 +243,7 @@ function Dashboard() {
     }
   };
 
-  // === UPDATED UPLOAD HANDLER ===
+  // === UPDATED MULTI-IMAGE UPLOAD HANDLER ===
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -258,7 +257,6 @@ function Dashboard() {
       return true;
     });
 
-    // Check dynamic limit
     if (validFiles.length + referenceImages.length > maxRefImages) {
       alert(
         `❌ Only ${maxRefImages} reference image${
@@ -294,6 +292,7 @@ function Dashboard() {
       formData.append("height", h);
     }
 
+    // Append all reference images
     referenceImages.forEach((file) => formData.append("referenceImages", file));
     return formData;
   };
@@ -456,6 +455,16 @@ function Dashboard() {
             </div>
             {!isMobile && (
               <div className="flex gap-2">
+                {/* NEW BUY CREDITS BUTTON */}
+                <a
+                  href="https://www.picdrift.com/fx-credits"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2.5 bg-gray-800/60 border border-green-400/30 rounded-xl text-green-400 text-sm hover:bg-green-400/10 flex items-center gap-2"
+                >
+                  💳 Buy FX Credits
+                </a>
+
                 <button
                   onClick={() => setShowBrandModal(true)}
                   className="px-4 py-2.5 bg-gray-800/60 border border-cyan-400/30 rounded-xl text-cyan-400 text-sm hover:bg-cyan-400/10"
@@ -473,6 +482,8 @@ function Dashboard() {
           </div>
         </div>
 
+        {/* --- ROI METRICS REMOVED --- */}
+
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
           <div className="flex-1">
             <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 lg:p-8 shadow-2xl">
@@ -487,7 +498,7 @@ function Dashboard() {
                   </div>
                 </div>
                 <p className="text-purple-300 text-sm ml-1">
-                  Imagine anything — move effortlessly between AI tools
+                  Create Something Cinematic
                 </p>
               </div>
 
@@ -499,19 +510,19 @@ function Dashboard() {
                   {[
                     {
                       type: "video" as MediaType,
-                      label: "Sora Video",
+                      label: "Video FX 2", // RENAMED
                       icon: "🎬",
                       gradient: "from-pink-500 to-rose-500",
                     },
                     {
                       type: "image" as MediaType,
-                      label: "Gemini Image",
+                      label: "Image FX", // RENAMED
                       icon: "🖼️",
                       gradient: "from-blue-500 to-cyan-500",
                     },
                     {
                       type: "carousel" as MediaType,
-                      label: "AI Carousel",
+                      label: "Carousel FX",
                       icon: "📱",
                       gradient: "from-green-500 to-emerald-500",
                     },
@@ -595,15 +606,11 @@ function Dashboard() {
                         {[
                           {
                             id: "sora-2",
-                            label: "Sora 2",
-                            description: "Standard quality",
-                            badge: "✨",
+                            label: "Video FX 2", // RENAMED, Description & Badge Removed
                           },
                           {
                             id: "sora-2-pro",
-                            label: "Sora 2 Pro",
-                            description: "Enhanced quality",
-                            badge: "🚀",
+                            label: "Video FX 2 Pro", // RENAMED, Description & Badge Removed
                           },
                         ].map((model) => (
                           <button
@@ -619,11 +626,9 @@ function Dashboard() {
                             <div className="flex items-center justify-between">
                               <div>
                                 <div className="font-semibold text-white text-sm flex items-center gap-2">
-                                  {model.badge} {model.label}
+                                  {model.label}
                                 </div>
-                                <div className="text-xs text-purple-300 mt-1">
-                                  {model.description}
-                                </div>
+                                {/* Removed description text div here */}
                               </div>
                               {videoModel === model.id && (
                                 <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
@@ -633,6 +638,7 @@ function Dashboard() {
                         ))}
                       </div>
                     </div>
+
                     <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
                         📐 Aspect Ratio
@@ -683,6 +689,88 @@ function Dashboard() {
                         ))}
                       </div>
                     </div>
+
+                    {/* RESTORED VIDEO SIZE SELECTOR */}
+                    <div className="space-y-2 sm:space-y-3">
+                      <label className="block text-sm font-semibold text-white">
+                        📏 Video Size
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                        {(aspectRatio === "16:9"
+                          ? [
+                              {
+                                size: "1280x720",
+                                label: "720p HD",
+                                resolution: "1280 × 720",
+                                quality: "Standard",
+                              },
+                              ...(videoModel === "sora-2-pro"
+                                ? [
+                                    {
+                                      size: "1792x1024",
+                                      label: "1024p",
+                                      resolution: "1792 × 1024",
+                                      quality: "Premium",
+                                    },
+                                  ]
+                                : []),
+                            ]
+                          : [
+                              {
+                                size: "720x1280",
+                                label: "720p HD",
+                                resolution: "720 × 1280",
+                                quality: "Standard",
+                              },
+                              ...(videoModel === "sora-2-pro"
+                                ? [
+                                    {
+                                      size: "1024x1792",
+                                      label: "1024p",
+                                      resolution: "1024 × 1792",
+                                      quality: "Premium",
+                                    },
+                                  ]
+                                : []),
+                            ]
+                        ).map(({ size, label, resolution, quality }) => (
+                          <button
+                            key={size}
+                            type="button"
+                            onClick={() => setVideoSize(size as any)}
+                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
+                              videoSize === size
+                                ? "border-green-400 bg-green-500/20 shadow-lg shadow-green-500/25"
+                                : "border-white/10 bg-gray-800/50 hover:border-green-400/50"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="font-semibold text-white text-sm">
+                                  {label}
+                                </div>
+                                <div className="text-xs text-purple-300">
+                                  {resolution}
+                                </div>
+                                <div className="text-xs text-gray-400 mt-1">
+                                  {quality}
+                                </div>
+                              </div>
+                              {videoSize === size && (
+                                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                      {videoModel === "sora-2" && (
+                        <p className="text-xs text-purple-300 mt-2">
+                          💡 Upgrade to Video FX 2 Pro for enhanced 1024p
+                          resolution
+                        </p>
+                      )}
+                    </div>
+
                     <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
                         ⏱️ Video Duration
@@ -707,7 +795,7 @@ function Dashboard() {
                   </div>
                 )}
 
-                {/* UPDATED: MULTI-IMAGE UPLOAD UI */}
+                {/* MULTI-IMAGE UPLOAD UI */}
                 <div className="space-y-2 sm:space-y-3">
                   <label className="block text-sm font-semibold text-white">
                     🎨 Reference Images (Optional)
@@ -725,7 +813,6 @@ function Dashboard() {
                             </span>{" "}
                             or drag and drop
                           </p>
-                          {/* DYNAMIC TEXT BASED ON TYPE */}
                           <p className="text-xs text-gray-500">
                             {selectedMediaType === "video"
                               ? "Single frame (PNG/JPG, Max 10MB)"
@@ -735,13 +822,12 @@ function Dashboard() {
                         <input
                           type="file"
                           className="hidden"
-                          multiple={selectedMediaType !== "video"} // DISABLE MULTIPLE FOR VIDEO
+                          multiple={selectedMediaType !== "video"}
                           accept="image/*"
                           onChange={handleImageUpload}
                         />
                       </label>
                     </div>
-
                     {referenceImageUrls.length > 0 && (
                       <div className="grid grid-cols-5 gap-2 animate-in fade-in">
                         {referenceImageUrls.map((url, index) => (
@@ -797,7 +883,6 @@ function Dashboard() {
                   )}
                 </button>
               </form>
-
               {generationState.status === "error" && (
                 <ErrorAlert
                   message={generationState.error || "Generation failed"}
@@ -810,7 +895,6 @@ function Dashboard() {
               )}
             </div>
           </div>
-
           <div className="lg:w-96">
             <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 shadow-2xl sticky top-4">
               <div className="flex items-center justify-between mb-4 sm:mb-6">
@@ -877,7 +961,6 @@ function Dashboard() {
             </div>
           </div>
         </div>
-
         {showBrandModal && (
           <BrandConfigModal
             onClose={() => setShowBrandModal(false)}

@@ -650,7 +650,16 @@ export const airtableService = {
 
       const posts = userPosts.map((record) => {
         const userIdField = record.get("userId");
-        const mediaUrl = record.get("mediaUrl");
+        let mediaUrl = record.get("mediaUrl") as string;
+
+        // --- SECURITY FIX: Force HTTPS ---
+        if (
+          mediaUrl &&
+          typeof mediaUrl === "string" &&
+          mediaUrl.startsWith("http://")
+        ) {
+          mediaUrl = mediaUrl.replace("http://", "https://");
+        }
 
         let actualUserId: string;
         if (Array.isArray(userIdField) && userIdField.length > 0) {
@@ -686,7 +695,7 @@ export const airtableService = {
           mediaType: record.get("mediaType") as "VIDEO" | "IMAGE" | "CAROUSEL",
           platform: record.get("platform") as string,
           status: record.get("status") as any,
-          mediaUrl: mediaUrl as string,
+          mediaUrl: mediaUrl,
           mediaProvider: record.get("mediaProvider") as string,
           script: record.get("script")
             ? JSON.parse(record.get("script") as string)
