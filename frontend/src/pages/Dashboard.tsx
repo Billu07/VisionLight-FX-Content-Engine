@@ -326,7 +326,7 @@ function Dashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="bg-gray-900 rounded-2xl border border-cyan-400/40 shadow-2xl max-w-sm w-full p-6">
             <h3 className="text-lg font-semibold text-white mb-2">
-              Queued Successfully 🎬
+              Queued Successfully
             </h3>
             <p className="text-sm text-purple-200 mb-4">
               We are processing your request. Check library for updates.
