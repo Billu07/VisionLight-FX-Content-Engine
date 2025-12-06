@@ -641,16 +641,12 @@ export const airtableService = {
         })
         .firstPage();
 
-      console.log(`📊 Total posts in Airtable: ${allRecords.length}`);
-
       const userPosts = allRecords.filter((record) => {
         const userIdField = record.get("userId");
         const isUserPost =
           Array.isArray(userIdField) && userIdField.includes(userId);
         return isUserPost;
       });
-
-      console.log(`🎯 Found ${userPosts.length} posts for user ${userId}`);
 
       const posts = userPosts.map((record) => {
         const userIdField = record.get("userId");

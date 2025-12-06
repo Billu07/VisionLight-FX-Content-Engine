@@ -40,25 +40,35 @@ function Dashboard() {
   const [videoSize, setVideoSize] = useState<
     "1280x720" | "1792x1024" | "720x1280" | "1024x1792"
   >("1280x720");
-  const [referenceImage, setReferenceImage] = useState<File | null>(null);
-  const [referenceImageUrl, setReferenceImageUrl] = useState("");
+
+  // MULTI-IMAGE STATE
+  const [referenceImages, setReferenceImages] = useState<File[]>([]);
+  const [referenceImageUrls, setReferenceImageUrls] = useState<string[]>([]);
+
   const [generationState, setGenerationState] = useState<GenerationState>({
     status: "idle",
   });
-
-  // "Publishing" is now "Copying" state
   const [copyingPostId, setCopyingPostId] = useState<string | null>(null);
-
   const [showBrandModal, setShowBrandModal] = useState(false);
   const [showWelcomeTour, setShowWelcomeTour] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-
-  // Async UX state
   const [showQueuedModal, setShowQueuedModal] = useState(false);
 
   const queryClient = useQueryClient();
   const { user, isLoading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
+
+  // --- LOGIC FIX: Enforce Single Image for Video ---
+  useEffect(() => {
+    if (selectedMediaType === "video" && referenceImages.length > 1) {
+      // Keep only the first image if user switches to Video
+      setReferenceImages([referenceImages[0]]);
+      setReferenceImageUrls([referenceImageUrls[0]]);
+    }
+  }, [selectedMediaType]);
+
+  // Define limits based on type
+  const maxRefImages = selectedMediaType === "video" ? 1 : 5;
 
   // Mobile detection
   useEffect(() => {
@@ -70,50 +80,31 @@ function Dashboard() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Initialize auth check
+  // Auth checks
   useEffect(() => {
     const { checkAuth } = useAuth.getState();
     checkAuth();
   }, []);
 
-  // Redirect if not authenticated
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/");
-    }
+    if (!authLoading && !user) navigate("/");
   }, [user, authLoading, navigate]);
 
-  // === Fetch Brand Config ===
   const { data: brandConfig } = useQuery({
     queryKey: ["brand-config"],
-    queryFn: async () => {
-      const response = await apiEndpoints.getBrandConfig();
-      return response.data.config;
-    },
+    queryFn: async () => (await apiEndpoints.getBrandConfig()).data.config,
     enabled: !!user,
   });
 
-  // Apply brand colors globally
   useEffect(() => {
-    const applyBrandColors = () => {
-      const primary = brandConfig?.primaryColor || "#6366f1";
-      const secondary = brandConfig?.secondaryColor || "#8b5cf6";
-      document.documentElement.style.setProperty("--primary-brand", primary);
-      document.documentElement.style.setProperty(
-        "--secondary-brand",
-        secondary
-      );
-      const metaThemeColor = document.querySelector("meta[name=theme-color]");
-      if (metaThemeColor) {
-        metaThemeColor.setAttribute("content", primary);
-      }
-    };
-    applyBrandColors();
-    window.addEventListener("focus", applyBrandColors);
-    return () => window.removeEventListener("focus", applyBrandColors);
+    const primary = brandConfig?.primaryColor || "#6366f1";
+    const secondary = brandConfig?.secondaryColor || "#8b5cf6";
+    document.documentElement.style.setProperty("--primary-brand", primary);
+    document.documentElement.style.setProperty("--secondary-brand", secondary);
+    const metaThemeColor = document.querySelector("meta[name=theme-color]");
+    if (metaThemeColor) metaThemeColor.setAttribute("content", primary);
   }, [brandConfig]);
 
-  // Check if first-time user
   useEffect(() => {
     if (user && !localStorage.getItem("visionlight_welcome_shown")) {
       setShowWelcomeTour(true);
@@ -121,7 +112,6 @@ function Dashboard() {
     }
   }, [user]);
 
-  // === Enhanced Posts Query (Crash Proofed) ===
   const {
     data: posts = [],
     isLoading: postsLoading,
@@ -151,7 +141,6 @@ function Dashboard() {
     staleTime: 1000,
   });
 
-  // === Safe Modal Logic ===
   const postNeedingApproval = useMemo(() => {
     if (!posts || !Array.isArray(posts) || posts.length === 0) return null;
     return posts.find(
@@ -172,40 +161,42 @@ function Dashboard() {
     }
   }, [postNeedingApproval, showPromptApproval, showQueuedModal]);
 
-  // === Fetch User Credits ===
   const {
     data: userCredits = { video: 0, image: 0, carousel: 0 },
     isLoading: creditsLoading,
   } = useQuery({
     queryKey: ["user-credits"],
-    queryFn: async () => {
-      const response = await apiEndpoints.getUserCredits();
-      return response.data.credits || { video: 0, image: 0, carousel: 0 };
-    },
+    queryFn: async () =>
+      (await apiEndpoints.getUserCredits()).data.credits || {
+        video: 0,
+        image: 0,
+        carousel: 0,
+      },
     enabled: !!user,
   });
 
-  // === Direct Media Generation Mutation ===
-  const generateMediaMutation = useMutation({
-    mutationFn: async (formData: FormData) => {
-      return apiEndpoints.generateMediaDirect(formData);
-    },
-    onSuccess: (response) => {
-      const data = (response as any)?.data ?? response;
+  // ROI Metrics logic was removed per your request, keeping data fetch just in case needed later
+  useQuery({
+    queryKey: ["roi-metrics"],
+    queryFn: async () => (await apiEndpoints.getROIMetrics()).data.metrics,
+    enabled: !!user,
+  });
 
+  const generateMediaMutation = useMutation({
+    mutationFn: async (formData: FormData) =>
+      apiEndpoints.generateMediaDirect(formData),
+    onSuccess: (response: any) => {
+      const data = response?.data ?? response;
       if (data?.success && data.postId) {
         setGenerationState({
           status: "generating",
           result: { postId: data.postId },
         });
-
         setShowQueuedModal(true);
-
         setPrompt("");
         setVideoTitle("");
-        setReferenceImage(null);
-        setReferenceImageUrl("");
-
+        setReferenceImages([]);
+        setReferenceImageUrls([]);
         queryClient.invalidateQueries({ queryKey: ["posts"] });
         queryClient.invalidateQueries({ queryKey: ["user-credits"] });
         setTimeout(
@@ -213,80 +204,78 @@ function Dashboard() {
           2000
         );
       } else {
-        setGenerationState({
-          status: "error",
-          error: "Unexpected response from server",
-        });
+        setGenerationState({ status: "error", error: "Unexpected response" });
       }
     },
     onError: (error: any) => {
-      console.error("Generate media error:", error);
-      setGenerationState({
-        status: "error",
-        error: error.message || "Failed to start generation",
-      });
+      console.error("Generate error:", error);
+      setGenerationState({ status: "error", error: error.message || "Failed" });
     },
   });
 
-  // === Approve Prompt Mutation ===
   const approvePromptMutation = useMutation({
-    mutationFn: async (data: { postId: string; finalPrompt: string }) => {
-      return apiEndpoints.approvePrompt(data);
-    },
+    mutationFn: (data: { postId: string; finalPrompt: string }) =>
+      apiEndpoints.approvePrompt(data),
     onSuccess: () => {
       setShowPromptApproval(false);
       setPendingApprovalPostId(null);
-      setPrompt("");
-      setReferenceImage(null);
-      setReferenceImageUrl("");
       queryClient.invalidateQueries({ queryKey: ["posts"] });
     },
-    onError: (error: any) => {
-      console.error("Error approving prompt:", error);
-    },
+    onError: (error) => console.error(error),
   });
 
-  // === Cancel Prompt Mutation ===
   const cancelPromptMutation = useMutation({
-    mutationFn: async (postId: string) => {
-      return apiEndpoints.cancelPrompt(postId);
-    },
+    mutationFn: (postId: string) => apiEndpoints.cancelPrompt(postId),
     onSuccess: () => {
       setShowPromptApproval(false);
       setPendingApprovalPostId(null);
       queryClient.invalidateQueries({ queryKey: ["posts"] });
     },
-    onError: (error: any) => {
-      console.error("Error cancelling prompt:", error);
-    },
   });
 
-  // === Copy Prompt Logic (Replaces Publish) ===
   const handleCopyPrompt = async (data: { prompt: string; postId: string }) => {
     try {
       setCopyingPostId(data.postId);
       await navigator.clipboard.writeText(data.prompt);
-      // Optional: Add a toast notification here
-      setTimeout(() => setCopyingPostId(null), 1000); // Reset after 1s
+      setTimeout(() => setCopyingPostId(null), 1000);
     } catch (err) {
-      console.error("Failed to copy:", err);
+      console.error(err);
       setCopyingPostId(null);
     }
   };
 
+  // === UPDATED UPLOAD HANDLER ===
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const newFiles = Array.from(files);
 
-    const maxSize = 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-      alert("❌ Image size must be less than 10MB.");
-      e.target.value = "";
+    const validFiles = newFiles.filter((file) => {
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`❌ ${file.name} too large.`);
+        return false;
+      }
+      return true;
+    });
+
+    // Check dynamic limit
+    if (validFiles.length + referenceImages.length > maxRefImages) {
+      alert(
+        `❌ Only ${maxRefImages} reference image${
+          maxRefImages > 1 ? "s" : ""
+        } allowed for ${selectedMediaType}.`
+      );
       return;
     }
 
-    setReferenceImage(file);
-    setReferenceImageUrl(URL.createObjectURL(file));
+    setReferenceImages((prev) => [...prev, ...validFiles]);
+    const newUrls = validFiles.map((file) => URL.createObjectURL(file));
+    setReferenceImageUrls((prev) => [...prev, ...newUrls]);
+  };
+
+  const removeImage = (index: number) => {
+    setReferenceImages((prev) => prev.filter((_, i) => i !== index));
+    setReferenceImageUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
   const buildFormData = () => {
@@ -300,26 +289,21 @@ function Dashboard() {
       formData.append("model", videoModel);
       formData.append("aspectRatio", aspectRatio);
       formData.append("size", videoSize);
-      const [width, height] = videoSize.split("x").map(Number);
-      formData.append("width", width.toString());
-      formData.append("height", height.toString());
+      const [w, h] = videoSize.split("x");
+      formData.append("width", w);
+      formData.append("height", h);
     }
 
-    if (referenceImage) {
-      formData.append("referenceImage", referenceImage);
-    }
-
+    referenceImages.forEach((file) => formData.append("referenceImages", file));
     return formData;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const currentCredits = userCredits?.[selectedMediaType] ?? 0;
-    if (!prompt.trim() || currentCredits <= 0) return;
-
+    const credits = userCredits?.[selectedMediaType] ?? 0;
+    if (!prompt.trim() || credits <= 0) return;
     setGenerationState({ status: "idle" });
-    const formData = buildFormData();
-    generateMediaMutation.mutate(formData);
+    generateMediaMutation.mutate(buildFormData());
   };
 
   const handleLogout = () => {
@@ -327,36 +311,25 @@ function Dashboard() {
     navigate("/");
   };
 
-  const primaryColor = brandConfig?.primaryColor || "#6366f1";
   const companyName = brandConfig?.companyName || "Visionlight AI";
-
-  if (authLoading) {
+  if (authLoading)
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 flex items-center justify-center p-4">
-        <div className="text-center">
-          <LoadingSpinner size="lg" variant="neon" />
-          <p className="mt-6 text-purple-200 text-lg font-medium">
-            Loading your creative studio...
-          </p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 flex items-center justify-center">
+        <LoadingSpinner size="lg" variant="neon" />
       </div>
     );
-  }
-
   if (!user) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900">
-      {/* Video queued modal */}
       {showQueuedModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="bg-gray-900 rounded-2xl border border-cyan-400/40 shadow-2xl max-w-sm w-full p-6">
             <h3 className="text-lg font-semibold text-white mb-2">
-              Your content is being generated 🎬
+              Queued Successfully 🎬
             </h3>
             <p className="text-sm text-purple-200 mb-4">
-              We've started enhancing your prompt. Check your library shortly
-              for approval!
+              We are processing your request. Check library for updates.
             </p>
             <div className="flex justify-end">
               <button
@@ -378,24 +351,20 @@ function Dashboard() {
         postId={pendingApprovalPostId || ""}
         isOpen={showPromptApproval}
         onClose={() => setShowPromptApproval(false)}
-        onApprove={(finalPrompt) => {
-          if (pendingApprovalPostId) {
-            approvePromptMutation.mutate({
-              postId: pendingApprovalPostId,
-              finalPrompt,
-            });
-          }
-        }}
-        onCancel={(postId) => {
-          if (postId) cancelPromptMutation.mutate(postId);
-        }}
+        onApprove={(finalPrompt) =>
+          pendingApprovalPostId &&
+          approvePromptMutation.mutate({
+            postId: pendingApprovalPostId,
+            finalPrompt,
+          })
+        }
+        onCancel={(postId) => postId && cancelPromptMutation.mutate(postId)}
         isLoading={
           approvePromptMutation.isPending || cancelPromptMutation.isPending
         }
       />
 
       <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
-        {/* --- HEADER --- */}
         <div className="mb-6 sm:mb-8 flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -411,12 +380,11 @@ function Dashboard() {
                 </p>
               </div>
             </div>
-
             <div className="absolute left-1/2 transform -translate-x-1/2 flex flex-col items-center mt-14">
               <div className="h-14 sm:h-16 flex items-center justify-center mb-1">
                 <img
                   src={fxLogo}
-                  alt="FX Creation Engine"
+                  alt="FX"
                   className="h-full w-auto object-contain"
                 />
               </div>
@@ -424,20 +392,19 @@ function Dashboard() {
                 Your AI-Powered Creation Engine
               </p>
             </div>
-
             {isMobile && (
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowBrandModal(true)}
-                  className="p-2 bg-gray-800/60 backdrop-blur-lg border border-cyan-400/30 rounded-xl hover:bg-cyan-400/10 transition-all"
+                  className="p-2 bg-gray-800/60 border border-cyan-400/30 rounded-xl"
                 >
-                  <span className="text-cyan-400">🎨</span>
+                  🎨
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="p-2 bg-gray-800/60 backdrop-blur-lg border border-purple-400/30 rounded-xl hover:bg-purple-400/10 transition-all"
+                  className="p-2 bg-gray-800/60 border border-purple-400/30 rounded-xl"
                 >
-                  <span className="text-purple-300">🚪</span>
+                  🚪
                 </button>
               </div>
             )}
@@ -487,18 +454,17 @@ function Dashboard() {
                 )}
               </div>
             </div>
-
             {!isMobile && (
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowBrandModal(true)}
-                  className="px-4 py-2.5 bg-gray-800/60 backdrop-blur-lg border border-cyan-400/30 rounded-xl hover:bg-cyan-400/10 transition-all duration-200 font-medium flex items-center gap-2 text-sm text-cyan-400 hover:scale-105"
+                  className="px-4 py-2.5 bg-gray-800/60 border border-cyan-400/30 rounded-xl text-cyan-400 text-sm hover:bg-cyan-400/10"
                 >
-                  <span>🎨</span> Brand
+                  🎨 Brand
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="px-4 py-2.5 bg-gray-800/60 backdrop-blur-lg border border-purple-400/30 rounded-xl hover:bg-purple-400/10 transition-all duration-200 font-medium text-purple-300 text-sm hover:scale-105"
+                  className="px-4 py-2.5 bg-gray-800/60 border border-purple-400/30 rounded-xl text-purple-300 text-sm hover:bg-purple-400/10"
                 >
                   Logout
                 </button>
@@ -507,11 +473,7 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* --- ROI METRICS REMOVED --- */}
-
-        {/* --- MAIN LAYOUT --- */}
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
-          {/* Generation Panel */}
           <div className="flex-1">
             <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 lg:p-8 shadow-2xl">
               <div className="mb-6 sm:mb-8">
@@ -529,7 +491,6 @@ function Dashboard() {
                 </p>
               </div>
 
-              {/* Media Type Selection */}
               <div className="mb-6 sm:mb-8">
                 <label className="block text-sm font-semibold text-white mb-3 sm:mb-4">
                   🎬 Select Content Type
@@ -575,7 +536,7 @@ function Dashboard() {
                           {icon}
                         </span>
                         <div className="flex-1">
-                          <div className={`font-semibold text-sm text-white`}>
+                          <div className="font-semibold text-sm text-white">
                             {label}
                           </div>
                           <div
@@ -607,12 +568,10 @@ function Dashboard() {
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     placeholder={`Describe your ${selectedMediaType} vision...`}
-                    className="w-full p-4 sm:p-5 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all duration-300 resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base sm:text-lg leading-relaxed"
+                    className="w-full p-4 sm:p-5 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base leading-relaxed"
                     rows={isMobile ? 3 : 4}
                   />
                 </div>
-
-                {/* DYNAMIC TITLE INPUT */}
                 <div className="space-y-2 sm:space-y-3">
                   <label className="block text-sm font-semibold text-white capitalize">
                     🏷️ {selectedMediaType} Title (Optional)
@@ -626,7 +585,6 @@ function Dashboard() {
                   />
                 </div>
 
-                {/* Video Controls */}
                 {selectedMediaType === "video" && (
                   <div className="space-y-4 sm:space-y-6">
                     <div className="space-y-2 sm:space-y-3">
@@ -651,13 +609,11 @@ function Dashboard() {
                           <button
                             key={model.id}
                             type="button"
-                            onClick={() =>
-                              setVideoModel(model.id as "sora-2" | "sora-2-pro")
-                            }
-                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
+                            onClick={() => setVideoModel(model.id as any)}
+                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all text-left group ${
                               videoModel === model.id
-                                ? "border-cyan-400 bg-cyan-500/20 shadow-lg shadow-cyan-500/25"
-                                : "border-white/10 bg-gray-800/50 hover:border-cyan-400/50"
+                                ? "border-cyan-400 bg-cyan-500/20"
+                                : "border-white/10 bg-gray-800/50"
                             }`}
                           >
                             <div className="flex items-center justify-between">
@@ -677,7 +633,6 @@ function Dashboard() {
                         ))}
                       </div>
                     </div>
-
                     <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
                         📐 Aspect Ratio
@@ -701,18 +656,18 @@ function Dashboard() {
                             key={ratio}
                             type="button"
                             onClick={() => {
-                              setAspectRatio(ratio as "16:9" | "9:16");
+                              setAspectRatio(ratio as any);
                               setVideoSize(
                                 ratio === "16:9" ? "1280x720" : "720x1280"
                               );
                             }}
-                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center group ${
+                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all text-center group ${
                               aspectRatio === ratio
-                                ? "border-purple-400 bg-purple-500/20 shadow-lg shadow-purple-500/25"
-                                : "border-white/10 bg-gray-800/50 hover:border-purple-400/50"
+                                ? "border-purple-400 bg-purple-500/20"
+                                : "border-white/10 bg-gray-800/50"
                             }`}
                           >
-                            <div className="text-xl sm:text-2xl mb-2 group-hover:scale-110 transition-transform">
+                            <div className="text-xl sm:text-2xl mb-2 group-hover:scale-110">
                               {icon}
                             </div>
                             <div className="font-semibold text-white text-sm">
@@ -728,86 +683,6 @@ function Dashboard() {
                         ))}
                       </div>
                     </div>
-
-                    <div className="space-y-2 sm:space-y-3">
-                      <label className="block text-sm font-semibold text-white">
-                        📏 Video Size
-                      </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                        {(aspectRatio === "16:9"
-                          ? [
-                              {
-                                size: "1280x720",
-                                label: "720p HD",
-                                resolution: "1280 × 720",
-                                quality: "Standard",
-                              },
-                              ...(videoModel === "sora-2-pro"
-                                ? [
-                                    {
-                                      size: "1792x1024",
-                                      label: "1024p",
-                                      resolution: "1792 × 1024",
-                                      quality: "Premium",
-                                    },
-                                  ]
-                                : []),
-                            ]
-                          : [
-                              {
-                                size: "720x1280",
-                                label: "720p HD",
-                                resolution: "720 × 1280",
-                                quality: "Standard",
-                              },
-                              ...(videoModel === "sora-2-pro"
-                                ? [
-                                    {
-                                      size: "1024x1792",
-                                      label: "1024p",
-                                      resolution: "1024 × 1792",
-                                      quality: "Premium",
-                                    },
-                                  ]
-                                : []),
-                            ]
-                        ).map(({ size, label, resolution, quality }) => (
-                          <button
-                            key={size}
-                            type="button"
-                            onClick={() => setVideoSize(size as any)}
-                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
-                              videoSize === size
-                                ? "border-green-400 bg-green-500/20 shadow-lg shadow-green-500/25"
-                                : "border-white/10 bg-gray-800/50 hover:border-green-400/50"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <div className="font-semibold text-white text-sm">
-                                  {label}
-                                </div>
-                                <div className="text-xs text-purple-300">
-                                  {resolution}
-                                </div>
-                                <div className="text-xs text-gray-400 mt-1">
-                                  {quality}
-                                </div>
-                              </div>
-                              {videoSize === size && (
-                                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                              )}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                      {videoModel === "sora-2" && (
-                        <p className="text-xs text-purple-300 mt-2">
-                          💡 Upgrade to Sora-2 Pro for enhanced 1024p resolution
-                        </p>
-                      )}
-                    </div>
-
                     <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
                         ⏱️ Video Duration
@@ -817,11 +692,11 @@ function Dashboard() {
                           <button
                             key={sec}
                             type="button"
-                            onClick={() => setVideoDuration(sec as 4 | 8 | 12)}
-                            className={`px-3 sm:px-5 py-2 sm:py-3 rounded-xl border text-sm font-semibold transition-all duration-300 flex-1 min-w-[80px] ${
+                            onClick={() => setVideoDuration(sec as any)}
+                            className={`px-3 sm:px-5 py-2 sm:py-3 rounded-xl border text-sm font-semibold flex-1 min-w-[80px] ${
                               videoDuration === sec
-                                ? "bg-cyan-500 border-cyan-500 text-white shadow-lg shadow-cyan-500/25"
-                                : "bg-gray-800/50 border-white/10 text-purple-200 hover:border-cyan-400/50 hover:bg-cyan-400/10"
+                                ? "bg-cyan-500 border-cyan-500 text-white"
+                                : "bg-gray-800/50 border-white/10 text-purple-200"
                             }`}
                           >
                             {sec}s
@@ -832,30 +707,62 @@ function Dashboard() {
                   </div>
                 )}
 
+                {/* UPDATED: MULTI-IMAGE UPLOAD UI */}
                 <div className="space-y-2 sm:space-y-3">
                   <label className="block text-sm font-semibold text-white">
-                    🎨 Reference Image (Optional)
+                    🎨 Reference Images (Optional)
                   </label>
-                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start">
-                    <div className="flex-1 w-full">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="w-full p-3 sm:p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white file:mr-3 file:py-2 file:px-4 sm:file:py-3 sm:file:px-6 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-gradient-to-r file:from-cyan-500 file:to-blue-500 file:text-white hover:file:from-cyan-600 hover:file:to-blue-600 transition-all duration-300 backdrop-blur-sm"
-                      />
-                      <p className="text-xs text-purple-300 mt-2">
-                        Maximum file size: 10MB. Supported formats: JPG, PNG
-                        (PNG Preferred)
-                      </p>
-                    </div>
-                    {referenceImageUrl && (
-                      <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-xl overflow-hidden border-2 border-cyan-400/30 shadow-lg flex-shrink-0">
-                        <img
-                          src={referenceImageUrl}
-                          alt="Reference"
-                          className="w-full h-full object-cover"
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-center w-full">
+                      <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:border-cyan-500 hover:bg-gray-800/50 transition-all group">
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          <div className="text-4xl mb-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                            📂
+                          </div>
+                          <p className="text-sm text-gray-400">
+                            <span className="font-semibold text-cyan-400">
+                              Click to upload
+                            </span>{" "}
+                            or drag and drop
+                          </p>
+                          {/* DYNAMIC TEXT BASED ON TYPE */}
+                          <p className="text-xs text-gray-500">
+                            {selectedMediaType === "video"
+                              ? "Single frame (PNG/JPG, Max 10MB)"
+                              : "Up to 5 images (PNG/JPG, Max 10MB)"}
+                          </p>
+                        </div>
+                        <input
+                          type="file"
+                          className="hidden"
+                          multiple={selectedMediaType !== "video"} // DISABLE MULTIPLE FOR VIDEO
+                          accept="image/*"
+                          onChange={handleImageUpload}
                         />
+                      </label>
+                    </div>
+
+                    {referenceImageUrls.length > 0 && (
+                      <div className="grid grid-cols-5 gap-2 animate-in fade-in">
+                        {referenceImageUrls.map((url, index) => (
+                          <div
+                            key={index}
+                            className="relative aspect-square group"
+                          >
+                            <img
+                              src={url}
+                              alt={`Ref ${index}`}
+                              className="w-full h-full object-cover rounded-lg border border-white/20"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeImage(index)}
+                              className="absolute -top-1 -right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -874,7 +781,7 @@ function Dashboard() {
                   {generateMediaMutation.isPending ? (
                     <>
                       <LoadingSpinner size="sm" variant="light" />
-                      <span>Starting {selectedMediaType} generation...</span>
+                      <span>Starting {selectedMediaType}...</span>
                     </>
                   ) : (
                     <>
@@ -904,12 +811,11 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* Content Library */}
           <div className="lg:w-96">
             <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 shadow-2xl sticky top-4">
               <div className="flex items-center justify-between mb-4 sm:mb-6">
                 <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
-                  <span>📚</span> Your Library
+                  <span>📚</span> Your Library{" "}
                   <span className="bg-purple-500/20 text-purple-300 text-xs px-2 py-1 rounded-full ml-2">
                     {posts && Array.isArray(posts)
                       ? posts.filter((p: any) => p.status !== "CANCELLED")
@@ -923,7 +829,6 @@ function Dashboard() {
                   </div>
                 )}
               </div>
-
               <div className="space-y-3 max-h-[500px] sm:max-h-[600px] overflow-y-auto custom-scrollbar">
                 {posts && Array.isArray(posts) && posts.length > 0 ? (
                   posts
@@ -937,13 +842,12 @@ function Dashboard() {
                       <PostCard
                         key={post.id}
                         post={post}
-                        // NOTE: onPublishPost is used to copy prompt now
                         onPublishPost={handleCopyPrompt}
                         userCredits={
                           userCredits || { video: 0, image: 0, carousel: 0 }
                         }
-                        publishingPost={copyingPostId} // Use copying state
-                        primaryColor={primaryColor}
+                        publishingPost={copyingPostId}
+                        primaryColor={brandConfig?.primaryColor || "#6366f1"}
                         compact={true}
                       />
                     ))
@@ -959,7 +863,6 @@ function Dashboard() {
                   </div>
                 ) : null}
               </div>
-
               {postsError && (
                 <div className="text-center py-6">
                   <ErrorAlert

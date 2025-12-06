@@ -5,7 +5,6 @@ import dotenv from "dotenv";
 import archiver from "archiver";
 import { upload, uploadToCloudinary } from "./utils/fileUpload";
 
-// Load environment variables FIRST
 dotenv.config();
 
 console.log("🔧 Environment Check:", {
@@ -25,7 +24,6 @@ import { contentEngine } from "./services/contentEngine";
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// Enhanced CORS configuration
 const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
@@ -33,21 +31,16 @@ const allowedOrigins = [
   "https://*.vercel.app",
 ];
 
-if (process.env.FRONTEND_URL) {
-  allowedOrigins.push(process.env.FRONTEND_URL);
-}
+if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL);
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      if (!origin || allowedOrigins.indexOf(origin) !== -1)
         callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
+      else callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
-    // --- CRITICAL FIX: Allow frontend to read the filename header ---
     exposedHeaders: ["Content-Disposition", "Content-Length", "Content-Type"],
   })
 );
@@ -55,11 +48,10 @@ app.use(
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-// Health check
 app.get("/", (req, res) => {
   res.json({
     message: "Visionlight FX Backend - Running!",
-    version: "3.1.0",
+    version: "3.2.0",
     status: "Healthy",
   });
 });
@@ -351,7 +343,7 @@ app.get(
 app.post(
   "/api/generate-media",
   authenticateToken,
-  upload.single("referenceImage"),
+  upload.array("referenceImages", 5),
   async (req: AuthenticatedRequest, res) => {
     try {
       console.log("🎬 /api/generate-media hit");
@@ -366,7 +358,7 @@ app.post(
         height,
         title,
       } = req.body;
-      const referenceImageFile = req.file;
+      const referenceFiles = (req.files as Express.Multer.File[]) || [];
 
       if (!prompt || !mediaType)
         return res.status(400).json({ error: "Missing required fields" });
@@ -379,16 +371,21 @@ app.post(
         return res.status(403).json({ error: "Insufficient credits" });
       }
 
-      let imageReferenceUrl: string | undefined;
-      if (referenceImageFile) {
+      // 1. Upload all images
+      const uploadedUrls: string[] = [];
+      if (referenceFiles.length > 0) {
         try {
-          imageReferenceUrl = await uploadToCloudinary(referenceImageFile);
+          for (const file of referenceFiles) {
+            const url = await uploadToCloudinary(file);
+            uploadedUrls.push(url);
+          }
         } catch (err) {
           return res
             .status(500)
             .json({ success: false, error: "Image upload failed" });
         }
       }
+      const primaryRefUrl = uploadedUrls.length > 0 ? uploadedUrls[0] : "";
 
       const generationParams = {
         mediaType,
@@ -398,14 +395,14 @@ app.post(
         size,
         width: width ? parseInt(width) : undefined,
         height: height ? parseInt(height) : undefined,
-        imageReference: imageReferenceUrl,
-        hasReferenceImage: !!referenceImageFile,
+        imageReference: primaryRefUrl,
+        imageReferences: uploadedUrls,
+        hasReferenceImage: uploadedUrls.length > 0,
         timestamp: new Date().toISOString(),
         title: title || "",
         userId: req.user!.id,
       };
 
-      // 1. Create Initial Post
       const post = await airtableService.createPost({
         userId: req.user!.id,
         prompt,
@@ -413,12 +410,16 @@ app.post(
         mediaType: mediaType.toUpperCase() as any,
         platform: "INSTAGRAM",
         generationParams,
-        imageReference: imageReferenceUrl,
+        imageReference: primaryRefUrl,
         generationStep: "PROMPT_ENHANCEMENT",
         requiresApproval: true,
       });
 
-      // Deduct credits
+      await airtableService.updatePost(post.id, {
+        status: "PROCESSING",
+        progress: 1,
+      });
+
       const updatedCredits = { ...user.demoCredits };
       updatedCredits[mediaType as keyof typeof user.demoCredits] -= 1;
       await airtableService.updateUserCredits(req.user!.id, updatedCredits);
@@ -428,72 +429,60 @@ app.post(
       // --- BACKGROUND PROCESS ---
       (async () => {
         try {
-          await airtableService.updatePost(post.id, {
-            status: "PROCESSING",
-            progress: 1,
-          });
+          const primaryBuffer =
+            referenceFiles.length > 0 ? referenceFiles[0].buffer : undefined;
+          const primaryMime =
+            referenceFiles.length > 0 ? referenceFiles[0].mimetype : undefined;
 
-          // 1. Enhance Prompt
+          // 1. Enhance Prompt (Returns raw for Image/Carousel if requested in engine)
           const enhancedPrompt = await contentEngine.enhanceUserPrompt(
             prompt,
             mediaType,
-            {
-              duration: duration ? parseInt(duration) : 8,
-              aspectRatio: aspectRatio || "16:9",
-              size: size || "1280x720",
-            },
-            referenceImageFile?.buffer,
-            referenceImageFile?.mimetype
+            { duration: duration ? parseInt(duration) : 8, aspectRatio, size },
+            primaryBuffer,
+            primaryMime
           );
 
-          // 2. DECISION LOGIC: Do we stop for approval?
-          // Video ALWAYS needs approval (Director mode).
-          // Image/Carousel ONLY needs approval if there is a reference image (Style mixing is unpredictable).
+          // --- FIX: ONLY PAUSE IF IT IS A VIDEO ---
+          // The logic used to pause if references existed, but user wants Images/Carousels to auto-run.
           const isVideo = mediaType === "video";
-          const hasRefImage = !!referenceImageFile;
 
-          const shouldPauseForApproval = isVideo || hasRefImage;
-
-          if (shouldPauseForApproval) {
-            // --> STOP & WAIT (Updates status to AWAITING_APPROVAL, Frontend shows Modal)
-            console.log(`⏸️ Post ${post.id} paused for approval.`);
+          if (isVideo) {
+            console.log(`⏸️ Post ${post.id} paused for approval (Video).`);
             await airtableService.updatePost(post.id, {
               enhancedPrompt,
               generationStep: "AWAITING_APPROVAL",
               progress: 2,
             });
           } else {
-            // --> AUTO-START (Skip Modal)
-            console.log(`⏩ Post ${post.id} auto-starting (Text-Only).`);
+            console.log(`⏩ Post ${post.id} auto-starting (Image/Carousel).`);
 
             await airtableService.updatePost(post.id, {
-              enhancedPrompt, // Use enhanced as final (or raw if enhancement skipped)
-              userEditedPrompt: enhancedPrompt,
+              enhancedPrompt,
+              userEditedPrompt: enhancedPrompt, // Auto-confirm the prompt
               generationStep: "GENERATION",
               requiresApproval: false,
-              progress: 5, // 5% = Started
+              progress: 5,
             });
 
-            // Trigger Generation immediately
-            if (mediaType === "carousel") {
+            if (mediaType === "carousel")
               contentEngine.startCarouselGeneration(
                 post.id,
                 enhancedPrompt,
                 generationParams
               );
-            } else {
+            else
               contentEngine.startImageGeneration(
                 post.id,
                 enhancedPrompt,
                 generationParams
               );
-            }
           }
         } catch (err: any) {
-          console.error("Background Workflow Error:", err);
+          console.error("Background Error:", err);
           await airtableService.updatePost(post.id, {
             status: "FAILED",
-            error: err.message || "Generation failed",
+            error: "Processing failed",
           });
         }
       })();
