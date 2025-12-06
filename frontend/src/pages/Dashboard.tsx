@@ -359,7 +359,7 @@ function Dashboard() {
         onClose={() => setShowPromptApproval(false)}
         onApprove={(p) =>
           approvePromptMutation.mutate({
-            postId: pendingApprovalPostId,
+            postId: pendingApprovalPostId || "",
             finalPrompt: p,
           })
         }
