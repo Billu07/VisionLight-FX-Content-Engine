@@ -14,7 +14,9 @@ import { PromptApprovalModal } from "../components/PromptApprovalModal";
 import fxLogo from "../assets/fx.png";
 import picdriftLogo from "../assets/picdrift.png";
 
-type MediaType = "video" | "image" | "carousel";
+// === TYPES FROM FINAL VERSION ===
+type EngineType = "kie" | "studio" | "openai";
+type StudioMode = "image" | "carousel";
 
 interface GenerationState {
   status: "idle" | "generating" | "completed" | "error";
@@ -23,55 +25,63 @@ interface GenerationState {
 }
 
 function Dashboard() {
-  // === Form State ===
+  // ==========================================
+  // LOGIC & STATE (FROM FINAL VERSION)
+  // ==========================================
+
+  // === STATE: CORE ===
   const [prompt, setPrompt] = useState("");
-  const [selectedMediaType, setSelectedMediaType] =
-    useState<MediaType>("video");
+  const [videoTitle, setVideoTitle] = useState("");
+
+  // === STATE: ENGINE SELECTION ===
+  const [activeEngine, setActiveEngine] = useState<EngineType>("kie");
+  const [studioMode, setStudioMode] = useState<StudioMode>("image");
+
+  // === STATE: KIE AI ===
+  const [kieDuration, setKieDuration] = useState<10 | 15>(10);
+  const [kieResolution, setKieResolution] = useState<"720p" | "1080p">("720p");
+  const [kieAspect, setKieAspect] = useState<"landscape" | "portrait">(
+    "landscape"
+  );
+  const [kieModel, setKieModel] = useState<"kie-sora-2" | "kie-sora-2-pro">(
+    "kie-sora-2"
+  );
+
+  // === STATE: OPENAI / ORIGINAL VIDEO ===
   const [videoDuration, setVideoDuration] = useState<4 | 8 | 12>(12);
   const [videoModel, setVideoModel] = useState<"sora-2" | "sora-2-pro">(
     "sora-2"
   );
-  const [videoTitle, setVideoTitle] = useState("");
-  const [showPromptApproval, setShowPromptApproval] = useState(false);
-  const [pendingApprovalPostId, setPendingApprovalPostId] = useState<
-    string | null
-  >(null);
   const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16">("16:9");
   const [videoSize, setVideoSize] = useState<
     "1280x720" | "1792x1024" | "720x1280" | "1024x1792"
   >("1280x720");
 
-  // MULTI-IMAGE STATE (Replaces single file state)
+  // === STATE: UPLOAD & UI ===
   const [referenceImages, setReferenceImages] = useState<File[]>([]);
   const [referenceImageUrls, setReferenceImageUrls] = useState<string[]>([]);
-
   const [generationState, setGenerationState] = useState<GenerationState>({
     status: "idle",
   });
-
-  // "Copying" state for button feedback
   const [copyingPostId, setCopyingPostId] = useState<string | null>(null);
-
   const [showBrandModal, setShowBrandModal] = useState(false);
   const [showWelcomeTour, setShowWelcomeTour] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [showQueuedModal, setShowQueuedModal] = useState(false);
+  const [showPromptApproval, setShowPromptApproval] = useState(false);
+  const [pendingApprovalPostId, setPendingApprovalPostId] = useState<
+    string | null
+  >(null);
 
   const queryClient = useQueryClient();
   const { user, isLoading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
 
-  // --- LOGIC FIX: Enforce Single Image for Video ---
-  // If user switches to video but has multiple images, keep only the first one
+  // --- EFFECT: Reset Files on Engine Change ---
   useEffect(() => {
-    if (selectedMediaType === "video" && referenceImages.length > 1) {
-      setReferenceImages([referenceImages[0]]);
-      setReferenceImageUrls([referenceImageUrls[0]]);
-    }
-  }, [selectedMediaType]);
-
-  // Define limits based on type
-  const maxRefImages = selectedMediaType === "video" ? 1 : 5;
+    setReferenceImages([]);
+    setReferenceImageUrls([]);
+  }, [activeEngine, studioMode]);
 
   // Mobile detection
   useEffect(() => {
@@ -85,10 +95,8 @@ function Dashboard() {
 
   // Auth checks
   useEffect(() => {
-    const { checkAuth } = useAuth.getState();
-    checkAuth();
+    useAuth.getState().checkAuth();
   }, []);
-
   useEffect(() => {
     if (!authLoading && !user) navigate("/");
   }, [user, authLoading, navigate]);
@@ -101,11 +109,7 @@ function Dashboard() {
 
   useEffect(() => {
     const primary = brandConfig?.primaryColor || "#6366f1";
-    const secondary = brandConfig?.secondaryColor || "#8b5cf6";
     document.documentElement.style.setProperty("--primary-brand", primary);
-    document.documentElement.style.setProperty("--secondary-brand", secondary);
-    const metaThemeColor = document.querySelector("meta[name=theme-color]");
-    if (metaThemeColor) metaThemeColor.setAttribute("content", primary);
   }, [brandConfig]);
 
   useEffect(() => {
@@ -145,7 +149,7 @@ function Dashboard() {
   });
 
   const postNeedingApproval = useMemo(() => {
-    if (!posts || !Array.isArray(posts) || posts.length === 0) return null;
+    if (!posts || !Array.isArray(posts)) return null;
     return posts.find(
       (p: any) =>
         p.generationStep === "AWAITING_APPROVAL" &&
@@ -158,11 +162,8 @@ function Dashboard() {
     if (postNeedingApproval && !showPromptApproval && !showQueuedModal) {
       setPendingApprovalPostId(postNeedingApproval.id);
       setShowPromptApproval(true);
-    } else if (!postNeedingApproval && showPromptApproval) {
-      setShowPromptApproval(false);
-      setPendingApprovalPostId(null);
     }
-  }, [postNeedingApproval, showPromptApproval, showQueuedModal]);
+  }, [postNeedingApproval]);
 
   const {
     data: userCredits = { video: 0, image: 0, carousel: 0 },
@@ -182,33 +183,22 @@ function Dashboard() {
     mutationFn: async (formData: FormData) =>
       apiEndpoints.generateMediaDirect(formData),
     onSuccess: (response: any) => {
-      const data = response?.data ?? response;
-      if (data?.success && data.postId) {
+      if (response?.data?.success) {
         setGenerationState({
           status: "generating",
-          result: { postId: data.postId },
+          result: { postId: response.data.postId },
         });
         setShowQueuedModal(true);
-        // Clear Form
         setPrompt("");
         setVideoTitle("");
         setReferenceImages([]);
         setReferenceImageUrls([]);
-
         queryClient.invalidateQueries({ queryKey: ["posts"] });
         queryClient.invalidateQueries({ queryKey: ["user-credits"] });
-        setTimeout(
-          () => queryClient.invalidateQueries({ queryKey: ["posts"] }),
-          2000
-        );
-      } else {
-        setGenerationState({ status: "error", error: "Unexpected response" });
       }
     },
-    onError: (error: any) => {
-      console.error("Generate error:", error);
-      setGenerationState({ status: "error", error: error.message || "Failed" });
-    },
+    onError: (err: any) =>
+      setGenerationState({ status: "error", error: err.message }),
   });
 
   const approvePromptMutation = useMutation({
@@ -219,7 +209,6 @@ function Dashboard() {
       setPendingApprovalPostId(null);
       queryClient.invalidateQueries({ queryKey: ["posts"] });
     },
-    onError: (error) => console.error(error),
   });
 
   const cancelPromptMutation = useMutation({
@@ -231,43 +220,30 @@ function Dashboard() {
     },
   });
 
-  // Handle Copy Prompt logic
   const handleCopyPrompt = async (data: { prompt: string; postId: string }) => {
     try {
       setCopyingPostId(data.postId);
       await navigator.clipboard.writeText(data.prompt);
       setTimeout(() => setCopyingPostId(null), 1000);
-    } catch (err) {
-      console.error(err);
-      setCopyingPostId(null);
-    }
+    } catch (err) {}
   };
 
-  // === UPDATED MULTI-IMAGE UPLOAD HANDLER ===
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    const newFiles = Array.from(files);
 
-    const validFiles = newFiles.filter((file) => {
-      if (file.size > 10 * 1024 * 1024) {
-        alert(`❌ ${file.name} too large.`);
-        return false;
-      }
-      return true;
-    });
+    // Limits
+    const maxFiles =
+      activeEngine === "studio" && studioMode === "carousel" ? 5 : 1;
 
-    if (validFiles.length + referenceImages.length > maxRefImages) {
-      alert(
-        `❌ Only ${maxRefImages} reference image${
-          maxRefImages > 1 ? "s" : ""
-        } allowed for ${selectedMediaType}.`
-      );
+    if (files.length + referenceImages.length > maxFiles) {
+      alert(`❌ Only ${maxFiles} image(s) allowed for this mode.`);
       return;
     }
 
-    setReferenceImages((prev) => [...prev, ...validFiles]);
-    const newUrls = validFiles.map((file) => URL.createObjectURL(file));
+    const newFiles = Array.from(files);
+    setReferenceImages((prev) => [...prev, ...newFiles]);
+    const newUrls = newFiles.map((file) => URL.createObjectURL(file));
     setReferenceImageUrls((prev) => [...prev, ...newUrls]);
   };
 
@@ -276,30 +252,55 @@ function Dashboard() {
     setReferenceImageUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // === FORM DATA BUILDER (CRITICAL LOGIC) ===
   const buildFormData = () => {
     const formData = new FormData();
     formData.append("prompt", prompt);
-    formData.append("mediaType", selectedMediaType);
     formData.append("title", videoTitle);
 
-    if (selectedMediaType === "video") {
-      formData.append("duration", videoDuration.toString());
+    if (activeEngine === "kie") {
+      formData.append("mediaType", "video");
+      formData.append("model", kieModel);
+      formData.append("duration", kieDuration.toString());
+      formData.append(
+        "aspectRatio",
+        kieAspect === "landscape" ? "16:9" : "9:16"
+      );
+
+      // Resolution Calculation
+      let w = 1280;
+      let h = 720;
+      if (kieResolution === "1080p") {
+        w = 1920;
+        h = 1080;
+      }
+      if (kieAspect === "portrait") {
+        const t = w;
+        w = h;
+        h = t;
+      }
+      formData.append("size", `${w}x${h}`);
+    } else if (activeEngine === "openai") {
+      formData.append("mediaType", "video");
       formData.append("model", videoModel);
-      formData.append("aspectRatio", aspectRatio);
+      formData.append("duration", videoDuration.toString());
       formData.append("size", videoSize);
-      const [w, h] = videoSize.split("x");
-      formData.append("width", w);
-      formData.append("height", h);
+      formData.append("aspectRatio", aspectRatio);
+    } else {
+      // Studio
+      formData.append("mediaType", studioMode);
     }
 
-    // Append all reference images
     referenceImages.forEach((file) => formData.append("referenceImages", file));
     return formData;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const credits = userCredits?.[selectedMediaType] ?? 0;
+    let typeToCheck = "video";
+    if (activeEngine === "studio") typeToCheck = studioMode;
+
+    const credits = userCredits?.[typeToCheck as keyof typeof userCredits] ?? 0;
     if (!prompt.trim() || credits <= 0) return;
     setGenerationState({ status: "idle" });
     generateMediaMutation.mutate(buildFormData());
@@ -311,7 +312,8 @@ function Dashboard() {
   };
 
   const companyName =
-    brandConfig?.companyName || user?.name || "PicDrift Studio";
+    brandConfig?.companyName || user?.name || "Visionlight AI";
+
   if (authLoading)
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 flex items-center justify-center">
@@ -320,8 +322,12 @@ function Dashboard() {
     );
   if (!user) return null;
 
+  // ==========================================
+  // RENDER: OLD VISUAL THEME
+  // ==========================================
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900">
+      {/* --- MODALS (Kept functional but styled consistently) --- */}
       {showQueuedModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="bg-gray-900 rounded-2xl border border-cyan-400/40 shadow-2xl max-w-sm w-full p-6">
@@ -351,20 +357,18 @@ function Dashboard() {
         postId={pendingApprovalPostId || ""}
         isOpen={showPromptApproval}
         onClose={() => setShowPromptApproval(false)}
-        onApprove={(finalPrompt) =>
-          pendingApprovalPostId &&
+        onApprove={(p) =>
           approvePromptMutation.mutate({
             postId: pendingApprovalPostId,
-            finalPrompt,
+            finalPrompt: p,
           })
         }
-        onCancel={(postId) => postId && cancelPromptMutation.mutate(postId)}
-        isLoading={
-          approvePromptMutation.isPending || cancelPromptMutation.isPending
-        }
+        onCancel={(id) => cancelPromptMutation.mutate(id)}
+        isLoading={approvePromptMutation.isPending}
       />
 
       <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
+        {/* --- HEADER (OLD VISUALS) --- */}
         <div className="mb-6 sm:mb-8 flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -421,27 +425,44 @@ function Dashboard() {
                         Credits:
                       </span>
                     </div>
+                    {/* CREDITS DISPLAY ADAPTED TO OLD LAYOUT */}
                     <div className="flex items-center gap-3">
-                      {["video", "image", "carousel"].map((type) => (
-                        <div key={type} className="flex items-center gap-1.5">
-                          <span className="text-sm">
-                            {type === "video"
-                              ? "🎬"
-                              : type === "image"
-                              ? "🖼️"
-                              : "📱"}
-                          </span>
-                          <span
-                            className={`text-xs font-semibold ${
-                              (userCredits[type as MediaType] || 0) > 0
-                                ? "text-white"
-                                : "text-gray-400"
-                            }`}
-                          >
-                            {userCredits[type as MediaType] || 0}
-                          </span>
-                        </div>
-                      ))}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm">🎬</span>
+                        <span
+                          className={`text-xs font-semibold ${
+                            userCredits.video > 0
+                              ? "text-white"
+                              : "text-gray-400"
+                          }`}
+                        >
+                          {userCredits.video}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm">🖼️</span>
+                        <span
+                          className={`text-xs font-semibold ${
+                            userCredits.image > 0
+                              ? "text-white"
+                              : "text-gray-400"
+                          }`}
+                        >
+                          {userCredits.image}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm">📱</span>
+                        <span
+                          className={`text-xs font-semibold ${
+                            userCredits.carousel > 0
+                              ? "text-white"
+                              : "text-gray-400"
+                          }`}
+                        >
+                          {userCredits.carousel}
+                        </span>
+                      </div>
                     </div>
                   </>
                 ) : (
@@ -456,16 +477,14 @@ function Dashboard() {
             </div>
             {!isMobile && (
               <div className="flex gap-2">
-                {/* NEW BUY CREDITS BUTTON */}
                 <a
                   href="https://www.picdrift.com/fx-credits"
                   target="_blank"
-                  rel="noopener noreferrer"
+                  rel="noreferrer"
                   className="px-4 py-2.5 bg-gray-800/60 border border-green-400/30 rounded-xl text-green-400 text-sm hover:bg-green-400/10 flex items-center gap-2"
                 >
                   💳 Buy FX Credits
                 </a>
-
                 <button
                   onClick={() => setShowBrandModal(true)}
                   className="px-4 py-2.5 bg-gray-800/60 border border-cyan-400/30 rounded-xl text-cyan-400 text-sm hover:bg-cyan-400/10"
@@ -483,9 +502,8 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* --- ROI METRICS REMOVED --- */}
-
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
+          {/* --- MAIN CREATION AREA --- */}
           <div className="flex-1">
             <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 lg:p-8 shadow-2xl">
               <div className="mb-6 sm:mb-8">
@@ -503,6 +521,7 @@ function Dashboard() {
                 </p>
               </div>
 
+              {/* === ENGINE SELECTOR (STYLED LIKE OLD TYPES) === */}
               <div className="mb-6 sm:mb-8">
                 <label className="block text-sm font-semibold text-white mb-3 sm:mb-4">
                   🎬 Select Content Type
@@ -510,58 +529,57 @@ function Dashboard() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
                   {[
                     {
-                      type: "video" as MediaType,
-                      label: "Video FX 2", // RENAMED
+                      id: "kie",
+                      label: "Video FX",
                       icon: "🎬",
-                      gradient: "from-pink-500 to-rose-500",
+                      // OLD VIDEO GRADIENT
+                      grad: "from-blue-700 to-cyan-700",
                     },
                     {
-                      type: "image" as MediaType,
-                      label: "Image FX", // RENAMED
-                      icon: "🖼️",
-                      gradient: "from-blue-500 to-cyan-500",
+                      id: "studio",
+                      label: "Studio FX",
+                      sub: "Image & Carousel",
+                      icon: "✨",
+                      // OLD IMAGE GRADIENT
+                      grad: "from-pink-500 to-rose-500",
                     },
                     {
-                      type: "carousel" as MediaType,
-                      label: "Carousel FX",
-                      icon: "📱",
-                      gradient: "from-green-500 to-emerald-500",
+                      id: "openai",
+                      label: "Video FX 2",
+                      icon: "🎥",
+                      // DISTINCT GRADIENT BUT OLD STYLE
+                      grad: "from-violet-700 to-purple-700",
                     },
-                  ].map(({ type, label, icon, gradient }) => (
+                  ].map((item) => (
                     <button
-                      key={type}
+                      key={item.id}
                       type="button"
-                      onClick={() => setSelectedMediaType(type)}
-                      disabled={(userCredits[type] || 0) <= 0}
+                      onClick={() => setActiveEngine(item.id as EngineType)}
                       className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
-                        selectedMediaType === type
-                          ? `border-white/20 bg-gradient-to-br ${gradient} shadow-2xl scale-105`
+                        activeEngine === item.id
+                          ? `border-white/20 bg-gradient-to-br ${item.grad} shadow-2xl scale-105`
                           : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
-                      } ${
-                        (userCredits[type] || 0) <= 0
-                          ? "opacity-40 cursor-not-allowed grayscale"
-                          : ""
                       }`}
                     >
                       <div className="flex items-center gap-2 sm:gap-3">
                         <span className="text-xl sm:text-2xl group-hover:scale-110 transition-transform">
-                          {icon}
+                          {item.icon}
                         </span>
                         <div className="flex-1">
                           <div className="font-semibold text-sm text-white">
-                            {label}
+                            {item.label}
                           </div>
                           <div
                             className={`text-xs ${
-                              selectedMediaType === type
+                              activeEngine === item.id
                                 ? "text-white/80"
                                 : "text-purple-300"
                             }`}
                           >
-                            {userCredits[type] || 0} credits
+                            {item.sub}
                           </div>
                         </div>
-                        {selectedMediaType === type && (
+                        {activeEngine === item.id && (
                           <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
                         )}
                       </div>
@@ -570,7 +588,34 @@ function Dashboard() {
                 </div>
               </div>
 
+              {/* === STUDIO TOGGLE (NEW LOGIC, OLD STYLE) === */}
+              {activeEngine === "studio" && (
+                <div className="flex bg-gray-900/50 p-1 rounded-xl mb-6 max-w-xs mx-auto border border-white/5 animate-in fade-in">
+                  <button
+                    onClick={() => setStudioMode("image")}
+                    className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                      studioMode === "image"
+                        ? "bg-cyan-500 text-white shadow-lg"
+                        : "text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    Image FX
+                  </button>
+                  <button
+                    onClick={() => setStudioMode("carousel")}
+                    className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                      studioMode === "carousel"
+                        ? "bg-green-500 text-white shadow-lg"
+                        : "text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    Carousel FX
+                  </button>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+                {/* PROMPT INPUT (OLD STYLE) */}
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2 sm:mb-3 flex items-center gap-2">
                     <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>
@@ -579,40 +624,138 @@ function Dashboard() {
                   <textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    placeholder={`Describe your ${selectedMediaType} vision...`}
+                    placeholder={`Describe your ${
+                      activeEngine === "studio" ? studioMode : "video"
+                    } vision...`}
                     className="w-full p-4 sm:p-5 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base leading-relaxed"
                     rows={isMobile ? 3 : 4}
                   />
                 </div>
+
+                {/* TITLE INPUT (OLD STYLE) */}
                 <div className="space-y-2 sm:space-y-3">
                   <label className="block text-sm font-semibold text-white capitalize">
-                    🏷️ {selectedMediaType} Title (Optional)
+                    🏷️ {activeEngine === "studio" ? studioMode : "video"} Title
+                    (Optional)
                   </label>
                   <input
                     type="text"
                     value={videoTitle}
                     onChange={(e) => setVideoTitle(e.target.value)}
-                    placeholder={`Give your ${selectedMediaType} a memorable name...`}
+                    placeholder="Give your creation a memorable name..."
                     className="w-full p-3 sm:p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-purple-300/60 backdrop-blur-sm"
                   />
                 </div>
 
-                {selectedMediaType === "video" && (
-                  <div className="space-y-4 sm:space-y-6">
+                {/* === KIE AI CONTROLS (NEW LOGIC, OLD "PILL" STYLE) === */}
+                {activeEngine === "kie" && (
+                  <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                      {[
+                        { id: "kie-sora-2", label: "Video FX" },
+                        { id: "kie-sora-2-pro", label: "Video FX Pro" },
+                      ].map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setKieModel(m.id as any)}
+                          className={`p-3 rounded-xl border text-sm font-bold transition-all ${
+                            kieModel === m.id
+                              ? "bg-blue-600 border-blue-600 text-white shadow-lg"
+                              : "border-white/10 bg-gray-800/50 text-gray-400"
+                          }`}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                      <div>
+                        <label className="text-sm font-semibold text-white mb-2 block">
+                          Duration
+                        </label>
+                        <div className="flex gap-2">
+                          {[10, 15].map((d) => (
+                            <button
+                              key={d}
+                              type="button"
+                              onClick={() => setKieDuration(d as any)}
+                              className={`flex-1 py-2 rounded-lg border ${
+                                kieDuration === d
+                                  ? "bg-blue-600 border-blue-600 text-white"
+                                  : "border-white/10 bg-gray-800/50 text-gray-400"
+                              }`}
+                            >
+                              {d}s
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold text-white mb-2 block">
+                          Aspect Ratio
+                        </label>
+                        <div className="flex gap-2">
+                          {[
+                            { id: "landscape", label: "Landscape" },
+                            { id: "portrait", label: "Portrait" },
+                          ].map((a) => (
+                            <button
+                              key={a.id}
+                              type="button"
+                              onClick={() => setKieAspect(a.id as any)}
+                              className={`flex-1 py-2 rounded-lg border ${
+                                kieAspect === a.id
+                                  ? "bg-blue-600 border-blue-600 text-white"
+                                  : "border-white/10 bg-gray-800/50 text-gray-400"
+                              }`}
+                            >
+                              {a.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="text-sm font-semibold text-white mb-2 block">
+                          Resolution
+                        </label>
+                        <div className="flex gap-2">
+                          {[
+                            { id: "720p", label: "720p (Fast)" },
+                            { id: "1080p", label: "1080p (HD)" },
+                          ].map((r) => (
+                            <button
+                              key={r.id}
+                              type="button"
+                              onClick={() => setKieResolution(r.id as any)}
+                              className={`flex-1 py-2 rounded-lg border ${
+                                kieResolution === r.id
+                                  ? "bg-blue-600 border-blue-600 text-white"
+                                  : "border-white/10 bg-gray-800/50 text-gray-400"
+                              }`}
+                            >
+                              {r.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* === OPENAI CONTROLS (NEW LOGIC, OLD VISUAL LAYOUT) === */}
+                {activeEngine === "openai" && (
+                  <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+                    {/* Model Selector */}
                     <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
                         🤖 AI Model
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                         {[
-                          {
-                            id: "sora-2",
-                            label: "Video FX 2", // RENAMED, Description & Badge Removed
-                          },
-                          {
-                            id: "sora-2-pro",
-                            label: "Video FX 2 Pro", // RENAMED, Description & Badge Removed
-                          },
+                          { id: "sora-2", label: "Video FX 2" },
+                          { id: "sora-2-pro", label: "Video FX 2 Pro" },
                         ].map((model) => (
                           <button
                             key={model.id}
@@ -625,11 +768,8 @@ function Dashboard() {
                             }`}
                           >
                             <div className="flex items-center justify-between">
-                              <div>
-                                <div className="font-semibold text-white text-sm flex items-center gap-2">
-                                  {model.label}
-                                </div>
-                                {/* Removed description text div here */}
+                              <div className="font-semibold text-white text-sm flex items-center gap-2">
+                                {model.label}
                               </div>
                               {videoModel === model.id && (
                                 <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
@@ -640,6 +780,7 @@ function Dashboard() {
                       </div>
                     </div>
 
+                    {/* Aspect Ratio */}
                     <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
                         📐 Aspect Ratio
@@ -665,7 +806,13 @@ function Dashboard() {
                             onClick={() => {
                               setAspectRatio(ratio as any);
                               setVideoSize(
-                                ratio === "16:9" ? "1280x720" : "720x1280"
+                                ratio === "16:9"
+                                  ? videoModel === "sora-2-pro"
+                                    ? "1792x1024"
+                                    : "1280x720"
+                                  : videoModel === "sora-2-pro"
+                                  ? "1024x1792"
+                                  : "720x1280"
                               );
                             }}
                             className={`p-3 sm:p-4 rounded-2xl border-2 transition-all text-center group ${
@@ -691,7 +838,7 @@ function Dashboard() {
                       </div>
                     </div>
 
-                    {/* RESTORED VIDEO SIZE SELECTOR */}
+                    {/* Video Size */}
                     <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
                         📏 Video Size
@@ -772,6 +919,7 @@ function Dashboard() {
                       )}
                     </div>
 
+                    {/* Duration */}
                     <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
                         ⏱️ Video Duration
@@ -796,7 +944,7 @@ function Dashboard() {
                   </div>
                 )}
 
-                {/* MULTI-IMAGE UPLOAD UI */}
+                {/* === UPLOAD UI (OLD VISUALS) === */}
                 <div className="space-y-2 sm:space-y-3">
                   <label className="block text-sm font-semibold text-white">
                     🎨 Reference Images (Optional)
@@ -815,15 +963,20 @@ function Dashboard() {
                             or drag and drop
                           </p>
                           <p className="text-xs text-gray-500">
-                            {selectedMediaType === "video"
-                              ? "Single frame (PNG/JPG, Max 10MB)"
-                              : "Up to 5 images (PNG/JPG, Max 10MB)"}
+                            {activeEngine === "studio" &&
+                            studioMode === "carousel"
+                              ? "Up to 5 images"
+                              : "Single frame"}{" "}
+                            (PNG/JPG, Max 10MB)
                           </p>
                         </div>
                         <input
                           type="file"
                           className="hidden"
-                          multiple={selectedMediaType !== "video"}
+                          multiple={
+                            activeEngine === "studio" &&
+                            studioMode === "carousel"
+                          }
                           accept="image/*"
                           onChange={handleImageUpload}
                         />
@@ -860,7 +1013,9 @@ function Dashboard() {
                   disabled={
                     generateMediaMutation.isPending ||
                     !prompt.trim() ||
-                    (userCredits[selectedMediaType] || 0) <= 0
+                    (userCredits[
+                      activeEngine === "studio" ? studioMode : "video"
+                    ] || 0) <= 0
                   }
                   className="w-full gradient-brand text-white py-4 sm:py-5 px-6 sm:px-8 rounded-2xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-bold text-base sm:text-lg flex items-center justify-center gap-3 group relative overflow-hidden"
                 >
@@ -868,7 +1023,10 @@ function Dashboard() {
                   {generateMediaMutation.isPending ? (
                     <>
                       <LoadingSpinner size="sm" variant="light" />
-                      <span>Starting {selectedMediaType}...</span>
+                      <span>
+                        Starting{" "}
+                        {activeEngine === "studio" ? studioMode : "video"}...
+                      </span>
                     </>
                   ) : (
                     <>
@@ -877,8 +1035,11 @@ function Dashboard() {
                       </span>
                       <span>
                         Generate{" "}
-                        {selectedMediaType.charAt(0).toUpperCase() +
-                          selectedMediaType.slice(1)}
+                        {activeEngine === "studio"
+                          ? studioMode === "image"
+                            ? "Image"
+                            : "Carousel"
+                          : "Video"}
                       </span>
                     </>
                   )}
@@ -896,6 +1057,8 @@ function Dashboard() {
               )}
             </div>
           </div>
+
+          {/* --- SIDEBAR (OLD VISUALS) --- */}
           <div className="lg:w-96">
             <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 shadow-2xl sticky top-4">
               <div className="flex items-center justify-between mb-4 sm:mb-6">

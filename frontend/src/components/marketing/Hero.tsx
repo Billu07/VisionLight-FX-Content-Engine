@@ -79,10 +79,6 @@ export const Hero = () => {
 
               {/* Enhanced CTA Section */}
               <div className="bg-gray-800/30 backdrop-blur-lg rounded-2xl p-4 sm:p-6 md:p-8 mb-8 sm:mb-12 border border-white/10 hover:border-cyan-400/30 transition-all duration-300">
-                <p className="text-white font-semibold mb-4 sm:mb-6 text-base sm:text-lg">
-                  Try it, love it, and upgrade only when you're ready.
-                </p>
-
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
                   {/* Button 1: SignUp Now */}
                   <a
@@ -106,24 +102,6 @@ export const Hero = () => {
                     Try Free Demo
                   </a>
                 </div>
-              </div>
-
-              {/* Enhanced Credits & Limited Offer */}
-              <div className="bg-gradient-to-r from-yellow-500 to-amber-500 text-yellow-900 inline-flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-full text-xs sm:text-sm font-semibold mb-4 sm:mb-6 shadow-lg max-w-sm sm:max-w-none mx-auto">
-                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-yellow-700 rounded-full animate-pulse"></div>
-                ⚡ Only 20 free demo builds available this month
-              </div>
-
-              {/* Enhanced Feature Points */}
-              <div className="text-purple-300 text-xs sm:text-sm space-y-1 px-2 sm:px-0">
-                <p className="flex items-center justify-center gap-2">
-                  <span>🎥</span>
-                  Use demo credits to create real videos, images, and graphics
-                </p>
-                <p className="flex items-center justify-center gap-2">
-                  <span>💡</span>
-                  Your logo. Your branding. Your automations.
-                </p>
               </div>
             </div>
           </div>

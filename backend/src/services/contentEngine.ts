@@ -27,11 +27,26 @@ const VIDEO_UPLOAD_TIMEOUT = 600000;
 const POLLING_REQUEST_TIMEOUT = 60000;
 const POLLING_INTERVAL = 40000;
 
+// --- NEW: KIE AI CONFIGURATION ---
+const KIE_BASE_URL = "https://api.kie.ai/api/v1";
+const KIE_API_KEY = process.env.KIE_AI_API_KEY;
+const KIE_POLL_INTERVAL = 15000; // Kie is faster than OpenAI
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// --- NEW HELPER: Fix Image Size for AI (Prevents 400/413 Errors) ---
+const getOptimizedUrl = (url: string) => {
+  if (!url || typeof url !== "string") return url;
+  if (url.includes("cloudinary.com") && url.includes("/upload/")) {
+    // Resize to max 1280px width, reduce quality slightly, force JPG
+    return url.replace("/upload/", "/upload/w_1280,c_limit,q_auto,f_jpg/");
+  }
+  return url;
+};
 
 export const contentEngine = {
   // ===========================================================================
-  // WORKFLOW 1: PROMPT ENHANCEMENT
+  // WORKFLOW 1: PROMPT ENHANCEMENT (PRESERVED)
   // ===========================================================================
   async enhanceUserPrompt(
     userPrompt: string,
@@ -141,10 +156,14 @@ export const contentEngine = {
   },
 
   // ===========================================================================
-  // WORKFLOW 2a: VIDEO GENERATION (FIXED UPLOAD LOGIC)
+  // WORKFLOW 2a: VIDEO GENERATION (UPDATED: ROUTER FOR KIE + OPENAI)
   // ===========================================================================
   async startVideoGeneration(postId: string, finalPrompt: string, params: any) {
-    console.log(`🎬 Video Gen for ${postId}`);
+    console.log(`🎬 Video Gen for ${postId} | Model: ${params.model}`);
+
+    // --- DETERMINE ENGINE ---
+    const isKieModel = params.model && params.model.includes("kie");
+
     try {
       let finalInputImageBuffer: Buffer | undefined;
 
@@ -153,11 +172,14 @@ export const contentEngine = {
       const targetWidth = parseInt(widthStr);
       const targetHeight = parseInt(heightStr);
 
-      // 1. IMAGE PROCESSING
-      const refUrl =
+      // 1. IMAGE PROCESSING (Common Logic)
+      const rawRefUrl =
         params.imageReferences && params.imageReferences.length > 0
           ? params.imageReferences[0]
           : params.imageReference;
+
+      // OPTIMIZE URL (Added Fix)
+      const refUrl = getOptimizedUrl(rawRefUrl);
 
       if (refUrl && params.hasReferenceImage) {
         console.log("📐 Processing Ref Image...");
@@ -170,18 +192,11 @@ export const contentEngine = {
           console.log(`⬇️ Downloading from: ${refUrl}`);
           const imageResponse = await axios.get(refUrl, {
             responseType: "arraybuffer",
-            timeout: 30000,
+            timeout: 60000,
           });
           originalImageBuffer = Buffer.from(imageResponse.data);
           originalMimeType =
             imageResponse.headers["content-type"] || "image/jpeg";
-          console.log(
-            `✅ Downloaded. Size: ${(
-              originalImageBuffer.length /
-              1024 /
-              1024
-            ).toFixed(2)} MB, Type: ${originalMimeType}`
-          );
 
           // B. Generate Empty Frame
           const guideFrame = await sharp({
@@ -208,7 +223,7 @@ export const contentEngine = {
                     { text: GEMINI_RESIZE_PROMPT },
                     {
                       inline_data: {
-                        mime_type: originalMimeType,
+                        mime_type: "image/jpeg", // Optimized images are always JPEG
                         data: originalImageBuffer.toString("base64"),
                       },
                     },
@@ -221,7 +236,6 @@ export const contentEngine = {
                   ],
                 },
               ],
-              // Ensure Safety settings don't block benign images
               safetySettings: [
                 {
                   category: "HARM_CATEGORY_HARASSMENT",
@@ -243,7 +257,7 @@ export const contentEngine = {
             },
             {
               headers: { "Content-Type": "application/json" },
-              maxBodyLength: Infinity, // Allow large payloads
+              maxBodyLength: Infinity,
               maxContentLength: Infinity,
               timeout: AI_TIMEOUT,
             }
@@ -268,32 +282,11 @@ export const contentEngine = {
               .toFormat("jpeg", { quality: 95 })
               .toBuffer();
           } else {
-            // Log why candidates might be empty (e.g. FinishReason: SAFETY)
             console.warn("⚠️ Gemini returned success (200) but NO image data.");
-            console.warn(
-              "Full Response:",
-              JSON.stringify(geminiResponse.data, null, 2)
-            );
             throw new Error("Gemini returned no image candidates.");
           }
         } catch (e: any) {
-          console.error("❌ GEMINI FRAME GEN FAILED:");
-
-          // --- DETAILED ERROR LOGGING ---
-          if (axios.isAxiosError(e) && e.response) {
-            console.error(
-              `Status: ${e.response.status} ${e.response.statusText}`
-            );
-            console.error(
-              "Error Body:",
-              JSON.stringify(e.response.data, null, 2)
-            );
-          } else {
-            console.error(e.message);
-          }
-          // -----------------------------
-
-          console.warn("⚠️ Using Fallback Resize (Contain/Black Bars).");
+          console.error("❌ GEMINI FRAME GEN FAILED (Fallback applied)");
           if (originalImageBuffer) {
             finalInputImageBuffer = await sharp(originalImageBuffer)
               .resize(targetWidth, targetHeight, {
@@ -307,138 +300,288 @@ export const contentEngine = {
         }
       }
 
-      // 2. START VIDEO
-      console.log("🎥 Calling OpenAI Video API...");
-      const form = new FormData();
-      form.append("prompt", finalPrompt);
-      form.append("model", params.model || "sora-2-pro");
-      form.append("seconds", params.duration || 8);
-      form.append("size", targetSize);
-      if (finalInputImageBuffer)
-        form.append("input_reference", finalInputImageBuffer, {
-          filename: "reference.jpg",
-          contentType: "image/jpeg",
-        });
+      // ==========================================================
+      // BRANCH A: KIE AI (Video FX)
+      // ==========================================================
+      if (isKieModel) {
+        console.log("🚀 Starting KIE AI Workflow...");
 
-      const videoApiUrl = "https://api.openai.com/v1/videos";
-      const genResponse = await axios.post(videoApiUrl, form, {
-        headers: {
-          ...form.getHeaders(),
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        },
-        timeout: VIDEO_UPLOAD_TIMEOUT,
-      });
+        // 1. Prepare Input Image if needed
+        let kieInputUrl = "";
+        let isImageToVideo = false;
 
-      const generationId = genResponse.data.id;
-      console.log(`⏳ Queued: ${generationId}`);
-
-      const updatedParams = { ...params, externalId: generationId };
-      await airtableService.updatePost(postId, {
-        generationParams: updatedParams,
-      });
-
-      // 3. POLLING
-      let videoData: string | Buffer | null = null;
-      let attempts = 0;
-      const MAX_ATTEMPTS = 90;
-
-      await sleep(45000);
-
-      while (attempts < MAX_ATTEMPTS) {
-        attempts++;
-        try {
-          const statusRes = await axios.get(`${videoApiUrl}/${generationId}`, {
-            headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-            timeout: POLLING_REQUEST_TIMEOUT,
-          });
-
-          const status = statusRes.data.status;
-          console.log(`🔄 Poll ${attempts}/${MAX_ATTEMPTS}: ${status}`);
-
-          if (status === "completed") {
-            if (statusRes.data.content && statusRes.data.content.url) {
-              videoData = statusRes.data.content.url; // String URL
-            } else {
-              // Fetch content
-              const contentRes = await axios.get(
-                `${videoApiUrl}/${generationId}/content`,
-                {
-                  headers: {
-                    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-                  },
-                  responseType: "arraybuffer", // CRITICAL
-                }
-              );
-
-              // Try to detect if it's JSON or Binary
-              try {
-                const textData = Buffer.from(contentRes.data).toString("utf-8");
-                // If it starts with { it's likely JSON
-                if (textData.trim().startsWith("{")) {
-                  const json = JSON.parse(textData);
-                  videoData = json.url || json.content?.url;
-                } else {
-                  // It's binary data
-                  videoData = Buffer.from(contentRes.data);
-                }
-              } catch (e) {
-                // Safe fallback to binary
-                videoData = Buffer.from(contentRes.data);
-              }
-            }
-
-            if (videoData) {
-              console.log("✅ Content Retrieved.");
-              break;
-            }
-          } else if (status === "failed") {
-            const errCode = statusRes.data.error?.code || "unknown";
-            if (errCode === "moderation_blocked")
-              throw new Error("⚠️ Blocked by Moderation");
-            throw new Error(`API Failed: ${errCode}`);
-          }
-
-          const progress = Math.min(
-            95,
-            5 + Math.floor((attempts / MAX_ATTEMPTS) * 90)
+        if (finalInputImageBuffer) {
+          console.log("📤 Uploading Input Frame for Kie...");
+          // We upload this specific frame so Kie can access it publicly
+          kieInputUrl = await this.uploadToCloudinary(
+            finalInputImageBuffer,
+            `${postId}_input`,
+            params.userId,
+            "Kie Input",
+            "image"
           );
-          await airtableService.updatePost(postId, { progress });
-        } catch (e: any) {
-          if (e.response?.status === 429) {
-            console.warn("🛑 Rate Limit. Waiting 60s...");
-            await sleep(60000);
-            continue;
-          }
-          if (e.message.includes("API Failed") || e.message.includes("Blocked"))
-            throw e;
-          console.warn(`⚠️ Poll Error: ${e.message}`);
+          isImageToVideo = true;
         }
 
-        await sleep(POLLING_INTERVAL);
+        // 2. Select Exact Model ID
+        // Logic: Frontend sends "kie-sora-2" or "kie-sora-2-pro".
+        const isPro = params.model.includes("pro");
+        let kieModelId = "";
+
+        if (isImageToVideo) {
+          kieModelId = isPro
+            ? "sora-2-pro-image-to-video"
+            : "sora-2-image-to-video";
+        } else {
+          kieModelId = isPro
+            ? "sora-2-pro-text-to-video"
+            : "sora-2-text-to-video";
+        }
+
+        console.log(`🤖 Kie Model Selected: ${kieModelId}`);
+
+        // 3. Construct Payload
+        const kiePayload: any = {
+          model: kieModelId,
+          input: {
+            prompt: finalPrompt,
+            aspect_ratio:
+              params.aspectRatio === "9:16" ? "portrait" : "landscape",
+            n_frames: params.duration === 15 ? "15" : "10",
+            remove_watermark: true,
+          },
+        };
+
+        // Add Image Params only if ImageToVideo
+        if (isImageToVideo) {
+          kiePayload.input.image_urls = [kieInputUrl];
+        }
+
+        // Add Size Param only if Pro
+        if (isPro) {
+          // Logic: If user asked for 1080p (high res), send 'high', else 'standard'
+          const isHighRes = targetWidth >= 1080 || targetHeight >= 1080;
+          kiePayload.input.size = isHighRes ? "high" : "standard";
+        }
+
+        // 4. API Call
+        const kieRes = await axios.post(
+          `${KIE_BASE_URL}/jobs/createTask`,
+          kiePayload,
+          {
+            headers: {
+              Authorization: `Bearer ${KIE_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (kieRes.data.code !== 200) {
+          throw new Error(`Kie Error: ${JSON.stringify(kieRes.data)}`);
+        }
+
+        const taskId = kieRes.data.data.taskId;
+        console.log(`⏳ Kie Task ID: ${taskId}`);
+        await airtableService.updatePost(postId, {
+          generationParams: { ...params, externalId: taskId },
+        });
+
+        // 5. Poll Kie
+        let videoUrl = "";
+        for (let i = 0; i < 100; i++) {
+          // Poll for ~15 mins
+          await sleep(KIE_POLL_INTERVAL);
+          const checkRes = await axios.get(
+            `${KIE_BASE_URL}/jobs/recordInfo?taskId=${taskId}`,
+            {
+              headers: { Authorization: `Bearer ${KIE_API_KEY}` },
+            }
+          );
+
+          const state = checkRes.data.data.state;
+          console.log(`🔄 Kie Poll: ${state}`);
+
+          if (state === "success") {
+            const resultObj = JSON.parse(checkRes.data.data.resultJson);
+            videoUrl = resultObj.resultUrls?.[0];
+            break;
+          } else if (state === "fail") {
+            const failMsg = checkRes.data.data.failMsg || "Unknown Error";
+            throw new Error(`Kie Task Failed: ${failMsg}`);
+          }
+
+          // Update progress
+          await airtableService.updatePost(postId, {
+            progress: Math.min(95, 10 + i * 3),
+          });
+        }
+
+        if (!videoUrl) throw new Error("Kie timed out or returned no URL");
+
+        // 6. Save Final Video
+        console.log("☁️ Saving Final Video...");
+        const vidRes = await axios.get(videoUrl, {
+          responseType: "arraybuffer",
+        });
+        const finalCloudUrl = await this.uploadToCloudinary(
+          vidRes.data,
+          postId,
+          params.userId,
+          params.title || "Kie Video",
+          "video"
+        );
+
+        await airtableService.updatePost(postId, {
+          mediaUrl: finalCloudUrl,
+          mediaProvider: kieModelId,
+          status: "READY",
+          progress: 100,
+          generationStep: "COMPLETED",
+        });
+        await ROIService.incrementMediaGenerated(params.userId);
       }
+      // ==========================================================
+      // BRANCH B: OPENAI (Video FX 2) - ORIGINAL LOGIC PRESERVED
+      // ==========================================================
+      else {
+        console.log("🎥 Calling OpenAI Video API...");
+        const form = new FormData();
+        form.append("prompt", finalPrompt);
+        form.append("model", params.model || "sora-2-pro");
+        form.append("seconds", params.duration || 8);
+        form.append("size", targetSize);
+        if (finalInputImageBuffer)
+          form.append("input_reference", finalInputImageBuffer, {
+            filename: "reference.jpg",
+            contentType: "image/jpeg",
+          });
 
-      if (!videoData) throw new Error(`Video generation timed out.`);
+        const videoApiUrl = "https://api.openai.com/v1/videos";
+        const genResponse = await axios.post(videoApiUrl, form, {
+          headers: {
+            ...form.getHeaders(),
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          },
+          timeout: VIDEO_UPLOAD_TIMEOUT,
+        });
 
-      // 4. UPLOAD
-      console.log("☁️ Uploading...");
-      const videoTitle = params.title || "Untitled Video";
+        const generationId = genResponse.data.id;
+        console.log(`⏳ Queued: ${generationId}`);
 
-      const cloudinaryUrl = await this.uploadToCloudinary(
-        videoData, // Can be String URL or Buffer
-        postId,
-        params.userId,
-        videoTitle,
-        "video"
-      );
+        const updatedParams = { ...params, externalId: generationId };
+        await airtableService.updatePost(postId, {
+          generationParams: updatedParams,
+        });
 
-      await airtableService.updatePost(postId, {
-        mediaUrl: cloudinaryUrl,
-        status: "READY",
-        progress: 100,
-        generationStep: "COMPLETED",
-      });
-      await ROIService.incrementMediaGenerated(params.userId);
-      console.log(`✅ Video finished!`);
+        // 3. POLLING (Original Logic)
+        let videoData: string | Buffer | null = null;
+        let attempts = 0;
+        const MAX_ATTEMPTS = 90;
+
+        await sleep(45000);
+
+        while (attempts < MAX_ATTEMPTS) {
+          attempts++;
+          try {
+            const statusRes = await axios.get(
+              `${videoApiUrl}/${generationId}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                },
+                timeout: POLLING_REQUEST_TIMEOUT,
+              }
+            );
+
+            const status = statusRes.data.status;
+            console.log(`🔄 Poll ${attempts}/${MAX_ATTEMPTS}: ${status}`);
+
+            if (status === "completed") {
+              if (statusRes.data.content && statusRes.data.content.url) {
+                videoData = statusRes.data.content.url; // String URL
+              } else {
+                // Fetch content
+                const contentRes = await axios.get(
+                  `${videoApiUrl}/${generationId}/content`,
+                  {
+                    headers: {
+                      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                    },
+                    responseType: "arraybuffer", // CRITICAL
+                  }
+                );
+
+                try {
+                  const textData = Buffer.from(contentRes.data).toString(
+                    "utf-8"
+                  );
+                  if (textData.trim().startsWith("{")) {
+                    const json = JSON.parse(textData);
+                    videoData = json.url || json.content?.url;
+                  } else {
+                    videoData = Buffer.from(contentRes.data);
+                  }
+                } catch (e) {
+                  videoData = Buffer.from(contentRes.data);
+                }
+              }
+
+              if (videoData) {
+                console.log("✅ Content Retrieved.");
+                break;
+              }
+            } else if (status === "failed") {
+              const errCode = statusRes.data.error?.code || "unknown";
+              if (errCode === "moderation_blocked")
+                throw new Error("⚠️ Blocked by Moderation");
+              throw new Error(`API Failed: ${errCode}`);
+            }
+
+            const progress = Math.min(
+              95,
+              5 + Math.floor((attempts / MAX_ATTEMPTS) * 90)
+            );
+            await airtableService.updatePost(postId, { progress });
+          } catch (e: any) {
+            if (e.response?.status === 429) {
+              console.warn("🛑 Rate Limit. Waiting 60s...");
+              await sleep(60000);
+              continue;
+            }
+            if (
+              e.message.includes("API Failed") ||
+              e.message.includes("Blocked")
+            )
+              throw e;
+            console.warn(`⚠️ Poll Error: ${e.message}`);
+          }
+
+          await sleep(POLLING_INTERVAL);
+        }
+
+        if (!videoData) throw new Error(`Video generation timed out.`);
+
+        // 4. UPLOAD
+        console.log("☁️ Uploading...");
+        const videoTitle = params.title || "Untitled Video";
+
+        const cloudinaryUrl = await this.uploadToCloudinary(
+          videoData, // Can be String URL or Buffer
+          postId,
+          params.userId,
+          videoTitle,
+          "video"
+        );
+
+        await airtableService.updatePost(postId, {
+          mediaUrl: cloudinaryUrl,
+          status: "READY",
+          progress: 100,
+          generationStep: "COMPLETED",
+        });
+        await ROIService.incrementMediaGenerated(params.userId);
+        console.log(`✅ Video finished!`);
+      }
     } catch (error: any) {
       console.error("❌ Video Gen Failed:", error.message);
       await airtableService.updatePost(postId, {
@@ -450,7 +593,7 @@ export const contentEngine = {
   },
 
   // ===========================================================================
-  // WORKFLOW 2b: IMAGE GENERATION
+  // WORKFLOW 2b: IMAGE GENERATION (PRESERVED)
   // ===========================================================================
   async startImageGeneration(postId: string, finalPrompt: string, params: any) {
     console.log(`🎨 Image Gen for ${postId}`);
@@ -458,6 +601,8 @@ export const contentEngine = {
       const refUrls: string[] =
         params.imageReferences ||
         (params.imageReference ? [params.imageReference] : []);
+
+      // OPTIMIZATION ADDED (Safe)
       const refBuffers = await this.downloadAndOptimizeImages(refUrls);
 
       const buf = await this.generateGeminiImage(finalPrompt, refBuffers);
@@ -490,7 +635,7 @@ export const contentEngine = {
   },
 
   // ===========================================================================
-  // WORKFLOW 2c: CAROUSEL GENERATION
+  // WORKFLOW 2c: CAROUSEL GENERATION (PRESERVED)
   // ===========================================================================
   async startCarouselGeneration(
     postId: string,
@@ -509,6 +654,8 @@ export const contentEngine = {
       const refUrls: string[] =
         params.imageReferences ||
         (params.imageReference ? [params.imageReference] : []);
+
+      // OPTIMIZATION ADDED (Safe)
       const userRefBuffers = await this.downloadAndOptimizeImages(refUrls);
 
       const generatedHistory: Buffer[] = [];
@@ -561,14 +708,15 @@ export const contentEngine = {
   },
 
   // ===========================================================================
-  // HELPERS
+  // HELPERS (PRESERVED)
   // ===========================================================================
 
   async downloadAndOptimizeImages(urls: string[]): Promise<Buffer[]> {
     if (urls.length === 0) return [];
     console.log(`⬇️ Downloading ${urls.length} reference images...`);
-    const promises = urls.map(async (url) => {
+    const promises = urls.map(async (rawUrl) => {
       try {
+        const url = getOptimizedUrl(rawUrl); // Optimization Hook
         const res = await axios.get(url, { responseType: "arraybuffer" });
         return await sharp(res.data)
           .resize(1024, 1024, { fit: "inside" })
