@@ -311,7 +311,7 @@ function Dashboard() {
   };
 
   const companyName =
-    brandConfig?.companyName || user?.name || "Visionlight AI";
+    brandConfig?.companyName || user?.name || "PicDrift Studio";
   if (authLoading)
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 flex items-center justify-center">
