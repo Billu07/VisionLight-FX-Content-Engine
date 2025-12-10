@@ -536,7 +536,7 @@ function Dashboard() {
                     },
                     {
                       id: "studio",
-                      label: "Studio FX",
+                      label: "Pic FX",
                       sub: "Image & Carousel",
 
                       grad: "from-pink-500 to-rose-500",
@@ -559,9 +559,6 @@ function Dashboard() {
                       }`}
                     >
                       <div className="flex items-center gap-2 sm:gap-3">
-                        <span className="text-xl sm:text-2xl group-hover:scale-110 transition-transform">
-                          {item.icon}
-                        </span>
                         <div className="flex-1">
                           <div className="font-semibold text-sm text-white">
                             {item.label}
@@ -796,7 +793,7 @@ function Dashboard() {
 
                             desc: "Mobile",
                           },
-                        ].map(({ ratio, label, icon, desc }) => (
+                        ].map(({ ratio, label, desc }) => (
                           <button
                             key={ratio}
                             type="button"
@@ -818,9 +815,6 @@ function Dashboard() {
                                 : "border-white/10 bg-gray-800/50"
                             }`}
                           >
-                            <div className="text-xl sm:text-2xl mb-2 group-hover:scale-110">
-                              {icon}
-                            </div>
                             <div className="font-semibold text-white text-sm">
                               {label}
                             </div>
