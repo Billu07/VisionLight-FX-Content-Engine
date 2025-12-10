@@ -418,13 +418,12 @@ export const contentEngine = {
 
         if (!videoUrl) throw new Error("Kie timed out or returned no URL");
 
-        // 6. Save Final Video
-        console.log("☁️ Saving Final Video...");
-        const vidRes = await axios.get(videoUrl, {
-          responseType: "arraybuffer",
-        });
+        // 6. Save Final Video (UPDATED: DIRECT UPLOAD)
+        console.log("☁️ Saving Final Video (Direct URL)...");
+
+        // This offloads the bandwidth work to Cloudinary and avoids server timeouts.
         const finalCloudUrl = await this.uploadToCloudinary(
-          vidRes.data,
+          videoUrl,
           postId,
           params.userId,
           params.title || "Kie Video",

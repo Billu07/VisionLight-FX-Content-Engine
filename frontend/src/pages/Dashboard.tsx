@@ -483,13 +483,13 @@ function Dashboard() {
                   rel="noreferrer"
                   className="px-4 py-2.5 bg-gray-800/60 border border-green-400/30 rounded-xl text-green-400 text-sm hover:bg-green-400/10 flex items-center gap-2"
                 >
-                  💳 Buy FX Credits
+                  Buy FX Credits
                 </a>
                 <button
                   onClick={() => setShowBrandModal(true)}
                   className="px-4 py-2.5 bg-gray-800/60 border border-cyan-400/30 rounded-xl text-cyan-400 text-sm hover:bg-cyan-400/10"
                 >
-                  🎨 Brand
+                  Edit Dashboard
                 </button>
                 <button
                   onClick={handleLogout}
@@ -531,23 +531,20 @@ function Dashboard() {
                     {
                       id: "kie",
                       label: "Video FX",
-                      icon: "🎬",
-                      // OLD VIDEO GRADIENT
+
                       grad: "from-blue-700 to-cyan-700",
                     },
                     {
                       id: "studio",
                       label: "Studio FX",
                       sub: "Image & Carousel",
-                      icon: "✨",
-                      // OLD IMAGE GRADIENT
+
                       grad: "from-pink-500 to-rose-500",
                     },
                     {
                       id: "openai",
                       label: "Video FX 2",
-                      icon: "🎥",
-                      // DISTINCT GRADIENT BUT OLD STYLE
+
                       grad: "from-violet-700 to-purple-700",
                     },
                   ].map((item) => (
@@ -619,7 +616,7 @@ function Dashboard() {
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2 sm:mb-3 flex items-center gap-2">
                     <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>
-                    💡 Your Creative Vision
+                    Your Creative Vision
                   </label>
                   <textarea
                     value={prompt}
@@ -635,7 +632,7 @@ function Dashboard() {
                 {/* TITLE INPUT (OLD STYLE) */}
                 <div className="space-y-2 sm:space-y-3">
                   <label className="block text-sm font-semibold text-white capitalize">
-                    🏷️ {activeEngine === "studio" ? studioMode : "video"} Title
+                    {activeEngine === "studio" ? studioMode : "video"} Title
                     (Optional)
                   </label>
                   <input
@@ -750,7 +747,7 @@ function Dashboard() {
                     {/* Model Selector */}
                     <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
-                        🤖 AI Model
+                        AI Model
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                         {[
@@ -783,20 +780,20 @@ function Dashboard() {
                     {/* Aspect Ratio */}
                     <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
-                        📐 Aspect Ratio
+                        Aspect Ratio
                       </label>
                       <div className="grid grid-cols-2 gap-2 sm:gap-3">
                         {[
                           {
                             ratio: "16:9",
                             label: "Landscape",
-                            icon: "🖥️",
+
                             desc: "Widescreen",
                           },
                           {
                             ratio: "9:16",
                             label: "Portrait",
-                            icon: "📱",
+
                             desc: "Mobile",
                           },
                         ].map(({ ratio, label, icon, desc }) => (
@@ -841,7 +838,7 @@ function Dashboard() {
                     {/* Video Size */}
                     <div className="space-y-2 sm:space-y-3">
                       <label className="block text-sm font-semibold text-white">
-                        📏 Video Size
+                        Video Size
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                         {(aspectRatio === "16:9"
@@ -913,7 +910,7 @@ function Dashboard() {
                       </div>
                       {videoModel === "sora-2" && (
                         <p className="text-xs text-purple-300 mt-2">
-                          💡 Upgrade to Video FX 2 Pro for enhanced 1024p
+                          Upgrade to Video FX 2 Pro for enhanced 1024p
                           resolution
                         </p>
                       )}
@@ -947,15 +944,13 @@ function Dashboard() {
                 {/* === UPLOAD UI (OLD VISUALS) === */}
                 <div className="space-y-2 sm:space-y-3">
                   <label className="block text-sm font-semibold text-white">
-                    🎨 Reference Images (Optional)
+                    Reference Images (Optional)
                   </label>
                   <div className="space-y-3">
                     <div className="flex items-center justify-center w-full">
                       <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:border-cyan-500 hover:bg-gray-800/50 transition-all group">
                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                          <div className="text-4xl mb-2 opacity-50 group-hover:opacity-100 transition-opacity">
-                            📂
-                          </div>
+                          <div className="text-4xl mb-2 opacity-50 group-hover:opacity-100 transition-opacity"></div>
                           <p className="text-sm text-gray-400">
                             <span className="font-semibold text-cyan-400">
                               Click to upload

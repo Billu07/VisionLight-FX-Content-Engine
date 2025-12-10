@@ -28,20 +28,19 @@ export const Hero = () => {
             <div className="flex flex-col sm:flex-row justify-between items-center mb-12 sm:mb-16 gap-6 sm:gap-0">
               {/* Dual Logos (Side by Side) */}
               <div className="flex items-center gap-4 sm:gap-6">
-                {/* 1. FX Logo (Left) */}
-                <img
-                  src={fxLogo}
-                  alt="FX"
-                  className="h-12 sm:h-16 w-auto object-contain transition-transform hover:scale-105"
-                />
-
-                {/* 2. Divider */}
-                <div className="h-8 w-px bg-white/20"></div>
-
                 {/* 3. PicDrift Logo (Right) */}
                 <img
                   src={picdriftLogo}
                   alt="PicDrift"
+                  className="h-12 sm:h-16 w-auto object-contain transition-transform hover:scale-105"
+                />
+                {/* 2. Divider */}
+                <div className="h-8 w-px bg-white/20"></div>
+
+                {/* 1. FX Logo (Left) */}
+                <img
+                  src={fxLogo}
+                  alt="FX"
                   className="h-10 sm:h-14 w-auto object-contain transition-transform hover:scale-105"
                 />
               </div>
@@ -87,8 +86,7 @@ export const Hero = () => {
                     rel="noopener noreferrer"
                     className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white px-4 sm:px-6 md:px-8 py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg transition-all duration-300 hover:shadow-2xl hover:scale-105 flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-center"
                   >
-                    <span>🚀</span>
-                    SignUp Now
+                    Sign Up Now
                   </a>
 
                   {/* Button 2: Try Free Demo */}
@@ -98,7 +96,6 @@ export const Hero = () => {
                     rel="noopener noreferrer"
                     className="border border-white/20 bg-white/5 hover:bg-white/10 text-white px-4 sm:px-6 md:px-8 py-3 sm:py-4 rounded-xl font-semibold text-base sm:text-lg transition-all duration-300 backdrop-blur-sm flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-center"
                   >
-                    <span>📺</span>
                     Try Free Demo
                   </a>
                 </div>
