@@ -1,34 +1,48 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabase"; // Make sure this path is correct
 import { useAuth } from "../hooks/useAuth";
 import { LoadingSpinner } from "./LoadingSpinner";
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  // removed onSuccess because navigation happens here now
 }
 
-export const LoginModal = ({ isOpen, onClose, onSuccess }: LoginModalProps) => {
+export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
   const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
+  const [password, setPassword] = useState(""); // Changed from 'name' to 'password'
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const { login } = useAuth();
+  const navigate = useNavigate();
+  const { checkAuth } = useAuth(); // We use checkAuth to sync, not login
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
+    if (!email.trim() || !password.trim()) return;
 
     setIsLoading(true);
     setError("");
 
     try {
-      await login(email, name.trim() || undefined);
-      onSuccess();
+      // 1. Authenticate with Supabase directly
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) throw authError;
+
+      // 2. Sync with Backend (Airtable)
+      await checkAuth();
+
+      // 3. Navigate
       onClose();
+      navigate("/app");
     } catch (err: any) {
-      setError(err.message || "Login failed");
+      setError(err.message || "Invalid login credentials");
     } finally {
       setIsLoading(false);
     }
@@ -43,14 +57,13 @@ export const LoginModal = ({ isOpen, onClose, onSuccess }: LoginModalProps) => {
         <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl -z-10"></div>
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl -z-10"></div>
 
-        <h2 className="text-2xl font-bold text-white mb-2">
-          Login to your Studio
-        </h2>
+        <h2 className="text-2xl font-bold text-white mb-2">Login to Studio</h2>
         <p className="text-purple-200/70 text-sm mb-6">
-          Enter your email to access the PicDrift Studio
+          Enter your credentials to access PicDrift FX.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Email */}
           <div>
             <label className="block text-sm font-medium text-purple-200 mb-1.5">
               Email Address
@@ -59,22 +72,24 @@ export const LoginModal = ({ isOpen, onClose, onSuccess }: LoginModalProps) => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
+              placeholder="client@brand.com"
               className="w-full p-3 bg-gray-800/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-gray-500 transition-all outline-none"
               required
             />
           </div>
 
+          {/* Password (Replaces 'Name Your Studio') */}
           <div>
             <label className="block text-sm font-medium text-purple-200 mb-1.5">
-              Name Your Studio
+              Password
             </label>
             <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="What should we call your studio?"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
               className="w-full p-3 bg-gray-800/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-gray-500 transition-all outline-none"
+              required
             />
           </div>
 
@@ -83,15 +98,6 @@ export const LoginModal = ({ isOpen, onClose, onSuccess }: LoginModalProps) => {
               {error}
             </div>
           )}
-
-          <div className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 rounded-xl p-4">
-            <p className="text-sm text-cyan-300 font-semibold mb-1">
-              Once you're inside:
-            </p>
-            <p className="text-sm text-purple-200/80 leading-relaxed">
-              Create images and video that bring your imagination to life.
-            </p>
-          </div>
 
           <div className="flex gap-3 pt-2">
             <button
@@ -104,7 +110,7 @@ export const LoginModal = ({ isOpen, onClose, onSuccess }: LoginModalProps) => {
             </button>
             <button
               type="submit"
-              disabled={isLoading || !email.trim()}
+              disabled={isLoading || !email || !password}
               className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white py-3 px-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 font-bold shadow-lg hover:shadow-cyan-500/25"
             >
               {isLoading ? <LoadingSpinner size="sm" variant="light" /> : null}
@@ -112,7 +118,6 @@ export const LoginModal = ({ isOpen, onClose, onSuccess }: LoginModalProps) => {
             </button>
           </div>
 
-          {/* Footer Link */}
           <div className="text-center mt-4 pt-2 border-t border-white/5">
             <p className="text-sm text-gray-400">
               Need a Login?{" "}

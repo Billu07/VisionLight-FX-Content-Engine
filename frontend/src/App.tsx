@@ -1,14 +1,22 @@
+import { useEffect } from "react";
 import {
   BrowserRouter as Router,
   Routes,
   Route,
   Navigate,
+  useLocation,
 } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MarketingSite } from "./pages/MarketingSite";
 import Dashboard from "./pages/Dashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { BrandProvider } from "./contexts/BrandContext";
+import { useAuth } from "./hooks/useAuth";
+import { LoadingSpinner } from "./components/LoadingSpinner";
+
+// Define your Admin Email here (or use import.meta.env.VITE_ADMIN_EMAIL)
+const ADMIN_EMAIL = "keith@picdrift.com";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -19,6 +27,52 @@ const queryClient = new QueryClient({
   },
 });
 
+// --- Standard Protected Route ---
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, isLoading, checkAuth } = useAuth();
+  const location = useLocation();
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  if (isLoading)
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <LoadingSpinner size="lg" variant="neon" />
+      </div>
+    );
+  if (!user) return <Navigate to="/" state={{ from: location }} replace />;
+
+  return <>{children}</>;
+};
+
+// --- 🔒 Admin Only Route ---
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, isLoading, checkAuth } = useAuth();
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  if (isLoading)
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <LoadingSpinner size="lg" variant="neon" />
+      </div>
+    );
+
+  // 1. Must be logged in
+  if (!user) return <Navigate to="/" replace />;
+
+  // 2. Must match Admin Email
+  if (user.email !== ADMIN_EMAIL) {
+    return <Navigate to="/app" replace />; // Kick regular users to dashboard
+  }
+
+  return <>{children}</>;
+};
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -26,23 +80,31 @@ function App() {
         <Router>
           <Routes>
             <Route path="/" element={<MarketingSite />} />
-            <Route
-              path="/demo"
-              element={
-                <ErrorBoundary>
-                  <Dashboard />
-                </ErrorBoundary>
-              }
-            />
+
             <Route
               path="/app"
               element={
-                <ErrorBoundary>
-                  <Dashboard />
-                </ErrorBoundary>
+                <ProtectedRoute>
+                  <ErrorBoundary>
+                    <Dashboard />
+                  </ErrorBoundary>
+                </ProtectedRoute>
               }
             />
-            {/* Redirect unknown routes to home */}
+
+            {/* 🔒 ADMIN ROUTE UPDATED */}
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <ErrorBoundary>
+                    <AdminDashboard />
+                  </ErrorBoundary>
+                </AdminRoute>
+              }
+            />
+
+            <Route path="/demo" element={<Navigate to="/app" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Router>

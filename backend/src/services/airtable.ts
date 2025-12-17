@@ -20,6 +20,9 @@ export interface User {
   email: string;
   name?: string;
   demoCredits: { video: number; image: number; carousel: number };
+  // NEW FIELDS
+  creditSystem: "COMMERCIAL" | "INTERNAL";
+  adminNotes?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -101,6 +104,11 @@ export const airtableService = {
           (record.get("demoCredits") as string) ||
             '{"video":2,"image":2,"carousel":2}'
         ),
+        // NEW: Parse Credit System & Notes
+        creditSystem:
+          (record.get("creditSystem") as "COMMERCIAL" | "INTERNAL") ||
+          "COMMERCIAL",
+        adminNotes: record.get("adminNotes") as string,
         createdAt: new Date(record.get("createdAt") as string),
         updatedAt: new Date(record.get("updatedAt") as string),
       };
@@ -122,12 +130,25 @@ export const airtableService = {
           (record.get("demoCredits") as string) ||
             '{"video":2,"image":2,"carousel":2}'
         ),
+        // NEW: Parse Credit System & Notes
+        creditSystem:
+          (record.get("creditSystem") as "COMMERCIAL" | "INTERNAL") ||
+          "COMMERCIAL",
+        adminNotes: record.get("adminNotes") as string,
         createdAt: new Date(record.get("createdAt") as string),
         updatedAt: new Date(record.get("updatedAt") as string),
       };
     } catch (error) {
       console.error("Airtable findUserById error:", error);
       return null;
+    }
+  },
+  async deleteUser(userId: string): Promise<void> {
+    try {
+      await base("Users").destroy(userId);
+    } catch (error) {
+      console.error("Airtable deleteUser error:", error);
+      throw error;
     }
   },
 
@@ -138,6 +159,7 @@ export const airtableService = {
         email: userData.email,
         name: userData.name || "",
         demoCredits: JSON.stringify({ video: 2, image: 2, carousel: 2 }),
+        creditSystem: "COMMERCIAL", // Default to Commercial
         createdAt: now,
         updatedAt: now,
       });
@@ -147,6 +169,7 @@ export const airtableService = {
         email: record.get("email") as string,
         name: record.get("name") as string,
         demoCredits: JSON.parse(record.get("demoCredits") as string),
+        creditSystem: "COMMERCIAL",
         createdAt: new Date(record.get("createdAt") as string),
         updatedAt: new Date(record.get("updatedAt") as string),
       };
@@ -171,7 +194,62 @@ export const airtableService = {
     }
   },
 
-  // Session operations
+  // === NEW ADMIN METHODS ===
+  async getAllUsers(): Promise<User[]> {
+    try {
+      const records = await base("Users")
+        .select({
+          sort: [{ field: "createdAt", direction: "desc" }],
+        })
+        .all();
+
+      return records.map((record) => ({
+        id: record.id,
+        email: record.get("email") as string,
+        name: record.get("name") as string,
+        demoCredits: JSON.parse(
+          (record.get("demoCredits") as string) ||
+            '{"video":0,"image":0,"carousel":0}'
+        ),
+        creditSystem:
+          (record.get("creditSystem") as "COMMERCIAL" | "INTERNAL") ||
+          "COMMERCIAL",
+        adminNotes: record.get("adminNotes") as string,
+        createdAt: new Date(record.get("createdAt") as string),
+        updatedAt: new Date(record.get("updatedAt") as string),
+      }));
+    } catch (error) {
+      console.error("Airtable getAllUsers error:", error);
+      throw error;
+    }
+  },
+
+  async adminUpdateUser(
+    userId: string,
+    updates: {
+      credits?: any;
+      creditSystem?: "COMMERCIAL" | "INTERNAL";
+      name?: string;
+      adminNotes?: string;
+    }
+  ): Promise<void> {
+    try {
+      const updateData: any = { updatedAt: new Date().toISOString() };
+
+      if (updates.credits)
+        updateData.demoCredits = JSON.stringify(updates.credits);
+      if (updates.creditSystem) updateData.creditSystem = updates.creditSystem;
+      if (updates.name) updateData.name = updates.name;
+      if (updates.adminNotes) updateData.adminNotes = updates.adminNotes;
+
+      await base("Users").update(userId, updateData);
+    } catch (error) {
+      console.error("Airtable adminUpdateUser error:", error);
+      throw error;
+    }
+  },
+
+  // Session operations (Unchanged)
   async createSession(userId: string, token: string): Promise<Session> {
     try {
       const now = new Date();
@@ -264,7 +342,7 @@ export const airtableService = {
     }
   },
 
-  // BrandConfig operations
+  // BrandConfig operations (Unchanged)
   async getBrandConfig(userId: string): Promise<BrandConfig | null> {
     try {
       const allRecords = await base("BrandConfig").select().firstPage();
@@ -385,7 +463,7 @@ export const airtableService = {
     }
   },
 
-  // Post operations
+  // Post operations (Unchanged)
   async createPost(postData: {
     userId: string;
     title?: string;
@@ -481,14 +559,12 @@ export const airtableService = {
     }
   },
 
-  // In the updatePost method in airtable.ts, add this to the updateData section:
   async updatePost(postId: string, updates: Partial<Post>): Promise<Post> {
     try {
       const updateData: any = {
         updatedAt: new Date().toISOString(),
       };
 
-      // Existing fields...
       if (updates.title !== undefined) updateData.title = updates.title;
       if (updates.mediaUrl !== undefined)
         updateData.mediaUrl = updates.mediaUrl;
@@ -502,7 +578,6 @@ export const airtableService = {
       if (updates.script !== undefined)
         updateData.script = JSON.stringify(updates.script);
 
-      // Enhanced workflow fields...
       if (updates.enhancedPrompt !== undefined)
         updateData.enhancedPrompt = updates.enhancedPrompt;
       if (updates.imageReference !== undefined)
@@ -516,14 +591,11 @@ export const airtableService = {
       if (updates.generationParams !== undefined)
         updateData.generationParams = JSON.stringify(updates.generationParams);
 
-      // Progress field...
       if (updates.progress !== undefined)
         updateData.progress = updates.progress;
 
-      // ADD THIS: Handle error field
       if (updates.error !== undefined) updateData.error = updates.error;
 
-      // Rest of the method remains the same...
       const record = await base("Posts").update(postId, updateData);
 
       const userIdField = record.get("userId");
@@ -562,7 +634,6 @@ export const airtableService = {
           : undefined,
         bufferPostId: record.get("bufferPostId") as string,
         progress: (record.get("progress") as number) || 0,
-        // ADD THIS: Include error field in return
         error: record.get("error") as string,
         createdAt: new Date(record.get("createdAt") as string),
         updatedAt: new Date(record.get("updatedAt") as string),
@@ -620,7 +691,6 @@ export const airtableService = {
           : undefined,
         bufferPostId: record.get("bufferPostId") as string,
         progress: (record.get("progress") as number) || 0,
-        // ADD THIS:
         error: record.get("error") as string,
         createdAt: new Date(record.get("createdAt") as string),
         updatedAt: new Date(record.get("updatedAt") as string),
@@ -652,7 +722,6 @@ export const airtableService = {
         const userIdField = record.get("userId");
         let mediaUrl = record.get("mediaUrl") as string;
 
-        // --- SECURITY FIX: Force HTTPS ---
         if (
           mediaUrl &&
           typeof mediaUrl === "string" &&
@@ -677,7 +746,7 @@ export const airtableService = {
         return {
           id: record.id,
           userId: actualUserId,
-          title: record.get("title") as string, // <--- THIS WAS MISSING
+          title: record.get("title") as string,
           prompt: record.get("prompt") as string,
           enhancedPrompt: record.get("enhancedPrompt") as string,
           generationStep: record.get("generationStep") as
@@ -701,7 +770,6 @@ export const airtableService = {
             ? JSON.parse(record.get("script") as string)
             : undefined,
           progress: (record.get("progress") as number) || 0,
-          // ADD THIS:
           error: record.get("error") as string,
           createdAt: new Date(record.get("createdAt") as string),
           updatedAt: new Date(record.get("updatedAt") as string),
@@ -715,7 +783,7 @@ export const airtableService = {
     }
   },
 
-  // ROI Metrics operations
+  // ROI Metrics operations (Unchanged)
   async getROIMetrics(userId: string): Promise<ROIMetrics> {
     try {
       const allRecords = await base("ROIMetrics").select().firstPage();

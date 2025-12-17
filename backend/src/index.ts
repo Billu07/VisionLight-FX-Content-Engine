@@ -13,7 +13,7 @@ console.log("🔧 Environment Check:", {
   cloudinary: process.env.CLOUDINARY_CLOUD_NAME ? "✅ Loaded" : "❌ Missing",
   openai: process.env.OPENAI_API_KEY ? "✅ Loaded" : "❌ Missing",
   google: process.env.GOOGLE_AI_API_KEY ? "✅ Loaded" : "❌ Missing",
-  nodeEnv: process.env.NODE_ENV,
+  supabase: process.env.SUPABASE_URL ? "✅ Loaded" : "❌ Missing",
 });
 
 import { ROIService } from "./services/roi";
@@ -24,8 +24,10 @@ import { contentEngine } from "./services/contentEngine";
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-const allowedOrigins = ["https://picdrift.studio", "http://localhost:5173"];
+// === ADMIN CONFIGURATION ===
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "snowfix07@gmail.com";
 
+const allowedOrigins = ["https://picdrift.studio", "http://localhost:5173"];
 if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL);
 
 app.use(
@@ -45,15 +47,15 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 app.get("/", (req, res) => {
   res.json({
-    message: "Visionlight FX Backend - Running!",
-    version: "3.2.0",
+    message: "Visionlight FX Backend - Supabase Edition",
+    version: "4.1.0",
     status: "Healthy",
   });
 });
 
 // ==================== AUTHENTICATION MIDDLEWARE ====================
 interface AuthenticatedRequest extends Request {
-  user?: any;
+  user?: any; // This is the Airtable User Object
   token?: string;
 }
 
@@ -69,6 +71,7 @@ const authenticateToken = async (
     const user = await AuthService.validateSession(token);
     if (!user)
       return res.status(401).json({ error: "Invalid or expired token" });
+    
     req.user = user;
     req.token = token;
     next();
@@ -77,52 +80,89 @@ const authenticateToken = async (
   }
 };
 
-// ==================== AUTH ROUTES ====================
-app.post("/api/auth/demo-login", async (req, res) => {
-  const { email, name } = req.body;
-  if (!email) return res.status(400).json({ error: "Email is required" });
+// ==================== ADMIN ROUTES ====================
+
+// Middleware helper for Admin Check
+const requireAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  if (req.user?.email !== ADMIN_EMAIL) {
+    console.warn(`⚠️ Unauthorized Admin Access Attempt by: ${req.user?.email}`);
+    return res.status(403).json({ error: "Access Denied: Admins only." });
+  }
+  next();
+};
+
+// 1. Create User
+app.post("/api/admin/create-user", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+  const { email, password, name } = req.body;
+  if (!email || !password) return res.status(400).json({ error: "Missing fields" });
+
   try {
-    const user = await AuthService.findOrCreateUser(email, name);
-    const session = await AuthService.createSession(user.id);
-    res.json({
-      success: true,
-      user: { id: user.id, email: user.email, name: user.name },
-      token: session.token,
-    });
+    const newUser = await AuthService.createSystemUser(email, password, name || "New User");
+    res.json({ success: true, user: newUser });
   } catch (error: any) {
-    res.status(500).json({ error: "Authentication failed" });
+    res.status(500).json({ error: error.message });
   }
 });
 
-app.post(
-  "/api/auth/logout",
-  authenticateToken,
-  async (req: AuthenticatedRequest, res) => {
-    try {
-      await AuthService.deleteSession(req.token!);
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
+// 2. List All Users
+app.get("/api/admin/users", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const users = await airtableService.getAllUsers();
+    res.json({ success: true, users });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
-);
+});
 
+// 3. Update User (Credits & System)
+app.put("/api/admin/users/:userId", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+  const { userId } = req.params;
+  const { credits, creditSystem, name } = req.body;
+
+  try {
+    await airtableService.adminUpdateUser(userId, { credits, creditSystem, name });
+    res.json({ success: true, message: "User updated successfully" });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== AUTH ROUTES ====================
 app.get(
   "/api/auth/me",
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
-    try {
-      const user = await airtableService.findUserByEmail(req.user!.email);
-      if (!user) return res.status(404).json({ error: "User not found" });
-      res.json({
-        success: true,
-        user: { id: user.id, email: user.email, name: user.name },
-      });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
+    res.json({
+      success: true,
+      user: req.user,
+    });
   }
 );
+
+// 4. Delete User
+app.delete("/api/admin/users/:userId", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+  const { userId } = req.params;
+
+  try {
+    // 1. Fetch user first to get their email (needed for Supabase deletion)
+    const userToDelete = await airtableService.findUserById(userId);
+    
+    if (!userToDelete) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // 2. Delete from Supabase (Auth)
+    await AuthService.deleteSupabaseUserByEmail(userToDelete.email);
+
+    // 3. Delete from Airtable (Data)
+    await airtableService.deleteUser(userId);
+
+    res.json({ success: true, message: "User deleted successfully" });
+  } catch (error: any) {
+    console.error("Delete Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // ==================== DATA ROUTES ====================
 app.get(
@@ -176,9 +216,8 @@ app.get(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const user = await airtableService.findUserByEmail(req.user!.email);
-      if (!user)
-        return res.json({ credits: { video: 0, image: 0, carousel: 0 } });
+      const user = await airtableService.findUserById(req.user!.id);
+      if (!user) return res.json({ credits: { video: 0, image: 0, carousel: 0 } });
       res.json({ credits: user.demoCredits });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch credits" });
@@ -236,7 +275,7 @@ app.put(
   }
 );
 
-//DOWNLOAD PROXY ---
+// DOWNLOAD PROXY
 app.get(
   "/api/posts/:postId/download",
   authenticateToken,
@@ -252,17 +291,14 @@ app.get(
         return res.status(404).json({ error: "Media not available" });
       }
 
-      // 1. Sanitize Filename
       let cleanTitle = `visionlight-${postId}`;
       if (post.title && post.title.trim().length > 0) {
-        // Replace illegal chars with underscore, keep spaces
         cleanTitle = post.title.replace(/[\\/:*?"<>|]/g, "_").trim();
       }
 
-      // 2. Check if it's a Carousel (JSON Array)
+      // Check Carousel
       let isCarousel = false;
       let imageUrls: string[] = [];
-
       if (post.mediaUrl.trim().startsWith("[")) {
         try {
           imageUrls = JSON.parse(post.mediaUrl);
@@ -270,43 +306,24 @@ app.get(
         } catch (e) {}
       }
 
-      // 3a. HANDLE CAROUSEL (ZIP DOWNLOAD)
       if (isCarousel) {
         const filename = `${cleanTitle}.zip`;
         res.setHeader("Content-Type", "application/zip");
-        res.setHeader(
-          "Content-Disposition",
-          `attachment; filename="${filename}"`
-        );
-
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
         const archive = archiver("zip", { zlib: { level: 9 } });
-
-        archive.on("error", (err) => {
-          throw err;
-        });
+        archive.on("error", (err) => { throw err; });
         archive.pipe(res);
-
-        // Loop through URLs, fetch stream, add to zip
         for (let i = 0; i < imageUrls.length; i++) {
           const url = imageUrls[i];
-          const response = await axios({
-            url,
-            method: "GET",
-            responseType: "stream",
-          });
-          archive.append(response.data, {
-            name: `${cleanTitle}_slide_${i + 1}.jpg`,
-          });
+          const response = await axios({ url, method: "GET", responseType: "stream" });
+          archive.append(response.data, { name: `${cleanTitle}_slide_${i + 1}.jpg` });
         }
-
         await archive.finalize();
         return;
       }
 
-      // 3b. HANDLE SINGLE VIDEO/IMAGE
       let extension = post.mediaType === "VIDEO" ? "mp4" : "jpg";
       const filename = `${cleanTitle}.${extension}`;
-
       const response = await axios({
         url: post.mediaUrl,
         method: "GET",
@@ -317,18 +334,11 @@ app.get(
       if (response.headers["content-length"]) {
         res.setHeader("Content-Length", response.headers["content-length"]);
       }
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="${filename}"`
-      );
-
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       response.data.pipe(res);
     } catch (error: any) {
       console.error("Download error:", error);
-      // Only send JSON if headers haven't been sent (streaming hasn't started)
-      if (!res.headersSent) {
-        res.status(500).json({ error: "Failed to download media" });
-      }
+      if (!res.headersSent) res.status(500).json({ error: "Failed to download media" });
     }
   }
 );
@@ -347,7 +357,8 @@ app.post(
         mediaType,
         duration,
         model,
-        aspectRatio,
+        aspectRatio, 
+        resolution,
         size,
         width,
         height,
@@ -358,15 +369,13 @@ app.post(
       if (!prompt || !mediaType)
         return res.status(400).json({ error: "Missing required fields" });
 
-      const user = await airtableService.findUserByEmail(req.user!.email);
-      if (
-        !user ||
-        user.demoCredits[mediaType as keyof typeof user.demoCredits] <= 0
-      ) {
+      const user = await airtableService.findUserById(req.user!.id);
+      const creditKey = mediaType as keyof typeof user!.demoCredits;
+      
+      if (!user || user.demoCredits[creditKey] <= 0) {
         return res.status(403).json({ error: "Insufficient credits" });
       }
 
-      // 1. Upload all images
       const uploadedUrls: string[] = [];
       if (referenceFiles.length > 0) {
         try {
@@ -375,9 +384,7 @@ app.post(
             uploadedUrls.push(url);
           }
         } catch (err) {
-          return res
-            .status(500)
-            .json({ success: false, error: "Image upload failed" });
+          return res.status(500).json({ success: false, error: "Image upload failed" });
         }
       }
       const primaryRefUrl = uploadedUrls.length > 0 ? uploadedUrls[0] : "";
@@ -387,6 +394,7 @@ app.post(
         duration: duration ? parseInt(duration) : undefined,
         model,
         aspectRatio,
+        resolution,
         size,
         width: width ? parseInt(width) : undefined,
         height: height ? parseInt(height) : undefined,
@@ -406,72 +414,30 @@ app.post(
         platform: "INSTAGRAM",
         generationParams,
         imageReference: primaryRefUrl,
-        generationStep: "PROMPT_ENHANCEMENT",
-        requiresApproval: true,
+        generationStep: "GENERATION",
+        requiresApproval: false,
       });
 
       await airtableService.updatePost(post.id, {
         status: "PROCESSING",
         progress: 1,
+        userEditedPrompt: prompt 
       });
 
       const updatedCredits = { ...user.demoCredits };
-      updatedCredits[mediaType as keyof typeof user.demoCredits] -= 1;
+      updatedCredits[creditKey] -= 1;
       await airtableService.updateUserCredits(req.user!.id, updatedCredits);
 
       res.json({ success: true, postId: post.id });
 
-      // --- BACKGROUND PROCESS ---
       (async () => {
         try {
-          const primaryBuffer =
-            referenceFiles.length > 0 ? referenceFiles[0].buffer : undefined;
-          const primaryMime =
-            referenceFiles.length > 0 ? referenceFiles[0].mimetype : undefined;
-
-          // 1. Enhance Prompt (Returns raw for Image/Carousel if requested in engine)
-          const enhancedPrompt = await contentEngine.enhanceUserPrompt(
-            prompt,
-            mediaType,
-            { duration: duration ? parseInt(duration) : 8, aspectRatio, size },
-            primaryBuffer,
-            primaryMime
-          );
-
-          // --- FIX: ONLY PAUSE IF IT IS A VIDEO ---
-          // The logic used to pause if references existed, but user wants Images/Carousels to auto-run.
-          const isVideo = mediaType === "video";
-
-          if (isVideo) {
-            console.log(`⏸️ Post ${post.id} paused for approval (Video).`);
-            await airtableService.updatePost(post.id, {
-              enhancedPrompt,
-              generationStep: "AWAITING_APPROVAL",
-              progress: 2,
-            });
+          if (mediaType === "carousel") {
+             contentEngine.startCarouselGeneration(post.id, prompt, generationParams);
+          } else if (mediaType === "image") {
+             contentEngine.startImageGeneration(post.id, prompt, generationParams);
           } else {
-            console.log(`⏩ Post ${post.id} auto-starting (Image/Carousel).`);
-
-            await airtableService.updatePost(post.id, {
-              enhancedPrompt,
-              userEditedPrompt: enhancedPrompt, // Auto-confirm the prompt
-              generationStep: "GENERATION",
-              requiresApproval: false,
-              progress: 5,
-            });
-
-            if (mediaType === "carousel")
-              contentEngine.startCarouselGeneration(
-                post.id,
-                enhancedPrompt,
-                generationParams
-              );
-            else
-              contentEngine.startImageGeneration(
-                post.id,
-                enhancedPrompt,
-                generationParams
-              );
+             contentEngine.startVideoGeneration(post.id, prompt, generationParams);
           }
         } catch (err: any) {
           console.error("Background Error:", err);
@@ -488,78 +454,7 @@ app.post(
   }
 );
 
-app.post(
-  "/api/approve-prompt",
-  authenticateToken,
-  async (req: AuthenticatedRequest, res) => {
-    try {
-      const { postId, finalPrompt } = req.body;
-      if (!postId || !finalPrompt)
-        return res.status(400).json({ error: "Missing fields" });
-
-      const post = await airtableService.getPostById(postId);
-      if (!post || post.userId !== req.user!.id)
-        return res.status(403).json({ error: "Access denied" });
-
-      await airtableService.updatePost(postId, {
-        userEditedPrompt: finalPrompt,
-        generationStep: "GENERATION",
-        requiresApproval: false,
-        status: "PROCESSING",
-        progress: 5,
-      });
-
-      const params = {
-        ...(post.generationParams || {}),
-        userId: req.user!.id,
-        imageReference:
-          post.imageReference || post.generationParams?.imageReference || "",
-        hasReferenceImage: !!(
-          post.imageReference || post.generationParams?.imageReference
-        ),
-        title: post.title,
-      };
-
-      const mediaType = post.mediaType?.toLowerCase() || "video";
-      if (mediaType === "video")
-        contentEngine.startVideoGeneration(postId, finalPrompt, params);
-      else if (mediaType === "carousel")
-        contentEngine.startCarouselGeneration(postId, finalPrompt, params);
-      else contentEngine.startImageGeneration(postId, finalPrompt, params);
-
-      res.json({ success: true, message: "Generation started", postId });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  }
-);
-
-app.post(
-  "/api/cancel-prompt",
-  authenticateToken,
-  async (req: AuthenticatedRequest, res) => {
-    try {
-      const { postId } = req.body;
-      const post = await airtableService.getPostById(postId);
-      if (!post || post.userId !== req.user!.id)
-        return res.status(403).json({ error: "Access denied" });
-
-      await airtableService.updatePost(postId, {
-        status: "CANCELLED",
-        generationStep: "COMPLETED",
-        requiresApproval: false,
-        progress: 0,
-      });
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  }
-);
-
-// --- FIX: SELF-HEALING STATUS CHECK ---
-// If frontend polls this and status is stuck, we can implement logic here to double-check external providers in V2.
-// For now, we verify the DB state.
+// --- STATUS CHECK ---
 app.get(
   "/api/post/:postId/status",
   authenticateToken,
@@ -569,7 +464,6 @@ app.get(
       if (!post || post.userId !== req.user!.id)
         return res.status(403).json({ error: "Denied" });
 
-      // CLEANUP: If it's been processing for > 1 hour, mark failed.
       if (post.status === "PROCESSING") {
         const createdAt = new Date(post.createdAt).getTime();
         const now = new Date().getTime();
@@ -579,7 +473,7 @@ app.get(
             status: "FAILED",
             error: "Timeout (Server restart)",
           });
-          post.status = "FAILED"; // return updated status
+          post.status = "FAILED";
         }
       }
 
@@ -611,7 +505,6 @@ app.get(
   }
 );
 
-// Error handling
 app.use((req, res) => res.status(404).json({ error: "Route not found" }));
 app.use((error: any, req: Request, res: Response, next: NextFunction) => {
   console.error("Global Error:", error);

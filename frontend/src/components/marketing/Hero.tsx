@@ -1,16 +1,10 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { LoginModal } from "../LoginModal";
 import fxLogo from "../../assets/fx.png";
 import picdriftLogo from "../../assets/picdrift.png";
 
 export const Hero = () => {
   const [showLogin, setShowLogin] = useState(false);
-  const navigate = useNavigate();
-
-  const handleDemoSuccess = () => {
-    navigate("/demo");
-  };
 
   return (
     <>
@@ -114,11 +108,7 @@ export const Hero = () => {
         <div className="sm:hidden absolute bottom-1/3 right-8 w-2 h-2 bg-purple-300 rounded-full opacity-30 animate-pulse"></div>
       </div>
 
-      <LoginModal
-        isOpen={showLogin}
-        onClose={() => setShowLogin(false)}
-        onSuccess={handleDemoSuccess}
-      />
+      <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
     </>
   );
 };

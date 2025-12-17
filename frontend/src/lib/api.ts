@@ -1,40 +1,36 @@
 import axios from "axios";
 
-// Dynamic API base URL for production/development
+// NOTE: Changed default to root (4000) because backend routes include '/api' prefix
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
 console.log("🔧 API Base URL:", API_BASE_URL);
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 40000, // Increased timeout for heavier loads
-  withCredentials: true,
+  timeout: 60000, // Increased for heavier AI polling
+  // withCredentials: true, // Not strictly needed for Bearer tokens but harmless
 });
 
-// Add auth header to all requests
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("visionlight_token");
+// Helper to set the token dynamically from useAuth
+export const setAuthToken = (token: string | null) => {
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+  } else {
+    delete api.defaults.headers.common["Authorization"];
   }
-  return config;
-});
+};
 
-// Response interceptor for error handling
+// Response interceptor (Simplified for Supabase)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem("visionlight_token");
-      window.location.href = "/";
-    }
-
+    // We let useAuth handle 401s via Supabase state changes,
+    // but we log other errors for debugging.
     const message =
       error.response?.data?.error || error.message || "Something went wrong";
 
-    // Less noise for expected polling 404s
-    if (error.response?.status !== 404) {
+    if (error.response?.status !== 404 && error.code !== "ERR_CANCELED") {
       console.error("API Error:", {
         url: error.config?.url,
         status: error.response?.status,
@@ -47,73 +43,45 @@ api.interceptors.response.use(
 );
 
 export const apiEndpoints = {
-  // === Auth ===
-  demoLogin: (data: { email: string; name?: string }) =>
-    api.post("/auth/demo-login", data),
+  // === Auth (Bridge to Airtable) ===
+  // Note: Actual login happens via Supabase Client in the UI.
+  // This endpoint retrieves the Airtable User Data using the Supabase Token.
+  getMe: () => api.get("/api/auth/me"),
 
-  logout: () => api.post("/auth/logout"),
-
-  getCurrentUser: () => api.get("/auth/me"),
+  // === Admin ===
+  adminCreateUser: (data: { email: string; password: string; name: string }) =>
+    api.post("/api/admin/create-user", data),
+  adminGetUsers: () => api.get("/api/admin/users"),
+  adminUpdateUser: (userId: string, data: any) =>
+    api.put(`/api/admin/users/${userId}`, data),
+  adminDeleteUser: (userId: string) => api.delete(`/api/admin/users/${userId}`),
 
   // === Brand & Config ===
-  getBrandConfig: () => api.get("/brand-config"),
-  updateBrandConfig: (data: any) => api.put("/brand-config", data),
+  getBrandConfig: () => api.get("/api/brand-config"),
+  updateBrandConfig: (data: any) => api.put("/api/brand-config", data),
 
   // === Posts ===
-  getPosts: () => api.get("/posts"),
-  getPost: (postId: string) => api.get(`/post/${postId}`),
+  getPosts: () => api.get("/api/posts"),
+  getPostById: (postId: string) => api.get(`/api/post/${postId}`),
   updatePostTitle: (postId: string, title: string) =>
-    api.put(`/posts/${postId}/title`, { title }),
-  getPostStatus: (postId: string) => api.get(`/post/${postId}/status`),
+    api.put(`/api/posts/${postId}/title`, { title }),
+  getPostStatus: (postId: string) => api.get(`/api/post/${postId}/status`),
 
-  // === Generation Workflow ===
+  // === Generation Workflow (Refined) ===
 
-  // 1. Initial Request
+  // 1. Generate (Now handles everything, no approval step)
   generateMediaDirect: (formData: FormData) => {
-    return api.post("/generate-media", formData, {
+    return api.post("/api/generate-media", formData, {
       headers: { "Content-Type": "multipart/form-data" },
-    });
-  },
-
-  // 2. User Approval
-  approvePrompt: (data: { postId: string; finalPrompt: string }) =>
-    api.post("/approve-prompt", data),
-
-  // 3. Cancel
-  cancelPrompt: (postId: string) => api.post("/cancel-prompt", { postId }),
-
-  publishPost: (data: { postId: string; platform?: string }) =>
-    api.post("/posts/publish", data),
-
-  // === Legacy / Backwards Compatibility (Fixes Build Errors) ===
-
-  // Maps legacy createPost to new generate-media endpoint
-  createPost: (data: { prompt: string; mediaType: string; title?: string }) => {
-    const formData = new FormData();
-    formData.append("prompt", data.prompt);
-    formData.append("mediaType", data.mediaType);
-    if (data.title) formData.append("title", data.title);
-    // Note: Legacy calls won't support image upload via this method
-    return api.post("/generate-media", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-  },
-
-  // Maps legacy generateMedia to approvePrompt (assuming auto-approval for legacy calls)
-  generateMedia: (postId: string) => {
-    // This is a best-effort map. In the new flow, we need a prompt.
-    // We'll send a dummy approval to kickstart generation if this old method is called.
-    return api.post("/approve-prompt", {
-      postId,
-      finalPrompt: "Legacy auto-approved prompt",
     });
   },
 
   // === Metrics & Utils ===
-  getROIMetrics: () => api.get("/roi-metrics"),
-  getUserCredits: () => api.get("/user-credits"),
-  resetDemoCredits: () => api.post("/reset-demo-credits"),
+  getROIMetrics: () => api.get("/api/roi-metrics"),
+  getUserCredits: () => api.get("/api/user-credits"),
+  resetDemoCredits: () => api.post("/api/reset-demo-credits"),
 
-  generateScript: (data: { prompt: string; mediaType: string }) =>
-    api.post("/generate-script", data),
+  // Publish (if you still have this logic in backend, otherwise optional)
+  publishPost: (data: { postId: string; platform?: string }) =>
+    api.post("/api/posts/publish", data),
 };

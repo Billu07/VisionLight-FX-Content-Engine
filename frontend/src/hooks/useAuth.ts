@@ -1,64 +1,68 @@
 import { create } from "zustand";
-import { apiEndpoints } from "../lib/api";
+import { supabase } from "../lib/supabase";
+import { apiEndpoints, setAuthToken } from "../lib/api";
+
+interface User {
+  id: string; // Airtable ID
+  email: string;
+  name: string;
+  // Add other fields if you use them in UI, e.g. credits are usually fetched separately
+}
 
 interface AuthState {
-  user: any | null;
-  token: string | null;
+  user: User | null;
   isLoading: boolean;
-  error: string | null;
-  login: (email: string, name?: string) => Promise<void>;
-  logout: () => Promise<void>;
+  token: string | null;
   checkAuth: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 export const useAuth = create<AuthState>((set) => ({
   user: null,
-  token: localStorage.getItem("visionlight_token"),
+  token: null,
   isLoading: true,
-  error: null,
 
-  login: async (email: string, name?: string) => {
-    set({ isLoading: true, error: null });
+  checkAuth: async () => {
     try {
-      const response = await apiEndpoints.demoLogin({ email, name });
-      const { user, token } = response.data;
+      // 1. Get Session from Supabase
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      localStorage.setItem("visionlight_token", token);
-      set({ user, token, isLoading: false });
-    } catch (error: any) {
-      set({
-        error: error.response?.data?.error || "Login failed",
-        isLoading: false,
-      });
-      throw error;
+      if (!session?.access_token) {
+        set({ user: null, token: null, isLoading: false });
+        setAuthToken(null);
+        return;
+      }
+
+      // 2. Set Token for API calls
+      setAuthToken(session.access_token);
+
+      // 3. Fetch Airtable User Data from Backend
+      // This ensures we have the "Airtable User" (with history), not just the Auth User
+      const response = await apiEndpoints.getMe();
+
+      if (response.data.success) {
+        set({
+          user: response.data.user,
+          token: session.access_token,
+          isLoading: false,
+        });
+      } else {
+        // Token was valid, but backend couldn't find/create Airtable user (rare)
+        console.error("Auth valid but User sync failed");
+        set({ user: null, token: null, isLoading: false });
+      }
+    } catch (error) {
+      console.error("Auth check failed:", error);
+      set({ user: null, token: null, isLoading: false });
+      setAuthToken(null);
     }
   },
 
   logout: async () => {
-    try {
-      // FIX: No arguments needed here anymore
-      await apiEndpoints.logout();
-    } catch (error) {
-      console.error("Logout failed", error);
-    } finally {
-      localStorage.removeItem("visionlight_token");
-      set({ user: null, token: null });
-    }
-  },
-
-  checkAuth: async () => {
-    const token = localStorage.getItem("visionlight_token");
-    if (!token) {
-      set({ user: null, token: null, isLoading: false });
-      return;
-    }
-
-    try {
-      const response = await apiEndpoints.getCurrentUser();
-      set({ user: response.data.user, token, isLoading: false });
-    } catch (error) {
-      localStorage.removeItem("visionlight_token");
-      set({ user: null, token: null, isLoading: false });
-    }
+    await supabase.auth.signOut();
+    setAuthToken(null);
+    set({ user: null, token: null });
   },
 }));
