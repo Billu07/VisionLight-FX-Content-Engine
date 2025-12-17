@@ -28,7 +28,7 @@ const PORT = process.env.PORT || 4000;
 // 1. Get string from env, default to your email
 const ADMIN_EMAILS_RAW = process.env.ADMIN_EMAILS || "snowfix07@gmail.com";
 // 2. Convert to Array and clean up spaces
-const ADMIN_EMAILS = ADMIN_EMAILS_RAW.split(",").map(email => email.trim());
+const ADMIN_EMAILS = ADMIN_EMAILS_RAW.split(",").map((email) => email.trim());
 
 const allowedOrigins = ["https://picdrift.studio", "http://localhost:5173"];
 if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL);
@@ -74,7 +74,7 @@ const authenticateToken = async (
     const user = await AuthService.validateSession(token);
     if (!user)
       return res.status(401).json({ error: "Invalid or expired token" });
-    
+
     req.user = user;
     req.token = token;
     next();
@@ -85,7 +85,11 @@ const authenticateToken = async (
 
 // ==================== ADMIN MIDDLEWARE (MOVED UP) ====================
 // This MUST be defined before any route that uses it.
-const requireAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+const requireAdmin = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
   if (!req.user?.email || !ADMIN_EMAILS.includes(req.user.email)) {
     console.warn(`⚠️ Unauthorized Admin Access Attempt by: ${req.user?.email}`);
     return res.status(403).json({ error: "Access Denied: Admins only." });
@@ -96,96 +100,143 @@ const requireAdmin = (req: AuthenticatedRequest, res: Response, next: NextFuncti
 // ==================== NOTIFICATION ROUTES ====================
 
 // User: Request Credits
-app.post("/api/request-credits", authenticateToken, async (req: AuthenticatedRequest, res) => {
-  try {
-    await airtableService.createCreditRequest(req.user.id, req.user.email, req.user.name);
-    res.json({ success: true, message: "Request sent to admin." });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+app.post(
+  "/api/request-credits",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      await airtableService.createCreditRequest(
+        req.user.id,
+        req.user.email,
+        req.user.name
+      );
+      res.json({ success: true, message: "Request sent to admin." });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   }
-});
+);
 
 // Admin: Get Requests
-app.get("/api/admin/requests", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
-  try {
-    const requests = await airtableService.getPendingCreditRequests();
-    res.json({ success: true, requests });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+app.get(
+  "/api/admin/requests",
+  authenticateToken,
+  requireAdmin,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const requests = await airtableService.getPendingCreditRequests();
+      res.json({ success: true, requests });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   }
-});
+);
 
 // Admin: Mark Request as Done (Dismiss Notification)
-app.put("/api/admin/requests/:id/resolve", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
-  try {
-    await airtableService.resolveCreditRequest(req.params.id);
-    res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+app.put(
+  "/api/admin/requests/:id/resolve",
+  authenticateToken,
+  requireAdmin,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      await airtableService.resolveCreditRequest(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   }
-});
+);
 
 // ==================== ADMIN MANAGEMENT ROUTES ====================
 
 // 1. Create User
-app.post("/api/admin/create-user", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
-  const { email, password, name } = req.body;
-  if (!email || !password) return res.status(400).json({ error: "Missing fields" });
+app.post(
+  "/api/admin/create-user",
+  authenticateToken,
+  requireAdmin,
+  async (req: AuthenticatedRequest, res) => {
+    const { email, password, name } = req.body;
+    if (!email || !password)
+      return res.status(400).json({ error: "Missing fields" });
 
-  try {
-    const newUser = await AuthService.createSystemUser(email, password, name || "New User");
-    res.json({ success: true, user: newUser });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    try {
+      const newUser = await AuthService.createSystemUser(
+        email,
+        password,
+        name || "New User"
+      );
+      res.json({ success: true, user: newUser });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   }
-});
+);
 
 // 2. List All Users
-app.get("/api/admin/users", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
-  try {
-    const users = await airtableService.getAllUsers();
-    res.json({ success: true, users });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+app.get(
+  "/api/admin/users",
+  authenticateToken,
+  requireAdmin,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const users = await airtableService.getAllUsers();
+      res.json({ success: true, users });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   }
-});
+);
 
 // 3. Update User (Credits & System)
-app.put("/api/admin/users/:userId", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
-  const { userId } = req.params;
-  const { credits, creditSystem, name } = req.body;
+app.put(
+  "/api/admin/users/:userId",
+  authenticateToken,
+  requireAdmin,
+  async (req: AuthenticatedRequest, res) => {
+    const { userId } = req.params;
+    const { credits, creditSystem, name } = req.body;
 
-  try {
-    await airtableService.adminUpdateUser(userId, { credits, creditSystem, name });
-    res.json({ success: true, message: "User updated successfully" });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    try {
+      await airtableService.adminUpdateUser(userId, {
+        credits,
+        creditSystem,
+        name,
+      });
+      res.json({ success: true, message: "User updated successfully" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   }
-});
+);
 
 // 4. Delete User
-app.delete("/api/admin/users/:userId", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
-  const { userId } = req.params;
+app.delete(
+  "/api/admin/users/:userId",
+  authenticateToken,
+  requireAdmin,
+  async (req: AuthenticatedRequest, res) => {
+    const { userId } = req.params;
 
-  try {
-    const userToDelete = await airtableService.findUserById(userId);
-    
-    if (!userToDelete) {
-      return res.status(404).json({ error: "User not found" });
+    try {
+      const userToDelete = await airtableService.findUserById(userId);
+
+      if (!userToDelete) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Delete from Supabase (Auth)
+      await AuthService.deleteSupabaseUserByEmail(userToDelete.email);
+
+      // Delete from Airtable (Data)
+      await airtableService.deleteUser(userId);
+
+      res.json({ success: true, message: "User deleted successfully" });
+    } catch (error: any) {
+      console.error("Delete Error:", error);
+      res.status(500).json({ error: error.message });
     }
-
-    // Delete from Supabase (Auth)
-    await AuthService.deleteSupabaseUserByEmail(userToDelete.email);
-
-    // Delete from Airtable (Data)
-    await airtableService.deleteUser(userId);
-
-    res.json({ success: true, message: "User deleted successfully" });
-  } catch (error: any) {
-    console.error("Delete Error:", error);
-    res.status(500).json({ error: error.message });
   }
-});
+);
 
 // ==================== AUTH ROUTES ====================
 app.get(
@@ -252,7 +303,8 @@ app.get(
   async (req: AuthenticatedRequest, res) => {
     try {
       const user = await airtableService.findUserById(req.user!.id);
-      if (!user) return res.json({ credits: { video: 0, image: 0, carousel: 0 } });
+      if (!user)
+        return res.json({ credits: { video: 0, image: 0, carousel: 0 } });
       res.json({ credits: user.demoCredits });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch credits" });
@@ -343,14 +395,25 @@ app.get(
       if (isCarousel) {
         const filename = `${cleanTitle}.zip`;
         res.setHeader("Content-Type", "application/zip");
-        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${filename}"`
+        );
         const archive = archiver("zip", { zlib: { level: 9 } });
-        archive.on("error", (err) => { throw err; });
+        archive.on("error", (err) => {
+          throw err;
+        });
         archive.pipe(res);
         for (let i = 0; i < imageUrls.length; i++) {
           const url = imageUrls[i];
-          const response = await axios({ url, method: "GET", responseType: "stream" });
-          archive.append(response.data, { name: `${cleanTitle}_slide_${i + 1}.jpg` });
+          const response = await axios({
+            url,
+            method: "GET",
+            responseType: "stream",
+          });
+          archive.append(response.data, {
+            name: `${cleanTitle}_slide_${i + 1}.jpg`,
+          });
         }
         await archive.finalize();
         return;
@@ -368,11 +431,15 @@ app.get(
       if (response.headers["content-length"]) {
         res.setHeader("Content-Length", response.headers["content-length"]);
       }
-      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${filename}"`
+      );
       response.data.pipe(res);
     } catch (error: any) {
       console.error("Download error:", error);
-      if (!res.headersSent) res.status(500).json({ error: "Failed to download media" });
+      if (!res.headersSent)
+        res.status(500).json({ error: "Failed to download media" });
     }
   }
 );
@@ -391,7 +458,7 @@ app.post(
         mediaType,
         duration,
         model,
-        aspectRatio, 
+        aspectRatio,
         resolution,
         size,
         width,
@@ -404,8 +471,8 @@ app.post(
         return res.status(400).json({ error: "Missing required fields" });
 
       const user = await airtableService.findUserById(req.user!.id);
-      const creditKey = mediaType as keyof typeof user!.demoCredits;
-      
+      const creditKey = mediaType as "video" | "image" | "carousel";
+
       if (!user || user.demoCredits[creditKey] <= 0) {
         return res.status(403).json({ error: "Insufficient credits" });
       }
@@ -418,7 +485,9 @@ app.post(
             uploadedUrls.push(url);
           }
         } catch (err) {
-          return res.status(500).json({ success: false, error: "Image upload failed" });
+          return res
+            .status(500)
+            .json({ success: false, error: "Image upload failed" });
         }
       }
       const primaryRefUrl = uploadedUrls.length > 0 ? uploadedUrls[0] : "";
@@ -455,7 +524,7 @@ app.post(
       await airtableService.updatePost(post.id, {
         status: "PROCESSING",
         progress: 1,
-        userEditedPrompt: prompt 
+        userEditedPrompt: prompt,
       });
 
       const updatedCredits = { ...user.demoCredits };
@@ -467,11 +536,23 @@ app.post(
       (async () => {
         try {
           if (mediaType === "carousel") {
-             contentEngine.startCarouselGeneration(post.id, prompt, generationParams);
+            contentEngine.startCarouselGeneration(
+              post.id,
+              prompt,
+              generationParams
+            );
           } else if (mediaType === "image") {
-             contentEngine.startImageGeneration(post.id, prompt, generationParams);
+            contentEngine.startImageGeneration(
+              post.id,
+              prompt,
+              generationParams
+            );
           } else {
-             contentEngine.startVideoGeneration(post.id, prompt, generationParams);
+            contentEngine.startVideoGeneration(
+              post.id,
+              prompt,
+              generationParams
+            );
           }
         } catch (err: any) {
           console.error("Background Error:", err);
