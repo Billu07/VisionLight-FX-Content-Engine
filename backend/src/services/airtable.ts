@@ -230,8 +230,6 @@ export const airtableService = {
     name: string
   ): Promise<void> {
     try {
-      // NOTE: You must create a 'CreditRequests' table in Airtable first!
-      // Columns: userId, email, name, status (Single Select: PENDING/RESOLVED), createdAt
       await base("CreditRequests").create({
         userId: userId,
         email: email,
@@ -284,7 +282,6 @@ export const airtableService = {
       });
       if (!userConfig) return null;
 
-      // Handle array/string userId mismatch from Airtable Link fields
       const userIdField = userConfig.get("userId");
       let actualUserId = Array.isArray(userIdField)
         ? String(userIdField[0])
@@ -304,6 +301,7 @@ export const airtableService = {
     }
   },
 
+  // FIX: Converted string 'now' back to Date for return object
   async upsertBrandConfig(configData: {
     userId: string;
     companyName?: string;
@@ -324,7 +322,7 @@ export const airtableService = {
 
       if (existing) {
         await base("BrandConfig").update(existing.id, payload);
-        return { ...existing, ...payload };
+        return { ...existing, ...payload, updatedAt: new Date(now) };
       } else {
         const record = await base("BrandConfig").create({
           userId: [configData.userId],
@@ -334,6 +332,7 @@ export const airtableService = {
           id: record.id,
           userId: configData.userId,
           ...payload,
+          updatedAt: new Date(now),
         } as BrandConfig;
       }
     } catch (error) {
@@ -364,7 +363,6 @@ export const airtableService = {
         createdAt: now,
         updatedAt: now,
       });
-      // ... mapping return (Simplified for brevity as structure is known)
       return {
         id: record.id,
         ...postData,
@@ -389,8 +387,7 @@ export const airtableService = {
         updateData.generationParams = JSON.stringify(updates.generationParams);
 
       const record = await base("Posts").update(postId, updateData);
-      // ... mapping return
-      return { id: record.id, ...updates } as Post; // simplified return
+      return { id: record.id, ...updates } as Post;
     } catch (error) {
       throw error;
     }
@@ -399,7 +396,6 @@ export const airtableService = {
   async getPostById(postId: string): Promise<Post | null> {
     try {
       const record = await base("Posts").find(postId);
-      // ... mapping logic (Same as your existing file)
       const userIdField = record.get("userId");
       let actualUserId = Array.isArray(userIdField)
         ? String(userIdField[0])
@@ -417,9 +413,9 @@ export const airtableService = {
         generationParams: record.get("generationParams")
           ? JSON.parse(record.get("generationParams") as string)
           : undefined,
+        error: record.get("error") as string, // Added error mapping
         createdAt: new Date(record.get("createdAt") as string),
         updatedAt: new Date(record.get("updatedAt") as string),
-        // ... include other fields
       } as Post;
     } catch (error) {
       return null;
@@ -437,17 +433,25 @@ export const airtableService = {
       });
 
       return userPosts.map((record) => {
-        // ... mapping logic (Same as your existing file)
+        let mediaUrl = record.get("mediaUrl") as string;
+        if (
+          mediaUrl &&
+          typeof mediaUrl === "string" &&
+          mediaUrl.startsWith("http://")
+        ) {
+          mediaUrl = mediaUrl.replace("http://", "https://");
+        }
+
         return {
           id: record.id,
           title: record.get("title"),
           prompt: record.get("prompt"),
-          mediaUrl: record.get("mediaUrl"),
+          mediaUrl: mediaUrl,
           mediaType: record.get("mediaType"),
           status: record.get("status"),
           progress: record.get("progress"),
+          error: record.get("error"),
           createdAt: record.get("createdAt"),
-          // ...
         };
       });
     } catch (error: any) {
@@ -455,26 +459,82 @@ export const airtableService = {
     }
   },
 
-  // === SESSION & ROI (Keep as is) ===
+  // === SESSION (Auth) ===
   async validateSession(token: string) {
-    /* ... */
-  }, // Handled by Auth Service mainly now
+    /* Handled by Auth Service */ return null;
+  },
   async createSession(userId: string, token: string) {
-    /* ... */
-  },
-  async deleteSession(token: string) {
-    /* ... */
-  },
-
-  async getROIMetrics(userId: string): Promise<ROIMetrics> {
-    // ... (Existing implementation)
     return {
       id: "mock",
       userId,
-      postsCreated: 0,
-      timeSaved: 0,
-      mediaGenerated: 0,
-      updatedAt: new Date(),
+      token,
+      expiresAt: new Date(),
+      createdAt: new Date(),
     };
+  },
+  async deleteSession(token: string) {
+    return;
+  },
+
+  // === ROI METRICS ===
+  async getROIMetrics(userId: string): Promise<ROIMetrics> {
+    try {
+      const allRecords = await base("ROIMetrics").select().firstPage();
+      const userMetrics = allRecords.find((record) => {
+        const userIdField = record.get("userId");
+        return Array.isArray(userIdField) && userIdField.includes(userId);
+      });
+
+      if (!userMetrics) {
+        const now = new Date().toISOString();
+        const record = await base("ROIMetrics").create({
+          userId: [userId],
+          postsCreated: 0,
+          timeSaved: 0,
+          mediaGenerated: 0,
+          updatedAt: now,
+        });
+        return {
+          id: record.id,
+          userId,
+          postsCreated: 0,
+          timeSaved: 0,
+          mediaGenerated: 0,
+          updatedAt: new Date(now),
+        };
+      }
+
+      return {
+        id: userMetrics.id,
+        userId,
+        postsCreated: userMetrics.get("postsCreated") as number,
+        timeSaved: userMetrics.get("timeSaved") as number,
+        mediaGenerated: userMetrics.get("mediaGenerated") as number,
+        updatedAt: new Date(userMetrics.get("updatedAt") as string),
+      };
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  async updateROIMetrics(
+    userId: string,
+    updates: Partial<Omit<ROIMetrics, "id" | "userId" | "updatedAt">>
+  ): Promise<ROIMetrics> {
+    try {
+      const existing = await this.getROIMetrics(userId);
+      const now = new Date().toISOString();
+      const updateData: any = { updatedAt: now, ...updates };
+
+      await base("ROIMetrics").update(existing.id, updateData);
+
+      return {
+        ...existing,
+        ...updates,
+        updatedAt: new Date(now),
+      };
+    } catch (error) {
+      throw error;
+    }
   },
 };
