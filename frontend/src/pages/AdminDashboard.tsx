@@ -11,11 +11,19 @@ interface User {
   demoCredits: { video: number; image: number; carousel: number };
 }
 
+interface CreditRequest {
+  id: string;
+  email: string;
+  name: string;
+  createdAt: string;
+}
+
 export default function AdminDashboard() {
   const { user: adminUser } = useAuth();
 
   // Data State
   const [users, setUsers] = useState<User[]>([]);
+  const [requests, setRequests] = useState<CreditRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -39,24 +47,37 @@ export default function AdminDashboard() {
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
-    fetchUsers();
+    fetchData();
   }, []);
 
-  const fetchUsers = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await apiEndpoints.adminGetUsers();
-      if (res.data.success) {
-        setUsers(res.data.users);
-      }
+      const [usersRes, reqRes] = await Promise.all([
+        apiEndpoints.adminGetUsers(),
+        apiEndpoints.adminGetRequests(),
+      ]);
+
+      if (usersRes.data.success) setUsers(usersRes.data.users);
+      if (reqRes.data.success) setRequests(reqRes.data.requests);
     } catch (err) {
-      console.error("Failed to load users", err);
+      console.error("Failed to load data", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // --- ACTIONS ---
+  // --- NOTIFICATION ACTIONS ---
+  const handleResolveRequest = async (id: string) => {
+    try {
+      await apiEndpoints.adminResolveRequest(id);
+      fetchData(); // Refresh list
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // --- USER ACTIONS ---
 
   const handleInviteUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,7 +88,7 @@ export default function AdminDashboard() {
       setMsg("✅ User created & synced!");
       setNewUser({ email: "", password: "", name: "" });
       setShowInviteModal(false);
-      fetchUsers();
+      fetchData();
     } catch (err: any) {
       setMsg("❌ " + (err.response?.data?.error || err.message));
     } finally {
@@ -90,7 +111,7 @@ export default function AdminDashboard() {
     try {
       await apiEndpoints.adminUpdateUser(editingUser.id, editForm);
       setEditingUser(null);
-      fetchUsers();
+      fetchData();
     } catch (err: any) {
       alert("Update failed: " + err.message);
     } finally {
@@ -98,7 +119,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // NEW: Delete Handler
   const handleDeleteUser = async (user: User) => {
     if (
       !window.confirm(
@@ -110,10 +130,9 @@ export default function AdminDashboard() {
 
     setLoading(true);
     try {
-      // Assuming you added adminDeleteUser to api.ts as discussed
       await apiEndpoints.adminDeleteUser(user.id);
       setMsg(`✅ User ${user.email} deleted.`);
-      fetchUsers();
+      fetchData();
     } catch (err: any) {
       alert("Failed to delete user: " + err.message);
       setLoading(false);
@@ -176,6 +195,52 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* === NOTIFICATION CENTER === */}
+        {requests.length > 0 && (
+          <div className="mb-8 bg-purple-900/20 border border-purple-500/30 rounded-xl p-6 animate-in fade-in">
+            <h2 className="text-xl font-bold text-purple-300 mb-4 flex items-center gap-2">
+              🔔 Pending Credit Requests ({requests.length})
+            </h2>
+            <div className="grid gap-3">
+              {requests.map((req) => (
+                <div
+                  key={req.id}
+                  className="flex items-center justify-between bg-gray-800 p-4 rounded-lg border border-gray-700"
+                >
+                  <div>
+                    <span className="font-bold text-white">{req.name}</span>
+                    <span className="text-gray-400 text-sm ml-2">
+                      ({req.email})
+                    </span>
+                    <span className="text-xs text-gray-500 block mt-1">
+                      Requested: {new Date(req.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        setSearchTerm(req.email); // Auto-filter the table
+                        setMsg(
+                          `🔍 Filtered for ${req.email}. Click 'Edit' to grant credits.`
+                        );
+                      }}
+                      className="text-cyan-400 hover:text-white text-sm underline"
+                    >
+                      Find User
+                    </button>
+                    <button
+                      onClick={() => handleResolveRequest(req.id)}
+                      className="bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded text-xs text-white uppercase font-bold"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* USERS TABLE */}
         <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow-2xl">
           <div className="overflow-x-auto">
@@ -183,9 +248,7 @@ export default function AdminDashboard() {
               <thead className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
                 <tr>
                   <th className="p-4 border-b border-gray-700">User Details</th>
-                  <th className="p-4 border-b border-gray-700">
-                    Credit System
-                  </th>
+                  <th className="p-4 border-b border-gray-700">System</th>
                   <th className="p-4 border-b border-gray-700">
                     Credits (Vid/Img/Car)
                   </th>
@@ -353,12 +416,10 @@ export default function AdminDashboard() {
               >
                 ✕
               </button>
-
               <h3 className="text-xl font-bold mb-2 text-white">Edit User</h3>
               <p className="text-sm text-cyan-400 mb-6">{editingUser.email}</p>
 
               <div className="space-y-6">
-                {/* 1. Credit System Toggle */}
                 <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700">
                   <label className="block text-xs uppercase text-gray-400 font-bold mb-3">
                     Credit System Mode
@@ -393,12 +454,11 @@ export default function AdminDashboard() {
                   </div>
                   <p className="text-xs text-gray-500 mt-2">
                     {editForm.creditSystem === "COMMERCIAL"
-                      ? "User sees 'Buy Credits' buttons linking to payment."
-                      : "User sees 'Request Credits' buttons linking to form."}
+                      ? "User sees 'Buy Credits' buttons."
+                      : "User sees 'Request Credits' buttons."}
                   </p>
                 </div>
 
-                {/* 2. Credits Inputs */}
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs uppercase text-blue-300 font-bold mb-1">
@@ -459,7 +519,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* 3. Name */}
                 <div>
                   <label className="block text-xs uppercase text-gray-400 font-bold mb-1">
                     Display Name

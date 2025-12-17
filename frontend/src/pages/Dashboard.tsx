@@ -14,7 +14,8 @@ import fxLogo from "../assets/fx.png";
 import picdriftLogo from "../assets/picdrift.png";
 
 // === CONFIGURATION ===
-const ADMIN_EMAIL = "keith@picdrift.com";
+// Use lowercase for reliable matching
+const ADMIN_EMAILS = ["snowfix07@gmail.com", "keith@picdrift.com"];
 
 type EngineType = "kie" | "studio" | "openai";
 type StudioMode = "image" | "carousel";
@@ -34,7 +35,7 @@ function Dashboard() {
   const [prompt, setPrompt] = useState("");
   const [videoTitle, setVideoTitle] = useState("");
 
-  // Engine Selection (Default to Video FX Pro logic -> OpenAI)
+  // Engine Selection (Default: OpenAI / Video FX 2)
   const [activeEngine, setActiveEngine] = useState<EngineType>("openai");
   const [studioMode, setStudioMode] = useState<StudioMode>("image");
 
@@ -58,7 +59,7 @@ function Dashboard() {
     "1280x720" | "1792x1024" | "720x1280" | "1024x1792"
   >("1792x1024");
 
-  // Studio (Gemini) Aspect Ratio
+  // Studio (Gemini)
   const [geminiAspect, setGeminiAspect] = useState<"1:1" | "16:9" | "9:16">(
     "16:9"
   );
@@ -168,10 +169,15 @@ function Dashboard() {
   // Credit System Logic
   // @ts-ignore
   const isCommercial = user?.creditSystem !== "INTERNAL";
+  const [isRequesting, setIsRequesting] = useState(false);
   const creditLink = isCommercial
     ? "https://www.picdrift.com/fx-credits"
     : "https://www.picdrift.com/fx-request";
   const creditBtnText = isCommercial ? "Buy FX Credits" : "Request Credits";
+
+  // Admin Check Logic (Case Insensitive)
+  const isAdmin =
+    user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
 
   // === ACTIONS ===
 
@@ -199,6 +205,20 @@ function Dashboard() {
 
   const handleShowPromptInfo = (promptText: string) => {
     setShowPromptInfo(promptText);
+  };
+
+  const handleRequestCredits = async () => {
+    if (!confirm("Send a notification to Admin requesting more credits?"))
+      return;
+    setIsRequesting(true);
+    try {
+      await apiEndpoints.requestCredits();
+      alert("✅ Request sent! The admin has been notified.");
+    } catch (err) {
+      alert("Failed to send request.");
+    } finally {
+      setIsRequesting(false);
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -240,6 +260,7 @@ function Dashboard() {
       formData.append("aspectRatio", aspectRatio);
     } else {
       formData.append("mediaType", studioMode);
+      // Map Gemini Aspect
       let sizeStr = "1024x1024";
       if (geminiAspect === "16:9") sizeStr = "1792x1024";
       if (geminiAspect === "9:16") sizeStr = "1024x1792";
@@ -319,14 +340,24 @@ function Dashboard() {
               You need more credits to start this generation.
             </p>
             <div className="flex flex-col gap-3">
-              <a
-                href={creditLink}
-                target="_blank"
-                rel="noreferrer"
-                className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition-all"
-              >
-                {creditBtnText}
-              </a>
+              {isCommercial ? (
+                <a
+                  href={creditLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition-all"
+                >
+                  {creditBtnText}
+                </a>
+              ) : (
+                <button
+                  onClick={handleRequestCredits}
+                  disabled={isRequesting}
+                  className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold transition-all"
+                >
+                  {isRequesting ? "Sending..." : "Request Credits"}
+                </button>
+              )}
               <button
                 onClick={() => setShowNoCreditsModal(false)}
                 className="text-gray-400 hover:text-white text-sm"
@@ -411,7 +442,7 @@ function Dashboard() {
 
             {isMobile && (
               <div className="flex gap-2">
-                {user.email === ADMIN_EMAIL && (
+                {isAdmin && (
                   <button
                     onClick={() => navigate("/admin")}
                     className="p-2 bg-red-900/50 border border-red-500/30 rounded-xl text-red-300"
@@ -498,7 +529,8 @@ function Dashboard() {
 
             {!isMobile && (
               <div className="flex gap-2">
-                {user.email === ADMIN_EMAIL && (
+                {/* Admin Button */}
+                {isAdmin && (
                   <button
                     onClick={() => navigate("/admin")}
                     className="px-4 py-2.5 bg-red-600/20 border border-red-500/50 rounded-xl text-red-300 text-sm hover:bg-red-600/40 font-bold transition-all"
@@ -507,14 +539,25 @@ function Dashboard() {
                   </button>
                 )}
 
-                <a
-                  href={creditLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-4 py-2.5 bg-gray-800/60 border border-green-400/30 rounded-xl text-green-400 text-sm hover:bg-green-400/10 flex items-center gap-2"
-                >
-                  {creditBtnText}
-                </a>
+                {/* Credit Button */}
+                {isCommercial ? (
+                  <a
+                    href={creditLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2.5 bg-gray-800/60 border border-green-400/30 rounded-xl text-green-400 text-sm hover:bg-green-400/10 flex items-center gap-2"
+                  >
+                    {creditBtnText}
+                  </a>
+                ) : (
+                  <button
+                    onClick={handleRequestCredits}
+                    disabled={isRequesting}
+                    className="px-4 py-2.5 bg-purple-600/20 border border-purple-500/50 rounded-xl text-purple-300 text-sm hover:bg-purple-600/40 font-bold transition-all"
+                  >
+                    {isRequesting ? "Sending..." : "Request Credits 🔔"}
+                  </button>
+                )}
 
                 <button
                   onClick={() => setShowBrandModal(true)}
@@ -552,27 +595,27 @@ function Dashboard() {
                 </p>
               </div>
 
-              {/* ENGINE SELECTOR - FIX: CORRECT ORDER & OPTIONS */}
+              {/* ENGINE SELECTOR - UPDATED COLOR THEME SWAP */}
               <div className="mb-6 sm:mb-8">
                 <label className="block text-sm font-semibold text-white mb-3 sm:mb-4">
                   🎬 Select Content Type
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
                   {[
-                    // 1. Kie (Video FX) - Uses VIOLET/PURPLE
+                    // 1. Kie (Video FX) - NOW PINK (Swapped with Pic FX)
                     {
                       id: "kie",
                       label: "Video FX",
-                      grad: "from-violet-700 to-purple-700",
+                      grad: "from-pink-500 to-rose-500",
                     },
-                    // 2. Studio (Pic FX) - Stays PINK
+                    // 2. Studio (Pic FX) - NOW VIOLET (Swapped with Video FX)
                     {
                       id: "studio",
                       label: "Pic FX",
                       sub: "Image & Carousel",
-                      grad: "from-pink-500 to-rose-500",
+                      grad: "from-violet-700 to-purple-700",
                     },
-                    // 3. OpenAI (Video FX 2) - Uses BLUE/CYAN
+                    // 3. OpenAI (Video FX 2) - Remains Blue/Cyan
                     {
                       id: "openai",
                       label: "Video FX 2",
@@ -615,7 +658,7 @@ function Dashboard() {
                 </div>
               </div>
 
-              {/* STUDIO TOGGLE & ASPECT */}
+              {/* STUDIO TOGGLE (PIC FX) - VIOLET THEME */}
               {activeEngine === "studio" && (
                 <div className="mb-6 animate-in fade-in space-y-4">
                   <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
@@ -623,7 +666,7 @@ function Dashboard() {
                       onClick={() => setStudioMode("image")}
                       className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
                         studioMode === "image"
-                          ? "bg-cyan-500 text-white shadow-lg"
+                          ? "bg-violet-600 text-white shadow-lg"
                           : "text-gray-400 hover:text-white"
                       }`}
                     >
@@ -633,7 +676,7 @@ function Dashboard() {
                       onClick={() => setStudioMode("carousel")}
                       className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
                         studioMode === "carousel"
-                          ? "bg-green-500 text-white shadow-lg"
+                          ? "bg-fuchsia-600 text-white shadow-lg"
                           : "text-gray-400 hover:text-white"
                       }`}
                     >
@@ -653,7 +696,7 @@ function Dashboard() {
                         onClick={() => setGeminiAspect(a.id as any)}
                         className={`px-4 py-2 rounded-lg border text-xs font-bold ${
                           geminiAspect === a.id
-                            ? "bg-pink-600 border-pink-500 text-white"
+                            ? "bg-violet-600 border-violet-500 text-white"
                             : "bg-gray-800 border-gray-700 text-gray-400"
                         }`}
                       >
@@ -693,11 +736,10 @@ function Dashboard() {
                   />
                 </div>
 
-                {/* KIE AI CONTROLS (Video FX) */}
+                {/* KIE AI CONTROLS (Video FX) - PINK/ROSE THEME */}
                 {activeEngine === "kie" && (
                   <div className="space-y-4 sm:space-y-6 animate-in fade-in">
                     <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                      {/* FIX: Restored BOTH Video FX and Video FX Pro options */}
                       {[
                         { id: "kie-sora-2", label: "Video FX" },
                         { id: "kie-sora-2-pro", label: "Video FX Pro" },
@@ -708,7 +750,7 @@ function Dashboard() {
                           onClick={() => setKieModel(m.id as any)}
                           className={`p-3 rounded-xl border text-sm font-bold transition-all ${
                             kieModel === m.id
-                              ? "bg-violet-600 border-violet-600 text-white shadow-lg"
+                              ? "bg-rose-600 border-rose-600 text-white shadow-lg"
                               : "border-white/10 bg-gray-800/50 text-gray-400"
                           }`}
                         >
@@ -723,14 +765,14 @@ function Dashboard() {
                           Duration
                         </label>
                         <div className="flex gap-2">
-                          {[5, 10].map((d) => (
+                          {[5, 10, 15].map((d) => (
                             <button
                               key={d}
                               type="button"
                               onClick={() => setKieDuration(d as any)}
                               className={`flex-1 py-2 rounded-lg border ${
                                 kieDuration === d
-                                  ? "bg-violet-600 border-violet-600 text-white"
+                                  ? "bg-rose-600 border-rose-600 text-white"
                                   : "border-white/10 bg-gray-800/50 text-gray-400"
                               }`}
                             >
@@ -754,7 +796,7 @@ function Dashboard() {
                               onClick={() => setKieAspect(a.id as any)}
                               className={`flex-1 py-2 rounded-lg border ${
                                 kieAspect === a.id
-                                  ? "bg-violet-600 border-violet-600 text-white"
+                                  ? "bg-rose-600 border-rose-600 text-white"
                                   : "border-white/10 bg-gray-800/50 text-gray-400"
                               }`}
                             >
@@ -778,7 +820,7 @@ function Dashboard() {
                               onClick={() => setKieResolution(r.id as any)}
                               className={`flex-1 py-2 rounded-lg border ${
                                 kieResolution === r.id
-                                  ? "bg-violet-600 border-violet-600 text-white"
+                                  ? "bg-rose-600 border-rose-600 text-white"
                                   : "border-white/10 bg-gray-800/50 text-gray-400"
                               }`}
                             >
@@ -791,7 +833,7 @@ function Dashboard() {
                   </div>
                 )}
 
-                {/* OPENAI CONTROLS (Video FX 2) */}
+                {/* OPENAI CONTROLS (Video FX 2) - BLUE/CYAN THEME */}
                 {activeEngine === "openai" && (
                   <div className="space-y-4 sm:space-y-6 animate-in fade-in">
                     <div className="space-y-2 sm:space-y-3">
@@ -799,7 +841,6 @@ function Dashboard() {
                         AI Model
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                        {/* FIX: Restored Video FX 2 and Video FX 2 Pro */}
                         {[
                           { id: "sora-2", label: "Video FX 2" },
                           { id: "sora-2-pro", label: "Video FX 2 Pro" },

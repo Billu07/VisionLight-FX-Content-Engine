@@ -16,7 +16,7 @@ import { useAuth } from "./hooks/useAuth";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 
 // Define your Admin Email here (or use import.meta.env.VITE_ADMIN_EMAIL)
-const ADMIN_EMAIL = "keith@picdrift.com";
+const ADMIN_EMAILS = ["snowfix07@gmail.com", "keith@picdrift.com"];
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -65,9 +65,9 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   // 1. Must be logged in
   if (!user) return <Navigate to="/" replace />;
 
-  // 2. Must match Admin Email
-  if (user.email !== ADMIN_EMAIL) {
-    return <Navigate to="/app" replace />; // Kick regular users to dashboard
+  // 2. Must be in the Allowed List (CHANGED)
+  if (!ADMIN_EMAILS.includes(user.email)) {
+    return <Navigate to="/app" replace />;
   }
 
   return <>{children}</>;

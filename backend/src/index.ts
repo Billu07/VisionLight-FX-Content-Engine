@@ -25,7 +25,10 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 // === ADMIN CONFIGURATION ===
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "snowfix07@gmail.com";
+// 1. Get string from env, default to your email
+const ADMIN_EMAILS_RAW = process.env.ADMIN_EMAILS || "snowfix07@gmail.com";
+// 2. Convert to Array and clean up spaces
+const ADMIN_EMAILS = ADMIN_EMAILS_RAW.split(",").map(email => email.trim());
 
 const allowedOrigins = ["https://picdrift.studio", "http://localhost:5173"];
 if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL);
@@ -48,7 +51,7 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.get("/", (req, res) => {
   res.json({
     message: "Visionlight FX Backend - Supabase Edition",
-    version: "4.1.0",
+    version: "4.1.1",
     status: "Healthy",
   });
 });
@@ -80,16 +83,49 @@ const authenticateToken = async (
   }
 };
 
-// ==================== ADMIN ROUTES ====================
-
-// Middleware helper for Admin Check
+// ==================== ADMIN MIDDLEWARE (MOVED UP) ====================
+// This MUST be defined before any route that uses it.
 const requireAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-  if (req.user?.email !== ADMIN_EMAIL) {
+  if (!req.user?.email || !ADMIN_EMAILS.includes(req.user.email)) {
     console.warn(`⚠️ Unauthorized Admin Access Attempt by: ${req.user?.email}`);
     return res.status(403).json({ error: "Access Denied: Admins only." });
   }
   next();
 };
+
+// ==================== NOTIFICATION ROUTES ====================
+
+// User: Request Credits
+app.post("/api/request-credits", authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    await airtableService.createCreditRequest(req.user.id, req.user.email, req.user.name);
+    res.json({ success: true, message: "Request sent to admin." });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: Get Requests
+app.get("/api/admin/requests", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    const requests = await airtableService.getPendingCreditRequests();
+    res.json({ success: true, requests });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin: Mark Request as Done (Dismiss Notification)
+app.put("/api/admin/requests/:id/resolve", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+  try {
+    await airtableService.resolveCreditRequest(req.params.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== ADMIN MANAGEMENT ROUTES ====================
 
 // 1. Create User
 app.post("/api/admin/create-user", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
@@ -127,6 +163,30 @@ app.put("/api/admin/users/:userId", authenticateToken, requireAdmin, async (req:
   }
 });
 
+// 4. Delete User
+app.delete("/api/admin/users/:userId", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+  const { userId } = req.params;
+
+  try {
+    const userToDelete = await airtableService.findUserById(userId);
+    
+    if (!userToDelete) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Delete from Supabase (Auth)
+    await AuthService.deleteSupabaseUserByEmail(userToDelete.email);
+
+    // Delete from Airtable (Data)
+    await airtableService.deleteUser(userId);
+
+    res.json({ success: true, message: "User deleted successfully" });
+  } catch (error: any) {
+    console.error("Delete Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ==================== AUTH ROUTES ====================
 app.get(
   "/api/auth/me",
@@ -138,31 +198,6 @@ app.get(
     });
   }
 );
-
-// 4. Delete User
-app.delete("/api/admin/users/:userId", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
-  const { userId } = req.params;
-
-  try {
-    // 1. Fetch user first to get their email (needed for Supabase deletion)
-    const userToDelete = await airtableService.findUserById(userId);
-    
-    if (!userToDelete) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    // 2. Delete from Supabase (Auth)
-    await AuthService.deleteSupabaseUserByEmail(userToDelete.email);
-
-    // 3. Delete from Airtable (Data)
-    await airtableService.deleteUser(userId);
-
-    res.json({ success: true, message: "User deleted successfully" });
-  } catch (error: any) {
-    console.error("Delete Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
 
 // ==================== DATA ROUTES ====================
 app.get(
@@ -296,7 +331,6 @@ app.get(
         cleanTitle = post.title.replace(/[\\/:*?"<>|]/g, "_").trim();
       }
 
-      // Check Carousel
       let isCarousel = false;
       let imageUrls: string[] = [];
       if (post.mediaUrl.trim().startsWith("[")) {

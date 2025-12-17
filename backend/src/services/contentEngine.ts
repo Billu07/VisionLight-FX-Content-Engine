@@ -211,7 +211,8 @@ export const contentEngine = {
             prompt: finalPrompt,
             aspect_ratio:
               params.aspectRatio === "9:16" ? "portrait" : "landscape",
-            n_frames: params.duration === 15 ? "15" : "10",
+            // FIX: Respect 5s, 10s, or 15s. Fallback to 10s if missing.
+            n_frames: params.duration ? params.duration.toString() : "10",
             remove_watermark: true,
           },
         };
@@ -423,7 +424,7 @@ export const contentEngine = {
   },
 
   // ===========================================================================
-  // WORKFLOW: IMAGE GENERATION (Gemini)
+  // WORKFLOW: IMAGE GENERATION (Gemini - UPDATED WITH ASPECT RATIO)
   // ===========================================================================
   async startImageGeneration(postId: string, finalPrompt: string, params: any) {
     console.log(`🎨 Image Gen for ${postId}`);
@@ -433,6 +434,7 @@ export const contentEngine = {
         (params.imageReference ? [params.imageReference] : []);
       const refBuffers = await this.downloadAndOptimizeImages(refUrls);
 
+      // Pass Aspect Ratio here
       const buf = await this.generateGeminiImage(
         finalPrompt,
         refBuffers,
@@ -465,7 +467,7 @@ export const contentEngine = {
   },
 
   // ===========================================================================
-  // WORKFLOW: CAROUSEL GENERATION (Gemini)
+  // WORKFLOW: CAROUSEL GENERATION (Gemini - UPDATED WITH ASPECT RATIO)
   // ===========================================================================
   async startCarouselGeneration(
     postId: string,
@@ -491,7 +493,7 @@ export const contentEngine = {
         console.log(`📸 Generating Slide ${i + 1}/3...`);
         const currentContext = [...userRefBuffers, ...generatedHistory];
 
-        // Carousel usually benefits from vertical 9:16
+        // Use aspect ratio (Carousels are usually 9:16 vertical, but we respect params)
         const buf = await this.generateGeminiImage(
           prompts[i],
           currentContext,

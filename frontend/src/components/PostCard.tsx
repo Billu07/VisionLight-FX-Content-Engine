@@ -36,6 +36,7 @@ export function PostCard({
   const [editedTitle, setEditedTitle] = useState(post.title || "");
   const [isPossiblyStuck, setIsPossiblyStuck] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [slideIndex, setSlideIndex] = useState(0);
 
   useEffect(() => {
     setEditedTitle(post.title || "");
@@ -56,7 +57,8 @@ export function PostCard({
   const handleVideoLoad = () => setVideoLoading(false);
 
   const handleMediaError = () => {
-    if (post.status === "READY" || post.status === "PUBLISHED") {
+    // If we have a URL but it fails to load, show error
+    if (post.status !== "PROCESSING" && post.status !== "NEW") {
       setMediaError(true);
       setVideoLoading(false);
     }
@@ -84,7 +86,6 @@ export function PostCard({
     if (!post.mediaUrl) return;
     try {
       setIsDownloading(true);
-      // FIX: Added "/api" prefix here to match backend route
       const response = await api.get(`/api/posts/${post.id}/download`, {
         responseType: "blob",
       });
@@ -111,7 +112,7 @@ export function PostCard({
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Download failed, opening fallback:", error);
+      console.error("Download fallback:", error);
       window.open(getCleanUrl(post.mediaUrl), "_blank");
     } finally {
       setIsDownloading(false);
@@ -119,17 +120,20 @@ export function PostCard({
   };
 
   const progress = post.progress || 0;
-  const isProcessing = post.status === "PROCESSING";
-  const isFailed = post.status === "FAILED";
-  const isNew = post.status === "NEW";
-  const isReady = post.status === "READY" || post.status === "PUBLISHED";
+  const isProcessing = post.status === "PROCESSING" || post.status === "NEW";
+
+  // === CRITICAL FIX ===
+  // If we have a Media URL, show the content/buttons, even if status is "FAILED"
+  // This handles cases where the generation worked but the final DB update step errored.
+  const hasMedia = !!post.mediaUrl && post.mediaUrl.length > 5;
+  const isContentVisible = hasMedia && !isProcessing;
 
   const renderMedia = () => {
-    if (!post.mediaUrl || isProcessing || isNew) {
+    if (!hasMedia || isProcessing) {
       return (
         <div className="aspect-video bg-gray-900 rounded-xl flex items-center justify-center border border-white/10 relative overflow-hidden">
           <div className="text-center w-full p-4 relative z-10">
-            {isFailed ? (
+            {post.status === "FAILED" && !hasMedia ? (
               <div className="text-red-400">
                 <span className="text-2xl block mb-2">⚠️</span>
                 <span className="text-xs font-bold">Generation Failed</span>
@@ -193,17 +197,26 @@ export function PostCard({
       } catch (e) {}
       if (!Array.isArray(slides)) slides = [];
 
+      const nextSlide = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (slides.length > 0)
+          setSlideIndex((prev) => (prev + 1) % slides.length);
+      };
+
       return (
-        <div className="relative aspect-video group">
+        <div
+          className="relative aspect-video group cursor-pointer"
+          onClick={nextSlide}
+        >
           {slides.length > 0 && (
             <img
-              src={slides[0]}
+              src={slides[slideIndex]}
               alt="Carousel"
               className="w-full h-full object-cover rounded-xl"
             />
           )}
-          <div className="absolute top-2 right-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded">
-            Carousel
+          <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-1 rounded border border-white/20">
+            {slideIndex + 1} / {slides.length}
           </div>
         </div>
       );
@@ -307,8 +320,8 @@ export function PostCard({
           </div>
         )}
 
-        {/* New Action Row */}
-        {isReady && post.mediaUrl && (
+        {/* Action Row - Now visible if content exists, ignoring status errors */}
+        {isContentVisible && (
           <div className="flex items-center gap-2 pt-1">
             <button
               onClick={handleDownload}
@@ -335,7 +348,7 @@ export function PostCard({
           </div>
         )}
 
-        {isFailed && post.error && (
+        {post.status === "FAILED" && post.error && !isContentVisible && (
           <div className="p-2 bg-red-900/20 border border-red-500/20 rounded text-[10px] text-red-300 break-words">
             {post.error}
           </div>

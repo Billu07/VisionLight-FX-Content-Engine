@@ -60,6 +60,14 @@ export const apiEndpoints = {
   getBrandConfig: () => api.get("/api/brand-config"),
   updateBrandConfig: (data: any) => api.put("/api/brand-config", data),
 
+  // === Credits & Requests ===
+  requestCredits: () => api.post("/api/request-credits"), // User action
+
+  // Admin Notifications
+  adminGetRequests: () => api.get("/api/admin/requests"),
+  adminResolveRequest: (id: string) =>
+    api.put(`/api/admin/requests/${id}/resolve`),
+
   // === Posts ===
   getPosts: () => api.get("/api/posts"),
   getPostById: (postId: string) => api.get(`/api/post/${postId}`),
