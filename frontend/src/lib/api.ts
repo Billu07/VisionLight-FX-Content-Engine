@@ -1,18 +1,19 @@
+// frontend/src/lib/api.ts
 import axios from "axios";
 
-// NOTE: Changed default to root (4000) because backend routes include '/api' prefix
+// 1. UPDATE: Add '/api' to localhost fallback so it matches your production structure
+// If .env is "/api", baseURL becomes "/api".
+// If .env is missing (local), baseURL becomes "http://localhost:4000/api"
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
 
 console.log("🔧 API Base URL:", API_BASE_URL);
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 60000, // Increased for heavier AI polling
-  // withCredentials: true, // Not strictly needed for Bearer tokens but harmless
+  timeout: 60000,
 });
 
-// Helper to set the token dynamically from useAuth
 export const setAuthToken = (token: string | null) => {
   if (token) {
     api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
@@ -21,12 +22,9 @@ export const setAuthToken = (token: string | null) => {
   }
 };
 
-// Response interceptor (Simplified for Supabase)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // We let useAuth handle 401s via Supabase state changes,
-    // but we log other errors for debugging.
     const message =
       error.response?.data?.error || error.message || "Something went wrong";
 
@@ -42,54 +40,49 @@ api.interceptors.response.use(
   }
 );
 
+// 2. UPDATE: Removed "/api" from all paths below because it is now part of API_BASE_URL
 export const apiEndpoints = {
-  // === Auth (Bridge to Airtable) ===
-  // Note: Actual login happens via Supabase Client in the UI.
-  // This endpoint retrieves the Airtable User Data using the Supabase Token.
-  getMe: () => api.get("/api/auth/me"),
+  // === Auth ===
+  getMe: () => api.get("/auth/me"), // Was: /api/auth/me
 
   // === Admin ===
   adminCreateUser: (data: { email: string; password: string; name: string }) =>
-    api.post("/api/admin/create-user", data),
-  adminGetUsers: () => api.get("/api/admin/users"),
+    api.post("/admin/create-user", data),
+  adminGetUsers: () => api.get("/admin/users"),
   adminUpdateUser: (userId: string, data: any) =>
-    api.put(`/api/admin/users/${userId}`, data),
-  adminDeleteUser: (userId: string) => api.delete(`/api/admin/users/${userId}`),
+    api.put(`/admin/users/${userId}`, data),
+  adminDeleteUser: (userId: string) => api.delete(`/admin/users/${userId}`),
 
   // === Brand & Config ===
-  getBrandConfig: () => api.get("/api/brand-config"),
-  updateBrandConfig: (data: any) => api.put("/api/brand-config", data),
+  getBrandConfig: () => api.get("/brand-config"),
+  updateBrandConfig: (data: any) => api.put("/brand-config", data),
 
   // === Credits & Requests ===
-  requestCredits: () => api.post("/api/request-credits"), // User action
+  requestCredits: () => api.post("/request-credits"),
 
   // Admin Notifications
-  adminGetRequests: () => api.get("/api/admin/requests"),
-  adminResolveRequest: (id: string) =>
-    api.put(`/api/admin/requests/${id}/resolve`),
+  adminGetRequests: () => api.get("/admin/requests"),
+  adminResolveRequest: (id: string) => api.put(`/admin/requests/${id}/resolve`),
 
   // === Posts ===
-  getPosts: () => api.get("/api/posts"),
-  getPostById: (postId: string) => api.get(`/api/post/${postId}`),
+  getPosts: () => api.get("/posts"),
+  getPostById: (postId: string) => api.get(`/post/${postId}`),
   updatePostTitle: (postId: string, title: string) =>
-    api.put(`/api/posts/${postId}/title`, { title }),
-  getPostStatus: (postId: string) => api.get(`/api/post/${postId}/status`),
+    api.put(`/posts/${postId}/title`, { title }),
+  getPostStatus: (postId: string) => api.get(`/post/${postId}/status`),
 
-  // === Generation Workflow (Refined) ===
-
-  // 1. Generate (Now handles everything, no approval step)
+  // === Generation Workflow ===
   generateMediaDirect: (formData: FormData) => {
-    return api.post("/api/generate-media", formData, {
+    return api.post("/generate-media", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
   },
 
   // === Metrics & Utils ===
-  getROIMetrics: () => api.get("/api/roi-metrics"),
-  getUserCredits: () => api.get("/api/user-credits"),
-  resetDemoCredits: () => api.post("/api/reset-demo-credits"),
+  getROIMetrics: () => api.get("/roi-metrics"),
+  getUserCredits: () => api.get("/user-credits"),
+  resetDemoCredits: () => api.post("/reset-demo-credits"),
 
-  // Publish (if you still have this logic in backend, otherwise optional)
   publishPost: (data: { postId: string; platform?: string }) =>
-    api.post("/api/posts/publish", data),
+    api.post("/posts/publish", data),
 };
