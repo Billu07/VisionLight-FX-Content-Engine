@@ -3,6 +3,7 @@ import cors from "cors";
 import axios from "axios";
 import dotenv from "dotenv";
 import archiver from "archiver";
+import { calculateCost } from "./config/pricing";
 import { upload, uploadToCloudinary } from "./utils/fileUpload";
 
 dotenv.config();
@@ -185,14 +186,26 @@ app.put(
   requireAdmin,
   async (req: AuthenticatedRequest, res) => {
     const { userId } = req.params;
-    const { credits, creditSystem, name } = req.body;
+    const { creditBalance, addCredits, creditSystem, name } = req.body;
 
     try {
-      await airtableService.adminUpdateUser(userId, {
-        credits,
-        creditSystem,
-        name,
-      });
+      if (addCredits) {
+        // Logic to ADD credits (e.g. +50)
+        await airtableService.addCredits(userId, parseInt(addCredits));
+      } else if (creditBalance !== undefined) {
+        // Logic to SET exact balance
+        await airtableService.adminUpdateUser(userId, { creditBalance });
+      }
+
+      // Handle other fields
+      const otherUpdates: any = {};
+      if (creditSystem) otherUpdates.creditSystem = creditSystem;
+      if (name) otherUpdates.name = name;
+
+      if (Object.keys(otherUpdates).length > 0) {
+        await airtableService.adminUpdateUser(userId, otherUpdates);
+      }
+
       res.json({ success: true, message: "User updated successfully" });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -285,26 +298,31 @@ app.get(
   async (req: AuthenticatedRequest, res) => {
     try {
       const user = await airtableService.findUserById(req.user!.id);
-      if (!user)
-        return res.json({ credits: { video: 0, image: 0, carousel: 0 } });
-      res.json({ credits: user.demoCredits });
+      if (!user) return res.json({ credits: 0 }); // Legacy frontend might expect object, but we are moving to number
+
+      // We return 'credits' as a number now.
+      // NOTE: Frontend Dashboard needs to be updated to handle a number,
+      // or we map it temporarily for backward compatibility if you haven't updated Dashboard logic yet.
+      res.json({ credits: user.creditBalance });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch credits" });
     }
   }
 );
 
+// Look for this section in your index.ts and replace it
+
 app.post(
   "/api/reset-demo-credits",
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      await airtableService.updateUserCredits(req.user!.id, {
-        video: 2,
-        image: 2,
-        carousel: 2,
+      // 🛠️ FIX: Use new adminUpdateUser with creditBalance logic
+      // Resetting to 20 credits ($2.00)
+      await airtableService.adminUpdateUser(req.user!.id, {
+        creditBalance: 20,
       });
-      res.json({ success: true, message: "Demo credits reset" });
+      res.json({ success: true, message: "Demo credits reset to 20" });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -444,20 +462,26 @@ app.post(
         height,
         title,
       } = req.body;
-      const referenceFiles = (req.files as Express.Multer.File[]) || [];
 
-      if (!prompt || !mediaType)
-        return res.status(400).json({ error: "Missing required fields" });
+      // 1. CALCULATE COST using new pricing logic
+      const cost = calculateCost(
+        mediaType,
+        duration ? parseInt(duration) : undefined,
+        model
+      );
 
+      // 2. CHECK BALANCE
       const user = await airtableService.findUserById(req.user!.id);
-
-      // FIX: Explicitly cast mediaType to match credit key types
-      const creditKey = mediaType as "video" | "image" | "carousel";
-
-      if (!user || user.demoCredits[creditKey] <= 0) {
-        return res.status(403).json({ error: "Insufficient credits" });
+      if (!user || user.creditBalance < cost) {
+        return res.status(403).json({
+          error: `Insufficient credits. Required: ${cost}, Balance: ${
+            user?.creditBalance || 0
+          }`,
+        });
       }
 
+      // Handle File Uploads
+      const referenceFiles = (req.files as Express.Multer.File[]) || [];
       const uploadedUrls: string[] = [];
       if (referenceFiles.length > 0) {
         try {
@@ -488,8 +512,13 @@ app.post(
         timestamp: new Date().toISOString(),
         title: title || "",
         userId: req.user!.id,
+        cost: cost, // Save cost to params for reference
       };
 
+      // 3. DEDUCT CREDITS
+      await airtableService.deductCredits(req.user!.id, cost);
+
+      // 4. CREATE POST
       const post = await airtableService.createPost({
         userId: req.user!.id,
         prompt,
@@ -502,28 +531,20 @@ app.post(
         requiresApproval: false,
       });
 
-      await airtableService.updatePost(post.id, {
-        status: "PROCESSING",
-        progress: 1,
-        userEditedPrompt: prompt,
-      });
-
-      const updatedCredits = { ...user.demoCredits };
-      updatedCredits[creditKey] -= 1;
-      await airtableService.updateUserCredits(req.user!.id, updatedCredits);
-
+      // 5. RESPOND
       res.json({ success: true, postId: post.id });
 
+      // 6. TRIGGER PROCESS
       (async () => {
         try {
           if (mediaType === "carousel") {
-            contentEngine.startCarouselGeneration(
+            await contentEngine.startCarouselGeneration(
               post.id,
               prompt,
               generationParams
             );
           } else if (mediaType === "image") {
-            contentEngine.startImageGeneration(
+            await contentEngine.startImageGeneration(
               post.id,
               prompt,
               generationParams
@@ -541,11 +562,47 @@ app.post(
             status: "FAILED",
             error: "Processing failed",
           });
+          // REFUND IF FAILED IMMEDIATELY
+          await airtableService.refundUserCredit(req.user!.id, cost);
         }
       })();
     } catch (error: any) {
       console.error("API Error:", error);
       res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// 2. NEW CHECK ENDPOINT
+app.get(
+  "/api/jobs/check-active",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      // Find all posts for this user that are PROCESSING
+      const allPosts = await airtableService.getUserPosts(req.user!.id);
+      const activePosts = allPosts.filter(
+        (p: any) => p.status === "PROCESSING"
+      );
+
+      if (activePosts.length === 0) {
+        return res.json({ success: true, active: 0 });
+      }
+
+      // We re-fetch the full post object to get generationParams (which might be hidden in getUserPosts summary)
+      const updates = activePosts.map(async (simplePost: any) => {
+        const fullPost = await airtableService.getPostById(simplePost.id);
+        if (fullPost && fullPost.status === "PROCESSING") {
+          await contentEngine.checkPostStatus(fullPost);
+        }
+      });
+
+      await Promise.all(updates);
+      res.json({ success: true, checked: activePosts.length });
+    } catch (error: any) {
+      console.error("Check Status Error:", error);
+      // Don't fail the request, just log it, so frontend keeps polling
+      res.json({ success: false, error: error.message });
     }
   }
 );

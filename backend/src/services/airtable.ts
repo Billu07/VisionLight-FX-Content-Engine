@@ -17,13 +17,14 @@ export interface User {
   id: string;
   email: string;
   name?: string;
-  demoCredits: { video: number; image: number; carousel: number };
+  creditBalance: number; // CHANGED: Single unified balance
   creditSystem: "COMMERCIAL" | "INTERNAL";
   adminNotes?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
+// Keep other interfaces as is...
 export interface Session {
   id: string;
   userId: string;
@@ -55,6 +56,7 @@ export interface Post {
   mediaType?: "VIDEO" | "IMAGE" | "CAROUSEL";
   mediaUrl?: string;
   mediaProvider?: string;
+  generatedEndFrame?: string;
   status: "NEW" | "PROCESSING" | "READY" | "PUBLISHED" | "FAILED" | "CANCELLED";
   platform: string;
   script?: any;
@@ -89,10 +91,8 @@ export const airtableService = {
         id: record.id,
         email: record.get("email") as string,
         name: record.get("name") as string,
-        demoCredits: JSON.parse(
-          (record.get("demoCredits") as string) ||
-            '{"video":2,"image":2,"carousel":2}'
-        ),
+        // UNIFIED CREDIT BALANCE
+        creditBalance: (record.get("creditBalance") as number) || 0,
         creditSystem:
           (record.get("creditSystem") as "COMMERCIAL" | "INTERNAL") ||
           "COMMERCIAL",
@@ -112,13 +112,9 @@ export const airtableService = {
         id: record.id,
         email: record.get("email") as string,
         name: record.get("name") as string,
-        demoCredits: JSON.parse(
-          (record.get("demoCredits") as string) ||
-            '{"video":2,"image":2,"carousel":2}'
-        ),
-        creditSystem:
-          (record.get("creditSystem") as "COMMERCIAL" | "INTERNAL") ||
-          "COMMERCIAL",
+        // UNIFIED CREDIT BALANCE
+        creditBalance: (record.get("creditBalance") as number) || 0,
+        creditSystem: (record.get("creditSystem") as any) || "COMMERCIAL",
         adminNotes: record.get("adminNotes") as string,
         createdAt: new Date(record.get("createdAt") as string),
         updatedAt: new Date(record.get("updatedAt") as string),
@@ -129,42 +125,59 @@ export const airtableService = {
   },
 
   async createUser(userData: { email: string; name?: string }): Promise<User> {
-    try {
-      const now = new Date().toISOString();
-      const record = await base("Users").create({
-        email: userData.email,
-        name: userData.name || "",
-        demoCredits: JSON.stringify({ video: 2, image: 2, carousel: 2 }),
-        creditSystem: "COMMERCIAL",
-        createdAt: now,
-        updatedAt: now,
-      });
-      return {
-        id: record.id,
-        email: record.get("email") as string,
-        name: record.get("name") as string,
-        demoCredits: JSON.parse(record.get("demoCredits") as string),
-        creditSystem: "COMMERCIAL",
-        createdAt: new Date(record.get("createdAt") as string),
-        updatedAt: new Date(record.get("updatedAt") as string),
-      };
-    } catch (error) {
-      throw error;
-    }
+    const now = new Date().toISOString();
+    // Start with 20 Credits ($2.00 value)
+    const record = await base("Users").create({
+      email: userData.email,
+      name: userData.name || "",
+      creditBalance: 20,
+      creditSystem: "COMMERCIAL",
+      createdAt: now,
+      updatedAt: now,
+    });
+    return {
+      id: record.id,
+      email: record.get("email") as string,
+      name: record.get("name") as string,
+      creditBalance: 20,
+      creditSystem: "COMMERCIAL",
+      createdAt: new Date(now),
+      updatedAt: new Date(now),
+    } as User;
   },
 
-  async updateUserCredits(
-    userId: string,
-    credits: { video: number; image: number; carousel: number }
-  ): Promise<void> {
-    try {
-      await base("Users").update(userId, {
-        demoCredits: JSON.stringify(credits),
-        updatedAt: new Date().toISOString(),
-      });
-    } catch (error) {
-      throw error;
-    }
+  // === NEW CREDIT TRANSACTION METHODS ===
+
+  async deductCredits(userId: string, amount: number): Promise<void> {
+    const user = await this.findUserById(userId);
+    if (!user) throw new Error("User not found");
+    if (user.creditBalance < amount)
+      throw new Error(
+        `Insufficient Balance. Need ${amount}, have ${user.creditBalance}`
+      );
+
+    const newBalance = user.creditBalance - amount;
+    await base("Users").update(userId, {
+      creditBalance: newBalance,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+
+  async addCredits(userId: string, amount: number): Promise<void> {
+    const user = await this.findUserById(userId);
+    if (!user) throw new Error("User not found");
+
+    const newBalance = (user.creditBalance || 0) + amount;
+    await base("Users").update(userId, {
+      creditBalance: newBalance,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+
+  // Generic refund method used by contentEngine
+  async refundUserCredit(userId: string, amount: number): Promise<void> {
+    await this.addCredits(userId, amount);
+    console.log(`💰 Refunded ${amount} credits to user ${userId}`);
   },
 
   async deleteUser(userId: string): Promise<void> {
@@ -185,10 +198,7 @@ export const airtableService = {
         id: record.id,
         email: record.get("email") as string,
         name: record.get("name") as string,
-        demoCredits: JSON.parse(
-          (record.get("demoCredits") as string) ||
-            '{"video":0,"image":0,"carousel":0}'
-        ),
+        creditBalance: (record.get("creditBalance") as number) || 0,
         creditSystem:
           (record.get("creditSystem") as "COMMERCIAL" | "INTERNAL") ||
           "COMMERCIAL",
@@ -204,7 +214,7 @@ export const airtableService = {
   async adminUpdateUser(
     userId: string,
     updates: {
-      credits?: any;
+      creditBalance?: number;
       creditSystem?: "COMMERCIAL" | "INTERNAL";
       name?: string;
       adminNotes?: string;
@@ -212,8 +222,8 @@ export const airtableService = {
   ): Promise<void> {
     try {
       const updateData: any = { updatedAt: new Date().toISOString() };
-      if (updates.credits)
-        updateData.demoCredits = JSON.stringify(updates.credits);
+      if (updates.creditBalance !== undefined)
+        updateData.creditBalance = updates.creditBalance;
       if (updates.creditSystem) updateData.creditSystem = updates.creditSystem;
       if (updates.name) updateData.name = updates.name;
       if (updates.adminNotes) updateData.adminNotes = updates.adminNotes;
@@ -223,7 +233,7 @@ export const airtableService = {
     }
   },
 
-  // === CREDIT REQUESTS (NOTIFICATIONS) ===
+  // === CREDIT REQUESTS ===
   async createCreditRequest(
     userId: string,
     email: string,
@@ -348,6 +358,7 @@ export const airtableService = {
         title: postData.title || "",
         prompt: postData.prompt,
         mediaType: postData.mediaType,
+        mediaProvider: postData.mediaProvider,
         platform: postData.platform,
         script: postData.script ? JSON.stringify(postData.script) : undefined,
         enhancedPrompt: postData.enhancedPrompt,
@@ -407,12 +418,14 @@ export const airtableService = {
         prompt: record.get("prompt") as string,
         mediaType: record.get("mediaType") as any,
         mediaUrl: record.get("mediaUrl") as string,
+        mediaProvider: record.get("mediaProvider") as string,
         status: record.get("status") as any,
         progress: record.get("progress") as number,
         generationParams: record.get("generationParams")
           ? JSON.parse(record.get("generationParams") as string)
           : undefined,
         error: record.get("error") as string,
+        generatedEndFrame: record.get("generatedEndFrame") as string,
         createdAt: new Date(record.get("createdAt") as string),
         updatedAt: new Date(record.get("updatedAt") as string),
       } as Post;
@@ -446,6 +459,8 @@ export const airtableService = {
           prompt: record.get("prompt"),
           mediaUrl: mediaUrl,
           mediaType: record.get("mediaType"),
+          mediaProvider: record.get("mediaProvider") as string,
+          generatedEndFrame: record.get("generatedEndFrame") as string,
           status: record.get("status"),
           progress: record.get("progress"),
           error: record.get("error"),
@@ -455,23 +470,6 @@ export const airtableService = {
     } catch (error: any) {
       throw new Error(`Failed to fetch posts: ${error.message}`);
     }
-  },
-
-  // === SESSION (Auth) ===
-  async validateSession(token: string) {
-    return null;
-  },
-  async createSession(userId: string, token: string) {
-    return {
-      id: "mock",
-      userId,
-      token,
-      expiresAt: new Date(),
-      createdAt: new Date(),
-    };
-  },
-  async deleteSession(token: string) {
-    return;
   },
 
   // === ROI METRICS ===

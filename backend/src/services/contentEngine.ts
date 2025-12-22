@@ -3,7 +3,7 @@ import FormData from "form-data";
 import sharp from "sharp";
 import axios from "axios";
 import { v2 as cloudinary } from "cloudinary";
-import { airtableService } from "./airtable";
+import { airtableService, Post } from "./airtable";
 import { ROIService } from "./roi";
 
 // Configuration
@@ -17,21 +17,19 @@ cloudinary.config({
 
 const AI_TIMEOUT = 120000;
 const VIDEO_UPLOAD_TIMEOUT = 600000;
-const POLLING_REQUEST_TIMEOUT = 60000;
-const KIE_POLL_INTERVAL = 15000;
+// Note: Polling loops removed. We rely on checkPostStatus called by frontend/cron.
 
 // Kie AI Config
 const KIE_BASE_URL = "https://api.kie.ai/api/v1";
 const KIE_API_KEY = process.env.KIE_AI_API_KEY;
 
 // FAL AI Config (Kling)
+// 🔙 v2.5 Turbo (Fast/Silent)
 const FAL_KEY = process.env.FAL_KEY;
 const FAL_BASE_PATH = "https://queue.fal.run/fal-ai/kling-video/v2.5-turbo";
 
 // Prompt for Gemini
 const GEMINI_RESIZE_INSTRUCTION = `Take the design, layout, and style of [Image A] exactly as it is, and seamlessly adapt it into the aspect ratio of [Image B]. Maintain all the visual elements, proportions, and composition of [Image A], but expand, crop, or extend the background naturally so that the final image perfectly matches the aspect ratio and dimensions of [Image B]. Do not distort or stretch any elements—use intelligent background extension, framing, or subtle composition adjustments to preserve the original design integrity while filling the new canvas size.`;
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const getOptimizedUrl = (url: string) => {
   if (!url || typeof url !== "string") return url;
@@ -41,7 +39,7 @@ const getOptimizedUrl = (url: string) => {
   return url;
 };
 
-// === HELPER 1: BLUR FILL FALLBACK ===
+// === HELPER 1: BLUR FILL FALLBACK (Strict Center Gravity) ===
 const resizeWithBlurFill = async (
   buffer: Buffer,
   width: number,
@@ -63,19 +61,37 @@ const resizeWithBlurFill = async (
       })
       .toBuffer();
 
+    // 🛠️ FIX: Added gravity: "center" to prevent left-shift
     return await sharp(background)
-      .composite([{ input: foreground }])
+      .composite([{ input: foreground, gravity: "center" }])
       .toFormat("jpeg", { quality: 95 })
       .toBuffer();
   } catch (e) {
+    // Fallback: Strict center position
     return await sharp(buffer)
-      .resize(width, height, { fit: "cover" })
+      .resize(width, height, { fit: "cover", position: "center" })
       .toFormat("jpeg")
       .toBuffer();
   }
 };
 
-// === HELPER 2: GEMINI RESIZE (FIXED & ROBUST) ===
+// === HELPER 2: STRICT CROP (Deterministic - New) ===
+const resizeStrict = async (
+  buffer: Buffer,
+  width: number,
+  height: number
+): Promise<Buffer> => {
+  console.log("📏 Using Strict Center Crop (No AI) for Consistency");
+  return await sharp(buffer)
+    .resize(width, height, {
+      fit: "cover",
+      position: "center", // Forces exact center crop
+    })
+    .toFormat("jpeg", { quality: 95 })
+    .toBuffer();
+};
+
+// === HELPER 3: GEMINI RESIZE (Robust) ===
 const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -86,13 +102,11 @@ const resizeWithGemini = async (
       `✨ Gemini Resize: Preparing inputs for ${targetWidth}x${targetHeight}...`
     );
 
-    // 1. Sanitize Input (Force JPEG + Safe Size)
     const sanitizedInputBuffer = await sharp(originalBuffer)
       .resize({ width: 1536, withoutEnlargement: true })
       .toFormat("jpeg", { quality: 90 })
       .toBuffer();
 
-    // 2. Create Guide Frame
     const guideFrameBuffer = await sharp({
       create: {
         width: targetWidth,
@@ -104,7 +118,6 @@ const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 3. Call Gemini
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
 
     const response = await axios.post(
@@ -144,16 +157,17 @@ const resizeWithGemini = async (
       { headers: { "Content-Type": "application/json" }, timeout: AI_TIMEOUT }
     );
 
-    // 4. Extract Data (CamelCase or SnakeCase)
-    const candidate = response.data?.candidates?.[0];
-    const part = candidate?.content?.parts?.find(
-      (p: any) => p.inline_data || p.inlineData
-    );
-    const base64Data = part?.inline_data?.data || part?.inlineData?.data;
+    const b64 =
+      response.data?.candidates?.[0]?.content?.parts?.find(
+        (p: any) => p.inline_data || p.inlineData
+      )?.inline_data?.data ||
+      response.data?.candidates?.[0]?.content?.parts?.find(
+        (p: any) => p.inline_data || p.inlineData
+      )?.inlineData?.data;
 
-    if (base64Data) {
+    if (b64) {
       console.log("✅ Gemini Resize Success.");
-      return await sharp(Buffer.from(base64Data, "base64"))
+      return await sharp(Buffer.from(b64, "base64"))
         .resize(targetWidth, targetHeight, { fit: "fill" })
         .toFormat("jpeg", { quality: 95 })
         .toBuffer();
@@ -171,7 +185,7 @@ const resizeWithGemini = async (
 
 export const contentEngine = {
   // ===========================================================================
-  // WORKFLOW: VIDEO GENERATION
+  // 1. INITIATE VIDEO GENERATION (Stateless Start)
   // ===========================================================================
   async startVideoGeneration(postId: string, finalPrompt: string, params: any) {
     console.log(`🎬 Video Gen for ${postId} | Model Input: ${params.model}`);
@@ -179,8 +193,6 @@ export const contentEngine = {
     const isKie = params.model.includes("kie");
     const isKling = params.model.includes("kling");
     const isOpenAI = !isKie && !isKling;
-
-    // Is this a "Pro" request? (Used for model selection in OpenAI/Kie)
     const isPro = params.model.includes("pro") || params.model.includes("Pro");
 
     try {
@@ -190,7 +202,6 @@ export const contentEngine = {
       let targetWidth = 1280;
       let targetHeight = 720;
 
-      // Check for explicit "size" from Dashboard first (e.g. "1792x1024")
       if (params.size) {
         const [w, h] = params.size.split("x");
         targetWidth = parseInt(w);
@@ -198,7 +209,6 @@ export const contentEngine = {
       } else if (params.resolution) {
         const isLandscape =
           params.aspectRatio === "landscape" || params.aspectRatio === "16:9";
-        // Pro/HD usually supports 1080p, Standard is safe at 720p/1280p
         if (params.resolution === "1080p") {
           targetWidth = isLandscape ? 1920 : 1080;
           targetHeight = isLandscape ? 1080 : 1920;
@@ -226,32 +236,51 @@ export const contentEngine = {
           });
           const originalImageBuffer = Buffer.from(imageResponse.data);
 
-          try {
-            console.log("✨ Attempting Gemini AI Outpainting...");
-            finalInputImageBuffer = await resizeWithGemini(
+          // 🛠️ FIX: Aspect Ratio Check
+          const metadata = await sharp(originalImageBuffer).metadata();
+          const sourceAR = (metadata.width || 1) / (metadata.height || 1);
+          const targetAR = targetWidth / targetHeight;
+          const isARMatch = Math.abs(sourceAR - targetAR) < 0.05; // 5% tolerance
+
+          if (isARMatch) {
+            finalInputImageBuffer = await resizeStrict(
               originalImageBuffer,
               targetWidth,
               targetHeight
             );
-            console.log("✅ Gemini Frame Success.");
-          } catch (geminiError) {
-            console.log("⚠️ Gemini failed, falling back to Blur-Fill.");
-            finalInputImageBuffer = await resizeWithBlurFill(
-              originalImageBuffer,
-              targetWidth,
-              targetHeight
-            );
+          } else {
+            try {
+              console.log(
+                "✨ AR Mismatch: Attempting Gemini AI Outpainting..."
+              );
+              finalInputImageBuffer = await resizeWithGemini(
+                originalImageBuffer,
+                targetWidth,
+                targetHeight
+              );
+            } catch (geminiError) {
+              console.log("⚠️ Gemini failed, falling back to Blur-Fill.");
+              finalInputImageBuffer = await resizeWithBlurFill(
+                originalImageBuffer,
+                targetWidth,
+                targetHeight
+              );
+            }
           }
         } catch (e: any) {
           console.error("❌ Image Processing Failed:", e.message);
         }
       }
 
+      let externalId = "";
+      let statusUrl = "";
+      let provider = "";
+
       // ==========================================================
-      // BRANCH A: KIE AI (Video FX / Video FX Pro)
+      // BRANCH A: KIE AI
       // ==========================================================
       if (isKie) {
-        console.log(`🚀 Route: Kie AI (${isPro ? "Pro" : "Standard"})`);
+        provider = "kie";
         let kieInputUrl = "";
         let isImageToVideo = false;
 
@@ -270,16 +299,10 @@ export const contentEngine = {
         const mode = isImageToVideo ? "image-to-video" : "text-to-video";
         const kieModelId = `${baseModel}-${mode}`;
 
-        // Kie Duration (Video FX): Dashboard sends 5, 10, 15
-        // Kie expects string with 's' (e.g., "5s", "10s", "15s")
         let rawDuration = params.duration
           ? params.duration.toString().replace("s", "")
           : "10";
-
-        // If user selected 5, force it to 10
         if (rawDuration === "5") rawDuration = "10";
-
-        const durationStr = `${rawDuration}s`;
 
         const kiePayload: any = {
           model: kieModelId,
@@ -287,11 +310,10 @@ export const contentEngine = {
             prompt: finalPrompt,
             aspect_ratio:
               params.aspectRatio === "9:16" ? "portrait" : "landscape",
-            n_frames: durationStr,
+            n_frames: `${rawDuration}s`,
             remove_watermark: true,
           },
         };
-
         if (isImageToVideo) kiePayload.input.image_urls = [kieInputUrl];
 
         const kieRes = await axios.post(
@@ -299,60 +321,24 @@ export const contentEngine = {
           kiePayload,
           { headers: { Authorization: `Bearer ${KIE_API_KEY}` } }
         );
-
         if (kieRes.data.code !== 200)
           throw new Error(`Kie Error: ${JSON.stringify(kieRes.data)}`);
-
-        const taskId = kieRes.data.data.taskId;
-        await airtableService.updatePost(postId, {
-          generationParams: { ...params, externalId: taskId },
-        });
-
-        // Polling
-        let videoUrl = "";
-        for (let i = 0; i < 100; i++) {
-          await sleep(KIE_POLL_INTERVAL);
-          const checkRes = await axios.get(
-            `${KIE_BASE_URL}/jobs/recordInfo?taskId=${taskId}`,
-            { headers: { Authorization: `Bearer ${KIE_API_KEY}` } }
-          );
-          if (checkRes.data.data.state === "success") {
-            const resJson = JSON.parse(checkRes.data.data.resultJson);
-            videoUrl = resJson.resultUrls?.[0] || resJson.videoUrl;
-            break;
-          } else if (checkRes.data.data.state === "fail")
-            throw new Error(`Kie Task Failed: ${checkRes.data.data.failMsg}`);
-
-          await airtableService.updatePost(postId, {
-            progress: Math.min(95, 10 + i * 3),
-          });
-        }
-        const finalCloudUrl = await this.uploadToCloudinary(
-          videoUrl,
-          postId,
-          params.userId,
-          "Kie Video",
-          "video"
-        );
-        await this.finalizePost(
-          postId,
-          finalCloudUrl,
-          kieModelId,
-          params.userId
-        );
+        externalId = kieRes.data.data.taskId;
       }
 
       // ==========================================================
-      // BRANCH B: FAL AI (Kling)
+      // BRANCH B: FAL AI (Kling 2.5 Turbo - FIXED)
       // ==========================================================
       else if (isKling) {
-        console.log("🚀 Route: Fal.ai (Kling 2.5)");
+        provider = "kling";
+        console.log("🚀 Route: Fal.ai (Kling 2.5 Turbo)");
 
         let klingInputUrl = "";
         let klingTailUrl = "";
         let isImageToVideo = false;
 
         if (finalInputImageBuffer) {
+          // 1. Upload Processed Start Frame
           klingInputUrl = await this.uploadToCloudinary(
             finalInputImageBuffer,
             `${postId}_kling_start`,
@@ -362,6 +348,7 @@ export const contentEngine = {
           );
           isImageToVideo = true;
 
+          // 2. Process End Frame (Tail)
           if (params.imageReferences && params.imageReferences.length > 1) {
             try {
               const tailRaw = getOptimizedUrl(params.imageReferences[1]);
@@ -370,21 +357,39 @@ export const contentEngine = {
               });
               const tailOriginalBuffer = Buffer.from(tailResp.data);
 
+              // AR Check for Tail Frame
+              const meta = await sharp(tailOriginalBuffer).metadata();
+              const tailAR = (meta.width || 1) / (meta.height || 1);
+              const targetAR = targetWidth / targetHeight;
+              const isTailARMatch = Math.abs(tailAR - targetAR) < 0.05;
+
               let tailBuffer: Buffer;
-              try {
-                tailBuffer = await resizeWithGemini(
+
+              if (isTailARMatch) {
+                console.log("📏 End Frame AR Match: Using Strict Crop");
+                tailBuffer = await resizeStrict(
                   tailOriginalBuffer,
                   targetWidth,
                   targetHeight
                 );
-              } catch (gemErr) {
-                tailBuffer = await resizeWithBlurFill(
-                  tailOriginalBuffer,
-                  targetWidth,
-                  targetHeight
-                );
+              } else {
+                try {
+                  console.log("✨ End Frame AR Mismatch: Gemini Resize...");
+                  tailBuffer = await resizeWithGemini(
+                    tailOriginalBuffer,
+                    targetWidth,
+                    targetHeight
+                  );
+                } catch (gemErr) {
+                  tailBuffer = await resizeWithBlurFill(
+                    tailOriginalBuffer,
+                    targetWidth,
+                    targetHeight
+                  );
+                }
               }
 
+              // 3. Upload Processed End Frame
               klingTailUrl = await this.uploadToCloudinary(
                 tailBuffer,
                 `${postId}_kling_end`,
@@ -392,6 +397,13 @@ export const contentEngine = {
                 "Kling End",
                 "image"
               );
+
+              // 👇👇👇 SAVING THE PROCESSED FRAME TO DATABASE 👇👇👇
+              // This is critical for the "Use as Start Frame" feature
+              await airtableService.updatePost(postId, {
+                generatedEndFrame: klingTailUrl,
+              });
+              console.log("💾 Saved Processed End Frame");
             } catch (e) {
               console.warn("Kling end frame processing failed, using raw.");
               klingTailUrl = getOptimizedUrl(params.imageReferences[1]);
@@ -408,118 +420,52 @@ export const contentEngine = {
         let tier = "standard";
         if (klingTailUrl) tier = "pro";
 
-        const makeFalRequest = async (currentTier: string) => {
-          const url = `${FAL_BASE_PATH}/${currentTier}/${endpointSuffix}`;
-          const payload: any = {
-            prompt: finalPrompt,
-            duration: params.duration ? params.duration.toString() : "5",
-            aspect_ratio: params.aspectRatio === "9:16" ? "9:16" : "16:9",
-          };
-          if (isImageToVideo) {
-            payload.image_url = klingInputUrl;
-            if (currentTier === "pro" && klingTailUrl)
-              payload.tail_image_url = klingTailUrl;
-          }
-          return axios.post(url, payload, {
-            headers: {
-              Authorization: `Key ${FAL_KEY}`,
-              "Content-Type": "application/json",
-            },
-          });
+        const url = `${FAL_BASE_PATH}/${tier}/${endpointSuffix}`;
+        const payload: any = {
+          prompt: finalPrompt,
+          duration: params.duration ? params.duration.toString() : "5",
+          aspect_ratio: params.aspectRatio === "9:16" ? "9:16" : "16:9",
         };
 
-        let submitRes;
-        try {
-          submitRes = await makeFalRequest(tier);
-        } catch (e: any) {
-          if (
-            tier === "pro" &&
-            (e.response?.status === 404 || e.response?.status === 400)
-          ) {
-            submitRes = await makeFalRequest("standard");
-          } else throw e;
+        if (isImageToVideo) {
+          payload.image_url = klingInputUrl;
+          if (tier === "pro" && klingTailUrl)
+            payload.tail_image_url = klingTailUrl;
         }
 
-        const requestId = submitRes.data.request_id;
-        const statusUrl = submitRes.data.status_url;
-        const responseUrl = submitRes.data.response_url;
-
-        await airtableService.updatePost(postId, {
-          generationParams: { ...params, externalId: requestId },
+        const submitRes = await axios.post(url, payload, {
+          headers: {
+            Authorization: `Key ${FAL_KEY}`,
+            "Content-Type": "application/json",
+          },
         });
 
-        let videoUrl = "";
-        for (let i = 0; i < 120; i++) {
-          await sleep(5000);
-          const statusRes = await axios.get(statusUrl, {
-            headers: { Authorization: `Key ${FAL_KEY}` },
-          });
-          if (statusRes.data.status === "COMPLETED") {
-            const resultRes = await axios.get(responseUrl, {
-              headers: { Authorization: `Key ${FAL_KEY}` },
-            });
-            videoUrl = resultRes.data.video.url;
-            break;
-          } else if (statusRes.data.status === "FAILED") {
-            throw new Error(`Fal Failed: ${statusRes.data.error}`);
-          }
-          await airtableService.updatePost(postId, {
-            progress: Math.min(90, 5 + i * 2),
-          });
-        }
-
-        const finalCloudUrl = await this.uploadToCloudinary(
-          videoUrl,
-          postId,
-          params.userId,
-          "Kling Video",
-          "video"
-        );
-        await this.finalizePost(
-          postId,
-          finalCloudUrl,
-          `kling-${tier}`,
-          params.userId
-        );
+        externalId = submitRes.data.request_id;
+        statusUrl = submitRes.data.status_url;
       }
 
       // ==========================================================
-      // BRANCH C: OPENAI (Video FX 2 / Video FX 2 Pro)
+      // BRANCH C: OPENAI
       // ==========================================================
       else if (isOpenAI) {
-        // MODEL: Dashboard sends "sora-2" or "sora-2-pro"
+        provider = "openai";
         const openAIModel = params.model || "sora-2-pro";
-        console.log(`🎥 Route: OpenAI Video API | Model: ${openAIModel}`);
-
-        // DURATION: Strict Integer (4, 8, 12). Default to 4.
         let secondsInt = 4;
         if (params.duration) {
           const s = params.duration.toString().replace("s", "");
-          secondsInt = parseInt(s);
-          if (isNaN(secondsInt)) secondsInt = 4;
+          secondsInt = parseInt(s) || 4;
         }
-
-        // SIZE: "WxH" string
-        const openAISizeString = `${targetWidth}x${targetHeight}`;
-
         const form = new FormData();
         form.append("prompt", finalPrompt);
         form.append("model", openAIModel);
         form.append("seconds", secondsInt);
-        form.append("size", openAISizeString);
-
+        form.append("size", `${targetWidth}x${targetHeight}`);
         if (finalInputImageBuffer) {
-          console.log("📤 Attaching Input Reference Image...");
           form.append("input_reference", finalInputImageBuffer, {
             filename: "ref.jpg",
             contentType: "image/jpeg",
           });
         }
-
-        console.log(
-          `📡 OpenAI Payload: Model=${openAIModel}, Secs=${secondsInt}, Size=${openAISizeString}`
-        );
-
         const genResponse = await axios.post(
           "https://api.openai.com/v1/videos",
           form,
@@ -531,106 +477,144 @@ export const contentEngine = {
             timeout: VIDEO_UPLOAD_TIMEOUT,
           }
         );
-
-        const generationId = genResponse.data.id;
-        await airtableService.updatePost(postId, {
-          generationParams: { ...params, externalId: generationId },
-        });
-
-        // POLLING LOOP (ROBUST RESTORED VERSION)
-        let videoData: string | Buffer = "";
-
-        for (let i = 0; i < 60; i++) {
-          await sleep(30000); // Poll every 30s
-          try {
-            const s = await axios.get(
-              `https://api.openai.com/v1/videos/${generationId}`,
-              {
-                headers: {
-                  Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-                },
-              }
-            );
-
-            console.log(`OpenAI Status: ${s.data.status}`);
-
-            if (s.data.status === "completed") {
-              // 1. Try to get URL directly from status response
-              if (s.data.content && s.data.content.url) {
-                videoData = s.data.content.url;
-              }
-              // 2. Fallback: Fetch content endpoint (Binary or JSON)
-              else {
-                console.log("📥 Fetching video content blob...");
-                const contentRes = await axios.get(
-                  `https://api.openai.com/v1/videos/${generationId}/content`,
-                  {
-                    headers: {
-                      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-                    },
-                    responseType: "arraybuffer", // Critical for binary video files
-                  }
-                );
-
-                // Check if it returned a JSON string (e.g. {"url": "..."}) or raw bytes
-                const textData = Buffer.from(contentRes.data).toString("utf-8");
-                if (textData.trim().startsWith("{")) {
-                  try {
-                    const json = JSON.parse(textData);
-                    videoData = json.url || json.content?.url;
-                  } catch (e) {
-                    // Not JSON, assume binary video
-                    videoData = contentRes.data;
-                  }
-                } else {
-                  // Raw binary video data
-                  videoData = contentRes.data;
-                }
-              }
-              break; // Exit loop on success
-            }
-
-            if (s.data.status === "failed") {
-              throw new Error(
-                `OpenAI Failed: ${JSON.stringify(
-                  s.data.error || "Unknown Error"
-                )}`
-              );
-            }
-
-            await airtableService.updatePost(postId, {
-              progress: Math.min(95, 10 + i * 5),
-            });
-          } catch (pollErr: any) {
-            console.warn("Polling warning:", pollErr.message);
-            if (pollErr.message.includes("OpenAI Failed")) throw pollErr;
-          }
-        }
-
-        if (!videoData) throw new Error("OpenAI Video Generation Timed Out");
-
-        const cloudUrl = await this.uploadToCloudinary(
-          videoData,
-          postId,
-          params.userId,
-          "Video",
-          "video"
-        );
-        await this.finalizePost(postId, cloudUrl, openAIModel, params.userId);
+        externalId = genResponse.data.id;
       }
+
+      // === SAVE STATE ===
+      await airtableService.updatePost(postId, {
+        generationParams: { ...params, externalId, statusUrl },
+        mediaProvider: provider,
+        status: "PROCESSING",
+      });
+
+      console.log(`✅ Initiated ${provider} job: ${externalId}`);
     } catch (error: any) {
-      console.error("❌ Video Gen Failed:", error.message);
-      if (error.response?.data) {
-        console.error(
-          "🔍 Provider Error Details:",
-          JSON.stringify(error.response.data, null, 2)
-        );
-      }
+      console.error("❌ Video Gen Startup Failed:", error.message);
       await airtableService.updatePost(postId, {
         status: "FAILED",
         error: error.message,
         progress: 0,
       });
+      // 🛠️ FIX: Refund exact cost if available, else default to safe amount
+      const refundAmount = params.cost || 2;
+      await airtableService.refundUserCredit(params.userId, refundAmount);
+    }
+  },
+
+  // ===========================================================================
+  // 2. CHECK STATUS (Stateless)
+  // ===========================================================================
+  async checkPostStatus(post: Post) {
+    if (post.status !== "PROCESSING" || !post.generationParams?.externalId)
+      return;
+
+    const externalId = post.generationParams.externalId;
+    const provider = post.mediaProvider || "openai";
+    const userId = post.userId;
+
+    try {
+      let isComplete = false;
+      let isFailed = false;
+      let finalUrl = "";
+      let progress = post.progress || 0;
+      let errorMessage = "";
+
+      // --- KIE ---
+      if (provider.includes("kie")) {
+        const checkRes = await axios.get(
+          `${KIE_BASE_URL}/jobs/recordInfo?taskId=${externalId}`,
+          { headers: { Authorization: `Bearer ${KIE_API_KEY}` } }
+        );
+        if (checkRes.data.data.state === "success") {
+          const resJson = JSON.parse(checkRes.data.data.resultJson);
+          finalUrl = resJson.resultUrls?.[0] || resJson.videoUrl;
+          isComplete = true;
+        } else if (checkRes.data.data.state === "fail") {
+          isFailed = true;
+          errorMessage = checkRes.data.data.failMsg;
+        } else progress = Math.min(95, progress + 5);
+      }
+
+      // --- FAL/KLING ---
+      else if (provider.includes("kling")) {
+        const checkUrl =
+          post.generationParams.statusUrl ||
+          `${FAL_BASE_PATH}/requests/${externalId}/status`;
+        const statusRes = await axios.get(checkUrl, {
+          headers: { Authorization: `Key ${FAL_KEY}` },
+        });
+
+        if (statusRes.data.status === "COMPLETED") {
+          const responseUrl = statusRes.data.response_url;
+          const resultRes = await axios.get(responseUrl, {
+            headers: { Authorization: `Key ${FAL_KEY}` },
+          });
+          finalUrl = resultRes.data.video.url;
+          isComplete = true;
+        } else if (statusRes.data.status === "FAILED") {
+          isFailed = true;
+          errorMessage = statusRes.data.error;
+        } else progress = Math.min(90, progress + 5);
+      }
+
+      // --- OPENAI ---
+      else if (provider.includes("openai")) {
+        try {
+          const s = await axios.get(
+            `https://api.openai.com/v1/videos/${externalId}`,
+            {
+              headers: {
+                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+              },
+            }
+          );
+          if (s.data.status === "completed") {
+            finalUrl =
+              s.data.content?.url ||
+              (
+                await axios.get(
+                  `https://api.openai.com/v1/videos/${externalId}/content`,
+                  {
+                    headers: {
+                      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                    },
+                    responseType: "arraybuffer",
+                  }
+                )
+              ).data;
+            isComplete = true;
+          } else if (s.data.status === "failed") {
+            isFailed = true;
+            errorMessage = JSON.stringify(s.data.error);
+          } else progress = Math.min(95, progress + 5);
+        } catch (e) {}
+      }
+
+      if (isComplete && finalUrl) {
+        const cloudUrl = await this.uploadToCloudinary(
+          finalUrl,
+          post.id,
+          userId,
+          "Video",
+          "video"
+        );
+        await this.finalizePost(post.id, cloudUrl, provider, userId);
+      } else if (isFailed) {
+        await airtableService.updatePost(post.id, {
+          status: "FAILED",
+          error: errorMessage,
+          progress: 0,
+        });
+
+        // 🛠️ FIX: Refund using numeric cost
+        const costToRefund = post.generationParams?.cost || 5;
+        await airtableService.refundUserCredit(userId, costToRefund);
+      } else {
+        if (progress !== post.progress)
+          await airtableService.updatePost(post.id, { progress });
+      }
+    } catch (error: any) {
+      console.error(`Check Status Error (${post.id}):`, error.message);
     }
   },
 
@@ -648,38 +632,33 @@ export const contentEngine = {
       generationStep: "COMPLETED",
     });
     await ROIService.incrementMediaGenerated(userId);
-    console.log(`✅ Generation finished for ${postId}`);
   },
 
-  // ===========================================================================
-  // IMAGE & CAROUSEL WORKFLOWS (Preserved)
-  // ===========================================================================
   async startImageGeneration(postId: string, finalPrompt: string, params: any) {
-    console.log(`🎨 Image Gen for ${postId}`);
     try {
-      const refUrls =
-        params.imageReferences ||
-        (params.imageReference ? [params.imageReference] : []);
-      const refBuffers = await this.downloadAndOptimizeImages(refUrls);
+      const refBuffers = await this.downloadAndOptimizeImages(
+        params.imageReferences || []
+      );
       const buf = await this.generateGeminiImage(
         finalPrompt,
         refBuffers,
         params.aspectRatio
       );
-      const cloudUrl = await this.uploadToCloudinary(
+      const url = await this.uploadToCloudinary(
         buf,
         postId,
         params.userId,
         "Image",
         "image"
       );
-      await this.finalizePost(postId, cloudUrl, "gemini-image", params.userId);
+      await this.finalizePost(postId, url, "gemini-image", params.userId);
     } catch (e: any) {
       await airtableService.updatePost(postId, {
         status: "FAILED",
         error: e.message,
-        progress: 0,
       });
+      // 🛠️ FIX: Refund fixed cost 1
+      await airtableService.refundUserCredit(params.userId, 1);
     }
   },
 
@@ -688,7 +667,6 @@ export const contentEngine = {
     finalPrompt: string,
     params: any
   ) {
-    console.log(`🎠 Carousel Gen for ${postId}`);
     try {
       const imageUrls: string[] = [];
       const prompts = [
@@ -696,14 +674,13 @@ export const contentEngine = {
         `Slide 2/3: ${finalPrompt}`,
         `Slide 3/3: ${finalPrompt}`,
       ];
-      const refUrls =
-        params.imageReferences ||
-        (params.imageReference ? [params.imageReference] : []);
-      const userRefBuffers = await this.downloadAndOptimizeImages(refUrls);
+      const refBuffers = await this.downloadAndOptimizeImages(
+        params.imageReferences || []
+      );
       const generatedHistory: Buffer[] = [];
 
       for (let i = 0; i < prompts.length; i++) {
-        const currentContext = [...userRefBuffers, ...generatedHistory];
+        const currentContext = [...refBuffers, ...generatedHistory];
         const buf = await this.generateGeminiImage(
           prompts[i],
           currentContext,
@@ -729,21 +706,18 @@ export const contentEngine = {
         mediaProvider: "gemini-carousel",
         status: "READY",
         progress: 100,
-        generationStep: "COMPLETED",
       });
       await ROIService.incrementMediaGenerated(params.userId);
     } catch (e: any) {
       await airtableService.updatePost(postId, {
         status: "FAILED",
         error: e.message,
-        progress: 0,
       });
+      // 🛠️ FIX: Refund fixed cost 3
+      await airtableService.refundUserCredit(params.userId, 3);
     }
   },
 
-  // ===========================================================================
-  // HELPERS
-  // ===========================================================================
   async downloadAndOptimizeImages(urls: string[]): Promise<Buffer[]> {
     if (urls.length === 0) return [];
     const promises = urls.map(async (rawUrl) => {
@@ -768,29 +742,27 @@ export const contentEngine = {
     aspectRatio: string
   ): Promise<Buffer> {
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
-    let ratioInstruction =
-      aspectRatio === "16:9"
-        ? "Wide 16:9. "
-        : aspectRatio === "9:16"
-        ? "Tall 9:16. "
-        : "Square 1:1. ";
-
-    const parts: any[] = [{ text: ratioInstruction + promptText }];
-    refBuffers.forEach((buf) => {
+    const parts: any[] = [
+      {
+        text:
+          (aspectRatio === "16:9"
+            ? "Wide 16:9. "
+            : aspectRatio === "9:16"
+            ? "Tall 9:16. "
+            : "Square 1:1. ") + promptText,
+      },
+    ];
+    refBuffers.forEach((buf) =>
       parts.push({
         inline_data: { mime_type: "image/jpeg", data: buf.toString("base64") },
-      });
-    });
+      })
+    );
 
     const response = await axios.post(
       geminiUrl,
-      {
-        contents: [{ parts }],
-        generationConfig: { temperature: 0.9 },
-      },
+      { contents: [{ parts }], generationConfig: { temperature: 0.9 } },
       { headers: { "Content-Type": "application/json" } }
     );
-
     const b64 =
       response.data?.candidates?.[0]?.content?.parts?.find(
         (p: any) => p.inline_data || p.inlineData
@@ -798,7 +770,6 @@ export const contentEngine = {
       response.data?.candidates?.[0]?.content?.parts?.find(
         (p: any) => p.inline_data || p.inlineData
       )?.inlineData?.data;
-
     if (b64) return Buffer.from(b64, "base64");
     throw new Error("Gemini No Image");
   },
