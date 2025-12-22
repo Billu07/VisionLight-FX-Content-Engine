@@ -3,10 +3,11 @@ import { supabase } from "../lib/supabase";
 import { apiEndpoints, setAuthToken } from "../lib/api";
 
 interface User {
-  id: string; // Airtable ID
+  id: string;
   email: string;
   name: string;
-  // Add other fields if you use them in UI, e.g. credits are usually fetched separately
+  // FIX: Added this field so Dashboard.tsx stops complaining
+  creditSystem?: "COMMERCIAL" | "INTERNAL";
 }
 
 interface AuthState {
@@ -24,7 +25,6 @@ export const useAuth = create<AuthState>((set) => ({
 
   checkAuth: async () => {
     try {
-      // 1. Get Session from Supabase
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -35,11 +35,9 @@ export const useAuth = create<AuthState>((set) => ({
         return;
       }
 
-      // 2. Set Token for API calls
       setAuthToken(session.access_token);
 
-      // 3. Fetch Airtable User Data from Backend
-      // This ensures we have the "Airtable User" (with history), not just the Auth User
+      // This URL should now be http://localhost:4000/api/auth/me
       const response = await apiEndpoints.getMe();
 
       if (response.data.success) {
@@ -49,8 +47,6 @@ export const useAuth = create<AuthState>((set) => ({
           isLoading: false,
         });
       } else {
-        // Token was valid, but backend couldn't find/create Airtable user (rare)
-        console.error("Auth valid but User sync failed");
         set({ user: null, token: null, isLoading: false });
       }
     } catch (error) {

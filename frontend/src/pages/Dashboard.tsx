@@ -14,7 +14,6 @@ import fxLogo from "../assets/fx.png";
 import picdriftLogo from "../assets/picdrift.png";
 
 // === CONFIGURATION ===
-// Use lowercase for reliable matching
 const ADMIN_EMAILS = ["snowfix07@gmail.com", "keith@picdrift.com"];
 
 type EngineType = "kie" | "studio" | "openai";
@@ -35,7 +34,7 @@ function Dashboard() {
   const [prompt, setPrompt] = useState("");
   const [videoTitle, setVideoTitle] = useState("");
 
-  // Engine Selection (Default: OpenAI / Video FX 2)
+  // Engine Selection
   const [activeEngine, setActiveEngine] = useState<EngineType>("openai");
   const [studioMode, setStudioMode] = useState<StudioMode>("image");
 
@@ -49,6 +48,9 @@ function Dashboard() {
     "kie-sora-2"
   );
 
+  // Video FX Sub-mode (Video vs PicDrift)
+  const [videoFxMode, setVideoFxMode] = useState<"video" | "picdrift">("video");
+
   // OpenAI (Video FX 2)
   const [videoDuration, setVideoDuration] = useState<4 | 8 | 12>(4);
   const [videoModel, setVideoModel] = useState<"sora-2" | "sora-2-pro">(
@@ -59,7 +61,7 @@ function Dashboard() {
     "1280x720" | "1792x1024" | "720x1280" | "1024x1792"
   >("1792x1024");
 
-  // Studio (Gemini)
+  // Studio (Gemini) Aspect Ratio
   const [geminiAspect, setGeminiAspect] = useState<"1:1" | "16:9" | "9:16">(
     "16:9"
   );
@@ -67,6 +69,17 @@ function Dashboard() {
   // Upload & UI
   const [referenceImages, setReferenceImages] = useState<File[]>([]);
   const [referenceImageUrls, setReferenceImageUrls] = useState<string[]>([]);
+
+  // Explicit State for PicDrift Frames
+  const [picDriftFrames, setPicDriftFrames] = useState<{
+    start: File | null;
+    end: File | null;
+  }>({ start: null, end: null });
+  const [picDriftUrls, setPicDriftUrls] = useState<{
+    start: string | null;
+    end: string | null;
+  }>({ start: null, end: null });
+
   const [generationState, setGenerationState] = useState<GenerationState>({
     status: "idle",
   });
@@ -87,7 +100,9 @@ function Dashboard() {
   useEffect(() => {
     setReferenceImages([]);
     setReferenceImageUrls([]);
-  }, [activeEngine, studioMode]);
+    setPicDriftFrames({ start: null, end: null });
+    setPicDriftUrls({ start: null, end: null });
+  }, [activeEngine, studioMode, videoFxMode]);
 
   // Mobile detection
   useEffect(() => {
@@ -174,8 +189,6 @@ function Dashboard() {
     ? "https://www.picdrift.com/fx-credits"
     : "https://www.picdrift.com/fx-request";
   const creditBtnText = isCommercial ? "Buy FX Credits" : "Request Credits";
-
-  // Admin Check Logic (Case Insensitive)
   const isAdmin =
     user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
 
@@ -195,6 +208,8 @@ function Dashboard() {
         setVideoTitle("");
         setReferenceImages([]);
         setReferenceImageUrls([]);
+        setPicDriftFrames({ start: null, end: null });
+        setPicDriftUrls({ start: null, end: null });
         queryClient.invalidateQueries({ queryKey: ["posts"] });
         queryClient.invalidateQueries({ queryKey: ["user-credits"] });
       }
@@ -221,7 +236,7 @@ function Dashboard() {
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleGenericUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const maxFiles =
@@ -236,9 +251,23 @@ function Dashboard() {
     setReferenceImageUrls((prev) => [...prev, ...newUrls]);
   };
 
-  const removeImage = (index: number) => {
+  const removeGenericImage = (index: number) => {
     setReferenceImages((prev) => prev.filter((_, i) => i !== index));
     setReferenceImageUrls((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handlePicDriftUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: "start" | "end"
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPicDriftFrames((prev) => ({ ...prev, [type]: file }));
+    setPicDriftUrls((prev) => ({ ...prev, [type]: URL.createObjectURL(file) }));
+  };
+  const removePicDriftImage = (type: "start" | "end") => {
+    setPicDriftFrames((prev) => ({ ...prev, [type]: null }));
+    setPicDriftUrls((prev) => ({ ...prev, [type]: null }));
   };
 
   const buildFormData = () => {
@@ -248,7 +277,18 @@ function Dashboard() {
 
     if (activeEngine === "kie") {
       formData.append("mediaType", "video");
-      formData.append("model", kieModel);
+      if (videoFxMode === "picdrift") {
+        formData.append("model", "kling-2.5");
+        if (picDriftFrames.start)
+          formData.append("referenceImages", picDriftFrames.start);
+        if (picDriftFrames.end)
+          formData.append("referenceImages", picDriftFrames.end);
+      } else {
+        formData.append("model", kieModel);
+        referenceImages.forEach((file) =>
+          formData.append("referenceImages", file)
+        );
+      }
       formData.append("duration", kieDuration.toString());
       formData.append("aspectRatio", kieAspect);
       formData.append("resolution", kieResolution);
@@ -258,17 +298,20 @@ function Dashboard() {
       formData.append("duration", videoDuration.toString());
       formData.append("size", videoSize);
       formData.append("aspectRatio", aspectRatio);
+      referenceImages.forEach((file) =>
+        formData.append("referenceImages", file)
+      );
     } else {
       formData.append("mediaType", studioMode);
-      // Map Gemini Aspect
       let sizeStr = "1024x1024";
       if (geminiAspect === "16:9") sizeStr = "1792x1024";
       if (geminiAspect === "9:16") sizeStr = "1024x1792";
       formData.append("size", sizeStr);
       formData.append("aspectRatio", geminiAspect);
+      referenceImages.forEach((file) =>
+        formData.append("referenceImages", file)
+      );
     }
-
-    referenceImages.forEach((file) => formData.append("referenceImages", file));
     return formData;
   };
 
@@ -278,12 +321,10 @@ function Dashboard() {
     if (activeEngine === "studio") typeToCheck = studioMode;
 
     const credits = userCredits?.[typeToCheck as keyof typeof userCredits] ?? 0;
-
     if (credits <= 0) {
       setShowNoCreditsModal(true);
       return;
     }
-
     if (!prompt.trim()) return;
     setGenerationState({ status: "idle" });
     generateMediaMutation.mutate(buildFormData());
@@ -328,7 +369,6 @@ function Dashboard() {
           </div>
         </div>
       )}
-
       {showNoCreditsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
           <div className="bg-gray-800 rounded-2xl border border-red-500/30 shadow-2xl max-w-sm w-full p-6 text-center">
@@ -345,7 +385,7 @@ function Dashboard() {
                   href={creditLink}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition-all"
+                  className="w-full py-3 bg-green-600 rounded-xl font-bold"
                 >
                   {creditBtnText}
                 </a>
@@ -353,14 +393,14 @@ function Dashboard() {
                 <button
                   onClick={handleRequestCredits}
                   disabled={isRequesting}
-                  className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold transition-all"
+                  className="w-full py-3 bg-purple-600 rounded-xl font-bold"
                 >
                   {isRequesting ? "Sending..." : "Request Credits"}
                 </button>
               )}
               <button
                 onClick={() => setShowNoCreditsModal(false)}
-                className="text-gray-400 hover:text-white text-sm"
+                className="text-gray-400 text-sm"
               >
                 Cancel
               </button>
@@ -368,7 +408,6 @@ function Dashboard() {
           </div>
         </div>
       )}
-
       {showPromptInfo && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4"
@@ -418,15 +457,8 @@ function Dashboard() {
                 <h1 className="text-xl sm:text-3xl md:text-4xl font-bold leading-tight brand-gradient-text">
                   {companyName}
                 </h1>
-                <p className="text-purple-300 text-xs sm:text-sm">
-                  Welcome back,{" "}
-                  <span className="font-semibold text-white">
-                    {user.name || user.email}
-                  </span>
-                </p>
               </div>
             </div>
-
             <div className="absolute left-1/2 transform -translate-x-1/2 flex flex-col items-center mt-14">
               <div className="h-14 sm:h-16 flex items-center justify-center mb-1">
                 <img
@@ -435,11 +467,7 @@ function Dashboard() {
                   className="h-full w-auto object-contain"
                 />
               </div>
-              <p className="text-purple-300 text-xs sm:text-sm text-center">
-                Your AI-Powered Creation Engine
-              </p>
             </div>
-
             {isMobile && (
               <div className="flex gap-2">
                 {isAdmin && (
@@ -465,81 +493,39 @@ function Dashboard() {
               </div>
             )}
           </div>
-
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="bg-gray-800/60 backdrop-blur-lg rounded-2xl px-3 sm:px-4 py-2 sm:py-3 border border-purple-500/20 w-full sm:w-auto">
               <div className="flex items-center justify-between sm:justify-start gap-4">
                 {!creditsLoading ? (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
-                      <span className="text-white text-sm font-medium">
-                        Credits:
-                      </span>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm">🎬</span>
+                      <span className="text-white">{userCredits.video}</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm">🎬</span>
-                        <span
-                          className={`text-xs font-semibold ${
-                            userCredits.video > 0
-                              ? "text-white"
-                              : "text-gray-400"
-                          }`}
-                        >
-                          {userCredits.video}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm">🖼️</span>
-                        <span
-                          className={`text-xs font-semibold ${
-                            userCredits.image > 0
-                              ? "text-white"
-                              : "text-gray-400"
-                          }`}
-                        >
-                          {userCredits.image}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm">📱</span>
-                        <span
-                          className={`text-xs font-semibold ${
-                            userCredits.carousel > 0
-                              ? "text-white"
-                              : "text-gray-400"
-                          }`}
-                        >
-                          {userCredits.carousel}
-                        </span>
-                      </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm">🖼️</span>
+                      <span className="text-white">{userCredits.image}</span>
                     </div>
-                  </>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <LoadingSpinner size="sm" variant="neon" />
-                    <span className="text-purple-300 text-sm">
-                      Loading credits...
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm">📱</span>
+                      <span className="text-white">{userCredits.carousel}</span>
+                    </div>
                   </div>
+                ) : (
+                  <LoadingSpinner size="sm" />
                 )}
               </div>
             </div>
-
             {!isMobile && (
               <div className="flex gap-2">
-                {/* Admin Button */}
                 {isAdmin && (
                   <button
                     onClick={() => navigate("/admin")}
-                    className="px-4 py-2.5 bg-red-600/20 border border-red-500/50 rounded-xl text-red-300 text-sm hover:bg-red-600/40 font-bold transition-all"
+                    className="px-4 py-2.5 bg-red-600/20 border border-red-500/50 rounded-xl text-red-300 text-sm font-bold"
                   >
                     Admin Panel
                   </button>
                 )}
-
-                {/* Credit Button */}
                 {isCommercial ? (
                   <a
                     href={creditLink}
@@ -553,12 +539,11 @@ function Dashboard() {
                   <button
                     onClick={handleRequestCredits}
                     disabled={isRequesting}
-                    className="px-4 py-2.5 bg-purple-600/20 border border-purple-500/50 rounded-xl text-purple-300 text-sm hover:bg-purple-600/40 font-bold transition-all"
+                    className="px-4 py-2.5 bg-purple-600/20 border border-purple-500/50 rounded-xl text-purple-300 text-sm"
                   >
                     {isRequesting ? "Sending..." : "Request Credits 🔔"}
                   </button>
                 )}
-
                 <button
                   onClick={() => setShowBrandModal(true)}
                   className="px-4 py-2.5 bg-gray-800/60 border border-cyan-400/30 rounded-xl text-cyan-400 text-sm hover:bg-cyan-400/10"
@@ -577,7 +562,6 @@ function Dashboard() {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
-          {/* MAIN CREATION AREA */}
           <div className="flex-1">
             <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 lg:p-8 shadow-2xl">
               <div className="mb-6 sm:mb-8">
@@ -595,27 +579,23 @@ function Dashboard() {
                 </p>
               </div>
 
-              {/* ENGINE SELECTOR - UPDATED COLOR THEME SWAP */}
+              {/* ENGINE SELECTOR */}
               <div className="mb-6 sm:mb-8">
                 <label className="block text-sm font-semibold text-white mb-3 sm:mb-4">
                   🎬 Select Content Type
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
                   {[
-                    // 1. Kie (Video FX) - NOW PINK (Swapped with Pic FX)
                     {
                       id: "kie",
                       label: "Video FX",
                       grad: "from-pink-500 to-rose-500",
                     },
-                    // 2. Studio (Pic FX) - NOW VIOLET (Swapped with Video FX)
                     {
                       id: "studio",
                       label: "Pic FX",
-                      sub: "Image & Carousel",
                       grad: "from-violet-700 to-purple-700",
                     },
-                    // 3. OpenAI (Video FX 2) - Remains Blue/Cyan
                     {
                       id: "openai",
                       label: "Video FX 2",
@@ -637,17 +617,6 @@ function Dashboard() {
                           <div className="font-semibold text-sm text-white">
                             {item.label}
                           </div>
-                          {item.sub && (
-                            <div
-                              className={`text-xs ${
-                                activeEngine === item.id
-                                  ? "text-white/80"
-                                  : "text-purple-300"
-                              }`}
-                            >
-                              {item.sub}
-                            </div>
-                          )}
                         </div>
                         {activeEngine === item.id && (
                           <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
@@ -658,7 +627,9 @@ function Dashboard() {
                 </div>
               </div>
 
-              {/* STUDIO TOGGLE (PIC FX) - VIOLET THEME */}
+              {/* TOP TOGGLES SECTION */}
+
+              {/* STUDIO TOGGLE (VIOLET) */}
               {activeEngine === "studio" && (
                 <div className="mb-6 animate-in fade-in space-y-4">
                   <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
@@ -683,8 +654,6 @@ function Dashboard() {
                       Carousel FX
                     </button>
                   </div>
-
-                  {/* Gemini Aspect Ratios */}
                   <div className="flex justify-center gap-3">
                     {[
                       { id: "1:1", label: "Square" },
@@ -707,57 +676,92 @@ function Dashboard() {
                 </div>
               )}
 
+              {/* VIDEO FX TOGGLE (PINK - TOP LEVEL) */}
+              {activeEngine === "kie" && (
+                <div className="mb-6 animate-in fade-in space-y-4">
+                  <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
+                    <button
+                      type="button"
+                      onClick={() => setVideoFxMode("video")}
+                      className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                        videoFxMode === "video"
+                          ? "bg-rose-600 text-white shadow-lg"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      Video
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVideoFxMode("picdrift")}
+                      className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                        videoFxMode === "picdrift"
+                          ? "bg-rose-600 text-white shadow-lg"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      PicDrift
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
                 <div>
-                  <label className="block text-sm font-semibold text-white mb-2 sm:mb-3 flex items-center gap-2">
-                    <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span>{" "}
+                  <label className="block text-sm font-semibold text-white mb-2">
                     Your Creative Vision
                   </label>
                   <textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     placeholder="Describe your vision with a prompt"
-                    className="w-full p-4 sm:p-5 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base leading-relaxed"
-                    rows={isMobile ? 3 : 4}
+                    className="w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base leading-relaxed"
+                    rows={3}
                   />
                 </div>
-
-                <div className="space-y-2 sm:space-y-3">
-                  <label className="block text-sm font-semibold text-white capitalize">
-                    {activeEngine === "studio" ? studioMode : "video"} Title
-                    (Optional)
+                <div>
+                  <label className="block text-sm font-semibold text-white">
+                    Title
                   </label>
                   <input
                     type="text"
                     value={videoTitle}
                     onChange={(e) => setVideoTitle(e.target.value)}
-                    placeholder="Give your creation a memorable name..."
-                    className="w-full p-3 sm:p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-purple-300/60 backdrop-blur-sm"
+                    placeholder="Name your creation..."
+                    className="w-full p-3 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-purple-300/60 backdrop-blur-sm"
                   />
                 </div>
 
-                {/* KIE AI CONTROLS (Video FX) - PINK/ROSE THEME */}
+                {/* KIE / PICDRIFT PARAMETERS (PINK/ROSE) */}
                 {activeEngine === "kie" && (
                   <div className="space-y-4 sm:space-y-6 animate-in fade-in">
-                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                      {[
-                        { id: "kie-sora-2", label: "Video FX" },
-                        { id: "kie-sora-2-pro", label: "Video FX Pro" },
-                      ].map((m) => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => setKieModel(m.id as any)}
-                          className={`p-3 rounded-xl border text-sm font-bold transition-all ${
-                            kieModel === m.id
-                              ? "bg-rose-600 border-rose-600 text-white shadow-lg"
-                              : "border-white/10 bg-gray-800/50 text-gray-400"
-                          }`}
-                        >
-                          {m.label}
-                        </button>
-                      ))}
-                    </div>
+                    {/* RESTORED: Video FX vs Pro Selection (Only in 'video' mode) */}
+                    {videoFxMode === "video" && (
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-white">
+                          AI Model
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { id: "kie-sora-2", label: "Video FX" },
+                            { id: "kie-sora-2-pro", label: "Video FX Pro" },
+                          ].map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => setKieModel(m.id as any)}
+                              className={`p-3 rounded-xl border text-left text-sm font-medium ${
+                                kieModel === m.id
+                                  ? "bg-rose-600 border-rose-500 text-white"
+                                  : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
+                              }`}
+                            >
+                              {m.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                       <div>
@@ -765,15 +769,18 @@ function Dashboard() {
                           Duration
                         </label>
                         <div className="flex gap-2">
-                          {[5, 10, 15].map((d) => (
+                          {(videoFxMode === "picdrift"
+                            ? [5, 10]
+                            : [10, 15]
+                          ).map((d) => (
                             <button
                               key={d}
                               type="button"
                               onClick={() => setKieDuration(d as any)}
-                              className={`flex-1 py-2 rounded-lg border ${
+                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
                                 kieDuration === d
                                   ? "bg-rose-600 border-rose-600 text-white"
-                                  : "border-white/10 bg-gray-800/50 text-gray-400"
+                                  : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
                               }`}
                             >
                               {d}s
@@ -794,10 +801,10 @@ function Dashboard() {
                               key={a.id}
                               type="button"
                               onClick={() => setKieAspect(a.id as any)}
-                              className={`flex-1 py-2 rounded-lg border ${
+                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
                                 kieAspect === a.id
                                   ? "bg-rose-600 border-rose-600 text-white"
-                                  : "border-white/10 bg-gray-800/50 text-gray-400"
+                                  : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
                               }`}
                             >
                               {a.label}
@@ -805,42 +812,44 @@ function Dashboard() {
                           ))}
                         </div>
                       </div>
-                      <div className="sm:col-span-2">
-                        <label className="text-sm font-semibold text-white mb-2 block">
-                          Resolution
-                        </label>
-                        <div className="flex gap-2">
-                          {[
-                            { id: "720p", label: "720p (Fast)" },
-                            { id: "1080p", label: "1080p (HD)" },
-                          ].map((r) => (
-                            <button
-                              key={r.id}
-                              type="button"
-                              onClick={() => setKieResolution(r.id as any)}
-                              className={`flex-1 py-2 rounded-lg border ${
-                                kieResolution === r.id
-                                  ? "bg-rose-600 border-rose-600 text-white"
-                                  : "border-white/10 bg-gray-800/50 text-gray-400"
-                              }`}
-                            >
-                              {r.label}
-                            </button>
-                          ))}
+                      {videoFxMode === "video" && (
+                        <div className="sm:col-span-2">
+                          <label className="text-sm font-semibold text-white mb-2 block">
+                            Resolution
+                          </label>
+                          <div className="flex gap-2">
+                            {[
+                              { id: "720p", label: "720p (Fast)" },
+                              { id: "1080p", label: "1080p (HD)" },
+                            ].map((r) => (
+                              <button
+                                key={r.id}
+                                type="button"
+                                onClick={() => setKieResolution(r.id as any)}
+                                className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                                  kieResolution === r.id
+                                    ? "bg-rose-600 border-rose-600 text-white"
+                                    : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                }`}
+                              >
+                                {r.label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 )}
 
-                {/* OPENAI CONTROLS (Video FX 2) - BLUE/CYAN THEME */}
+                {/* OPENAI CONTROLS (BLUE) */}
                 {activeEngine === "openai" && (
                   <div className="space-y-4 sm:space-y-6 animate-in fade-in">
-                    <div className="space-y-2 sm:space-y-3">
+                    <div className="space-y-2">
                       <label className="block text-sm font-semibold text-white">
                         AI Model
                       </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                      <div className="grid grid-cols-2 gap-2">
                         {[
                           { id: "sora-2", label: "Video FX 2" },
                           { id: "sora-2-pro", label: "Video FX 2 Pro" },
@@ -849,42 +858,28 @@ function Dashboard() {
                             key={model.id}
                             type="button"
                             onClick={() => setVideoModel(model.id as any)}
-                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all text-left group ${
+                            className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${
                               videoModel === model.id
                                 ? "border-cyan-400 bg-cyan-500/20"
                                 : "border-white/10 bg-gray-800/50"
                             }`}
                           >
-                            <div className="flex items-center justify-between">
-                              <div className="font-semibold text-white text-sm flex items-center gap-2">
-                                {model.label}
-                              </div>
-                              {videoModel === model.id && (
-                                <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
-                              )}
+                            <div className="font-semibold text-white text-sm">
+                              {model.label}
                             </div>
                           </button>
                         ))}
                       </div>
                     </div>
-
-                    <div className="space-y-2 sm:space-y-3">
+                    <div className="space-y-2">
                       <label className="block text-sm font-semibold text-white">
                         Aspect Ratio
                       </label>
-                      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                      <div className="grid grid-cols-2 gap-2">
                         {[
-                          {
-                            ratio: "16:9",
-                            label: "Landscape (16:9)",
-                            desc: "Widescreen",
-                          },
-                          {
-                            ratio: "9:16",
-                            label: "Portrait (9:16)",
-                            desc: "Mobile",
-                          },
-                        ].map(({ ratio, label, desc }) => (
+                          { ratio: "16:9", label: "Landscape" },
+                          { ratio: "9:16", label: "Portrait" },
+                        ].map(({ ratio, label }) => (
                           <button
                             key={ratio}
                             type="button"
@@ -894,7 +889,7 @@ function Dashboard() {
                                 ratio === "16:9" ? "1792x1024" : "1024x1792"
                               );
                             }}
-                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all text-center group ${
+                            className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${
                               aspectRatio === ratio
                                 ? "border-purple-400 bg-purple-500/20"
                                 : "border-white/10 bg-gray-800/50"
@@ -903,102 +898,57 @@ function Dashboard() {
                             <div className="font-semibold text-white text-sm">
                               {label}
                             </div>
-                            <div className="text-xs text-purple-300">
-                              {ratio}
-                            </div>
-                            <div className="text-xs text-gray-400 mt-1">
-                              {desc}
-                            </div>
                           </button>
                         ))}
                       </div>
                     </div>
-
-                    <div className="space-y-2 sm:space-y-3">
+                    <div className="space-y-2">
                       <label className="block text-sm font-semibold text-white">
                         Video Size
                       </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                      <div className="grid grid-cols-2 gap-2">
                         {(aspectRatio === "16:9"
                           ? [
-                              {
-                                size: "1280x720",
-                                label: "720p HD",
-                                resolution: "1280 × 720",
-                                quality: "Standard",
-                              },
+                              { size: "1280x720", label: "720p HD" },
                               ...(videoModel === "sora-2-pro"
-                                ? [
-                                    {
-                                      size: "1792x1024",
-                                      label: "1080p",
-                                      resolution: "1920 × 1024",
-                                      quality: "Premium",
-                                    },
-                                  ]
+                                ? [{ size: "1792x1024", label: "1080p" }]
                                 : []),
                             ]
                           : [
-                              {
-                                size: "720x1280",
-                                label: "720p HD",
-                                resolution: "720 × 1280",
-                                quality: "Standard",
-                              },
+                              { size: "720x1280", label: "720p HD" },
                               ...(videoModel === "sora-2-pro"
-                                ? [
-                                    {
-                                      size: "1024x1792",
-                                      label: "1080p",
-                                      resolution: "1024 × 1920",
-                                      quality: "Premium",
-                                    },
-                                  ]
+                                ? [{ size: "1024x1792", label: "1080p" }]
                                 : []),
                             ]
-                        ).map(({ size, label, resolution, quality }) => (
+                        ).map(({ size, label }) => (
                           <button
                             key={size}
                             type="button"
                             onClick={() => setVideoSize(size as any)}
-                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
+                            className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${
                               videoSize === size
-                                ? "border-green-400 bg-green-500/20 shadow-lg shadow-green-500/25"
-                                : "border-white/10 bg-gray-800/50 hover:border-green-400/50"
+                                ? "border-green-400 bg-green-500/20"
+                                : "border-white/10 bg-gray-800/50"
                             }`}
                           >
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <div className="font-semibold text-white text-sm">
-                                  {label}
-                                </div>
-                                <div className="text-xs text-purple-300">
-                                  {resolution}
-                                </div>
-                                <div className="text-xs text-gray-400 mt-1">
-                                  {quality}
-                                </div>
-                              </div>
-                              {videoSize === size && (
-                                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                              )}
+                            <div className="font-semibold text-white text-sm">
+                              {label}
                             </div>
                           </button>
                         ))}
                       </div>
                     </div>
-
-                    <div className="space-y-2 sm:space-y-3">
+                    <div className="space-y-2">
                       <label className="block text-sm font-semibold text-white">
-                        ⏱️ Video Duration
+                        Duration
                       </label>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex gap-2">
                         {[4, 8, 12].map((sec) => (
                           <button
                             key={sec}
                             type="button"
                             onClick={() => setVideoDuration(sec as any)}
-                            className={`px-3 sm:px-5 py-2 sm:py-3 rounded-xl border text-sm font-semibold flex-1 min-w-[80px] ${
+                            className={`px-3 py-2 rounded-xl border text-sm flex-1 ${
                               videoDuration === sec
                                 ? "bg-cyan-500 border-cyan-500 text-white"
                                 : "bg-gray-800/50 border-white/10 text-purple-200"
@@ -1012,74 +962,150 @@ function Dashboard() {
                   </div>
                 )}
 
-                {/* UPLOAD UI */}
+                {/* UPLOAD UI - DYNAMIC FOR PICDRIFT */}
                 <div className="space-y-2 sm:space-y-3">
                   <label className="block text-sm font-semibold text-white">
-                    Reference Images (Optional)
+                    Reference Images
                   </label>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-center w-full">
-                      <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:border-cyan-500 hover:bg-gray-800/50 transition-all group">
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                          <div className="text-4xl mb-2 opacity-50 group-hover:opacity-100 transition-opacity"></div>
-                          <p className="text-sm text-gray-400">
-                            <span className="font-semibold text-cyan-400">
-                              Click to upload
-                            </span>{" "}
-                            or drag and drop
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {activeEngine === "studio" &&
-                            studioMode === "carousel"
-                              ? "Up to 5 images"
-                              : "Single frame"}{" "}
-                            (PNG/JPG, Max 10MB)
-                          </p>
+
+                  {activeEngine === "kie" && videoFxMode === "picdrift" ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs text-rose-300 uppercase font-bold">
+                          Start Frame
+                        </label>
+                        <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
+                          {picDriftUrls.start ? (
+                            <>
+                              <img
+                                src={picDriftUrls.start}
+                                className="w-full h-full object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removePicDriftImage("start")}
+                                className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
+                              >
+                                ✕
+                              </button>
+                            </>
+                          ) : (
+                            <label className="flex flex-col items-center justify-center w-full h-full cursor-pointer">
+                              <span className="text-rose-400 text-2xl">+</span>
+                              <span className="text-xs text-rose-300/70">
+                                Upload Start
+                              </span>
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept="image/*"
+                                onChange={(e) =>
+                                  handlePicDriftUpload(e, "start")
+                                }
+                              />
+                            </label>
+                          )}
                         </div>
-                        <input
-                          type="file"
-                          className="hidden"
-                          multiple={
-                            activeEngine === "studio" &&
-                            studioMode === "carousel"
-                          }
-                          accept="image/*"
-                          onChange={handleImageUpload}
-                        />
-                      </label>
-                    </div>
-                    {referenceImageUrls.length > 0 && (
-                      <div className="grid grid-cols-5 gap-2 animate-in fade-in">
-                        {referenceImageUrls.map((url, index) => (
-                          <div
-                            key={index}
-                            className="relative aspect-square group"
-                          >
-                            <img
-                              src={url}
-                              alt={`Ref ${index}`}
-                              className="w-full h-full object-cover rounded-lg border border-white/20"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeImage(index)}
-                              className="absolute -top-1 -right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ))}
                       </div>
-                    )}
-                  </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs text-rose-300 uppercase font-bold">
+                          End Frame
+                        </label>
+                        <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
+                          {picDriftUrls.end ? (
+                            <>
+                              <img
+                                src={picDriftUrls.end}
+                                className="w-full h-full object-cover"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removePicDriftImage("end")}
+                                className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
+                              >
+                                ✕
+                              </button>
+                            </>
+                          ) : (
+                            <label className="flex flex-col items-center justify-center w-full h-full cursor-pointer">
+                              <span className="text-rose-400 text-2xl">+</span>
+                              <span className="text-xs text-rose-300/70">
+                                Upload End
+                              </span>
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept="image/*"
+                                onChange={(e) => handlePicDriftUpload(e, "end")}
+                              />
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-center w-full">
+                        <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:border-cyan-500 hover:bg-gray-800/50 transition-all group">
+                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                            <div className="text-4xl mb-2 opacity-50"></div>
+                            <p className="text-sm text-gray-400">
+                              <span className="font-semibold text-cyan-400">
+                                Click to upload
+                              </span>{" "}
+                              or drag and drop
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {activeEngine === "studio" &&
+                              studioMode === "carousel"
+                                ? "Up to 5 images"
+                                : "Single frame"}{" "}
+                              (PNG/JPG)
+                            </p>
+                          </div>
+                          <input
+                            type="file"
+                            className="hidden"
+                            multiple={
+                              activeEngine === "studio" &&
+                              studioMode === "carousel"
+                            }
+                            accept="image/*"
+                            onChange={handleGenericUpload}
+                          />
+                        </label>
+                      </div>
+                      {referenceImageUrls.length > 0 && (
+                        <div className="grid grid-cols-5 gap-2 animate-in fade-in">
+                          {referenceImageUrls.map((url, index) => (
+                            <div
+                              key={index}
+                              className="relative aspect-square group"
+                            >
+                              <img
+                                src={url}
+                                className="w-full h-full object-cover rounded-lg border border-white/20"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeGenericImage(index)}
+                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <button
                   type="submit"
                   disabled={generateMediaMutation.isPending || !prompt.trim()}
-                  className="w-full gradient-brand text-white py-4 sm:py-5 px-6 sm:px-8 rounded-2xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-bold text-base sm:text-lg flex items-center justify-center gap-3 group relative overflow-hidden"
+                  className="w-full gradient-brand text-white py-4 sm:py-5 px-6 sm:px-8 rounded-2xl hover:shadow-2xl disabled:opacity-50 font-bold text-base sm:text-lg flex items-center justify-center gap-3"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
                   {generateMediaMutation.isPending ? (
                     <>
                       <LoadingSpinner size="sm" variant="light" />
@@ -1090,21 +1116,16 @@ function Dashboard() {
                     </>
                   ) : (
                     <>
-                      <span className="group-hover:scale-110 transition-transform text-lg sm:text-xl">
-                        ✨
-                      </span>
+                      <span className="text-xl">✨</span>
                       <span>
                         Generate{" "}
-                        {activeEngine === "studio"
-                          ? studioMode === "image"
-                            ? "Image"
-                            : "Carousel"
-                          : "Video"}
+                        {activeEngine === "studio" ? studioMode : "Video"}
                       </span>
                     </>
                   )}
                 </button>
               </form>
+
               {generationState.status === "error" && (
                 <ErrorAlert
                   message={generationState.error || "Generation failed"}
@@ -1123,19 +1144,9 @@ function Dashboard() {
             <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 shadow-2xl sticky top-4">
               <div className="flex items-center justify-between mb-4 sm:mb-6">
                 <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
-                  <span>📚</span> Your Library{" "}
-                  <span className="bg-purple-500/20 text-purple-300 text-xs px-2 py-1 rounded-full ml-2">
-                    {posts && Array.isArray(posts)
-                      ? posts.filter((p: any) => p.status !== "CANCELLED")
-                          .length
-                      : 0}
-                  </span>
+                  <span>📚</span> Your Library
                 </h2>
-                {postsLoading && (
-                  <div className="flex items-center gap-2 text-sm text-purple-300">
-                    <LoadingSpinner size="sm" variant="neon" />
-                  </div>
-                )}
+                {postsLoading && <LoadingSpinner size="sm" variant="neon" />}
               </div>
               <div className="space-y-3 max-h-[500px] sm:max-h-[600px] overflow-y-auto custom-scrollbar">
                 {posts && Array.isArray(posts) && posts.length > 0 ? (
@@ -1151,11 +1162,9 @@ function Dashboard() {
                         key={post.id}
                         post={post}
                         onPublishPost={() => handleShowPromptInfo(post.prompt)}
-                        userCredits={
-                          userCredits || { video: 0, image: 0, carousel: 0 }
-                        }
+                        userCredits={userCredits}
                         publishingPost={null}
-                        primaryColor={brandConfig?.primaryColor || "#6366f1"}
+                        primaryColor={brandConfig?.primaryColor}
                         compact={true}
                       />
                     ))
@@ -1165,9 +1174,6 @@ function Dashboard() {
                       No content yet
                     </div>
                     <div className="text-4xl mb-2">✨</div>
-                    <div className="text-gray-400 text-xs">
-                      Start creating above!
-                    </div>
                   </div>
                 ) : null}
               </div>

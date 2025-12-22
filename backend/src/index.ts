@@ -25,9 +25,7 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 // === ADMIN CONFIGURATION ===
-// 1. Get string from env, default to your email
 const ADMIN_EMAILS_RAW = process.env.ADMIN_EMAILS || "snowfix07@gmail.com";
-// 2. Convert to Array and clean up spaces
 const ADMIN_EMAILS = ADMIN_EMAILS_RAW.split(",").map((email) => email.trim());
 
 const allowedOrigins = ["https://picdrift.studio", "http://localhost:5173"];
@@ -83,8 +81,7 @@ const authenticateToken = async (
   }
 };
 
-// ==================== ADMIN MIDDLEWARE (MOVED UP) ====================
-// This MUST be defined before any route that uses it.
+// ==================== ADMIN MIDDLEWARE ====================
 const requireAdmin = (
   req: AuthenticatedRequest,
   res: Response,
@@ -99,7 +96,6 @@ const requireAdmin = (
 
 // ==================== NOTIFICATION ROUTES ====================
 
-// User: Request Credits
 app.post(
   "/api/request-credits",
   authenticateToken,
@@ -117,7 +113,6 @@ app.post(
   }
 );
 
-// Admin: Get Requests
 app.get(
   "/api/admin/requests",
   authenticateToken,
@@ -132,7 +127,6 @@ app.get(
   }
 );
 
-// Admin: Mark Request as Done (Dismiss Notification)
 app.put(
   "/api/admin/requests/:id/resolve",
   authenticateToken,
@@ -149,7 +143,6 @@ app.put(
 
 // ==================== ADMIN MANAGEMENT ROUTES ====================
 
-// 1. Create User
 app.post(
   "/api/admin/create-user",
   authenticateToken,
@@ -172,7 +165,6 @@ app.post(
   }
 );
 
-// 2. List All Users
 app.get(
   "/api/admin/users",
   authenticateToken,
@@ -187,7 +179,6 @@ app.get(
   }
 );
 
-// 3. Update User (Credits & System)
 app.put(
   "/api/admin/users/:userId",
   authenticateToken,
@@ -209,7 +200,6 @@ app.put(
   }
 );
 
-// 4. Delete User
 app.delete(
   "/api/admin/users/:userId",
   authenticateToken,
@@ -219,15 +209,10 @@ app.delete(
 
     try {
       const userToDelete = await airtableService.findUserById(userId);
-
-      if (!userToDelete) {
+      if (!userToDelete)
         return res.status(404).json({ error: "User not found" });
-      }
 
-      // Delete from Supabase (Auth)
       await AuthService.deleteSupabaseUserByEmail(userToDelete.email);
-
-      // Delete from Airtable (Data)
       await airtableService.deleteUser(userId);
 
       res.json({ success: true, message: "User deleted successfully" });
@@ -243,10 +228,7 @@ app.get(
   "/api/auth/me",
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
-    res.json({
-      success: true,
-      user: req.user,
-    });
+    res.json({ success: true, user: req.user });
   }
 );
 
@@ -371,12 +353,10 @@ app.get(
       const { postId } = req.params;
       const post = await airtableService.getPostById(postId);
 
-      if (!post || post.userId !== req.user!.id) {
+      if (!post || post.userId !== req.user!.id)
         return res.status(403).json({ error: "Access denied" });
-      }
-      if (!post.mediaUrl) {
+      if (!post.mediaUrl)
         return res.status(404).json({ error: "Media not available" });
-      }
 
       let cleanTitle = `visionlight-${postId}`;
       if (post.title && post.title.trim().length > 0) {
@@ -428,9 +408,8 @@ app.get(
       });
 
       res.setHeader("Content-Type", response.headers["content-type"]);
-      if (response.headers["content-length"]) {
+      if (response.headers["content-length"])
         res.setHeader("Content-Length", response.headers["content-length"]);
-      }
       res.setHeader(
         "Content-Disposition",
         `attachment; filename="${filename}"`
@@ -471,6 +450,8 @@ app.post(
         return res.status(400).json({ error: "Missing required fields" });
 
       const user = await airtableService.findUserById(req.user!.id);
+
+      // FIX: Explicitly cast mediaType to match credit key types
       const creditKey = mediaType as "video" | "image" | "carousel";
 
       if (!user || user.demoCredits[creditKey] <= 0) {

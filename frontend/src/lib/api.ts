@@ -1,11 +1,7 @@
-// frontend/src/lib/api.ts
 import axios from "axios";
 
-// 1. UPDATE: Add '/api' to localhost fallback so it matches your production structure
-// If .env is "/api", baseURL becomes "/api".
-// If .env is missing (local), baseURL becomes "http://localhost:4000/api"
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
+const RAW_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
+const API_BASE_URL = RAW_URL.replace(/\/api\/?$/, "").replace(/\/$/, "");
 
 console.log("🔧 API Base URL:", API_BASE_URL);
 
@@ -25,64 +21,49 @@ export const setAuthToken = (token: string | null) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message =
-      error.response?.data?.error || error.message || "Something went wrong";
-
+    const message = error.response?.data?.error || error.message || "Error";
+    // Ignore 404s from polling
     if (error.response?.status !== 404 && error.code !== "ERR_CANCELED") {
       console.error("API Error:", {
         url: error.config?.url,
         status: error.response?.status,
-        message: message,
       });
     }
-
     return Promise.reject(new Error(message));
   }
 );
 
-// 2. UPDATE: Removed "/api" from all paths below because it is now part of API_BASE_URL
 export const apiEndpoints = {
   // === Auth ===
-  getMe: () => api.get("/auth/me"), // Was: /api/auth/me
-
-  // === Admin ===
-  adminCreateUser: (data: { email: string; password: string; name: string }) =>
-    api.post("/admin/create-user", data),
-  adminGetUsers: () => api.get("/admin/users"),
+  getMe: () => api.get("/api/auth/me"),
+  adminCreateUser: (data: any) => api.post("/api/admin/create-user", data),
+  adminGetUsers: () => api.get("/api/admin/users"),
   adminUpdateUser: (userId: string, data: any) =>
-    api.put(`/admin/users/${userId}`, data),
-  adminDeleteUser: (userId: string) => api.delete(`/admin/users/${userId}`),
+    api.put(`/api/admin/users/${userId}`, data),
+  adminDeleteUser: (userId: string) => api.delete(`/api/admin/users/${userId}`),
 
-  // === Brand & Config ===
-  getBrandConfig: () => api.get("/brand-config"),
-  updateBrandConfig: (data: any) => api.put("/brand-config", data),
-
-  // === Credits & Requests ===
-  requestCredits: () => api.post("/request-credits"),
-
-  // Admin Notifications
-  adminGetRequests: () => api.get("/admin/requests"),
-  adminResolveRequest: (id: string) => api.put(`/admin/requests/${id}/resolve`),
-
-  // === Posts ===
-  getPosts: () => api.get("/posts"),
-  getPostById: (postId: string) => api.get(`/post/${postId}`),
+  // === Data ===
+  getBrandConfig: () => api.get("/api/brand-config"),
+  updateBrandConfig: (data: any) => api.put("/api/brand-config", data),
+  getPosts: () => api.get("/api/posts"),
+  getPostById: (id: string) => api.get(`/api/post/${id}`),
   updatePostTitle: (postId: string, title: string) =>
-    api.put(`/posts/${postId}/title`, { title }),
-  getPostStatus: (postId: string) => api.get(`/post/${postId}/status`),
+    api.put(`/api/posts/${postId}/title`, { title }),
+  getPostStatus: (id: string) => api.get(`/api/post/${id}/status`),
 
-  // === Generation Workflow ===
-  generateMediaDirect: (formData: FormData) => {
-    return api.post("/generate-media", formData, {
+  // === Generation ===
+  generateMediaDirect: (formData: FormData) =>
+    api.post("/api/generate-media", formData, {
       headers: { "Content-Type": "multipart/form-data" },
-    });
-  },
+    }),
 
-  // === Metrics & Utils ===
-  getROIMetrics: () => api.get("/roi-metrics"),
-  getUserCredits: () => api.get("/user-credits"),
-  resetDemoCredits: () => api.post("/reset-demo-credits"),
+  // === ROI & Credits ===
+  getROIMetrics: () => api.get("/api/roi-metrics"),
+  getUserCredits: () => api.get("/api/user-credits"),
+  requestCredits: () => api.post("/api/request-credits"),
 
-  publishPost: (data: { postId: string; platform?: string }) =>
-    api.post("/posts/publish", data),
+  // === Admin Notifications ===
+  adminGetRequests: () => api.get("/api/admin/requests"),
+  adminResolveRequest: (id: string) =>
+    api.put(`/api/admin/requests/${id}/resolve`),
 };

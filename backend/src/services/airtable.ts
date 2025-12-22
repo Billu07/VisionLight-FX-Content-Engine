@@ -301,7 +301,6 @@ export const airtableService = {
     }
   },
 
-  // FIX: Converted string 'now' back to Date for return object
   async upsertBrandConfig(configData: {
     userId: string;
     companyName?: string;
@@ -413,7 +412,7 @@ export const airtableService = {
         generationParams: record.get("generationParams")
           ? JSON.parse(record.get("generationParams") as string)
           : undefined,
-        error: record.get("error") as string, // Added error mapping
+        error: record.get("error") as string,
         createdAt: new Date(record.get("createdAt") as string),
         updatedAt: new Date(record.get("updatedAt") as string),
       } as Post;
@@ -441,7 +440,6 @@ export const airtableService = {
         ) {
           mediaUrl = mediaUrl.replace("http://", "https://");
         }
-
         return {
           id: record.id,
           title: record.get("title"),
@@ -461,7 +459,7 @@ export const airtableService = {
 
   // === SESSION (Auth) ===
   async validateSession(token: string) {
-    /* Handled by Auth Service */ return null;
+    return null;
   },
   async createSession(userId: string, token: string) {
     return {
