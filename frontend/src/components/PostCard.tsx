@@ -35,7 +35,11 @@ export function PostCard({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(post.title || "");
   const [isPossiblyStuck, setIsPossiblyStuck] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
+
+  // Separate loading states for the two download buttons
+  const [isDownloadingVideo, setIsDownloadingVideo] = useState(false);
+  const [isDownloadingEndFrame, setIsDownloadingEndFrame] = useState(false);
+
   const [slideIndex, setSlideIndex] = useState(0);
 
   useEffect(() => {
@@ -57,7 +61,6 @@ export function PostCard({
   const handleVideoLoad = () => setVideoLoading(false);
 
   const handleMediaError = () => {
-    // If we have a URL but it fails to load, show error
     if (post.status !== "PROCESSING" && post.status !== "NEW") {
       setMediaError(true);
       setVideoLoading(false);
@@ -81,11 +84,12 @@ export function PostCard({
     }
   };
 
-  const handleDownload = async (e: React.MouseEvent) => {
+  // --- DOWNLOAD VIDEO HANDLER ---
+  const handleDownloadVideo = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (!post.mediaUrl) return;
     try {
-      setIsDownloading(true);
+      setIsDownloadingVideo(true);
       const response = await api.get(`/api/posts/${post.id}/download`, {
         responseType: "blob",
       });
@@ -115,16 +119,44 @@ export function PostCard({
       console.error("Download fallback:", error);
       window.open(getCleanUrl(post.mediaUrl), "_blank");
     } finally {
-      setIsDownloading(false);
+      setIsDownloadingVideo(false);
+    }
+  };
+
+  // --- DOWNLOAD END FRAME HANDLER (Updated for Quality) ---
+  const handleDownloadEndFrame = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!post.generatedEndFrame) return;
+
+    try {
+      setIsDownloadingEndFrame(true);
+
+      // Fetch the raw image data as a Blob to force a real file download
+      // Cloudinary allows CORS, so this direct fetch preserves quality
+      const response = await fetch(post.generatedEndFrame);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      // Force the name to match the clip ID for organization
+      link.setAttribute("download", `end-frame-${post.id}.jpg`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("End frame download failed, falling back to tab:", error);
+      // Fallback: If fetch fails (e.g., strict CORS), just open the tab
+      window.open(post.generatedEndFrame, "_blank");
+    } finally {
+      setIsDownloadingEndFrame(false);
     }
   };
 
   const progress = post.progress || 0;
   const isProcessing = post.status === "PROCESSING" || post.status === "NEW";
-
-  // === CRITICAL FIX ===
-  // If we have a Media URL, show the content/buttons, even if status is "FAILED"
-  // This handles cases where the generation worked but the final DB update step errored.
   const hasMedia = !!post.mediaUrl && post.mediaUrl.length > 5;
   const isContentVisible = hasMedia && !isProcessing;
 
@@ -320,31 +352,47 @@ export function PostCard({
           </div>
         )}
 
-        {/* Action Row - Now visible if content exists, ignoring status errors */}
         {isContentVisible && (
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              onClick={handleDownload}
-              disabled={isDownloading}
-              className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-cyan-400 text-xs py-2 rounded-lg transition-colors flex items-center justify-center gap-1"
-            >
-              {isDownloading ? (
-                <LoadingSpinner size="sm" />
-              ) : (
-                <span>⬇️ Download</span>
-              )}
-            </button>
+          <div className="flex flex-col gap-2 pt-1">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleDownloadVideo}
+                disabled={isDownloadingVideo}
+                className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-cyan-400 text-xs py-2 rounded-lg transition-colors flex items-center justify-center gap-1"
+              >
+                {isDownloadingVideo ? (
+                  <LoadingSpinner size="sm" />
+                ) : (
+                  <span>⬇️ Download</span>
+                )}
+              </button>
 
-            {/* Info Button */}
-            <button
-              onClick={() =>
-                onPublishPost({ prompt: post.prompt, postId: post.id })
-              }
-              className="w-8 h-8 flex items-center justify-center bg-gray-700 hover:bg-gray-600 border border-white/10 rounded-full text-white transition-all shadow-sm"
-              title="View Prompt Info"
-            >
-              ℹ️
-            </button>
+              <button
+                onClick={() =>
+                  onPublishPost({ prompt: post.prompt, postId: post.id })
+                }
+                className="w-8 h-8 flex items-center justify-center bg-gray-700 hover:bg-gray-600 border border-white/10 rounded-full text-white"
+                title="View Prompt Info"
+              >
+                ℹ️
+              </button>
+            </div>
+
+            {/* 👇 END FRAME DOWNLOAD BUTTON */}
+            {post.generatedEndFrame && (
+              <button
+                onClick={handleDownloadEndFrame}
+                disabled={isDownloadingEndFrame}
+                className="w-full bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 text-[10px] py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1"
+                title="Use this as the Start Frame for your next clip to ensure perfect matching"
+              >
+                {isDownloadingEndFrame ? (
+                  <LoadingSpinner size="sm" variant="light" />
+                ) : (
+                  "📥 Download End Frame"
+                )}
+              </button>
+            )}
           </div>
         )}
 

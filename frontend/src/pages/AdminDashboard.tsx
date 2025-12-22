@@ -8,7 +8,7 @@ interface User {
   email: string;
   name: string;
   creditSystem: "COMMERCIAL" | "INTERNAL";
-  demoCredits: { video: number; image: number; carousel: number };
+  creditBalance: number; // CHANGED: Single number
 }
 
 interface CreditRequest {
@@ -33,16 +33,6 @@ export default function AdminDashboard() {
 
   // Forms State
   const [newUser, setNewUser] = useState({ email: "", password: "", name: "" });
-  const [editForm, setEditForm] = useState<{
-    credits: { video: number; image: number; carousel: number };
-    creditSystem: "COMMERCIAL" | "INTERNAL";
-    name: string;
-  }>({
-    credits: { video: 0, image: 0, carousel: 0 },
-    creditSystem: "COMMERCIAL",
-    name: "",
-  });
-
   const [actionLoading, setActionLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -96,26 +86,33 @@ export default function AdminDashboard() {
     }
   };
 
-  const openEditModal = (u: User) => {
-    setEditingUser(u);
-    setEditForm({
-      credits: { ...u.demoCredits },
-      creditSystem: u.creditSystem || "COMMERCIAL",
-      name: u.name,
-    });
-  };
-
-  const handleUpdateUser = async () => {
-    if (!editingUser) return;
+  // Simplified Add Credits Action
+  const handleAddCredits = async (userId: string, amount: number) => {
     setActionLoading(true);
     try {
-      await apiEndpoints.adminUpdateUser(editingUser.id, editForm);
-      setEditingUser(null);
+      // We assume adminUpdateUser now handles "addCredits" key
+      await apiEndpoints.adminUpdateUser(userId, { addCredits: amount });
+      setMsg(`✅ Added ${amount} credits!`);
       fetchData();
+      if (editingUser) setEditingUser(null);
     } catch (err: any) {
-      alert("Update failed: " + err.message);
+      alert("Failed to add credits: " + err.message);
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleUpdateUserSystem = async (system: "COMMERCIAL" | "INTERNAL") => {
+    if (!editingUser) return;
+    try {
+      await apiEndpoints.adminUpdateUser(editingUser.id, {
+        creditSystem: system,
+      });
+      setMsg("✅ System updated");
+      fetchData();
+      setEditingUser(null);
+    } catch (err) {
+      alert("Failed");
     }
   };
 
@@ -127,7 +124,6 @@ export default function AdminDashboard() {
     ) {
       return;
     }
-
     setLoading(true);
     try {
       await apiEndpoints.adminDeleteUser(user.id);
@@ -219,9 +215,9 @@ export default function AdminDashboard() {
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => {
-                        setSearchTerm(req.email); // Auto-filter the table
+                        setSearchTerm(req.email);
                         setMsg(
-                          `🔍 Filtered for ${req.email}. Click 'Edit' to grant credits.`
+                          `🔍 Filtered for ${req.email}. Click 'Manage' to grant credits.`
                         );
                       }}
                       className="text-cyan-400 hover:text-white text-sm underline"
@@ -250,7 +246,10 @@ export default function AdminDashboard() {
                   <th className="p-4 border-b border-gray-700">User Details</th>
                   <th className="p-4 border-b border-gray-700">System</th>
                   <th className="p-4 border-b border-gray-700">
-                    Credits (Vid/Img/Car)
+                    Wallet Balance
+                  </th>
+                  <th className="p-4 border-b border-gray-700 text-right">
+                    Quick Top-Up
                   </th>
                   <th className="p-4 border-b border-gray-700 text-right">
                     Actions
@@ -260,13 +259,13 @@ export default function AdminDashboard() {
               <tbody className="divide-y divide-gray-700">
                 {loading ? (
                   <tr>
-                    <td colSpan={4} className="p-12 text-center">
+                    <td colSpan={5} className="p-12 text-center">
                       <LoadingSpinner size="lg" variant="neon" />
                     </td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="p-8 text-center text-gray-500">
+                    <td colSpan={5} className="p-8 text-center text-gray-500">
                       No users found.
                     </td>
                   </tr>
@@ -297,32 +296,49 @@ export default function AdminDashboard() {
                             : "🏢 INTERNAL"}
                         </span>
                       </td>
-                      <td className="p-4 font-mono text-sm">
-                        <div className="flex gap-3">
-                          <span title="Video" className="text-blue-300">
-                            🎬 {u.demoCredits.video}
-                          </span>
-                          <span title="Image" className="text-pink-300">
-                            🖼️ {u.demoCredits.image}
-                          </span>
-                          <span title="Carousel" className="text-orange-300">
-                            📱 {u.demoCredits.carousel}
-                          </span>
+                      <td className="p-4">
+                        <span className="text-2xl font-bold text-yellow-400">
+                          {u.creditBalance}
+                        </span>
+                        <span className="text-xs text-gray-500 ml-1">
+                          Credits
+                        </span>
+                      </td>
+                      <td className="p-4 text-right">
+                        <div className="flex justify-end gap-1">
+                          <button
+                            onClick={() => handleAddCredits(u.id, 10)}
+                            className="px-2 py-1 bg-gray-700 hover:bg-green-700 rounded text-xs text-white border border-gray-600"
+                          >
+                            +10
+                          </button>
+                          <button
+                            onClick={() => handleAddCredits(u.id, 50)}
+                            className="px-2 py-1 bg-gray-700 hover:bg-green-700 rounded text-xs text-white border border-gray-600"
+                          >
+                            +50
+                          </button>
+                          <button
+                            onClick={() => handleAddCredits(u.id, 100)}
+                            className="px-2 py-1 bg-gray-700 hover:bg-green-700 rounded text-xs text-white border border-gray-600"
+                          >
+                            +100
+                          </button>
                         </div>
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex justify-end gap-2">
                           <button
-                            onClick={() => openEditModal(u)}
+                            onClick={() => setEditingUser(u)}
                             className="text-cyan-400 hover:text-white bg-cyan-950 hover:bg-cyan-600 border border-cyan-800 hover:border-cyan-500 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
                           >
-                            Edit
+                            Manage
                           </button>
                           <button
                             onClick={() => handleDeleteUser(u)}
                             className="text-red-400 hover:text-white bg-red-950/50 hover:bg-red-600 border border-red-900 hover:border-red-500 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
                           >
-                            Delete
+                            🗑️
                           </button>
                         </div>
                       </td>
@@ -406,7 +422,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* MODAL: EDIT USER */}
+        {/* MODAL: EDIT USER (SIMPLIFIED FOR CREDITS) */}
         {editingUser && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-gray-800 rounded-2xl border border-cyan-500/30 p-8 w-full max-w-lg shadow-2xl relative">
@@ -416,7 +432,7 @@ export default function AdminDashboard() {
               >
                 ✕
               </button>
-              <h3 className="text-xl font-bold mb-2 text-white">Edit User</h3>
+              <h3 className="text-xl font-bold mb-2 text-white">Manage User</h3>
               <p className="text-sm text-cyan-400 mb-6">{editingUser.email}</p>
 
               <div className="space-y-6">
@@ -427,130 +443,40 @@ export default function AdminDashboard() {
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() =>
-                        setEditForm({ ...editForm, creditSystem: "COMMERCIAL" })
-                      }
+                      onClick={() => handleUpdateUserSystem("COMMERCIAL")}
                       className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-all ${
-                        editForm.creditSystem === "COMMERCIAL"
+                        editingUser.creditSystem === "COMMERCIAL"
                           ? "bg-green-600 border-green-500 text-white"
                           : "bg-gray-800 border-gray-600 text-gray-400"
                       }`}
                     >
-                      💵 Commercial (Buy $)
+                      💵 Commercial
                     </button>
                     <button
                       type="button"
-                      onClick={() =>
-                        setEditForm({ ...editForm, creditSystem: "INTERNAL" })
-                      }
+                      onClick={() => handleUpdateUserSystem("INTERNAL")}
                       className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-all ${
-                        editForm.creditSystem === "INTERNAL"
+                        editingUser.creditSystem === "INTERNAL"
                           ? "bg-purple-600 border-purple-500 text-white"
                           : "bg-gray-800 border-gray-600 text-gray-400"
                       }`}
                     >
-                      🏢 Internal (Request)
+                      🏢 Internal
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    {editForm.creditSystem === "COMMERCIAL"
-                      ? "User sees 'Buy Credits' buttons."
-                      : "User sees 'Request Credits' buttons."}
-                  </p>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs uppercase text-blue-300 font-bold mb-1">
-                      Video
-                    </label>
-                    <input
-                      type="number"
-                      className="w-full p-2 bg-gray-900 border border-gray-600 rounded text-center font-mono text-lg"
-                      value={editForm.credits.video}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          credits: {
-                            ...editForm.credits,
-                            video: parseInt(e.target.value) || 0,
-                          },
-                        })
-                      }
-                    />
+                <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700 text-center">
+                  <div className="text-sm text-gray-400 mb-2">
+                    Current Balance
                   </div>
-                  <div>
-                    <label className="block text-xs uppercase text-pink-300 font-bold mb-1">
-                      Image
-                    </label>
-                    <input
-                      type="number"
-                      className="w-full p-2 bg-gray-900 border border-gray-600 rounded text-center font-mono text-lg"
-                      value={editForm.credits.image}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          credits: {
-                            ...editForm.credits,
-                            image: parseInt(e.target.value) || 0,
-                          },
-                        })
-                      }
-                    />
+                  <div className="text-4xl font-bold text-yellow-400 mb-4">
+                    {editingUser.creditBalance}
                   </div>
-                  <div>
-                    <label className="block text-xs uppercase text-orange-300 font-bold mb-1">
-                      Carousel
-                    </label>
-                    <input
-                      type="number"
-                      className="w-full p-2 bg-gray-900 border border-gray-600 rounded text-center font-mono text-lg"
-                      value={editForm.credits.carousel}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          credits: {
-                            ...editForm.credits,
-                            carousel: parseInt(e.target.value) || 0,
-                          },
-                        })
-                      }
-                    />
+                  <div className="text-xs text-gray-500">
+                    Use quick top-up buttons on the main list to add funds.
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-xs uppercase text-gray-400 font-bold mb-1">
-                    Display Name
-                  </label>
-                  <input
-                    className="w-full p-2 bg-gray-900 border border-gray-600 rounded"
-                    value={editForm.name}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, name: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-4 mt-8 pt-4 border-t border-gray-700">
-                <button
-                  onClick={() => setEditingUser(null)}
-                  className="flex-1 py-3 bg-gray-700 rounded hover:bg-gray-600 font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleUpdateUser}
-                  disabled={actionLoading}
-                  className="flex-1 py-3 bg-cyan-600 rounded hover:bg-cyan-500 font-bold text-white shadow-lg shadow-cyan-900/20"
-                >
-                  {actionLoading ? (
-                    <LoadingSpinner size="sm" variant="light" />
-                  ) : (
-                    "Save Changes"
-                  )}
-                </button>
               </div>
             </div>
           </div>

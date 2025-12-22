@@ -50,6 +50,7 @@ export const apiEndpoints = {
   updatePostTitle: (postId: string, title: string) =>
     api.put(`/api/posts/${postId}/title`, { title }),
   getPostStatus: (id: string) => api.get(`/api/post/${id}/status`),
+  checkActiveJobs: () => api.get("/api/jobs/check-active"),
 
   // === Generation ===
   generateMediaDirect: (formData: FormData) =>

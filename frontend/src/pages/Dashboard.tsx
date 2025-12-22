@@ -35,7 +35,7 @@ function Dashboard() {
   const [videoTitle, setVideoTitle] = useState("");
 
   // Engine Selection
-  const [activeEngine, setActiveEngine] = useState<EngineType>("openai");
+  const [activeEngine, setActiveEngine] = useState<EngineType>("kie");
   const [studioMode, setStudioMode] = useState<StudioMode>("image");
 
   // Kie AI (Video FX)
@@ -167,28 +167,49 @@ function Dashboard() {
     staleTime: 1000,
   });
 
+  // --- UPDATED: Fetch Single Credit Balance ---
   const {
-    data: userCredits = { video: 0, image: 0, carousel: 0 },
+    data: userCredits = 0, // Default to 0 instead of object
     isLoading: creditsLoading,
   } = useQuery({
     queryKey: ["user-credits"],
-    queryFn: async () =>
-      (await apiEndpoints.getUserCredits()).data.credits || {
-        video: 0,
-        image: 0,
-        carousel: 0,
-      },
+    queryFn: async () => {
+      const res = await apiEndpoints.getUserCredits();
+      // Ensure we treat it as a number
+      return typeof res.data.credits === "number" ? res.data.credits : 0;
+    },
     enabled: !!user,
   });
 
-  // Credit System Logic
+  // --- POLLING FOR STATUS ---
+  useQuery({
+    queryKey: ["check-jobs"],
+    queryFn: async () => {
+      const hasActive = posts.some(
+        (p: any) => p.status === "PROCESSING" || p.status === "NEW"
+      );
+      if (hasActive) {
+        // Ensure apiEndpoints.checkActiveJobs exists in your api.ts
+        await apiEndpoints.checkActiveJobs();
+      }
+      return true;
+    },
+    refetchInterval: () => {
+      const hasActive = posts.some(
+        (p: any) => p.status === "PROCESSING" || p.status === "NEW"
+      );
+      return hasActive ? 5000 : false;
+    },
+    enabled: !!user && posts.length > 0,
+  });
+
   // @ts-ignore
   const isCommercial = user?.creditSystem !== "INTERNAL";
   const [isRequesting, setIsRequesting] = useState(false);
   const creditLink = isCommercial
     ? "https://www.picdrift.com/fx-credits"
     : "https://www.picdrift.com/fx-request";
-  const creditBtnText = isCommercial ? "Buy FX Credits" : "Request Credits";
+  const creditBtnText = isCommercial ? "Buy Credits" : "Request Credits";
   const isAdmin =
     user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
 
@@ -214,8 +235,14 @@ function Dashboard() {
         queryClient.invalidateQueries({ queryKey: ["user-credits"] });
       }
     },
-    onError: (err: any) =>
-      setGenerationState({ status: "error", error: err.message }),
+    onError: (err: any) => {
+      // Handle specific 403 Insufficient Credits error
+      if (err.response?.status === 403) {
+        setShowNoCreditsModal(true);
+      } else {
+        setGenerationState({ status: "error", error: err.message });
+      }
+    },
   });
 
   const handleShowPromptInfo = (promptText: string) => {
@@ -317,14 +344,15 @@ function Dashboard() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    let typeToCheck = "video";
-    if (activeEngine === "studio") typeToCheck = studioMode;
 
-    const credits = userCredits?.[typeToCheck as keyof typeof userCredits] ?? 0;
-    if (credits <= 0) {
+    // --- SIMPLIFIED CREDIT CHECK ---
+    // If balance is 0 or less, show modal immediately.
+    // Exact cost check happens on backend to keep frontend simple.
+    if (userCredits <= 0) {
       setShowNoCreditsModal(true);
       return;
     }
+
     if (!prompt.trim()) return;
     setGenerationState({ status: "idle" });
     generateMediaMutation.mutate(buildFormData());
@@ -497,18 +525,16 @@ function Dashboard() {
             <div className="bg-gray-800/60 backdrop-blur-lg rounded-2xl px-3 sm:px-4 py-2 sm:py-3 border border-purple-500/20 w-full sm:w-auto">
               <div className="flex items-center justify-between sm:justify-start gap-4">
                 {!creditsLoading ? (
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm">🎬</span>
-                      <span className="text-white">{userCredits.video}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm">🖼️</span>
-                      <span className="text-white">{userCredits.image}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm">📱</span>
-                      <span className="text-white">{userCredits.carousel}</span>
+                  // --- UPDATED CREDIT DISPLAY ---
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">💎</span>
+                    <div className="flex flex-col">
+                      <span className="text-white font-bold text-lg leading-none">
+                        {userCredits}
+                      </span>
+                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
+                        Credits
+                      </span>
                     </div>
                   </div>
                 ) : (
