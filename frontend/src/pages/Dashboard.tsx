@@ -7,6 +7,7 @@ import { LoadingSpinner } from "../components/LoadingSpinner";
 import { ErrorAlert } from "../components/ErrorAlert";
 import { PostCard } from "../components/PostCard";
 import { BrandConfigModal } from "../components/BrandConfigModal";
+import { AssetLibrary } from "../components/AssetLibrary";
 import { WelcomeTour } from "../components/WelcomeTour";
 
 // Import your logo images
@@ -33,6 +34,9 @@ function Dashboard() {
   // Core
   const [prompt, setPrompt] = useState("");
   const [videoTitle, setVideoTitle] = useState("");
+  const [activeLibrarySlot, setActiveLibrarySlot] = useState<
+    "start" | "end" | "generic" | null
+  >(null);
 
   // Engine Selection
   const [activeEngine, setActiveEngine] = useState<EngineType>("kie");
@@ -167,21 +171,15 @@ function Dashboard() {
     staleTime: 1000,
   });
 
-  // --- UPDATED: Fetch Single Credit Balance ---
-  const {
-    data: userCredits = 0, // Default to 0 instead of object
-    isLoading: creditsLoading,
-  } = useQuery({
+  const { data: userCredits = 0, isLoading: creditsLoading } = useQuery({
     queryKey: ["user-credits"],
     queryFn: async () => {
       const res = await apiEndpoints.getUserCredits();
-      // Ensure we treat it as a number
       return typeof res.data.credits === "number" ? res.data.credits : 0;
     },
     enabled: !!user,
   });
 
-  // --- POLLING FOR STATUS ---
   useQuery({
     queryKey: ["check-jobs"],
     queryFn: async () => {
@@ -189,7 +187,6 @@ function Dashboard() {
         (p: any) => p.status === "PROCESSING" || p.status === "NEW"
       );
       if (hasActive) {
-        // Ensure apiEndpoints.checkActiveJobs exists in your api.ts
         await apiEndpoints.checkActiveJobs();
       }
       return true;
@@ -236,7 +233,6 @@ function Dashboard() {
       }
     },
     onError: (err: any) => {
-      // Handle specific 403 Insufficient Credits error
       if (err.response?.status === 403) {
         setShowNoCreditsModal(true);
       } else {
@@ -263,11 +259,73 @@ function Dashboard() {
     }
   };
 
+  // --- 1. ASSET LIBRARY SELECTION HANDLER ---
+  // ... inside Dashboard component ...
+
+  // --- 1. ASSET LIBRARY SELECTION HANDLER (UPDATED) ---
+  const handleAssetSelect = (file: File, url: string) => {
+    // 1. PicDrift Start Slot
+    if (activeLibrarySlot === "start") {
+      // Ensure we are in correct mode
+      if (activeEngine !== "kie" || videoFxMode !== "picdrift") {
+        setActiveEngine("kie");
+        setVideoFxMode("picdrift");
+      }
+      setPicDriftFrames((prev) => ({ ...prev, start: file }));
+      setPicDriftUrls((prev) => ({ ...prev, start: url }));
+    }
+    // 2. PicDrift End Slot
+    else if (activeLibrarySlot === "end") {
+      if (activeEngine !== "kie" || videoFxMode !== "picdrift") {
+        setActiveEngine("kie");
+        setVideoFxMode("picdrift");
+      }
+      setPicDriftFrames((prev) => ({ ...prev, end: file }));
+      setPicDriftUrls((prev) => ({ ...prev, end: url }));
+    }
+    // 3. Generic/List Slot
+    else {
+      if (activeEngine === "studio" && studioMode === "carousel") {
+        setReferenceImages((prev) => [...prev, file]);
+        setReferenceImageUrls((prev) => [...prev, url]);
+      } else {
+        setReferenceImages([file]);
+        setReferenceImageUrls([url]);
+      }
+    }
+
+    // Close Library
+    setActiveLibrarySlot(null);
+  };
+
+  // --- 2. REUSE END FRAME HANDLER (Used by PostCard) ---
+  const handleUseAsStartFrame = async (url: string) => {
+    try {
+      // Switch to PicDrift automatically for seamless continuity
+      setActiveEngine("kie");
+      setVideoFxMode("picdrift");
+
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const file = new File([blob], "start_frame_reused.jpg", {
+        type: "image/jpeg",
+      });
+
+      setPicDriftFrames({ start: file, end: null });
+      setPicDriftUrls({ start: url, end: null });
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) {
+      console.error("Failed to reuse frame:", error);
+      alert("Could not load frame. Please try downloading it.");
+    }
+  };
+
   const handleGenericUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const maxFiles =
-      activeEngine === "studio" && studioMode === "carousel" ? 5 : 1;
+      activeEngine === "studio" && studioMode === "carousel" ? 5 : 5;
     if (files.length + referenceImages.length > maxFiles) {
       alert(`❌ Only ${maxFiles} image(s) allowed for this mode.`);
       return;
@@ -292,6 +350,7 @@ function Dashboard() {
     setPicDriftFrames((prev) => ({ ...prev, [type]: file }));
     setPicDriftUrls((prev) => ({ ...prev, [type]: URL.createObjectURL(file) }));
   };
+
   const removePicDriftImage = (type: "start" | "end") => {
     setPicDriftFrames((prev) => ({ ...prev, [type]: null }));
     setPicDriftUrls((prev) => ({ ...prev, [type]: null }));
@@ -344,15 +403,10 @@ function Dashboard() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    // --- SIMPLIFIED CREDIT CHECK ---
-    // If balance is 0 or less, show modal immediately.
-    // Exact cost check happens on backend to keep frontend simple.
     if (userCredits <= 0) {
       setShowNoCreditsModal(true);
       return;
     }
-
     if (!prompt.trim()) return;
     setGenerationState({ status: "idle" });
     generateMediaMutation.mutate(buildFormData());
@@ -376,7 +430,15 @@ function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900">
-      {/* MODALS */}
+      {/* --- ASSET LIBRARY MODAL --- */}
+      {activeLibrarySlot !== null && (
+        <AssetLibrary
+          onClose={() => setActiveLibrarySlot(null)}
+          onSelect={handleAssetSelect}
+        />
+      )}
+
+      {/* --- EXISTING MODALS --- */}
       {showQueuedModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="bg-gray-900 rounded-2xl border border-cyan-400/40 shadow-2xl max-w-sm w-full p-6">
@@ -525,7 +587,6 @@ function Dashboard() {
             <div className="bg-gray-800/60 backdrop-blur-lg rounded-2xl px-3 sm:px-4 py-2 sm:py-3 border border-purple-500/20 w-full sm:w-auto">
               <div className="flex items-center justify-between sm:justify-start gap-4">
                 {!creditsLoading ? (
-                  // --- UPDATED CREDIT DISPLAY ---
                   <div className="flex items-center gap-2">
                     <span className="text-2xl">💎</span>
                     <div className="flex flex-col">
@@ -608,7 +669,7 @@ function Dashboard() {
               {/* ENGINE SELECTOR */}
               <div className="mb-6 sm:mb-8">
                 <label className="block text-sm font-semibold text-white mb-3 sm:mb-4">
-                  🎬 Select Content Type
+                  Select Content Type
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
                   {[
@@ -654,8 +715,6 @@ function Dashboard() {
               </div>
 
               {/* TOP TOGGLES SECTION */}
-
-              {/* STUDIO TOGGLE (VIOLET) */}
               {activeEngine === "studio" && (
                 <div className="mb-6 animate-in fade-in space-y-4">
                   <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
@@ -702,7 +761,6 @@ function Dashboard() {
                 </div>
               )}
 
-              {/* VIDEO FX TOGGLE (PINK - TOP LEVEL) */}
               {activeEngine === "kie" && (
                 <div className="mb-6 animate-in fade-in space-y-4">
                   <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
@@ -758,10 +816,8 @@ function Dashboard() {
                   />
                 </div>
 
-                {/* KIE / PICDRIFT PARAMETERS (PINK/ROSE) */}
                 {activeEngine === "kie" && (
                   <div className="space-y-4 sm:space-y-6 animate-in fade-in">
-                    {/* RESTORED: Video FX vs Pro Selection (Only in 'video' mode) */}
                     {videoFxMode === "video" && (
                       <div className="space-y-2">
                         <label className="block text-sm font-semibold text-white">
@@ -788,7 +844,6 @@ function Dashboard() {
                         </div>
                       </div>
                     )}
-
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                       <div>
                         <label className="text-sm font-semibold text-white mb-2 block">
@@ -868,7 +923,6 @@ function Dashboard() {
                   </div>
                 )}
 
-                {/* OPENAI CONTROLS (BLUE) */}
                 {activeEngine === "openai" && (
                   <div className="space-y-4 sm:space-y-6 animate-in fade-in">
                     <div className="space-y-2">
@@ -988,14 +1042,23 @@ function Dashboard() {
                   </div>
                 )}
 
-                {/* UPLOAD UI - DYNAMIC FOR PICDRIFT */}
                 <div className="space-y-2 sm:space-y-3">
-                  <label className="block text-sm font-semibold text-white">
-                    Reference Images
-                  </label>
+                  <div className="flex justify-between items-center">
+                    <label className="block text-sm font-semibold text-white">
+                      Reference Images
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setActiveLibrarySlot("generic")}
+                      className="text-xs bg-cyan-900/50 text-cyan-300 px-3 py-1.5 rounded-lg hover:bg-cyan-800 border border-cyan-700/50 flex items-center gap-1 transition-colors"
+                    >
+                      <span></span> Open Library
+                    </button>
+                  </div>
 
                   {activeEngine === "kie" && videoFxMode === "picdrift" ? (
                     <div className="grid grid-cols-2 gap-4">
+                      {/* --- START FRAME BOX --- */}
                       <div className="flex flex-col gap-2">
                         <label className="text-xs text-rose-300 uppercase font-bold">
                           Start Frame
@@ -1016,23 +1079,43 @@ function Dashboard() {
                               </button>
                             </>
                           ) : (
-                            <label className="flex flex-col items-center justify-center w-full h-full cursor-pointer">
-                              <span className="text-rose-400 text-2xl">+</span>
-                              <span className="text-xs text-rose-300/70">
-                                Upload Start
-                              </span>
-                              <input
-                                type="file"
-                                className="hidden"
-                                accept="image/*"
-                                onChange={(e) =>
-                                  handlePicDriftUpload(e, "start")
-                                }
-                              />
-                            </label>
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                              {/* Option A: Upload File */}
+                              <label className="flex flex-col items-center justify-center cursor-pointer">
+                                <span className="text-rose-400 text-2xl">
+                                  +
+                                </span>
+                                <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
+                                  Upload File
+                                </span>
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept="image/*"
+                                  onChange={(e) =>
+                                    handlePicDriftUpload(e, "start")
+                                  }
+                                />
+                              </label>
+
+                              <div className="text-gray-600 text-[10px]">
+                                - OR -
+                              </div>
+
+                              {/* Option B: Open Library */}
+                              <button
+                                type="button"
+                                onClick={() => setActiveLibrarySlot("start")}
+                                className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
+                              >
+                                Select from Library
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>
+
+                      {/* --- END FRAME BOX --- */}
                       <div className="flex flex-col gap-2">
                         <label className="text-xs text-rose-300 uppercase font-bold">
                           End Frame
@@ -1053,54 +1136,86 @@ function Dashboard() {
                               </button>
                             </>
                           ) : (
-                            <label className="flex flex-col items-center justify-center w-full h-full cursor-pointer">
-                              <span className="text-rose-400 text-2xl">+</span>
-                              <span className="text-xs text-rose-300/70">
-                                Upload End
-                              </span>
-                              <input
-                                type="file"
-                                className="hidden"
-                                accept="image/*"
-                                onChange={(e) => handlePicDriftUpload(e, "end")}
-                              />
-                            </label>
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                              <label className="flex flex-col items-center justify-center cursor-pointer">
+                                <span className="text-rose-400 text-2xl">
+                                  +
+                                </span>
+                                <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
+                                  Upload File
+                                </span>
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept="image/*"
+                                  onChange={(e) =>
+                                    handlePicDriftUpload(e, "end")
+                                  }
+                                />
+                              </label>
+
+                              <div className="text-gray-600 text-[10px]">
+                                - OR -
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => setActiveLibrarySlot("end")}
+                                className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
+                              >
+                                Select from Library
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>
                     </div>
                   ) : (
+                    // --- GENERIC UPLOAD BOX ---
                     <div className="space-y-3">
-                      <div className="flex items-center justify-center w-full">
-                        <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer hover:border-cyan-500 hover:bg-gray-800/50 transition-all group">
-                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                            <div className="text-4xl mb-2 opacity-50"></div>
-                            <p className="text-sm text-gray-400">
-                              <span className="font-semibold text-cyan-400">
-                                Click to upload
-                              </span>{" "}
-                              or drag and drop
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {activeEngine === "studio" &&
-                              studioMode === "carousel"
-                                ? "Up to 5 images"
-                                : "Single frame"}{" "}
-                              (PNG/JPG)
-                            </p>
-                          </div>
-                          <input
-                            type="file"
-                            className="hidden"
-                            multiple={
-                              activeEngine === "studio" &&
-                              studioMode === "carousel"
-                            }
-                            accept="image/*"
-                            onChange={handleGenericUpload}
-                          />
-                        </label>
+                      <div className="w-full h-24 border-2 border-dashed border-gray-600 rounded-xl hover:border-cyan-500 hover:bg-gray-800/50 transition-all group relative flex items-center justify-center">
+                        {/* We split the box into two click zones visually, or just put buttons inside */}
+                        <div className="flex items-center gap-6">
+                          <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
+                            <span className="text-2xl mb-1">📂</span>
+                            <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
+                              Upload File
+                            </span>
+                            <input
+                              type="file"
+                              className="hidden"
+                              multiple={
+                                activeEngine === "studio" &&
+                                studioMode === "carousel"
+                              }
+                              accept="image/*"
+                              onChange={handleGenericUpload}
+                            />
+                          </label>
+
+                          <div className="h-8 w-px bg-gray-600"></div>
+
+                          <button
+                            type="button"
+                            onClick={() => setActiveLibrarySlot("generic")}
+                            className="flex flex-col items-center group-hover:scale-105 transition-transform"
+                          >
+                            <span className="text-2xl mb-1">📚</span>
+                            <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
+                              From Library
+                            </span>
+                          </button>
+                        </div>
+
+                        <p className="absolute bottom-2 text-[10px] text-gray-600">
+                          {activeEngine === "studio" &&
+                          studioMode === "carousel"
+                            ? "Up to 5 images"
+                            : "Single frame"}{" "}
+                          (PNG/JPG)
+                        </p>
                       </div>
+
                       {referenceImageUrls.length > 0 && (
                         <div className="grid grid-cols-5 gap-2 animate-in fade-in">
                           {referenceImageUrls.map((url, index) => (
@@ -1142,7 +1257,7 @@ function Dashboard() {
                     </>
                   ) : (
                     <>
-                      <span className="text-xl">✨</span>
+                      <span className="text-xl"></span>
                       <span>
                         Generate{" "}
                         {activeEngine === "studio" ? studioMode : "Video"}
@@ -1165,12 +1280,11 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* SIDEBAR */}
           <div className="lg:w-96">
             <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 shadow-2xl sticky top-4">
               <div className="flex items-center justify-between mb-4 sm:mb-6">
                 <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
-                  <span>📚</span> Your Library
+                  <span></span> Your Library
                 </h2>
                 {postsLoading && <LoadingSpinner size="sm" variant="neon" />}
               </div>
@@ -1192,6 +1306,8 @@ function Dashboard() {
                         publishingPost={null}
                         primaryColor={brandConfig?.primaryColor}
                         compact={true}
+                        // 👇 PASS THE NEW HANDLER HERE
+                        onUseAsStartFrame={handleUseAsStartFrame}
                       />
                     ))
                 ) : !postsLoading ? (

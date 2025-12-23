@@ -9,6 +9,7 @@ interface PostCardProps {
   userCredits: any;
   primaryColor?: string;
   compact?: boolean;
+  onUseAsStartFrame?: (url: string) => void;
 }
 
 const getCleanUrl = (url: string) => {

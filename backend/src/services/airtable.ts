@@ -17,14 +17,21 @@ export interface User {
   id: string;
   email: string;
   name?: string;
-  creditBalance: number; // CHANGED: Single unified balance
+  creditBalance: number;
   creditSystem: "COMMERCIAL" | "INTERNAL";
   adminNotes?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-// Keep other interfaces as is...
+export interface Asset {
+  id: string;
+  userId: string;
+  url: string;
+  aspectRatio: "16:9" | "9:16";
+  createdAt: Date;
+}
+
 export interface Session {
   id: string;
   userId: string;
@@ -91,7 +98,6 @@ export const airtableService = {
         id: record.id,
         email: record.get("email") as string,
         name: record.get("name") as string,
-        // UNIFIED CREDIT BALANCE
         creditBalance: (record.get("creditBalance") as number) || 0,
         creditSystem:
           (record.get("creditSystem") as "COMMERCIAL" | "INTERNAL") ||
@@ -112,7 +118,6 @@ export const airtableService = {
         id: record.id,
         email: record.get("email") as string,
         name: record.get("name") as string,
-        // UNIFIED CREDIT BALANCE
         creditBalance: (record.get("creditBalance") as number) || 0,
         creditSystem: (record.get("creditSystem") as any) || "COMMERCIAL",
         adminNotes: record.get("adminNotes") as string,
@@ -126,7 +131,6 @@ export const airtableService = {
 
   async createUser(userData: { email: string; name?: string }): Promise<User> {
     const now = new Date().toISOString();
-    // Start with 20 Credits ($2.00 value)
     const record = await base("Users").create({
       email: userData.email,
       name: userData.name || "",
@@ -146,8 +150,7 @@ export const airtableService = {
     } as User;
   },
 
-  // === NEW CREDIT TRANSACTION METHODS ===
-
+  // === CREDIT TRANSACTIONS ===
   async deductCredits(userId: string, amount: number): Promise<void> {
     const user = await this.findUserById(userId);
     if (!user) throw new Error("User not found");
@@ -174,7 +177,6 @@ export const airtableService = {
     });
   },
 
-  // Generic refund method used by contentEngine
   async refundUserCredit(userId: string, amount: number): Promise<void> {
     await this.addCredits(userId, amount);
     console.log(`💰 Refunded ${amount} credits to user ${userId}`);
@@ -469,6 +471,56 @@ export const airtableService = {
       });
     } catch (error: any) {
       throw new Error(`Failed to fetch posts: ${error.message}`);
+    }
+  },
+
+  // === ASSETS (Batch Processing) ===
+  async createAsset(
+    userId: string,
+    url: string,
+    aspectRatio: "16:9" | "9:16"
+  ): Promise<Asset> {
+    const record = await base("Assets").create({
+      userId: userId, // 🛠️ FIX: Removed brackets since it is Single Line Text
+      url,
+      aspectRatio,
+    });
+    return {
+      id: record.id,
+      userId,
+      url,
+      aspectRatio,
+      createdAt: new Date(record.get("createdAt") as string),
+    };
+  },
+
+  async getUserAssets(userId: string): Promise<Asset[]> {
+    try {
+      const records = await base("Assets")
+        .select({
+          sort: [{ field: "createdAt", direction: "desc" }],
+          filterByFormula: `{userId} = '${userId}'`,
+        })
+        .all();
+
+      return records.map((r) => ({
+        id: r.id,
+        userId,
+        url: r.get("url") as string,
+        aspectRatio: r.get("aspectRatio") as "16:9" | "9:16",
+        createdAt: new Date(r.get("createdAt") as string),
+      }));
+    } catch (e) {
+      return [];
+    }
+  },
+
+  // 🛠️ FIX: Added missing deleteAsset function
+  async deleteAsset(assetId: string): Promise<void> {
+    try {
+      await base("Assets").destroy(assetId);
+    } catch (error) {
+      throw error;
     }
   },
 

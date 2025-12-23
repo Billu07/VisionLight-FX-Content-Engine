@@ -329,6 +329,115 @@ app.post(
   }
 );
 
+// ==================== ASSET MANAGEMENT ====================
+
+// 1. Batch Upload & Process
+app.post(
+  "/api/assets/batch",
+  authenticateToken,
+  upload.array("images", 20), // Allow up to 20 images
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const files = (req.files as Express.Multer.File[]) || [];
+      const { aspectRatio } = req.body; // Expect "16:9" or "9:16"
+
+      if (files.length === 0)
+        return res.status(400).json({ error: "No images provided" });
+      if (!aspectRatio)
+        return res.status(400).json({ error: "Aspect Ratio required" });
+
+      // We process these asynchronously so the UI doesn't hang forever,
+      // OR we await them if we want to show a progress bar.
+      // Since Gemini takes 5-10s per image, 20 images = 3 mins.
+      // BETTER UX: Respond "Processing" and let frontend poll or just wait for them to appear in the list.
+
+      // Start processing in background
+      (async () => {
+        for (const file of files) {
+          try {
+            await contentEngine.processAndSaveAsset(
+              file.buffer,
+              req.user!.id,
+              aspectRatio
+            );
+          } catch (e) {
+            console.error("Failed to process one asset in batch", e);
+          }
+        }
+      })();
+
+      res.json({
+        success: true,
+        message: `Started processing ${files.length} images. They will appear in your library shortly.`,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// backend/src/index.ts
+
+// ... [Existing Asset Routes like /api/assets/batch and /api/assets] ...
+
+// 👇 ADD THIS MISSING ROUTE 👇
+app.post(
+  "/api/assets/edit",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { assetId, prompt, assetUrl, aspectRatio } = req.body;
+
+      if (!assetUrl || !prompt) {
+        return res.status(400).json({ error: "Missing asset or prompt" });
+      }
+
+      console.log(`🎨 Editing asset request for user ${req.user.id}`);
+
+      // We perform the edit and create a NEW asset (non-destructive)
+      const newAsset = await contentEngine.editAsset(
+        assetUrl,
+        prompt,
+        req.user!.id,
+        aspectRatio || "16:9"
+      );
+
+      res.json({ success: true, asset: newAsset });
+    } catch (error: any) {
+      console.error("Edit Route Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// 2. Get Assets
+app.get(
+  "/api/assets",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const assets = await airtableService.getUserAssets(req.user!.id);
+      res.json({ success: true, assets });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// 3. Delete Asset
+app.delete(
+  "/api/assets/:id",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      await airtableService.deleteAsset(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
 // ==================== CONTENT ROUTES ====================
 app.get(
   "/api/posts",
