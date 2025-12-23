@@ -137,7 +137,7 @@ const resizeWithGemini = async (
 
     const fullPrompt = `Task: Outpaint the background to fill the entire canvas.\n${directionInstruction}\nCRITICAL: Do NOT modify, distort, or resize the central subject. Only generate new content in the black areas to match the scene seamlessly.`;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
 
     // 5. Native Aspect Ratio Config
     let targetRatio = "1:1";
