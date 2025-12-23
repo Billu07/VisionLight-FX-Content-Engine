@@ -381,12 +381,15 @@ app.post(
 // ... [Existing Asset Routes like /api/assets/batch and /api/assets] ...
 
 // 👇 ADD THIS MISSING ROUTE 👇
+// backend/src/index.ts
+
 app.post(
   "/api/assets/edit",
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { assetId, prompt, assetUrl, aspectRatio } = req.body;
+      // 👇 EXTRACT referenceUrl
+      const { assetId, prompt, assetUrl, aspectRatio, referenceUrl } = req.body;
 
       if (!assetUrl || !prompt) {
         return res.status(400).json({ error: "Missing asset or prompt" });
@@ -394,12 +397,12 @@ app.post(
 
       console.log(`🎨 Editing asset request for user ${req.user.id}`);
 
-      // We perform the edit and create a NEW asset (non-destructive)
       const newAsset = await contentEngine.editAsset(
         assetUrl,
         prompt,
         req.user!.id,
-        aspectRatio || "16:9"
+        aspectRatio || "16:9",
+        referenceUrl // 👈 PASS IT TO THE ENGINE
       );
 
       res.json({ success: true, asset: newAsset });

@@ -3,7 +3,7 @@ import FormData from "form-data";
 import sharp from "sharp";
 import axios from "axios";
 import { v2 as cloudinary } from "cloudinary";
-import { airtableService, Post } from "./airtable";
+import { airtableService, Post, Asset } from "./airtable";
 import { ROIService } from "./roi";
 
 // Configuration
@@ -87,7 +87,7 @@ const resizeStrict = async (
     .toBuffer();
 };
 
-// === HELPER 3: GEMINI RESIZE (For Batch/Frame Prep) ===
+// === HELPER 3: GEMINI RESIZE (FIXED: Pre-Scaling + Pre-Padding) ===
 const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -95,33 +95,54 @@ const resizeWithGemini = async (
 ): Promise<Buffer> => {
   try {
     console.log(
-      `✨ Gemini Resize: Preparing inputs for ${targetWidth}x${targetHeight}...`
+      `✨ Gemini Resize: Pre-padding input to ${targetWidth}x${targetHeight} to prevent distortion...`
     );
 
-    const sanitizedInputBuffer = await sharp(originalBuffer)
-      .resize({ width: 1536, withoutEnlargement: true })
-      .toFormat("jpeg", { quality: 90 })
+    // 1. RESIZE TO FIT: Ensure the image fits INSIDE the target box first
+    // This prevents the "Image to composite must have same dimensions or smaller" error
+    const fittedBuffer = await sharp(originalBuffer)
+      .resize({
+        width: targetWidth,
+        height: targetHeight,
+        fit: "inside", // Preserves Aspect Ratio, ensures it fits
+      })
       .toBuffer();
 
-    const guideFrameBuffer = await sharp({
+    // 2. PRE-COMPOSITION: "Letterbox" the image
+    // Create the canvas and place the fitted image in the center
+    const letterboxedBuffer = await sharp({
       create: {
         width: targetWidth,
         height: targetHeight,
         channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 0 },
+        background: { r: 0, g: 0, b: 0, alpha: 255 }, // Black Background
       },
     })
-      .png()
+      .composite([
+        {
+          input: fittedBuffer, // Use the resized version
+          gravity: "center", // Force center alignment
+        },
+      ])
+      .png() // Use PNG to ensure high quality before AI
       .toBuffer();
 
+    // 3. Determine Orientation for Prompt
     const isPortrait = targetHeight > targetWidth;
+
+    // 4. Dynamic Prompt
     const directionInstruction = isPortrait
-      ? `The target format is VERTICAL (9:16). You MUST extend the image UPWARDS and DOWNWARDS to fill the vertical space. Keep the main subject centered. Do NOT add white bars.`
-      : `The target format is HORIZONTAL (16:9). You MUST extend the image to the LEFT and RIGHT sides. Keep the main subject centered.`;
+      ? `The image is currently centered with black bars on the top and bottom. Replace the black bars by extending the scene UPWARDS and DOWNWARDS.`
+      : `The image is currently centered with black bars on the sides. Replace the black bars by extending the scene to the LEFT and RIGHT.`;
 
-    const fullPrompt = `${BASE_RESIZE_INSTRUCTION}\n${directionInstruction}\nEnsure the style matches perfectly. Output full screen image.`;
+    const fullPrompt = `Task: Outpaint the background to fill the entire canvas.\n${directionInstruction}\nCRITICAL: Do NOT modify, distort, or resize the central subject. Only generate new content in the black areas to match the scene seamlessly.`;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
+
+    // 5. Native Aspect Ratio Config
+    let targetRatio = "1:1";
+    if (targetWidth > targetHeight) targetRatio = "16:9";
+    if (targetHeight > targetWidth) targetRatio = "9:16";
 
     const response = await axios.post(
       geminiUrl,
@@ -132,30 +153,18 @@ const resizeWithGemini = async (
               { text: fullPrompt },
               {
                 inline_data: {
-                  mime_type: "image/jpeg",
-                  data: sanitizedInputBuffer.toString("base64"),
-                },
-              },
-              {
-                inline_data: {
                   mime_type: "image/png",
-                  data: guideFrameBuffer.toString("base64"),
+                  data: letterboxedBuffer.toString("base64"),
                 },
               },
             ],
           },
         ],
-        safetySettings: [
-          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-          {
-            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-            threshold: "BLOCK_NONE",
-          },
-          {
-            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-            threshold: "BLOCK_NONE",
-          },
-        ],
+        generationConfig: {
+          temperature: 0.85,
+          responseModalities: ["IMAGE"],
+          imageConfig: { aspectRatio: targetRatio },
+        },
       },
       { headers: { "Content-Type": "application/json" }, timeout: AI_TIMEOUT }
     );
@@ -246,40 +255,76 @@ export const contentEngine = {
     }
   },
 
-  // === EDIT ASSET ===
+  // === EDIT ASSET (Universal Subject Consistency) ===
   async editAsset(
     originalAssetUrl: string,
     prompt: string,
     userId: string,
-    aspectRatio: "16:9" | "9:16"
-  ) {
+    aspectRatio: "16:9" | "9:16",
+    referenceUrl?: string
+  ): Promise<Asset> {
     try {
       console.log(`🎨 Editing asset for ${userId}: "${prompt}"`);
+
       const imageResponse = await axios.get(originalAssetUrl, {
         responseType: "arraybuffer",
       });
       const originalBuffer = Buffer.from(imageResponse.data);
 
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
+      const parts: any[] = [
+        { text: prompt },
+        {
+          inline_data: {
+            mime_type: "image/jpeg",
+            data: originalBuffer.toString("base64"),
+          },
+        },
+      ];
+
+      // Use Flash by default, upgrade to Pro for reference tasks
+      let model = "gemini-2.5-flash-image";
+
+      if (referenceUrl) {
+        try {
+          console.log("🔗 Attaching Reference Image for Viewpoint/Angle...");
+          const refRes = await axios.get(referenceUrl, {
+            responseType: "arraybuffer",
+          });
+          const refBuf = Buffer.from(refRes.data);
+
+          parts.push({
+            inline_data: {
+              mime_type: "image/jpeg",
+              data: refBuf.toString("base64"),
+            },
+          });
+
+          parts[0].text = `
+TASK: ${prompt}
+INPUT ANALYSIS:
+- IMAGE 1 (Context): The MAIN SUBJECT.
+- IMAGE 2 (Reference): The TARGET VIEWPOINT/ANGLE.
+INSTRUCTIONS:
+1. SUBJECT LOCK: Strictly preserve the visual identity, colors, textures, and structural details of the subject in IMAGE 1.
+2. VIEWPOINT TRANSFER: Re-render the subject from IMAGE 1 using the exact camera angle, perspective, and composition shown in IMAGE 2.
+3. OUTPUT: High-fidelity image of Subject 1 seen from the Angle of Image 2.
+            `;
+
+          model = "gemini-3-pro-image-preview";
+        } catch (e) {
+          console.warn("Reference load failed, falling back to simple prompt.");
+          parts[0].text = prompt;
+        }
+      }
+
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
 
       const response = await axios.post(
         geminiUrl,
         {
-          contents: [
-            {
-              parts: [
-                { text: prompt },
-                {
-                  inline_data: {
-                    mime_type: "image/jpeg",
-                    data: originalBuffer.toString("base64"),
-                  },
-                },
-              ],
-            },
-          ],
+          contents: [{ parts }],
           generationConfig: {
-            temperature: 0.8,
+            temperature: 0.9,
             responseModalities: ["IMAGE"],
             imageConfig: {
               aspectRatio: aspectRatio === "16:9" ? "16:9" : "9:16",
@@ -440,9 +485,7 @@ export const contentEngine = {
         externalId = kieRes.data.data.taskId;
       }
 
-      // ==========================================================
-      // BRANCH B: FAL AI (Kling 2.5 Turbo - FIXED TAIL LOGIC)
-      // ==========================================================
+      // KLING (2.5 Turbo)
       else if (isKling) {
         provider = "kling";
         let klingInputUrl = "";
@@ -459,7 +502,6 @@ export const contentEngine = {
           );
           isImageToVideo = true;
 
-          // Process End Frame (Tail)
           if (params.imageReferences && params.imageReferences.length > 1) {
             try {
               const tailRaw = getOptimizedUrl(params.imageReferences[1]);
@@ -501,8 +543,6 @@ export const contentEngine = {
                 "Kling End",
                 "image"
               );
-
-              // Save processed frame for reuse
               await airtableService.updatePost(postId, {
                 generatedEndFrame: klingTailUrl,
               });
@@ -518,8 +558,6 @@ export const contentEngine = {
         const endpointSuffix = isImageToVideo
           ? "image-to-video"
           : "text-to-video";
-
-        // 🚨 FIX: Enable PRO tier if we have a tail image
         let tier = "standard";
         if (klingTailUrl) tier = "pro";
 
@@ -532,11 +570,9 @@ export const contentEngine = {
 
         if (isImageToVideo) {
           payload.image_url = klingInputUrl;
-          // 🚨 FIX: This check now passes because tier is "pro"
           if (tier === "pro" && klingTailUrl)
             payload.tail_image_url = klingTailUrl;
         }
-
         const submitRes = await axios.post(url, payload, {
           headers: {
             Authorization: `Key ${FAL_KEY}`,
@@ -785,8 +821,8 @@ export const contentEngine = {
 
       for (let i = 0; i < prompts.length; i++) {
         // Slide 1 uses user upload.
-        // Slide 2 uses Slide 1.
-        // Slide 3 uses Slide 2.
+        // Slide 2 uses Slide 1 output.
+        // Slide 3 uses Slide 2 output.
         const currentInput = previousBuffer ? [previousBuffer] : [];
 
         const buf = await this.generateGeminiImage(
@@ -858,6 +894,7 @@ export const contentEngine = {
   ): Promise<Buffer> {
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
 
+    // Map Aspect Ratio strings to Gemini Enums
     let targetRatio = "1:1";
     if (aspectRatio === "16:9" || aspectRatio === "landscape")
       targetRatio = "16:9";

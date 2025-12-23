@@ -67,6 +67,7 @@ export const apiEndpoints = {
     assetUrl: string;
     prompt: string;
     aspectRatio: string;
+    referenceUrl?: string;
   }) => api.post("/api/assets/edit", data),
 
   // === Generation ===
