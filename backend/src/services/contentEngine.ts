@@ -38,16 +38,24 @@ const getOptimizedUrl = (url: string) => {
 };
 
 // === HELPER 1: BLUR FILL FALLBACK (Strict Center) ===
+// === HELPER 1: BLACK FILL FALLBACK (Strict Center) ===
+// (Renaming function would break calls, so we keep the name but change behavior)
 const resizeWithBlurFill = async (
   buffer: Buffer,
   width: number,
   height: number
 ): Promise<Buffer> => {
   try {
-    const background = await sharp(buffer)
-      .resize(width, height, { fit: "cover" })
-      .blur(40)
-      .modulate({ brightness: 0.7 })
+    // 1. Create Solid Black Background
+    const background = await sharp({
+      create: {
+        width: width,
+        height: height,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 255 }, // Solid Black
+      },
+    })
+      .png()
       .toBuffer();
 
     const foreground = await sharp(buffer)
@@ -55,15 +63,17 @@ const resizeWithBlurFill = async (
         width: width,
         height: height,
         fit: "contain",
-        background: { r: 0, g: 0, b: 0, alpha: 0 },
+        background: { r: 0, g: 0, b: 0, alpha: 0 }, // Transparent edges on resized img
       })
       .toBuffer();
 
+    // 2. Composite
     return await sharp(background)
       .composite([{ input: foreground, gravity: "center" }])
       .toFormat("jpeg", { quality: 95 })
       .toBuffer();
   } catch (e) {
+    // Fallback
     return await sharp(buffer)
       .resize(width, height, { fit: "cover", position: "center" })
       .toFormat("jpeg")
@@ -87,8 +97,7 @@ const resizeStrict = async (
     .toBuffer();
 };
 
-// === HELPER 3: GEMINI 3 PRO (Updated for Detail/Logo Preservation) ===
-// === HELPER 3: GEMINI RESIZE (FIXED: Blur-Guide for Outpainting) ===
+// === HELPER 3: GEMINI RESIZE (Updated: Black Bar Removal) ===
 const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -96,21 +105,22 @@ const resizeWithGemini = async (
 ): Promise<Buffer> => {
   try {
     console.log(
-      `✨ Gemini 3 Pro: Outpainting ${targetWidth}x${targetHeight} with Blur Guide...`
+      `✨ Gemini 3 Pro: Outpainting ${targetWidth}x${targetHeight} (Black Guide)...`
     );
 
-    // 1. Create Context (Blurred Background)
-    const backgroundGuide = await sharp(originalBuffer)
-      .resize({
+    // 1. Create Context (Solid Black Background)
+    const backgroundGuide = await sharp({
+      create: {
         width: targetWidth,
         height: targetHeight,
-        fit: "cover", // Stretch/Crop to fill screen
-      })
-      .blur(50) // Heavy blur so AI knows it needs fixing
-      .modulate({ brightness: 0.9 }) // Keep it bright
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 255 }, // Black
+      },
+    })
+      .png()
       .toBuffer();
 
-    // 2. Composite (Sharp Center)
+    // 2. Composite (Sharp Center on Black)
     const compositeBuffer = await sharp(backgroundGuide)
       .composite([
         {
@@ -129,25 +139,22 @@ const resizeWithGemini = async (
       ? "vertical (top/bottom)"
       : "horizontal (left/right)";
 
-    // 4. Prompt: Explicitly forbid black bars
+    // 4. 🔥 UPDATED PROMPT FOR BLACK BARS
     const fullPrompt = `
     TASK: Image Extension (Outpainting).
     
-    INPUT: An image with a sharp central subject and blurred ${direction} edges.
+    INPUT: An image with a sharp central subject and BLACK ${direction} bars.
     
-    CRITICAL RULES:
-    1. NO BLACK BARS: You must NOT create letterboxing, pillarboxing, or solid colored bars.
-    2. REPLACE THE BLUR: The blurred edges are placeholders. Paint over them completely with high-definition details that seamlessly match the center.
-    3. PRESERVE CENTER: Do not modify the central subject.
+    INSTRUCTIONS:
+    1. REMOVE THE BLACK BARS: The black areas are empty space. You must completely paint over them with high-definition details that extend the central scene.
+    2. SEAMLESS EXTENSION: The new details must match the lighting, texture, and style of the center.
+    3. NO LETTERBOXING: The final output must be a full-screen image with NO remaining black borders.
+    4. PRESERVE CENTER: Do not modify the central subject (Faces, Text, Logos).
     `;
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
 
-    // 5. Native Config
-    let targetRatio = "1:1";
-    if (targetWidth > targetHeight) targetRatio = "16:9";
-    if (targetHeight > targetWidth) targetRatio = "9:16";
-
+    // Native Config
     const response = await axios.post(
       geminiUrl,
       {
@@ -165,9 +172,9 @@ const resizeWithGemini = async (
           },
         ],
         generationConfig: {
-          temperature: 0.9,
+          temperature: 0.95,
           responseModalities: ["IMAGE"],
-          imageConfig: { aspectRatio: targetRatio },
+          imageConfig: { aspectRatio: isPortrait ? "9:16" : "16:9" },
         },
       },
       { headers: { "Content-Type": "application/json" }, timeout: AI_TIMEOUT }
@@ -182,7 +189,7 @@ const resizeWithGemini = async (
       )?.inlineData?.data;
 
     if (b64) {
-      console.log("✅ Gemini Resize Success.");
+      console.log("✅ Gemini 3 Pro Outpaint Success.");
       return await sharp(Buffer.from(b64, "base64"))
         .resize(targetWidth, targetHeight, { fit: "fill" })
         .toFormat("jpeg", { quality: 95 })
