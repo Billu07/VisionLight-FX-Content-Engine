@@ -1284,7 +1284,7 @@ function Dashboard() {
             <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 shadow-2xl sticky top-4">
               <div className="flex items-center justify-between mb-4 sm:mb-6">
                 <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
-                  <span></span> Your Library
+                  <span></span> Timeline
                 </h2>
                 {postsLoading && <LoadingSpinner size="sm" variant="neon" />}
               </div>

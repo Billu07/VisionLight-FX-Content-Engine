@@ -37,16 +37,13 @@ const getOptimizedUrl = (url: string) => {
   return url;
 };
 
-// === HELPER 1: BLUR FILL FALLBACK (Strict Center) ===
-// === HELPER 1: BLACK FILL FALLBACK (Strict Center) ===
-// (Renaming function would break calls, so we keep the name but change behavior)
+// === HELPER 1: BLACK FILL FALLBACK ===
 const resizeWithBlurFill = async (
   buffer: Buffer,
   width: number,
   height: number
 ): Promise<Buffer> => {
   try {
-    // 1. Create Solid Black Background
     const background = await sharp({
       create: {
         width: width,
@@ -63,17 +60,15 @@ const resizeWithBlurFill = async (
         width: width,
         height: height,
         fit: "contain",
-        background: { r: 0, g: 0, b: 0, alpha: 0 }, // Transparent edges on resized img
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
       })
       .toBuffer();
 
-    // 2. Composite
     return await sharp(background)
       .composite([{ input: foreground, gravity: "center" }])
       .toFormat("jpeg", { quality: 95 })
       .toBuffer();
   } catch (e) {
-    // Fallback
     return await sharp(buffer)
       .resize(width, height, { fit: "cover", position: "center" })
       .toFormat("jpeg")
@@ -81,7 +76,7 @@ const resizeWithBlurFill = async (
   }
 };
 
-// === HELPER 2: STRICT CROP (Deterministic) ===
+// === HELPER 2: STRICT CROP ===
 const resizeStrict = async (
   buffer: Buffer,
   width: number,
@@ -97,7 +92,7 @@ const resizeStrict = async (
     .toBuffer();
 };
 
-// === HELPER 3: GEMINI RESIZE (Updated: Black Bar Removal) ===
+// === HELPER 3: GEMINI RESIZE (Black Bar Removal) ===
 const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -108,7 +103,6 @@ const resizeWithGemini = async (
       `✨ Gemini 3 Pro: Outpainting ${targetWidth}x${targetHeight} (Black Guide)...`
     );
 
-    // 1. Create Context (Solid Black Background)
     const backgroundGuide = await sharp({
       create: {
         width: targetWidth,
@@ -120,7 +114,6 @@ const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 2. Composite (Sharp Center on Black)
     const compositeBuffer = await sharp(backgroundGuide)
       .composite([
         {
@@ -133,13 +126,11 @@ const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 3. Orientation Logic
     const isPortrait = targetHeight > targetWidth;
     const direction = isPortrait
       ? "vertical (top/bottom)"
       : "horizontal (left/right)";
 
-    // 4. 🔥 UPDATED PROMPT FOR BLACK BARS
     const fullPrompt = `
     TASK: Image Extension (Outpainting).
     
@@ -154,7 +145,6 @@ const resizeWithGemini = async (
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
 
-    // Native Config
     const response = await axios.post(
       geminiUrl,
       {
@@ -207,7 +197,6 @@ const resizeWithGemini = async (
 };
 
 export const contentEngine = {
-  // === BATCH ASSET PROCESSOR (Updated Tolerance) ===
   // === BATCH ASSET PROCESSOR ===
   async processAndSaveAsset(
     fileBuffer: Buffer,
@@ -222,14 +211,13 @@ export const contentEngine = {
       const sourceAR = (metadata.width || 1) / (metadata.height || 1);
       const targetRatioNum = targetWidth / targetHeight;
 
-      // 🛠️ FIX: Increased tolerance to 0.15
-      // If mismatch is < 15%, we crop. If > 15%, we outpaint.
-      const isMatch = Math.abs(sourceAR - targetRatioNum) < 0.1;
+      // 15% tolerance for Asset Library
+      const isMatch = Math.abs(sourceAR - targetRatioNum) < 0.15;
 
       let processedBuffer: Buffer;
 
       if (isMatch) {
-        console.log("📏 Batch: AR Near-Match (<15%) - Using Strict Crop");
+        console.log("📏 Batch: AR Match - Strict Crop");
         processedBuffer = await resizeStrict(
           fileBuffer,
           targetWidth,
@@ -237,7 +225,7 @@ export const contentEngine = {
         );
       } else {
         try {
-          console.log(`✨ Batch: AR Mismatch (>15%) - Gemini Outpaint...`);
+          console.log(`✨ Batch: AR Mismatch - Gemini Outpaint...`);
           processedBuffer = await resizeWithGemini(
             fileBuffer,
             targetWidth,
@@ -268,7 +256,7 @@ export const contentEngine = {
     }
   },
 
-  // === EDIT ASSET (Universal Subject Consistency) ===
+  // === EDIT ASSET ===
   async editAsset(
     originalAssetUrl: string,
     prompt: string,
@@ -294,12 +282,11 @@ export const contentEngine = {
         },
       ];
 
-      // Use Flash by default, upgrade to Pro for reference tasks
       let model = "gemini-2.5-flash-image";
 
       if (referenceUrl) {
         try {
-          console.log("🔗 Attaching Reference Image for Viewpoint/Angle...");
+          console.log("🔗 Attaching Reference Image...");
           const refRes = await axios.get(referenceUrl, {
             responseType: "arraybuffer",
           });
@@ -318,14 +305,13 @@ INPUT ANALYSIS:
 - IMAGE 1 (Context): The MAIN SUBJECT.
 - IMAGE 2 (Reference): The TARGET VIEWPOINT/ANGLE.
 INSTRUCTIONS:
-1. SUBJECT LOCK: Strictly preserve the visual identity, colors, textures, and structural details of the subject in IMAGE 1.
-2. VIEWPOINT TRANSFER: Re-render the subject from IMAGE 1 using the exact camera angle, perspective, and composition shown in IMAGE 2.
-3. OUTPUT: High-fidelity image of Subject 1 seen from the Angle of Image 2.
+1. SUBJECT LOCK: Strictly preserve the visual identity, colors, and structure of Subject 1.
+2. VIEWPOINT TRANSFER: Re-render Subject 1 using the camera angle/composition of Image 2.
+3. OUTPUT: High-fidelity image.
             `;
 
           model = "gemini-3-pro-image-preview";
         } catch (e) {
-          console.warn("Reference load failed, falling back to simple prompt.");
           parts[0].text = prompt;
         }
       }
@@ -374,7 +360,7 @@ INSTRUCTIONS:
   },
 
   // ===========================================================================
-  // 1. INITIATE VIDEO GENERATION
+  // 1. INITIATE VIDEO GENERATION (Unchanged - Goes to Timeline)
   // ===========================================================================
   async startVideoGeneration(postId: string, finalPrompt: string, params: any) {
     console.log(`🎬 Video Gen for ${postId} | Model Input: ${params.model}`);
@@ -422,6 +408,8 @@ INSTRUCTIONS:
           const metadata = await sharp(originalImageBuffer).metadata();
           const sourceAR = (metadata.width || 1) / (metadata.height || 1);
           const targetAR = targetWidth / targetHeight;
+
+          // 5% Tolerance for Video Gen
           const isARMatch = Math.abs(sourceAR - targetAR) < 0.05;
 
           if (isARMatch) {
@@ -498,7 +486,7 @@ INSTRUCTIONS:
         externalId = kieRes.data.data.taskId;
       }
 
-      // KLING (2.5 Turbo)
+      // KLING
       else if (isKling) {
         provider = "kling";
         let klingInputUrl = "";
@@ -586,6 +574,7 @@ INSTRUCTIONS:
           if (tier === "pro" && klingTailUrl)
             payload.tail_image_url = klingTailUrl;
         }
+
         const submitRes = await axios.post(url, payload, {
           headers: {
             Authorization: `Key ${FAL_KEY}`,
@@ -649,7 +638,7 @@ INSTRUCTIONS:
   },
 
   // ===========================================================================
-  // 2. CHECK STATUS
+  // 2. CHECK STATUS (Unchanged)
   // ===========================================================================
   async checkPostStatus(post: Post) {
     if (post.status !== "PROCESSING" || !post.generationParams?.externalId)
@@ -770,21 +759,18 @@ INSTRUCTIONS:
   },
 
   // ===========================================================================
-  // 3. CREATIVE WORKFLOWS (Image/Carousel)
+  // 3. CREATIVE WORKFLOWS (Image/Carousel) - REVERTED TO USE POSTS
   // ===========================================================================
 
-  // 📸 IMAGE GENERATION: Single Call with Multiple Inputs
+  // 📸 IMAGE GENERATION: Update Post (Timeline)
   async startImageGeneration(postId: string, finalPrompt: string, params: any) {
-    console.log(`🎨 Image Gen for ${postId}`);
+    console.log(`🎨 Image Gen for Post ${postId}`);
     try {
       const refUrls =
         params.imageReferences ||
         (params.imageReference ? [params.imageReference] : []);
-
-      // Download all inputs
       const refBuffers = await this.downloadAndOptimizeImages(refUrls);
 
-      // Generate result (Gemini natively handles multiple inputs for one output)
       const buf = await this.generateGeminiImage(
         finalPrompt,
         refBuffers,
@@ -798,6 +784,8 @@ INSTRUCTIONS:
         "Image",
         "image"
       );
+
+      // ✅ UPDATE POST (Timeline) instead of creating Asset
       await this.finalizePost(postId, cloudUrl, "gemini-image", params.userId);
     } catch (e: any) {
       await airtableService.updatePost(postId, {
@@ -809,20 +797,18 @@ INSTRUCTIONS:
     }
   },
 
-  // 🎠 CAROUSEL GENERATION: Chained Continuity
+  // 🎠 CAROUSEL GENERATION: Update Post (Timeline)
   async startCarouselGeneration(
     postId: string,
     finalPrompt: string,
     params: any
   ) {
-    console.log(`🎠 Carousel Gen for ${postId}`);
+    console.log(`🎠 Carousel Gen for Post ${postId}`);
     try {
       const imageUrls: string[] = [];
       const userRefBuffers = await this.downloadAndOptimizeImages(
         params.imageReferences || []
       );
-
-      // Initialize chain with user input
       let previousBuffer =
         userRefBuffers.length > 0 ? userRefBuffers[0] : undefined;
 
@@ -833,18 +819,12 @@ INSTRUCTIONS:
       ];
 
       for (let i = 0; i < prompts.length; i++) {
-        // Slide 1 uses user upload.
-        // Slide 2 uses Slide 1 output.
-        // Slide 3 uses Slide 2 output.
         const currentInput = previousBuffer ? [previousBuffer] : [];
-
         const buf = await this.generateGeminiImage(
           prompts[i],
           currentInput,
           "9:16"
         );
-
-        // Save for next chain link
         previousBuffer = buf;
 
         const resized = await sharp(buf)
@@ -860,6 +840,7 @@ INSTRUCTIONS:
         imageUrls.push(url);
       }
 
+      // ✅ UPDATE POST (Timeline)
       await airtableService.updatePost(postId, {
         mediaUrl: JSON.stringify(imageUrls),
         mediaProvider: "gemini-carousel",
@@ -899,15 +880,12 @@ INSTRUCTIONS:
     return results.filter((buf): buf is Buffer => buf !== null);
   },
 
-  // ✨ CREATIVE GENERATOR: NATIVE CONFIG
   async generateGeminiImage(
     promptText: string,
     refBuffers: Buffer[],
     aspectRatio: string
   ): Promise<Buffer> {
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
-
-    // Map Aspect Ratio strings to Gemini Enums
     let targetRatio = "1:1";
     if (aspectRatio === "16:9" || aspectRatio === "landscape")
       targetRatio = "16:9";

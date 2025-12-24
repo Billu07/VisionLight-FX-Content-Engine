@@ -50,14 +50,14 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.get("/", (req, res) => {
   res.json({
     message: "Visionlight FX Backend - Supabase Edition",
-    version: "4.1.1",
+    version: "4.2.0",
     status: "Healthy",
   });
 });
 
 // ==================== AUTHENTICATION MIDDLEWARE ====================
 interface AuthenticatedRequest extends Request {
-  user?: any; // This is the Airtable User Object
+  user?: any;
   token?: string;
 }
 
@@ -190,14 +190,11 @@ app.put(
 
     try {
       if (addCredits) {
-        // Logic to ADD credits (e.g. +50)
         await airtableService.addCredits(userId, parseInt(addCredits));
       } else if (creditBalance !== undefined) {
-        // Logic to SET exact balance
         await airtableService.adminUpdateUser(userId, { creditBalance });
       }
 
-      // Handle other fields
       const otherUpdates: any = {};
       if (creditSystem) otherUpdates.creditSystem = creditSystem;
       if (name) otherUpdates.name = name;
@@ -298,11 +295,7 @@ app.get(
   async (req: AuthenticatedRequest, res) => {
     try {
       const user = await airtableService.findUserById(req.user!.id);
-      if (!user) return res.json({ credits: 0 }); // Legacy frontend might expect object, but we are moving to number
-
-      // We return 'credits' as a number now.
-      // NOTE: Frontend Dashboard needs to be updated to handle a number,
-      // or we map it temporarily for backward compatibility if you haven't updated Dashboard logic yet.
+      if (!user) return res.json({ credits: 0 });
       res.json({ credits: user.creditBalance });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch credits" });
@@ -310,15 +303,11 @@ app.get(
   }
 );
 
-// Look for this section in your index.ts and replace it
-
 app.post(
   "/api/reset-demo-credits",
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      // 🛠️ FIX: Use new adminUpdateUser with creditBalance logic
-      // Resetting to 20 credits ($2.00)
       await airtableService.adminUpdateUser(req.user!.id, {
         creditBalance: 20,
       });
@@ -335,23 +324,23 @@ app.post(
 app.post(
   "/api/assets/batch",
   authenticateToken,
-  upload.array("images", 20), // Allow up to 20 images
+  upload.array("images", 20),
   async (req: AuthenticatedRequest, res) => {
     try {
       const files = (req.files as Express.Multer.File[]) || [];
-      const { aspectRatio } = req.body; // Expect "16:9" or "9:16"
+      const { aspectRatio } = req.body;
 
       if (files.length === 0)
         return res.status(400).json({ error: "No images provided" });
       if (!aspectRatio)
         return res.status(400).json({ error: "Aspect Ratio required" });
 
-      // We process these asynchronously so the UI doesn't hang forever,
-      // OR we await them if we want to show a progress bar.
-      // Since Gemini takes 5-10s per image, 20 images = 3 mins.
-      // BETTER UX: Respond "Processing" and let frontend poll or just wait for them to appear in the list.
+      res.json({
+        success: true,
+        message: `Started processing ${files.length} images. They will appear in your library shortly.`,
+      });
 
-      // Start processing in background
+      // Background Processing
       (async () => {
         for (const file of files) {
           try {
@@ -365,30 +354,18 @@ app.post(
           }
         }
       })();
-
-      res.json({
-        success: true,
-        message: `Started processing ${files.length} images. They will appear in your library shortly.`,
-      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   }
 );
 
-// backend/src/index.ts
-
-// ... [Existing Asset Routes like /api/assets/batch and /api/assets] ...
-
-// 👇 ADD THIS MISSING ROUTE 👇
-// backend/src/index.ts
-
+// 2. Edit Asset
 app.post(
   "/api/assets/edit",
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      // 👇 EXTRACT referenceUrl
       const { assetId, prompt, assetUrl, aspectRatio, referenceUrl } = req.body;
 
       if (!assetUrl || !prompt) {
@@ -402,7 +379,7 @@ app.post(
         prompt,
         req.user!.id,
         aspectRatio || "16:9",
-        referenceUrl // 👈 PASS IT TO THE ENGINE
+        referenceUrl
       );
 
       res.json({ success: true, asset: newAsset });
@@ -413,7 +390,7 @@ app.post(
   }
 );
 
-// 2. Get Assets
+// 3. Get Assets
 app.get(
   "/api/assets",
   authenticateToken,
@@ -427,7 +404,7 @@ app.get(
   }
 );
 
-// 3. Delete Asset
+// 4. Delete Asset
 app.delete(
   "/api/assets/:id",
   authenticateToken,
@@ -441,7 +418,7 @@ app.delete(
   }
 );
 
-// ==================== CONTENT ROUTES ====================
+// ==================== CONTENT ROUTES (TIMELINE) ====================
 app.get(
   "/api/posts",
   authenticateToken,
@@ -474,7 +451,6 @@ app.put(
   }
 );
 
-// DOWNLOAD PROXY
 app.get(
   "/api/posts/:postId/download",
   authenticateToken,
@@ -493,43 +469,8 @@ app.get(
         cleanTitle = post.title.replace(/[\\/:*?"<>|]/g, "_").trim();
       }
 
-      let isCarousel = false;
-      let imageUrls: string[] = [];
-      if (post.mediaUrl.trim().startsWith("[")) {
-        try {
-          imageUrls = JSON.parse(post.mediaUrl);
-          if (Array.isArray(imageUrls)) isCarousel = true;
-        } catch (e) {}
-      }
-
-      if (isCarousel) {
-        const filename = `${cleanTitle}.zip`;
-        res.setHeader("Content-Type", "application/zip");
-        res.setHeader(
-          "Content-Disposition",
-          `attachment; filename="${filename}"`
-        );
-        const archive = archiver("zip", { zlib: { level: 9 } });
-        archive.on("error", (err) => {
-          throw err;
-        });
-        archive.pipe(res);
-        for (let i = 0; i < imageUrls.length; i++) {
-          const url = imageUrls[i];
-          const response = await axios({
-            url,
-            method: "GET",
-            responseType: "stream",
-          });
-          archive.append(response.data, {
-            name: `${cleanTitle}_slide_${i + 1}.jpg`,
-          });
-        }
-        await archive.finalize();
-        return;
-      }
-
-      let extension = post.mediaType === "VIDEO" ? "mp4" : "jpg";
+      // Videos Only Logic for Download
+      let extension = "mp4";
       const filename = `${cleanTitle}.${extension}`;
       const response = await axios({
         url: post.mediaUrl,
@@ -553,7 +494,7 @@ app.get(
   }
 );
 
-// ==================== GENERATION WORKFLOW ====================
+// ==================== GENERATION WORKFLOW (UNIFIED) ====================
 
 app.post(
   "/api/generate-media",
@@ -564,7 +505,7 @@ app.post(
       console.log("🎬 /api/generate-media hit");
       const {
         prompt,
-        mediaType,
+        mediaType, // "video", "image", "carousel"
         duration,
         model,
         aspectRatio,
@@ -575,14 +516,12 @@ app.post(
         title,
       } = req.body;
 
-      // 1. CALCULATE COST using new pricing logic
       const cost = calculateCost(
         mediaType,
         duration ? parseInt(duration) : undefined,
         model
       );
 
-      // 2. CHECK BALANCE
       const user = await airtableService.findUserById(req.user!.id);
       if (!user || user.creditBalance < cost) {
         return res.status(403).json({
@@ -592,7 +531,7 @@ app.post(
         });
       }
 
-      // Handle File Uploads
+      // Handle Uploads
       const referenceFiles = (req.files as Express.Multer.File[]) || [];
       const uploadedUrls: string[] = [];
       if (referenceFiles.length > 0) {
@@ -602,9 +541,7 @@ app.post(
             uploadedUrls.push(url);
           }
         } catch (err) {
-          return res
-            .status(500)
-            .json({ success: false, error: "Image upload failed" });
+          return res.status(500).json({ error: "Image upload failed" });
         }
       }
       const primaryRefUrl = uploadedUrls.length > 0 ? uploadedUrls[0] : "";
@@ -614,23 +551,19 @@ app.post(
         duration: duration ? parseInt(duration) : undefined,
         model,
         aspectRatio,
-        resolution,
-        size,
-        width: width ? parseInt(width) : undefined,
-        height: height ? parseInt(height) : undefined,
         imageReference: primaryRefUrl,
         imageReferences: uploadedUrls,
         hasReferenceImage: uploadedUrls.length > 0,
         timestamp: new Date().toISOString(),
         title: title || "",
         userId: req.user!.id,
-        cost: cost, // Save cost to params for reference
+        cost: cost,
       };
 
-      // 3. DEDUCT CREDITS
+      // 1. Deduct Credits
       await airtableService.deductCredits(req.user!.id, cost);
 
-      // 4. CREATE POST
+      // 2. CREATE POST FOR EVERYTHING (Video, Image, or Carousel)
       const post = await airtableService.createPost({
         userId: req.user!.id,
         prompt,
@@ -643,19 +576,21 @@ app.post(
         requiresApproval: false,
       });
 
-      // 5. RESPOND
+      // 3. RESPOND
       res.json({ success: true, postId: post.id });
 
-      // 6. TRIGGER PROCESS
+      // 4. TRIGGER PROCESS
       (async () => {
         try {
           if (mediaType === "carousel") {
+            // Pass postId (string), prompt, params
             await contentEngine.startCarouselGeneration(
               post.id,
               prompt,
               generationParams
             );
           } else if (mediaType === "image") {
+            // Pass postId (string), prompt, params
             await contentEngine.startImageGeneration(
               post.id,
               prompt,
@@ -674,7 +609,6 @@ app.post(
             status: "FAILED",
             error: "Processing failed",
           });
-          // REFUND IF FAILED IMMEDIATELY
           await airtableService.refundUserCredit(req.user!.id, cost);
         }
       })();
@@ -685,13 +619,12 @@ app.post(
   }
 );
 
-// 2. NEW CHECK ENDPOINT
+// 2. JOB CHECK (Only for Videos now)
 app.get(
   "/api/jobs/check-active",
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      // Find all posts for this user that are PROCESSING
       const allPosts = await airtableService.getUserPosts(req.user!.id);
       const activePosts = allPosts.filter(
         (p: any) => p.status === "PROCESSING"
@@ -701,7 +634,6 @@ app.get(
         return res.json({ success: true, active: 0 });
       }
 
-      // We re-fetch the full post object to get generationParams (which might be hidden in getUserPosts summary)
       const updates = activePosts.map(async (simplePost: any) => {
         const fullPost = await airtableService.getPostById(simplePost.id);
         if (fullPost && fullPost.status === "PROCESSING") {
@@ -713,13 +645,12 @@ app.get(
       res.json({ success: true, checked: activePosts.length });
     } catch (error: any) {
       console.error("Check Status Error:", error);
-      // Don't fail the request, just log it, so frontend keeps polling
       res.json({ success: false, error: error.message });
     }
   }
 );
 
-// --- STATUS CHECK ---
+// --- STATUS CHECK (For Videos) ---
 app.get(
   "/api/post/:postId/status",
   authenticateToken,
