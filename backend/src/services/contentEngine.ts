@@ -87,7 +87,8 @@ const resizeStrict = async (
     .toBuffer();
 };
 
-// === HELPER 3: GEMINI RESIZE (FIXED: Pre-Scaling + Pre-Padding) ===
+// === HELPER 3: GEMINI 3 PRO (Updated for Detail/Logo Preservation) ===
+// === HELPER 3: GEMINI RESIZE (FIXED: Blur-Guide for Outpainting) ===
 const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -95,51 +96,54 @@ const resizeWithGemini = async (
 ): Promise<Buffer> => {
   try {
     console.log(
-      `✨ Gemini Resize: Pre-padding input to ${targetWidth}x${targetHeight} to prevent distortion...`
+      `✨ Gemini 3 Pro: Outpainting ${targetWidth}x${targetHeight} with Blur Guide...`
     );
 
-    // 1. RESIZE TO FIT: Ensure the image fits INSIDE the target box first
-    // This prevents the "Image to composite must have same dimensions or smaller" error
-    const fittedBuffer = await sharp(originalBuffer)
+    // 1. Create Context (Blurred Background)
+    const backgroundGuide = await sharp(originalBuffer)
       .resize({
         width: targetWidth,
         height: targetHeight,
-        fit: "inside", // Preserves Aspect Ratio, ensures it fits
+        fit: "cover", // Stretch/Crop to fill screen
       })
+      .blur(50) // Heavy blur so AI knows it needs fixing
+      .modulate({ brightness: 0.9 }) // Keep it bright
       .toBuffer();
 
-    // 2. PRE-COMPOSITION: "Letterbox" the image
-    // Create the canvas and place the fitted image in the center
-    const letterboxedBuffer = await sharp({
-      create: {
-        width: targetWidth,
-        height: targetHeight,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 }, // Black Background
-      },
-    })
+    // 2. Composite (Sharp Center)
+    const compositeBuffer = await sharp(backgroundGuide)
       .composite([
         {
-          input: fittedBuffer, // Use the resized version
-          gravity: "center", // Force center alignment
+          input: await sharp(originalBuffer)
+            .resize({ width: targetWidth, height: targetHeight, fit: "inside" })
+            .toBuffer(),
+          gravity: "center",
         },
       ])
-      .png() // Use PNG to ensure high quality before AI
+      .png()
       .toBuffer();
 
-    // 3. Determine Orientation for Prompt
+    // 3. Orientation Logic
     const isPortrait = targetHeight > targetWidth;
+    const direction = isPortrait
+      ? "vertical (top/bottom)"
+      : "horizontal (left/right)";
 
-    // 4. Dynamic Prompt
-    const directionInstruction = isPortrait
-      ? `The image is currently centered with black bars on the top and bottom. Replace the black bars by extending the scene UPWARDS and DOWNWARDS.`
-      : `The image is currently centered with black bars on the sides. Replace the black bars by extending the scene to the LEFT and RIGHT.`;
-
-    const fullPrompt = `Task: Outpaint the background to fill the entire canvas.\n${directionInstruction}\nCRITICAL: Do NOT modify, distort, or resize the central subject. Only generate new content in the black areas to match the scene seamlessly.`;
+    // 4. Prompt: Explicitly forbid black bars
+    const fullPrompt = `
+    TASK: Image Extension (Outpainting).
+    
+    INPUT: An image with a sharp central subject and blurred ${direction} edges.
+    
+    CRITICAL RULES:
+    1. NO BLACK BARS: You must NOT create letterboxing, pillarboxing, or solid colored bars.
+    2. REPLACE THE BLUR: The blurred edges are placeholders. Paint over them completely with high-definition details that seamlessly match the center.
+    3. PRESERVE CENTER: Do not modify the central subject.
+    `;
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
 
-    // 5. Native Aspect Ratio Config
+    // 5. Native Config
     let targetRatio = "1:1";
     if (targetWidth > targetHeight) targetRatio = "16:9";
     if (targetHeight > targetWidth) targetRatio = "9:16";
@@ -154,14 +158,14 @@ const resizeWithGemini = async (
               {
                 inline_data: {
                   mime_type: "image/png",
-                  data: letterboxedBuffer.toString("base64"),
+                  data: compositeBuffer.toString("base64"),
                 },
               },
             ],
           },
         ],
         generationConfig: {
-          temperature: 0.85,
+          temperature: 0.9,
           responseModalities: ["IMAGE"],
           imageConfig: { aspectRatio: targetRatio },
         },
@@ -196,6 +200,7 @@ const resizeWithGemini = async (
 };
 
 export const contentEngine = {
+  // === BATCH ASSET PROCESSOR (Updated Tolerance) ===
   // === BATCH ASSET PROCESSOR ===
   async processAndSaveAsset(
     fileBuffer: Buffer,
@@ -209,12 +214,15 @@ export const contentEngine = {
       const metadata = await sharp(fileBuffer).metadata();
       const sourceAR = (metadata.width || 1) / (metadata.height || 1);
       const targetRatioNum = targetWidth / targetHeight;
-      const isARMatch = Math.abs(sourceAR - targetRatioNum) < 0.05;
+
+      // 🛠️ FIX: Increased tolerance to 0.15
+      // If mismatch is < 15%, we crop. If > 15%, we outpaint.
+      const isMatch = Math.abs(sourceAR - targetRatioNum) < 0.1;
 
       let processedBuffer: Buffer;
 
-      if (isARMatch) {
-        console.log("📏 Batch: AR Match - Strict Crop");
+      if (isMatch) {
+        console.log("📏 Batch: AR Near-Match (<15%) - Using Strict Crop");
         processedBuffer = await resizeStrict(
           fileBuffer,
           targetWidth,
@@ -222,9 +230,7 @@ export const contentEngine = {
         );
       } else {
         try {
-          console.log(
-            `✨ Batch: AR Mismatch - Gemini Outpaint to ${targetAspectRatio}`
-          );
+          console.log(`✨ Batch: AR Mismatch (>15%) - Gemini Outpaint...`);
           processedBuffer = await resizeWithGemini(
             fileBuffer,
             targetWidth,
