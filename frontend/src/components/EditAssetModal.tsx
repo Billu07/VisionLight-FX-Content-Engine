@@ -6,7 +6,7 @@ import { LoadingSpinner } from "./LoadingSpinner";
 interface Asset {
   id: string;
   url: string;
-  aspectRatio: "16:9" | "9:16";
+  aspectRatio: "16:9" | "9:16" | "original";
 }
 
 interface EditAssetModalProps {

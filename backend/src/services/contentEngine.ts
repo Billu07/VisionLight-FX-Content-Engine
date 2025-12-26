@@ -239,22 +239,36 @@ export const contentEngine = {
     }
   },
 
+  // === MOVE POST MEDIA TO ASSET ===
   async copyPostMediaToAsset(postId: string, userId: string): Promise<Asset> {
     const post = await airtableService.getPostById(postId);
     if (!post || !post.mediaUrl) throw new Error("Post has no media");
 
+    // If it's a carousel (JSON array), pick the first image
     let targetUrl = post.mediaUrl;
     try {
       const parsed = JSON.parse(post.mediaUrl);
       if (Array.isArray(parsed)) targetUrl = parsed[0];
     } catch (e) {}
 
-    const aspectRatio =
-      (post.generationParams as any)?.aspectRatio === "landscape"
-        ? "16:9"
-        : "9:16";
+    // 🛠️ FIX: Robust Aspect Ratio Detection
+    const params = post.generationParams as any;
+    const rawRatio = params?.aspectRatio;
 
-    return await airtableService.createAsset(userId, targetUrl, aspectRatio);
+    let dbAspectRatio = "16:9"; // Default fallback
+
+    if (rawRatio === "landscape" || rawRatio === "16:9") {
+      dbAspectRatio = "16:9";
+    } else if (rawRatio === "portrait" || rawRatio === "9:16") {
+      dbAspectRatio = "9:16";
+    } else if (rawRatio === "square" || rawRatio === "1:1") {
+      dbAspectRatio = "1:1"; // This will show up in the "Magic / Raw" tab
+    } else if (rawRatio === "original") {
+      dbAspectRatio = "original";
+    }
+
+    // Create Asset entry pointing to existing Cloudinary URL
+    return await airtableService.createAsset(userId, targetUrl, dbAspectRatio);
   },
 
   // === EDIT ASSET ===

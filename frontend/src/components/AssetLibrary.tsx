@@ -7,19 +7,23 @@ import { EditAssetModal } from "./EditAssetModal";
 interface Asset {
   id: string;
   url: string;
-  aspectRatio: "16:9" | "9:16";
+  aspectRatio: "16:9" | "9:16" | "original"; // Updated type
   createdAt: string;
 }
 
 interface AssetLibraryProps {
-  onSelect: (file: File, url: string) => void;
+  onSelect?: (file: File, url: string) => void; // Made optional for cases where we just browse
   onClose: () => void;
 }
 
 export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [targetRatio, setTargetRatio] = useState<"16:9" | "9:16">("16:9");
+
+  // 🛠️ UPDATE: Default to "original" if you want to see magic edits first, or keep "16:9"
+  const [targetRatio, setTargetRatio] = useState<"16:9" | "9:16" | "original">(
+    "16:9"
+  );
 
   // UI States
   const [isUploading, setIsUploading] = useState(false);
@@ -31,35 +35,26 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
   const [pollingUntil, setPollingUntil] = useState<number>(0);
   const [processingCount, setProcessingCount] = useState(0);
 
-  // Derived state for cleaner logic
-  // We check Date.now() inside the render to keep it reactive,
-  // but rely on useEffect to actually unset the state.
   const isProcessing = pollingUntil > 0;
 
   // 1. Fetch Assets
   const { data: assets = [], isLoading } = useQuery({
     queryKey: ["assets"],
     queryFn: async () => (await apiEndpoints.getAssets()).data.assets,
-    // Poll every 2 seconds if processing is active
     refetchInterval: isProcessing ? 2000 : false,
-    // Continue polling in the background if window loses focus (important for long waits)
     refetchIntervalInBackground: true,
   });
 
-  // 2. Timer Logic & Final Refresh
+  // 2. Timer Logic
   useEffect(() => {
     if (pollingUntil === 0) return;
-
     const checkInterval = setInterval(() => {
       if (Date.now() > pollingUntil) {
-        // Time is up!
         setPollingUntil(0);
         setProcessingCount(0);
-        // ⚡ CRITICAL: Force one last fetch to catch any stragglers
         queryClient.invalidateQueries({ queryKey: ["assets"] });
       }
     }, 1000);
-
     return () => clearInterval(checkInterval);
   }, [pollingUntil, queryClient]);
 
@@ -68,28 +63,24 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
     mutationFn: async (files: FileList) => {
       const formData = new FormData();
       Array.from(files).forEach((file) => formData.append("images", file));
-      formData.append("aspectRatio", targetRatio);
+      // For standard batch uploads, we still use the selected tab ratio
+      // If user is in "Magic/Original" tab, we default to 16:9 for processing, or we could add logic to raw upload
+      const uploadRatio = targetRatio === "original" ? "16:9" : targetRatio;
+      formData.append("aspectRatio", uploadRatio);
       return apiEndpoints.uploadBatchAssets(formData);
     },
     onMutate: () => setIsUploading(true),
     onSuccess: (_, variables: FileList) => {
       const fileCount = variables.length;
-
-      // 🧠 INCREASED ESTIMATE: 20 seconds per image for Gemini 3 Pro
       const estimatedTime = fileCount * 20000;
-      const endTime = Date.now() + estimatedTime;
-
       setProcessingCount(fileCount);
-      setPollingUntil(endTime);
-
-      // Immediate refresh to show initial state
+      setPollingUntil(Date.now() + estimatedTime);
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     },
     onError: (err: any) => alert("Upload failed: " + err.message),
     onSettled: () => setIsUploading(false),
   });
 
-  // ... (Delete Mutation / Handlers remain unchanged) ...
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => apiEndpoints.deleteAsset(id),
     onSuccess: () => {
@@ -104,6 +95,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
   };
 
   const handleUseImage = async (asset: Asset) => {
+    if (!onSelect) return;
     try {
       const response = await fetch(asset.url);
       const blob = await response.blob();
@@ -137,8 +129,18 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
     }
   };
 
+  // 🛠️ FILTER LOGIC UPDATED
   const filteredAssets = Array.isArray(assets)
-    ? assets.filter((a: Asset) => a.aspectRatio === targetRatio)
+    ? assets.filter((a: Asset) => {
+        if (targetRatio === "original") {
+          // Show explicit 'original' OR any weird ratios that aren't strict 16:9/9:16
+          return (
+            a.aspectRatio === "original" ||
+            (a.aspectRatio !== "16:9" && a.aspectRatio !== "9:16")
+          );
+        }
+        return a.aspectRatio === targetRatio;
+      })
     : [];
 
   return (
@@ -151,7 +153,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
               📚 Asset Library
             </h2>
             <p className="text-sm text-gray-400">
-              Pre-process images for perfect consistency
+              Manage your generated and uploaded assets
             </p>
           </div>
           <button
@@ -164,10 +166,11 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
 
         {/* CONTROLS */}
         <div className="p-6 bg-gray-800/50 flex flex-col md:flex-row gap-4 items-center justify-between border-b border-gray-800">
+          {/* 🛠️ UPDATED TABS */}
           <div className="flex bg-gray-950 p-1 rounded-lg border border-gray-700">
             <button
               onClick={() => setTargetRatio("16:9")}
-              className={`px-5 py-2 rounded-md text-sm font-bold transition-all ${
+              className={`px-4 py-2 rounded-md text-xs sm:text-sm font-bold transition-all ${
                 targetRatio === "16:9"
                   ? "bg-cyan-600 text-white shadow-lg"
                   : "text-gray-400 hover:text-white"
@@ -177,13 +180,23 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
             </button>
             <button
               onClick={() => setTargetRatio("9:16")}
-              className={`px-5 py-2 rounded-md text-sm font-bold transition-all ${
+              className={`px-4 py-2 rounded-md text-xs sm:text-sm font-bold transition-all ${
                 targetRatio === "9:16"
                   ? "bg-purple-600 text-white shadow-lg"
                   : "text-gray-400 hover:text-white"
               }`}
             >
               Portrait 9:16
+            </button>
+            <button
+              onClick={() => setTargetRatio("original")}
+              className={`px-4 py-2 rounded-md text-xs sm:text-sm font-bold transition-all ${
+                targetRatio === "original"
+                  ? "bg-emerald-600 text-white shadow-lg"
+                  : "text-gray-400 hover:text-white"
+              }`}
+            >
+              Magic / Raw
             </button>
           </div>
 
@@ -197,7 +210,6 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
               onChange={handleFileChange}
             />
 
-            {/* MANUAL REFRESH BUTTON (Just in case) */}
             <button
               onClick={() =>
                 queryClient.invalidateQueries({ queryKey: ["assets"] })
@@ -221,7 +233,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                 <LoadingSpinner size="sm" variant="default" />
               ) : (
                 <>
-                  <span></span> Upload & Process
+                  <span></span> Upload
                 </>
               )}
             </button>
@@ -246,38 +258,31 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
             </div>
           ) : filteredAssets.length === 0 && !isProcessing ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-500 opacity-60">
-              <span className="text-6xl mb-4"></span>
-              <p>No images found.</p>
+              <span className="text-6xl mb-4">🖼️</span>
+              <p>No images found in this category.</p>
             </div>
           ) : (
             <div
               className={`grid gap-6 ${
-                targetRatio === "16:9"
+                targetRatio === "16:9" || targetRatio === "original"
                   ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
                   : "grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
               }`}
             >
-              {/* Skeletons while processing */}
-              {isProcessing &&
-                Array.from({ length: processingCount }).map((_, i) => (
-                  <div
-                    key={`skel-${i}`}
-                    className="animate-pulse bg-gray-800/50 rounded-lg aspect-video border border-white/5 flex items-center justify-center"
-                  >
-                    <LoadingSpinner size="sm" variant="neon" />
-                  </div>
-                ))}
-
               {filteredAssets.map((asset: Asset) => (
                 <div
                   key={asset.id}
                   onClick={() => setSelectedAsset(asset)}
-                  className="relative group border border-gray-800 rounded-xl overflow-hidden bg-black cursor-pointer hover:border-cyan-500/50 transition-all hover:shadow-2xl hover:shadow-cyan-900/20"
+                  className="relative group border border-gray-800 rounded-xl overflow-hidden bg-black cursor-pointer hover:border-cyan-500/50 transition-all hover:shadow-2xl hover:shadow-cyan-900/20 aspect-auto"
                 >
                   <img
                     src={asset.url}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     loading="lazy"
+                    style={{
+                      aspectRatio:
+                        asset.aspectRatio === "9:16" ? "9/16" : "16/9",
+                    }}
                   />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <span className="bg-black/50 text-white px-3 py-1 rounded-full text-xs backdrop-blur-sm border border-white/20">
@@ -291,7 +296,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
         </div>
       </div>
 
-      {/* --- LIGHTBOX & EDIT MODAL (Keep as is) --- */}
+      {/* --- LIGHTBOX & EDIT MODAL --- */}
       {selectedAsset && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 p-4 animate-in fade-in duration-200">
           <div
@@ -317,15 +322,21 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                   Asset Details
                 </h3>
                 <p className="text-gray-400 text-sm mb-6">
-                  ID: {selectedAsset.id.substring(0, 8)}...
+                  {selectedAsset.aspectRatio === "original"
+                    ? "Raw / Magic Edit"
+                    : selectedAsset.aspectRatio}
                 </p>
                 <div className="space-y-3">
-                  <button
-                    onClick={() => handleUseImage(selectedAsset)}
-                    className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-900/20 transform active:scale-95 transition-all flex items-center justify-center gap-2"
-                  >
-                    <span></span> Use in Video
-                  </button>
+                  {/* Only show 'Use' button if we are selecting for a prompt, not just browsing */}
+                  {onSelect && (
+                    <button
+                      onClick={() => handleUseImage(selectedAsset)}
+                      className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-900/20 transform active:scale-95 transition-all flex items-center justify-center gap-2"
+                    >
+                      <span>✅</span> Use this Asset
+                    </button>
+                  )}
+
                   <button
                     onClick={() => {
                       setEditingAsset(selectedAsset);
@@ -333,7 +344,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                     }}
                     className="w-full py-3 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/50 rounded-xl font-bold transition-all flex items-center justify-center gap-2"
                   >
-                    <span></span> Edit
+                    <span></span> Magic Edit
                   </button>
                 </div>
               </div>
