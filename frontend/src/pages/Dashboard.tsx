@@ -353,26 +353,27 @@ function Dashboard() {
   };
 
   // 🛠️ UPDATE 2: Magic Edit Upload Handler
+  // frontend/src/pages/Dashboard.tsx
+
+  // 🛠️ UPDATE: Direct Edit Upload Handler
   const handleMagicEditUpload = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // We reuse the batch upload endpoint to get it into the library
     try {
       const formData = new FormData();
-      formData.append("images", file);
-      formData.append("aspectRatio", "16:9"); // Default placeholder, will be set on edit anyway
+      formData.append("image", file); // Note: 'image' singular for the sync route
+      formData.append("aspectRatio", "16:9");
 
-      await apiEndpoints.uploadBatchAssets(formData);
+      // Use the new SYNC endpoint
+      const res = await apiEndpoints.uploadAssetSync(formData);
 
-      alert(
-        "✅ Image uploaded to Asset Library!\nOpening Library now - please select your new image to start editing."
-      );
-
-      // Open library automatically so they can pick it
-      setActiveLibrarySlot("generic");
+      if (res.data.success && res.data.asset) {
+        // Automatically open the editor with the new asset
+        setEditingAsset(res.data.asset);
+      }
     } catch (err: any) {
       alert("Upload failed: " + err.message);
     }

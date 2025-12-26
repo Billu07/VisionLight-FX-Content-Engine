@@ -58,6 +58,11 @@ export const apiEndpoints = {
       headers: { "Content-Type": "multipart/form-data" },
     }),
 
+  // ✅ NEW: Sync Upload
+  uploadAssetSync: (formData: FormData) =>
+    api.post("/api/assets/upload-sync", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
   // === Asset Library ===
   getAssets: () => api.get("/api/assets"),
 

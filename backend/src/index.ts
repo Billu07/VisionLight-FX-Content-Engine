@@ -333,6 +333,32 @@ app.post(
   }
 );
 
+// ✅ NEW: Synchronous Upload (For Magic Edit & Direct Reference)
+app.post(
+  "/api/assets/upload-sync",
+  authenticateToken,
+  upload.single("image"),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.file)
+        return res.status(400).json({ error: "No image provided" });
+
+      const { aspectRatio } = req.body; // Optional
+
+      // Process immediately and await result
+      const asset = await contentEngine.processAndSaveAsset(
+        req.file.buffer,
+        req.user!.id,
+        aspectRatio || "16:9"
+      );
+
+      res.json({ success: true, asset });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
 // 1. Batch Upload & Process
 app.post(
   "/api/assets/batch",
