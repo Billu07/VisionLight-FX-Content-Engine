@@ -52,10 +52,18 @@ export const apiEndpoints = {
   getPostStatus: (id: string) => api.get(`/api/post/${id}/status`),
   checkActiveJobs: () => api.get("/api/jobs/check-active"),
 
+  // === Vision & Analysis ===
+  analyzeImage: (formData: FormData) =>
+    api.post("/api/analyze-image", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+
   // === Asset Library ===
   getAssets: () => api.get("/api/assets"),
 
   deleteAsset: (id: string) => api.delete(`/api/assets/${id}`),
+  movePostToAsset: (postId: string) =>
+    api.post(`/api/posts/${postId}/to-asset`),
 
   uploadBatchAssets: (formData: FormData) =>
     api.post("/api/assets/batch", formData, {

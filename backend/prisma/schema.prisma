@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String?
+  creditBalance Int       @default(20)
+  creditSystem  String    @default("COMMERCIAL")
+  adminNotes    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  posts         Post[]
+  assets        Asset[]
+  brandConfig   BrandConfig?
+  roiMetrics    ROIMetrics?
+  creditRequests CreditRequest[]
+}
+
+model Post {
+  id               String   @id @default(uuid())
+  userId           String
+  title            String?
+  prompt           String
+  enhancedPrompt   String?
+  imageReference   String?
+  mediaType        String?
+  mediaUrl         String?
+  mediaProvider    String?
+  generatedEndFrame String?
+  status           String   @default("NEW")
+  platform         String?
+  script           Json?
+  generationParams Json?
+  progress         Int      @default(0)
+  error            String?
+  generationStep   String?
+  requiresApproval Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Asset {
+  id          String   @id @default(uuid())
+  userId      String
+  url         String
+  aspectRatio String
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BrandConfig {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  companyName    String?
+  primaryColor   String?
+  secondaryColor String?
+  logoUrl        String?
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ROIMetrics {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  postsCreated   Int      @default(0)
+  timeSaved      Int      @default(0)
+  mediaGenerated Int      @default(0)
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CreditRequest {
+  id        String   @id @default(uuid())
+  userId    String
+  email     String
+  name      String?
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

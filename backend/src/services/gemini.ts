@@ -1,117 +1,104 @@
-import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
-export class GeminiService {
-  private genAI: GoogleGenerativeAI;
-  private model: GenerativeModel;
+const client = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY });
 
-  constructor() {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is required");
+export const GeminiService = {
+  async generateOrEditImage(params: {
+    prompt: string;
+    aspectRatio: "16:9" | "9:16" | "1:1";
+    referenceImages?: Buffer[];
+    modelType?: "speed" | "quality";
+    useGrounding?: boolean;
+  }): Promise<Buffer> {
+    // 1. Select Model
+    const modelId =
+      params.modelType === "speed"
+        ? "gemini-2.5-flash-image"
+        : "gemini-3-pro-image-preview";
+
+    console.log(
+      `🍌 Gemini Engine: ${modelId} | Refs: ${
+        params.referenceImages?.length || 0
+      }`
+    );
+
+    // 2. Build Payload
+    const parts: any[] = [{ text: params.prompt }];
+
+    if (params.referenceImages) {
+      params.referenceImages.forEach((buf) => {
+        parts.push({
+          inlineData: {
+            mimeType: "image/jpeg",
+            data: buf.toString("base64"),
+          },
+        });
+      });
     }
 
-    this.genAI = new GoogleGenerativeAI(apiKey);
-    this.model = this.genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-exp",
-      generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 2048,
-      },
-    });
-  }
-
-  async generateImage(prompt: string): Promise<{ url: string; type: string }> {
+    // 3. Execute via SDK
     try {
-      console.log("🎨 Generating Gemini image with prompt:", prompt);
+      const response = await client.models.generateContent({
+        model: modelId,
+        contents: [{ parts }],
+        config: {
+          responseModalities: ["IMAGE"],
+          imageConfig: {
+            aspectRatio: params.aspectRatio,
+            imageSize: modelId.includes("pro") ? "2K" : undefined,
+          },
+        },
+      });
 
-      // For Gemini Flash 2.0, we use the model to generate image descriptions
-      // and then potentially use another service for actual image generation
-      // For now, we'll use a placeholder approach since direct image generation
-      // might require Imagen or another Google service
-
-      const enhancedPrompt = await this.enhanceImagePrompt(prompt);
-
-      // In a real implementation, you'd call Google's Image Generation API here
-      // For now, we return a descriptive success response
-      const imageDescription = await this.generateImageDescription(
-        enhancedPrompt
+      const imagePart = response.candidates?.[0]?.content?.parts?.find(
+        (p: any) => p.inlineData
       );
 
-      return {
-        url: `https://visionlight-fx.com/generated/${Date.now()}.jpg?prompt=${encodeURIComponent(
-          imageDescription
-        )}`,
-        type: "image",
-      };
-    } catch (error: any) {
-      console.error("❌ Gemini image generation error:", error);
-
-      if (error.message?.includes("API_KEY_INVALID")) {
-        throw new Error(
-          "Invalid Gemini API key - please check your credentials"
-        );
-      } else if (error.message?.includes("QUOTA_EXCEEDED")) {
-        throw new Error(
-          "Gemini API quota exceeded - please check your usage limits"
-        );
-      } else {
-        throw new Error(`Image generation failed: ${error.message}`);
+      if (imagePart?.inlineData?.data) {
+        return Buffer.from(imagePart.inlineData.data, "base64");
       }
-    }
-  }
-
-  private async enhanceImagePrompt(prompt: string): Promise<string> {
-    try {
-      const result = await this.model.generateContent(
-        `Enhance this image generation prompt for better visual results. Make it descriptive, vivid, and optimized for AI image generation. Return only the enhanced prompt: "${prompt}"`
-      );
-
-      const enhanced = result.response.text().trim();
-      return enhanced || prompt; // Fallback to original if empty
-    } catch (error) {
-      console.warn("Prompt enhancement failed, using original:", error);
-      return prompt;
-    }
-  }
-
-  private async generateImageDescription(prompt: string): Promise<string> {
-    try {
-      const result = await this.model.generateContent(
-        `Create a detailed visual description for this prompt that would be perfect for AI image generation. Be specific about colors, composition, lighting, and style: "${prompt}"`
-      );
-
-      return result.response.text().trim();
-    } catch (error) {
-      console.warn("Image description generation failed:", error);
-      return prompt;
-    }
-  }
-
-  async generateScript(prompt: string, mediaType: string): Promise<any> {
-    try {
-      const result = await this.model.generateContent(
-        `Create a social media script for ${mediaType} content. Prompt: "${prompt}"
-        
-        Return JSON format:
-        {
-          "caption": ["line1", "line2", "line3"],
-          "cta": "call to action text",
-          "imageReference": "detailed visual description"
-        }`
-      );
-
-      const text = result.response.text();
-      // Extract JSON from response
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-
-      throw new Error("Invalid response format from Gemini");
+      throw new Error("No image data returned from Gemini.");
     } catch (error: any) {
-      throw new Error(`Script generation failed: ${error.message}`);
+      console.error("Gemini Service Error:", error.message);
+      throw error;
     }
-  }
-}
+  },
+
+  /**
+   * VISION ANALYSIS (Text Output)
+   * Returns a text description of the input image(s).
+   */
+  async analyzeImageText(params: {
+    prompt: string;
+    imageBuffer: Buffer;
+  }): Promise<string> {
+    const modelId = "gemini-2.5-flash"; // Best for text analysis of images
+
+    try {
+      const response = await client.models.generateContent({
+        model: modelId,
+        contents: [
+          {
+            parts: [
+              { text: params.prompt },
+              {
+                inlineData: {
+                  mimeType: "image/jpeg",
+                  data: params.imageBuffer.toString("base64"),
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      return (
+        response.candidates?.[0]?.content?.parts?.[0]?.text ||
+        "No analysis generated."
+      );
+    } catch (error: any) {
+      console.error("Gemini Analysis Error:", error.message);
+      throw error;
+    }
+  },
+};

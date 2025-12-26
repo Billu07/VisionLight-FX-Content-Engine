@@ -9,6 +9,7 @@ import { PostCard } from "../components/PostCard";
 import { BrandConfigModal } from "../components/BrandConfigModal";
 import { AssetLibrary } from "../components/AssetLibrary";
 import { WelcomeTour } from "../components/WelcomeTour";
+import { MediaPreview } from "../components/MediaPreview"; // Uses your existing component
 
 // Import your logo images
 import fxLogo from "../assets/fx.png";
@@ -95,6 +96,14 @@ function Dashboard() {
   const [showNoCreditsModal, setShowNoCreditsModal] = useState(false);
   const [showPromptInfo, setShowPromptInfo] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+
+  // === NEW PREVIEW STATE ===
+  const [previewMedia, setPreviewMedia] = useState<{
+    type: "image" | "video" | "carousel";
+    url: string | string[];
+  } | null>(null);
+  // Internal index for carousel preview navigation
+  const [previewCarouselIndex, setPreviewCarouselIndex] = useState(0);
 
   const queryClient = useQueryClient();
   const { user, isLoading: authLoading, logout } = useAuth();
@@ -245,6 +254,18 @@ function Dashboard() {
     setShowPromptInfo(promptText);
   };
 
+  // === NEW: Move To Asset Library ===
+  const handleMoveToAssets = async (postId: string) => {
+    if (!confirm("Save this image to your Asset Library for editing?")) return;
+    try {
+      await apiEndpoints.movePostToAsset(postId);
+      alert("✅ Saved! Check your Asset Library to edit.");
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+    } catch (e: any) {
+      alert("Failed to save: " + e.message);
+    }
+  };
+
   const handleRequestCredits = async () => {
     if (!confirm("Send a notification to Admin requesting more credits?"))
       return;
@@ -260,13 +281,9 @@ function Dashboard() {
   };
 
   // --- 1. ASSET LIBRARY SELECTION HANDLER ---
-  // ... inside Dashboard component ...
-
-  // --- 1. ASSET LIBRARY SELECTION HANDLER (UPDATED) ---
   const handleAssetSelect = (file: File, url: string) => {
     // 1. PicDrift Start Slot
     if (activeLibrarySlot === "start") {
-      // Ensure we are in correct mode
       if (activeEngine !== "kie" || videoFxMode !== "picdrift") {
         setActiveEngine("kie");
         setVideoFxMode("picdrift");
@@ -293,15 +310,12 @@ function Dashboard() {
         setReferenceImageUrls([url]);
       }
     }
-
-    // Close Library
     setActiveLibrarySlot(null);
   };
 
-  // --- 2. REUSE END FRAME HANDLER (Used by PostCard) ---
+  // --- 2. REUSE END FRAME HANDLER ---
   const handleUseAsStartFrame = async (url: string) => {
     try {
-      // Switch to PicDrift automatically for seamless continuity
       setActiveEngine("kie");
       setVideoFxMode("picdrift");
 
@@ -321,11 +335,14 @@ function Dashboard() {
     }
   };
 
+  // === UPDATED FILE HANDLER (Increased Limit for Gemini 3 Pro) ===
   const handleGenericUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    const maxFiles =
-      activeEngine === "studio" && studioMode === "carousel" ? 5 : 5;
+
+    // ✅ UPDATED: Gemini 3 Pro supports up to 14 images (e.g. for Carousel consistency)
+    const maxFiles = 14;
+
     if (files.length + referenceImages.length > maxFiles) {
       alert(`❌ Only ${maxFiles} image(s) allowed for this mode.`);
       return;
@@ -438,6 +455,70 @@ function Dashboard() {
         />
       )}
 
+      {/* --- PREVIEW MODAL (Wraps existing MediaPreview) --- */}
+      {previewMedia && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 animate-in fade-in duration-200"
+          onClick={() => {
+            setPreviewMedia(null);
+            setPreviewCarouselIndex(0);
+          }}
+        >
+          <div
+            className="relative w-full max-w-5xl flex flex-col items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* HANDLING CAROUSELS MANUALLY since MediaPreview is simple */}
+            {previewMedia.type === "carousel" &&
+            Array.isArray(previewMedia.url) ? (
+              <div className="flex flex-col items-center w-full">
+                <img
+                  src={previewMedia.url[previewCarouselIndex]}
+                  className="max-h-[80vh] w-auto rounded-lg shadow-2xl border border-gray-800"
+                />
+                {previewMedia.url.length > 1 && (
+                  <div className="flex gap-2 mt-4">
+                    {previewMedia.url.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setPreviewCarouselIndex(idx)}
+                        className={`w-3 h-3 rounded-full transition-all ${
+                          idx === previewCarouselIndex
+                            ? "bg-white scale-125"
+                            : "bg-white/30 hover:bg-white/60"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Use existing MediaPreview for single Image/Video
+              <div className="w-full flex justify-center">
+                <div className="max-w-full max-h-[85vh]">
+                  <MediaPreview
+                    mediaUrl={previewMedia.url as string}
+                    mediaType={
+                      previewMedia.type === "video" ? "video" : "image"
+                    }
+                  />
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => {
+                setPreviewMedia(null);
+                setPreviewCarouselIndex(0);
+              }}
+              className="absolute -top-12 right-0 bg-white/10 hover:bg-white/20 text-white p-2 rounded-full transition-colors"
+            >
+              ✕ Close
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* --- EXISTING MODALS --- */}
       {showQueuedModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
@@ -459,6 +540,7 @@ function Dashboard() {
           </div>
         </div>
       )}
+      {/* ... keep showNoCreditsModal ... */}
       {showNoCreditsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
           <div className="bg-gray-800 rounded-2xl border border-red-500/30 shadow-2xl max-w-sm w-full p-6 text-center">
@@ -761,6 +843,7 @@ function Dashboard() {
                 </div>
               )}
 
+              {/* ... (Kie and OpenAI settings remain identical to your original code) ... */}
               {activeEngine === "kie" && (
                 <div className="mb-6 animate-in fade-in space-y-4">
                   <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
@@ -1210,7 +1293,7 @@ function Dashboard() {
                         <p className="absolute bottom-2 text-[10px] text-gray-600">
                           {activeEngine === "studio" &&
                           studioMode === "carousel"
-                            ? "Up to 5 images"
+                            ? "Up to 14 images"
                             : "Single frame"}{" "}
                           (PNG/JPG)
                         </p>
@@ -1306,8 +1389,28 @@ function Dashboard() {
                         publishingPost={null}
                         primaryColor={brandConfig?.primaryColor}
                         compact={true}
-                        // 👇 PASS THE NEW HANDLER HERE
                         onUseAsStartFrame={handleUseAsStartFrame}
+                        // NEW PROPS FOR PREVIEW AND SAVE
+                        onPreview={() => {
+                          let type = "image";
+                          if (post.mediaType === "VIDEO") type = "video";
+                          if (post.mediaType === "CAROUSEL") type = "carousel";
+
+                          let url = post.mediaUrl;
+                          if (type === "carousel") {
+                            try {
+                              url = JSON.parse(post.mediaUrl);
+                            } catch (e) {}
+                          }
+
+                          setPreviewMedia({ type: type as any, url });
+                        }}
+                        onMoveToAsset={
+                          post.mediaType === "IMAGE" ||
+                          post.mediaType === "CAROUSEL"
+                            ? () => handleMoveToAssets(post.id)
+                            : undefined
+                        }
                       />
                     ))
                 ) : !postsLoading ? (

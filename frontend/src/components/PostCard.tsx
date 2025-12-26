@@ -10,6 +10,10 @@ interface PostCardProps {
   primaryColor?: string;
   compact?: boolean;
   onUseAsStartFrame?: (url: string) => void;
+
+  // NEW PROPS
+  onPreview?: () => void;
+  onMoveToAsset?: () => void;
 }
 
 const getCleanUrl = (url: string) => {
@@ -30,6 +34,8 @@ export function PostCard({
   post,
   onPublishPost,
   compact = false,
+  onPreview,
+  onMoveToAsset,
 }: PostCardProps) {
   const [mediaError, setMediaError] = useState(false);
   const [videoLoading, setVideoLoading] = useState(true);
@@ -88,6 +94,7 @@ export function PostCard({
   // --- DOWNLOAD VIDEO HANDLER ---
   const handleDownloadVideo = async (e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation(); // Stop propagation to prevent preview trigger
     if (!post.mediaUrl) return;
     try {
       setIsDownloadingVideo(true);
@@ -132,16 +139,12 @@ export function PostCard({
 
     try {
       setIsDownloadingEndFrame(true);
-
-      // Fetch the raw image data as a Blob to force a real file download
-      // Cloudinary allows CORS, so this direct fetch preserves quality
       const response = await fetch(post.generatedEndFrame);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
 
       const link = document.createElement("a");
       link.href = url;
-      // Force the name to match the clip ID for organization
       link.setAttribute("download", `end-frame-${post.id}.jpg`);
       document.body.appendChild(link);
       link.click();
@@ -149,7 +152,6 @@ export function PostCard({
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("End frame download failed, falling back to tab:", error);
-      // Fallback: If fetch fails (e.g., strict CORS), just open the tab
       window.open(post.generatedEndFrame, "_blank");
     } finally {
       setIsDownloadingEndFrame(false);
@@ -223,6 +225,7 @@ export function PostCard({
       );
     }
 
+    // CAROUSEL
     if (post.mediaType === "CAROUSEL") {
       let slides: string[] = [];
       try {
@@ -238,8 +241,8 @@ export function PostCard({
 
       return (
         <div
-          className="relative aspect-video group cursor-pointer"
-          onClick={nextSlide}
+          className="relative aspect-video group cursor-pointer hover:opacity-90 transition-opacity"
+          onClick={onPreview || nextSlide} // Use preview if available, else local nav
         >
           {slides.length > 0 && (
             <img
@@ -248,6 +251,11 @@ export function PostCard({
               className="w-full h-full object-cover rounded-xl"
             />
           )}
+          {/* Overlay to indicate clickability */}
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
+            <span className="text-white text-3xl drop-shadow-lg">⤢</span>
+          </div>
+
           <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-1 rounded border border-white/20">
             {slideIndex + 1} / {slides.length}
           </div>
@@ -255,31 +263,46 @@ export function PostCard({
       );
     }
 
+    // VIDEO
     if (post.mediaType === "VIDEO" || post.mediaProvider === "sora") {
       return (
-        <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-white/10 group">
+        <div
+          className="relative aspect-video bg-black rounded-xl overflow-hidden border border-white/10 group cursor-pointer"
+          onClick={onPreview} // CLICK TO OPEN FULLSCREEN
+        >
           {videoLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
               <LoadingSpinner size="md" variant="neon" />
             </div>
           )}
           <video
-            controls
-            muted={false}
+            muted={true} // Auto-mute for preview
             loop
-            className="w-full h-full object-contain"
+            className="w-full h-full object-cover"
             onLoadedData={handleVideoLoad}
             onError={handleMediaError}
             playsInline
+            // Remove controls so click goes to parent div
           >
             <source src={getCleanUrl(post.mediaUrl)} type="video/mp4" />
           </video>
+
+          {/* Play/Expand Icon Overlay */}
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
+            <span className="text-white text-3xl drop-shadow-lg opacity-80 group-hover:opacity-100 transition-opacity">
+              ▶
+            </span>
+          </div>
         </div>
       );
     }
 
+    // IMAGE
     return (
-      <div className="aspect-video bg-gray-900 rounded-xl overflow-hidden border border-white/10">
+      <div
+        className="aspect-video bg-gray-900 rounded-xl overflow-hidden border border-white/10 cursor-pointer group relative"
+        onClick={onPreview} // CLICK TO OPEN FULLSCREEN
+      >
         <img
           src={getCleanUrl(post.mediaUrl)}
           alt={post.title}
@@ -287,6 +310,9 @@ export function PostCard({
           onError={handleMediaError}
           loading="lazy"
         />
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
+          <span className="text-white text-3xl drop-shadow-lg">⤢</span>
+        </div>
       </div>
     );
   };
@@ -368,24 +394,35 @@ export function PostCard({
                 )}
               </button>
 
+              {/* SAVE TO ASSET LIBRARY BUTTON (New) */}
+              {onMoveToAsset && (
+                <button
+                  onClick={onMoveToAsset}
+                  className="w-8 h-8 flex items-center justify-center bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 rounded-lg text-purple-300 transition-colors"
+                  title="Save to Asset Library"
+                >
+                  💾
+                </button>
+              )}
+
               <button
                 onClick={() =>
                   onPublishPost({ prompt: post.prompt, postId: post.id })
                 }
-                className="w-8 h-8 flex items-center justify-center bg-gray-700 hover:bg-gray-600 border border-white/10 rounded-full text-white"
+                className="w-8 h-8 flex items-center justify-center bg-gray-700 hover:bg-gray-600 border border-white/10 rounded-lg text-white"
                 title="View Prompt Info"
               >
                 ℹ️
               </button>
             </div>
 
-            {/* 👇 END FRAME DOWNLOAD BUTTON */}
+            {/* END FRAME DOWNLOAD BUTTON */}
             {post.generatedEndFrame && (
               <button
                 onClick={handleDownloadEndFrame}
                 disabled={isDownloadingEndFrame}
                 className="w-full bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 text-[10px] py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1"
-                title="Use this as the Start Frame for your next clip to ensure perfect matching"
+                title="Use this as the Start Frame for your next clip"
               >
                 {isDownloadingEndFrame ? (
                   <LoadingSpinner size="sm" variant="light" />

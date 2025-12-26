@@ -3,7 +3,8 @@ import FormData from "form-data";
 import sharp from "sharp";
 import axios from "axios";
 import { v2 as cloudinary } from "cloudinary";
-import { airtableService, Post, Asset } from "./airtable";
+import { dbService as airtableService, Post, Asset } from "./database";
+import { GeminiService } from "./gemini"; // ✅ Correct Import
 import { ROIService } from "./roi";
 
 // Configuration
@@ -25,9 +26,6 @@ const KIE_API_KEY = process.env.KIE_AI_API_KEY;
 // FAL AI Config (Kling 2.5 Turbo)
 const FAL_KEY = process.env.FAL_KEY;
 const FAL_BASE_PATH = "https://queue.fal.run/fal-ai/kling-video/v2.5-turbo";
-
-// Base prompt for RESIZING tasks only
-const BASE_RESIZE_INSTRUCTION = `Take the design, layout, and style of [Image A] exactly as it is, and seamlessly adapt it into the aspect ratio of [Image B]. Maintain all the visual elements, proportions, and composition.`;
 
 const getOptimizedUrl = (url: string) => {
   if (!url || typeof url !== "string") return url;
@@ -100,15 +98,16 @@ const resizeWithGemini = async (
 ): Promise<Buffer> => {
   try {
     console.log(
-      `✨ Gemini 3 Pro: Outpainting ${targetWidth}x${targetHeight} (Black Guide)...`
+      `✨ Gemini 3 Pro: Outpainting ${targetWidth}x${targetHeight}...`
     );
 
+    // 1. Create the Black Guide
     const backgroundGuide = await sharp({
       create: {
         width: targetWidth,
         height: targetHeight,
         channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 }, // Black
+        background: { r: 0, g: 0, b: 0, alpha: 255 },
       },
     })
       .png()
@@ -127,71 +126,28 @@ const resizeWithGemini = async (
       .toBuffer();
 
     const isPortrait = targetHeight > targetWidth;
-    const direction = isPortrait
-      ? "vertical (top/bottom)"
-      : "horizontal (left/right)";
+    const direction = isPortrait ? "vertical" : "horizontal";
 
+    // 2. Use Your Exact Prompt Logic
     const fullPrompt = `
     TASK: Image Extension (Outpainting).
-    
     INPUT: An image with a sharp central subject and BLACK ${direction} bars.
-    
     INSTRUCTIONS:
-    1. REMOVE THE BLACK BARS: The black areas are empty space. You must completely paint over them with high-definition details that extend the central scene.
-    2. SEAMLESS EXTENSION: The new details must match the lighting, texture, and style of the center.
-    3. NO LETTERBOXING: The final output must be a full-screen image with NO remaining black borders.
-    4. PRESERVE CENTER: Do not modify the central subject (Faces, Text, Logos).
+    1. REMOVE THE BLACK BARS: The black areas are empty space. Paint over them completely with high-definition details.
+    2. SEAMLESS EXTENSION: Match lighting, texture, and style.
+    3. NO LETTERBOXING: Final output must be full-screen.
+    4. PRESERVE CENTER: Do not modify the central subject.
     `;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
-
-    const response = await axios.post(
-      geminiUrl,
-      {
-        contents: [
-          {
-            parts: [
-              { text: fullPrompt },
-              {
-                inline_data: {
-                  mime_type: "image/png",
-                  data: compositeBuffer.toString("base64"),
-                },
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.95,
-          responseModalities: ["IMAGE"],
-          imageConfig: { aspectRatio: isPortrait ? "9:16" : "16:9" },
-        },
-      },
-      { headers: { "Content-Type": "application/json" }, timeout: AI_TIMEOUT }
-    );
-
-    const b64 =
-      response.data?.candidates?.[0]?.content?.parts?.find(
-        (p: any) => p.inline_data || p.inlineData
-      )?.inline_data?.data ||
-      response.data?.candidates?.[0]?.content?.parts?.find(
-        (p: any) => p.inline_data || p.inlineData
-      )?.inlineData?.data;
-
-    if (b64) {
-      console.log("✅ Gemini 3 Pro Outpaint Success.");
-      return await sharp(Buffer.from(b64, "base64"))
-        .resize(targetWidth, targetHeight, { fit: "fill" })
-        .toFormat("jpeg", { quality: 95 })
-        .toBuffer();
-    } else {
-      throw new Error("Gemini returned no image data.");
-    }
+    // 3. EXECUTE via GeminiService (Standardized)
+    return await GeminiService.generateOrEditImage({
+      prompt: fullPrompt,
+      aspectRatio: isPortrait ? "9:16" : "16:9",
+      referenceImages: [compositeBuffer], // Pass the composite with black bars
+      modelType: "quality", // Gemini 3 Pro
+    });
   } catch (error: any) {
-    console.error(
-      "❌ Gemini Resize Error:",
-      error.response?.data || error.message
-    );
+    console.error("❌ Gemini Resize Error:", error.message);
     throw error;
   }
 };
@@ -256,6 +212,28 @@ export const contentEngine = {
     }
   },
 
+  // === MOVE POST MEDIA TO ASSET ===
+  async copyPostMediaToAsset(postId: string, userId: string): Promise<Asset> {
+    const post = await airtableService.getPostById(postId);
+    if (!post || !post.mediaUrl) throw new Error("Post has no media");
+
+    // If it's a carousel (JSON array), pick the first image
+    let targetUrl = post.mediaUrl;
+    try {
+      const parsed = JSON.parse(post.mediaUrl);
+      if (Array.isArray(parsed)) targetUrl = parsed[0];
+    } catch (e) {}
+
+    // 🛠️ FIX 1: Cast generationParams to any to access properties safely
+    const aspectRatio =
+      (post.generationParams as any)?.aspectRatio === "landscape"
+        ? "16:9"
+        : "9:16";
+
+    // Create Asset entry pointing to existing Cloudinary URL
+    return await airtableService.createAsset(userId, targetUrl, aspectRatio);
+  },
+
   // === EDIT ASSET ===
   async editAsset(
     originalAssetUrl: string,
@@ -267,39 +245,25 @@ export const contentEngine = {
     try {
       console.log(`🎨 Editing asset for ${userId}: "${prompt}"`);
 
-      const imageResponse = await axios.get(originalAssetUrl, {
+      // 1. Prepare Inputs
+      const imageResponse = await axios.get(getOptimizedUrl(originalAssetUrl), {
         responseType: "arraybuffer",
       });
-      const originalBuffer = Buffer.from(imageResponse.data);
+      const inputBuffers = [Buffer.from(imageResponse.data)];
 
-      const parts: any[] = [
-        { text: prompt },
-        {
-          inline_data: {
-            mime_type: "image/jpeg",
-            data: originalBuffer.toString("base64"),
-          },
-        },
-      ];
+      let finalPrompt = prompt;
+      let modelType: "speed" | "quality" = "speed"; // Default to Flash
 
-      let model = "gemini-2.5-flash-image";
-
+      // 2. CHECK REFERENCE
       if (referenceUrl) {
-        try {
-          console.log("🔗 Attaching Reference Image...");
-          const refRes = await axios.get(referenceUrl, {
-            responseType: "arraybuffer",
-          });
-          const refBuf = Buffer.from(refRes.data);
+        console.log("🔗 Attaching Reference Image (Frame Generation Mode)...");
+        const refRes = await axios.get(getOptimizedUrl(referenceUrl), {
+          responseType: "arraybuffer",
+        });
+        inputBuffers.push(Buffer.from(refRes.data));
 
-          parts.push({
-            inline_data: {
-              mime_type: "image/jpeg",
-              data: refBuf.toString("base64"),
-            },
-          });
-
-          parts[0].text = `
+        // Prompt Logic
+        finalPrompt = `
 TASK: ${prompt}
 INPUT ANALYSIS:
 - IMAGE 1 (Context): The MAIN SUBJECT.
@@ -308,42 +272,20 @@ INSTRUCTIONS:
 1. SUBJECT LOCK: Strictly preserve the visual identity, colors, and structure of Subject 1.
 2. VIEWPOINT TRANSFER: Re-render Subject 1 using the camera angle/composition of Image 2.
 3. OUTPUT: High-fidelity image.
-            `;
+        `;
 
-          model = "gemini-3-pro-image-preview";
-        } catch (e) {
-          parts[0].text = prompt;
-        }
+        modelType = "quality"; // Upgrade to Gemini 3 Pro
       }
 
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
+      // 3. Execute via SDK
+      const editedBuffer = await GeminiService.generateOrEditImage({
+        prompt: finalPrompt,
+        aspectRatio: aspectRatio,
+        referenceImages: inputBuffers,
+        modelType: modelType,
+      });
 
-      const response = await axios.post(
-        geminiUrl,
-        {
-          contents: [{ parts }],
-          generationConfig: {
-            temperature: 0.9,
-            responseModalities: ["IMAGE"],
-            imageConfig: {
-              aspectRatio: aspectRatio === "16:9" ? "16:9" : "9:16",
-            },
-          },
-        },
-        { headers: { "Content-Type": "application/json" }, timeout: AI_TIMEOUT }
-      );
-
-      const b64 =
-        response.data?.candidates?.[0]?.content?.parts?.find(
-          (p: any) => p.inline_data || p.inlineData
-        )?.inline_data?.data ||
-        response.data?.candidates?.[0]?.content?.parts?.find(
-          (p: any) => p.inline_data || p.inlineData
-        )?.inlineData?.data;
-
-      if (!b64) throw new Error("Gemini returned no image data for edit.");
-
-      const editedBuffer = Buffer.from(b64, "base64");
+      // 4. Save
       const newUrl = await this.uploadToCloudinary(
         editedBuffer,
         `edited_${userId}_${Date.now()}`,
@@ -354,13 +296,13 @@ INSTRUCTIONS:
 
       return await airtableService.createAsset(userId, newUrl, aspectRatio);
     } catch (e: any) {
-      console.error("Asset Edit Failed:", e.response?.data || e.message);
+      console.error("Asset Edit Failed:", e.message);
       throw new Error(`Edit failed: ${e.message}`);
     }
   },
 
   // ===========================================================================
-  // 1. INITIATE VIDEO GENERATION (Unchanged - Goes to Timeline)
+  // 1. INITIATE VIDEO GENERATION
   // ===========================================================================
   async startVideoGeneration(postId: string, finalPrompt: string, params: any) {
     console.log(`🎬 Video Gen for ${postId} | Model Input: ${params.model}`);
@@ -641,9 +583,11 @@ INSTRUCTIONS:
   // 2. CHECK STATUS (Unchanged)
   // ===========================================================================
   async checkPostStatus(post: Post) {
-    if (post.status !== "PROCESSING" || !post.generationParams?.externalId)
-      return;
-    const externalId = post.generationParams.externalId;
+    // 🛠️ FIX 2: Cast generationParams to any
+    const params = post.generationParams as any;
+
+    if (post.status !== "PROCESSING" || !params?.externalId) return;
+    const externalId = params.externalId;
     const provider = post.mediaProvider || "openai";
     const userId = post.userId;
 
@@ -668,8 +612,9 @@ INSTRUCTIONS:
           errorMessage = checkRes.data.data.failMsg;
         } else progress = Math.min(95, progress + 5);
       } else if (provider.includes("kling")) {
+        // 🛠️ FIX 3: Cast generationParams to any for statusUrl
         const checkUrl =
-          post.generationParams.statusUrl ||
+          (post.generationParams as any).statusUrl ||
           `${FAL_BASE_PATH}/requests/${externalId}/status`;
         const statusRes = await axios.get(checkUrl, {
           headers: { Authorization: `Key ${FAL_KEY}` },
@@ -731,7 +676,8 @@ INSTRUCTIONS:
           error: errorMessage,
           progress: 0,
         });
-        const costToRefund = post.generationParams?.cost || 5;
+        // 🛠️ FIX 4: Cast generationParams to any for cost
+        const costToRefund = (post.generationParams as any)?.cost || 5;
         await airtableService.refundUserCredit(userId, costToRefund);
       } else {
         if (progress !== post.progress)
@@ -759,35 +705,38 @@ INSTRUCTIONS:
   },
 
   // ===========================================================================
-  // 3. CREATIVE WORKFLOWS (Image/Carousel) - REVERTED TO USE POSTS
+  // 3. CREATIVE WORKFLOWS (Image/Carousel)
   // ===========================================================================
 
   // 📸 IMAGE GENERATION: Update Post (Timeline)
   async startImageGeneration(postId: string, finalPrompt: string, params: any) {
-    console.log(`🎨 Image Gen for Post ${postId}`);
+    console.log(`🎨 Gemini 3 Pro Gen for Post ${postId}`);
     try {
       const refUrls =
         params.imageReferences ||
         (params.imageReference ? [params.imageReference] : []);
       const refBuffers = await this.downloadAndOptimizeImages(refUrls);
 
-      const buf = await this.generateGeminiImage(
-        finalPrompt,
-        refBuffers,
-        params.aspectRatio
-      );
+      // ✅ UPDATED: Use GeminiService
+      const buf = await GeminiService.generateOrEditImage({
+        prompt: finalPrompt,
+        aspectRatio: params.aspectRatio === "landscape" ? "16:9" : "9:16",
+        referenceImages: refBuffers,
+        modelType: "quality", // Always use Pro for main generation
+        useGrounding: true, // Enable Search (e.g. "News from yesterday")
+      });
 
       const cloudUrl = await this.uploadToCloudinary(
         buf,
         postId,
         params.userId,
-        "Image",
+        "Gemini 3 Pro Image",
         "image"
       );
 
-      // ✅ UPDATE POST (Timeline) instead of creating Asset
-      await this.finalizePost(postId, cloudUrl, "gemini-image", params.userId);
+      await this.finalizePost(postId, cloudUrl, "gemini-3-pro", params.userId);
     } catch (e: any) {
+      console.error("Image Gen Error:", e);
       await airtableService.updatePost(postId, {
         status: "FAILED",
         error: e.message,
@@ -803,35 +752,43 @@ INSTRUCTIONS:
     finalPrompt: string,
     params: any
   ) {
-    console.log(`🎠 Carousel Gen for Post ${postId}`);
+    console.log(`🎠 Gemini 3 Pro Carousel for Post ${postId}`);
     try {
       const imageUrls: string[] = [];
       const userRefBuffers = await this.downloadAndOptimizeImages(
         params.imageReferences || []
       );
-      let previousBuffer =
-        userRefBuffers.length > 0 ? userRefBuffers[0] : undefined;
 
-      const prompts = [
-        `Phase 1: Start. ${finalPrompt}`,
-        `Phase 2: Progression. Continue the previous visual. ${finalPrompt}`,
-        `Phase 3: Finale. Conclude the sequence. ${finalPrompt}`,
+      // Store the visual history of the carousel
+      const carouselHistory: Buffer[] = [...userRefBuffers];
+
+      const steps = [
+        "Image 1: Establish the scene and main subject. Wide shot. ",
+        "Image 2: Action or Interaction. Medium shot. Show dynamic movement. ",
+        "Image 3: Conclusion or Detail. Close-up or dramatic angle. ",
       ];
 
-      for (let i = 0; i < prompts.length; i++) {
-        const currentInput = previousBuffer ? [previousBuffer] : [];
-        const buf = await this.generateGeminiImage(
-          prompts[i],
-          currentInput,
-          "9:16"
-        );
-        previousBuffer = buf;
+      for (let i = 0; i < steps.length; i++) {
+        const stepPrompt = `
+        PROJECT: 3-Slide Visual Story.
+        CURRENT SLIDE: ${i + 1}/3.
+        OVERALL THEME: ${finalPrompt}
+        SPECIFIC INSTRUCTION: ${steps[i]}
+        CONSTRAINT: You must maintain perfect consistency with the REFERENCE IMAGES provided (Character, Art Style, Lighting).
+        `;
 
-        const resized = await sharp(buf)
-          .resize(1080, 1350, { fit: "cover" })
-          .toBuffer();
+        // ✅ UPDATED: Use GeminiService
+        const buf = await GeminiService.generateOrEditImage({
+          prompt: stepPrompt,
+          aspectRatio: "9:16",
+          referenceImages: carouselHistory,
+          modelType: "quality",
+        });
+
+        carouselHistory.push(buf);
+
         const url = await this.uploadToCloudinary(
-          resized,
+          buf,
           `${postId}_slide_${i + 1}`,
           params.userId,
           `Slide ${i + 1}`,
@@ -840,16 +797,16 @@ INSTRUCTIONS:
         imageUrls.push(url);
       }
 
-      // ✅ UPDATE POST (Timeline)
       await airtableService.updatePost(postId, {
         mediaUrl: JSON.stringify(imageUrls),
-        mediaProvider: "gemini-carousel",
+        mediaProvider: "gemini-3-carousel",
         status: "READY",
         progress: 100,
         generationStep: "COMPLETED",
       });
       await ROIService.incrementMediaGenerated(params.userId);
     } catch (e: any) {
+      console.error("Carousel Error:", e);
       await airtableService.updatePost(postId, {
         status: "FAILED",
         error: e.message,
@@ -878,50 +835,6 @@ INSTRUCTIONS:
     });
     const results = await Promise.all(promises);
     return results.filter((buf): buf is Buffer => buf !== null);
-  },
-
-  async generateGeminiImage(
-    promptText: string,
-    refBuffers: Buffer[],
-    aspectRatio: string
-  ): Promise<Buffer> {
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${process.env.GOOGLE_AI_API_KEY}`;
-    let targetRatio = "1:1";
-    if (aspectRatio === "16:9" || aspectRatio === "landscape")
-      targetRatio = "16:9";
-    if (aspectRatio === "9:16" || aspectRatio === "portrait")
-      targetRatio = "9:16";
-
-    const parts: any[] = [{ text: promptText }];
-    refBuffers.forEach((buf) => {
-      parts.push({
-        inline_data: { mime_type: "image/jpeg", data: buf.toString("base64") },
-      });
-    });
-
-    const response = await axios.post(
-      geminiUrl,
-      {
-        contents: [{ parts }],
-        generationConfig: {
-          temperature: 0.9,
-          responseModalities: ["IMAGE"],
-          imageConfig: { aspectRatio: targetRatio },
-        },
-      },
-      { headers: { "Content-Type": "application/json" } }
-    );
-
-    const b64 =
-      response.data?.candidates?.[0]?.content?.parts?.find(
-        (p: any) => p.inline_data || p.inlineData
-      )?.inline_data?.data ||
-      response.data?.candidates?.[0]?.content?.parts?.find(
-        (p: any) => p.inline_data || p.inlineData
-      )?.inlineData?.data;
-
-    if (b64) return Buffer.from(b64, "base64");
-    throw new Error("Gemini No Image");
   },
 
   async uploadToCloudinary(

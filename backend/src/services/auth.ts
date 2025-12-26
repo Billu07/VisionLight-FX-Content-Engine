@@ -1,6 +1,6 @@
 // backend/src/services/auth.ts
 import { createClient } from "@supabase/supabase-js";
-import { airtableService } from "./airtable";
+import { dbService as airtableService } from "./database";
 import dotenv from "dotenv";
 
 dotenv.config();
