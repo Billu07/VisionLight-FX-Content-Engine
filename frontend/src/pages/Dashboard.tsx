@@ -9,7 +9,8 @@ import { PostCard } from "../components/PostCard";
 import { BrandConfigModal } from "../components/BrandConfigModal";
 import { AssetLibrary } from "../components/AssetLibrary";
 import { WelcomeTour } from "../components/WelcomeTour";
-import { MediaPreview } from "../components/MediaPreview"; // Uses your existing component
+import { MediaPreview } from "../components/MediaPreview";
+import { EditAssetModal } from "../components/EditAssetModal";
 
 // Import your logo images
 import fxLogo from "../assets/fx.png";
@@ -19,7 +20,8 @@ import picdriftLogo from "../assets/picdrift.png";
 const ADMIN_EMAILS = ["snowfix07@gmail.com", "keith@picdrift.com"];
 
 type EngineType = "kie" | "studio" | "openai";
-type StudioMode = "image" | "carousel";
+// 🛠️ UPDATE 1: Added "edit" mode
+type StudioMode = "image" | "carousel" | "edit";
 
 interface GenerationState {
   status: "idle" | "generating" | "completed" | "error";
@@ -102,8 +104,10 @@ function Dashboard() {
     type: "image" | "video" | "carousel";
     url: string | string[];
   } | null>(null);
-  // Internal index for carousel preview navigation
   const [previewCarouselIndex, setPreviewCarouselIndex] = useState(0);
+
+  // State for Magic Edit Asset (if triggered directly)
+  const [editingAsset, setEditingAsset] = useState<any | null>(null);
 
   const queryClient = useQueryClient();
   const { user, isLoading: authLoading, logout } = useAuth();
@@ -282,7 +286,6 @@ function Dashboard() {
 
   // --- 1. ASSET LIBRARY SELECTION HANDLER ---
   const handleAssetSelect = (file: File, url: string) => {
-    // 1. PicDrift Start Slot
     if (activeLibrarySlot === "start") {
       if (activeEngine !== "kie" || videoFxMode !== "picdrift") {
         setActiveEngine("kie");
@@ -290,18 +293,14 @@ function Dashboard() {
       }
       setPicDriftFrames((prev) => ({ ...prev, start: file }));
       setPicDriftUrls((prev) => ({ ...prev, start: url }));
-    }
-    // 2. PicDrift End Slot
-    else if (activeLibrarySlot === "end") {
+    } else if (activeLibrarySlot === "end") {
       if (activeEngine !== "kie" || videoFxMode !== "picdrift") {
         setActiveEngine("kie");
         setVideoFxMode("picdrift");
       }
       setPicDriftFrames((prev) => ({ ...prev, end: file }));
       setPicDriftUrls((prev) => ({ ...prev, end: url }));
-    }
-    // 3. Generic/List Slot
-    else {
+    } else {
       if (activeEngine === "studio" && studioMode === "carousel") {
         setReferenceImages((prev) => [...prev, file]);
         setReferenceImageUrls((prev) => [...prev, url]);
@@ -340,7 +339,7 @@ function Dashboard() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    // ✅ UPDATED: Gemini 3 Pro supports up to 14 images (e.g. for Carousel consistency)
+    // ✅ UPDATED: Gemini 3 Pro supports up to 14 images
     const maxFiles = 14;
 
     if (files.length + referenceImages.length > maxFiles) {
@@ -351,6 +350,32 @@ function Dashboard() {
     setReferenceImages((prev) => [...prev, ...newFiles]);
     const newUrls = newFiles.map((file) => URL.createObjectURL(file));
     setReferenceImageUrls((prev) => [...prev, ...newUrls]);
+  };
+
+  // 🛠️ UPDATE 2: Magic Edit Upload Handler
+  const handleMagicEditUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // We reuse the batch upload endpoint to get it into the library
+    try {
+      const formData = new FormData();
+      formData.append("images", file);
+      formData.append("aspectRatio", "16:9"); // Default placeholder, will be set on edit anyway
+
+      await apiEndpoints.uploadBatchAssets(formData);
+
+      alert(
+        "✅ Image uploaded to Asset Library!\nOpening Library now - please select your new image to start editing."
+      );
+
+      // Open library automatically so they can pick it
+      setActiveLibrarySlot("generic");
+    } catch (err: any) {
+      alert("Upload failed: " + err.message);
+    }
   };
 
   const removeGenericImage = (index: number) => {
@@ -468,7 +493,6 @@ function Dashboard() {
             className="relative w-full max-w-5xl flex flex-col items-center justify-center"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* HANDLING CAROUSELS MANUALLY since MediaPreview is simple */}
             {previewMedia.type === "carousel" &&
             Array.isArray(previewMedia.url) ? (
               <div className="flex flex-col items-center w-full">
@@ -493,7 +517,6 @@ function Dashboard() {
                 )}
               </div>
             ) : (
-              // Use existing MediaPreview for single Image/Video
               <div className="w-full flex justify-center">
                 <div className="max-w-full max-h-[85vh]">
                   <MediaPreview
@@ -540,7 +563,6 @@ function Dashboard() {
           </div>
         </div>
       )}
-      {/* ... keep showNoCreditsModal ... */}
       {showNoCreditsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
           <div className="bg-gray-800 rounded-2xl border border-red-500/30 shadow-2xl max-w-sm w-full p-6 text-center">
@@ -796,13 +818,13 @@ function Dashboard() {
                 </div>
               </div>
 
-              {/* TOP TOGGLES SECTION */}
+              {/* 🛠️ UPDATE 3: STUDIO FX TOGGLES (Including Magic Edit) */}
               {activeEngine === "studio" && (
                 <div className="mb-6 animate-in fade-in space-y-4">
                   <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
                     <button
                       onClick={() => setStudioMode("image")}
-                      className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                      className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
                         studioMode === "image"
                           ? "bg-violet-600 text-white shadow-lg"
                           : "text-gray-400 hover:text-white"
@@ -812,38 +834,52 @@ function Dashboard() {
                     </button>
                     <button
                       onClick={() => setStudioMode("carousel")}
-                      className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                      className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
                         studioMode === "carousel"
                           ? "bg-fuchsia-600 text-white shadow-lg"
                           : "text-gray-400 hover:text-white"
                       }`}
                     >
-                      Carousel FX
+                      Carousel
+                    </button>
+                    {/* NEW MAGIC EDIT BUTTON */}
+                    <button
+                      onClick={() => setStudioMode("edit")}
+                      className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
+                        studioMode === "edit"
+                          ? "bg-cyan-600 text-white shadow-lg"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      Magic Edit
                     </button>
                   </div>
-                  <div className="flex justify-center gap-3">
-                    {[
-                      { id: "1:1", label: "Square" },
-                      { id: "16:9", label: "Landscape" },
-                      { id: "9:16", label: "Portrait" },
-                    ].map((a) => (
-                      <button
-                        key={a.id}
-                        onClick={() => setGeminiAspect(a.id as any)}
-                        className={`px-4 py-2 rounded-lg border text-xs font-bold ${
-                          geminiAspect === a.id
-                            ? "bg-violet-600 border-violet-500 text-white"
-                            : "bg-gray-800 border-gray-700 text-gray-400"
-                        }`}
-                      >
-                        {a.label}
-                      </button>
-                    ))}
-                  </div>
+
+                  {/* Hide Aspect Ratio for Edit Mode */}
+                  {studioMode !== "edit" && (
+                    <div className="flex justify-center gap-3">
+                      {[
+                        { id: "1:1", label: "Square" },
+                        { id: "16:9", label: "Landscape" },
+                        { id: "9:16", label: "Portrait" },
+                      ].map((a) => (
+                        <button
+                          key={a.id}
+                          onClick={() => setGeminiAspect(a.id as any)}
+                          className={`px-4 py-2 rounded-lg border text-xs font-bold ${
+                            geminiAspect === a.id
+                              ? "bg-violet-600 border-violet-500 text-white"
+                              : "bg-gray-800 border-gray-700 text-gray-400"
+                          }`}
+                        >
+                          {a.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* ... (Kie and OpenAI settings remain identical to your original code) ... */}
               {activeEngine === "kie" && (
                 <div className="mb-6 animate-in fade-in space-y-4">
                   <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
@@ -874,480 +910,532 @@ function Dashboard() {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-                <div>
-                  <label className="block text-sm font-semibold text-white mb-2">
-                    Your Creative Vision
-                  </label>
-                  <textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Describe your vision with a prompt"
-                    className="w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base leading-relaxed"
-                    rows={3}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-white">
-                    Title
-                  </label>
-                  <input
-                    type="text"
-                    value={videoTitle}
-                    onChange={(e) => setVideoTitle(e.target.value)}
-                    placeholder="Name your creation..."
-                    className="w-full p-3 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-purple-300/60 backdrop-blur-sm"
-                  />
-                </div>
+                {/* 🛠️ UPDATE 4: MAGIC EDIT UI */}
+                {activeEngine === "studio" && studioMode === "edit" ? (
+                  <div className="bg-gray-900/50 border border-cyan-500/30 rounded-2xl p-8 text-center space-y-5 animate-in fade-in">
+                    <div className="w-20 h-20 bg-cyan-900/20 rounded-full flex items-center justify-center mx-auto border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+                      <span className="text-4xl">🪄</span>
+                    </div>
+                    <div>
+                      <h3 className="text-white font-bold text-xl mb-2">
+                        Conversational Magic Edit
+                      </h3>
+                      <p className="text-gray-400 text-sm max-w-md mx-auto">
+                        Upload an image to start a chat session. Ask Gemini to
+                        change lighting, add objects, or completely
+                        style-transfer your image.
+                      </p>
+                    </div>
 
-                {activeEngine === "kie" && (
-                  <div className="space-y-4 sm:space-y-6 animate-in fade-in">
-                    {videoFxMode === "video" && (
-                      <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-white">
-                          AI Model
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {[
-                            { id: "kie-sora-2", label: "Video FX" },
-                            { id: "kie-sora-2-pro", label: "Video FX Pro" },
-                          ].map((m) => (
-                            <button
-                              key={m.id}
-                              type="button"
-                              onClick={() => setKieModel(m.id as any)}
-                              className={`p-3 rounded-xl border text-left text-sm font-medium ${
-                                kieModel === m.id
-                                  ? "bg-rose-600 border-rose-500 text-white"
-                                  : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
-                              }`}
-                            >
-                              {m.label}
-                            </button>
-                          ))}
+                    <label className="block w-full max-w-sm mx-auto cursor-pointer group">
+                      <div className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl text-white font-bold group-hover:shadow-lg group-hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
+                        <span>📤 Upload to Start</span>
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleMagicEditUpload}
+                      />
+                    </label>
+                    <p className="text-[10px] text-gray-500">
+                      Or select from{" "}
+                      <button
+                        type="button"
+                        onClick={() => setActiveLibrarySlot("generic")}
+                        className="underline text-cyan-400"
+                      >
+                        Asset Library
+                      </button>
+                    </p>
+                  </div>
+                ) : (
+                  // EXISTING UI FOR OTHER MODES
+                  <>
+                    <div>
+                      <label className="block text-sm font-semibold text-white mb-2">
+                        Your Creative Vision
+                      </label>
+                      <textarea
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder="Describe your vision with a prompt"
+                        className="w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base leading-relaxed"
+                        rows={3}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-white">
+                        Title
+                      </label>
+                      <input
+                        type="text"
+                        value={videoTitle}
+                        onChange={(e) => setVideoTitle(e.target.value)}
+                        placeholder="Name your creation..."
+                        className="w-full p-3 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-purple-300/60 backdrop-blur-sm"
+                      />
+                    </div>
+
+                    {activeEngine === "kie" && (
+                      <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+                        {videoFxMode === "video" && (
+                          <div className="space-y-2">
+                            <label className="block text-sm font-semibold text-white">
+                              AI Model
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              {[
+                                { id: "kie-sora-2", label: "Video FX" },
+                                { id: "kie-sora-2-pro", label: "Video FX Pro" },
+                              ].map((m) => (
+                                <button
+                                  key={m.id}
+                                  type="button"
+                                  onClick={() => setKieModel(m.id as any)}
+                                  className={`p-3 rounded-xl border text-left text-sm font-medium ${
+                                    kieModel === m.id
+                                      ? "bg-rose-600 border-rose-500 text-white"
+                                      : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
+                                  }`}
+                                >
+                                  {m.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                          <div>
+                            <label className="text-sm font-semibold text-white mb-2 block">
+                              Duration
+                            </label>
+                            <div className="flex gap-2">
+                              {(videoFxMode === "picdrift"
+                                ? [5, 10]
+                                : [10, 15]
+                              ).map((d) => (
+                                <button
+                                  key={d}
+                                  type="button"
+                                  onClick={() => setKieDuration(d as any)}
+                                  className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                                    kieDuration === d
+                                      ? "bg-rose-600 border-rose-600 text-white"
+                                      : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                  }`}
+                                >
+                                  {d}s
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-sm font-semibold text-white mb-2 block">
+                              Aspect Ratio
+                            </label>
+                            <div className="flex gap-2">
+                              {[
+                                { id: "landscape", label: "Landscape" },
+                                { id: "portrait", label: "Portrait" },
+                              ].map((a) => (
+                                <button
+                                  key={a.id}
+                                  type="button"
+                                  onClick={() => setKieAspect(a.id as any)}
+                                  className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                                    kieAspect === a.id
+                                      ? "bg-rose-600 border-rose-600 text-white"
+                                      : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                  }`}
+                                >
+                                  {a.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          {videoFxMode === "video" && (
+                            <div className="sm:col-span-2">
+                              <label className="text-sm font-semibold text-white mb-2 block">
+                                Resolution
+                              </label>
+                              <div className="flex gap-2">
+                                {[
+                                  { id: "720p", label: "720p (Fast)" },
+                                  { id: "1080p", label: "1080p (HD)" },
+                                ].map((r) => (
+                                  <button
+                                    key={r.id}
+                                    type="button"
+                                    onClick={() =>
+                                      setKieResolution(r.id as any)
+                                    }
+                                    className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                                      kieResolution === r.id
+                                        ? "bg-rose-600 border-rose-600 text-white"
+                                        : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                    }`}
+                                  >
+                                    {r.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                      <div>
-                        <label className="text-sm font-semibold text-white mb-2 block">
-                          Duration
-                        </label>
-                        <div className="flex gap-2">
-                          {(videoFxMode === "picdrift"
-                            ? [5, 10]
-                            : [10, 15]
-                          ).map((d) => (
-                            <button
-                              key={d}
-                              type="button"
-                              onClick={() => setKieDuration(d as any)}
-                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                kieDuration === d
-                                  ? "bg-rose-600 border-rose-600 text-white"
-                                  : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                              }`}
-                            >
-                              {d}s
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-sm font-semibold text-white mb-2 block">
-                          Aspect Ratio
-                        </label>
-                        <div className="flex gap-2">
-                          {[
-                            { id: "landscape", label: "Landscape" },
-                            { id: "portrait", label: "Portrait" },
-                          ].map((a) => (
-                            <button
-                              key={a.id}
-                              type="button"
-                              onClick={() => setKieAspect(a.id as any)}
-                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                kieAspect === a.id
-                                  ? "bg-rose-600 border-rose-600 text-white"
-                                  : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                              }`}
-                            >
-                              {a.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      {videoFxMode === "video" && (
-                        <div className="sm:col-span-2">
-                          <label className="text-sm font-semibold text-white mb-2 block">
-                            Resolution
+
+                    {activeEngine === "openai" && (
+                      <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+                        <div className="space-y-2">
+                          <label className="block text-sm font-semibold text-white">
+                            AI Model
                           </label>
-                          <div className="flex gap-2">
+                          <div className="grid grid-cols-2 gap-2">
                             {[
-                              { id: "720p", label: "720p (Fast)" },
-                              { id: "1080p", label: "1080p (HD)" },
-                            ].map((r) => (
+                              { id: "sora-2", label: "Video FX 2" },
+                              { id: "sora-2-pro", label: "Video FX 2 Pro" },
+                            ].map((model) => (
                               <button
-                                key={r.id}
+                                key={model.id}
                                 type="button"
-                                onClick={() => setKieResolution(r.id as any)}
-                                className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                  kieResolution === r.id
-                                    ? "bg-rose-600 border-rose-600 text-white"
-                                    : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                onClick={() => setVideoModel(model.id as any)}
+                                className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${
+                                  videoModel === model.id
+                                    ? "border-cyan-400 bg-cyan-500/20"
+                                    : "border-white/10 bg-gray-800/50"
                                 }`}
                               >
-                                {r.label}
+                                <div className="font-semibold text-white text-sm">
+                                  {model.label}
+                                </div>
                               </button>
                             ))}
                           </div>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {activeEngine === "openai" && (
-                  <div className="space-y-4 sm:space-y-6 animate-in fade-in">
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-white">
-                        AI Model
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { id: "sora-2", label: "Video FX 2" },
-                          { id: "sora-2-pro", label: "Video FX 2 Pro" },
-                        ].map((model) => (
-                          <button
-                            key={model.id}
-                            type="button"
-                            onClick={() => setVideoModel(model.id as any)}
-                            className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${
-                              videoModel === model.id
-                                ? "border-cyan-400 bg-cyan-500/20"
-                                : "border-white/10 bg-gray-800/50"
-                            }`}
-                          >
-                            <div className="font-semibold text-white text-sm">
-                              {model.label}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-white">
-                        Aspect Ratio
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {[
-                          { ratio: "16:9", label: "Landscape" },
-                          { ratio: "9:16", label: "Portrait" },
-                        ].map(({ ratio, label }) => (
-                          <button
-                            key={ratio}
-                            type="button"
-                            onClick={() => {
-                              setAspectRatio(ratio as any);
-                              setVideoSize(
-                                ratio === "16:9" ? "1792x1024" : "1024x1792"
-                              );
-                            }}
-                            className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${
-                              aspectRatio === ratio
-                                ? "border-purple-400 bg-purple-500/20"
-                                : "border-white/10 bg-gray-800/50"
-                            }`}
-                          >
-                            <div className="font-semibold text-white text-sm">
-                              {label}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-white">
-                        Video Size
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {(aspectRatio === "16:9"
-                          ? [
-                              { size: "1280x720", label: "720p HD" },
-                              ...(videoModel === "sora-2-pro"
-                                ? [{ size: "1792x1024", label: "1080p" }]
-                                : []),
-                            ]
-                          : [
-                              { size: "720x1280", label: "720p HD" },
-                              ...(videoModel === "sora-2-pro"
-                                ? [{ size: "1024x1792", label: "1080p" }]
-                                : []),
-                            ]
-                        ).map(({ size, label }) => (
-                          <button
-                            key={size}
-                            type="button"
-                            onClick={() => setVideoSize(size as any)}
-                            className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${
-                              videoSize === size
-                                ? "border-green-400 bg-green-500/20"
-                                : "border-white/10 bg-gray-800/50"
-                            }`}
-                          >
-                            <div className="font-semibold text-white text-sm">
-                              {label}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-white">
-                        Duration
-                      </label>
-                      <div className="flex gap-2">
-                        {[4, 8, 12].map((sec) => (
-                          <button
-                            key={sec}
-                            type="button"
-                            onClick={() => setVideoDuration(sec as any)}
-                            className={`px-3 py-2 rounded-xl border text-sm flex-1 ${
-                              videoDuration === sec
-                                ? "bg-cyan-500 border-cyan-500 text-white"
-                                : "bg-gray-800/50 border-white/10 text-purple-200"
-                            }`}
-                          >
-                            {sec}s
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-2 sm:space-y-3">
-                  <div className="flex justify-between items-center">
-                    <label className="block text-sm font-semibold text-white">
-                      Reference Images
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setActiveLibrarySlot("generic")}
-                      className="text-xs bg-cyan-900/50 text-cyan-300 px-3 py-1.5 rounded-lg hover:bg-cyan-800 border border-cyan-700/50 flex items-center gap-1 transition-colors"
-                    >
-                      <span></span> Open Library
-                    </button>
-                  </div>
-
-                  {activeEngine === "kie" && videoFxMode === "picdrift" ? (
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* --- START FRAME BOX --- */}
-                      <div className="flex flex-col gap-2">
-                        <label className="text-xs text-rose-300 uppercase font-bold">
-                          Start Frame
-                        </label>
-                        <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
-                          {picDriftUrls.start ? (
-                            <>
-                              <img
-                                src={picDriftUrls.start}
-                                className="w-full h-full object-cover"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removePicDriftImage("start")}
-                                className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
-                              >
-                                ✕
-                              </button>
-                            </>
-                          ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-                              {/* Option A: Upload File */}
-                              <label className="flex flex-col items-center justify-center cursor-pointer">
-                                <span className="text-rose-400 text-2xl">
-                                  +
-                                </span>
-                                <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
-                                  Upload File
-                                </span>
-                                <input
-                                  type="file"
-                                  className="hidden"
-                                  accept="image/*"
-                                  onChange={(e) =>
-                                    handlePicDriftUpload(e, "start")
-                                  }
-                                />
-                              </label>
-
-                              <div className="text-gray-600 text-[10px]">
-                                - OR -
-                              </div>
-
-                              {/* Option B: Open Library */}
-                              <button
-                                type="button"
-                                onClick={() => setActiveLibrarySlot("start")}
-                                className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
-                              >
-                                Select from Library
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* --- END FRAME BOX --- */}
-                      <div className="flex flex-col gap-2">
-                        <label className="text-xs text-rose-300 uppercase font-bold">
-                          End Frame
-                        </label>
-                        <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
-                          {picDriftUrls.end ? (
-                            <>
-                              <img
-                                src={picDriftUrls.end}
-                                className="w-full h-full object-cover"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removePicDriftImage("end")}
-                                className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
-                              >
-                                ✕
-                              </button>
-                            </>
-                          ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-                              <label className="flex flex-col items-center justify-center cursor-pointer">
-                                <span className="text-rose-400 text-2xl">
-                                  +
-                                </span>
-                                <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
-                                  Upload File
-                                </span>
-                                <input
-                                  type="file"
-                                  className="hidden"
-                                  accept="image/*"
-                                  onChange={(e) =>
-                                    handlePicDriftUpload(e, "end")
-                                  }
-                                />
-                              </label>
-
-                              <div className="text-gray-600 text-[10px]">
-                                - OR -
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => setActiveLibrarySlot("end")}
-                                className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
-                              >
-                                Select from Library
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    // --- GENERIC UPLOAD BOX ---
-                    <div className="space-y-3">
-                      <div className="w-full h-24 border-2 border-dashed border-gray-600 rounded-xl hover:border-cyan-500 hover:bg-gray-800/50 transition-all group relative flex items-center justify-center">
-                        {/* We split the box into two click zones visually, or just put buttons inside */}
-                        <div className="flex items-center gap-6">
-                          <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
-                            <span className="text-2xl mb-1">📂</span>
-                            <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
-                              Upload File
-                            </span>
-                            <input
-                              type="file"
-                              className="hidden"
-                              multiple={
-                                activeEngine === "studio" &&
-                                studioMode === "carousel"
-                              }
-                              accept="image/*"
-                              onChange={handleGenericUpload}
-                            />
+                        <div className="space-y-2">
+                          <label className="block text-sm font-semibold text-white">
+                            Aspect Ratio
                           </label>
-
-                          <div className="h-8 w-px bg-gray-600"></div>
-
-                          <button
-                            type="button"
-                            onClick={() => setActiveLibrarySlot("generic")}
-                            className="flex flex-col items-center group-hover:scale-105 transition-transform"
-                          >
-                            <span className="text-2xl mb-1">📚</span>
-                            <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
-                              From Library
-                            </span>
-                          </button>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { ratio: "16:9", label: "Landscape" },
+                              { ratio: "9:16", label: "Portrait" },
+                            ].map(({ ratio, label }) => (
+                              <button
+                                key={ratio}
+                                type="button"
+                                onClick={() => {
+                                  setAspectRatio(ratio as any);
+                                  setVideoSize(
+                                    ratio === "16:9" ? "1792x1024" : "1024x1792"
+                                  );
+                                }}
+                                className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${
+                                  aspectRatio === ratio
+                                    ? "border-purple-400 bg-purple-500/20"
+                                    : "border-white/10 bg-gray-800/50"
+                                }`}
+                              >
+                                <div className="font-semibold text-white text-sm">
+                                  {label}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
                         </div>
+                        <div className="space-y-2">
+                          <label className="block text-sm font-semibold text-white">
+                            Video Size
+                          </label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {(aspectRatio === "16:9"
+                              ? [
+                                  { size: "1280x720", label: "720p HD" },
+                                  ...(videoModel === "sora-2-pro"
+                                    ? [{ size: "1792x1024", label: "1080p" }]
+                                    : []),
+                                ]
+                              : [
+                                  { size: "720x1280", label: "720p HD" },
+                                  ...(videoModel === "sora-2-pro"
+                                    ? [{ size: "1024x1792", label: "1080p" }]
+                                    : []),
+                                ]
+                            ).map(({ size, label }) => (
+                              <button
+                                key={size}
+                                type="button"
+                                onClick={() => setVideoSize(size as any)}
+                                className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${
+                                  videoSize === size
+                                    ? "border-green-400 bg-green-500/20"
+                                    : "border-white/10 bg-gray-800/50"
+                                }`}
+                              >
+                                <div className="font-semibold text-white text-sm">
+                                  {label}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="block text-sm font-semibold text-white">
+                            Duration
+                          </label>
+                          <div className="flex gap-2">
+                            {[4, 8, 12].map((sec) => (
+                              <button
+                                key={sec}
+                                type="button"
+                                onClick={() => setVideoDuration(sec as any)}
+                                className={`px-3 py-2 rounded-xl border text-sm flex-1 ${
+                                  videoDuration === sec
+                                    ? "bg-cyan-500 border-cyan-500 text-white"
+                                    : "bg-gray-800/50 border-white/10 text-purple-200"
+                                }`}
+                              >
+                                {sec}s
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
-                        <p className="absolute bottom-2 text-[10px] text-gray-600">
-                          {activeEngine === "studio" &&
-                          studioMode === "carousel"
-                            ? "Up to 14 images"
-                            : "Single frame"}{" "}
-                          (PNG/JPG)
-                        </p>
+                    <div className="space-y-2 sm:space-y-3">
+                      <div className="flex justify-between items-center">
+                        <label className="block text-sm font-semibold text-white">
+                          Reference Images
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setActiveLibrarySlot("generic")}
+                          className="text-xs bg-cyan-900/50 text-cyan-300 px-3 py-1.5 rounded-lg hover:bg-cyan-800 border border-cyan-700/50 flex items-center gap-1 transition-colors"
+                        >
+                          <span></span> Open Library
+                        </button>
                       </div>
 
-                      {referenceImageUrls.length > 0 && (
-                        <div className="grid grid-cols-5 gap-2 animate-in fade-in">
-                          {referenceImageUrls.map((url, index) => (
-                            <div
-                              key={index}
-                              className="relative aspect-square group"
-                            >
-                              <img
-                                src={url}
-                                className="w-full h-full object-cover rounded-lg border border-white/20"
-                              />
+                      {/* ... (Keep existing PicDrift logic) ... */}
+                      {activeEngine === "kie" && videoFxMode === "picdrift" ? (
+                        <div className="grid grid-cols-2 gap-4">
+                          {/* --- START FRAME BOX --- */}
+                          <div className="flex flex-col gap-2">
+                            <label className="text-xs text-rose-300 uppercase font-bold">
+                              Start Frame
+                            </label>
+                            <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
+                              {picDriftUrls.start ? (
+                                <>
+                                  <img
+                                    src={picDriftUrls.start}
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => removePicDriftImage("start")}
+                                    className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
+                                  >
+                                    ✕
+                                  </button>
+                                </>
+                              ) : (
+                                <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                                  {/* Option A: Upload File */}
+                                  <label className="flex flex-col items-center justify-center cursor-pointer">
+                                    <span className="text-rose-400 text-2xl">
+                                      +
+                                    </span>
+                                    <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
+                                      Upload File
+                                    </span>
+                                    <input
+                                      type="file"
+                                      className="hidden"
+                                      accept="image/*"
+                                      onChange={(e) =>
+                                        handlePicDriftUpload(e, "start")
+                                      }
+                                    />
+                                  </label>
+
+                                  <div className="text-gray-600 text-[10px]">
+                                    - OR -
+                                  </div>
+
+                                  {/* Option B: Open Library */}
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setActiveLibrarySlot("start")
+                                    }
+                                    className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
+                                  >
+                                    Select from Library
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* --- END FRAME BOX --- */}
+                          <div className="flex flex-col gap-2">
+                            <label className="text-xs text-rose-300 uppercase font-bold">
+                              End Frame
+                            </label>
+                            <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
+                              {picDriftUrls.end ? (
+                                <>
+                                  <img
+                                    src={picDriftUrls.end}
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => removePicDriftImage("end")}
+                                    className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
+                                  >
+                                    ✕
+                                  </button>
+                                </>
+                              ) : (
+                                <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                                  <label className="flex flex-col items-center justify-center cursor-pointer">
+                                    <span className="text-rose-400 text-2xl">
+                                      +
+                                    </span>
+                                    <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
+                                      Upload File
+                                    </span>
+                                    <input
+                                      type="file"
+                                      className="hidden"
+                                      accept="image/*"
+                                      onChange={(e) =>
+                                        handlePicDriftUpload(e, "end")
+                                      }
+                                    />
+                                  </label>
+
+                                  <div className="text-gray-600 text-[10px]">
+                                    - OR -
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveLibrarySlot("end")}
+                                    className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
+                                  >
+                                    Select from Library
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        // --- GENERIC UPLOAD BOX ---
+                        <div className="space-y-3">
+                          <div className="w-full h-24 border-2 border-dashed border-gray-600 rounded-xl hover:border-cyan-500 hover:bg-gray-800/50 transition-all group relative flex items-center justify-center">
+                            {/* We split the box into two click zones visually, or just put buttons inside */}
+                            <div className="flex items-center gap-6">
+                              <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
+                                <span className="text-2xl mb-1">📂</span>
+                                <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
+                                  Upload File
+                                </span>
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  multiple={
+                                    activeEngine === "studio" &&
+                                    studioMode === "carousel"
+                                  }
+                                  accept="image/*"
+                                  onChange={handleGenericUpload}
+                                />
+                              </label>
+
+                              <div className="h-8 w-px bg-gray-600"></div>
+
                               <button
                                 type="button"
-                                onClick={() => removeGenericImage(index)}
-                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs"
+                                onClick={() => setActiveLibrarySlot("generic")}
+                                className="flex flex-col items-center group-hover:scale-105 transition-transform"
                               >
-                                ✕
+                                <span className="text-2xl mb-1">📚</span>
+                                <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
+                                  From Library
+                                </span>
                               </button>
                             </div>
-                          ))}
+
+                            <p className="absolute bottom-2 text-[10px] text-gray-600">
+                              {activeEngine === "studio" &&
+                              studioMode === "carousel"
+                                ? "Up to 14 images"
+                                : "Single frame"}{" "}
+                              (PNG/JPG)
+                            </p>
+                          </div>
+
+                          {referenceImageUrls.length > 0 && (
+                            <div className="grid grid-cols-5 gap-2 animate-in fade-in">
+                              {referenceImageUrls.map((url, index) => (
+                                <div
+                                  key={index}
+                                  className="relative aspect-square group"
+                                >
+                                  <img
+                                    src={url}
+                                    className="w-full h-full object-cover rounded-lg border border-white/20"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => removeGenericImage(index)}
+                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
 
-                <button
-                  type="submit"
-                  disabled={generateMediaMutation.isPending || !prompt.trim()}
-                  className="w-full gradient-brand text-white py-4 sm:py-5 px-6 sm:px-8 rounded-2xl hover:shadow-2xl disabled:opacity-50 font-bold text-base sm:text-lg flex items-center justify-center gap-3"
-                >
-                  {generateMediaMutation.isPending ? (
-                    <>
-                      <LoadingSpinner size="sm" variant="light" />
-                      <span>
-                        Starting{" "}
-                        {activeEngine === "studio" ? studioMode : "video"}...
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-xl"></span>
-                      <span>
-                        Generate{" "}
-                        {activeEngine === "studio" ? studioMode : "Video"}
-                      </span>
-                    </>
-                  )}
-                </button>
+                    <button
+                      type="submit"
+                      disabled={
+                        generateMediaMutation.isPending || !prompt.trim()
+                      }
+                      className="w-full gradient-brand text-white py-4 sm:py-5 px-6 sm:px-8 rounded-2xl hover:shadow-2xl disabled:opacity-50 font-bold text-base sm:text-lg flex items-center justify-center gap-3"
+                    >
+                      {generateMediaMutation.isPending ? (
+                        <>
+                          <LoadingSpinner size="sm" variant="light" />
+                          <span>
+                            Starting{" "}
+                            {activeEngine === "studio" ? studioMode : "video"}
+                            ...
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-xl"></span>
+                          <span>
+                            Generate{" "}
+                            {activeEngine === "studio" ? studioMode : "Video"}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  </>
+                )}
               </form>
 
               {generationState.status === "error" && (
@@ -1440,6 +1528,14 @@ function Dashboard() {
           <BrandConfigModal
             onClose={() => setShowBrandModal(false)}
             currentConfig={brandConfig}
+          />
+        )}
+
+        {/* 🛠️ UPDATE 5: Render Editing Asset Modal */}
+        {editingAsset && (
+          <EditAssetModal
+            asset={editingAsset}
+            onClose={() => setEditingAsset(null)}
           />
         )}
       </div>

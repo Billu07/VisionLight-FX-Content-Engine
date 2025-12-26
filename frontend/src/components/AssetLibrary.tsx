@@ -246,7 +246,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
             </div>
           ) : filteredAssets.length === 0 && !isProcessing ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-500 opacity-60">
-              <span className="text-6xl mb-4">🖼️</span>
+              <span className="text-6xl mb-4"></span>
               <p>No images found.</p>
             </div>
           ) : (

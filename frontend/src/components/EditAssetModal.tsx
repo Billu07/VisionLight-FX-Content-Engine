@@ -155,7 +155,7 @@ export function EditAssetModal({
           {/* Header */}
           <div className="p-6 border-b border-gray-800">
             <h3 className="text-xl font-bold text-white flex items-center gap-2">
-              ✨ Studio FX
+              Studio FX
             </h3>
             <p className="text-xs text-gray-400 mt-1">
               Conversational editing powered by Gemini 3 Pro.
@@ -210,7 +210,7 @@ export function EditAssetModal({
                 "Refining..."
               ) : (
                 <>
-                  <span>✨</span> Apply Edit
+                  <span></span> Apply Edit
                 </>
               )}
             </button>

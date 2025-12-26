@@ -49,7 +49,7 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.get("/", (req, res) => {
   res.json({
     message: "Visionlight FX Backend - Supabase Edition",
-    version: "4.2.0",
+    version: "4.3.0",
     status: "Healthy",
   });
 });
@@ -319,6 +319,7 @@ app.post(
 
 // ==================== ASSET MANAGEMENT ====================
 
+// ✅ FIXED: Add the route to move a timeline post to assets
 app.post(
   "/api/posts/:postId/to-asset",
   authenticateToken,
@@ -331,6 +332,7 @@ app.post(
     }
   }
 );
+
 // 1. Batch Upload & Process
 app.post(
   "/api/assets/batch",
@@ -343,8 +345,6 @@ app.post(
 
       if (files.length === 0)
         return res.status(400).json({ error: "No images provided" });
-      if (!aspectRatio)
-        return res.status(400).json({ error: "Aspect Ratio required" });
 
       res.json({
         success: true,
@@ -358,7 +358,7 @@ app.post(
             await contentEngine.processAndSaveAsset(
               file.buffer,
               req.user!.id,
-              aspectRatio
+              aspectRatio || "16:9" // Default to 16:9 if missing
             );
           } catch (e) {
             console.error("Failed to process one asset in batch", e);
@@ -377,7 +377,7 @@ app.post(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { assetId, prompt, assetUrl, aspectRatio, referenceUrl } = req.body;
+      const { prompt, assetUrl, aspectRatio, referenceUrl } = req.body;
 
       if (!assetUrl || !prompt) {
         return res.status(400).json({ error: "Missing asset or prompt" });
@@ -401,7 +401,7 @@ app.post(
   }
 );
 
-// usage: POST /api/analyze-image (form-data: image file + text prompt)
+// 3. Vision Analysis
 app.post(
   "/api/analyze-image",
   authenticateToken,
@@ -413,42 +413,23 @@ app.post(
 
       const { prompt } = req.body;
 
-      // Import the service dynamically or ensure it's imported at top
+      // Lazy load Gemini Service
       const { GeminiService } = require("./services/gemini");
 
-      // Use the new Gemini Service to "see" the image
-      // We use Gemini 2.5 Flash for fast vision analysis
-      const analysis = await GeminiService.generateOrEditImage({
+      // Use Gemini 2.5 Flash for text analysis of the image
+      const text = await GeminiService.analyzeImageText({
         prompt: prompt || "Describe this image in detail.",
-        aspectRatio: "16:9", // Aspect ratio doesn't matter for analysis, but required by type
-        referenceImages: [req.file.buffer],
-        modelType: "speed", // Use Flash for analysis
+        imageBuffer: req.file.buffer,
       });
 
-      // Note: generateOrEditImage returns a Buffer (image).
-      // If we want TEXT back (Analysis), we need a slight tweak to GeminiService
-      // or we just use the existing generateContent method directly here for text.
-
-      // ACTUALLY, let's keep it simple.
-      // Since GeminiService.generateOrEditImage is strictly for IMAGES,
-      // let's add a quick direct call here for TEXT analysis if that's what we want.
-      // OR, better yet, add 'analyzeImage' to GeminiService in the next step if needed.
-
-      // For now, if you want "Image-to-Text" (Captioning), we need to add that method
-      // to GeminiService. If you just want "Image-to-Image", we are good.
-
-      res.json({
-        success: true,
-        message:
-          "Analysis endpoint ready (Logic pending GeminiService update for text output)",
-      });
+      res.json({ success: true, result: text });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   }
 );
 
-// 3. Get Assets
+// 4. Get Assets
 app.get(
   "/api/assets",
   authenticateToken,
@@ -462,7 +443,7 @@ app.get(
   }
 );
 
-// 4. Delete Asset
+// 5. Delete Asset
 app.delete(
   "/api/assets/:id",
   authenticateToken,
@@ -509,6 +490,7 @@ app.put(
   }
 );
 
+// ✅ FIXED: Dynamic Download Extension Handling
 app.get(
   "/api/posts/:postId/download",
   authenticateToken,
@@ -527,11 +509,26 @@ app.get(
         cleanTitle = post.title.replace(/[\\/:*?"<>|]/g, "_").trim();
       }
 
-      // Videos Only Logic for Download
-      let extension = "mp4";
+      // Check Media Type for extension
+      let extension = "mp4"; // Default for video
+      const type = post.mediaType ? post.mediaType.toUpperCase() : "VIDEO";
+
+      if (type === "IMAGE") extension = "jpg";
+      // For carousels, if it's an array, we might just serve the first image
+      // or rely on frontend to download individually. For single link:
+      if (type === "CAROUSEL") extension = "jpg";
+
       const filename = `${cleanTitle}.${extension}`;
+
+      // Handle Carousel Arrays: Pick the first image for the direct download button
+      let targetUrl = post.mediaUrl;
+      try {
+        const parsed = JSON.parse(post.mediaUrl);
+        if (Array.isArray(parsed) && parsed.length > 0) targetUrl = parsed[0];
+      } catch (e) {}
+
       const response = await axios({
-        url: post.mediaUrl,
+        url: targetUrl,
         method: "GET",
         responseType: "stream",
       });
@@ -621,7 +618,7 @@ app.post(
       // 1. Deduct Credits
       await airtableService.deductCredits(req.user!.id, cost);
 
-      // 2. CREATE POST FOR EVERYTHING (Video, Image, or Carousel)
+      // 2. CREATE POST
       const post = await airtableService.createPost({
         userId: req.user!.id,
         prompt,
@@ -641,14 +638,12 @@ app.post(
       (async () => {
         try {
           if (mediaType === "carousel") {
-            // Pass postId (string), prompt, params
             await contentEngine.startCarouselGeneration(
               post.id,
               prompt,
               generationParams
             );
           } else if (mediaType === "image") {
-            // Pass postId (string), prompt, params
             await contentEngine.startImageGeneration(
               post.id,
               prompt,
