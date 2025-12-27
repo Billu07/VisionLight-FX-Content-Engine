@@ -3,29 +3,32 @@ import { GoogleGenAI } from "@google/genai";
 const client = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY });
 
 export const GeminiService = {
+  /**
+   * CORE GENERATION & EDITING
+   * If aspectRatio is "original" or undefined, we DO NOT send imageConfig.
+   * This tells Gemini to match the input image dimensions.
+   */
   async generateOrEditImage(params: {
     prompt: string;
-    aspectRatio: "16:9" | "9:16" | "1:1";
+    aspectRatio?: "16:9" | "9:16" | "1:1" | "original" | string; // Updated type
     referenceImages?: Buffer[];
     modelType?: "speed" | "quality";
     useGrounding?: boolean;
   }): Promise<Buffer> {
-    // 1. Select Model
+    // 1. Model Selection
     const modelId =
       params.modelType === "speed"
         ? "gemini-2.5-flash-image"
         : "gemini-3-pro-image-preview";
 
     console.log(
-      `🍌 Gemini Engine: ${modelId} | Refs: ${
-        params.referenceImages?.length || 0
-      }`
+      `🍌 Gemini Engine: ${modelId} | Ratio: ${params.aspectRatio || "Auto"}`
     );
 
-    // 2. Build Payload
+    // 2. Payload
     const parts: any[] = [{ text: params.prompt }];
 
-    if (params.referenceImages) {
+    if (params.referenceImages && params.referenceImages.length > 0) {
       params.referenceImages.forEach((buf) => {
         parts.push({
           inlineData: {
@@ -36,18 +39,28 @@ export const GeminiService = {
       });
     }
 
-    // 3. Execute via SDK
+    // 3. Configuration
+    // Only add imageConfig if we are forcing a specific aspect ratio
+    let config: any = {
+      responseModalities: ["IMAGE"],
+      tools:
+        params.useGrounding && modelId.includes("pro")
+          ? [{ googleSearch: {} }]
+          : undefined,
+    };
+
+    if (params.aspectRatio && params.aspectRatio !== "original") {
+      config.imageConfig = {
+        aspectRatio: params.aspectRatio,
+        imageSize: modelId.includes("pro") ? "2K" : undefined,
+      };
+    }
+
     try {
       const response = await client.models.generateContent({
         model: modelId,
         contents: [{ parts }],
-        config: {
-          responseModalities: ["IMAGE"],
-          imageConfig: {
-            aspectRatio: params.aspectRatio,
-            imageSize: modelId.includes("pro") ? "2K" : undefined,
-          },
-        },
+        config: config,
       });
 
       const imagePart = response.candidates?.[0]?.content?.parts?.find(
@@ -66,13 +79,12 @@ export const GeminiService = {
 
   /**
    * VISION ANALYSIS (Text Output)
-   * Returns a text description of the input image(s).
    */
   async analyzeImageText(params: {
     prompt: string;
     imageBuffer: Buffer;
   }): Promise<string> {
-    const modelId = "gemini-2.5-flash"; // Best for text analysis of images
+    const modelId = "gemini-2.5-flash";
 
     try {
       const response = await client.models.generateContent({

@@ -35,7 +35,7 @@ export function EditAssetModal({
   const [showRefSelector, setShowRefSelector] = useState(false);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
 
-  // Fetch Library Assets
+  // Fetch Library Assets (Only if selector is open)
   const { data: allAssets = [] } = useQuery({
     queryKey: ["assets"],
     queryFn: async () => (await apiEndpoints.getAssets()).data.assets,
@@ -49,17 +49,22 @@ export function EditAssetModal({
         assetId: currentAsset.id,
         assetUrl: currentAsset.url,
         prompt: prompt,
-        aspectRatio: currentAsset.aspectRatio,
-        referenceUrl: referenceAsset?.url, // Pass the reference if selected
+        // ✅ CRITICAL: "original" tells Gemini to NOT crop/resize.
+        // It will return an image with the exact same dimensions as the input.
+        aspectRatio: "original",
+        referenceUrl: referenceAsset?.url,
       });
     },
     onMutate: () => setIsProcessing(true),
     onSuccess: (response: any) => {
       const newAsset = response.data.asset;
+
+      // Add to history
       const newHistory = history.slice(0, currentIndex + 1);
       newHistory.push(newAsset);
       setHistory(newHistory);
       setCurrentIndex(newHistory.length - 1);
+
       setPrompt("");
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     },
@@ -67,7 +72,7 @@ export function EditAssetModal({
     onSettled: () => setIsProcessing(false),
   });
 
-  // 2. ANALYZE MUTATION
+  // 2. ANALYZE MUTATION (Vision)
   const analyzeMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch(currentAsset.url);
@@ -76,7 +81,7 @@ export function EditAssetModal({
       formData.append("image", blob, "current.jpg");
       formData.append(
         "prompt",
-        "Describe this image details, lighting and style."
+        "Describe the lighting, style, and main subjects of this image."
       );
       return apiEndpoints.analyzeImage(formData);
     },
@@ -92,19 +97,20 @@ export function EditAssetModal({
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("image", file);
-      formData.append("aspectRatio", "16:9");
+      formData.append("raw", "true"); // Upload raw for reference
       return apiEndpoints.uploadAssetSync(formData);
     },
     onMutate: () => setIsUploadingRef(true),
     onSuccess: (res: any) => {
       setReferenceAsset(res.data.asset);
-      setShowRefSelector(false); // Close selector on success
+      setShowRefSelector(false);
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     },
     onError: (err: any) => alert("Reference upload failed: " + err.message),
     onSettled: () => setIsUploadingRef(false),
   });
 
+  // Handlers
   const handleUndo = () => {
     if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
   };
@@ -142,7 +148,7 @@ export function EditAssetModal({
             </button>
           </div>
 
-          {/* Reference Overlay */}
+          {/* Reference Overlay (Picture-in-Picture) */}
           {referenceAsset && (
             <div className="absolute bottom-4 right-4 w-32 border-2 border-purple-500 rounded-lg overflow-hidden bg-gray-800 shadow-2xl z-20">
               <div className="relative aspect-video">
@@ -163,7 +169,7 @@ export function EditAssetModal({
             </div>
           )}
 
-          {/* Processing Overlay */}
+          {/* Processing Spinner */}
           {isProcessing && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-30 backdrop-blur-sm">
               <div className="flex flex-col items-center gap-3">
@@ -188,16 +194,16 @@ export function EditAssetModal({
               Magic Edit
             </h3>
             <p className="text-xs text-gray-400 mt-1">
-              Conversational editing powered by Gemini 3.
+              Conversational editing. Ask to change anything.
             </p>
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {/* Reference Selection Area */}
+            {/* Reference Image Section */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <label className="text-xs font-bold text-purple-300 uppercase tracking-wider">
-                  Reference Image
+                  Reference (Optional)
                 </label>
                 {referenceAsset && (
                   <span className="text-[10px] text-green-400">Active</span>
@@ -213,22 +219,27 @@ export function EditAssetModal({
                       : "border-gray-700 hover:border-gray-500"
                   }`}
                 >
-                  <span className="text-xl"></span>
+                  <span className="text-xl">🖼️</span>
                   <span className="text-xs text-gray-300">
                     {referenceAsset
                       ? "Change Reference"
-                      : "Add Reference (Optional)"}
+                      : "Add Reference Image"}
                   </span>
                 </button>
               ) : (
                 <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 animate-in slide-in-from-top-2">
-                  <div className="flex gap-2 mb-3">
+                  {/* Upload New Option */}
+                  <div className="flex gap-2 mb-3 border-b border-gray-800 pb-3">
                     <button
                       onClick={() => refFileInput.current?.click()}
                       disabled={isUploadingRef}
                       className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-white border border-gray-600 flex items-center justify-center gap-1"
                     >
-                      {isUploadingRef ? <LoadingSpinner size="sm" /> : "Upload"}
+                      {isUploadingRef ? (
+                        <LoadingSpinner size="sm" />
+                      ) : (
+                        "Upload from Computer"
+                      )}
                     </button>
                     <input
                       type="file"
@@ -241,14 +252,15 @@ export function EditAssetModal({
                       onClick={() => setShowRefSelector(false)}
                       className="px-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 text-xs"
                     >
-                      Cancel
+                      Close
                     </button>
                   </div>
 
+                  {/* Select from Library Option */}
                   <div className="text-[10px] text-gray-500 mb-2 uppercase font-bold">
                     Or Select from Library:
                   </div>
-                  <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto custom-scrollbar">
+                  <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto custom-scrollbar">
                     {Array.isArray(allAssets) &&
                       allAssets.map((a: Asset) => (
                         <img
@@ -281,8 +293,8 @@ export function EditAssetModal({
                 </button>
               </div>
               <textarea
-                className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none leading-relaxed placeholder-gray-500"
-                placeholder="E.g. 'Make it night time', 'Add a neon sign', 'Use the style of the reference image'..."
+                className="w-full h-40 bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none leading-relaxed placeholder-gray-500"
+                placeholder="E.g. 'Make it night time', 'Remove the cup', 'Style like the reference image'..."
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 disabled={isProcessing}
@@ -293,6 +305,10 @@ export function EditAssetModal({
                   }
                 }}
               />
+              <p className="text-[10px] text-gray-500">
+                Tip: Press Enter to submit. Changes are applied on top of the
+                current image.
+              </p>
             </div>
           </div>
 

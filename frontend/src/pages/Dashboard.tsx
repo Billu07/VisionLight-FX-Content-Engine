@@ -353,9 +353,6 @@ function Dashboard() {
   };
 
   // 🛠️ UPDATE 2: Magic Edit Upload Handler
-  // frontend/src/pages/Dashboard.tsx
-
-  // 🛠️ UPDATE: Direct Edit Upload Handler
   const handleMagicEditUpload = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -364,15 +361,17 @@ function Dashboard() {
 
     try {
       const formData = new FormData();
-      formData.append("image", file); // Note: 'image' singular for the sync route
-      formData.append("aspectRatio", "16:9");
+      formData.append("image", file);
+      // 👇 KEY CHANGE: Tell backend to keep it raw
+      formData.append("raw", "true");
 
-      // Use the new SYNC endpoint
+      // The backend will detect the ratio for the DB, but keep the file original
       const res = await apiEndpoints.uploadAssetSync(formData);
 
       if (res.data.success && res.data.asset) {
         // Automatically open the editor with the new asset
         setEditingAsset(res.data.asset);
+        e.target.value = ""; // Reset input
       }
     } catch (err: any) {
       alert("Upload failed: " + err.message);

@@ -334,6 +334,7 @@ app.post(
 );
 
 // ✅ NEW: Synchronous Upload (For Magic Edit & Direct Reference)
+// ✅ NEW: Synchronous Upload (Supports Raw Mode)
 app.post(
   "/api/assets/upload-sync",
   authenticateToken,
@@ -343,14 +344,24 @@ app.post(
       if (!req.file)
         return res.status(400).json({ error: "No image provided" });
 
-      const { aspectRatio } = req.body; // Optional
+      const { aspectRatio, raw } = req.body;
 
-      // Process immediately and await result
-      const asset = await contentEngine.processAndSaveAsset(
-        req.file.buffer,
-        req.user!.id,
-        aspectRatio || "16:9"
-      );
+      let asset;
+
+      if (raw === "true") {
+        // 🚀 Raw Mode: No resizing, no processing
+        asset = await contentEngine.uploadRawAsset(
+          req.file.buffer,
+          req.user!.id
+        );
+      } else {
+        // ⚙️ Process Mode: Resize/Outpaint to target ratio
+        asset = await contentEngine.processAndSaveAsset(
+          req.file.buffer,
+          req.user!.id,
+          aspectRatio || "16:9"
+        );
+      }
 
       res.json({ success: true, asset });
     } catch (error: any) {

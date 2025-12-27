@@ -150,6 +150,40 @@ const resizeWithGemini = async (
 };
 
 export const contentEngine = {
+  // ... inside contentEngine object ...
+
+  // ✅ NEW: Upload Raw (No Resizing)
+  async uploadRawAsset(fileBuffer: Buffer, userId: string) {
+    try {
+      // 1. Get Dimensions just for the DB record (we don't change the image)
+      const metadata = await sharp(fileBuffer).metadata();
+      const width = metadata.width || 1000;
+      const height = metadata.height || 1000;
+
+      // Calculate a rough ratio string for the UI grid
+      let ratio = "16:9";
+      if (Math.abs(width / height - 1) < 0.1) ratio = "1:1";
+      else if (height > width) ratio = "9:16";
+
+      console.log(`🚀 Uploading Raw Asset: ${width}x${height} (${ratio})`);
+
+      // 2. Upload ORIGINAL buffer to Cloudinary
+      const url = await this.uploadToCloudinary(
+        fileBuffer,
+        `raw_${userId}_${Date.now()}`,
+        userId,
+        "Raw Upload",
+        "image"
+      );
+
+      // 3. Save to DB with a flag or just the detected ratio
+      // We explicitly pass the calculated ratio so it fits nicely in the Asset Library grid later
+      return await airtableService.createAsset(userId, url, ratio as any);
+    } catch (e: any) {
+      console.error("Raw Upload Failed:", e.message);
+      throw e;
+    }
+  },
   // === BATCH ASSET PROCESSOR ===
   async processAndSaveAsset(
     fileBuffer: Buffer,
