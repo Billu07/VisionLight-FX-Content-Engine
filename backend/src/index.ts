@@ -414,25 +414,48 @@ app.post(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { prompt, assetUrl, aspectRatio, referenceUrl } = req.body;
+      const { prompt, assetUrl, aspectRatio, referenceUrl, mode } = req.body;
 
       if (!assetUrl || !prompt) {
         return res.status(400).json({ error: "Missing asset or prompt" });
       }
-
-      console.log(`🎨 Editing asset request for user ${req.user.id}`);
 
       const newAsset = await contentEngine.editAsset(
         assetUrl,
         prompt,
         req.user!.id,
         aspectRatio || "16:9",
-        referenceUrl
+        referenceUrl,
+        mode || "pro"
       );
 
       res.json({ success: true, asset: newAsset });
     } catch (error: any) {
-      console.error("Edit Route Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// ✅ NEW: Drift Edit Route
+app.post(
+  "/api/assets/drift",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { assetUrl, horizontal, vertical, zoom } = req.body;
+
+      if (!assetUrl) return res.status(400).json({ error: "Missing asset" });
+
+      const asset = await contentEngine.processDriftEdit(
+        req.user!.id,
+        assetUrl,
+        Number(horizontal || 0),
+        Number(vertical || 0),
+        Number(zoom || 5)
+      );
+
+      res.json({ success: true, asset });
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   }

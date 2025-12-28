@@ -14,6 +14,8 @@ interface EditAssetModalProps {
   onClose: () => void;
 }
 
+type EditorMode = "standard" | "pro" | "drift";
+
 export function EditAssetModal({
   asset: initialAsset,
   onClose,
@@ -21,58 +23,81 @@ export function EditAssetModal({
   const queryClient = useQueryClient();
   const refFileInput = useRef<HTMLInputElement>(null);
 
-  // Conversation History
   const [history, setHistory] = useState<Asset[]>([initialAsset]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentAsset = history[currentIndex];
 
-  const [prompt, setPrompt] = useState("");
+  // Global State
+  const [activeTab, setActiveTab] = useState<EditorMode>("pro");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // Reference State
+  // Text Edit State (Standard/Pro)
+  const [prompt, setPrompt] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [referenceAsset, setReferenceAsset] = useState<Asset | null>(null);
   const [showRefSelector, setShowRefSelector] = useState(false);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
 
-  // Fetch Library Assets (Only if selector is open)
+  // Drift State
+  const [driftParams, setDriftParams] = useState({
+    horizontal: 0, // 0 to 360
+    vertical: 0, // 0 to 60
+    zoom: 5, // 0 to 10
+  });
+
+  // Fetch Library
   const { data: allAssets = [] } = useQuery({
     queryKey: ["assets"],
     queryFn: async () => (await apiEndpoints.getAssets()).data.assets,
     enabled: showRefSelector,
   });
 
-  // 1. EDIT MUTATION
-  const editMutation = useMutation({
+  // === MUTATIONS ===
+
+  // 1. TEXT EDIT (Standard/Pro)
+  const textEditMutation = useMutation({
     mutationFn: async () => {
       return apiEndpoints.editAsset({
         assetId: currentAsset.id,
         assetUrl: currentAsset.url,
         prompt: prompt,
-        // ✅ CRITICAL: "original" tells Gemini to NOT crop/resize.
-        // It will return an image with the exact same dimensions as the input.
         aspectRatio: "original",
         referenceUrl: referenceAsset?.url,
+        mode: activeTab as "standard" | "pro",
       });
     },
     onMutate: () => setIsProcessing(true),
-    onSuccess: (response: any) => {
-      const newAsset = response.data.asset;
-
-      // Add to history
-      const newHistory = history.slice(0, currentIndex + 1);
-      newHistory.push(newAsset);
-      setHistory(newHistory);
-      setCurrentIndex(newHistory.length - 1);
-
-      setPrompt("");
-      queryClient.invalidateQueries({ queryKey: ["assets"] });
-    },
+    onSuccess: (res: any) => handleSuccess(res.data.asset),
     onError: (err: any) => alert("Edit failed: " + err.message),
     onSettled: () => setIsProcessing(false),
   });
 
-  // 2. ANALYZE MUTATION (Vision)
+  // 2. DRIFT EDIT
+  const driftMutation = useMutation({
+    mutationFn: async () => {
+      return apiEndpoints.driftAsset({
+        assetUrl: currentAsset.url,
+        horizontal: driftParams.horizontal,
+        vertical: driftParams.vertical,
+        zoom: driftParams.zoom,
+      });
+    },
+    onMutate: () => setIsProcessing(true),
+    onSuccess: (res: any) => handleSuccess(res.data.asset),
+    onError: (err: any) => alert("Drift failed: " + err.message),
+    onSettled: () => setIsProcessing(false),
+  });
+
+  // 3. HELPERS
+  const handleSuccess = (newAsset: Asset) => {
+    const newHistory = history.slice(0, currentIndex + 1);
+    newHistory.push(newAsset);
+    setHistory(newHistory);
+    setCurrentIndex(newHistory.length - 1);
+    setPrompt("");
+    queryClient.invalidateQueries({ queryKey: ["assets"] });
+  };
+
   const analyzeMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch(currentAsset.url);
@@ -81,23 +106,21 @@ export function EditAssetModal({
       formData.append("image", blob, "current.jpg");
       formData.append(
         "prompt",
-        "Describe the lighting, style, and main subjects of this image."
+        "Describe the lighting, style, and main subjects."
       );
       return apiEndpoints.analyzeImage(formData);
     },
     onMutate: () => setIsAnalyzing(true),
     onSuccess: (res: any) =>
       setPrompt((prev) => (prev ? prev + "\n\n" : "") + res.data.result),
-    onError: (err: any) => alert("Analysis failed: " + err.message),
     onSettled: () => setIsAnalyzing(false),
   });
 
-  // 3. UPLOAD REFERENCE MUTATION
   const uploadRefMutation = useMutation({
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("image", file);
-      formData.append("raw", "true"); // Upload raw for reference
+      formData.append("raw", "true");
       return apiEndpoints.uploadAssetSync(formData);
     },
     onMutate: () => setIsUploadingRef(true),
@@ -106,18 +129,16 @@ export function EditAssetModal({
       setShowRefSelector(false);
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     },
-    onError: (err: any) => alert("Reference upload failed: " + err.message),
+    onError: (err: any) => alert("Upload failed: " + err.message),
     onSettled: () => setIsUploadingRef(false),
   });
 
-  // Handlers
   const handleUndo = () => {
     if (currentIndex > 0) setCurrentIndex(currentIndex - 1);
   };
   const handleRedo = () => {
     if (currentIndex < history.length - 1) setCurrentIndex(currentIndex + 1);
   };
-
   const handleRefFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) uploadRefMutation.mutate(e.target.files[0]);
   };
@@ -125,9 +146,8 @@ export function EditAssetModal({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 p-4 backdrop-blur-md">
       <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-6xl flex flex-col md:flex-row overflow-hidden shadow-2xl h-[90vh]">
-        {/* LEFT: CANVAS AREA */}
+        {/* LEFT: CANVAS */}
         <div className="flex-1 bg-black flex flex-col items-center justify-center p-4 relative border-r border-gray-800 group">
-          {/* History Controls */}
           <div className="absolute top-4 left-4 z-10 flex gap-2">
             <button
               onClick={handleUndo}
@@ -148,8 +168,7 @@ export function EditAssetModal({
             </button>
           </div>
 
-          {/* Reference Overlay (Picture-in-Picture) */}
-          {referenceAsset && (
+          {referenceAsset && activeTab !== "drift" && (
             <div className="absolute bottom-4 right-4 w-32 border-2 border-purple-500 rounded-lg overflow-hidden bg-gray-800 shadow-2xl z-20">
               <div className="relative aspect-video">
                 <img
@@ -169,13 +188,14 @@ export function EditAssetModal({
             </div>
           )}
 
-          {/* Processing Spinner */}
           {isProcessing && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-30 backdrop-blur-sm">
               <div className="flex flex-col items-center gap-3">
                 <LoadingSpinner size="lg" variant="neon" />
                 <span className="text-cyan-300 font-bold animate-pulse">
-                  Gemini is Thinking...
+                  {activeTab === "drift"
+                    ? "Rotating Camera..."
+                    : "Processing Edit..."}
                 </span>
               </div>
             </div>
@@ -189,137 +209,255 @@ export function EditAssetModal({
 
         {/* RIGHT: CONTROLS */}
         <div className="w-full md:w-96 flex flex-col bg-gray-900">
-          <div className="p-6 border-b border-gray-800">
-            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-              Magic Edit
-            </h3>
-            <p className="text-xs text-gray-400 mt-1">
-              Conversational editing. Ask to change anything.
-            </p>
+          {/* EDITOR TABS */}
+          <div className="p-4 border-b border-gray-800 bg-gray-950">
+            <div className="flex bg-gray-900 p-1 rounded-xl">
+              {[
+                { id: "standard", label: "Standard", icon: "⚡" },
+                { id: "pro", label: "Pro", icon: "🧠" },
+                { id: "drift", label: "Drift", icon: "🌀" },
+              ].map((mode) => (
+                <button
+                  key={mode.id}
+                  onClick={() => setActiveTab(mode.id as any)}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex flex-col items-center gap-1 ${
+                    activeTab === mode.id
+                      ? "bg-cyan-600 text-white shadow-lg"
+                      : "text-gray-400 hover:text-white hover:bg-gray-800"
+                  }`}
+                >
+                  <span className="text-sm">{mode.icon}</span>
+                  {mode.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {/* Reference Image Section */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <label className="text-xs font-bold text-purple-300 uppercase tracking-wider">
-                  Reference (Optional)
-                </label>
-                {referenceAsset && (
-                  <span className="text-[10px] text-green-400">Active</span>
-                )}
-              </div>
-
-              {!showRefSelector ? (
-                <button
-                  onClick={() => setShowRefSelector(true)}
-                  className={`w-full border-2 border-dashed rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${
-                    referenceAsset
-                      ? "border-purple-500/50 bg-purple-500/10"
-                      : "border-gray-700 hover:border-gray-500"
-                  }`}
-                >
-                  <span className="text-xl">🖼️</span>
-                  <span className="text-xs text-gray-300">
-                    {referenceAsset
-                      ? "Change Reference"
-                      : "Add Reference Image"}
-                  </span>
-                </button>
-              ) : (
-                <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 animate-in slide-in-from-top-2">
-                  {/* Upload New Option */}
-                  <div className="flex gap-2 mb-3 border-b border-gray-800 pb-3">
-                    <button
-                      onClick={() => refFileInput.current?.click()}
-                      disabled={isUploadingRef}
-                      className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-white border border-gray-600 flex items-center justify-center gap-1"
-                    >
-                      {isUploadingRef ? (
-                        <LoadingSpinner size="sm" />
-                      ) : (
-                        "Upload from Computer"
-                      )}
-                    </button>
-                    <input
-                      type="file"
-                      ref={refFileInput}
-                      className="hidden"
-                      accept="image/*"
-                      onChange={handleRefFileUpload}
-                    />
-                    <button
-                      onClick={() => setShowRefSelector(false)}
-                      className="px-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 text-xs"
-                    >
-                      Close
-                    </button>
+            {/* === MODE: STANDARD / PRO === */}
+            {activeTab !== "drift" && (
+              <>
+                {/* Reference UI (Only for Pro/Standard) */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-purple-300 uppercase tracking-wider">
+                      Reference (Optional)
+                    </label>
                   </div>
 
-                  {/* Select from Library Option */}
-                  <div className="text-[10px] text-gray-500 mb-2 uppercase font-bold">
-                    Or Select from Library:
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto custom-scrollbar">
-                    {Array.isArray(allAssets) &&
-                      allAssets.map((a: Asset) => (
-                        <img
-                          key={a.id}
-                          src={a.url}
-                          className="w-full h-12 object-cover rounded cursor-pointer border border-transparent hover:border-purple-500"
-                          onClick={() => {
-                            setReferenceAsset(a);
-                            setShowRefSelector(false);
-                          }}
+                  {!showRefSelector ? (
+                    <button
+                      onClick={() => setShowRefSelector(true)}
+                      className={`w-full border-2 border-dashed rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${
+                        referenceAsset
+                          ? "border-purple-500/50 bg-purple-500/10"
+                          : "border-gray-700 hover:border-gray-500"
+                      }`}
+                    >
+                      <span className="text-xl">🖼️</span>
+                      <span className="text-xs text-gray-300">
+                        {referenceAsset
+                          ? "Change Reference"
+                          : "Add Reference Image"}
+                      </span>
+                    </button>
+                  ) : (
+                    <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 animate-in slide-in-from-top-2">
+                      <div className="flex gap-2 mb-3 border-b border-gray-800 pb-3">
+                        <button
+                          onClick={() => refFileInput.current?.click()}
+                          disabled={isUploadingRef}
+                          className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-white border border-gray-600 flex items-center justify-center gap-1"
+                        >
+                          {isUploadingRef ? (
+                            <LoadingSpinner size="sm" />
+                          ) : (
+                            "Upload Local"
+                          )}
+                        </button>
+                        <input
+                          type="file"
+                          ref={refFileInput}
+                          className="hidden"
+                          accept="image/*"
+                          onChange={handleRefFileUpload}
                         />
-                      ))}
+                        <button
+                          onClick={() => setShowRefSelector(false)}
+                          className="px-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 text-xs"
+                        >
+                          Close
+                        </button>
+                      </div>
+                      <div className="text-[10px] text-gray-500 mb-2 uppercase font-bold">
+                        Or Asset Library:
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto custom-scrollbar">
+                        {Array.isArray(allAssets) &&
+                          allAssets.map((a: Asset) => (
+                            <img
+                              key={a.id}
+                              src={a.url}
+                              className="w-full h-12 object-cover rounded cursor-pointer border border-transparent hover:border-purple-500"
+                              onClick={() => {
+                                setReferenceAsset(a);
+                                setShowRefSelector(false);
+                              }}
+                            />
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Prompt UI */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-end">
+                    <label className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
+                      Instruction
+                    </label>
+                    <button
+                      onClick={() => analyzeMutation.mutate()}
+                      disabled={isAnalyzing || isProcessing}
+                      className="text-[10px] bg-cyan-900/30 text-cyan-300 px-2 py-1 rounded border border-cyan-500/30 hover:bg-cyan-800/50 flex items-center gap-1"
+                    >
+                      {isAnalyzing ? "Scanning..." : "👁️ Analyze"}
+                    </button>
+                  </div>
+                  <textarea
+                    className="w-full h-40 bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none leading-relaxed placeholder-gray-500"
+                    placeholder={
+                      activeTab === "standard"
+                        ? "Simple edits: 'Remove the cup', 'Change background to blue'..."
+                        : "Complex edits: 'Make it night time', 'Change style to oil painting', 'Add a neon sign'..."
+                    }
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    disabled={isProcessing}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        if (prompt.trim()) textEditMutation.mutate();
+                      }
+                    }}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* === MODE: DRIFT === */}
+            {activeTab === "drift" && (
+              <div className="space-y-6 animate-in fade-in">
+                <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                  <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                    🎥 Camera Control
+                  </h4>
+
+                  {/* Horizontal */}
+                  <div className="space-y-2 mb-4">
+                    <div className="flex justify-between text-xs text-gray-400">
+                      <span>Orbit (Horizontal)</span>
+                      <span className="text-cyan-400">
+                        {driftParams.horizontal}°
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="360"
+                      step="10"
+                      value={driftParams.horizontal}
+                      onChange={(e) =>
+                        setDriftParams((p) => ({
+                          ...p,
+                          horizontal: parseInt(e.target.value),
+                        }))
+                      }
+                      className="w-full accent-cyan-500"
+                    />
+                  </div>
+
+                  {/* Vertical */}
+                  <div className="space-y-2 mb-4">
+                    <div className="flex justify-between text-xs text-gray-400">
+                      <span>Elevation (Vertical)</span>
+                      <span className="text-cyan-400">
+                        {driftParams.vertical}°
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="60"
+                      step="5"
+                      value={driftParams.vertical}
+                      onChange={(e) =>
+                        setDriftParams((p) => ({
+                          ...p,
+                          vertical: parseInt(e.target.value),
+                        }))
+                      }
+                      className="w-full accent-purple-500"
+                    />
+                  </div>
+
+                  {/* Zoom */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs text-gray-400">
+                      <span>Zoom Distance</span>
+                      <span className="text-cyan-400">{driftParams.zoom}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="10"
+                      step="1"
+                      value={driftParams.zoom}
+                      onChange={(e) =>
+                        setDriftParams((p) => ({
+                          ...p,
+                          zoom: parseInt(e.target.value),
+                        }))
+                      }
+                      className="w-full accent-green-500"
+                    />
+                    <div className="flex justify-between text-[10px] text-gray-600 mt-1">
+                      <span>Wide (0)</span>
+                      <span>Close-up (10)</span>
+                    </div>
                   </div>
                 </div>
-              )}
-            </div>
 
-            {/* Prompt Input */}
-            <div className="space-y-3">
-              <div className="flex justify-between items-end">
-                <label className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
-                  Instruction
-                </label>
-                <button
-                  onClick={() => analyzeMutation.mutate()}
-                  disabled={isAnalyzing || isProcessing}
-                  className="text-[10px] bg-cyan-900/30 text-cyan-300 px-2 py-1 rounded border border-cyan-500/30 hover:bg-cyan-800/50 flex items-center gap-1"
-                >
-                  {isAnalyzing ? "Scanning..." : "👁️ Analyze Image"}
-                </button>
+                <div className="text-xs text-gray-500 bg-black/30 p-3 rounded-lg border border-gray-800">
+                  ℹ️ <b>Drift</b> uses AI to rotate the subject. Best results
+                  with clear, singular subjects on simple backgrounds.
+                </div>
               </div>
-              <textarea
-                className="w-full h-40 bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none leading-relaxed placeholder-gray-500"
-                placeholder="E.g. 'Make it night time', 'Remove the cup', 'Style like the reference image'..."
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                disabled={isProcessing}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    if (prompt.trim()) editMutation.mutate();
-                  }
-                }}
-              />
-              <p className="text-[10px] text-gray-500">
-                Tip: Press Enter to submit. Changes are applied on top of the
-                current image.
-              </p>
-            </div>
+            )}
           </div>
 
           <div className="p-6 border-t border-gray-800 bg-gray-900/50 flex flex-col gap-3">
-            <button
-              onClick={() => editMutation.mutate()}
-              disabled={!prompt.trim() || isProcessing}
-              className="w-full py-4 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {isProcessing ? "Refining..." : <span>Apply Edit</span>}
-            </button>
+            {activeTab === "drift" ? (
+              <button
+                onClick={() => driftMutation.mutate()}
+                disabled={isProcessing}
+                className="w-full py-4 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isProcessing ? (
+                  "Drifting..."
+                ) : (
+                  <span>🌀 Generate New Angle</span>
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={() => textEditMutation.mutate()}
+                disabled={!prompt.trim() || isProcessing}
+                className="w-full py-4 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isProcessing ? "Refining..." : <span>✨ Apply Edit</span>}
+              </button>
+            )}
             <button
               onClick={onClose}
               disabled={isProcessing}

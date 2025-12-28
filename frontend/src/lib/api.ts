@@ -22,7 +22,6 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const message = error.response?.data?.error || error.message || "Error";
-    // Ignore 404s from polling
     if (error.response?.status !== 404 && error.code !== "ERR_CANCELED") {
       console.error("API Error:", {
         url: error.config?.url,
@@ -58,15 +57,17 @@ export const apiEndpoints = {
       headers: { "Content-Type": "multipart/form-data" },
     }),
 
-  // ✅ NEW: Sync Upload
+  // ✅ Sync Upload
   uploadAssetSync: (formData: FormData) =>
     api.post("/api/assets/upload-sync", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     }),
+
   // === Asset Library ===
   getAssets: () => api.get("/api/assets"),
 
   deleteAsset: (id: string) => api.delete(`/api/assets/${id}`),
+
   movePostToAsset: (postId: string) =>
     api.post(`/api/posts/${postId}/to-asset`),
 
@@ -75,13 +76,23 @@ export const apiEndpoints = {
       headers: { "Content-Type": "multipart/form-data" },
     }),
 
+  // ✅ UPDATED: Edit Asset supports 'mode'
   editAsset: (data: {
     assetId: string;
     assetUrl: string;
     prompt: string;
     aspectRatio: string;
     referenceUrl?: string;
+    mode?: "standard" | "pro";
   }) => api.post("/api/assets/edit", data),
+
+  // ✅ NEW: Drift Asset (FAL Flux)
+  driftAsset: (data: {
+    assetUrl: string;
+    horizontal: number;
+    vertical: number;
+    zoom: number;
+  }) => api.post("/api/assets/drift", data),
 
   // === Generation ===
   generateMediaDirect: (formData: FormData) =>

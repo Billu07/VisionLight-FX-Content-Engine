@@ -3,6 +3,7 @@ import FormData from "form-data";
 import sharp from "sharp";
 import axios from "axios";
 import { v2 as cloudinary } from "cloudinary";
+import { FalService } from "./fal";
 import { dbService as airtableService, Post, Asset } from "./database";
 import { GeminiService } from "./gemini";
 import { ROIService } from "./roi";
@@ -150,8 +151,6 @@ const resizeWithGemini = async (
 };
 
 export const contentEngine = {
-  // ... inside contentEngine object ...
-
   // ✅ NEW: Upload Raw (No Resizing)
   async uploadRawAsset(fileBuffer: Buffer, userId: string) {
     try {
@@ -271,52 +270,100 @@ export const contentEngine = {
     return await airtableService.createAsset(userId, targetUrl, dbAspectRatio);
   },
 
-  // === EDIT ASSET ===
+  // === DRIFT EDIT ===
+  async processDriftEdit(
+    userId: string,
+    assetUrl: string,
+    horizontal: number,
+    vertical: number,
+    zoom: number
+  ) {
+    try {
+      // 1. Generate via FAL
+      const buffer = await FalService.generateDriftAngle({
+        imageUrl: getOptimizedUrl(assetUrl),
+        horizontalAngle: horizontal,
+        verticalAngle: vertical,
+        zoom: zoom,
+      });
+
+      // 2. Upload to Cloudinary
+      const newUrl = await this.uploadToCloudinary(
+        buffer,
+        `drift_${userId}_${Date.now()}`,
+        userId,
+        `Drift: H${horizontal} V${vertical} Z${zoom}`,
+        "image"
+      );
+
+      // 3. Save as Asset (Original Ratio)
+      // Drift maintains aspect ratio usually, or outputs square depending on model defaults.
+      // We will mark it as "original" to be safe.
+      return await airtableService.createAsset(userId, newUrl, "original");
+    } catch (e: any) {
+      throw new Error(`Drift failed: ${e.message}`);
+    }
+  },
+
+  // === EDIT ASSET (Updated for Standard/Pro & Raw) ===
   async editAsset(
     originalAssetUrl: string,
     prompt: string,
     userId: string,
-    aspectRatio: "16:9" | "9:16",
-    referenceUrl?: string
+    aspectRatio: "16:9" | "9:16" | "original",
+    referenceUrl?: string,
+    mode: "standard" | "pro" = "pro" // 👈 Added Mode Flag (Default to Pro)
   ): Promise<Asset> {
     try {
-      console.log(`🎨 Editing asset for ${userId}: "${prompt}"`);
+      console.log(`🎨 Editing asset for ${userId} [${mode}]: "${prompt}"`);
 
+      // 1. Prepare Inputs
       const imageResponse = await axios.get(getOptimizedUrl(originalAssetUrl), {
         responseType: "arraybuffer",
       });
       const inputBuffers = [Buffer.from(imageResponse.data)];
 
       let finalPrompt = prompt;
-      let modelType: "speed" | "quality" = "speed";
 
+      // 2. Map frontend mode to GeminiService modelType
+      // Standard -> Speed (Gemini 2.5 Flash)
+      // Pro -> Quality (Gemini 3 Pro)
+      const modelType = mode === "standard" ? "speed" : "quality";
+
+      // 3. CHECK REFERENCE
       if (referenceUrl) {
+        console.log("🔗 Attaching Reference Image...");
         const refRes = await axios.get(getOptimizedUrl(referenceUrl), {
           responseType: "arraybuffer",
         });
         inputBuffers.push(Buffer.from(refRes.data));
 
-        finalPrompt = `
+        // Enhanced prompt logic for Pro mode with reference
+        if (mode === "pro") {
+          finalPrompt = `
 TASK: ${prompt}
 INPUT ANALYSIS:
 - IMAGE 1 (Context): The MAIN SUBJECT.
-- IMAGE 2 (Reference): The TARGET VIEWPOINT/ANGLE.
+- IMAGE 2 (Reference): The TARGET VIEWPOINT/ANGLE or STYLE REFERENCE.
 INSTRUCTIONS:
 1. SUBJECT LOCK: Strictly preserve the visual identity, colors, and structure of Subject 1.
-2. VIEWPOINT TRANSFER: Re-render Subject 1 using the camera angle/composition of Image 2.
+2. TRANSFORMATION: Apply the style, angle, or modifications requested using Image 2 as a guide.
 3. OUTPUT: High-fidelity image.
-        `;
-
-        modelType = "quality";
+            `;
+        }
       }
 
+      // 4. Execute via SDK
       const editedBuffer = await GeminiService.generateOrEditImage({
         prompt: finalPrompt,
-        aspectRatio: aspectRatio,
+        // If aspectRatio is "original", GeminiService handles it by not sending imageConfig
+        aspectRatio: aspectRatio === "original" ? "original" : aspectRatio,
         referenceImages: inputBuffers,
         modelType: modelType,
+        useGrounding: mode === "pro", // Only use Google Search in Pro mode
       });
 
+      // 5. Upload Result
       const newUrl = await this.uploadToCloudinary(
         editedBuffer,
         `edited_${userId}_${Date.now()}`,
@@ -325,6 +372,7 @@ INSTRUCTIONS:
         "image"
       );
 
+      // 6. Save to Database
       return await airtableService.createAsset(userId, newUrl, aspectRatio);
     } catch (e: any) {
       console.error("Asset Edit Failed:", e.message);
