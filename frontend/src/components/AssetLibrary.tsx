@@ -196,7 +196,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                   : "text-gray-400 hover:text-white"
               }`}
             >
-              Magic / Raw
+              Edited Pictures
             </button>
           </div>
 
@@ -344,7 +344,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                     }}
                     className="w-full py-3 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/50 rounded-xl font-bold transition-all flex items-center justify-center gap-2"
                   >
-                    <span></span> Edited Pictures
+                    <span></span> Edit
                   </button>
                 </div>
               </div>
