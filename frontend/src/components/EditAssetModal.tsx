@@ -9,8 +9,6 @@ interface Asset {
   id: string;
   url: string;
   aspectRatio: "16:9" | "9:16" | "original";
-  // type is optional here because we mostly use it for display in Library,
-  // but it's good to be aware it exists on the backend object.
   type?: "IMAGE" | "VIDEO";
 }
 
@@ -65,63 +63,24 @@ export function EditAssetModal({
   const [driftStatusMsg, setDriftStatusMsg] = useState("Processing...");
   const [driftProgress, setDriftProgress] = useState(0);
 
-  // IMPROVED POLLING LOGIC (Defined before useEffect)
-  // ... inside EditAssetModal ...
-
-  // === MUTATION 2: DRIFT PATH START ===
-  const driftStartMutation = useMutation({
-    mutationFn: async () => {
-      return apiEndpoints.startDriftVideo({
-        assetUrl: currentAsset.url,
-        prompt: prompt,
-        horizontal: driftParams.horizontal,
-        vertical: driftParams.vertical,
-        zoom: driftParams.zoom,
-      });
-    },
-    onMutate: () => {
-      setIsProcessing(true);
-      setDriftStatusMsg("Initializing connection...");
-      setDriftProgress(5); // Start at 5%
-    },
-    onSuccess: (res: any) => {
-      console.log("✅ Drift Started. Status URL:", res.data.statusUrl);
-      localStorage.setItem(`drift_job_${currentAsset.id}`, res.data.statusUrl);
-      pollDriftStatus(res.data.statusUrl);
-    },
-    onError: (err: any) => {
-      alert("Drift Start Failed: " + err.message);
-      setIsProcessing(false);
-    },
-  });
-
   // IMPROVED POLLING LOGIC
   const pollDriftStatus = useCallback(
     async (statusUrl: string) => {
       setIsDriftPolling(true);
-      let attempts = 0;
 
-      // Force progress to move even if status doesn't change immediately
       const interval = setInterval(async () => {
-        attempts++;
         try {
           const res = await apiEndpoints.checkToolStatus(statusUrl);
           const status = res.data.status;
-          const logs =
-            res.data.logs?.map((l: any) => l.message).join(" ") || "";
-
-          console.log(`Poll #${attempts}: ${status}`); // Debug log
 
           // UPDATE UI BASED ON STATUS
           if (status === "IN_QUEUE") {
             const pos =
               res.data.queue_position > 0 ? ` #${res.data.queue_position}` : "";
             setDriftStatusMsg(`In Queue${pos}... (High Demand)`);
-            // Slowly crawl to 50% while queued
             setDriftProgress((p) => (p < 50 ? p + 0.5 : 50));
           } else if (status === "IN_PROGRESS") {
             setDriftStatusMsg("Rendering Video...");
-            // Move faster once processing starts
             setDriftProgress((p) => (p < 90 ? p + 5 : 90));
           }
 
@@ -157,7 +116,6 @@ export function EditAssetModal({
           }
         } catch (e) {
           console.error("Polling Network Error", e);
-          // Don't stop polling on simple network errors, just wait
         }
       }, 3000); // Check every 3 seconds
     },
@@ -217,6 +175,7 @@ export function EditAssetModal({
       setDriftProgress(5);
     },
     onSuccess: (res: any) => {
+      console.log("✅ Drift Started. Status URL:", res.data.statusUrl);
       localStorage.setItem(`drift_job_${currentAsset.id}`, res.data.statusUrl);
       pollDriftStatus(res.data.statusUrl);
     },
@@ -499,7 +458,6 @@ export function EditAssetModal({
                       }
                       className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-2 text-center transition-all active:scale-95"
                     >
-                      <span className="text-lg">{preset.icon}</span>
                       <span className="text-[10px] text-gray-300 font-bold block">
                         {preset.label}
                       </span>
