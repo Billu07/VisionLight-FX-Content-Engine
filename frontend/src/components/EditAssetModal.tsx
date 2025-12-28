@@ -1,14 +1,17 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiEndpoints } from "../lib/api";
 import { DriftFrameExtractor } from "./DriftFrameExtractor";
 import { LoadingSpinner } from "./LoadingSpinner";
-import { ProgressBar } from "./ProgressBar"; // ✅ Ensure this file exists
+import { ProgressBar } from "./ProgressBar";
 
 interface Asset {
   id: string;
   url: string;
   aspectRatio: "16:9" | "9:16" | "original";
+  // type is optional here because we mostly use it for display in Library,
+  // but it's good to be aware it exists on the backend object.
+  type?: "IMAGE" | "VIDEO";
 }
 
 interface EditAssetModalProps {
@@ -60,7 +63,73 @@ export function EditAssetModal({
   const [driftVideoUrl, setDriftVideoUrl] = useState<string | null>(null);
   const [isDriftPolling, setIsDriftPolling] = useState(false);
   const [driftStatusMsg, setDriftStatusMsg] = useState("Processing...");
-  const [driftProgress, setDriftProgress] = useState(0); // ✅ New Progress State
+  const [driftProgress, setDriftProgress] = useState(0);
+
+  // IMPROVED POLLING LOGIC (Defined before useEffect)
+  const pollDriftStatus = useCallback(
+    async (statusUrl: string) => {
+      setIsDriftPolling(true);
+      let attempts = 0;
+
+      const interval = setInterval(async () => {
+        attempts++;
+        try {
+          const res = await apiEndpoints.checkToolStatus(statusUrl);
+          const status = res.data.status;
+
+          if (status === "IN_QUEUE") {
+            setDriftStatusMsg(
+              `Queued (Pos: ${res.data.queue_position || "?"})...`
+            );
+            // Slowly creep up to 20% while queued
+            setDriftProgress((prev) => (prev < 20 ? prev + 0.5 : 20));
+          } else if (status === "IN_PROGRESS") {
+            setDriftStatusMsg("Rendering 3D Path...");
+            // Creep up to 95% while processing
+            setDriftProgress((prev) => (prev < 95 ? prev + 1 : 95));
+          }
+
+          if (status === "COMPLETED") {
+            clearInterval(interval);
+            setDriftProgress(100);
+            setDriftStatusMsg("Finalizing...");
+
+            localStorage.removeItem(`drift_job_${currentAsset.id}`);
+
+            const videoUrl = res.data.response_url || res.data.video.url;
+
+            // Auto-save the video asset
+            try {
+              await apiEndpoints.saveAssetUrl({
+                url: videoUrl,
+                aspectRatio: "16:9",
+                type: "VIDEO",
+              });
+              // Refresh library in background so "Videos" tab updates
+              queryClient.invalidateQueries({ queryKey: ["assets"] });
+            } catch (e) {
+              console.warn("Auto-save video failed", e);
+            }
+
+            setDriftVideoUrl(videoUrl);
+            setIsProcessing(false);
+            setIsDriftPolling(false);
+          } else if (status === "FAILED") {
+            clearInterval(interval);
+            localStorage.removeItem(`drift_job_${currentAsset.id}`);
+            alert(
+              "Drift Generation Failed: " + (res.data.error || "Unknown error")
+            );
+            setIsProcessing(false);
+            setIsDriftPolling(false);
+          }
+        } catch (e) {
+          console.error("Polling error", e);
+        }
+      }, 4000);
+    },
+    [currentAsset.id, queryClient]
+  );
 
   // 1. RECOVERY LOGIC: Resume polling on refresh
   useEffect(() => {
@@ -68,9 +137,11 @@ export function EditAssetModal({
     if (pendingJob) {
       console.log("🔄 Found pending Drift job, resuming...");
       setActiveTab("drift");
+      setIsProcessing(true);
+      setDriftProgress(5);
       pollDriftStatus(pendingJob);
     }
-  }, [currentAsset.id]);
+  }, [currentAsset.id, pollDriftStatus]);
 
   const { data: allAssets = [] } = useQuery({
     queryKey: ["assets"],
@@ -109,8 +180,8 @@ export function EditAssetModal({
     },
     onMutate: () => {
       setIsProcessing(true);
-      setDriftStatusMsg("Sending to Kling Engine...");
-      setDriftProgress(5); // Start progress
+      setDriftStatusMsg("Sending to Drift Engine...");
+      setDriftProgress(5);
     },
     onSuccess: (res: any) => {
       localStorage.setItem(`drift_job_${currentAsset.id}`, res.data.statusUrl);
@@ -121,65 +192,6 @@ export function EditAssetModal({
       setIsProcessing(false);
     },
   });
-
-  // POLLING LOGIC
-  const pollDriftStatus = async (statusUrl: string) => {
-    setIsDriftPolling(true);
-    let attempts = 0;
-
-    const interval = setInterval(async () => {
-      attempts++;
-      try {
-        const res = await apiEndpoints.checkToolStatus(statusUrl);
-        const status = res.data.status;
-
-        // Update UX
-        if (status === "IN_QUEUE") {
-          setDriftStatusMsg(
-            `Queued (Pos: ${res.data.queue_position || "?"})...`
-          );
-        } else if (status === "IN_PROGRESS") {
-          setDriftStatusMsg("Rendering 3D Path...");
-          // Simulate progress (slowly creep to 95%)
-          setDriftProgress((prev) => (prev < 95 ? prev + 1 : 95));
-        }
-
-        if (status === "COMPLETED") {
-          clearInterval(interval);
-          setDriftProgress(100);
-          localStorage.removeItem(`drift_job_${currentAsset.id}`);
-
-          const videoUrl = res.data.response_url || res.data.video.url;
-
-          // Auto-save the video asset
-          try {
-            await apiEndpoints.saveAssetUrl({
-              url: videoUrl,
-              aspectRatio: "16:9",
-              type: "VIDEO",
-            });
-            queryClient.invalidateQueries({ queryKey: ["assets"] });
-          } catch (e) {
-            console.warn("Auto-save video failed", e);
-          }
-
-          setDriftVideoUrl(videoUrl);
-          setIsProcessing(false);
-          setIsDriftPolling(false);
-        } else if (status === "FAILED") {
-          clearInterval(interval);
-          localStorage.removeItem(`drift_job_${currentAsset.id}`);
-          alert(
-            "Drift Generation Failed: " + (res.data.error || "Unknown error")
-          );
-          setIsProcessing(false);
-          setIsDriftPolling(false);
-        }
-      } catch (e) {
-        console.error("Polling error", e);
-      }
-    }, 4000);
-  };
 
   // EXTRACT FRAME HANDLER
   const handleFrameExtraction = async (blob: Blob) => {
@@ -303,6 +315,9 @@ export function EditAssetModal({
                     >
                       ✕
                     </button>
+                  </div>
+                  <div className="bg-purple-900/90 text-[8px] text-center py-0.5 text-white font-bold tracking-wide">
+                    REFERENCE
                   </div>
                 </div>
               )}
@@ -451,6 +466,7 @@ export function EditAssetModal({
                       }
                       className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-2 text-center transition-all active:scale-95"
                     >
+                      <span className="text-lg">{preset.icon}</span>
                       <span className="text-[10px] text-gray-300 font-bold block">
                         {preset.label}
                       </span>

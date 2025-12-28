@@ -3,11 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiEndpoints } from "../lib/api";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { EditAssetModal } from "./EditAssetModal";
+import { DriftFrameExtractor } from "./DriftFrameExtractor";
 
 interface Asset {
   id: string;
   url: string;
   aspectRatio: "16:9" | "9:16" | "original";
+  type: "IMAGE" | "VIDEO";
   createdAt: string;
 }
 
@@ -20,21 +22,23 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [targetRatio, setTargetRatio] = useState<"16:9" | "9:16" | "original">(
-    "16:9"
-  );
+  // ✅ NEW: Tabs now include "VIDEO"
+  const [activeTab, setActiveTab] = useState<
+    "16:9" | "9:16" | "original" | "VIDEO"
+  >("16:9");
 
   // UI States
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+  const [viewingVideoAsset, setViewingVideoAsset] = useState<Asset | null>(
+    null
+  );
 
   // Polling State
   const [pollingUntil, setPollingUntil] = useState<number>(0);
   const [processingCount, setProcessingCount] = useState(0);
-
-  // ✅ NEW: Track assets that have active/completed Drift paths locally
   const [activeDriftIds, setActiveDriftIds] = useState<Set<string>>(new Set());
 
   const isProcessing = pollingUntil > 0;
@@ -47,29 +51,24 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
     refetchIntervalInBackground: true,
   });
 
-  // ✅ NEW: Scan LocalStorage for Drift Jobs on mount/update
+  // 2. Scan LocalStorage for Active Drift Jobs
   useEffect(() => {
     const checkDrifts = () => {
       const found = new Set<string>();
-      // Scan all local storage keys
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith("drift_job_")) {
-          const assetId = key.replace("drift_job_", "");
-          found.add(assetId);
+          found.add(key.replace("drift_job_", ""));
         }
       }
       setActiveDriftIds(found);
     };
-
     checkDrifts();
-
-    // Optional: Re-scan every few seconds in case a job finishes/clears elsewhere
     const interval = setInterval(checkDrifts, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  // 2. Timer Logic
+  // 3. Timer Logic
   useEffect(() => {
     if (pollingUntil === 0) return;
     const checkInterval = setInterval(() => {
@@ -82,21 +81,26 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
     return () => clearInterval(checkInterval);
   }, [pollingUntil, queryClient]);
 
-  // 3. Upload Mutation
+  // Upload Mutation
   const uploadMutation = useMutation({
     mutationFn: async (files: FileList) => {
       const formData = new FormData();
       Array.from(files).forEach((file) => formData.append("images", file));
-      const uploadRatio = targetRatio === "original" ? "16:9" : targetRatio;
+      // Default to 16:9 for manual uploads unless in Magic tab
+      const uploadRatio =
+        activeTab === "original"
+          ? "16:9"
+          : activeTab === "VIDEO"
+          ? "16:9"
+          : activeTab;
       formData.append("aspectRatio", uploadRatio);
       return apiEndpoints.uploadBatchAssets(formData);
     },
     onMutate: () => setIsUploading(true),
     onSuccess: (_, variables: FileList) => {
       const fileCount = variables.length;
-      const estimatedTime = fileCount * 20000;
       setProcessingCount(fileCount);
-      setPollingUntil(Date.now() + estimatedTime);
+      setPollingUntil(Date.now() + fileCount * 20000);
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     },
     onError: (err: any) => alert("Upload failed: " + err.message),
@@ -108,6 +112,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       setSelectedAsset(null);
+      setViewingVideoAsset(null);
     },
   });
 
@@ -139,7 +144,8 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `visionlight-asset-${asset.id}.jpg`);
+      const ext = asset.type === "VIDEO" ? "mp4" : "jpg";
+      link.setAttribute("download", `visionlight-asset-${asset.id}.${ext}`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -151,15 +157,17 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
     }
   };
 
+  // ✅ FILTER LOGIC
   const filteredAssets = Array.isArray(assets)
     ? assets.filter((a: Asset) => {
-        if (targetRatio === "original") {
+        if (activeTab === "VIDEO") return a.type === "VIDEO";
+        if (activeTab === "original")
           return (
-            a.aspectRatio === "original" ||
-            (a.aspectRatio !== "16:9" && a.aspectRatio !== "9:16")
+            a.type === "IMAGE" &&
+            (a.aspectRatio === "original" ||
+              (a.aspectRatio !== "16:9" && a.aspectRatio !== "9:16"))
           );
-        }
-        return a.aspectRatio === targetRatio;
+        return a.type === "IMAGE" && a.aspectRatio === activeTab;
       })
     : [];
 
@@ -186,37 +194,25 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
 
         {/* CONTROLS */}
         <div className="p-6 bg-gray-800/50 flex flex-col md:flex-row gap-4 items-center justify-between border-b border-gray-800">
-          <div className="flex bg-gray-950 p-1 rounded-lg border border-gray-700">
-            <button
-              onClick={() => setTargetRatio("16:9")}
-              className={`px-4 py-2 rounded-md text-xs sm:text-sm font-bold transition-all ${
-                targetRatio === "16:9"
-                  ? "bg-cyan-600 text-white shadow-lg"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              Landscape
-            </button>
-            <button
-              onClick={() => setTargetRatio("9:16")}
-              className={`px-4 py-2 rounded-md text-xs sm:text-sm font-bold transition-all ${
-                targetRatio === "9:16"
-                  ? "bg-purple-600 text-white shadow-lg"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              Portrait
-            </button>
-            <button
-              onClick={() => setTargetRatio("original")}
-              className={`px-4 py-2 rounded-md text-xs sm:text-sm font-bold transition-all ${
-                targetRatio === "original"
-                  ? "bg-emerald-600 text-white shadow-lg"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              Edited Pictures
-            </button>
+          <div className="flex bg-gray-950 p-1 rounded-lg border border-gray-700 overflow-x-auto">
+            {[
+              { id: "16:9", label: "Landscape" },
+              { id: "9:16", label: "Portrait" },
+              { id: "original", label: "Raw / Edits" },
+              { id: "VIDEO", label: "Videos / Paths" }, // ✅ NEW TAB
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`px-4 py-2 rounded-md text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
+                  activeTab === tab.id
+                    ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
           <div className="flex items-center gap-3">
@@ -228,31 +224,24 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
               className="hidden"
               onChange={handleFileChange}
             />
-
             <button
               onClick={() =>
                 queryClient.invalidateQueries({ queryKey: ["assets"] })
               }
-              className="p-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors border border-gray-700"
-              title="Refresh Library"
+              className="p-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white border border-gray-700"
             >
               🔄
             </button>
-
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading || isProcessing}
-              className={`px-6 py-2.5 font-bold rounded-lg transition-all flex items-center gap-2 ${
-                isUploading
-                  ? "bg-gray-700 text-gray-400 cursor-wait"
-                  : "bg-white text-black hover:bg-gray-200"
-              }`}
+              className="px-6 py-2.5 font-bold rounded-lg bg-white text-black hover:bg-gray-200 flex items-center gap-2 transition-colors"
             >
               {isUploading ? (
                 <LoadingSpinner size="sm" variant="default" />
               ) : (
                 <>
-                  <span></span> Upload
+                  <span>📤</span> Upload
                 </>
               )}
             </button>
@@ -263,8 +252,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
         {isProcessing && (
           <div className="bg-blue-900/30 border-b border-blue-500/30 p-2 text-center animate-pulse">
             <span className="text-blue-200 text-xs font-bold uppercase tracking-wider">
-              Processing {processingCount} images... They will appear
-              automatically.
+              Processing {processingCount} items...
             </span>
           </div>
         )}
@@ -277,39 +265,48 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
             </div>
           ) : filteredAssets.length === 0 && !isProcessing ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-500 opacity-60">
-              <span className="text-6xl mb-4">🖼️</span>
-              <p>No images found in this category.</p>
+              <span className="text-6xl mb-4">
+                {activeTab === "VIDEO" ? "🎬" : "🖼️"}
+              </span>
+              <p>No {activeTab === "VIDEO" ? "videos" : "images"} found.</p>
             </div>
           ) : (
-            <div
-              className={`grid gap-6 ${
-                targetRatio === "16:9" || targetRatio === "original"
-                  ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
-                  : "grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
-              }`}
-            >
+            <div className="grid gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {filteredAssets.map((asset: Asset) => (
                 <div
                   key={asset.id}
-                  onClick={() => setSelectedAsset(asset)}
-                  className={`relative group border rounded-xl overflow-hidden bg-black cursor-pointer transition-all hover:shadow-2xl hover:shadow-cyan-900/20 aspect-auto ${
-                    // ✅ HIGHLIGHT ACTIVE DRIFT ASSETS
+                  onClick={() => {
+                    if (asset.type === "VIDEO") setViewingVideoAsset(asset);
+                    else setSelectedAsset(asset);
+                  }}
+                  className={`relative group border rounded-xl overflow-hidden bg-black cursor-pointer transition-all hover:shadow-2xl hover:shadow-cyan-900/20 ${
                     activeDriftIds.has(asset.id)
                       ? "border-rose-500 ring-2 ring-rose-500/50"
                       : "border-gray-800 hover:border-cyan-500/50"
                   }`}
                 >
-                  <img
-                    src={asset.url}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    loading="lazy"
-                    style={{
-                      aspectRatio:
-                        asset.aspectRatio === "9:16" ? "9/16" : "16/9",
-                    }}
-                  />
+                  {/* THUMBNAIL LOGIC */}
+                  {asset.type === "VIDEO" ? (
+                    <div className="w-full h-full relative aspect-video">
+                      <video
+                        src={asset.url}
+                        className="w-full h-full object-cover opacity-80"
+                        muted
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-3xl text-white opacity-80">
+                          ▶️
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <img
+                      src={asset.url}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                  )}
 
-                  {/* ✅ DRIFT BADGE */}
                   {activeDriftIds.has(asset.id) && (
                     <div className="absolute top-2 right-2 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg z-10 animate-pulse">
                       🌀 Drift Ready
@@ -328,7 +325,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
         </div>
       </div>
 
-      {/* --- LIGHTBOX & EDIT MODAL --- */}
+      {/* --- IMAGE EDIT MODAL --- */}
       {selectedAsset && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 p-4 animate-in fade-in duration-200">
           <div
@@ -343,7 +340,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
               />
               <button
                 onClick={() => setSelectedAsset(null)}
-                className="absolute top-4 left-4 bg-black/50 text-white p-2 rounded-full hover:bg-white/20 transition-colors"
+                className="absolute top-4 left-4 bg-black/50 text-white p-2 rounded-full hover:bg-white/20"
               >
                 ✕
               </button>
@@ -355,35 +352,33 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                 </h3>
                 <p className="text-gray-400 text-sm mb-6">
                   {selectedAsset.aspectRatio === "original"
-                    ? "Raw / Magic Edit"
+                    ? "Raw"
                     : selectedAsset.aspectRatio}
                 </p>
                 <div className="space-y-3">
                   {onSelect && (
                     <button
                       onClick={() => handleUseImage(selectedAsset)}
-                      className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-900/20 transform active:scale-95 transition-all flex items-center justify-center gap-2"
+                      className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-lg"
                     >
-                      <span></span> Use this Asset
+                      Use this Asset
                     </button>
                   )}
-
                   <button
                     onClick={() => {
                       setEditingAsset(selectedAsset);
                       setSelectedAsset(null);
                     }}
                     className={`w-full py-3 border rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
-                      // Highlight button if drift is waiting
                       activeDriftIds.has(selectedAsset.id)
-                        ? "bg-rose-600 text-white border-rose-500 hover:bg-rose-500"
-                        : "bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border-purple-500/50"
+                        ? "bg-rose-600 text-white border-rose-500"
+                        : "bg-purple-600/20 text-purple-300 border-purple-500/50"
                     }`}
                   >
                     <span>
                       {activeDriftIds.has(selectedAsset.id)
                         ? "🌀 Resume Drift"
-                        : "Edit"}
+                        : "🪄 Magic Edit"}
                     </span>
                   </button>
                 </div>
@@ -392,18 +387,51 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                 <button
                   onClick={() => handleDownloadAsset(selectedAsset)}
                   disabled={isDownloading}
-                  className="w-full py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm"
                 >
                   {isDownloading ? <LoadingSpinner size="sm" /> : "Download"}
                 </button>
                 <button
                   onClick={() => deleteMutation.mutate(selectedAsset.id)}
-                  className="w-full py-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg text-sm transition-colors"
+                  className="w-full py-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg text-sm"
                 >
                   Delete
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- VIDEO EXTRACTOR MODAL --- */}
+      {viewingVideoAsset && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-4xl p-6 relative flex flex-col items-center">
+            <button
+              onClick={() => setViewingVideoAsset(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+              ✕
+            </button>
+            <h3 className="text-white font-bold mb-4 self-start">
+              🎬 Saved Path
+            </h3>
+            <DriftFrameExtractor
+              videoUrl={viewingVideoAsset.url}
+              onExtract={async (blob) => {
+                const file = new File([blob], "extracted_frame.jpg", {
+                  type: "image/jpeg",
+                });
+                const formData = new FormData();
+                formData.append("image", file);
+                formData.append("raw", "true");
+                await apiEndpoints.uploadAssetSync(formData);
+                alert("Frame Saved to Library!");
+                setViewingVideoAsset(null);
+                queryClient.invalidateQueries({ queryKey: ["assets"] });
+              }}
+              onCancel={() => setViewingVideoAsset(null)}
+            />
           </div>
         </div>
       )}
