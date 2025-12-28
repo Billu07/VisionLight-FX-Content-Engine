@@ -49,7 +49,7 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.get("/", (req, res) => {
   res.json({
     message: "Visionlight FX Backend - Supabase Edition",
-    version: "4.4.0",
+    version: "4.4.1",
     status: "Healthy",
   });
 });
@@ -433,9 +433,7 @@ app.post(
   }
 );
 
-// ✅ NEW: Start Drift Video Path (Kling)
-// Replace your existing /api/assets/drift-video route with this:
-
+// ✅ NEW: Start Drift Video Path (Updated to return POST ID)
 app.post(
   "/api/assets/drift-video",
   authenticateToken,
@@ -451,7 +449,6 @@ app.post(
         return res.status(403).json({ error: "Insufficient credits" });
       }
 
-      // We use the prompt or a default title
       const cleanPrompt = prompt || `Drift H${horizontal} V${vertical}`;
 
       const generationParams = {
@@ -466,18 +463,19 @@ app.post(
       await airtableService.deductCredits(userId, cost);
 
       // Create the DB Record
+      // IMPORTANT: Platform is "Internal" so we can hide it from Timeline later
       const post = await airtableService.createPost({
         userId,
         title: "Drift Generation",
         prompt: cleanPrompt,
         mediaType: "VIDEO",
-        mediaProvider: "kling", // Important: This triggers the existing Kling check logic
+        mediaProvider: "kling",
         platform: "Internal",
         status: "PROCESSING",
         generationParams,
         generationStep: "GENERATION",
         requiresApproval: false,
-        imageReference: assetUrl, // Save the input image
+        imageReference: assetUrl,
       });
 
       // 3. Start the process in background
@@ -492,7 +490,6 @@ app.post(
             Number(zoom)
           );
 
-          // Update the Post with the External ID so the poller can find it
           await airtableService.updatePost(post.id, {
             generationParams: {
               ...generationParams,
@@ -512,7 +509,6 @@ app.post(
         }
       })();
 
-      // 4. Return the Post ID to the frontend (not the FAL status URL)
       res.json({ success: true, postId: post.id });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -520,7 +516,7 @@ app.post(
   }
 );
 
-// ✅ NEW: Check Tool Status (For Drift Polling)
+// Check Tool Status
 app.post(
   "/api/tools/status",
   authenticateToken,
@@ -535,7 +531,7 @@ app.post(
   }
 );
 
-// ✅ NEW: Save Extracted Frame / Video URL
+// Save Extracted Frame / Video URL
 app.post(
   "/api/assets/save-url",
   authenticateToken,
@@ -849,19 +845,44 @@ app.get(
   }
 );
 
-// Post Status
+// ✅ UPDATED: Post Status (ACTIVE POLLING FIX)
+// backend/index.ts
+
 app.get(
   "/api/post/:postId/status",
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const post = await airtableService.getPostById(req.params.postId);
-      if (!post || post.userId !== req.user!.id)
-        return res.status(403).json({ error: "Denied" });
+      // 1. Initial Fetch
+      let post = await airtableService.getPostById(req.params.postId);
 
+      // 2. Initial Null Check
+      if (!post || post.userId !== req.user!.id) {
+        return res.status(403).json({ error: "Denied" });
+      }
+
+      // =========================================================
+      // 🚀 ACTIVE POLLING FIX
+      // =========================================================
+      if (post.status === "PROCESSING") {
+        await contentEngine.checkPostStatus(post); // Force check
+
+        // Re-fetch data
+        post = await airtableService.getPostById(req.params.postId);
+
+        // 🛑 TS FIX: Handle case if re-fetch returns null
+        if (!post) {
+          return res.status(404).json({ error: "Post lost during update" });
+        }
+      }
+      // =========================================================
+
+      // 3. Timeout Logic
+      // TypeScript now knows 'post' is definitely NOT null here
       if (post.status === "PROCESSING") {
         const diffMins =
           (new Date().getTime() - new Date(post.createdAt).getTime()) / 60000;
+
         if (diffMins > 60) {
           await airtableService.updatePost(post.id, {
             status: "FAILED",
@@ -871,11 +892,13 @@ app.get(
         }
       }
 
+      // 4. Response
       res.json({
         success: true,
         status: post.status,
         progress: post.progress || 0,
         mediaUrl: post.mediaUrl,
+        error: post.error,
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

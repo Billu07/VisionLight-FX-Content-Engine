@@ -718,8 +718,6 @@ INSTRUCTIONS:
     }
   },
 
-  // Find your finalizePost function and update it:
-
   async finalizePost(
     postId: string,
     url: string,
@@ -739,6 +737,7 @@ INSTRUCTIONS:
     const params = post.generationParams as any;
     if (params?.source === "DRIFT_EDITOR") {
       console.log("💾 Auto-saving Drift result to Asset Library...");
+      // Check for duplicates in a real scenario if needed, but here we just create
       await airtableService.createAsset(
         userId,
         url,

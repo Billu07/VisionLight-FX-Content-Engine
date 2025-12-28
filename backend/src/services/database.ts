@@ -73,7 +73,6 @@ export const dbService = {
 
   // === POSTS ===
   async createPost(data: any) {
-    // Ensure JSON is parsed if passed as string
     const script =
       typeof data.script === "string" ? JSON.parse(data.script) : data.script;
     const params =
@@ -105,9 +104,13 @@ export const dbService = {
   async getPostById(id: string) {
     return prisma.post.findUnique({ where: { id } });
   },
+  // ✅ UPDATED: Filter out Internal (Drift) jobs from Timeline
   async getUserPosts(userId: string) {
     return prisma.post.findMany({
-      where: { userId },
+      where: {
+        userId,
+        platform: { not: "Internal" }, // <--- This hides them!
+      },
       orderBy: { createdAt: "desc" },
     });
   },
