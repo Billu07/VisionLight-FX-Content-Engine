@@ -451,7 +451,7 @@ app.post(
         assetUrl,
         Number(horizontal || 0),
         Number(vertical || 0),
-        Number(zoom || 5)
+        Number(zoom || 5) // Default zoom is 5 (Medium shot)
       );
 
       res.json({ success: true, asset });

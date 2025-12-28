@@ -279,28 +279,38 @@ export const contentEngine = {
     zoom: number
   ) {
     try {
-      // 1. Generate via FAL
-      const buffer = await FalService.generateDriftAngle({
+      // 1. Get Original Dimensions (To maintain "Raw" quality)
+      // We download the image header to get size without downloading the whole body if possible,
+      // or just download it since we need it anyway.
+      const imageResponse = await axios.get(getOptimizedUrl(assetUrl), {
+        responseType: "arraybuffer",
+      });
+      const buffer = Buffer.from(imageResponse.data);
+      const metadata = await sharp(buffer).metadata();
+
+      // 2. Call FAL Service
+      const resultBuffer = await FalService.generateDriftAngle({
         imageUrl: getOptimizedUrl(assetUrl),
         horizontalAngle: horizontal,
         verticalAngle: vertical,
         zoom: zoom,
+        width: metadata.width,
+        height: metadata.height,
       });
 
-      // 2. Upload to Cloudinary
+      // 3. Upload Result to Cloudinary
       const newUrl = await this.uploadToCloudinary(
-        buffer,
+        resultBuffer,
         `drift_${userId}_${Date.now()}`,
         userId,
         `Drift: H${horizontal} V${vertical} Z${zoom}`,
         "image"
       );
 
-      // 3. Save as Asset (Original Ratio)
-      // Drift maintains aspect ratio usually, or outputs square depending on model defaults.
-      // We will mark it as "original" to be safe.
+      // 4. Save to Database (Mark as "original" to keep Raw tab)
       return await airtableService.createAsset(userId, newUrl, "original");
     } catch (e: any) {
+      console.error("Drift Logic Failed:", e.message);
       throw new Error(`Drift failed: ${e.message}`);
     }
   },

@@ -16,14 +16,6 @@ interface EditAssetModalProps {
 
 type EditorMode = "standard" | "pro" | "drift";
 
-// ✅ NEW: Pre-defined Camera Angles
-const DRIFT_PRESETS = [
-  { label: "Front", h: 0, v: 0, z: 5, icon: "⏹️" },
-  { label: "Side View", h: 90, v: 0, z: 5, icon: "➡️" },
-  { label: "Top Down", h: 0, v: 45, z: 5, icon: "⬇️" },
-  { label: "Close Up", h: 0, v: 0, z: 9, icon: "🔍" },
-];
-
 export function EditAssetModal({
   asset: initialAsset,
   onClose,
@@ -31,37 +23,37 @@ export function EditAssetModal({
   const queryClient = useQueryClient();
   const refFileInput = useRef<HTMLInputElement>(null);
 
+  // History State
   const [history, setHistory] = useState<Asset[]>([initialAsset]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentAsset = history[currentIndex];
 
-  // Global State
+  // Editor State
   const [activeTab, setActiveTab] = useState<EditorMode>("pro");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Text Edit State
+  // Text Edit State (Standard/Pro)
   const [prompt, setPrompt] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [referenceAsset, setReferenceAsset] = useState<Asset | null>(null);
   const [showRefSelector, setShowRefSelector] = useState(false);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
 
-  // Drift State
+  // Drift State (Flux 2 LoRA)
   const [driftParams, setDriftParams] = useState({
-    horizontal: 0,
-    vertical: 0,
-    zoom: 5,
+    horizontal: 0, // 0 to 360
+    vertical: 0, // 0 to 90 (Eye level to High angle)
+    zoom: 5, // 0 (Wide) to 10 (Close)
   });
 
-  // Fetch Library
+  // Fetch Library for Reference
   const { data: allAssets = [] } = useQuery({
     queryKey: ["assets"],
     queryFn: async () => (await apiEndpoints.getAssets()).data.assets,
     enabled: showRefSelector,
   });
 
-  // === MUTATIONS ===
-
+  // === MUTATION 1: TEXT EDIT (Standard/Pro) ===
   const textEditMutation = useMutation({
     mutationFn: async () => {
       return apiEndpoints.editAsset({
@@ -79,6 +71,7 @@ export function EditAssetModal({
     onSettled: () => setIsProcessing(false),
   });
 
+  // === MUTATION 2: DRIFT EDIT (FAL) ===
   const driftMutation = useMutation({
     mutationFn: async () => {
       return apiEndpoints.driftAsset({
@@ -94,12 +87,13 @@ export function EditAssetModal({
     onSettled: () => setIsProcessing(false),
   });
 
+  // === MUTATION 3: HELPERS ===
   const handleSuccess = (newAsset: Asset) => {
     const newHistory = history.slice(0, currentIndex + 1);
     newHistory.push(newAsset);
     setHistory(newHistory);
     setCurrentIndex(newHistory.length - 1);
-    setPrompt("");
+    setPrompt(""); // Clear prompt
     queryClient.invalidateQueries({ queryKey: ["assets"] });
   };
 
@@ -109,15 +103,12 @@ export function EditAssetModal({
       const blob = await res.blob();
       const formData = new FormData();
       formData.append("image", blob, "current.jpg");
-      formData.append(
-        "prompt",
-        "Describe the lighting, style, and main subjects."
-      );
+      formData.append("prompt", "Describe details.");
       return apiEndpoints.analyzeImage(formData);
     },
     onMutate: () => setIsAnalyzing(true),
     onSuccess: (res: any) =>
-      setPrompt((prev) => (prev ? prev + "\n\n" : "") + res.data.result),
+      setPrompt((prev) => (prev ? prev + "\n" : "") + res.data.result),
     onSettled: () => setIsAnalyzing(false),
   });
 
@@ -134,7 +125,7 @@ export function EditAssetModal({
       setShowRefSelector(false);
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     },
-    onError: (err: any) => alert("Upload failed: " + err.message),
+    onError: (err: any) => alert("Reference upload failed: " + err.message),
     onSettled: () => setIsUploadingRef(false),
   });
 
@@ -199,8 +190,8 @@ export function EditAssetModal({
                 <LoadingSpinner size="lg" variant="neon" />
                 <span className="text-cyan-300 font-bold animate-pulse">
                   {activeTab === "drift"
-                    ? "Rotating Camera..."
-                    : "Picturing..."}
+                    ? "Rotating Camera (Flux 2)..."
+                    : "Processing Edit..."}
                 </span>
               </div>
             </div>
@@ -217,24 +208,36 @@ export function EditAssetModal({
           {/* EDITOR TABS */}
           <div className="p-4 border-b border-gray-800 bg-gray-950">
             <div className="flex bg-gray-900 p-1 rounded-xl">
-              {[
-                { id: "standard", label: "Standard" },
-                { id: "pro", label: "Pro", icon: "🧠" },
-                { id: "drift", label: "Drift", icon: "🌀" },
-              ].map((mode) => (
-                <button
-                  key={mode.id}
-                  onClick={() => setActiveTab(mode.id as any)}
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex flex-col items-center gap-1 ${
-                    activeTab === mode.id
-                      ? "bg-cyan-600 text-white shadow-lg"
-                      : "text-gray-400 hover:text-white hover:bg-gray-800"
-                  }`}
-                >
-                  <span className="text-sm">{mode.icon}</span>
-                  {mode.label}
-                </button>
-              ))}
+              <button
+                onClick={() => setActiveTab("standard")}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex flex-col items-center gap-1 ${
+                  activeTab === "standard"
+                    ? "bg-gray-700 text-white"
+                    : "text-gray-400 hover:bg-gray-800"
+                }`}
+              >
+                <span className="text-sm">⚡</span> Standard
+              </button>
+              <button
+                onClick={() => setActiveTab("pro")}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex flex-col items-center gap-1 ${
+                  activeTab === "pro"
+                    ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg"
+                    : "text-gray-400 hover:bg-gray-800"
+                }`}
+              >
+                <span className="text-sm">🧠</span> Pro
+              </button>
+              <button
+                onClick={() => setActiveTab("drift")}
+                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex flex-col items-center gap-1 ${
+                  activeTab === "drift"
+                    ? "bg-gradient-to-r from-rose-600 to-orange-600 text-white shadow-lg"
+                    : "text-gray-400 hover:bg-gray-800"
+                }`}
+              >
+                <span className="text-sm">🌀</span> Drift
+              </button>
             </div>
           </div>
 
@@ -243,12 +246,12 @@ export function EditAssetModal({
             {activeTab !== "drift" && (
               <>
                 <div className="space-y-2">
+                  {/* Reference Logic */}
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-bold text-purple-300 uppercase tracking-wider">
                       Reference (Optional)
                     </label>
                   </div>
-
                   {!showRefSelector ? (
                     <button
                       onClick={() => setShowRefSelector(true)}
@@ -260,9 +263,7 @@ export function EditAssetModal({
                     >
                       <span className="text-xl">🖼️</span>
                       <span className="text-xs text-gray-300">
-                        {referenceAsset
-                          ? "Change Reference"
-                          : "Add Reference Image"}
+                        {referenceAsset ? "Change Reference" : "Add Reference"}
                       </span>
                     </button>
                   ) : (
@@ -348,34 +349,12 @@ export function EditAssetModal({
               </>
             )}
 
-            {/* === MODE: DRIFT === */}
+            {/* === MODE: DRIFT (Flux 2 LoRA) === */}
             {activeTab === "drift" && (
               <div className="space-y-6 animate-in fade-in">
-                {/* ✅ NEW: QUICK PRESETS */}
-                <div className="grid grid-cols-4 gap-2">
-                  {DRIFT_PRESETS.map((preset) => (
-                    <button
-                      key={preset.label}
-                      onClick={() =>
-                        setDriftParams({
-                          horizontal: preset.h,
-                          vertical: preset.v,
-                          zoom: preset.z,
-                        })
-                      }
-                      className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-2 flex flex-col items-center justify-center gap-1 transition-all active:scale-95"
-                    >
-                      <span className="text-lg">{preset.icon}</span>
-                      <span className="text-[10px] text-gray-400 font-bold">
-                        {preset.label}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-
                 <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
                   <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                    🎥 Camera Control
+                    🎥 Virtual Camera
                   </h4>
 
                   {/* Horizontal */}
@@ -398,11 +377,17 @@ export function EditAssetModal({
                           horizontal: parseInt(e.target.value),
                         }))
                       }
-                      className="w-full accent-cyan-500"
+                      className="w-full accent-cyan-500 cursor-pointer"
                     />
+                    <div className="flex justify-between text-[10px] text-gray-600 mt-1">
+                      <span>Front</span>
+                      <span>Side</span>
+                      <span>Back</span>
+                      <span>Front</span>
+                    </div>
                   </div>
 
-                  {/* Vertical */}
+                  {/* Vertical (Elevation) */}
                   <div className="space-y-2 mb-4">
                     <div className="flex justify-between text-xs text-gray-400">
                       <span>Elevation (Vertical)</span>
@@ -412,31 +397,36 @@ export function EditAssetModal({
                     </div>
                     <input
                       type="range"
-                      min="-20"
+                      min="-90"
                       max="90"
                       step="1"
                       value={driftParams.vertical}
                       onChange={(e) =>
                         setDriftParams((p) => ({
                           ...p,
-                          vertical: parseInt(e.target.value),
+                          vertical: parseFloat(e.target.value),
                         }))
                       }
-                      className="w-full accent-purple-500"
+                      className="w-full accent-purple-500 cursor-pointer"
                     />
+                    <div className="flex justify-between text-[10px] text-gray-600 mt-1">
+                      <span>Low Angle (-90°)</span>
+                      <span>Eye Level</span>
+                      <span>Top Down (90°)</span>
+                    </div>
                   </div>
 
                   {/* Zoom */}
                   <div className="space-y-2">
                     <div className="flex justify-between text-xs text-gray-400">
-                      <span>Zoom Distance</span>
+                      <span>Zoom</span>
                       <span className="text-cyan-400">{driftParams.zoom}</span>
                     </div>
                     <input
                       type="range"
                       min="0"
                       max="10"
-                      step="0.1"
+                      step="1"
                       value={driftParams.zoom}
                       onChange={(e) =>
                         setDriftParams((p) => ({
@@ -444,13 +434,13 @@ export function EditAssetModal({
                           zoom: parseInt(e.target.value),
                         }))
                       }
-                      className="w-full accent-green-500"
+                      className="w-full accent-green-500 cursor-pointer"
                     />
+                    <div className="flex justify-between text-[10px] text-gray-600 mt-1">
+                      <span>Wide</span>
+                      <span>Close Up</span>
+                    </div>
                   </div>
-                </div>
-
-                <div className="text-xs text-gray-500 bg-black/30 p-3 rounded-lg border border-gray-800">
-                  ℹ️ <b>Drift</b> uses AI to rotate the subject.
                 </div>
               </div>
             )}
@@ -463,11 +453,7 @@ export function EditAssetModal({
                 disabled={isProcessing}
                 className="w-full py-4 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isProcessing ? (
-                  "Drifting..."
-                ) : (
-                  <span>🌀 Generate New Angle</span>
-                )}
+                {isProcessing ? "Drifting..." : <span>🌀 Generate Angle</span>}
               </button>
             ) : (
               <button
