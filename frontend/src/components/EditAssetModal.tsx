@@ -196,9 +196,7 @@ export function EditAssetModal({
               <div className="flex flex-col items-center gap-3">
                 <LoadingSpinner size="lg" variant="neon" />
                 <span className="text-cyan-300 font-bold animate-pulse">
-                  {activeTab === "drift"
-                    ? "Rotating Camera (Flux 2)..."
-                    : "Processing Edit..."}
+                  {activeTab === "drift" ? "Drifting..." : "Processing Edit..."}
                 </span>
               </div>
             </div>
