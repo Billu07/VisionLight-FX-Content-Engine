@@ -271,17 +271,22 @@ export const contentEngine = {
   },
 
   // === DRIFT EDIT ===
+  // === DRIFT EDIT ===
   async processDriftEdit(
     userId: string,
     assetUrl: string,
-    prompt: string, // 👈 Added Prompt
+    prompt: string,
     horizontal: number,
     vertical: number,
     zoom: number
   ) {
     try {
-      // 1. Get Original Dimensions for Raw Quality
-      const imageResponse = await axios.get(getOptimizedUrl(assetUrl), {
+      // 🛑 FIX: Use the raw assetUrl.
+      // Do NOT use getOptimizedUrl(), as it adds compression and resizing.
+      const rawUrl = assetUrl;
+
+      // 1. Get Original Dimensions (from the raw file)
+      const imageResponse = await axios.get(rawUrl, {
         responseType: "arraybuffer",
       });
       const buffer = Buffer.from(imageResponse.data);
@@ -289,8 +294,8 @@ export const contentEngine = {
 
       // 2. Generate
       const resultBuffer = await FalService.generateDriftAngle({
-        imageUrl: getOptimizedUrl(assetUrl),
-        prompt: prompt, // Pass it through
+        imageUrl: rawUrl, // 👈 Send the High-Res URL to AI
+        prompt: prompt,
         horizontalAngle: horizontal,
         verticalAngle: vertical,
         zoom: zoom,
@@ -307,7 +312,7 @@ export const contentEngine = {
         "image"
       );
 
-      // 4. Save (Original Ratio)
+      // 4. Save
       return await airtableService.createAsset(userId, newUrl, "original");
     } catch (e: any) {
       console.error("Drift Logic Failed:", e.message);
