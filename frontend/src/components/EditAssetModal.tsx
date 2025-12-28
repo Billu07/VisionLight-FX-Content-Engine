@@ -121,7 +121,7 @@ export function EditAssetModal({
       } catch (e) {
         console.error("Polling error", e);
       }
-    }, 3000); // Check every 3 seconds
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [driftPostId, currentAsset.id, queryClient]);
