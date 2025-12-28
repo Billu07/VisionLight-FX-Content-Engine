@@ -85,6 +85,7 @@ export function EditAssetModal({
   }, [currentAsset.id]);
 
   // 2. POLLING EFFECT: Watch the Post ID (Like Regular PicDrift)
+  // 2. POLLING EFFECT: Watch the Post ID
   useEffect(() => {
     if (!driftPostId) return;
 
@@ -101,15 +102,12 @@ export function EditAssetModal({
           setDriftProgress(100);
           setDriftStatusMsg("Loading Video...");
 
-          // Clean up local storage
           localStorage.removeItem(`active_drift_post_${currentAsset.id}`);
           setDriftPostId(null);
 
-          // ✅ Show the video so user can extract frame
           setDriftVideoUrl(mediaUrl);
           setIsProcessing(false);
 
-          // Refresh library (optional, if you want the video to appear there too)
           queryClient.invalidateQueries({ queryKey: ["assets"] });
         } else if (status === "FAILED") {
           clearInterval(interval);
@@ -118,10 +116,23 @@ export function EditAssetModal({
           setIsProcessing(false);
           alert("Drift Generation Failed: " + (error || "Unknown error"));
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error("Polling error", e);
+
+        // 🚀 FIX: If Post is deleted/missing (404/403), Stop Polling!
+        if (
+          e.message?.includes("404") ||
+          e.message?.includes("403") ||
+          e.response?.status === 404
+        ) {
+          console.warn("Job not found on server. Clearing local state.");
+          clearInterval(interval);
+          localStorage.removeItem(`active_drift_post_${currentAsset.id}`);
+          setDriftPostId(null);
+          setIsProcessing(false);
+        }
       }
-    }, 10000);
+    }, 10000); // ✅ 10 Seconds Interval (Safer)
 
     return () => clearInterval(interval);
   }, [driftPostId, currentAsset.id, queryClient]);

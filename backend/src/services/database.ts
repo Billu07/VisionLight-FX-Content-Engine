@@ -88,7 +88,8 @@ export const dbService = {
         mediaType: data.mediaType,
         mediaProvider: data.mediaProvider,
         platform: data.platform,
-        status: "NEW",
+        // ✅ FIX: Use provided status, or default to NEW
+        status: data.status || "NEW",
         imageReference: data.imageReference,
         enhancedPrompt: data.enhancedPrompt,
         generationStep: data.generationStep,
@@ -109,7 +110,7 @@ export const dbService = {
     return prisma.post.findMany({
       where: {
         userId,
-        platform: { not: "Internal" }, // <--- This hides them!
+        platform: { not: "Internal" },
       },
       orderBy: { createdAt: "desc" },
     });
