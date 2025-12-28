@@ -49,7 +49,7 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.get("/", (req, res) => {
   res.json({
     message: "Visionlight FX Backend - Supabase Edition",
-    version: "4.3.0",
+    version: "4.4.0",
     status: "Healthy",
   });
 });
@@ -319,7 +319,7 @@ app.post(
 
 // ==================== ASSET MANAGEMENT ====================
 
-// ✅ FIXED: Add the route to move a timeline post to assets
+// 1. Move Post Media to Asset (Existing)
 app.post(
   "/api/posts/:postId/to-asset",
   authenticateToken,
@@ -333,8 +333,7 @@ app.post(
   }
 );
 
-// ✅ NEW: Synchronous Upload (For Magic Edit & Direct Reference)
-// ✅ NEW: Synchronous Upload (Supports Raw Mode)
+// 2. Sync Upload (Magic Edit & Reference)
 app.post(
   "/api/assets/upload-sync",
   authenticateToken,
@@ -349,13 +348,11 @@ app.post(
       let asset;
 
       if (raw === "true") {
-        // 🚀 Raw Mode: No resizing, no processing
         asset = await contentEngine.uploadRawAsset(
           req.file.buffer,
           req.user!.id
         );
       } else {
-        // ⚙️ Process Mode: Resize/Outpaint to target ratio
         asset = await contentEngine.processAndSaveAsset(
           req.file.buffer,
           req.user!.id,
@@ -370,7 +367,7 @@ app.post(
   }
 );
 
-// 1. Batch Upload & Process
+// 3. Batch Upload
 app.post(
   "/api/assets/batch",
   authenticateToken,
@@ -395,7 +392,7 @@ app.post(
             await contentEngine.processAndSaveAsset(
               file.buffer,
               req.user!.id,
-              aspectRatio || "16:9" // Default to 16:9 if missing
+              aspectRatio || "16:9"
             );
           } catch (e) {
             console.error("Failed to process one asset in batch", e);
@@ -408,7 +405,7 @@ app.post(
   }
 );
 
-// 2. Edit Asset
+// 4. Edit Asset (Standard/Pro)
 app.post(
   "/api/assets/edit",
   authenticateToken,
@@ -436,7 +433,7 @@ app.post(
   }
 );
 
-// ✅ NEW: Start Kling Drift
+// ✅ NEW: Start Drift Video Path (Kling)
 app.post(
   "/api/assets/drift-video",
   authenticateToken,
@@ -458,7 +455,7 @@ app.post(
   }
 );
 
-// ✅ NEW: Check Tool Status (Generic)
+// ✅ NEW: Check Tool Status (For Drift Polling)
 app.post(
   "/api/tools/status",
   authenticateToken,
@@ -473,7 +470,31 @@ app.post(
   }
 );
 
-// 3. Vision Analysis
+// ✅ NEW: Save Extracted Frame / Video URL
+app.post(
+  "/api/assets/save-url",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { url, aspectRatio, type } = req.body;
+
+      if (!url) return res.status(400).json({ error: "URL required" });
+
+      const asset = await airtableService.createAsset(
+        req.user!.id,
+        url,
+        aspectRatio || "16:9",
+        type || "IMAGE"
+      );
+
+      res.json({ success: true, asset });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// 5. Vision Analysis
 app.post(
   "/api/analyze-image",
   authenticateToken,
@@ -484,11 +505,8 @@ app.post(
         return res.status(400).json({ error: "No image uploaded" });
 
       const { prompt } = req.body;
-
-      // Lazy load Gemini Service
       const { GeminiService } = require("./services/gemini");
 
-      // Use Gemini 2.5 Flash for text analysis of the image
       const text = await GeminiService.analyzeImageText({
         prompt: prompt || "Describe this image in detail.",
         imageBuffer: req.file.buffer,
@@ -501,7 +519,7 @@ app.post(
   }
 );
 
-// 4. Get Assets
+// 6. Get Assets
 app.get(
   "/api/assets",
   authenticateToken,
@@ -515,7 +533,7 @@ app.get(
   }
 );
 
-// 5. Delete Asset
+// 7. Delete Asset
 app.delete(
   "/api/assets/:id",
   authenticateToken,
@@ -562,7 +580,26 @@ app.put(
   }
 );
 
-// ✅ FIXED: Dynamic Download Extension Handling
+app.delete(
+  "/api/posts/:postId",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { postId } = req.params;
+      const post = await airtableService.getPostById(postId);
+
+      if (!post || post.userId !== req.user!.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await airtableService.deletePost(postId);
+      res.json({ success: true, message: "Post deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
 app.get(
   "/api/posts/:postId/download",
   authenticateToken,
@@ -582,17 +619,13 @@ app.get(
       }
 
       // Check Media Type for extension
-      let extension = "mp4"; // Default for video
+      let extension = "mp4";
       const type = post.mediaType ? post.mediaType.toUpperCase() : "VIDEO";
-
       if (type === "IMAGE") extension = "jpg";
-      // For carousels, if it's an array, we might just serve the first image
-      // or rely on frontend to download individually. For single link:
       if (type === "CAROUSEL") extension = "jpg";
 
       const filename = `${cleanTitle}.${extension}`;
 
-      // Handle Carousel Arrays: Pick the first image for the direct download button
       let targetUrl = post.mediaUrl;
       try {
         const parsed = JSON.parse(post.mediaUrl);
@@ -621,8 +654,7 @@ app.get(
   }
 );
 
-// ==================== GENERATION WORKFLOW (UNIFIED) ====================
-
+// ==================== GENERATION WORKFLOW ====================
 app.post(
   "/api/generate-media",
   authenticateToken,
@@ -630,19 +662,8 @@ app.post(
   async (req: AuthenticatedRequest, res) => {
     try {
       console.log("🎬 /api/generate-media hit");
-      const {
-        prompt,
-        mediaType, // "video", "image", "carousel"
-        duration,
-        model,
-        aspectRatio,
-        resolution,
-        size,
-        width,
-        height,
-        title,
-      } = req.body;
-
+      const { prompt, mediaType, duration, model, aspectRatio, title } =
+        req.body;
       const cost = calculateCost(
         mediaType,
         duration ? parseInt(duration) : undefined,
@@ -651,24 +672,17 @@ app.post(
 
       const user = await airtableService.findUserById(req.user!.id);
       if (!user || user.creditBalance < cost) {
-        return res.status(403).json({
-          error: `Insufficient credits. Required: ${cost}, Balance: ${
-            user?.creditBalance || 0
-          }`,
-        });
+        return res
+          .status(403)
+          .json({ error: `Insufficient credits. Required: ${cost}` });
       }
 
-      // Handle Uploads
       const referenceFiles = (req.files as Express.Multer.File[]) || [];
       const uploadedUrls: string[] = [];
       if (referenceFiles.length > 0) {
-        try {
-          for (const file of referenceFiles) {
-            const url = await uploadToCloudinary(file);
-            uploadedUrls.push(url);
-          }
-        } catch (err) {
-          return res.status(500).json({ error: "Image upload failed" });
+        for (const file of referenceFiles) {
+          const url = await uploadToCloudinary(file);
+          uploadedUrls.push(url);
         }
       }
       const primaryRefUrl = uploadedUrls.length > 0 ? uploadedUrls[0] : "";
@@ -687,10 +701,8 @@ app.post(
         cost: cost,
       };
 
-      // 1. Deduct Credits
       await airtableService.deductCredits(req.user!.id, cost);
 
-      // 2. CREATE POST
       const post = await airtableService.createPost({
         userId: req.user!.id,
         prompt,
@@ -703,10 +715,9 @@ app.post(
         requiresApproval: false,
       });
 
-      // 3. RESPOND
       res.json({ success: true, postId: post.id });
 
-      // 4. TRIGGER PROCESS
+      // TRIGGER PROCESS
       (async () => {
         try {
           if (mediaType === "carousel") {
@@ -744,7 +755,7 @@ app.post(
   }
 );
 
-// 2. JOB CHECK (Only for Videos now)
+// Check Active Jobs
 app.get(
   "/api/jobs/check-active",
   authenticateToken,
@@ -755,9 +766,8 @@ app.get(
         (p: any) => p.status === "PROCESSING"
       );
 
-      if (activePosts.length === 0) {
+      if (activePosts.length === 0)
         return res.json({ success: true, active: 0 });
-      }
 
       const updates = activePosts.map(async (simplePost: any) => {
         const fullPost = await airtableService.getPostById(simplePost.id);
@@ -769,13 +779,12 @@ app.get(
       await Promise.all(updates);
       res.json({ success: true, checked: activePosts.length });
     } catch (error: any) {
-      console.error("Check Status Error:", error);
       res.json({ success: false, error: error.message });
     }
   }
 );
 
-// --- STATUS CHECK (For Videos) ---
+// Post Status
 app.get(
   "/api/post/:postId/status",
   authenticateToken,
@@ -786,13 +795,12 @@ app.get(
         return res.status(403).json({ error: "Denied" });
 
       if (post.status === "PROCESSING") {
-        const createdAt = new Date(post.createdAt).getTime();
-        const now = new Date().getTime();
-        const diffMins = (now - createdAt) / 60000;
+        const diffMins =
+          (new Date().getTime() - new Date(post.createdAt).getTime()) / 60000;
         if (diffMins > 60) {
           await airtableService.updatePost(post.id, {
             status: "FAILED",
-            error: "Timeout (Server restart)",
+            error: "Timeout",
           });
           post.status = "FAILED";
         }
@@ -802,7 +810,6 @@ app.get(
         success: true,
         status: post.status,
         progress: post.progress || 0,
-        generationStep: post.generationStep,
         mediaUrl: post.mediaUrl,
       });
     } catch (error: any) {

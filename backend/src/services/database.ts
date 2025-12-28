@@ -51,9 +51,15 @@ export const dbService = {
   },
 
   // === ASSETS ===
-  async createAsset(userId: string, url: string, aspectRatio: string) {
+  // === ASSETS ===
+  async createAsset(
+    userId: string,
+    url: string,
+    aspectRatio: string,
+    type: string = "IMAGE"
+  ) {
     return prisma.asset.create({
-      data: { userId, url, aspectRatio },
+      data: { userId, url, aspectRatio, type },
     });
   },
   async getUserAssets(userId: string) {

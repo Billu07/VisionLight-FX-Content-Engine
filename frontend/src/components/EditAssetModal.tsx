@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiEndpoints } from "../lib/api";
 import { DriftFrameExtractor } from "./DriftFrameExtractor";
 import { LoadingSpinner } from "./LoadingSpinner";
+import { ProgressBar } from "./ProgressBar"; // ✅ Ensure this file exists
 
 interface Asset {
   id: string;
@@ -59,8 +60,9 @@ export function EditAssetModal({
   const [driftVideoUrl, setDriftVideoUrl] = useState<string | null>(null);
   const [isDriftPolling, setIsDriftPolling] = useState(false);
   const [driftStatusMsg, setDriftStatusMsg] = useState("Processing...");
+  const [driftProgress, setDriftProgress] = useState(0); // ✅ New Progress State
 
-  // ✅ 1. RECOVERY LOGIC: Resume polling on refresh
+  // 1. RECOVERY LOGIC: Resume polling on refresh
   useEffect(() => {
     const pendingJob = localStorage.getItem(`drift_job_${currentAsset.id}`);
     if (pendingJob) {
@@ -76,7 +78,7 @@ export function EditAssetModal({
     enabled: showRefSelector,
   });
 
-  // === MUTATION 1: STANDARD/PRO EDIT ===
+  // === MUTATION 1: TEXT EDIT ===
   const textEditMutation = useMutation({
     mutationFn: async () => {
       return apiEndpoints.editAsset({
@@ -94,7 +96,7 @@ export function EditAssetModal({
     onSettled: () => setIsProcessing(false),
   });
 
-  // === MUTATION 2: DRIFT PATH START (Kling) ===
+  // === MUTATION 2: DRIFT PATH START ===
   const driftStartMutation = useMutation({
     mutationFn: async () => {
       return apiEndpoints.startDriftVideo({
@@ -108,9 +110,9 @@ export function EditAssetModal({
     onMutate: () => {
       setIsProcessing(true);
       setDriftStatusMsg("Sending to Kling Engine...");
+      setDriftProgress(5); // Start progress
     },
     onSuccess: (res: any) => {
-      // ✅ 2. SAVE STATE: Save Job ID
       localStorage.setItem(`drift_job_${currentAsset.id}`, res.data.statusUrl);
       pollDriftStatus(res.data.statusUrl);
     },
@@ -131,20 +133,36 @@ export function EditAssetModal({
         const res = await apiEndpoints.checkToolStatus(statusUrl);
         const status = res.data.status;
 
-        // Update UX Message
-        if (status === "IN_QUEUE")
+        // Update UX
+        if (status === "IN_QUEUE") {
           setDriftStatusMsg(
             `Queued (Pos: ${res.data.queue_position || "?"})...`
           );
-        else if (status === "IN_PROGRESS")
+        } else if (status === "IN_PROGRESS") {
           setDriftStatusMsg("Rendering 3D Path...");
+          // Simulate progress (slowly creep to 95%)
+          setDriftProgress((prev) => (prev < 95 ? prev + 1 : 95));
+        }
 
         if (status === "COMPLETED") {
           clearInterval(interval);
-          // ✅ 3. CLEANUP: Remove Job ID
+          setDriftProgress(100);
           localStorage.removeItem(`drift_job_${currentAsset.id}`);
 
           const videoUrl = res.data.response_url || res.data.video.url;
+
+          // Auto-save the video asset
+          try {
+            await apiEndpoints.saveAssetUrl({
+              url: videoUrl,
+              aspectRatio: "16:9",
+              type: "VIDEO",
+            });
+            queryClient.invalidateQueries({ queryKey: ["assets"] });
+          } catch (e) {
+            console.warn("Auto-save video failed", e);
+          }
+
           setDriftVideoUrl(videoUrl);
           setIsProcessing(false);
           setIsDriftPolling(false);
@@ -200,7 +218,7 @@ export function EditAssetModal({
       const blob = await res.blob();
       const formData = new FormData();
       formData.append("image", blob, "current.jpg");
-      formData.append("prompt", "Describe the subject, lighting, and style.");
+      formData.append("prompt", "Describe subject, lighting, and style.");
       return apiEndpoints.analyzeImage(formData);
     },
     onMutate: () => setIsAnalyzing(true),
@@ -290,22 +308,23 @@ export function EditAssetModal({
               )}
 
               {isProcessing && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-30 backdrop-blur-sm">
-                  <div className="flex flex-col items-center gap-3">
-                    <LoadingSpinner size="lg" variant="neon" />
-                    {/* ✅ STATUS MESSAGE */}
-                    <div className="text-center">
-                      <span className="text-cyan-300 font-bold animate-pulse block">
-                        {isDriftPolling
-                          ? "Calculating Path..."
-                          : "Processing..."}
-                      </span>
-                      {isDriftPolling && (
-                        <span className="text-xs text-gray-400 mt-1 block">
-                          {driftStatusMsg}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30 backdrop-blur-sm">
+                  <div className="flex flex-col items-center gap-4 w-full max-w-sm px-6">
+                    {isDriftPolling ? (
+                      // ✅ PROGRESS BAR FOR DRIFT
+                      <ProgressBar
+                        progress={driftProgress}
+                        label={driftStatusMsg}
+                      />
+                    ) : (
+                      // STANDARD SPINNER FOR OTHERS
+                      <>
+                        <LoadingSpinner size="lg" variant="neon" />
+                        <span className="text-cyan-300 font-bold animate-pulse">
+                          Processing...
                         </span>
-                      )}
-                    </div>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -430,9 +449,8 @@ export function EditAssetModal({
                           zoom: preset.z,
                         })
                       }
-                      className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-2 flex flex-col items-center justify-center gap-1 transition-all active:scale-95"
+                      className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-2 text-center transition-all active:scale-95"
                     >
-                      <span className="text-lg">{preset.icon}</span>
                       <span className="text-[10px] text-gray-300 font-bold block">
                         {preset.label}
                       </span>

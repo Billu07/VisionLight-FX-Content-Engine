@@ -83,6 +83,11 @@ export const apiEndpoints = {
   checkToolStatus: (statusUrl: string) =>
     api.post("/api/tools/status", { statusUrl }),
 
+  saveAssetUrl: (data: {
+    url: string;
+    aspectRatio: string;
+    type: "IMAGE" | "VIDEO";
+  }) => api.post("/api/assets/save-url", data),
   // ✅ UPDATED: Edit Asset supports 'mode'
   editAsset: (data: {
     assetId: string;
