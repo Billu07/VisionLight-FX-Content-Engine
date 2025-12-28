@@ -215,7 +215,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                   : "text-gray-400 hover:text-white"
               }`}
             >
-              Magic / Raw
+              Edited Pictures
             </button>
           </div>
 
@@ -252,7 +252,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                 <LoadingSpinner size="sm" variant="default" />
               ) : (
                 <>
-                  <span>📤</span> Upload
+                  <span></span> Upload
                 </>
               )}
             </button>
@@ -364,7 +364,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                       onClick={() => handleUseImage(selectedAsset)}
                       className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-900/20 transform active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
-                      <span>✅</span> Use this Asset
+                      <span></span> Use this Asset
                     </button>
                   )}
 
@@ -383,7 +383,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                     <span>
                       {activeDriftIds.has(selectedAsset.id)
                         ? "🌀 Resume Drift"
-                        : "🪄 Magic Edit"}
+                        : "Magic Edit"}
                     </span>
                   </button>
                 </div>
