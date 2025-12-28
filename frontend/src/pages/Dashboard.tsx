@@ -1284,7 +1284,7 @@ function Dashboard() {
                           {/* --- END FRAME BOX --- */}
                           <div className="flex flex-col gap-2">
                             <label className="text-xs text-rose-300 uppercase font-bold">
-                              End Frame
+                              End Frame(optional)
                             </label>
                             <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
                               {picDriftUrls.end ? (
