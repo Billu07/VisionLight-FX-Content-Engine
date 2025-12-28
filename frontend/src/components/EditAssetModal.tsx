@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiEndpoints } from "../lib/api";
 import { DriftFrameExtractor } from "./DriftFrameExtractor";
@@ -17,14 +17,13 @@ interface EditAssetModalProps {
 
 type EditorMode = "standard" | "pro" | "drift";
 
-// Clean Presets (Minimalist)
 const DRIFT_PRESETS = [
-  { label: "Front", h: 0, v: 0, z: 5 },
-  { label: "Side R", h: 90, v: 0, z: 5 },
-  { label: "Side L", h: 270, v: 0, z: 5 },
-  { label: "Top", h: 0, v: 60, z: 5 },
-  { label: "Back", h: 180, v: 0, z: 5 },
-  { label: "Macro", h: 30, v: 15, z: 9 },
+  { label: "Front", h: 0, v: 0, z: 5, icon: "⏹️" },
+  { label: "Side R", h: 90, v: 0, z: 5, icon: "➡️" },
+  { label: "Side L", h: 270, v: 0, z: 5, icon: "⬅️" },
+  { label: "Top", h: 0, v: 60, z: 5, icon: "⬇️" },
+  { label: "Back", h: 180, v: 0, z: 5, icon: "↩️" },
+  { label: "Macro", h: 30, v: 15, z: 9, icon: "🔍" },
 ];
 
 export function EditAssetModal({
@@ -59,6 +58,17 @@ export function EditAssetModal({
   // Drift Video State
   const [driftVideoUrl, setDriftVideoUrl] = useState<string | null>(null);
   const [isDriftPolling, setIsDriftPolling] = useState(false);
+  const [driftStatusMsg, setDriftStatusMsg] = useState("Processing...");
+
+  // ✅ 1. RECOVERY LOGIC: Resume polling on refresh
+  useEffect(() => {
+    const pendingJob = localStorage.getItem(`drift_job_${currentAsset.id}`);
+    if (pendingJob) {
+      console.log("🔄 Found pending Drift job, resuming...");
+      setActiveTab("drift");
+      pollDriftStatus(pendingJob);
+    }
+  }, [currentAsset.id]);
 
   const { data: allAssets = [] } = useQuery({
     queryKey: ["assets"],
@@ -95,9 +105,13 @@ export function EditAssetModal({
         zoom: driftParams.zoom,
       });
     },
-    onMutate: () => setIsProcessing(true),
+    onMutate: () => {
+      setIsProcessing(true);
+      setDriftStatusMsg("Sending to Kling Engine...");
+    },
     onSuccess: (res: any) => {
-      // Start polling for video completion
+      // ✅ 2. SAVE STATE: Save Job ID
+      localStorage.setItem(`drift_job_${currentAsset.id}`, res.data.statusUrl);
       pollDriftStatus(res.data.statusUrl);
     },
     onError: (err: any) => {
@@ -109,19 +123,34 @@ export function EditAssetModal({
   // POLLING LOGIC
   const pollDriftStatus = async (statusUrl: string) => {
     setIsDriftPolling(true);
+    let attempts = 0;
+
     const interval = setInterval(async () => {
+      attempts++;
       try {
         const res = await apiEndpoints.checkToolStatus(statusUrl);
         const status = res.data.status;
 
+        // Update UX Message
+        if (status === "IN_QUEUE")
+          setDriftStatusMsg(
+            `Queued (Pos: ${res.data.queue_position || "?"})...`
+          );
+        else if (status === "IN_PROGRESS")
+          setDriftStatusMsg("Rendering 3D Path...");
+
         if (status === "COMPLETED") {
           clearInterval(interval);
+          // ✅ 3. CLEANUP: Remove Job ID
+          localStorage.removeItem(`drift_job_${currentAsset.id}`);
+
           const videoUrl = res.data.response_url || res.data.video.url;
-          setDriftVideoUrl(videoUrl); // Switch UI to Extractor
+          setDriftVideoUrl(videoUrl);
           setIsProcessing(false);
           setIsDriftPolling(false);
         } else if (status === "FAILED") {
           clearInterval(interval);
+          localStorage.removeItem(`drift_job_${currentAsset.id}`);
           alert(
             "Drift Generation Failed: " + (res.data.error || "Unknown error")
           );
@@ -143,10 +172,11 @@ export function EditAssetModal({
 
     try {
       setIsProcessing(true);
+      setDriftStatusMsg("Saving extracted frame...");
       const res = await apiEndpoints.uploadAssetSync(formData);
       if (res.data.success) {
-        handleSuccess(res.data.asset); // Add extracted frame to history
-        setDriftVideoUrl(null); // Close extractor
+        handleSuccess(res.data.asset);
+        setDriftVideoUrl(null);
       }
     } catch (e: any) {
       alert("Failed to save frame: " + e.message);
@@ -164,14 +194,13 @@ export function EditAssetModal({
     queryClient.invalidateQueries({ queryKey: ["assets"] });
   };
 
-  // ... (Analyze & Upload Handlers same as before) ...
   const analyzeMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch(currentAsset.url);
       const blob = await res.blob();
       const formData = new FormData();
       formData.append("image", blob, "current.jpg");
-      formData.append("prompt", "Describe subject, lighting, and style.");
+      formData.append("prompt", "Describe the subject, lighting, and style.");
       return apiEndpoints.analyzeImage(formData);
     },
     onMutate: () => setIsAnalyzing(true),
@@ -264,9 +293,19 @@ export function EditAssetModal({
                 <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-30 backdrop-blur-sm">
                   <div className="flex flex-col items-center gap-3">
                     <LoadingSpinner size="lg" variant="neon" />
-                    <span className="text-cyan-300 font-bold animate-pulse">
-                      {isDriftPolling ? "Calculating Path..." : "Processing..."}
-                    </span>
+                    {/* ✅ STATUS MESSAGE */}
+                    <div className="text-center">
+                      <span className="text-cyan-300 font-bold animate-pulse block">
+                        {isDriftPolling
+                          ? "Calculating Path..."
+                          : "Processing..."}
+                      </span>
+                      {isDriftPolling && (
+                        <span className="text-xs text-gray-400 mt-1 block">
+                          {driftStatusMsg}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -391,8 +430,9 @@ export function EditAssetModal({
                           zoom: preset.z,
                         })
                       }
-                      className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-2 text-center transition-all active:scale-95"
+                      className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-2 flex flex-col items-center justify-center gap-1 transition-all active:scale-95"
                     >
+                      <span className="text-lg">{preset.icon}</span>
                       <span className="text-[10px] text-gray-300 font-bold block">
                         {preset.label}
                       </span>
@@ -523,7 +563,7 @@ export function EditAssetModal({
                 className="w-full py-4 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isProcessing || isDriftPolling ? (
-                  "Calculating Path..."
+                  "Generating Path..."
                 ) : (
                   <span>🌀 Generate Path</span>
                 )}

@@ -290,7 +290,7 @@ export const contentEngine = {
     return await airtableService.createAsset(userId, targetUrl, dbAspectRatio);
   },
 
-  // === KLING DRIFT PATH (Video Generation) ===
+// === KLING DRIFT PATH (Video Generation) ===
   async processKlingDrift(
     userId: string,
     assetUrl: string,
@@ -302,7 +302,18 @@ export const contentEngine = {
     try {
       console.log(`🎬 Kling Drift: H${horizontal} V${vertical} Z${zoom}`);
 
-      // 1. Construct Prompt
+      // 1. Get Image Metadata for Ratio
+      // We need to know if the input is Portrait or Landscape
+      const imageResponse = await axios.get(getOptimizedUrl(assetUrl), { responseType: 'arraybuffer' });
+      const metadata = await sharp(Buffer.from(imageResponse.data)).metadata();
+      
+      let targetRatio = "16:9";
+      if (metadata.width && metadata.height) {
+          if (Math.abs(metadata.width - metadata.height) < 100) targetRatio = "1:1";
+          else if (metadata.height > metadata.width) targetRatio = "9:16";
+      }
+
+      // 2. Construct Prompt
       const cameraMove = getKlingCameraPrompt(horizontal, vertical, zoom);
       const finalPrompt = `
       Subject: ${prompt || "The main subject of the image"}.
@@ -310,19 +321,17 @@ export const contentEngine = {
       Style: High fidelity, consistent geometry, smooth motion, 3D depth.
       `;
 
-      // 2. Prepare Payload for Kling (Image-to-Video)
-      const inputUrl = getOptimizedUrl(assetUrl);
-
+      // 3. Prepare Payload
       const payload: any = {
         prompt: finalPrompt,
-        image_url: inputUrl,
-        duration: "5", // 5 seconds is perfect for a "Path"
-        aspect_ratio: "16:9", // Or dynamic based on input if needed
+        image_url: getOptimizedUrl(assetUrl),
+        duration: "5", // 5s is the sweet spot for a camera move. 10s often hallucinates.
+        aspect_ratio: targetRatio, // ✅ Fixed: Matches input image
       };
 
-      // 3. Call Kling (Standard or Pro - Pro is safer for consistency)
-      const url = `${FAL_BASE_PATH}/pro/image-to-video`;
-
+      // 4. Call Kling Pro
+      const url = `${FAL_BASE_PATH}/pro/image-to-video`; 
+      
       const submitRes = await axios.post(url, payload, {
         headers: {
           Authorization: `Key ${FAL_KEY}`,
@@ -330,12 +339,11 @@ export const contentEngine = {
         },
       });
 
-      // 4. Return Request ID immediately (Frontend will poll)
-      // We do NOT save to DB yet. This is a temporary "Tool" usage.
-      return {
-        requestId: submitRes.data.request_id,
-        statusUrl: submitRes.data.status_url,
+      return { 
+          requestId: submitRes.data.request_id, 
+          statusUrl: submitRes.data.status_url 
       };
+
     } catch (e: any) {
       console.error("Kling Drift Failed:", e.message);
       throw new Error(`Drift failed: ${e.message}`);

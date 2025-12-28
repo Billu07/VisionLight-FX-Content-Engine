@@ -7,12 +7,12 @@ import { EditAssetModal } from "./EditAssetModal";
 interface Asset {
   id: string;
   url: string;
-  aspectRatio: "16:9" | "9:16" | "original"; // Updated type
+  aspectRatio: "16:9" | "9:16" | "original";
   createdAt: string;
 }
 
 interface AssetLibraryProps {
-  onSelect?: (file: File, url: string) => void; // Made optional for cases where we just browse
+  onSelect?: (file: File, url: string) => void;
   onClose: () => void;
 }
 
@@ -20,7 +20,6 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 🛠️ UPDATE: Default to "original" if you want to see magic edits first, or keep "16:9"
   const [targetRatio, setTargetRatio] = useState<"16:9" | "9:16" | "original">(
     "16:9"
   );
@@ -35,6 +34,9 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
   const [pollingUntil, setPollingUntil] = useState<number>(0);
   const [processingCount, setProcessingCount] = useState(0);
 
+  // ✅ NEW: Track assets that have active/completed Drift paths locally
+  const [activeDriftIds, setActiveDriftIds] = useState<Set<string>>(new Set());
+
   const isProcessing = pollingUntil > 0;
 
   // 1. Fetch Assets
@@ -44,6 +46,28 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
     refetchInterval: isProcessing ? 2000 : false,
     refetchIntervalInBackground: true,
   });
+
+  // ✅ NEW: Scan LocalStorage for Drift Jobs on mount/update
+  useEffect(() => {
+    const checkDrifts = () => {
+      const found = new Set<string>();
+      // Scan all local storage keys
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("drift_job_")) {
+          const assetId = key.replace("drift_job_", "");
+          found.add(assetId);
+        }
+      }
+      setActiveDriftIds(found);
+    };
+
+    checkDrifts();
+
+    // Optional: Re-scan every few seconds in case a job finishes/clears elsewhere
+    const interval = setInterval(checkDrifts, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   // 2. Timer Logic
   useEffect(() => {
@@ -63,8 +87,6 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
     mutationFn: async (files: FileList) => {
       const formData = new FormData();
       Array.from(files).forEach((file) => formData.append("images", file));
-      // For standard batch uploads, we still use the selected tab ratio
-      // If user is in "Magic/Original" tab, we default to 16:9 for processing, or we could add logic to raw upload
       const uploadRatio = targetRatio === "original" ? "16:9" : targetRatio;
       formData.append("aspectRatio", uploadRatio);
       return apiEndpoints.uploadBatchAssets(formData);
@@ -129,11 +151,9 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
     }
   };
 
-  // 🛠️ FILTER LOGIC UPDATED
   const filteredAssets = Array.isArray(assets)
     ? assets.filter((a: Asset) => {
         if (targetRatio === "original") {
-          // Show explicit 'original' OR any weird ratios that aren't strict 16:9/9:16
           return (
             a.aspectRatio === "original" ||
             (a.aspectRatio !== "16:9" && a.aspectRatio !== "9:16")
@@ -166,7 +186,6 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
 
         {/* CONTROLS */}
         <div className="p-6 bg-gray-800/50 flex flex-col md:flex-row gap-4 items-center justify-between border-b border-gray-800">
-          {/* 🛠️ UPDATED TABS */}
           <div className="flex bg-gray-950 p-1 rounded-lg border border-gray-700">
             <button
               onClick={() => setTargetRatio("16:9")}
@@ -176,7 +195,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                   : "text-gray-400 hover:text-white"
               }`}
             >
-              Landscape 16:9
+              Landscape
             </button>
             <button
               onClick={() => setTargetRatio("9:16")}
@@ -186,7 +205,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                   : "text-gray-400 hover:text-white"
               }`}
             >
-              Portrait 9:16
+              Portrait
             </button>
             <button
               onClick={() => setTargetRatio("original")}
@@ -196,7 +215,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                   : "text-gray-400 hover:text-white"
               }`}
             >
-              Edited Pictures
+              Magic / Raw
             </button>
           </div>
 
@@ -233,7 +252,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                 <LoadingSpinner size="sm" variant="default" />
               ) : (
                 <>
-                  <span></span> Upload
+                  <span>📤</span> Upload
                 </>
               )}
             </button>
@@ -273,7 +292,12 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                 <div
                   key={asset.id}
                   onClick={() => setSelectedAsset(asset)}
-                  className="relative group border border-gray-800 rounded-xl overflow-hidden bg-black cursor-pointer hover:border-cyan-500/50 transition-all hover:shadow-2xl hover:shadow-cyan-900/20 aspect-auto"
+                  className={`relative group border rounded-xl overflow-hidden bg-black cursor-pointer transition-all hover:shadow-2xl hover:shadow-cyan-900/20 aspect-auto ${
+                    // ✅ HIGHLIGHT ACTIVE DRIFT ASSETS
+                    activeDriftIds.has(asset.id)
+                      ? "border-rose-500 ring-2 ring-rose-500/50"
+                      : "border-gray-800 hover:border-cyan-500/50"
+                  }`}
                 >
                   <img
                     src={asset.url}
@@ -284,6 +308,14 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                         asset.aspectRatio === "9:16" ? "9/16" : "16/9",
                     }}
                   />
+
+                  {/* ✅ DRIFT BADGE */}
+                  {activeDriftIds.has(asset.id) && (
+                    <div className="absolute top-2 right-2 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg z-10 animate-pulse">
+                      🌀 Drift Ready
+                    </div>
+                  )}
+
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <span className="bg-black/50 text-white px-3 py-1 rounded-full text-xs backdrop-blur-sm border border-white/20">
                       View
@@ -323,17 +355,16 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                 </h3>
                 <p className="text-gray-400 text-sm mb-6">
                   {selectedAsset.aspectRatio === "original"
-                    ? "Picture Edit"
+                    ? "Raw / Magic Edit"
                     : selectedAsset.aspectRatio}
                 </p>
                 <div className="space-y-3">
-                  {/* Only show 'Use' button if we are selecting for a prompt, not just browsing */}
                   {onSelect && (
                     <button
                       onClick={() => handleUseImage(selectedAsset)}
                       className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-900/20 transform active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
-                      <span></span> Use this Asset
+                      <span>✅</span> Use this Asset
                     </button>
                   )}
 
@@ -342,9 +373,18 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                       setEditingAsset(selectedAsset);
                       setSelectedAsset(null);
                     }}
-                    className="w-full py-3 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/50 rounded-xl font-bold transition-all flex items-center justify-center gap-2"
+                    className={`w-full py-3 border rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
+                      // Highlight button if drift is waiting
+                      activeDriftIds.has(selectedAsset.id)
+                        ? "bg-rose-600 text-white border-rose-500 hover:bg-rose-500"
+                        : "bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border-purple-500/50"
+                    }`}
                   >
-                    <span></span> Edit
+                    <span>
+                      {activeDriftIds.has(selectedAsset.id)
+                        ? "🌀 Resume Drift"
+                        : "🪄 Magic Edit"}
+                    </span>
                   </button>
                 </div>
               </div>
