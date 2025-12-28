@@ -17,15 +17,18 @@ export function DriftFrameExtractor({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [isReady, setIsReady] = useState(false);
 
   // Sync slider with video time
   const handleTimeUpdate = () => {
     if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
   };
 
+  // ✅ IMPROVEMENT 1: Pause while scrubbing for precision
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const time = parseFloat(e.target.value);
     if (videoRef.current) {
+      videoRef.current.pause(); // Pause so frame doesn't drift
       videoRef.current.currentTime = time;
       setCurrentTime(time);
     }
@@ -36,22 +39,40 @@ export function DriftFrameExtractor({
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
-    // Draw current video frame to canvas
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    try {
+      // ✅ IMPROVEMENT 2: Check if video data is actually loaded
+      if (video.readyState < 2) {
+        alert("Video is still loading, please wait a moment.");
+        return;
+      }
 
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
 
-    // Convert to Blob and send back
-    canvas.toBlob(
-      (blob) => {
-        if (blob) onExtract(blob);
-      },
-      "image/jpeg",
-      0.95
-    );
+      // Draw current video frame to canvas
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Convert to Blob
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            onExtract(blob);
+          } else {
+            throw new Error("Canvas extraction failed (Empty Blob).");
+          }
+        },
+        "image/jpeg",
+        0.95
+      );
+    } catch (e: any) {
+      // ✅ IMPROVEMENT 3: Catch CORS "Tainted Canvas" errors explicitly
+      console.error("Frame Extraction Error:", e);
+      alert(
+        "Security Error: The browser blocked frame extraction. \n\nEnsure your Cloudinary settings allow 'Access-Control-Allow-Origin: *'"
+      );
+    }
   };
 
   return (
@@ -60,14 +81,23 @@ export function DriftFrameExtractor({
         {/* Hidden Canvas for Extraction */}
         <canvas ref={canvasRef} className="hidden" />
 
+        {/* ✅ IMPROVEMENT 4: Add key to force reload if URL changes */}
         <video
+          key={videoUrl}
           ref={videoRef}
           src={videoUrl}
-          className="w-full max-h-[50vh] object-contain"
+          className="w-full max-h-[50vh] object-contain bg-black"
           onTimeUpdate={handleTimeUpdate}
-          onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)}
+          onLoadedMetadata={() => {
+            setDuration(videoRef.current?.duration || 0);
+            setIsReady(true);
+          }}
+          // ✅ IMPROVEMENT 5: Sync state with actual video events
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
           loop
-          crossOrigin="anonymous" // CRITICAL for canvas extraction
+          playsInline
+          crossOrigin="anonymous" // CRITICAL
         />
 
         {/* Play/Pause Overlay */}
@@ -76,15 +106,15 @@ export function DriftFrameExtractor({
           onClick={() => {
             if (videoRef.current?.paused) {
               videoRef.current.play();
-              setIsPlaying(true);
             } else {
               videoRef.current?.pause();
-              setIsPlaying(false);
             }
           }}
         >
           {!isPlaying && (
-            <span className="text-4xl text-white opacity-80">▶</span>
+            <div className="bg-black/50 rounded-full p-4 backdrop-blur-sm border border-white/20">
+              <span className="text-4xl text-white ml-1">▶</span>
+            </div>
           )}
         </div>
       </div>
@@ -92,7 +122,7 @@ export function DriftFrameExtractor({
       {/* Scrubber Controls */}
       <div className="space-y-2 px-2">
         <div className="flex justify-between text-xs text-gray-400 font-mono">
-          <span>Frame: {(currentTime * 30).toFixed(0)}</span>
+          <span>Frame: {((currentTime || 0) * 30).toFixed(0)}</span>
           <span>
             {currentTime.toFixed(2)}s / {duration.toFixed(2)}s
           </span>
@@ -100,11 +130,12 @@ export function DriftFrameExtractor({
         <input
           type="range"
           min="0"
-          max={duration}
-          step="0.03" // Approx 1 frame at 30fps
+          max={duration || 100} // Prevent NaN
+          step="0.033" // 30fps
           value={currentTime}
+          disabled={!isReady}
           onChange={handleSliderChange}
-          className="w-full accent-rose-500 cursor-pointer"
+          className="w-full accent-rose-500 cursor-pointer disabled:opacity-50"
         />
       </div>
 
@@ -112,7 +143,8 @@ export function DriftFrameExtractor({
       <div className="flex gap-3">
         <button
           onClick={captureFrame}
-          className="flex-1 py-3 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg transition-all flex items-center justify-center gap-2"
+          disabled={!isReady}
+          className="flex-1 py-3 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <span>📸</span> Extract This Frame
         </button>
@@ -128,7 +160,7 @@ export function DriftFrameExtractor({
         <a
           href={videoUrl}
           target="_blank"
-          download
+          rel="noopener noreferrer"
           className="text-xs text-gray-500 hover:text-white underline"
         >
           Download Full Video Path

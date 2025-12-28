@@ -718,19 +718,35 @@ INSTRUCTIONS:
     }
   },
 
+  // Find your finalizePost function and update it:
+
   async finalizePost(
     postId: string,
     url: string,
     provider: string,
     userId: string
   ) {
-    await airtableService.updatePost(postId, {
+    // 1. Update the Post
+    const post = await airtableService.updatePost(postId, {
       mediaUrl: url,
       mediaProvider: provider,
       status: "READY",
       progress: 100,
       generationStep: "COMPLETED",
     });
+
+    // 2. CHECK: If this was a "Drift Editor" job, auto-save to Asset Library
+    const params = post.generationParams as any;
+    if (params?.source === "DRIFT_EDITOR") {
+      console.log("💾 Auto-saving Drift result to Asset Library...");
+      await airtableService.createAsset(
+        userId,
+        url,
+        "16:9", // Drift is usually 16:9
+        "VIDEO"
+      );
+    }
+
     await ROIService.incrementMediaGenerated(userId);
   },
 

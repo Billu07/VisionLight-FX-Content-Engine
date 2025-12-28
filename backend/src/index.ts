@@ -434,21 +434,86 @@ app.post(
 );
 
 // ✅ NEW: Start Drift Video Path (Kling)
+// Replace your existing /api/assets/drift-video route with this:
+
 app.post(
   "/api/assets/drift-video",
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
       const { assetUrl, prompt, horizontal, vertical, zoom } = req.body;
-      const result = await contentEngine.processKlingDrift(
-        req.user!.id,
+      const userId = req.user!.id;
+
+      // 1. Calculate Cost (Drift usually costs same as video gen)
+      const cost = 5;
+      const user = await airtableService.findUserById(userId);
+      if (!user || user.creditBalance < cost) {
+        return res.status(403).json({ error: "Insufficient credits" });
+      }
+
+      // We use the prompt or a default title
+      const cleanPrompt = prompt || `Drift H${horizontal} V${vertical}`;
+
+      const generationParams = {
+        horizontal,
+        vertical,
+        zoom,
         assetUrl,
-        prompt,
-        Number(horizontal),
-        Number(vertical),
-        Number(zoom)
-      );
-      res.json({ success: true, ...result });
+        source: "DRIFT_EDITOR", // Flag to know this came from editor
+        cost,
+      };
+
+      await airtableService.deductCredits(userId, cost);
+
+      // Create the DB Record
+      const post = await airtableService.createPost({
+        userId,
+        title: "Drift Generation",
+        prompt: cleanPrompt,
+        mediaType: "VIDEO",
+        mediaProvider: "kling", // Important: This triggers the existing Kling check logic
+        platform: "Internal",
+        status: "PROCESSING",
+        generationParams,
+        generationStep: "GENERATION",
+        requiresApproval: false,
+        imageReference: assetUrl, // Save the input image
+      });
+
+      // 3. Start the process in background
+      (async () => {
+        try {
+          const result = await contentEngine.processKlingDrift(
+            userId,
+            assetUrl,
+            prompt,
+            Number(horizontal),
+            Number(vertical),
+            Number(zoom)
+          );
+
+          // Update the Post with the External ID so the poller can find it
+          await airtableService.updatePost(post.id, {
+            generationParams: {
+              ...generationParams,
+              externalId: result.requestId,
+              statusUrl: result.statusUrl,
+            },
+          });
+
+          console.log(`✅ Drift Job Attached to Post ${post.id}`);
+        } catch (e: any) {
+          console.error("Drift Start Failed:", e);
+          await airtableService.updatePost(post.id, {
+            status: "FAILED",
+            error: e.message,
+          });
+          await airtableService.refundUserCredit(userId, cost);
+        }
+      })();
+
+      // 4. Return the Post ID to the frontend (not the FAL status URL)
+      res.json({ success: true, postId: post.id });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
