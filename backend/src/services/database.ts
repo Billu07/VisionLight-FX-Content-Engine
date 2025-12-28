@@ -51,7 +51,6 @@ export const dbService = {
   },
 
   // === ASSETS ===
-  // === ASSETS ===
   async createAsset(
     userId: string,
     url: string,
@@ -99,6 +98,9 @@ export const dbService = {
         generationParams: params || undefined,
       },
     });
+  },
+  async deletePost(id: string) {
+    return prisma.post.delete({ where: { id } });
   },
   async getPostById(id: string) {
     return prisma.post.findUnique({ where: { id } });
