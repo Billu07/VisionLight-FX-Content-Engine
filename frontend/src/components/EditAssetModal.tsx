@@ -66,27 +66,63 @@ export function EditAssetModal({
   const [driftProgress, setDriftProgress] = useState(0);
 
   // IMPROVED POLLING LOGIC (Defined before useEffect)
+  // ... inside EditAssetModal ...
+
+  // === MUTATION 2: DRIFT PATH START ===
+  const driftStartMutation = useMutation({
+    mutationFn: async () => {
+      return apiEndpoints.startDriftVideo({
+        assetUrl: currentAsset.url,
+        prompt: prompt,
+        horizontal: driftParams.horizontal,
+        vertical: driftParams.vertical,
+        zoom: driftParams.zoom,
+      });
+    },
+    onMutate: () => {
+      setIsProcessing(true);
+      setDriftStatusMsg("Initializing connection...");
+      setDriftProgress(5); // Start at 5%
+    },
+    onSuccess: (res: any) => {
+      console.log("✅ Drift Started. Status URL:", res.data.statusUrl);
+      localStorage.setItem(`drift_job_${currentAsset.id}`, res.data.statusUrl);
+      pollDriftStatus(res.data.statusUrl);
+    },
+    onError: (err: any) => {
+      alert("Drift Start Failed: " + err.message);
+      setIsProcessing(false);
+    },
+  });
+
+  // IMPROVED POLLING LOGIC
   const pollDriftStatus = useCallback(
     async (statusUrl: string) => {
       setIsDriftPolling(true);
       let attempts = 0;
 
+      // Force progress to move even if status doesn't change immediately
       const interval = setInterval(async () => {
         attempts++;
         try {
           const res = await apiEndpoints.checkToolStatus(statusUrl);
           const status = res.data.status;
+          const logs =
+            res.data.logs?.map((l: any) => l.message).join(" ") || "";
 
+          console.log(`Poll #${attempts}: ${status}`); // Debug log
+
+          // UPDATE UI BASED ON STATUS
           if (status === "IN_QUEUE") {
-            setDriftStatusMsg(
-              `Queued (Pos: ${res.data.queue_position || "?"})...`
-            );
-            // Slowly creep up to 20% while queued
-            setDriftProgress((prev) => (prev < 20 ? prev + 0.5 : 20));
+            const pos =
+              res.data.queue_position > 0 ? ` #${res.data.queue_position}` : "";
+            setDriftStatusMsg(`In Queue${pos}... (High Demand)`);
+            // Slowly crawl to 50% while queued
+            setDriftProgress((p) => (p < 50 ? p + 0.5 : 50));
           } else if (status === "IN_PROGRESS") {
-            setDriftStatusMsg("Rendering 3D Path...");
-            // Creep up to 95% while processing
-            setDriftProgress((prev) => (prev < 95 ? prev + 1 : 95));
+            setDriftStatusMsg("Rendering Video...");
+            // Move faster once processing starts
+            setDriftProgress((p) => (p < 90 ? p + 5 : 90));
           }
 
           if (status === "COMPLETED") {
@@ -95,20 +131,18 @@ export function EditAssetModal({
             setDriftStatusMsg("Finalizing...");
 
             localStorage.removeItem(`drift_job_${currentAsset.id}`);
-
             const videoUrl = res.data.response_url || res.data.video.url;
 
-            // Auto-save the video asset
+            // Auto-save
             try {
               await apiEndpoints.saveAssetUrl({
                 url: videoUrl,
                 aspectRatio: "16:9",
                 type: "VIDEO",
               });
-              // Refresh library in background so "Videos" tab updates
               queryClient.invalidateQueries({ queryKey: ["assets"] });
             } catch (e) {
-              console.warn("Auto-save video failed", e);
+              console.warn("Auto-save failed", e);
             }
 
             setDriftVideoUrl(videoUrl);
@@ -117,16 +151,15 @@ export function EditAssetModal({
           } else if (status === "FAILED") {
             clearInterval(interval);
             localStorage.removeItem(`drift_job_${currentAsset.id}`);
-            alert(
-              "Drift Generation Failed: " + (res.data.error || "Unknown error")
-            );
+            alert("Generation Failed: " + (res.data.error || "Unknown error"));
             setIsProcessing(false);
             setIsDriftPolling(false);
           }
         } catch (e) {
-          console.error("Polling error", e);
+          console.error("Polling Network Error", e);
+          // Don't stop polling on simple network errors, just wait
         }
-      }, 4000);
+      }, 3000); // Check every 3 seconds
     },
     [currentAsset.id, queryClient]
   );

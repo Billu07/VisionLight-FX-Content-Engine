@@ -197,13 +197,17 @@ export const contentEngine = {
     zoom: number
   ) {
     try {
-      console.log(`🎬 Kling Drift: H${horizontal} V${vertical} Z${zoom}`);
+      console.log(
+        `🎬 Kling Drift Request: H${horizontal} V${vertical} Z${zoom}`
+      );
 
       // 1. Get Image Ratio
+      // We force download to ensure we get valid dimensions
       const imageResponse = await axios.get(getOptimizedUrl(assetUrl), {
         responseType: "arraybuffer",
       });
       const metadata = await sharp(Buffer.from(imageResponse.data)).metadata();
+
       let targetRatio = "16:9";
       if (metadata.width && metadata.height) {
         if (Math.abs(metadata.width - metadata.height) < 100)
@@ -211,23 +215,28 @@ export const contentEngine = {
         else if (metadata.height > metadata.width) targetRatio = "9:16";
       }
 
-      // 2. Construct Prompt
+      // 2. Construct Prompt using the Helper
       const cameraMove = getKlingCameraPrompt(horizontal, vertical, zoom);
       const finalPrompt = `
       Subject: ${prompt || "The main subject of the image"}.
       Action: ${cameraMove}
-      Style: High fidelity, consistent geometry, smooth motion, 3D depth.
+      Style: Cinematic, high fidelity, 3D depth, smooth motion.
       `;
 
-      // 3. Prepare Payload
+      // 3. Prepare Payload (EXACTLY matching the working video generator)
       const payload: any = {
         prompt: finalPrompt,
-        image_url: getOptimizedUrl(assetUrl),
-        duration: "5",
+        image_url: getOptimizedUrl(assetUrl), // Use optimized URL to prevent timeouts
+        duration: "5", // String "5" is safer for Kling API
         aspect_ratio: targetRatio,
       };
 
+      console.log("🚀 Sending to Kling Pro:", JSON.stringify(payload));
+
+      // 4. Call Kling Pro
+      // Ensure FAL_BASE_PATH is "https://queue.fal.run/fal-ai/kling-video/v2.5-turbo"
       const url = `${FAL_BASE_PATH}/pro/image-to-video`;
+
       const submitRes = await axios.post(url, payload, {
         headers: {
           Authorization: `Key ${FAL_KEY}`,
@@ -235,13 +244,15 @@ export const contentEngine = {
         },
       });
 
+      console.log("✅ Kling Accepted:", submitRes.data.request_id);
+
       return {
         requestId: submitRes.data.request_id,
         statusUrl: submitRes.data.status_url,
       };
     } catch (e: any) {
-      console.error("Kling Drift Failed:", e.message);
-      throw new Error(`Drift failed: ${e.message}`);
+      console.error("❌ Kling Drift Failed:", e.response?.data || e.message);
+      throw new Error(`Drift failed: ${e.response?.data?.detail || e.message}`);
     }
   },
 
