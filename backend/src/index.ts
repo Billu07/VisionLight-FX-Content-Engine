@@ -446,10 +446,11 @@ app.post(
 
       if (!assetUrl) return res.status(400).json({ error: "Missing asset" });
 
+      // Calls the new Gemini-powered logic
       const asset = await contentEngine.processDriftEdit(
         req.user!.id,
         assetUrl,
-        prompt || "", // Pass the prompt (optional but recommended)
+        prompt || "",
         Number(horizontal || 0),
         Number(vertical || 0),
         Number(zoom || 5)

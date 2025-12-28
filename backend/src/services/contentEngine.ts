@@ -8,6 +8,31 @@ import { dbService as airtableService, Post, Asset } from "./database";
 import { GeminiService } from "./gemini";
 import { ROIService } from "./roi";
 
+// Helper: Convert Sliders to Camera Terms (Mimics Flux Logic)
+const getCameraPrompts = (h: number, v: number, z: number) => {
+  // 1. Horizontal (Orbit)
+  let angle = "front view";
+  const absH = Math.abs(h % 360);
+  if (absH > 315 || absH <= 45) angle = "front view";
+  else if (absH > 45 && absH <= 135) angle = "side profile view";
+  else if (absH > 135 && absH <= 225) angle = "back view";
+  else if (absH > 225 && absH <= 315) angle = "side profile view";
+
+  // 2. Vertical (Elevation)
+  let elevation = "eye-level angle";
+  if (v > 60) elevation = "top-down overhead view";
+  else if (v > 30) elevation = "high-angle view";
+  else if (v < -60) elevation = "worm's-eye view from below";
+  else if (v < -30) elevation = "low-angle view";
+
+  // 3. Zoom (Distance)
+  let zoom = "medium shot";
+  if (z >= 9) zoom = "extreme close-up macro shot";
+  else if (z >= 7) zoom = "close-up shot";
+  else if (z <= 2) zoom = "wide-angle full body shot";
+
+  return { angle, elevation, zoom };
+};
 // Configuration
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -271,51 +296,60 @@ export const contentEngine = {
   },
 
   // === DRIFT EDIT ===
-  // === DRIFT EDIT ===
   async processDriftEdit(
     userId: string,
     assetUrl: string,
-    prompt: string,
+    prompt: string, // User's description of subject
     horizontal: number,
     vertical: number,
     zoom: number
   ) {
     try {
-      // 🛑 FIX: Use the raw assetUrl.
-      // Do NOT use getOptimizedUrl(), as it adds compression and resizing.
-      const rawUrl = assetUrl;
+      console.log(`🌀 Gemini Drift: H${horizontal} V${vertical} Z${zoom}`);
 
-      // 1. Get Original Dimensions (from the raw file)
-      const imageResponse = await axios.get(rawUrl, {
+      // 1. Convert Sliders to Text Prompt
+      const cam = getCameraPrompts(horizontal, vertical, zoom);
+      const cameraInstruction = `${cam.zoomLevel}, ${cam.elevation}, ${cam.angle}`;
+
+      // 2. Build the Gemini 3 Pro Prompt
+      const fullPrompt = `
+      TASK: Re-imagine the input image with a specific camera move.
+      INPUT IMAGE: The reference provided.
+      SUBJECT: ${prompt || "The main subject of the image"}
+      NEW CAMERA ANGLE: ${cameraInstruction}.
+      INSTRUCTIONS: 
+      1. Keep the subject IDENTITY identical (colors, shapes, style).
+      2. Rotate the subject to match the NEW CAMERA ANGLE.
+      3. Fill in any dis-occluded areas naturally.
+      `;
+
+      // 3. Get Raw Image Buffer
+      // Use rawUrl logic we fixed earlier to ensure max quality
+      const imageResponse = await axios.get(assetUrl, {
         responseType: "arraybuffer",
       });
-      const buffer = Buffer.from(imageResponse.data);
-      const metadata = await sharp(buffer).metadata();
+      const inputBuffer = Buffer.from(imageResponse.data);
 
-      // 2. Generate
-      const resultBuffer = await FalService.generateDriftAngle({
-        imageUrl: rawUrl, // 👈 Send the High-Res URL to AI
-        prompt: prompt,
-        horizontalAngle: horizontal,
-        verticalAngle: vertical,
-        zoom: zoom,
-        width: metadata.width,
-        height: metadata.height,
+      // 4. Send to Gemini 3 Pro
+      const resultBuffer = await GeminiService.generateOrEditImage({
+        prompt: fullPrompt,
+        aspectRatio: "original", // Maintain raw resolution
+        referenceImages: [inputBuffer],
+        modelType: "quality", // Gemini 3 Pro
       });
 
-      // 3. Upload
+      // 5. Upload & Save
       const newUrl = await this.uploadToCloudinary(
         resultBuffer,
-        `drift_${userId}_${Date.now()}`,
+        `gemini_drift_${userId}_${Date.now()}`,
         userId,
-        `Drift: H${horizontal} V${vertical} Z${zoom}`,
+        `Gemini Drift: ${cameraInstruction}`,
         "image"
       );
 
-      // 4. Save
       return await airtableService.createAsset(userId, newUrl, "original");
     } catch (e: any) {
-      console.error("Drift Logic Failed:", e.message);
+      console.error("Gemini Drift Failed:", e.message);
       throw new Error(`Drift failed: ${e.message}`);
     }
   },
