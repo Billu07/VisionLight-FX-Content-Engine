@@ -198,8 +198,8 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
             {[
               { id: "16:9", label: "Landscape" },
               { id: "9:16", label: "Portrait" },
-              { id: "original", label: "Raw / Edits" },
-              { id: "VIDEO", label: "Videos / Paths" }, // ✅ NEW TAB
+              { id: "original", label: "Edited Pictures" },
+              { id: "VIDEO", label: "Drift Paths" }, // ✅ NEW TAB
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -241,7 +241,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                 <LoadingSpinner size="sm" variant="default" />
               ) : (
                 <>
-                  <span>📤</span> Upload
+                  <span></span> Upload
                 </>
               )}
             </button>
@@ -294,9 +294,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                         muted
                       />
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-3xl text-white opacity-80">
-                          ▶️
-                        </span>
+                        <span className="text-3xl text-white opacity-80"></span>
                       </div>
                     </div>
                   ) : (
@@ -378,7 +376,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                     <span>
                       {activeDriftIds.has(selectedAsset.id)
                         ? "🌀 Resume Drift"
-                        : "🪄 Magic Edit"}
+                        : "Edit"}
                     </span>
                   </button>
                 </div>
