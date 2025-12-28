@@ -436,27 +436,37 @@ app.post(
   }
 );
 
-// ✅ NEW: Drift Edit Route
+// ✅ NEW: Start Kling Drift
 app.post(
-  "/api/assets/drift",
+  "/api/assets/drift-video",
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
       const { assetUrl, prompt, horizontal, vertical, zoom } = req.body;
-
-      if (!assetUrl) return res.status(400).json({ error: "Missing asset" });
-
-      // Calls the new Gemini-powered logic
-      const asset = await contentEngine.processDriftEdit(
+      const result = await contentEngine.processKlingDrift(
         req.user!.id,
         assetUrl,
-        prompt || "",
-        Number(horizontal || 0),
-        Number(vertical || 0),
-        Number(zoom || 5)
+        prompt,
+        Number(horizontal),
+        Number(vertical),
+        Number(zoom)
       );
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
 
-      res.json({ success: true, asset });
+// ✅ NEW: Check Tool Status (Generic)
+app.post(
+  "/api/tools/status",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { statusUrl } = req.body;
+      const status = await contentEngine.checkToolStatus(statusUrl);
+      res.json({ success: true, status });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

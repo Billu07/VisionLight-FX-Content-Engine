@@ -76,6 +76,13 @@ export const apiEndpoints = {
       headers: { "Content-Type": "multipart/form-data" },
     }),
 
+  // Drift Video (Kling)
+  startDriftVideo: (data: any) => api.post("/api/assets/drift-video", data),
+
+  // Check Status
+  checkToolStatus: (statusUrl: string) =>
+    api.post("/api/tools/status", { statusUrl }),
+
   // ✅ UPDATED: Edit Asset supports 'mode'
   editAsset: (data: {
     assetId: string;

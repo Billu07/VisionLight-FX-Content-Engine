@@ -8,32 +8,27 @@ import { dbService as airtableService, Post, Asset } from "./database";
 import { GeminiService } from "./gemini";
 import { ROIService } from "./roi";
 
-// Helper: Convert Sliders to Camera Terms (Mimics Flux Logic)
-const getCameraPrompts = (h: number, v: number, z: number) => {
-  // 1. Horizontal (Orbit)
-  let angle = "front view";
-  const absH = Math.abs(h % 360);
-  if (absH > 315 || absH <= 45) angle = "front view";
-  else if (absH > 45 && absH <= 135) angle = "side profile view";
-  else if (absH > 135 && absH <= 225) angle = "back view";
-  else if (absH > 225 && absH <= 315) angle = "side profile view";
+// === HELPER: Convert Sliders to Kling Camera Prompts ===
+const getKlingCameraPrompt = (h: number, v: number, z: number) => {
+  const parts: string[] = [];
 
-  // 2. Vertical (Elevation)
-  let elevation = "eye-level angle";
-  if (v > 60) elevation = "top-down overhead view";
-  else if (v > 30) elevation = "high-angle view";
-  else if (v < -60) elevation = "worm's-eye view from below";
-  else if (v < -30) elevation = "low-angle view";
+  // 1. Horizontal (Pan/Orbit)
+  if (h > 10) parts.push("Camera orbits right");
+  else if (h < -10) parts.push("Camera orbits left");
 
-  // 3. Zoom (Distance)
-  let zoom = "medium shot";
-  if (z >= 9) zoom = "extreme close-up macro shot";
-  else if (z >= 7) zoom = "close-up shot";
-  else if (z <= 2) zoom = "wide-angle full body shot";
+  // 2. Vertical (Tilt/Crane)
+  if (v > 10) parts.push("Camera cranes up");
+  else if (v < -10) parts.push("Camera cranes down");
 
-  return { angle, elevation, zoom };
-};
-// Configuration
+  // 3. Zoom
+  if (z > 5.5) parts.push("Camera zooms in");
+  else if (z < 4.5) parts.push("Camera zooms out");
+
+  // Default if static
+  if (parts.length === 0) return "Static camera, subtle motion";
+
+  return parts.join(", ") + ". Smooth cinematic movement.";
+}; // Configuration
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 cloudinary.config({
@@ -295,63 +290,64 @@ export const contentEngine = {
     return await airtableService.createAsset(userId, targetUrl, dbAspectRatio);
   },
 
-  // === DRIFT EDIT ===
-  async processDriftEdit(
+  // === KLING DRIFT PATH (Video Generation) ===
+  async processKlingDrift(
     userId: string,
     assetUrl: string,
-    prompt: string, // User's description of subject
+    prompt: string,
     horizontal: number,
     vertical: number,
     zoom: number
   ) {
     try {
-      console.log(`🌀 Gemini Drift: H${horizontal} V${vertical} Z${zoom}`);
+      console.log(`🎬 Kling Drift: H${horizontal} V${vertical} Z${zoom}`);
 
-      // 1. Convert Sliders to Text Prompt
-      const cam = getCameraPrompts(horizontal, vertical, zoom);
-      const cameraInstruction = `${cam.zoomLevel}, ${cam.elevation}, ${cam.angle}`;
-
-      // 2. Build the Gemini 3 Pro Prompt
-      const fullPrompt = `
-      TASK: Re-imagine the input image with a specific camera move.
-      INPUT IMAGE: The reference provided.
-      SUBJECT: ${prompt || "The main subject of the image"}
-      NEW CAMERA ANGLE: ${cameraInstruction}.
-      INSTRUCTIONS: 
-      1. Keep the subject IDENTITY identical (colors, shapes, style).
-      2. Rotate the subject to match the NEW CAMERA ANGLE.
-      3. Fill in any dis-occluded areas naturally.
+      // 1. Construct Prompt
+      const cameraMove = getKlingCameraPrompt(horizontal, vertical, zoom);
+      const finalPrompt = `
+      Subject: ${prompt || "The main subject of the image"}.
+      Action: ${cameraMove}
+      Style: High fidelity, consistent geometry, smooth motion, 3D depth.
       `;
 
-      // 3. Get Raw Image Buffer
-      // Use rawUrl logic we fixed earlier to ensure max quality
-      const imageResponse = await axios.get(assetUrl, {
-        responseType: "arraybuffer",
+      // 2. Prepare Payload for Kling (Image-to-Video)
+      const inputUrl = getOptimizedUrl(assetUrl);
+
+      const payload: any = {
+        prompt: finalPrompt,
+        image_url: inputUrl,
+        duration: "5", // 5 seconds is perfect for a "Path"
+        aspect_ratio: "16:9", // Or dynamic based on input if needed
+      };
+
+      // 3. Call Kling (Standard or Pro - Pro is safer for consistency)
+      const url = `${FAL_BASE_PATH}/pro/image-to-video`;
+
+      const submitRes = await axios.post(url, payload, {
+        headers: {
+          Authorization: `Key ${FAL_KEY}`,
+          "Content-Type": "application/json",
+        },
       });
-      const inputBuffer = Buffer.from(imageResponse.data);
 
-      // 4. Send to Gemini 3 Pro
-      const resultBuffer = await GeminiService.generateOrEditImage({
-        prompt: fullPrompt,
-        aspectRatio: "original", // Maintain raw resolution
-        referenceImages: [inputBuffer],
-        modelType: "quality", // Gemini 3 Pro
-      });
-
-      // 5. Upload & Save
-      const newUrl = await this.uploadToCloudinary(
-        resultBuffer,
-        `gemini_drift_${userId}_${Date.now()}`,
-        userId,
-        `Gemini Drift: ${cameraInstruction}`,
-        "image"
-      );
-
-      return await airtableService.createAsset(userId, newUrl, "original");
+      // 4. Return Request ID immediately (Frontend will poll)
+      // We do NOT save to DB yet. This is a temporary "Tool" usage.
+      return {
+        requestId: submitRes.data.request_id,
+        statusUrl: submitRes.data.status_url,
+      };
     } catch (e: any) {
-      console.error("Gemini Drift Failed:", e.message);
+      console.error("Kling Drift Failed:", e.message);
       throw new Error(`Drift failed: ${e.message}`);
     }
+  },
+
+  // === CHECK TOOL STATUS (Generic Polling) ===
+  async checkToolStatus(statusUrl: string) {
+    const res = await axios.get(statusUrl, {
+      headers: { Authorization: `Key ${FAL_KEY}` },
+    });
+    return res.data;
   },
 
   // === EDIT ASSET (Updated for Standard/Pro & Raw) ===

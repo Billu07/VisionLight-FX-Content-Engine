@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiEndpoints } from "../lib/api";
+import { DriftFrameExtractor } from "./DriftFrameExtractor";
 import { LoadingSpinner } from "./LoadingSpinner";
 
 interface Asset {
@@ -16,14 +17,14 @@ interface EditAssetModalProps {
 
 type EditorMode = "standard" | "pro" | "drift";
 
-// ✅ RESTORED: Quick Camera Presets
+// Clean Presets (Minimalist)
 const DRIFT_PRESETS = [
-  { label: "Front", h: 0, v: 0, z: 5, icon: "⏹️" },
-  { label: "Side Right", h: 90, v: 0, z: 5, icon: "➡️" },
-  { label: "Side Left", h: 270, v: 0, z: 5, icon: "⬅️" },
-  { label: "Top Down", h: 0, v: 60, z: 5, icon: "⬇️" },
-  { label: "Back", h: 180, v: 0, z: 5, icon: "↩️" },
-  { label: "Macro", h: 30, v: 15, z: 9, icon: "🔍" },
+  { label: "Front", h: 0, v: 0, z: 5 },
+  { label: "Side R", h: 90, v: 0, z: 5 },
+  { label: "Side L", h: 270, v: 0, z: 5 },
+  { label: "Top", h: 0, v: 60, z: 5 },
+  { label: "Back", h: 180, v: 0, z: 5 },
+  { label: "Macro", h: 30, v: 15, z: 9 },
 ];
 
 export function EditAssetModal({
@@ -33,6 +34,7 @@ export function EditAssetModal({
   const queryClient = useQueryClient();
   const refFileInput = useRef<HTMLInputElement>(null);
 
+  // History & State
   const [history, setHistory] = useState<Asset[]>([initialAsset]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentAsset = history[currentIndex];
@@ -49,10 +51,14 @@ export function EditAssetModal({
 
   // Drift State
   const [driftParams, setDriftParams] = useState({
-    horizontal: 0, // 0-360
-    vertical: 0, // 0-60 (Fixed range)
-    zoom: 5, // 0-10
+    horizontal: 0,
+    vertical: 0,
+    zoom: 5,
   });
+
+  // Drift Video State
+  const [driftVideoUrl, setDriftVideoUrl] = useState<string | null>(null);
+  const [isDriftPolling, setIsDriftPolling] = useState(false);
 
   const { data: allAssets = [] } = useQuery({
     queryKey: ["assets"],
@@ -60,7 +66,7 @@ export function EditAssetModal({
     enabled: showRefSelector,
   });
 
-  // MUTATIONS
+  // === MUTATION 1: STANDARD/PRO EDIT ===
   const textEditMutation = useMutation({
     mutationFn: async () => {
       return apiEndpoints.editAsset({
@@ -78,9 +84,10 @@ export function EditAssetModal({
     onSettled: () => setIsProcessing(false),
   });
 
-  const driftMutation = useMutation({
+  // === MUTATION 2: DRIFT PATH START (Kling) ===
+  const driftStartMutation = useMutation({
     mutationFn: async () => {
-      return apiEndpoints.driftAsset({
+      return apiEndpoints.startDriftVideo({
         assetUrl: currentAsset.url,
         prompt: prompt,
         horizontal: driftParams.horizontal,
@@ -89,28 +96,82 @@ export function EditAssetModal({
       });
     },
     onMutate: () => setIsProcessing(true),
-    onSuccess: (res: any) => handleSuccess(res.data.asset),
-    onError: (err: any) => alert("Drift failed: " + err.message),
-    onSettled: () => setIsProcessing(false),
+    onSuccess: (res: any) => {
+      // Start polling for video completion
+      pollDriftStatus(res.data.statusUrl);
+    },
+    onError: (err: any) => {
+      alert("Drift Start Failed: " + err.message);
+      setIsProcessing(false);
+    },
   });
+
+  // POLLING LOGIC
+  const pollDriftStatus = async (statusUrl: string) => {
+    setIsDriftPolling(true);
+    const interval = setInterval(async () => {
+      try {
+        const res = await apiEndpoints.checkToolStatus(statusUrl);
+        const status = res.data.status;
+
+        if (status === "COMPLETED") {
+          clearInterval(interval);
+          const videoUrl = res.data.response_url || res.data.video.url;
+          setDriftVideoUrl(videoUrl); // Switch UI to Extractor
+          setIsProcessing(false);
+          setIsDriftPolling(false);
+        } else if (status === "FAILED") {
+          clearInterval(interval);
+          alert(
+            "Drift Generation Failed: " + (res.data.error || "Unknown error")
+          );
+          setIsProcessing(false);
+          setIsDriftPolling(false);
+        }
+      } catch (e) {
+        console.error("Polling error", e);
+      }
+    }, 4000);
+  };
+
+  // EXTRACT FRAME HANDLER
+  const handleFrameExtraction = async (blob: Blob) => {
+    const file = new File([blob], "drift_frame.jpg", { type: "image/jpeg" });
+    const formData = new FormData();
+    formData.append("image", file);
+    formData.append("raw", "true");
+
+    try {
+      setIsProcessing(true);
+      const res = await apiEndpoints.uploadAssetSync(formData);
+      if (res.data.success) {
+        handleSuccess(res.data.asset); // Add extracted frame to history
+        setDriftVideoUrl(null); // Close extractor
+      }
+    } catch (e: any) {
+      alert("Failed to save frame: " + e.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleSuccess = (newAsset: Asset) => {
     const newHistory = history.slice(0, currentIndex + 1);
     newHistory.push(newAsset);
     setHistory(newHistory);
     setCurrentIndex(newHistory.length - 1);
-    // Don't clear prompt in Drift mode as user might want to tweak angle with same prompt
     if (activeTab !== "drift") setPrompt("");
     queryClient.invalidateQueries({ queryKey: ["assets"] });
   };
 
+  // ... (Analyze & Upload Handlers same as before) ...
   const analyzeMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch(currentAsset.url);
       const blob = await res.blob();
       const formData = new FormData();
       formData.append("image", blob, "current.jpg");
-      formData.append("prompt", "Describe the subject, lighting, and style.");
+      formData.append("prompt", "Describe subject, lighting, and style.");
       return apiEndpoints.analyzeImage(formData);
     },
     onMutate: () => setIsAnalyzing(true),
@@ -151,61 +212,71 @@ export function EditAssetModal({
       <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-6xl flex flex-col md:flex-row overflow-hidden shadow-2xl h-[90vh]">
         {/* LEFT: CANVAS */}
         <div className="flex-1 bg-black flex flex-col items-center justify-center p-4 relative border-r border-gray-800 group">
-          <div className="absolute top-4 left-4 z-10 flex gap-2">
-            <button
-              onClick={handleUndo}
-              disabled={currentIndex === 0}
-              className="p-2 bg-gray-800/80 rounded-full text-white disabled:opacity-30 hover:bg-gray-700 backdrop-blur-md"
-            >
-              ↩️
-            </button>
-            <span className="bg-black/50 text-white px-3 py-1.5 rounded-full text-xs font-mono backdrop-blur-md flex items-center">
-              v{currentIndex + 1} / {history.length}
-            </span>
-            <button
-              onClick={handleRedo}
-              disabled={currentIndex === history.length - 1}
-              className="p-2 bg-gray-800/80 rounded-full text-white disabled:opacity-30 hover:bg-gray-700 backdrop-blur-md"
-            >
-              ↪️
-            </button>
-          </div>
-
-          {referenceAsset && activeTab !== "drift" && (
-            <div className="absolute bottom-4 right-4 w-32 border-2 border-purple-500 rounded-lg overflow-hidden bg-gray-800 shadow-2xl z-20">
-              <div className="relative aspect-video">
-                <img
-                  src={referenceAsset.url}
-                  className="w-full h-full object-cover opacity-90"
-                />
+          {/* If Drift Video is Ready, Show Extractor */}
+          {driftVideoUrl ? (
+            <div className="w-full h-full flex flex-col items-center justify-center">
+              <DriftFrameExtractor
+                videoUrl={driftVideoUrl}
+                onExtract={handleFrameExtraction}
+                onCancel={() => setDriftVideoUrl(null)}
+              />
+            </div>
+          ) : (
+            <>
+              <div className="absolute top-4 left-4 z-10 flex gap-2">
                 <button
-                  onClick={() => setReferenceAsset(null)}
-                  className="absolute top-1 right-1 bg-red-600/80 text-white w-5 h-5 flex items-center justify-center text-xs rounded-full hover:bg-red-500"
+                  onClick={handleUndo}
+                  disabled={currentIndex === 0}
+                  className="p-2 bg-gray-800/80 rounded-full text-white disabled:opacity-30 hover:bg-gray-700 backdrop-blur-md"
                 >
-                  ✕
+                  ↩️
+                </button>
+                <span className="bg-black/50 text-white px-3 py-1.5 rounded-full text-xs font-mono backdrop-blur-md flex items-center">
+                  v{currentIndex + 1}
+                </span>
+                <button
+                  onClick={handleRedo}
+                  disabled={currentIndex === history.length - 1}
+                  className="p-2 bg-gray-800/80 rounded-full text-white disabled:opacity-30 hover:bg-gray-700 backdrop-blur-md"
+                >
+                  ↪️
                 </button>
               </div>
-              <div className="bg-purple-900/90 text-[8px] text-center py-0.5 text-white font-bold tracking-wide">
-                REFERENCE
-              </div>
-            </div>
-          )}
 
-          {isProcessing && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-30 backdrop-blur-sm">
-              <div className="flex flex-col items-center gap-3">
-                <LoadingSpinner size="lg" variant="neon" />
-                <span className="text-cyan-300 font-bold animate-pulse">
-                  {activeTab === "drift" ? "Drifting..." : "Processing Edit..."}
-                </span>
-              </div>
-            </div>
-          )}
+              {referenceAsset && activeTab !== "drift" && (
+                <div className="absolute bottom-4 right-4 w-32 border-2 border-purple-500 rounded-lg overflow-hidden bg-gray-800 shadow-2xl z-20">
+                  <div className="relative aspect-video">
+                    <img
+                      src={referenceAsset.url}
+                      className="w-full h-full object-cover opacity-90"
+                    />
+                    <button
+                      onClick={() => setReferenceAsset(null)}
+                      className="absolute top-1 right-1 bg-red-600/80 text-white w-5 h-5 flex items-center justify-center text-xs rounded-full hover:bg-red-500"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
 
-          <img
-            src={currentAsset.url}
-            className="max-h-[80vh] object-contain rounded-lg border border-gray-700 shadow-2xl"
-          />
+              {isProcessing && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-30 backdrop-blur-sm">
+                  <div className="flex flex-col items-center gap-3">
+                    <LoadingSpinner size="lg" variant="neon" />
+                    <span className="text-cyan-300 font-bold animate-pulse">
+                      {isDriftPolling ? "Calculating Path..." : "Processing..."}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <img
+                src={currentAsset.url}
+                className="max-h-[80vh] object-contain rounded-lg border border-gray-700 shadow-2xl"
+              />
+            </>
+          )}
         </div>
 
         {/* RIGHT: CONTROLS */}
@@ -226,7 +297,6 @@ export function EditAssetModal({
                       : "text-gray-400 hover:text-white hover:bg-gray-800"
                   }`}
                 >
-                  <span className="text-sm">{mode.icon}</span>
                   {mode.label}
                 </button>
               ))}
@@ -240,19 +310,18 @@ export function EditAssetModal({
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-bold text-purple-300 uppercase tracking-wider">
-                      Reference (Optional)
+                      Reference
                     </label>
                   </div>
                   {!showRefSelector ? (
                     <button
                       onClick={() => setShowRefSelector(true)}
-                      className={`w-full border-2 border-dashed rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${
+                      className={`w-full border border-dashed rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${
                         referenceAsset
                           ? "border-purple-500/50 bg-purple-500/10"
                           : "border-gray-700 hover:border-gray-500"
                       }`}
                     >
-                      <span className="text-xl"></span>
                       <span className="text-xs text-gray-300">
                         {referenceAsset ? "Change Reference" : "Add Reference"}
                       </span>
@@ -268,7 +337,7 @@ export function EditAssetModal({
                           {isUploadingRef ? (
                             <LoadingSpinner size="sm" />
                           ) : (
-                            "Upload Local"
+                            "Local"
                           )}
                         </button>
                         <input
@@ -286,7 +355,7 @@ export function EditAssetModal({
                         </button>
                       </div>
                       <div className="text-[10px] text-gray-500 mb-2 uppercase font-bold">
-                        Or Asset Library:
+                        Library:
                       </div>
                       <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto custom-scrollbar">
                         {Array.isArray(allAssets) &&
@@ -311,7 +380,6 @@ export function EditAssetModal({
             {/* === MODE: DRIFT === */}
             {activeTab === "drift" && (
               <div className="space-y-6 animate-in fade-in">
-                {/* ✅ PRESETS */}
                 <div className="grid grid-cols-3 gap-2">
                   {DRIFT_PRESETS.map((preset) => (
                     <button
@@ -323,12 +391,9 @@ export function EditAssetModal({
                           zoom: preset.z,
                         })
                       }
-                      className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-2 flex flex-col items-center justify-center gap-1 transition-all active:scale-95 group"
+                      className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-2 text-center transition-all active:scale-95"
                     >
-                      <span className="text-lg group-hover:scale-110 transition-transform">
-                        {preset.icon}
-                      </span>
-                      <span className="text-[10px] text-gray-400 font-bold">
+                      <span className="text-[10px] text-gray-300 font-bold block">
                         {preset.label}
                       </span>
                     </button>
@@ -336,14 +401,14 @@ export function EditAssetModal({
                 </div>
 
                 <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
-                  <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                    🎥 Drift Camera
+                  <h4 className="text-sm font-bold text-white mb-4">
+                    Camera Controls
                   </h4>
 
                   {/* Horizontal */}
                   <div className="space-y-2 mb-4">
                     <div className="flex justify-between text-xs text-gray-400">
-                      <span>Orbit (Horizontal)</span>
+                      <span>Orbit</span>
                       <span className="text-cyan-400">
                         {driftParams.horizontal}°
                       </span>
@@ -367,15 +432,15 @@ export function EditAssetModal({
                   {/* Vertical */}
                   <div className="space-y-2 mb-4">
                     <div className="flex justify-between text-xs text-gray-400">
-                      <span>Elevation (Vertical)</span>
+                      <span>Elevation</span>
                       <span className="text-cyan-400">
                         {driftParams.vertical}°
                       </span>
                     </div>
                     <input
                       type="range"
-                      min="0"
-                      max="60"
+                      min="-90"
+                      max="90"
                       step="1"
                       value={driftParams.vertical}
                       onChange={(e) =>
@@ -386,16 +451,12 @@ export function EditAssetModal({
                       }
                       className="w-full accent-purple-500 cursor-pointer"
                     />
-                    <div className="flex justify-between text-[10px] text-gray-600 mt-1">
-                      <span>Eye Level (0°)</span>
-                      <span>High Angle (60°)</span>
-                    </div>
                   </div>
 
                   {/* Zoom */}
                   <div className="space-y-2">
                     <div className="flex justify-between text-xs text-gray-400">
-                      <span>Zoom Distance</span>
+                      <span>Zoom</span>
                       <span className="text-cyan-400">{driftParams.zoom}</span>
                     </div>
                     <input
@@ -422,22 +483,22 @@ export function EditAssetModal({
               <div className="flex justify-between items-end">
                 <label className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
                   {activeTab === "drift"
-                    ? "Subject Description (Optional)"
+                    ? "Subject Description"
                     : "Instruction"}
                 </label>
                 <button
                   onClick={() => analyzeMutation.mutate()}
                   disabled={isAnalyzing || isProcessing}
-                  className="text-[10px] bg-cyan-900/30 text-cyan-300 px-2 py-1 rounded border border-cyan-500/30 hover:bg-cyan-800/50 flex items-center gap-1"
+                  className="text-[10px] bg-cyan-900/30 text-cyan-300 px-2 py-1 rounded border border-cyan-500/30 hover:bg-cyan-800/50"
                 >
-                  {isAnalyzing ? "Scanning..." : "👁️ Analyze"}
+                  {isAnalyzing ? "Scanning..." : "Analyze Image"}
                 </button>
               </div>
               <textarea
                 className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none leading-relaxed placeholder-gray-500"
                 placeholder={
                   activeTab === "drift"
-                    ? "e.g. 'A silver robot' (Helps maintain identity during rotation)"
+                    ? "e.g. 'A silver robot' (Helps maintain identity)"
                     : "e.g. 'Make it night time', 'Add neon lights'..."
                 }
                 value={prompt}
@@ -446,7 +507,7 @@ export function EditAssetModal({
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    if (activeTab === "drift") driftMutation.mutate();
+                    if (activeTab === "drift") driftStartMutation.mutate();
                     else if (prompt.trim()) textEditMutation.mutate();
                   }
                 }}
@@ -457,14 +518,14 @@ export function EditAssetModal({
           <div className="p-6 border-t border-gray-800 bg-gray-900/50 flex flex-col gap-3">
             {activeTab === "drift" ? (
               <button
-                onClick={() => driftMutation.mutate()}
-                disabled={isProcessing}
+                onClick={() => driftStartMutation.mutate()}
+                disabled={isProcessing || isDriftPolling}
                 className="w-full py-4 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isProcessing ? (
-                  "Drifting..."
+                {isProcessing || isDriftPolling ? (
+                  "Calculating Path..."
                 ) : (
-                  <span>🌀 Generate New Angle</span>
+                  <span>🌀 Generate Path</span>
                 )}
               </button>
             ) : (
