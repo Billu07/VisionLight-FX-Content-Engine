@@ -16,6 +16,16 @@ interface EditAssetModalProps {
 
 type EditorMode = "standard" | "pro" | "drift";
 
+// ✅ RESTORED: Quick Camera Presets
+const DRIFT_PRESETS = [
+  { label: "Front", h: 0, v: 0, z: 5, icon: "⏹️" },
+  { label: "Side Right", h: 90, v: 0, z: 5, icon: "➡️" },
+  { label: "Side Left", h: 270, v: 0, z: 5, icon: "⬅️" },
+  { label: "Top Down", h: 0, v: 60, z: 5, icon: "⬇️" },
+  { label: "Back", h: 180, v: 0, z: 5, icon: "↩️" },
+  { label: "Macro", h: 30, v: 15, z: 9, icon: "🔍" },
+];
+
 export function EditAssetModal({
   asset: initialAsset,
   onClose,
@@ -23,37 +33,34 @@ export function EditAssetModal({
   const queryClient = useQueryClient();
   const refFileInput = useRef<HTMLInputElement>(null);
 
-  // History State
   const [history, setHistory] = useState<Asset[]>([initialAsset]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentAsset = history[currentIndex];
 
-  // Editor State
   const [activeTab, setActiveTab] = useState<EditorMode>("pro");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Text Edit State (Standard/Pro)
+  // Text Edit State
   const [prompt, setPrompt] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [referenceAsset, setReferenceAsset] = useState<Asset | null>(null);
   const [showRefSelector, setShowRefSelector] = useState(false);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
 
-  // Drift State (Flux 2 LoRA)
+  // Drift State
   const [driftParams, setDriftParams] = useState({
-    horizontal: 0, // 0 to 360
-    vertical: 0, // 0 to 90 (Eye level to High angle)
-    zoom: 5, // 0 (Wide) to 10 (Close)
+    horizontal: 0, // 0-360
+    vertical: 0, // 0-60 (Fixed range)
+    zoom: 5, // 0-10
   });
 
-  // Fetch Library for Reference
   const { data: allAssets = [] } = useQuery({
     queryKey: ["assets"],
     queryFn: async () => (await apiEndpoints.getAssets()).data.assets,
     enabled: showRefSelector,
   });
 
-  // === MUTATION 1: TEXT EDIT (Standard/Pro) ===
+  // MUTATIONS
   const textEditMutation = useMutation({
     mutationFn: async () => {
       return apiEndpoints.editAsset({
@@ -71,11 +78,11 @@ export function EditAssetModal({
     onSettled: () => setIsProcessing(false),
   });
 
-  // === MUTATION 2: DRIFT EDIT (FAL) ===
   const driftMutation = useMutation({
     mutationFn: async () => {
       return apiEndpoints.driftAsset({
         assetUrl: currentAsset.url,
+        prompt: prompt,
         horizontal: driftParams.horizontal,
         vertical: driftParams.vertical,
         zoom: driftParams.zoom,
@@ -87,13 +94,13 @@ export function EditAssetModal({
     onSettled: () => setIsProcessing(false),
   });
 
-  // === MUTATION 3: HELPERS ===
   const handleSuccess = (newAsset: Asset) => {
     const newHistory = history.slice(0, currentIndex + 1);
     newHistory.push(newAsset);
     setHistory(newHistory);
     setCurrentIndex(newHistory.length - 1);
-    setPrompt(""); // Clear prompt
+    // Don't clear prompt in Drift mode as user might want to tweak angle with same prompt
+    if (activeTab !== "drift") setPrompt("");
     queryClient.invalidateQueries({ queryKey: ["assets"] });
   };
 
@@ -103,7 +110,7 @@ export function EditAssetModal({
       const blob = await res.blob();
       const formData = new FormData();
       formData.append("image", blob, "current.jpg");
-      formData.append("prompt", "Describe details.");
+      formData.append("prompt", "Describe the subject, lighting, and style.");
       return apiEndpoints.analyzeImage(formData);
     },
     onMutate: () => setIsAnalyzing(true),
@@ -205,39 +212,26 @@ export function EditAssetModal({
 
         {/* RIGHT: CONTROLS */}
         <div className="w-full md:w-96 flex flex-col bg-gray-900">
-          {/* EDITOR TABS */}
           <div className="p-4 border-b border-gray-800 bg-gray-950">
             <div className="flex bg-gray-900 p-1 rounded-xl">
-              <button
-                onClick={() => setActiveTab("standard")}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex flex-col items-center gap-1 ${
-                  activeTab === "standard"
-                    ? "bg-gray-700 text-white"
-                    : "text-gray-400 hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-sm">⚡</span> Standard
-              </button>
-              <button
-                onClick={() => setActiveTab("pro")}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex flex-col items-center gap-1 ${
-                  activeTab === "pro"
-                    ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg"
-                    : "text-gray-400 hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-sm">🧠</span> Pro
-              </button>
-              <button
-                onClick={() => setActiveTab("drift")}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex flex-col items-center gap-1 ${
-                  activeTab === "drift"
-                    ? "bg-gradient-to-r from-rose-600 to-orange-600 text-white shadow-lg"
-                    : "text-gray-400 hover:bg-gray-800"
-                }`}
-              >
-                <span className="text-sm">🌀</span> Drift
-              </button>
+              {[
+                { id: "standard", label: "Standard", icon: "⚡" },
+                { id: "pro", label: "Pro", icon: "🧠" },
+                { id: "drift", label: "Drift", icon: "🌀" },
+              ].map((mode) => (
+                <button
+                  key={mode.id}
+                  onClick={() => setActiveTab(mode.id as any)}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex flex-col items-center gap-1 ${
+                    activeTab === mode.id
+                      ? "bg-cyan-600 text-white shadow-lg"
+                      : "text-gray-400 hover:text-white hover:bg-gray-800"
+                  }`}
+                >
+                  <span className="text-sm">{mode.icon}</span>
+                  {mode.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -246,7 +240,6 @@ export function EditAssetModal({
             {activeTab !== "drift" && (
               <>
                 <div className="space-y-2">
-                  {/* Reference Logic */}
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-bold text-purple-300 uppercase tracking-wider">
                       Reference (Optional)
@@ -261,7 +254,7 @@ export function EditAssetModal({
                           : "border-gray-700 hover:border-gray-500"
                       }`}
                     >
-                      <span className="text-xl">🖼️</span>
+                      <span className="text-xl"></span>
                       <span className="text-xs text-gray-300">
                         {referenceAsset ? "Change Reference" : "Add Reference"}
                       </span>
@@ -314,47 +307,39 @@ export function EditAssetModal({
                     </div>
                   )}
                 </div>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between items-end">
-                    <label className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
-                      Instruction
-                    </label>
-                    <button
-                      onClick={() => analyzeMutation.mutate()}
-                      disabled={isAnalyzing || isProcessing}
-                      className="text-[10px] bg-cyan-900/30 text-cyan-300 px-2 py-1 rounded border border-cyan-500/30 hover:bg-cyan-800/50 flex items-center gap-1"
-                    >
-                      {isAnalyzing ? "Scanning..." : "👁️ Analyze"}
-                    </button>
-                  </div>
-                  <textarea
-                    className="w-full h-40 bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none leading-relaxed placeholder-gray-500"
-                    placeholder={
-                      activeTab === "standard"
-                        ? "Simple edits: 'Remove the cup', 'Change background to blue'..."
-                        : "Complex edits: 'Make it night time', 'Change style to oil painting', 'Add a neon sign'..."
-                    }
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    disabled={isProcessing}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        if (prompt.trim()) textEditMutation.mutate();
-                      }
-                    }}
-                  />
-                </div>
               </>
             )}
 
-            {/* === MODE: DRIFT (Flux 2 LoRA) === */}
+            {/* === MODE: DRIFT === */}
             {activeTab === "drift" && (
               <div className="space-y-6 animate-in fade-in">
+                {/* ✅ PRESETS */}
+                <div className="grid grid-cols-3 gap-2">
+                  {DRIFT_PRESETS.map((preset) => (
+                    <button
+                      key={preset.label}
+                      onClick={() =>
+                        setDriftParams({
+                          horizontal: preset.h,
+                          vertical: preset.v,
+                          zoom: preset.z,
+                        })
+                      }
+                      className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-2 flex flex-col items-center justify-center gap-1 transition-all active:scale-95 group"
+                    >
+                      <span className="text-lg group-hover:scale-110 transition-transform">
+                        {preset.icon}
+                      </span>
+                      <span className="text-[10px] text-gray-400 font-bold">
+                        {preset.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
                 <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
                   <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                    🎥 Virtual Camera
+                    🎥 Drift Camera
                   </h4>
 
                   {/* Horizontal */}
@@ -374,20 +359,14 @@ export function EditAssetModal({
                       onChange={(e) =>
                         setDriftParams((p) => ({
                           ...p,
-                          horizontal: parseInt(e.target.value),
+                          horizontal: parseFloat(e.target.value),
                         }))
                       }
                       className="w-full accent-cyan-500 cursor-pointer"
                     />
-                    <div className="flex justify-between text-[10px] text-gray-600 mt-1">
-                      <span>Front</span>
-                      <span>Side</span>
-                      <span>Back</span>
-                      <span>Front</span>
-                    </div>
                   </div>
 
-                  {/* Vertical (Elevation) */}
+                  {/* Vertical */}
                   <div className="space-y-2 mb-4">
                     <div className="flex justify-between text-xs text-gray-400">
                       <span>Elevation (Vertical)</span>
@@ -397,8 +376,8 @@ export function EditAssetModal({
                     </div>
                     <input
                       type="range"
-                      min="-90"
-                      max="90"
+                      min="0"
+                      max="60"
                       step="1"
                       value={driftParams.vertical}
                       onChange={(e) =>
@@ -410,40 +389,71 @@ export function EditAssetModal({
                       className="w-full accent-purple-500 cursor-pointer"
                     />
                     <div className="flex justify-between text-[10px] text-gray-600 mt-1">
-                      <span>Low Angle (-90°)</span>
-                      <span>Eye Level</span>
-                      <span>Top Down (90°)</span>
+                      <span>Eye Level (0°)</span>
+                      <span>High Angle (60°)</span>
                     </div>
                   </div>
 
                   {/* Zoom */}
                   <div className="space-y-2">
                     <div className="flex justify-between text-xs text-gray-400">
-                      <span>Zoom</span>
+                      <span>Zoom Distance</span>
                       <span className="text-cyan-400">{driftParams.zoom}</span>
                     </div>
                     <input
                       type="range"
                       min="0"
                       max="10"
-                      step="1"
+                      step="0.1"
                       value={driftParams.zoom}
                       onChange={(e) =>
                         setDriftParams((p) => ({
                           ...p,
-                          zoom: parseInt(e.target.value),
+                          zoom: parseFloat(e.target.value),
                         }))
                       }
                       className="w-full accent-green-500 cursor-pointer"
                     />
-                    <div className="flex justify-between text-[10px] text-gray-600 mt-1">
-                      <span>Wide</span>
-                      <span>Close Up</span>
-                    </div>
                   </div>
                 </div>
               </div>
             )}
+
+            {/* SHARED PROMPT INPUT */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-end">
+                <label className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
+                  {activeTab === "drift"
+                    ? "Subject Description (Optional)"
+                    : "Instruction"}
+                </label>
+                <button
+                  onClick={() => analyzeMutation.mutate()}
+                  disabled={isAnalyzing || isProcessing}
+                  className="text-[10px] bg-cyan-900/30 text-cyan-300 px-2 py-1 rounded border border-cyan-500/30 hover:bg-cyan-800/50 flex items-center gap-1"
+                >
+                  {isAnalyzing ? "Scanning..." : "👁️ Analyze"}
+                </button>
+              </div>
+              <textarea
+                className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none leading-relaxed placeholder-gray-500"
+                placeholder={
+                  activeTab === "drift"
+                    ? "e.g. 'A silver robot' (Helps maintain identity during rotation)"
+                    : "e.g. 'Make it night time', 'Add neon lights'..."
+                }
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                disabled={isProcessing}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (activeTab === "drift") driftMutation.mutate();
+                    else if (prompt.trim()) textEditMutation.mutate();
+                  }
+                }}
+              />
+            </div>
           </div>
 
           <div className="p-6 border-t border-gray-800 bg-gray-900/50 flex flex-col gap-3">
@@ -453,7 +463,11 @@ export function EditAssetModal({
                 disabled={isProcessing}
                 className="w-full py-4 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isProcessing ? "Drifting..." : <span>🌀 Generate Angle</span>}
+                {isProcessing ? (
+                  "Drifting..."
+                ) : (
+                  <span>🌀 Generate New Angle</span>
+                )}
               </button>
             ) : (
               <button

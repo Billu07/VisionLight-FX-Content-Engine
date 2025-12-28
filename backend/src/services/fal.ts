@@ -2,22 +2,22 @@ import { fal } from "@fal-ai/client";
 import axios from "axios";
 
 // Configure FAL
-// Make sure FAL_KEY is in your .env file
 fal.config({
   credentials: process.env.FAL_KEY,
 });
 
 export const FalService = {
   /**
-   * DRIFT EDITOR: Changes camera angle/zoom of an input image
-   * utilizing the full capabilities of Flux 2 LoRA.
+   * DRIFT EDITOR: Full-Power Virtual Camera
+   * Uses Flux 2 LoRA with user prompts + parametric control
    */
   async generateDriftAngle(params: {
     imageUrl: string;
-    horizontalAngle: number; // 0-360
-    verticalAngle: number; // -90 to 90 (We'll map this logically)
-    zoom: number; // 0-10
-    width?: number; // Preserve Original Aspect Ratio
+    prompt?: string;
+    horizontalAngle: number;
+    verticalAngle: number;
+    zoom: number;
+    width?: number;
     height?: number;
   }): Promise<Buffer> {
     try {
@@ -25,37 +25,42 @@ export const FalService = {
         `🌀 FAL Drift | H:${params.horizontalAngle}° V:${params.verticalAngle}° Z:${params.zoom}`
       );
 
-      // Construct Image Size object if dimensions exist
-      let imageSize: any = "square_hd"; // Default fallback
+      // Default to square_hd if dimensions aren't provided
+      let imageSize: any = "square_hd";
       if (params.width && params.height) {
         imageSize = { width: params.width, height: params.height };
       }
 
+      // 🛠️ FIX: Cast input to 'any' to bypass strict TypeScript check for 'prompt'
+      const inputPayload: any = {
+        image_urls: [params.imageUrl],
+
+        // We pass the prompt to help the model retain subject identity.
+        // Even if the model auto-generates camera tokens, this adds context.
+        prompt: params.prompt || "",
+
+        horizontal_angle: params.horizontalAngle,
+        vertical_angle: params.verticalAngle,
+        zoom: params.zoom,
+
+        image_size: imageSize,
+        output_format: "png", // Lossless
+        num_inference_steps: 50, // ✅ YES, WE ARE USING 50 STEPS (Max Quality)
+        guidance_scale: 2.5,
+        lora_scale: 1.0,
+        enable_safety_checker: false,
+      };
+
       const result: any = await fal.subscribe(
         "fal-ai/flux-2-lora-gallery/multiple-angles",
         {
-          input: {
-            image_urls: [params.imageUrl],
-            horizontal_angle: params.horizontalAngle,
-            vertical_angle: params.verticalAngle,
-            zoom: params.zoom,
-
-            // 🚀 SAAS QUALITY SETTINGS
-            image_size: imageSize,
-            output_format: "png", // Lossless quality
-            num_inference_steps: 50, // High step count for better detail (default is 40)
-            guidance_scale: 2.5, // Optimal for Flux-LoRA adherence
-            lora_scale: 1.0, // Full effect strength
-            enable_safety_checker: false, // Prevent false positives on artistic content
-          },
+          input: inputPayload,
           logs: true,
         }
       );
 
       if (result.data && result.data.images && result.data.images.length > 0) {
         const outputUrl = result.data.images[0].url;
-
-        // Download the result immediately to buffer
         const response = await axios.get(outputUrl, {
           responseType: "arraybuffer",
         });

@@ -442,16 +442,17 @@ app.post(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { assetUrl, horizontal, vertical, zoom } = req.body;
+      const { assetUrl, prompt, horizontal, vertical, zoom } = req.body;
 
       if (!assetUrl) return res.status(400).json({ error: "Missing asset" });
 
       const asset = await contentEngine.processDriftEdit(
         req.user!.id,
         assetUrl,
+        prompt || "", // Pass the prompt (optional but recommended)
         Number(horizontal || 0),
         Number(vertical || 0),
-        Number(zoom || 5) // Default zoom is 5 (Medium shot)
+        Number(zoom || 5)
       );
 
       res.json({ success: true, asset });

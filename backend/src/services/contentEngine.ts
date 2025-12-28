@@ -274,23 +274,23 @@ export const contentEngine = {
   async processDriftEdit(
     userId: string,
     assetUrl: string,
+    prompt: string, // 👈 Added Prompt
     horizontal: number,
     vertical: number,
     zoom: number
   ) {
     try {
-      // 1. Get Original Dimensions (To maintain "Raw" quality)
-      // We download the image header to get size without downloading the whole body if possible,
-      // or just download it since we need it anyway.
+      // 1. Get Original Dimensions for Raw Quality
       const imageResponse = await axios.get(getOptimizedUrl(assetUrl), {
         responseType: "arraybuffer",
       });
       const buffer = Buffer.from(imageResponse.data);
       const metadata = await sharp(buffer).metadata();
 
-      // 2. Call FAL Service
+      // 2. Generate
       const resultBuffer = await FalService.generateDriftAngle({
         imageUrl: getOptimizedUrl(assetUrl),
+        prompt: prompt, // Pass it through
         horizontalAngle: horizontal,
         verticalAngle: vertical,
         zoom: zoom,
@@ -298,7 +298,7 @@ export const contentEngine = {
         height: metadata.height,
       });
 
-      // 3. Upload Result to Cloudinary
+      // 3. Upload
       const newUrl = await this.uploadToCloudinary(
         resultBuffer,
         `drift_${userId}_${Date.now()}`,
@@ -307,7 +307,7 @@ export const contentEngine = {
         "image"
       );
 
-      // 4. Save to Database (Mark as "original" to keep Raw tab)
+      // 4. Save (Original Ratio)
       return await airtableService.createAsset(userId, newUrl, "original");
     } catch (e: any) {
       console.error("Drift Logic Failed:", e.message);

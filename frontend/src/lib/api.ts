@@ -89,6 +89,7 @@ export const apiEndpoints = {
   // ✅ NEW: Drift Asset (FAL Flux)
   driftAsset: (data: {
     assetUrl: string;
+    prompt?: string;
     horizontal: number;
     vertical: number;
     zoom: number;
