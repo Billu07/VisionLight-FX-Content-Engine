@@ -496,13 +496,17 @@ INSTRUCTIONS:
         if (kieRes.data.code !== 200)
           throw new Error(`Kie Error: ${JSON.stringify(kieRes.data)}`);
         externalId = kieRes.data.data.taskId;
-      } else if (isKling) {
+      }
+
+      // KLING Branch
+      else if (isKling) {
         provider = "kling";
         let klingInputUrl = "";
         let klingTailUrl = "";
         let isImageToVideo = false;
 
         if (finalInputImageBuffer) {
+          // Upload Start Frame
           klingInputUrl = await this.uploadToCloudinary(
             finalInputImageBuffer,
             `${postId}_kling_start`,
@@ -512,15 +516,46 @@ INSTRUCTIONS:
           );
           isImageToVideo = true;
 
+          // Check for End Frame (Tail)
           if (params.imageReferences && params.imageReferences.length > 1) {
             try {
-              // Resize end frame logic... (kept brief for readability, existing logic is fine)
               const tailRaw = getOptimizedUrl(params.imageReferences[1]);
               const tailResp = await axios.get(tailRaw, {
                 responseType: "arraybuffer",
               });
+              const tailOriginalBuffer = Buffer.from(tailResp.data);
+
+              // Resize Tail logic (simplified for brevity, assumes helpers exist)
+              const meta = await sharp(tailOriginalBuffer).metadata();
+              const tailAR = (meta.width || 1) / (meta.height || 1);
+              const targetAR = targetWidth / targetHeight;
+
+              let tailBuffer: Buffer;
+              if (Math.abs(tailAR - targetAR) < 0.05) {
+                tailBuffer = await resizeStrict(
+                  tailOriginalBuffer,
+                  targetWidth,
+                  targetHeight
+                );
+              } else {
+                // Try Gemini, fallback to Blur
+                try {
+                  tailBuffer = await resizeWithGemini(
+                    tailOriginalBuffer,
+                    targetWidth,
+                    targetHeight
+                  );
+                } catch (e) {
+                  tailBuffer = await resizeWithBlurFill(
+                    tailOriginalBuffer,
+                    targetWidth,
+                    targetHeight
+                  );
+                }
+              }
+
               klingTailUrl = await this.uploadToCloudinary(
-                tailResp.data,
+                tailBuffer,
                 `${postId}_kling_end`,
                 params.userId,
                 "Kling End",
@@ -530,7 +565,7 @@ INSTRUCTIONS:
                 generatedEndFrame: klingTailUrl,
               });
             } catch (e) {
-              klingTailUrl = getOptimizedUrl(params.imageReferences[1]);
+              console.warn("Failed to process tail image, skipping.", e);
             }
           }
         } else if (params.imageReference) {
@@ -538,19 +573,26 @@ INSTRUCTIONS:
           isImageToVideo = true;
         }
 
-        const tier = klingTailUrl ? "pro" : "standard";
-        const url = `${FAL_BASE_PATH}/${tier}/${
-          isImageToVideo ? "image-to-video" : "text-to-video"
-        }`;
+        // 🛠️ UPDATE: Always force PRO tier
+        const tier = "pro";
+
+        const endpointSuffix = isImageToVideo
+          ? "image-to-video"
+          : "text-to-video";
+        const url = `${FAL_BASE_PATH}/${tier}/${endpointSuffix}`;
+
         const payload: any = {
           prompt: finalPrompt,
           duration: params.duration ? params.duration.toString() : "5",
           aspect_ratio: isPortrait ? "9:16" : "16:9",
         };
+
         if (isImageToVideo) {
           payload.image_url = klingInputUrl;
-          if (tier === "pro" && klingTailUrl)
+          // Only add tail URL if it exists (Pro model supports it)
+          if (klingTailUrl) {
             payload.tail_image_url = klingTailUrl;
+          }
         }
 
         const submitRes = await axios.post(url, payload, {
@@ -561,7 +603,10 @@ INSTRUCTIONS:
         });
         externalId = submitRes.data.request_id;
         statusUrl = submitRes.data.status_url;
-      } else if (isOpenAI) {
+      }
+
+      //OpenAi Branch
+      else if (isOpenAI) {
         provider = "openai";
         const form = new FormData();
         form.append("prompt", finalPrompt);

@@ -16,6 +16,14 @@ interface EditAssetModalProps {
 
 type EditorMode = "standard" | "pro" | "drift";
 
+// ✅ NEW: Pre-defined Camera Angles
+const DRIFT_PRESETS = [
+  { label: "Front", h: 0, v: 0, z: 5, icon: "⏹️" },
+  { label: "Side View", h: 90, v: 0, z: 5, icon: "➡️" },
+  { label: "Top Down", h: 0, v: 45, z: 5, icon: "⬇️" },
+  { label: "Close Up", h: 0, v: 0, z: 9, icon: "🔍" },
+];
+
 export function EditAssetModal({
   asset: initialAsset,
   onClose,
@@ -31,7 +39,7 @@ export function EditAssetModal({
   const [activeTab, setActiveTab] = useState<EditorMode>("pro");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Text Edit State (Standard/Pro)
+  // Text Edit State
   const [prompt, setPrompt] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [referenceAsset, setReferenceAsset] = useState<Asset | null>(null);
@@ -40,9 +48,9 @@ export function EditAssetModal({
 
   // Drift State
   const [driftParams, setDriftParams] = useState({
-    horizontal: 0, // 0 to 360
-    vertical: 0, // 0 to 60
-    zoom: 5, // 0 to 10
+    horizontal: 0,
+    vertical: 0,
+    zoom: 5,
   });
 
   // Fetch Library
@@ -54,7 +62,6 @@ export function EditAssetModal({
 
   // === MUTATIONS ===
 
-  // 1. TEXT EDIT (Standard/Pro)
   const textEditMutation = useMutation({
     mutationFn: async () => {
       return apiEndpoints.editAsset({
@@ -72,7 +79,6 @@ export function EditAssetModal({
     onSettled: () => setIsProcessing(false),
   });
 
-  // 2. DRIFT EDIT
   const driftMutation = useMutation({
     mutationFn: async () => {
       return apiEndpoints.driftAsset({
@@ -88,7 +94,6 @@ export function EditAssetModal({
     onSettled: () => setIsProcessing(false),
   });
 
-  // 3. HELPERS
   const handleSuccess = (newAsset: Asset) => {
     const newHistory = history.slice(0, currentIndex + 1);
     newHistory.push(newAsset);
@@ -195,7 +200,7 @@ export function EditAssetModal({
                 <span className="text-cyan-300 font-bold animate-pulse">
                   {activeTab === "drift"
                     ? "Rotating Camera..."
-                    : "Processing Edit..."}
+                    : "Picturing..."}
                 </span>
               </div>
             </div>
@@ -213,7 +218,7 @@ export function EditAssetModal({
           <div className="p-4 border-b border-gray-800 bg-gray-950">
             <div className="flex bg-gray-900 p-1 rounded-xl">
               {[
-                { id: "standard", label: "Standard", icon: "⚡" },
+                { id: "standard", label: "Standard" },
                 { id: "pro", label: "Pro", icon: "🧠" },
                 { id: "drift", label: "Drift", icon: "🌀" },
               ].map((mode) => (
@@ -237,7 +242,6 @@ export function EditAssetModal({
             {/* === MODE: STANDARD / PRO === */}
             {activeTab !== "drift" && (
               <>
-                {/* Reference UI (Only for Pro/Standard) */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-bold text-purple-300 uppercase tracking-wider">
@@ -310,7 +314,6 @@ export function EditAssetModal({
                   )}
                 </div>
 
-                {/* Prompt UI */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-end">
                     <label className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
@@ -348,6 +351,28 @@ export function EditAssetModal({
             {/* === MODE: DRIFT === */}
             {activeTab === "drift" && (
               <div className="space-y-6 animate-in fade-in">
+                {/* ✅ NEW: QUICK PRESETS */}
+                <div className="grid grid-cols-4 gap-2">
+                  {DRIFT_PRESETS.map((preset) => (
+                    <button
+                      key={preset.label}
+                      onClick={() =>
+                        setDriftParams({
+                          horizontal: preset.h,
+                          vertical: preset.v,
+                          zoom: preset.z,
+                        })
+                      }
+                      className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-2 flex flex-col items-center justify-center gap-1 transition-all active:scale-95"
+                    >
+                      <span className="text-lg">{preset.icon}</span>
+                      <span className="text-[10px] text-gray-400 font-bold">
+                        {preset.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
                 <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
                   <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
                     🎥 Camera Control
@@ -365,7 +390,7 @@ export function EditAssetModal({
                       type="range"
                       min="0"
                       max="360"
-                      step="10"
+                      step="1"
                       value={driftParams.horizontal}
                       onChange={(e) =>
                         setDriftParams((p) => ({
@@ -387,9 +412,9 @@ export function EditAssetModal({
                     </div>
                     <input
                       type="range"
-                      min="0"
-                      max="60"
-                      step="5"
+                      min="-20"
+                      max="90"
+                      step="1"
                       value={driftParams.vertical}
                       onChange={(e) =>
                         setDriftParams((p) => ({
@@ -411,7 +436,7 @@ export function EditAssetModal({
                       type="range"
                       min="0"
                       max="10"
-                      step="1"
+                      step="0.1"
                       value={driftParams.zoom}
                       onChange={(e) =>
                         setDriftParams((p) => ({
@@ -421,16 +446,11 @@ export function EditAssetModal({
                       }
                       className="w-full accent-green-500"
                     />
-                    <div className="flex justify-between text-[10px] text-gray-600 mt-1">
-                      <span>Wide (0)</span>
-                      <span>Close-up (10)</span>
-                    </div>
                   </div>
                 </div>
 
                 <div className="text-xs text-gray-500 bg-black/30 p-3 rounded-lg border border-gray-800">
-                  ℹ️ <b>Drift</b> uses AI to rotate the subject. Best results
-                  with clear, singular subjects on simple backgrounds.
+                  ℹ️ <b>Drift</b> uses AI to rotate the subject.
                 </div>
               </div>
             )}
@@ -455,7 +475,7 @@ export function EditAssetModal({
                 disabled={!prompt.trim() || isProcessing}
                 className="w-full py-4 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isProcessing ? "Refining..." : <span>✨ Apply Edit</span>}
+                {isProcessing ? "Refining..." : <span>Apply Edit</span>}
               </button>
             )}
             <button

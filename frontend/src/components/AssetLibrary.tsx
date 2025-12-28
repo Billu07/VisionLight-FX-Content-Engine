@@ -323,7 +323,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                 </h3>
                 <p className="text-gray-400 text-sm mb-6">
                   {selectedAsset.aspectRatio === "original"
-                    ? "Raw / Magic Edit"
+                    ? "Picture Edit"
                     : selectedAsset.aspectRatio}
                 </p>
                 <div className="space-y-3">
@@ -333,7 +333,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                       onClick={() => handleUseImage(selectedAsset)}
                       className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-900/20 transform active:scale-95 transition-all flex items-center justify-center gap-2"
                     >
-                      <span>✅</span> Use this Asset
+                      <span></span> Use this Asset
                     </button>
                   )}
 
@@ -344,7 +344,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                     }}
                     className="w-full py-3 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 border border-purple-500/50 rounded-xl font-bold transition-all flex items-center justify-center gap-2"
                   >
-                    <span></span> Magic Edit
+                    <span></span> Edited Pictures
                   </button>
                 </div>
               </div>

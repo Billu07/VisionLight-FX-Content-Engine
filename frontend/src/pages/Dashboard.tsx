@@ -851,7 +851,7 @@ function Dashboard() {
                           : "text-gray-400 hover:text-white"
                       }`}
                     >
-                      Magic Edit
+                      Picture Edit
                     </button>
                   </div>
 
@@ -914,7 +914,7 @@ function Dashboard() {
                 {activeEngine === "studio" && studioMode === "edit" ? (
                   <div className="bg-gray-900/50 border border-cyan-500/30 rounded-2xl p-8 text-center space-y-5 animate-in fade-in">
                     <div className="w-20 h-20 bg-cyan-900/20 rounded-full flex items-center justify-center mx-auto border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
-                      <span className="text-4xl">🪄</span>
+                      <span className="text-4xl"></span>
                     </div>
                     <div>
                       <h3 className="text-white font-bold text-xl mb-2">
