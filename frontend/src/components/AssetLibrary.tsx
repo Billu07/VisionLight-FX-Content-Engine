@@ -383,7 +383,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                     <span>
                       {activeDriftIds.has(selectedAsset.id)
                         ? "🌀 Resume Drift"
-                        : "Magic Edit"}
+                        : "Edit"}
                     </span>
                   </button>
                 </div>
