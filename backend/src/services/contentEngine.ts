@@ -201,7 +201,7 @@ export const contentEngine = {
     horizontal: number,
     vertical: number,
     zoom: number,
-    userAspectRatio?: string // ✅ ADDED: Accept user preference
+    userAspectRatio?: string
   ) {
     try {
       console.log(
@@ -257,8 +257,6 @@ export const contentEngine = {
           },
         }
       );
-
-      console.log("✅ Kling Accepted:", submitRes.data.request_id);
 
       return {
         requestId: submitRes.data.request_id,
@@ -342,67 +340,35 @@ export const contentEngine = {
       if (Array.isArray(parsed)) targetUrl = parsed[0];
     } catch (e) {}
 
+    const params = post.generationParams as any;
+    const rawRatio = params?.aspectRatio;
+
+    let dbAspectRatio = "16:9";
+
+    if (rawRatio === "landscape" || rawRatio === "16:9") {
+      dbAspectRatio = "16:9";
+    } else if (rawRatio === "portrait" || rawRatio === "9:16") {
+      dbAspectRatio = "9:16";
+    } else if (rawRatio === "square" || rawRatio === "1:1") {
+      dbAspectRatio = "1:1";
+    } else if (rawRatio === "original") {
+      dbAspectRatio = "original";
+    }
+
     let type = "IMAGE";
     if (post.mediaType === "VIDEO" || post.mediaProvider?.includes("kling")) {
       type = "VIDEO";
     }
 
-    return await airtableService.createAsset(userId, targetUrl, "16:9", type);
+    return await airtableService.createAsset(
+      userId,
+      targetUrl,
+      dbAspectRatio,
+      type
+    );
   },
 
-  async editAsset(
-    originalAssetUrl: string,
-    prompt: string,
-    userId: string,
-    aspectRatio: "16:9" | "9:16" | "original",
-    referenceUrl?: string,
-    mode: "standard" | "pro" = "pro"
-  ): Promise<Asset> {
-    try {
-      const imageResponse = await axios.get(getOptimizedUrl(originalAssetUrl), {
-        responseType: "arraybuffer",
-      });
-      const inputBuffers = [Buffer.from(imageResponse.data)];
-      let finalPrompt = prompt;
-      const modelType = mode === "standard" ? "speed" : "quality";
-
-      if (referenceUrl) {
-        const refRes = await axios.get(getOptimizedUrl(referenceUrl), {
-          responseType: "arraybuffer",
-        });
-        inputBuffers.push(Buffer.from(refRes.data));
-        if (mode === "pro") {
-          finalPrompt = `TASK: ${prompt} \nINPUT 2 is style reference. Maintain ID of INPUT 1.`;
-        }
-      }
-
-      const editedBuffer = await GeminiService.generateOrEditImage({
-        prompt: finalPrompt,
-        aspectRatio: aspectRatio === "original" ? "original" : aspectRatio,
-        referenceImages: inputBuffers,
-        modelType: modelType,
-        useGrounding: mode === "pro",
-      });
-
-      const newUrl = await this.uploadToCloudinary(
-        editedBuffer,
-        `edited_${userId}_${Date.now()}`,
-        userId,
-        `Edited: ${prompt}`,
-        "image"
-      );
-      return await airtableService.createAsset(
-        userId,
-        newUrl,
-        aspectRatio,
-        "IMAGE"
-      );
-    } catch (e: any) {
-      throw new Error(`Edit failed: ${e.message}`);
-    }
-  },
-
-  // === ✅ NEW: ENHANCE ASSET (Topaz) ===
+  // === ✅ RESTORED: ENHANCE ASSET (Topaz) ===
   async enhanceAsset(userId: string, assetUrl: string): Promise<Asset> {
     try {
       console.log(`✨ Enhancing Asset for ${userId}...`);
@@ -460,7 +426,7 @@ export const contentEngine = {
       return await airtableService.createAsset(
         userId,
         cloudUrl,
-        "original", // Maintain original or detect? Usually 1:1 or as input.
+        "original", // Keep resolution/ratio of source
         "IMAGE"
       );
     } catch (e: any) {
@@ -469,34 +435,90 @@ export const contentEngine = {
     }
   },
 
-  // === VIDEO GENERATION (Standard) ===
+  async editAsset(
+    originalAssetUrl: string,
+    prompt: string,
+    userId: string,
+    aspectRatio: "16:9" | "9:16" | "original",
+    referenceUrl?: string,
+    mode: "standard" | "pro" = "pro"
+  ): Promise<Asset> {
+    try {
+      const imageResponse = await axios.get(getOptimizedUrl(originalAssetUrl), {
+        responseType: "arraybuffer",
+      });
+      const inputBuffers = [Buffer.from(imageResponse.data)];
+      let finalPrompt = prompt;
+      const modelType = mode === "standard" ? "speed" : "quality";
+
+      if (referenceUrl) {
+        const refRes = await axios.get(getOptimizedUrl(referenceUrl), {
+          responseType: "arraybuffer",
+        });
+        inputBuffers.push(Buffer.from(refRes.data));
+        if (mode === "pro") {
+          finalPrompt = `TASK: ${prompt} \nINPUT 2 is style reference. Maintain ID of INPUT 1.`;
+        }
+      }
+
+      const editedBuffer = await GeminiService.generateOrEditImage({
+        prompt: finalPrompt,
+        aspectRatio: aspectRatio === "original" ? "original" : aspectRatio,
+        referenceImages: inputBuffers,
+        modelType: modelType,
+        useGrounding: mode === "pro",
+      });
+
+      const newUrl = await this.uploadToCloudinary(
+        editedBuffer,
+        `edited_${userId}_${Date.now()}`,
+        userId,
+        `Edited: ${prompt}`,
+        "image"
+      );
+      return await airtableService.createAsset(
+        userId,
+        newUrl,
+        aspectRatio,
+        "IMAGE"
+      );
+    } catch (e: any) {
+      throw new Error(`Edit failed: ${e.message}`);
+    }
+  },
+
+  // ===========================================================================
+  // 1. INITIATE VIDEO GENERATION
+  // ===========================================================================
   async startVideoGeneration(postId: string, finalPrompt: string, params: any) {
     console.log(`🎬 Video Gen for ${postId} | Model Input: ${params.model}`);
+
     const isKie = params.model.includes("kie");
     const isKling = params.model.includes("kling");
     const isOpenAI = !isKie && !isKling;
     const isPro = params.model.includes("pro") || params.model.includes("Pro");
 
     try {
-      let finalInputImageBuffer: Buffer | undefined;
-      let targetWidth = 1280;
-      let targetHeight = 720;
+      // 1. Determine Target Dimensions based on User Selection (Not Image)
       const isPortrait =
         params.aspectRatio === "portrait" || params.aspectRatio === "9:16";
 
-      if (params.size) {
-        const [w, h] = params.size.split("x");
-        targetWidth = parseInt(w);
-        targetHeight = parseInt(h);
-      } else if (params.resolution) {
-        targetWidth = isPortrait ? 1080 : 1920;
-        targetHeight = isPortrait ? 1920 : 1080;
-        if (params.resolution === "720p") {
-          targetWidth = isPortrait ? 720 : 1280;
-          targetHeight = isPortrait ? 1280 : 720;
-        }
+      let targetWidth = 1280;
+      let targetHeight = 720;
+
+      // Force dimensions based on selection
+      if (isPortrait) {
+        targetWidth = 720;
+        targetHeight = 1280;
       }
 
+      if (params.resolution === "1080p") {
+        targetWidth = isPortrait ? 1080 : 1920;
+        targetHeight = isPortrait ? 1920 : 1080;
+      }
+
+      // 2. Process Start Image (Reference Image 0)
+      let finalInputImageBuffer: Buffer | undefined;
       const rawRefUrl =
         params.imageReferences && params.imageReferences.length > 0
           ? params.imageReferences[0]
@@ -510,33 +532,41 @@ export const contentEngine = {
             timeout: 60000,
           });
           const originalImageBuffer = Buffer.from(imageResponse.data);
+
+          // Check Ratio Mismatch
           const metadata = await sharp(originalImageBuffer).metadata();
           const sourceAR = (metadata.width || 1) / (metadata.height || 1);
           const targetAR = targetWidth / targetHeight;
 
-          if (Math.abs(sourceAR - targetAR) < 0.05) {
-            finalInputImageBuffer = await resizeStrict(
-              originalImageBuffer,
-              targetWidth,
-              targetHeight
+          // If mismatch > 5%, use Gemini Outpainting to fill the frame
+          if (Math.abs(sourceAR - targetAR) > 0.05) {
+            console.log(
+              `📐 Start Frame Ratio Mismatch. Outpainting to ${targetWidth}x${targetHeight}...`
             );
-          } else {
             try {
               finalInputImageBuffer = await resizeWithGemini(
                 originalImageBuffer,
                 targetWidth,
                 targetHeight
               );
-            } catch (geminiError) {
+            } catch (e) {
+              console.warn("Gemini Outpaint failed, falling back to blur.");
               finalInputImageBuffer = await resizeWithBlurFill(
                 originalImageBuffer,
                 targetWidth,
                 targetHeight
               );
             }
+          } else {
+            // Ratio matches, just resize strict
+            finalInputImageBuffer = await resizeStrict(
+              originalImageBuffer,
+              targetWidth,
+              targetHeight
+            );
           }
         } catch (e: any) {
-          console.error("❌ Image Processing Failed:", e.message);
+          console.error("❌ Start Image Processing Failed:", e.message);
         }
       }
 
@@ -597,14 +627,46 @@ export const contentEngine = {
           );
           isImageToVideo = true;
 
+          // Process End Frame (Tail)
           if (params.imageReferences && params.imageReferences.length > 1) {
             try {
+              console.log("🎬 Processing Tail Frame...");
               const tailRaw = getOptimizedUrl(params.imageReferences[1]);
               const tailResp = await axios.get(tailRaw, {
                 responseType: "arraybuffer",
               });
+              const tailBuf = Buffer.from(tailResp.data);
+
+              const tailMeta = await sharp(tailBuf).metadata();
+              const tailAR = (tailMeta.width || 1) / (tailMeta.height || 1);
+              const targetAR = targetWidth / targetHeight;
+
+              let processedTail: Buffer;
+
+              if (Math.abs(tailAR - targetAR) > 0.05) {
+                try {
+                  processedTail = await resizeWithGemini(
+                    tailBuf,
+                    targetWidth,
+                    targetHeight
+                  );
+                } catch (e) {
+                  processedTail = await resizeWithBlurFill(
+                    tailBuf,
+                    targetWidth,
+                    targetHeight
+                  );
+                }
+              } else {
+                processedTail = await resizeStrict(
+                  tailBuf,
+                  targetWidth,
+                  targetHeight
+                );
+              }
+
               klingTailUrl = await this.uploadToCloudinary(
-                tailResp.data,
+                processedTail,
                 `${postId}_kling_end`,
                 params.userId,
                 "Kling End",
@@ -614,6 +676,7 @@ export const contentEngine = {
                 generatedEndFrame: klingTailUrl,
               });
             } catch (e) {
+              console.error("❌ Tail Processing Failed:", e);
               klingTailUrl = getOptimizedUrl(params.imageReferences[1]);
             }
           }
@@ -622,7 +685,7 @@ export const contentEngine = {
           isImageToVideo = true;
         }
 
-        const tier = "pro"; // Always force PRO
+        const tier = "pro";
         const url = `${FAL_BASE_PATH}/${tier}/${
           isImageToVideo ? "image-to-video" : "text-to-video"
         }`;
@@ -633,7 +696,9 @@ export const contentEngine = {
         };
         if (isImageToVideo) {
           payload.image_url = klingInputUrl;
-          if (klingTailUrl) payload.tail_image_url = klingTailUrl;
+          if (klingTailUrl) {
+            payload.tail_image_url = klingTailUrl;
+          }
         }
 
         const submitRes = await axios.post(url, payload, {
@@ -691,9 +756,9 @@ export const contentEngine = {
     }
   },
 
-  // =========================================================
-  // 🚀 CRITICAL FIX: Robust Check Status with Fallback
-  // =========================================================
+  // ===========================================================================
+  // 2. CHECK STATUS
+  // ===========================================================================
   async checkPostStatus(post: Post) {
     const params = post.generationParams as any;
     if (post.status !== "PROCESSING" || !params?.externalId) return;
@@ -739,9 +804,7 @@ export const contentEngine = {
         } else progress = Math.min(90, progress + 5);
       }
 
-      // ✅ CLOUDINARY FALLBACK FIX
       if (isComplete && finalUrl) {
-        console.log(`✅ Job ${externalId} Completed! Uploading...`);
         try {
           const cloudUrl = await this.uploadToCloudinary(
             finalUrl,
@@ -769,7 +832,7 @@ export const contentEngine = {
           await airtableService.updatePost(post.id, { progress });
       }
     } catch (error: any) {
-      console.error(`Check Status Critical Error (${post.id}):`, error.message);
+      console.error(`Check Status Error (${post.id}):`, error.message);
     }
   },
 
@@ -787,7 +850,6 @@ export const contentEngine = {
       generationStep: "COMPLETED",
     });
 
-    // ✅ FIX: Use aspect ratio from params, not hardcoded
     const params = post.generationParams as any;
     if (params?.source === "DRIFT_EDITOR") {
       console.log("💾 Auto-saving Drift result to Asset Library...");

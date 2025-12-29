@@ -7,11 +7,13 @@ import { upload, uploadToCloudinary } from "./utils/fileUpload";
 
 dotenv.config();
 
-// Log environment status
 console.log("🔧 Environment Check:", {
   airtableKey: process.env.AIRTABLE_API_KEY ? "✅ Loaded" : "❌ Missing",
+  airtableBase: process.env.AIRTABLE_BASE_ID ? "✅ Loaded" : "❌ Missing",
   cloudinary: process.env.CLOUDINARY_CLOUD_NAME ? "✅ Loaded" : "❌ Missing",
   openai: process.env.OPENAI_API_KEY ? "✅ Loaded" : "❌ Missing",
+  google: process.env.GOOGLE_AI_API_KEY ? "✅ Loaded" : "❌ Missing",
+  supabase: process.env.SUPABASE_URL ? "✅ Loaded" : "❌ Missing",
 });
 
 import { ROIService } from "./services/roi";
@@ -22,13 +24,16 @@ import { contentEngine } from "./services/contentEngine";
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// === ADMIN CONFIGURATION ===
 const ADMIN_EMAILS_RAW = process.env.ADMIN_EMAILS || "snowfix07@gmail.com";
 const ADMIN_EMAILS = ADMIN_EMAILS_RAW.split(",").map((email) => email.trim());
 
-// ✅ CRITICAL FIX: Allow all origins to prevent "Infinite Loading"
+const allowedOrigins = ["https://picdrift.studio", "http://localhost:5173"];
+if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL);
+
 app.use(
   cors({
-    origin: true, // Allow any domain to connect
+    origin: true, // Allow any domain (safer for PWA/Mobile)
     credentials: true,
     exposedHeaders: ["Content-Disposition", "Content-Length", "Content-Type"],
   })
@@ -85,6 +90,7 @@ const requireAdmin = (
 };
 
 // ==================== NOTIFICATION ROUTES ====================
+
 app.post(
   "/api/request-credits",
   authenticateToken,
@@ -131,6 +137,7 @@ app.put(
 );
 
 // ==================== ADMIN MANAGEMENT ROUTES ====================
+
 app.post(
   "/api/admin/create-user",
   authenticateToken,
@@ -203,6 +210,7 @@ app.delete(
   requireAdmin,
   async (req: AuthenticatedRequest, res) => {
     const { userId } = req.params;
+
     try {
       const userToDelete = await airtableService.findUserById(userId);
       if (!userToDelete)
@@ -213,6 +221,7 @@ app.delete(
 
       res.json({ success: true, message: "User deleted successfully" });
     } catch (error: any) {
+      console.error("Delete Error:", error);
       res.status(500).json({ error: error.message });
     }
   }
@@ -304,6 +313,8 @@ app.post(
 );
 
 // ==================== ASSET MANAGEMENT ====================
+
+// ✅ Move Post Media to Asset (Timeline -> Library)
 app.post(
   "/api/posts/:postId/to-asset",
   authenticateToken,
@@ -317,6 +328,7 @@ app.post(
   }
 );
 
+// ✅ Sync Upload (Magic Edit & Direct Reference)
 app.post(
   "/api/assets/upload-sync",
   authenticateToken,
@@ -327,20 +339,24 @@ app.post(
         return res.status(400).json({ error: "No image provided" });
 
       const { aspectRatio, raw } = req.body;
+
       let asset;
 
       if (raw === "true") {
+        // Raw Mode: No resizing
         asset = await contentEngine.uploadRawAsset(
           req.file.buffer,
           req.user!.id
         );
       } else {
+        // Process Mode: Resize/Outpaint
         asset = await contentEngine.processAndSaveAsset(
           req.file.buffer,
           req.user!.id,
           aspectRatio || "16:9"
         );
       }
+
       res.json({ success: true, asset });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -348,6 +364,7 @@ app.post(
   }
 );
 
+// ✅ Batch Upload
 app.post(
   "/api/assets/batch",
   authenticateToken,
@@ -362,9 +379,10 @@ app.post(
 
       res.json({
         success: true,
-        message: `Started processing ${files.length} images.`,
+        message: `Started processing ${files.length} images. They will appear in your library shortly.`,
       });
 
+      // Background Processing
       (async () => {
         for (const file of files) {
           try {
@@ -374,7 +392,7 @@ app.post(
               aspectRatio || "16:9"
             );
           } catch (e) {
-            console.error("Batch processing error", e);
+            console.error("Failed to process one asset in batch", e);
           }
         }
       })();
@@ -384,12 +402,18 @@ app.post(
   }
 );
 
+// ✅ Edit Asset (Standard/Pro)
 app.post(
   "/api/assets/edit",
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
       const { prompt, assetUrl, aspectRatio, referenceUrl, mode } = req.body;
+
+      if (!assetUrl || !prompt) {
+        return res.status(400).json({ error: "Missing asset or prompt" });
+      }
+
       const newAsset = await contentEngine.editAsset(
         assetUrl,
         prompt,
@@ -398,6 +422,7 @@ app.post(
         referenceUrl,
         mode || "pro"
       );
+
       res.json({ success: true, asset: newAsset });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -405,7 +430,7 @@ app.post(
   }
 );
 
-// ✅ DRIFT VIDEO (Fixed Aspect Ratio handling)
+// ✅ Start Drift Video Path (Kling)
 app.post(
   "/api/assets/drift-video",
   authenticateToken,
@@ -413,78 +438,24 @@ app.post(
     try {
       const { assetUrl, prompt, horizontal, vertical, zoom, aspectRatio } =
         req.body;
-      const userId = req.user!.id;
-      const cost = 5;
-
-      const user = await airtableService.findUserById(userId);
-      if (!user || user.creditBalance < cost) {
-        return res.status(403).json({ error: "Insufficient credits" });
-      }
-
-      const cleanPrompt = prompt || `Drift H${horizontal} V${vertical}`;
-      const generationParams = {
-        horizontal,
-        vertical,
-        zoom,
+      // We pass the user-selected aspect ratio if provided
+      const result = await contentEngine.processKlingDrift(
+        req.user!.id,
         assetUrl,
-        aspectRatio: aspectRatio || "16:9",
-        source: "DRIFT_EDITOR",
-        cost,
-      };
-
-      await airtableService.deductCredits(userId, cost);
-
-      const post = await airtableService.createPost({
-        userId,
-        title: "Drift Generation",
-        prompt: cleanPrompt,
-        mediaType: "VIDEO",
-        mediaProvider: "kling",
-        platform: "Internal",
-        status: "PROCESSING",
-        generationParams,
-        generationStep: "GENERATION",
-        requiresApproval: false,
-        imageReference: assetUrl,
-      });
-
-      // Background process
-      (async () => {
-        try {
-          const result = await contentEngine.processKlingDrift(
-            userId,
-            assetUrl,
-            prompt,
-            Number(horizontal),
-            Number(vertical),
-            Number(zoom),
-            aspectRatio
-          );
-
-          await airtableService.updatePost(post.id, {
-            generationParams: {
-              ...generationParams,
-              externalId: result.requestId,
-              statusUrl: result.statusUrl,
-            },
-          });
-        } catch (e: any) {
-          console.error("Drift Failed:", e);
-          await airtableService.updatePost(post.id, {
-            status: "FAILED",
-            error: e.message,
-          });
-          await airtableService.refundUserCredit(userId, cost);
-        }
-      })();
-
-      res.json({ success: true, postId: post.id });
+        prompt,
+        Number(horizontal),
+        Number(vertical),
+        Number(zoom),
+        aspectRatio // 👈 Correctly pass this
+      );
+      res.json({ success: true, ...result });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   }
 );
 
+// ✅ Check Tool Status (For Drift Polling)
 app.post(
   "/api/tools/status",
   authenticateToken,
@@ -499,39 +470,24 @@ app.post(
   }
 );
 
+// ✅ Save Extracted Frame / Video URL
 app.post(
   "/api/assets/save-url",
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
       const { url, aspectRatio, type } = req.body;
+
+      if (!url) return res.status(400).json({ error: "URL required" });
+
       const asset = await airtableService.createAsset(
         req.user!.id,
         url,
         aspectRatio || "16:9",
         type || "IMAGE"
       );
-      res.json({ success: true, asset });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  }
-);
 
-app.post(
-  "/api/analyze-image",
-  authenticateToken,
-  upload.single("image"),
-  async (req: AuthenticatedRequest, res) => {
-    try {
-      if (!req.file) return res.status(400).json({ error: "No image" });
-      const { prompt } = req.body;
-      const { GeminiService } = require("./services/gemini");
-      const text = await GeminiService.analyzeImageText({
-        prompt: prompt || "Describe this image.",
-        imageBuffer: req.file.buffer,
-      });
-      res.json({ success: true, result: text });
+      res.json({ success: true, asset });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -553,6 +509,32 @@ app.post(
   }
 );
 
+// ✅ Vision Analysis
+app.post(
+  "/api/analyze-image",
+  authenticateToken,
+  upload.single("image"),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.file)
+        return res.status(400).json({ error: "No image uploaded" });
+
+      const { prompt } = req.body;
+      const { GeminiService } = require("./services/gemini");
+
+      const text = await GeminiService.analyzeImageText({
+        prompt: prompt || "Describe this image in detail.",
+        imageBuffer: req.file.buffer,
+      });
+
+      res.json({ success: true, result: text });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// ✅ Get Assets
 app.get(
   "/api/assets",
   authenticateToken,
@@ -566,6 +548,7 @@ app.get(
   }
 );
 
+// ✅ Delete Asset
 app.delete(
   "/api/assets/:id",
   authenticateToken,
@@ -579,6 +562,7 @@ app.delete(
   }
 );
 
+// ==================== CONTENT ROUTES (TIMELINE) ====================
 app.get(
   "/api/posts",
   authenticateToken,
@@ -597,42 +581,53 @@ app.put(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      await airtableService.updatePost(req.params.postId, {
-        title: req.body.title,
-      });
-      res.json({ success: true });
+      const { postId } = req.params;
+      const { title } = req.body;
+      const post = await airtableService.getPostById(postId);
+      if (!post || post.userId !== req.user!.id)
+        return res.status(403).json({ error: "Access denied" });
+
+      await airtableService.updatePost(postId, { title });
+      res.json({ success: true, message: "Title updated" });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   }
 );
 
-app.delete(
-  "/api/posts/:postId",
-  authenticateToken,
-  async (req: AuthenticatedRequest, res) => {
-    try {
-      await airtableService.deletePost(req.params.postId);
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  }
-);
-
+// ✅ FIXED: Dynamic Download Extension
 app.get(
   "/api/posts/:postId/download",
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const post = await airtableService.getPostById(req.params.postId);
-      if (!post || !post.mediaUrl)
-        return res.status(404).json({ error: "No media" });
+      const { postId } = req.params;
+      const post = await airtableService.getPostById(postId);
 
+      if (!post || post.userId !== req.user!.id)
+        return res.status(403).json({ error: "Access denied" });
+      if (!post.mediaUrl)
+        return res.status(404).json({ error: "Media not available" });
+
+      let cleanTitle = `visionlight-${postId}`;
+      if (post.title && post.title.trim().length > 0) {
+        cleanTitle = post.title.replace(/[\\/:*?"<>|]/g, "_").trim();
+      }
+
+      // Check Media Type for extension
+      let extension = "mp4";
+      const type = post.mediaType ? post.mediaType.toUpperCase() : "VIDEO";
+
+      if (type === "IMAGE") extension = "jpg";
+      if (type === "CAROUSEL") extension = "jpg";
+
+      const filename = `${cleanTitle}.${extension}`;
+
+      // Handle Carousel Arrays
       let targetUrl = post.mediaUrl;
       try {
         const parsed = JSON.parse(post.mediaUrl);
-        if (Array.isArray(parsed)) targetUrl = parsed[0];
+        if (Array.isArray(parsed) && parsed.length > 0) targetUrl = parsed[0];
       } catch (e) {}
 
       const response = await axios({
@@ -640,59 +635,129 @@ app.get(
         method: "GET",
         responseType: "stream",
       });
+
       res.setHeader("Content-Type", response.headers["content-type"]);
+      if (response.headers["content-length"])
+        res.setHeader("Content-Length", response.headers["content-length"]);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${filename}"`
+      );
       response.data.pipe(res);
     } catch (error: any) {
-      res.status(500).json({ error: "Download failed" });
+      console.error("Download error:", error);
+      if (!res.headersSent)
+        res.status(500).json({ error: "Failed to download media" });
     }
   }
 );
 
-// === GENERATION ===
+// ✅ Delete Post (Timeline)
+app.delete(
+  "/api/posts/:postId",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { postId } = req.params;
+      const post = await airtableService.getPostById(postId);
+
+      if (!post || post.userId !== req.user!.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await airtableService.deletePost(postId);
+      res.json({ success: true, message: "Post deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// ==================== GENERATION WORKFLOW (UNIFIED) ====================
 app.post(
   "/api/generate-media",
   authenticateToken,
   upload.array("referenceImages", 5),
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { prompt, mediaType, duration, model, aspectRatio, title } =
-        req.body;
-      const cost = calculateCost(mediaType, duration, model);
-      const user = await airtableService.findUserById(req.user!.id);
-
-      if (!user || user.creditBalance < cost) {
-        return res.status(403).json({ error: "Insufficient credits" });
-      }
-
-      const files = (req.files as Express.Multer.File[]) || [];
-      const uploadedUrls = [];
-      for (const f of files) uploadedUrls.push(await uploadToCloudinary(f));
-
-      const generationParams = {
-        mediaType,
+      console.log("🎬 /api/generate-media hit");
+      const {
+        prompt,
+        mediaType, // "video", "image", "carousel"
         duration,
         model,
         aspectRatio,
+        resolution,
+        size,
+        width,
+        height,
+        title,
+      } = req.body;
+
+      const cost = calculateCost(
+        mediaType,
+        duration ? parseInt(duration) : undefined,
+        model
+      );
+
+      const user = await airtableService.findUserById(req.user!.id);
+      if (!user || user.creditBalance < cost) {
+        return res.status(403).json({
+          error: `Insufficient credits. Required: ${cost}, Balance: ${
+            user?.creditBalance || 0
+          }`,
+        });
+      }
+
+      // Handle Uploads
+      const referenceFiles = (req.files as Express.Multer.File[]) || [];
+      const uploadedUrls: string[] = [];
+      if (referenceFiles.length > 0) {
+        try {
+          for (const file of referenceFiles) {
+            const url = await uploadToCloudinary(file);
+            uploadedUrls.push(url);
+          }
+        } catch (err) {
+          return res.status(500).json({ error: "Image upload failed" });
+        }
+      }
+      const primaryRefUrl = uploadedUrls.length > 0 ? uploadedUrls[0] : "";
+
+      const generationParams = {
+        mediaType,
+        duration: duration ? parseInt(duration) : undefined,
+        model,
+        aspectRatio,
+        imageReference: primaryRefUrl,
         imageReferences: uploadedUrls,
-        imageReference: uploadedUrls[0] || "",
-        cost,
+        hasReferenceImage: uploadedUrls.length > 0,
+        timestamp: new Date().toISOString(),
+        title: title || "",
+        userId: req.user!.id,
+        cost: cost,
       };
 
+      // 1. Deduct Credits
       await airtableService.deductCredits(req.user!.id, cost);
 
+      // 2. CREATE POST FOR EVERYTHING
       const post = await airtableService.createPost({
         userId: req.user!.id,
         prompt,
-        title,
-        mediaType: mediaType.toUpperCase(),
+        title: title || "",
+        mediaType: mediaType.toUpperCase() as any,
         platform: "INSTAGRAM",
         generationParams,
+        imageReference: primaryRefUrl,
         generationStep: "GENERATION",
+        requiresApproval: false,
       });
 
+      // 3. RESPOND
       res.json({ success: true, postId: post.id });
 
-      // Trigger Logic
+      // 4. TRIGGER PROCESS
       (async () => {
         try {
           if (mediaType === "carousel") {
@@ -708,41 +773,24 @@ app.post(
               generationParams
             );
           } else {
-            await contentEngine.startVideoGeneration(
+            contentEngine.startVideoGeneration(
               post.id,
               prompt,
               generationParams
             );
           }
         } catch (err: any) {
-          console.error("Gen failed:", err);
+          console.error("Background Error:", err);
           await airtableService.updatePost(post.id, {
             status: "FAILED",
-            error: err.message,
+            error: "Processing failed",
           });
           await airtableService.refundUserCredit(req.user!.id, cost);
         }
       })();
     } catch (error: any) {
+      console.error("API Error:", error);
       res.status(500).json({ error: error.message });
-    }
-  }
-);
-
-app.get(
-  "/api/jobs/check-active",
-  authenticateToken,
-  async (req: AuthenticatedRequest, res) => {
-    try {
-      const posts = await airtableService.getUserPosts(req.user!.id);
-      const active = posts.filter((p: any) => p.status === "PROCESSING");
-
-      const updates = active.map((p: any) => contentEngine.checkPostStatus(p));
-      await Promise.all(updates);
-
-      res.json({ success: true, checked: active.length });
-    } catch (error: any) {
-      res.json({ success: false, error: error.message });
     }
   }
 );
@@ -760,18 +808,47 @@ app.get(
       if (post.status === "PROCESSING") {
         await contentEngine.checkPostStatus(post);
         post = await airtableService.getPostById(req.params.postId);
-        if (!post) return res.status(404).json({ error: "Post lost" });
       }
 
       res.json({
         success: true,
-        status: post.status,
-        progress: post.progress || 0,
-        mediaUrl: post.mediaUrl,
-        error: post.error,
+        status: post?.status,
+        progress: post?.progress || 0,
+        mediaUrl: post?.mediaUrl,
+        error: post?.error,
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// 2. JOB CHECK (Active Jobs List)
+app.get(
+  "/api/jobs/check-active",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const allPosts = await airtableService.getUserPosts(req.user!.id);
+      const activePosts = allPosts.filter(
+        (p: any) => p.status === "PROCESSING"
+      );
+
+      if (activePosts.length === 0) {
+        return res.json({ success: true, active: 0 });
+      }
+
+      const updates = activePosts.map(async (simplePost: any) => {
+        const fullPost = await airtableService.getPostById(simplePost.id);
+        if (fullPost && fullPost.status === "PROCESSING") {
+          await contentEngine.checkPostStatus(fullPost);
+        }
+      });
+
+      await Promise.all(updates);
+      res.json({ success: true, checked: activePosts.length });
+    } catch (error: any) {
+      res.json({ success: false, error: error.message });
     }
   }
 );
@@ -782,6 +859,8 @@ app.get(
   async (req: AuthenticatedRequest, res) => {
     try {
       const post = await airtableService.getPostById(req.params.postId);
+      if (!post || post.userId !== req.user!.id)
+        return res.status(403).json({ error: "Denied" });
       res.json({ success: true, post });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -789,7 +868,11 @@ app.get(
   }
 );
 
-app.use((req, res) => res.status(404).json({ error: "Not Found" }));
+app.use((req, res) => res.status(404).json({ error: "Route not found" }));
+app.use((error: any, req: Request, res: Response, next: NextFunction) => {
+  console.error("Global Error:", error);
+  res.status(500).json({ error: "Internal Server Error" });
+});
 
 if (process.env.NODE_ENV !== "production" || process.env.VERCEL !== "1") {
   app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
