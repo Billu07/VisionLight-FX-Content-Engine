@@ -580,6 +580,24 @@ app.post(
   }
 );
 
+// ✅ NEW: Enhance Asset Route
+app.post(
+  "/api/assets/enhance",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { assetUrl } = req.body;
+      if (!assetUrl)
+        return res.status(400).json({ error: "No asset URL provided" });
+
+      const asset = await contentEngine.enhanceAsset(req.user!.id, assetUrl);
+      res.json({ success: true, asset });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
 // 6. Get Assets
 app.get(
   "/api/assets",

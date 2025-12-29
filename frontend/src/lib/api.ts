@@ -76,6 +76,9 @@ export const apiEndpoints = {
       headers: { "Content-Type": "multipart/form-data" },
     }),
 
+  enhanceAsset: (data: { assetUrl: string }) =>
+    api.post("/api/assets/enhance", data),
+
   // Drift Video (Kling)
   startDriftVideo: (data: any) => api.post("/api/assets/drift-video", data),
 

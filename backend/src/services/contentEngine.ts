@@ -23,9 +23,10 @@ const VIDEO_UPLOAD_TIMEOUT = 600000;
 const KIE_BASE_URL = "https://api.kie.ai/api/v1";
 const KIE_API_KEY = process.env.KIE_AI_API_KEY;
 
-// FAL AI Config (Kling 2.5 Turbo)
+// FAL AI Config
 const FAL_KEY = process.env.FAL_KEY;
 const FAL_BASE_PATH = "https://queue.fal.run/fal-ai/kling-video/v2.5-turbo";
+const FAL_TOPAZ_PATH = "https://queue.fal.run/fal-ai/topaz/upscale/image";
 
 const getOptimizedUrl = (url: string) => {
   if (!url || typeof url !== "string") return url;
@@ -35,14 +36,13 @@ const getOptimizedUrl = (url: string) => {
   return url;
 };
 
-// === HELPER: Convert Sliders to Kling Camera Prompts ===
 // === HELPER: Convert Sliders (-10 to 10) to Kling Camera Prompts ===
 const getKlingCameraPrompt = (h: number, v: number, z: number) => {
   const parts: string[] = [];
 
-  // Horizontal (Orbit/Pan)
+  // Horizontal (Orbit/Pan) - Threshold 3 for strong move
   if (h >= 3) parts.push("Camera orbits right");
-  else if (h > 0) parts.push("Camera pans right"); // Subtle move for low values
+  else if (h > 0) parts.push("Camera pans right");
 
   if (h <= -3) parts.push("Camera orbits left");
   else if (h < 0) parts.push("Camera pans left");
@@ -231,14 +231,16 @@ export const contentEngine = {
         aspect_ratio: targetRatio,
       };
 
-      const url = `${FAL_BASE_PATH}/pro/image-to-video`;
-
-      const submitRes = await axios.post(url, payload, {
-        headers: {
-          Authorization: `Key ${FAL_KEY}`,
-          "Content-Type": "application/json",
-        },
-      });
+      const submitRes = await axios.post(
+        `${FAL_BASE_PATH}/pro/image-to-video`,
+        payload,
+        {
+          headers: {
+            Authorization: `Key ${FAL_KEY}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       console.log("✅ Kling Accepted:", submitRes.data.request_id);
 
@@ -384,6 +386,73 @@ export const contentEngine = {
     }
   },
 
+  // === ✅ NEW: ENHANCE ASSET (Topaz) ===
+  async enhanceAsset(userId: string, assetUrl: string): Promise<Asset> {
+    try {
+      console.log(`✨ Enhancing Asset for ${userId}...`);
+
+      // 1. Submit to Topaz
+      const submitRes = await axios.post(
+        FAL_TOPAZ_PATH,
+        {
+          image_url: getOptimizedUrl(assetUrl),
+          model: "Standard V2",
+          upscale_factor: 2,
+          output_format: "jpeg",
+          face_enhancement: true,
+        },
+        {
+          headers: {
+            Authorization: `Key ${FAL_KEY}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const statusUrl = submitRes.data.status_url;
+      console.log("Enhance Job Submitted:", submitRes.data.request_id);
+
+      // 2. Simple Polling Loop (Wait for result - up to 90s)
+      let resultUrl = "";
+      let attempts = 0;
+      while (!resultUrl && attempts < 45) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const checkRes = await axios.get(statusUrl, {
+          headers: { Authorization: `Key ${FAL_KEY}` },
+        });
+
+        if (checkRes.data.status === "COMPLETED") {
+          const resultRes = await axios.get(checkRes.data.response_url);
+          resultUrl = resultRes.data.image.url;
+        } else if (checkRes.data.status === "FAILED") {
+          throw new Error("Enhancement Failed: " + checkRes.data.error);
+        }
+        attempts++;
+      }
+
+      if (!resultUrl) throw new Error("Enhancement timed out.");
+
+      // 3. Upload Result & Save
+      const cloudUrl = await this.uploadToCloudinary(
+        resultUrl,
+        `enhanced_${userId}_${Date.now()}`,
+        userId,
+        "Enhanced Asset",
+        "image"
+      );
+
+      return await airtableService.createAsset(
+        userId,
+        cloudUrl,
+        "original",
+        "IMAGE"
+      );
+    } catch (e: any) {
+      console.error("Enhance Error:", e.message);
+      throw e;
+    }
+  },
+
   // === VIDEO GENERATION (Standard) ===
   async startVideoGeneration(postId: string, finalPrompt: string, params: any) {
     console.log(`🎬 Video Gen for ${postId} | Model Input: ${params.model}`);
@@ -412,7 +481,6 @@ export const contentEngine = {
         }
       }
 
-      // Check Reference Image
       const rawRefUrl =
         params.imageReferences && params.imageReferences.length > 0
           ? params.imageReferences[0]
@@ -608,7 +676,7 @@ export const contentEngine = {
   },
 
   // =========================================================
-  // 🚀 CRITICAL FIX: The Safety Net
+  // 🚀 CRITICAL FIX: Robust Check Status with Fallback
   // =========================================================
   async checkPostStatus(post: Post) {
     const params = post.generationParams as any;
@@ -653,11 +721,9 @@ export const contentEngine = {
           isFailed = true;
           errorMessage = statusRes.data.error;
         } else progress = Math.min(90, progress + 5);
-      } else if (provider.includes("openai")) {
-        // OpenAI check logic could go here
       }
 
-      // ✅ FIX IS HERE:
+      // ✅ CLOUDINARY FALLBACK FIX
       if (isComplete && finalUrl) {
         console.log(`✅ Job ${externalId} Completed! Uploading...`);
         try {
@@ -671,8 +737,6 @@ export const contentEngine = {
           await this.finalizePost(post.id, cloudUrl, provider, userId);
         } catch (uploadError: any) {
           console.error("❌ Cloudinary Failed:", uploadError.message);
-          // 🔥 FALLBACK: IF UPLOAD FAILS, SAVE THE RAW FAL URL
-          // This guarantees the video finishes processing in the DB
           console.warn("⚠️ Fallback: Using Raw FAL URL");
           await this.finalizePost(post.id, finalUrl, provider, userId);
         }
@@ -715,7 +779,7 @@ export const contentEngine = {
     await ROIService.incrementMediaGenerated(userId);
   },
 
-  // === IMAGE GEN (Added Back) ===
+  // === IMAGE GEN ===
   async startImageGeneration(postId: string, finalPrompt: string, params: any) {
     console.log(
       `🎨 Gemini 3 Pro Gen for Post ${postId} | AR: ${params.aspectRatio}`
@@ -758,7 +822,7 @@ export const contentEngine = {
     }
   },
 
-  // === CAROUSEL GEN (Added Back) ===
+  // === CAROUSEL GEN ===
   async startCarouselGeneration(
     postId: string,
     finalPrompt: string,

@@ -19,8 +19,17 @@ interface EditAssetModalProps {
 
 type EditorMode = "standard" | "pro" | "drift";
 
-// ✅ UPDATED PRESETS
-const DRIFT_PRESETS = [
+// ✅ FIXED: Defined Interface for Presets
+interface DriftPreset {
+  label: string;
+  h: number;
+  v: number;
+  z: number;
+  icon: string;
+}
+
+// ✅ UPDATED PRESETS (-10 to 10 scale)
+const DRIFT_PRESETS: DriftPreset[] = [
   { label: "Orbit Right", h: 10, v: 0, z: 0, icon: "↪️" },
   { label: "Orbit Left", h: -10, v: 0, z: 0, icon: "↩️" },
   { label: "Dolly Right", h: 5, v: 0, z: 0, icon: "➡️" },
@@ -35,6 +44,9 @@ export function EditAssetModal({
 }: EditAssetModalProps) {
   const queryClient = useQueryClient();
   const refFileInput = useRef<HTMLInputElement>(null);
+
+  // ✅ NEW: Enhance State
+  const [isEnhancing, setIsEnhancing] = useState(false);
 
   const [history, setHistory] = useState<Asset[]>([initialAsset]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -133,6 +145,20 @@ export function EditAssetModal({
     onSuccess: (res: any) => handleSuccess(res.data.asset),
     onError: (err: any) => alert("Edit failed: " + err.message),
     onSettled: () => setIsProcessing(false),
+  });
+
+  // ✅ NEW: Enhance Mutation
+  const enhanceMutation = useMutation({
+    mutationFn: async () => {
+      return apiEndpoints.enhanceAsset({ assetUrl: currentAsset.url });
+    },
+    onMutate: () => setIsEnhancing(true),
+    onSuccess: (res: any) => {
+      handleSuccess(res.data.asset);
+      alert("Image Enhanced Successfully!");
+    },
+    onError: (err: any) => alert("Enhancement failed: " + err.message),
+    onSettled: () => setIsEnhancing(false),
   });
 
   const driftStartMutation = useMutation({
@@ -236,10 +262,10 @@ export function EditAssetModal({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 p-4 backdrop-blur-md">
       <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-6xl flex flex-col md:flex-row overflow-hidden shadow-2xl h-[90vh] relative">
-        {/* ✅ NEW: Close Button (Top Right) */}
+        {/* ✅ FIXED: Close Button Top-Left */}
         <button
           onClick={onClose}
-          className="absolute top-4 leftt-4 z-50 bg-black/50 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors font-bold border border-white/20"
+          className="absolute top-4 left-4 z-50 bg-black/50 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors font-bold border border-white/20"
         >
           ✕
         </button>
@@ -256,6 +282,7 @@ export function EditAssetModal({
             </div>
           ) : (
             <>
+              {/* ✅ FIXED: Undo/Redo Top-Right */}
               <div className="absolute top-4 right-4 z-10 flex gap-2">
                 <button
                   onClick={handleUndo}
@@ -349,6 +376,29 @@ export function EditAssetModal({
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            {/* ✅ NEW: Action Bar (Analyze + Enhance) */}
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => analyzeMutation.mutate()}
+                disabled={isAnalyzing || isProcessing || isEnhancing}
+                className="flex-1 text-xs bg-gray-800 text-cyan-300 px-3 py-2 rounded-lg border border-cyan-500/30 hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <span>🔍</span> {isAnalyzing ? "Scanning..." : "Analyze"}
+              </button>
+
+              <button
+                onClick={() => enhanceMutation.mutate()}
+                disabled={isAnalyzing || isProcessing || isEnhancing}
+                className="flex-1 text-xs bg-gradient-to-r from-amber-600/20 to-orange-600/20 text-orange-300 px-3 py-2 rounded-lg border border-orange-500/30 hover:bg-orange-900/20 transition-colors flex items-center justify-center gap-2"
+              >
+                {isEnhancing ? (
+                  <LoadingSpinner size="sm" color="text-orange-400" />
+                ) : (
+                  <span>Enhance</span>
+                )}
+              </button>
+            </div>
+
             {activeTab !== "drift" && (
               <>
                 <div className="space-y-2">
@@ -544,20 +594,13 @@ export function EditAssetModal({
                     ? "Describe Camera Move (Optional)"
                     : "Instruction"}
                 </label>
-                <button
-                  onClick={() => analyzeMutation.mutate()}
-                  disabled={isAnalyzing || isProcessing}
-                  className="text-[10px] bg-cyan-900/30 text-cyan-300 px-2 py-1 rounded border border-cyan-500/30 hover:bg-cyan-800/50"
-                >
-                  {isAnalyzing ? "Scanning..." : "Analyze Image"}
-                </button>
               </div>
               <textarea
                 className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none leading-relaxed placeholder-gray-500"
                 placeholder={
                   activeTab === "drift"
                     ? "e.g. 'Slow pan right', 'Fast zoom'..."
-                    : "e.g. 'Make it night time'..."
+                    : "e.g. 'Make it night time', 'Add neon lights'..."
                 }
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
