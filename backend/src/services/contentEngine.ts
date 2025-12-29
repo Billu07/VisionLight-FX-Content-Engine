@@ -36,16 +36,27 @@ const getOptimizedUrl = (url: string) => {
 };
 
 // === HELPER: Convert Sliders to Kling Camera Prompts ===
+// === HELPER: Convert Sliders (-10 to 10) to Kling Camera Prompts ===
 const getKlingCameraPrompt = (h: number, v: number, z: number) => {
   const parts: string[] = [];
-  if (h > 10) parts.push("Camera orbits right");
-  else if (h < -10) parts.push("Camera orbits left");
 
-  if (v > 10) parts.push("Camera cranes up");
-  else if (v < -10) parts.push("Camera cranes down");
+  // Horizontal (Orbit/Pan)
+  if (h >= 3) parts.push("Camera orbits right");
+  else if (h > 0) parts.push("Camera pans right"); // Subtle move for low values
 
-  if (z > 5.5) parts.push("Camera zooms in");
-  else if (z < 4.5) parts.push("Camera zooms out");
+  if (h <= -3) parts.push("Camera orbits left");
+  else if (h < 0) parts.push("Camera pans left");
+
+  // Vertical (Crane/Tilt)
+  if (v >= 3) parts.push("Camera cranes up");
+  else if (v > 0) parts.push("Camera tilts up");
+
+  if (v <= -3) parts.push("Camera cranes down");
+  else if (v < 0) parts.push("Camera tilts down");
+
+  // Zoom
+  if (z >= 2) parts.push("Camera zooms in");
+  else if (z <= -2) parts.push("Camera zooms out");
 
   if (parts.length === 0) return "Static camera, subtle motion";
   return parts.join(", ") + ". Smooth cinematic movement.";

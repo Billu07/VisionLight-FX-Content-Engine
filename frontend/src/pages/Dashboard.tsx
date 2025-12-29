@@ -20,8 +20,10 @@ import picdriftLogo from "../assets/picdrift.png";
 const ADMIN_EMAILS = ["snowfix07@gmail.com", "keith@picdrift.com"];
 
 type EngineType = "kie" | "studio" | "openai";
-// 🛠️ UPDATE 1: Added "edit" mode
 type StudioMode = "image" | "carousel" | "edit";
+
+// ✅ NEW: Visual Tab Type
+type VisualTab = "picdrift" | "studio" | "videofx";
 
 interface GenerationState {
   status: "idle" | "generating" | "completed" | "error";
@@ -42,6 +44,7 @@ function Dashboard() {
   >(null);
 
   // Engine Selection
+  // ✅ DEFAULT CHANGED: activeEngine 'kie' + videoFxMode 'picdrift' = PicDrift
   const [activeEngine, setActiveEngine] = useState<EngineType>("kie");
   const [studioMode, setStudioMode] = useState<StudioMode>("image");
 
@@ -56,7 +59,10 @@ function Dashboard() {
   );
 
   // Video FX Sub-mode (Video vs PicDrift)
-  const [videoFxMode, setVideoFxMode] = useState<"video" | "picdrift">("video");
+  // ✅ DEFAULT CHANGED: PicDrift is now default
+  const [videoFxMode, setVideoFxMode] = useState<"video" | "picdrift">(
+    "picdrift"
+  );
 
   // OpenAI (Video FX 2)
   const [videoDuration, setVideoDuration] = useState<4 | 8 | 12>(4);
@@ -112,6 +118,14 @@ function Dashboard() {
   const queryClient = useQueryClient();
   const { user, isLoading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
+
+  // Helper to determine the current "Visual Tab" based on engine state
+  const currentVisualTab: VisualTab =
+    activeEngine === "studio"
+      ? "studio"
+      : activeEngine === "kie" && videoFxMode === "picdrift"
+      ? "picdrift"
+      : "videofx";
 
   // Reset Files on Engine Change
   useEffect(() => {
@@ -258,7 +272,6 @@ function Dashboard() {
     setShowPromptInfo(promptText);
   };
 
-  // === NEW: Move To Asset Library ===
   const handleMoveToAssets = async (postId: string) => {
     if (!confirm("Save this image to your Asset Library for editing?")) return;
     try {
@@ -287,17 +300,9 @@ function Dashboard() {
   // --- 1. ASSET LIBRARY SELECTION HANDLER ---
   const handleAssetSelect = (file: File, url: string) => {
     if (activeLibrarySlot === "start") {
-      if (activeEngine !== "kie" || videoFxMode !== "picdrift") {
-        setActiveEngine("kie");
-        setVideoFxMode("picdrift");
-      }
       setPicDriftFrames((prev) => ({ ...prev, start: file }));
       setPicDriftUrls((prev) => ({ ...prev, start: url }));
     } else if (activeLibrarySlot === "end") {
-      if (activeEngine !== "kie" || videoFxMode !== "picdrift") {
-        setActiveEngine("kie");
-        setVideoFxMode("picdrift");
-      }
       setPicDriftFrames((prev) => ({ ...prev, end: file }));
       setPicDriftUrls((prev) => ({ ...prev, end: url }));
     } else {
@@ -316,17 +321,14 @@ function Dashboard() {
   const handleUseAsStartFrame = async (url: string) => {
     try {
       setActiveEngine("kie");
-      setVideoFxMode("picdrift");
-
+      setVideoFxMode("picdrift"); // Go to PicDrift tab
       const response = await fetch(url);
       const blob = await response.blob();
       const file = new File([blob], "start_frame_reused.jpg", {
         type: "image/jpeg",
       });
-
       setPicDriftFrames({ start: file, end: null });
       setPicDriftUrls({ start: url, end: null });
-
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       console.error("Failed to reuse frame:", error);
@@ -334,14 +336,11 @@ function Dashboard() {
     }
   };
 
-  // === UPDATED FILE HANDLER (Increased Limit for Gemini 3 Pro) ===
+  // === UPDATED FILE HANDLER ===
   const handleGenericUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-
-    // ✅ UPDATED: Gemini 3 Pro supports up to 14 images
     const maxFiles = 14;
-
     if (files.length + referenceImages.length > maxFiles) {
       alert(`❌ Only ${maxFiles} image(s) allowed for this mode.`);
       return;
@@ -352,26 +351,19 @@ function Dashboard() {
     setReferenceImageUrls((prev) => [...prev, ...newUrls]);
   };
 
-  // 🛠️ UPDATE 2: Magic Edit Upload Handler
   const handleMagicEditUpload = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     try {
       const formData = new FormData();
       formData.append("image", file);
-      // 👇 KEY CHANGE: Tell backend to keep it raw
       formData.append("raw", "true");
-
-      // The backend will detect the ratio for the DB, but keep the file original
       const res = await apiEndpoints.uploadAssetSync(formData);
-
       if (res.data.success && res.data.asset) {
-        // Automatically open the editor with the new asset
         setEditingAsset(res.data.asset);
-        e.target.value = ""; // Reset input
+        e.target.value = "";
       }
     } catch (err: any) {
       alert("Upload failed: " + err.message);
@@ -403,24 +395,29 @@ function Dashboard() {
     formData.append("prompt", prompt);
     formData.append("title", videoTitle);
 
-    if (activeEngine === "kie") {
+    if (activeEngine === "kie" && videoFxMode === "picdrift") {
+      // PICDRIFT
       formData.append("mediaType", "video");
-      if (videoFxMode === "picdrift") {
-        formData.append("model", "kling-2.5");
-        if (picDriftFrames.start)
-          formData.append("referenceImages", picDriftFrames.start);
-        if (picDriftFrames.end)
-          formData.append("referenceImages", picDriftFrames.end);
-      } else {
-        formData.append("model", kieModel);
-        referenceImages.forEach((file) =>
-          formData.append("referenceImages", file)
-        );
-      }
+      formData.append("model", "kling-2.5");
+      if (picDriftFrames.start)
+        formData.append("referenceImages", picDriftFrames.start);
+      if (picDriftFrames.end)
+        formData.append("referenceImages", picDriftFrames.end);
+      formData.append("duration", kieDuration.toString());
+      formData.append("aspectRatio", kieAspect);
+      formData.append("resolution", kieResolution);
+    } else if (activeEngine === "kie" && videoFxMode === "video") {
+      // VIDEO FX 1 (Kie)
+      formData.append("mediaType", "video");
+      formData.append("model", kieModel);
+      referenceImages.forEach((file) =>
+        formData.append("referenceImages", file)
+      );
       formData.append("duration", kieDuration.toString());
       formData.append("aspectRatio", kieAspect);
       formData.append("resolution", kieResolution);
     } else if (activeEngine === "openai") {
+      // VIDEO FX 2 (OpenAI)
       formData.append("mediaType", "video");
       formData.append("model", videoModel);
       formData.append("duration", videoDuration.toString());
@@ -430,6 +427,7 @@ function Dashboard() {
         formData.append("referenceImages", file)
       );
     } else {
+      // STUDIO
       formData.append("mediaType", studioMode);
       let sizeStr = "1024x1024";
       if (geminiAspect === "16:9") sizeStr = "1792x1024";
@@ -458,7 +456,6 @@ function Dashboard() {
     logout();
     navigate("/");
   };
-
   const companyName =
     brandConfig?.companyName || user?.name || "Visionlight AI";
 
@@ -472,15 +469,13 @@ function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900">
-      {/* --- ASSET LIBRARY MODAL --- */}
+      {/* ... MODALS ... */}
       {activeLibrarySlot !== null && (
         <AssetLibrary
           onClose={() => setActiveLibrarySlot(null)}
           onSelect={handleAssetSelect}
         />
       )}
-
-      {/* --- PREVIEW MODAL (Wraps existing MediaPreview) --- */}
       {previewMedia && (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 animate-in fade-in duration-200"
@@ -528,7 +523,6 @@ function Dashboard() {
                 </div>
               </div>
             )}
-
             <button
               onClick={() => {
                 setPreviewMedia(null);
@@ -541,8 +535,6 @@ function Dashboard() {
           </div>
         </div>
       )}
-
-      {/* --- EXISTING MODALS --- */}
       {showQueuedModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="bg-gray-900 rounded-2xl border border-cyan-400/40 shadow-2xl max-w-sm w-full p-6">
@@ -637,7 +629,6 @@ function Dashboard() {
           </div>
         </div>
       )}
-
       {showWelcomeTour && (
         <WelcomeTour onClose={() => setShowWelcomeTour(false)} />
       )}
@@ -770,56 +761,88 @@ function Dashboard() {
                 </p>
               </div>
 
-              {/* ENGINE SELECTOR */}
+              {/* ✅ UPDATED NAVIGATION BAR */}
               <div className="mb-6 sm:mb-8">
                 <label className="block text-sm font-semibold text-white mb-3 sm:mb-4">
                   Select Content Type
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-                  {[
-                    {
-                      id: "kie",
-                      label: "Video FX",
-                      grad: "from-pink-500 to-rose-500",
-                    },
-                    {
-                      id: "studio",
-                      label: "Pic FX",
-                      grad: "from-violet-700 to-purple-700",
-                    },
-                    {
-                      id: "openai",
-                      label: "Video FX 2",
-                      grad: "from-blue-700 to-cyan-700",
-                    },
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setActiveEngine(item.id as EngineType)}
-                      className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
-                        activeEngine === item.id
-                          ? `border-white/20 bg-gradient-to-br ${item.grad} shadow-2xl scale-105`
-                          : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="flex-1">
-                          <div className="font-semibold text-sm text-white">
-                            {item.label}
-                          </div>
+                  {/* TAB 1: PICDRIFT (Default) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveEngine("kie");
+                      setVideoFxMode("picdrift");
+                    }}
+                    className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
+                      currentVisualTab === "picdrift"
+                        ? "border-white/20 bg-gradient-to-br from-pink-500 to-rose-500 shadow-2xl scale-105"
+                        : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className="flex-1">
+                        <div className="font-semibold text-sm text-white">
+                          PicDrift
                         </div>
-                        {activeEngine === item.id && (
-                          <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                        )}
                       </div>
-                    </button>
-                  ))}
+                      {currentVisualTab === "picdrift" && (
+                        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* TAB 2: PIC FX */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveEngine("studio")}
+                    className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
+                      currentVisualTab === "studio"
+                        ? "border-white/20 bg-gradient-to-br from-violet-700 to-purple-700 shadow-2xl scale-105"
+                        : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className="flex-1">
+                        <div className="font-semibold text-sm text-white">
+                          Pic FX
+                        </div>
+                      </div>
+                      {currentVisualTab === "studio" && (
+                        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* TAB 3: VIDEO FX (Container for Kie-Video and OpenAI) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveEngine("kie");
+                      setVideoFxMode("video");
+                    }}
+                    className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
+                      currentVisualTab === "videofx"
+                        ? "border-white/20 bg-gradient-to-br from-blue-700 to-cyan-700 shadow-2xl scale-105"
+                        : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className="flex-1">
+                        <div className="font-semibold text-sm text-white">
+                          Video FX
+                        </div>
+                      </div>
+                      {currentVisualTab === "videofx" && (
+                        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                      )}
+                    </div>
+                  </button>
                 </div>
               </div>
 
-              {/* 🛠️ UPDATE 3: STUDIO FX TOGGLES (Including Magic Edit) */}
-              {activeEngine === "studio" && (
+              {/* STUDIO SUB-MENU */}
+              {currentVisualTab === "studio" && (
                 <div className="mb-6 animate-in fade-in space-y-4">
                   <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
                     <button
@@ -842,7 +865,6 @@ function Dashboard() {
                     >
                       Carousel
                     </button>
-                    {/* NEW MAGIC EDIT BUTTON */}
                     <button
                       onClick={() => setStudioMode("edit")}
                       className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
@@ -854,8 +876,6 @@ function Dashboard() {
                       Picture Edit
                     </button>
                   </div>
-
-                  {/* Hide Aspect Ratio for Edit Mode */}
                   {studioMode !== "edit" && (
                     <div className="flex justify-center gap-3">
                       {[
@@ -880,41 +900,45 @@ function Dashboard() {
                 </div>
               )}
 
-              {activeEngine === "kie" && (
+              {/* ✅ NEW: VIDEO FX SUB-MENU (Toggle between Kie and OpenAI) */}
+              {currentVisualTab === "videofx" && (
                 <div className="mb-6 animate-in fade-in space-y-4">
                   <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
                     <button
                       type="button"
-                      onClick={() => setVideoFxMode("video")}
+                      onClick={() => {
+                        setActiveEngine("kie");
+                        setVideoFxMode("video");
+                      }}
                       className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
-                        videoFxMode === "video"
-                          ? "bg-rose-600 text-white shadow-lg"
+                        activeEngine === "kie"
+                          ? "bg-cyan-600 text-white shadow-lg"
                           : "text-gray-400 hover:text-white"
                       }`}
                     >
-                      Video
+                      Video FX 1
                     </button>
                     <button
                       type="button"
-                      onClick={() => setVideoFxMode("picdrift")}
+                      onClick={() => setActiveEngine("openai")}
                       className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
-                        videoFxMode === "picdrift"
-                          ? "bg-rose-600 text-white shadow-lg"
+                        activeEngine === "openai"
+                          ? "bg-cyan-600 text-white shadow-lg"
                           : "text-gray-400 hover:text-white"
                       }`}
                     >
-                      PicDrift
+                      Video FX 2
                     </button>
                   </div>
                 </div>
               )}
 
               <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-                {/* 🛠️ UPDATE 4: MAGIC EDIT UI */}
-                {activeEngine === "studio" && studioMode === "edit" ? (
+                {/* MAGIC EDIT UI */}
+                {currentVisualTab === "studio" && studioMode === "edit" ? (
                   <div className="bg-gray-900/50 border border-cyan-500/30 rounded-2xl p-8 text-center space-y-5 animate-in fade-in">
                     <div className="w-20 h-20 bg-cyan-900/20 rounded-full flex items-center justify-center mx-auto border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
-                      <span className="text-4xl"></span>
+                      <span className="text-4xl">🪄</span>
                     </div>
                     <div>
                       <h3 className="text-white font-bold text-xl mb-2">
@@ -926,7 +950,6 @@ function Dashboard() {
                         style-transfer your image.
                       </p>
                     </div>
-
                     <label className="block w-full max-w-sm mx-auto cursor-pointer group">
                       <div className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl text-white font-bold group-hover:shadow-lg group-hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
                         <span>📤 Upload to Start</span>
@@ -950,7 +973,6 @@ function Dashboard() {
                     </p>
                   </div>
                 ) : (
-                  // EXISTING UI FOR OTHER MODES
                   <>
                     <div>
                       <label className="block text-sm font-semibold text-white mb-2">
@@ -977,6 +999,7 @@ function Dashboard() {
                       />
                     </div>
 
+                    {/* KIE AI SETTINGS (Visible in PicDrift OR Video FX 1) */}
                     {activeEngine === "kie" && (
                       <div className="space-y-4 sm:space-y-6 animate-in fade-in">
                         {videoFxMode === "video" && (
@@ -995,7 +1018,7 @@ function Dashboard() {
                                   onClick={() => setKieModel(m.id as any)}
                                   className={`p-3 rounded-xl border text-left text-sm font-medium ${
                                     kieModel === m.id
-                                      ? "bg-rose-600 border-rose-500 text-white"
+                                      ? "bg-cyan-600 border-cyan-500 text-white"
                                       : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
                                   }`}
                                 >
@@ -1021,7 +1044,7 @@ function Dashboard() {
                                   onClick={() => setKieDuration(d as any)}
                                   className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
                                     kieDuration === d
-                                      ? "bg-rose-600 border-rose-600 text-white"
+                                      ? "bg-cyan-600 border-cyan-600 text-white"
                                       : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
                                   }`}
                                 >
@@ -1045,7 +1068,7 @@ function Dashboard() {
                                   onClick={() => setKieAspect(a.id as any)}
                                   className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
                                     kieAspect === a.id
-                                      ? "bg-rose-600 border-rose-600 text-white"
+                                      ? "bg-cyan-600 border-cyan-600 text-white"
                                       : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
                                   }`}
                                 >
@@ -1072,7 +1095,7 @@ function Dashboard() {
                                     }
                                     className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
                                       kieResolution === r.id
-                                        ? "bg-rose-600 border-rose-600 text-white"
+                                        ? "bg-cyan-600 border-cyan-600 text-white"
                                         : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
                                     }`}
                                   >
@@ -1086,6 +1109,7 @@ function Dashboard() {
                       </div>
                     )}
 
+                    {/* OPENAI SETTINGS (Video FX 2) */}
                     {activeEngine === "openai" && (
                       <div className="space-y-4 sm:space-y-6 animate-in fade-in">
                         <div className="space-y-2">
@@ -1219,10 +1243,9 @@ function Dashboard() {
                         </button>
                       </div>
 
-                      {/* ... (Keep existing PicDrift logic) ... */}
-                      {activeEngine === "kie" && videoFxMode === "picdrift" ? (
+                      {/* PICDRIFT SPECIFIC UI */}
+                      {currentVisualTab === "picdrift" ? (
                         <div className="grid grid-cols-2 gap-4">
-                          {/* --- START FRAME BOX --- */}
                           <div className="flex flex-col gap-2">
                             <label className="text-xs text-rose-300 uppercase font-bold">
                               Start Frame
@@ -1244,7 +1267,6 @@ function Dashboard() {
                                 </>
                               ) : (
                                 <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-                                  {/* Option A: Upload File */}
                                   <label className="flex flex-col items-center justify-center cursor-pointer">
                                     <span className="text-rose-400 text-2xl">
                                       +
@@ -1261,12 +1283,9 @@ function Dashboard() {
                                       }
                                     />
                                   </label>
-
                                   <div className="text-gray-600 text-[10px]">
                                     - OR -
                                   </div>
-
-                                  {/* Option B: Open Library */}
                                   <button
                                     type="button"
                                     onClick={() =>
@@ -1280,8 +1299,6 @@ function Dashboard() {
                               )}
                             </div>
                           </div>
-
-                          {/* --- END FRAME BOX --- */}
                           <div className="flex flex-col gap-2">
                             <label className="text-xs text-rose-300 uppercase font-bold">
                               End Frame (optional)
@@ -1319,11 +1336,9 @@ function Dashboard() {
                                       }
                                     />
                                   </label>
-
                                   <div className="text-gray-600 text-[10px]">
                                     - OR -
                                   </div>
-
                                   <button
                                     type="button"
                                     onClick={() => setActiveLibrarySlot("end")}
@@ -1337,10 +1352,8 @@ function Dashboard() {
                           </div>
                         </div>
                       ) : (
-                        // --- GENERIC UPLOAD BOX ---
                         <div className="space-y-3">
                           <div className="w-full h-24 border-2 border-dashed border-gray-600 rounded-xl hover:border-cyan-500 hover:bg-gray-800/50 transition-all group relative flex items-center justify-center">
-                            {/* We split the box into two click zones visually, or just put buttons inside */}
                             <div className="flex items-center gap-6">
                               <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
                                 <span className="text-2xl mb-1">📂</span>
@@ -1358,9 +1371,7 @@ function Dashboard() {
                                   onChange={handleGenericUpload}
                                 />
                               </label>
-
                               <div className="h-8 w-px bg-gray-600"></div>
-
                               <button
                                 type="button"
                                 onClick={() => setActiveLibrarySlot("generic")}
@@ -1372,7 +1383,6 @@ function Dashboard() {
                                 </span>
                               </button>
                             </div>
-
                             <p className="absolute bottom-2 text-[10px] text-gray-600">
                               {activeEngine === "studio" &&
                               studioMode === "carousel"
@@ -1381,7 +1391,6 @@ function Dashboard() {
                               (PNG/JPG)
                             </p>
                           </div>
-
                           {referenceImageUrls.length > 0 && (
                             <div className="grid grid-cols-5 gap-2 animate-in fade-in">
                               {referenceImageUrls.map((url, index) => (
@@ -1478,19 +1487,16 @@ function Dashboard() {
                         primaryColor={brandConfig?.primaryColor}
                         compact={true}
                         onUseAsStartFrame={handleUseAsStartFrame}
-                        // NEW PROPS FOR PREVIEW AND SAVE
                         onPreview={() => {
                           let type = "image";
                           if (post.mediaType === "VIDEO") type = "video";
                           if (post.mediaType === "CAROUSEL") type = "carousel";
-
                           let url = post.mediaUrl;
                           if (type === "carousel") {
                             try {
                               url = JSON.parse(post.mediaUrl);
                             } catch (e) {}
                           }
-
                           setPreviewMedia({ type: type as any, url });
                         }}
                         onMoveToAsset={
@@ -1530,8 +1536,6 @@ function Dashboard() {
             currentConfig={brandConfig}
           />
         )}
-
-        {/* 🛠️ UPDATE 5: Render Editing Asset Modal */}
         {editingAsset && (
           <EditAssetModal
             asset={editingAsset}

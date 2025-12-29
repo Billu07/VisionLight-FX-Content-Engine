@@ -24,7 +24,7 @@ export function DriftFrameExtractor({
     if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
   };
 
-  // ✅ IMPROVEMENT 1: Pause while scrubbing for precision
+  // Pause while scrubbing for precision
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const time = parseFloat(e.target.value);
     if (videoRef.current) {
@@ -40,7 +40,6 @@ export function DriftFrameExtractor({
     if (!video || !canvas) return;
 
     try {
-      // ✅ IMPROVEMENT 2: Check if video data is actually loaded
       if (video.readyState < 2) {
         alert("Video is still loading, please wait a moment.");
         return;
@@ -67,7 +66,6 @@ export function DriftFrameExtractor({
         0.95
       );
     } catch (e: any) {
-      // ✅ IMPROVEMENT 3: Catch CORS "Tainted Canvas" errors explicitly
       console.error("Frame Extraction Error:", e);
       alert(
         "Security Error: The browser blocked frame extraction. \n\nEnsure your Cloudinary settings allow 'Access-Control-Allow-Origin: *'"
@@ -76,28 +74,26 @@ export function DriftFrameExtractor({
   };
 
   return (
-    <div className="space-y-4 animate-in fade-in">
-      <div className="bg-black rounded-xl overflow-hidden border border-gray-700 relative group">
+    <div className="space-y-4 animate-in fade-in w-full max-w-4xl">
+      <div className="bg-black rounded-xl overflow-hidden border border-gray-700 relative group aspect-video">
         {/* Hidden Canvas for Extraction */}
         <canvas ref={canvasRef} className="hidden" />
 
-        {/* ✅ IMPROVEMENT 4: Add key to force reload if URL changes */}
         <video
           key={videoUrl}
           ref={videoRef}
           src={videoUrl}
-          className="w-full max-h-[50vh] object-contain bg-black"
+          className="w-full h-full object-contain bg-black"
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={() => {
             setDuration(videoRef.current?.duration || 0);
             setIsReady(true);
           }}
-          // ✅ IMPROVEMENT 5: Sync state with actual video events
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
           loop
           playsInline
-          crossOrigin="anonymous" // CRITICAL
+          crossOrigin="anonymous"
         />
 
         {/* Play/Pause Overlay */}
@@ -130,8 +126,8 @@ export function DriftFrameExtractor({
         <input
           type="range"
           min="0"
-          max={duration || 100} // Prevent NaN
-          step="0.033" // 30fps
+          max={duration || 100}
+          step="0.033"
           value={currentTime}
           disabled={!isReady}
           onChange={handleSliderChange}
@@ -140,31 +136,32 @@ export function DriftFrameExtractor({
       </div>
 
       {/* Actions */}
-      <div className="flex gap-3">
+      <div className="flex gap-3 pt-2">
         <button
           onClick={captureFrame}
           disabled={!isReady}
-          className="flex-1 py-3 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 py-3 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
         >
-          <span>📸</span> Extract This Frame
+          <span></span> Extract This Frame
         </button>
+
+        {/* ✅ UPDATED: Big visible Download Button */}
+        <a
+          href={videoUrl}
+          download
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-xl text-white font-bold text-center flex items-center justify-center gap-2"
+        >
+          <span></span> Download Clip
+        </a>
+
         <button
           onClick={onCancel}
           className="px-4 py-3 bg-gray-800 text-gray-400 rounded-xl hover:bg-gray-700"
         >
-          Back
+          Cancel
         </button>
-      </div>
-
-      <div className="text-center">
-        <a
-          href={videoUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-gray-500 hover:text-white underline"
-        >
-          Download Full Video Path
-        </a>
       </div>
     </div>
   );

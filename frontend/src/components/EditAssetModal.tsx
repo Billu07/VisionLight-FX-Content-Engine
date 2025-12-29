@@ -19,13 +19,14 @@ interface EditAssetModalProps {
 
 type EditorMode = "standard" | "pro" | "drift";
 
+// ✅ UPDATED PRESETS
 const DRIFT_PRESETS = [
-  { label: "Front", h: 0, v: 0, z: 5, icon: "⏹️" },
-  { label: "Side R", h: 90, v: 0, z: 5, icon: "➡️" },
-  { label: "Side L", h: 270, v: 0, z: 5, icon: "⬅️" },
-  { label: "Top", h: 0, v: 60, z: 5, icon: "⬇️" },
-  { label: "Back", h: 180, v: 0, z: 5, icon: "↩️" },
-  { label: "Macro", h: 30, v: 15, z: 9, icon: "🔍" },
+  { label: "Orbit Right", h: 10, v: 0, z: 0, icon: "↪️" },
+  { label: "Orbit Left", h: -10, v: 0, z: 0, icon: "↩️" },
+  { label: "Dolly Right", h: 5, v: 0, z: 0, icon: "➡️" },
+  { label: "Dolly Left", h: -5, v: 0, z: 0, icon: "⬅️" },
+  { label: "Crane Up", h: 0, v: 10, z: 0, icon: "⬆️" },
+  { label: "Crane Down", h: 0, v: -10, z: 0, icon: "⬇️" },
 ];
 
 export function EditAssetModal({
@@ -35,7 +36,6 @@ export function EditAssetModal({
   const queryClient = useQueryClient();
   const refFileInput = useRef<HTMLInputElement>(null);
 
-  // History & State
   const [history, setHistory] = useState<Asset[]>([initialAsset]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentAsset = history[currentIndex];
@@ -43,26 +43,22 @@ export function EditAssetModal({
   const [activeTab, setActiveTab] = useState<EditorMode>("pro");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Text Edit State
   const [prompt, setPrompt] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [referenceAsset, setReferenceAsset] = useState<Asset | null>(null);
   const [showRefSelector, setShowRefSelector] = useState(false);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
 
-  // Drift State
+  // ✅ UPDATED DEFAULTS (Start in Middle = 0)
   const [driftParams, setDriftParams] = useState({
     horizontal: 0,
     vertical: 0,
-    zoom: 5,
+    zoom: 0,
   });
 
-  // Drift Video & Polling State
   const [driftVideoUrl, setDriftVideoUrl] = useState<string | null>(null);
   const [driftStatusMsg, setDriftStatusMsg] = useState("Processing...");
   const [driftProgress, setDriftProgress] = useState(0);
-
-  // ✅ NEW: Track the specific Post ID for this Drift job
   const [driftPostId, setDriftPostId] = useState<string | null>(null);
 
   const { data: allAssets = [] } = useQuery({
@@ -71,21 +67,17 @@ export function EditAssetModal({
     enabled: showRefSelector,
   });
 
-  // 1. RECOVERY LOGIC: Check if we were polling a post before refresh
   useEffect(() => {
     const pendingPostId = localStorage.getItem(
       `active_drift_post_${currentAsset.id}`
     );
     if (pendingPostId) {
-      console.log("🔄 Found pending Drift Post, resuming polling...");
       setActiveTab("drift");
       setDriftPostId(pendingPostId);
       setIsProcessing(true);
     }
   }, [currentAsset.id]);
 
-  // 2. POLLING EFFECT: Watch the Post ID (Like Regular PicDrift)
-  // 2. POLLING EFFECT: Watch the Post ID
   useEffect(() => {
     if (!driftPostId) return;
 
@@ -101,13 +93,10 @@ export function EditAssetModal({
           clearInterval(interval);
           setDriftProgress(100);
           setDriftStatusMsg("Loading Video...");
-
           localStorage.removeItem(`active_drift_post_${currentAsset.id}`);
           setDriftPostId(null);
-
           setDriftVideoUrl(mediaUrl);
           setIsProcessing(false);
-
           queryClient.invalidateQueries({ queryKey: ["assets"] });
         } else if (status === "FAILED") {
           clearInterval(interval);
@@ -117,27 +106,18 @@ export function EditAssetModal({
           alert("Drift Generation Failed: " + (error || "Unknown error"));
         }
       } catch (e: any) {
-        console.error("Polling error", e);
-
-        // 🚀 FIX: If Post is deleted/missing (404/403), Stop Polling!
-        if (
-          e.message?.includes("404") ||
-          e.message?.includes("403") ||
-          e.response?.status === 404
-        ) {
-          console.warn("Job not found on server. Clearing local state.");
+        if (e.message?.includes("404") || e.response?.status === 404) {
           clearInterval(interval);
           localStorage.removeItem(`active_drift_post_${currentAsset.id}`);
           setDriftPostId(null);
           setIsProcessing(false);
         }
       }
-    }, 10000); // ✅ 10 Seconds Interval (Safer)
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [driftPostId, currentAsset.id, queryClient]);
 
-  // === MUTATION 1: TEXT EDIT ===
   const textEditMutation = useMutation({
     mutationFn: async () => {
       return apiEndpoints.editAsset({
@@ -155,10 +135,8 @@ export function EditAssetModal({
     onSettled: () => setIsProcessing(false),
   });
 
-  // === MUTATION 2: DRIFT PATH START (Updated) ===
   const driftStartMutation = useMutation({
     mutationFn: async () => {
-      // ✅ This now calls the updated backend route that creates a POST
       return apiEndpoints.startDriftVideo({
         assetUrl: currentAsset.url,
         prompt: prompt,
@@ -173,10 +151,7 @@ export function EditAssetModal({
       setDriftProgress(5);
     },
     onSuccess: (res: any) => {
-      // ✅ We receive a postId now
       const newPostId = res.data.postId;
-      console.log("✅ Drift Job Started. Post ID:", newPostId);
-
       setDriftPostId(newPostId);
       localStorage.setItem(`active_drift_post_${currentAsset.id}`, newPostId);
     },
@@ -186,20 +161,19 @@ export function EditAssetModal({
     },
   });
 
-  // EXTRACT FRAME HANDLER (Saves the specific frame user selected)
   const handleFrameExtraction = async (blob: Blob) => {
     const file = new File([blob], "drift_frame.jpg", { type: "image/jpeg" });
     const formData = new FormData();
     formData.append("image", file);
-    formData.append("raw", "true"); // Prevent resizing, keep exact frame
+    formData.append("raw", "true");
 
     try {
       setIsProcessing(true);
       setDriftStatusMsg("Saving extracted frame...");
       const res = await apiEndpoints.uploadAssetSync(formData);
       if (res.data.success) {
-        handleSuccess(res.data.asset); // Add to history
-        setDriftVideoUrl(null); // Close video player, back to editor
+        handleSuccess(res.data.asset);
+        setDriftVideoUrl(null);
       }
     } catch (e: any) {
       alert("Failed to save frame: " + e.message);
@@ -261,10 +235,17 @@ export function EditAssetModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 p-4 backdrop-blur-md">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-6xl flex flex-col md:flex-row overflow-hidden shadow-2xl h-[90vh]">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-6xl flex flex-col md:flex-row overflow-hidden shadow-2xl h-[90vh] relative">
+        {/* ✅ NEW: Close Button (Top Right) */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-50 bg-black/50 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors font-bold border border-white/20"
+        >
+          ✕
+        </button>
+
         {/* LEFT: CANVAS */}
         <div className="flex-1 bg-black flex flex-col items-center justify-center p-4 relative border-r border-gray-800 group">
-          {/* If Drift Video is Ready, Show Extractor */}
           {driftVideoUrl ? (
             <div className="w-full h-full flex flex-col items-center justify-center">
               <DriftFrameExtractor
@@ -318,20 +299,16 @@ export function EditAssetModal({
               {isProcessing && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30 backdrop-blur-sm">
                   <div className="flex flex-col items-center gap-4 w-full max-w-sm px-6">
-                    {/* ✅ PROGRESS BAR FOR DRIFT */}
                     {activeTab === "drift" && driftPostId ? (
                       <ProgressBar
                         progress={driftProgress}
                         label={driftStatusMsg}
                       />
                     ) : (
-                      // STANDARD SPINNER FOR OTHERS
                       <>
                         <LoadingSpinner size="lg" variant="neon" />
                         <span className="text-cyan-300 font-bold animate-pulse mt-4">
-                          {driftStatusMsg === "Processing..."
-                            ? "Processing..."
-                            : driftStatusMsg}
+                          {driftStatusMsg}
                         </span>
                       </>
                     )}
@@ -372,7 +349,6 @@ export function EditAssetModal({
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {/* === MODE: STANDARD / PRO === */}
             {activeTab !== "drift" && (
               <>
                 <div className="space-y-2">
@@ -422,9 +398,6 @@ export function EditAssetModal({
                           Close
                         </button>
                       </div>
-                      <div className="text-[10px] text-gray-500 mb-2 uppercase font-bold">
-                        Library:
-                      </div>
                       <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto custom-scrollbar">
                         {Array.isArray(allAssets) &&
                           allAssets.map((a: Asset) => (
@@ -445,10 +418,10 @@ export function EditAssetModal({
               </>
             )}
 
-            {/* === MODE: DRIFT === */}
+            {/* ✅ UPDATED: Drift Controls with -10 to 10 Range */}
             {activeTab === "drift" && (
               <div className="space-y-6 animate-in fade-in">
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {DRIFT_PRESETS.map((preset) => (
                     <button
                       key={preset.label}
@@ -459,9 +432,10 @@ export function EditAssetModal({
                           zoom: preset.z,
                         })
                       }
-                      className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-2 text-center transition-all active:scale-95"
+                      className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-2 text-left flex items-center gap-2 transition-all active:scale-95"
                     >
-                      <span className="text-[10px] text-gray-300 font-bold block">
+                      <span className="text-lg">{preset.icon}</span>
+                      <span className="text-[10px] text-gray-300 font-bold">
                         {preset.label}
                       </span>
                     </button>
@@ -470,21 +444,21 @@ export function EditAssetModal({
 
                 <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
                   <h4 className="text-sm font-bold text-white mb-4">
-                    Camera Controls
+                    Camera Rig
                   </h4>
 
                   {/* Horizontal */}
                   <div className="space-y-2 mb-4">
                     <div className="flex justify-between text-xs text-gray-400">
-                      <span>Orbit</span>
+                      <span>Orbit / Dolly (Feet)</span>
                       <span className="text-cyan-400">
-                        {driftParams.horizontal}°
+                        {driftParams.horizontal}
                       </span>
                     </div>
                     <input
                       type="range"
-                      min="0"
-                      max="360"
+                      min="-10"
+                      max="10"
                       step="1"
                       value={driftParams.horizontal}
                       onChange={(e) =>
@@ -495,20 +469,25 @@ export function EditAssetModal({
                       }
                       className="w-full accent-cyan-500 cursor-pointer"
                     />
+                    <div className="flex justify-between text-[8px] text-gray-600">
+                      <span>Left</span>
+                      <span>Center</span>
+                      <span>Right</span>
+                    </div>
                   </div>
 
                   {/* Vertical */}
                   <div className="space-y-2 mb-4">
                     <div className="flex justify-between text-xs text-gray-400">
-                      <span>Elevation</span>
-                      <span className="text-cyan-400">
-                        {driftParams.vertical}°
+                      <span>Elevation (Feet)</span>
+                      <span className="text-purple-400">
+                        {driftParams.vertical}
                       </span>
                     </div>
                     <input
                       type="range"
-                      min="-90"
-                      max="90"
+                      min="-10"
+                      max="10"
                       step="1"
                       value={driftParams.vertical}
                       onChange={(e) =>
@@ -519,19 +498,24 @@ export function EditAssetModal({
                       }
                       className="w-full accent-purple-500 cursor-pointer"
                     />
+                    <div className="flex justify-between text-[8px] text-gray-600">
+                      <span>Down</span>
+                      <span>Center</span>
+                      <span>Up</span>
+                    </div>
                   </div>
 
                   {/* Zoom */}
                   <div className="space-y-2">
                     <div className="flex justify-between text-xs text-gray-400">
-                      <span>Zoom</span>
-                      <span className="text-cyan-400">{driftParams.zoom}</span>
+                      <span>Zoom (Feet)</span>
+                      <span className="text-green-400">{driftParams.zoom}</span>
                     </div>
                     <input
                       type="range"
-                      min="0"
+                      min="-10"
                       max="10"
-                      step="0.1"
+                      step="1"
                       value={driftParams.zoom}
                       onChange={(e) =>
                         setDriftParams((p) => ({
@@ -541,6 +525,11 @@ export function EditAssetModal({
                       }
                       className="w-full accent-green-500 cursor-pointer"
                     />
+                    <div className="flex justify-between text-[8px] text-gray-600">
+                      <span>Out</span>
+                      <span>Neutral</span>
+                      <span>In</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -550,8 +539,9 @@ export function EditAssetModal({
             <div className="space-y-3">
               <div className="flex justify-between items-end">
                 <label className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
+                  {/* ✅ UPDATED LABEL */}
                   {activeTab === "drift"
-                    ? "Subject Description"
+                    ? "Describe Camera Move (Optional)"
                     : "Instruction"}
                 </label>
                 <button
@@ -566,8 +556,8 @@ export function EditAssetModal({
                 className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none leading-relaxed placeholder-gray-500"
                 placeholder={
                   activeTab === "drift"
-                    ? "e.g. 'A silver robot' (Helps maintain identity)"
-                    : "e.g. 'Make it night time', 'Add neon lights'..."
+                    ? "e.g. 'Slow pan right', 'Fast zoom'..."
+                    : "e.g. 'Make it night time'..."
                 }
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
@@ -590,7 +580,7 @@ export function EditAssetModal({
                 disabled={isProcessing || !!driftPostId}
                 className="w-full py-4 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isProcessing ? "Working..." : <span>🌀 Generate Path</span>}
+                {isProcessing ? "Drifting..." : <span>🌀 Generate Path</span>}
               </button>
             ) : (
               <button
