@@ -21,12 +21,12 @@ type EditorMode = "standard" | "pro" | "drift";
 
 // ✅ UPDATED PRESETS
 const DRIFT_PRESETS = [
-  { label: "Orbit Right", h: 10, v: 0, z: 0 },
-  { label: "Orbit Left", h: -10, v: 0, z: 0 },
-  { label: "Dolly Right", h: 5, v: 0, z: 0 },
-  { label: "Dolly Left", h: -5, v: 0, z: 0 },
-  { label: "Crane Up", h: 0, v: 10, z: 0 },
-  { label: "Crane Down", h: 0, v: -10, z: 0 },
+  { label: "Orbit Right", h: 10, v: 0, z: 0, icon: "↪️" },
+  { label: "Orbit Left", h: -10, v: 0, z: 0, icon: "↩️" },
+  { label: "Dolly Right", h: 5, v: 0, z: 0, icon: "➡️" },
+  { label: "Dolly Left", h: -5, v: 0, z: 0, icon: "⬅️" },
+  { label: "Crane Up", h: 0, v: 10, z: 0, icon: "⬆️" },
+  { label: "Crane Down", h: 0, v: -10, z: 0, icon: "⬇️" },
 ];
 
 export function EditAssetModal({
