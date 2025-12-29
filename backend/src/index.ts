@@ -49,7 +49,7 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.get("/", (req, res) => {
   res.json({
     message: "Visionlight FX Backend - Supabase Edition",
-    version: "4.4.1",
+    version: "4.4.2", // Bumped version
     status: "Healthy",
   });
 });
@@ -433,13 +433,14 @@ app.post(
   }
 );
 
-// ✅ NEW: Start Drift Video Path (Updated to return POST ID)
+// ✅ NEW: Start Drift Video Path
 app.post(
   "/api/assets/drift-video",
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { assetUrl, prompt, horizontal, vertical, zoom } = req.body;
+      const { assetUrl, prompt, horizontal, vertical, zoom, aspectRatio } =
+        req.body;
       const userId = req.user!.id;
 
       // 1. Calculate Cost (Drift usually costs same as video gen)
@@ -456,14 +457,13 @@ app.post(
         vertical,
         zoom,
         assetUrl,
-        source: "DRIFT_EDITOR", // Flag to know this came from editor
+        aspectRatio: aspectRatio || "16:9", // ✅ Saving correct ratio
+        source: "DRIFT_EDITOR",
         cost,
       };
 
       await airtableService.deductCredits(userId, cost);
 
-      // Create the DB Record
-      // IMPORTANT: Platform is "Internal" so we can hide it from Timeline later
       const post = await airtableService.createPost({
         userId,
         title: "Drift Generation",
@@ -487,7 +487,8 @@ app.post(
             prompt,
             Number(horizontal),
             Number(vertical),
-            Number(zoom)
+            Number(zoom),
+            aspectRatio // ✅ Passing ratio
           );
 
           await airtableService.updatePost(post.id, {
@@ -863,9 +864,7 @@ app.get(
   }
 );
 
-// ✅ UPDATED: Post Status (ACTIVE POLLING FIX)
-// backend/index.ts
-
+// ✅ POST STATUS (Active Polling Version)
 app.get(
   "/api/post/:postId/status",
   authenticateToken,
@@ -879,24 +878,17 @@ app.get(
         return res.status(403).json({ error: "Denied" });
       }
 
-      // =========================================================
-      // 🚀 ACTIVE POLLING FIX
-      // =========================================================
+      // 🚀 ACTIVE POLLING
       if (post.status === "PROCESSING") {
         await contentEngine.checkPostStatus(post); // Force check
-
-        // Re-fetch data
         post = await airtableService.getPostById(req.params.postId);
 
-        // 🛑 TS FIX: Handle case if re-fetch returns null
+        // 🛑 TS FIX
         if (!post) {
           return res.status(404).json({ error: "Post lost during update" });
         }
       }
-      // =========================================================
 
-      // 3. Timeout Logic
-      // TypeScript now knows 'post' is definitely NOT null here
       if (post.status === "PROCESSING") {
         const diffMins =
           (new Date().getTime() - new Date(post.createdAt).getTime()) / 60000;
@@ -910,7 +902,6 @@ app.get(
         }
       }
 
-      // 4. Response
       res.json({
         success: true,
         status: post.status,
