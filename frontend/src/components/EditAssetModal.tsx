@@ -155,7 +155,7 @@ export function EditAssetModal({
     onMutate: () => setIsEnhancing(true),
     onSuccess: (res: any) => {
       handleSuccess(res.data.asset);
-      alert("Image Enhanced Successfully!");
+      alert("Image Enhanced Successfully! ✨");
     },
     onError: (err: any) => alert("Enhancement failed: " + err.message),
     onSettled: () => setIsEnhancing(false),
@@ -169,6 +169,7 @@ export function EditAssetModal({
         horizontal: driftParams.horizontal,
         vertical: driftParams.vertical,
         zoom: driftParams.zoom,
+        aspectRatio: currentAsset.aspectRatio, // ✅ PASS CORRECT RATIO
       });
     },
     onMutate: () => {
@@ -392,9 +393,9 @@ export function EditAssetModal({
                 className="flex-1 text-xs bg-gradient-to-r from-amber-600/20 to-orange-600/20 text-orange-300 px-3 py-2 rounded-lg border border-orange-500/30 hover:bg-orange-900/20 transition-colors flex items-center justify-center gap-2"
               >
                 {isEnhancing ? (
-                  <LoadingSpinner size="sm" color="text-orange-400" />
+                  <LoadingSpinner size="sm" variant="light" />
                 ) : (
-                  <span>Enhance</span>
+                  <span>✨ Enhance</span>
                 )}
               </button>
             </div>
