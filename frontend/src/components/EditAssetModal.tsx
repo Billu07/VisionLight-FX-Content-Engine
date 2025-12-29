@@ -21,12 +21,12 @@ type EditorMode = "standard" | "pro" | "drift";
 
 // ✅ UPDATED PRESETS
 const DRIFT_PRESETS = [
-  { label: "Orbit Right", h: 10, v: 0, z: 0, icon: "↪️" },
-  { label: "Orbit Left", h: -10, v: 0, z: 0, icon: "↩️" },
-  { label: "Dolly Right", h: 5, v: 0, z: 0, icon: "➡️" },
-  { label: "Dolly Left", h: -5, v: 0, z: 0, icon: "⬅️" },
-  { label: "Crane Up", h: 0, v: 10, z: 0, icon: "⬆️" },
-  { label: "Crane Down", h: 0, v: -10, z: 0, icon: "⬇️" },
+  { label: "Orbit Right", h: 10, v: 0, z: 0 },
+  { label: "Orbit Left", h: -10, v: 0, z: 0 },
+  { label: "Dolly Right", h: 5, v: 0, z: 0 },
+  { label: "Dolly Left", h: -5, v: 0, z: 0 },
+  { label: "Crane Up", h: 0, v: 10, z: 0 },
+  { label: "Crane Down", h: 0, v: -10, z: 0 },
 ];
 
 export function EditAssetModal({
@@ -239,7 +239,7 @@ export function EditAssetModal({
         {/* ✅ NEW: Close Button (Top Right) */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-50 bg-black/50 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors font-bold border border-white/20"
+          className="absolute top-4 leftt-4 z-50 bg-black/50 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors font-bold border border-white/20"
         >
           ✕
         </button>
@@ -256,7 +256,7 @@ export function EditAssetModal({
             </div>
           ) : (
             <>
-              <div className="absolute top-4 left-4 z-10 flex gap-2">
+              <div className="absolute top-4 right-4 z-10 flex gap-2">
                 <button
                   onClick={handleUndo}
                   disabled={currentIndex === 0}

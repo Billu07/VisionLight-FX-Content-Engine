@@ -74,16 +74,17 @@ export function DriftFrameExtractor({
   };
 
   return (
-    <div className="space-y-4 animate-in fade-in w-full max-w-4xl">
-      <div className="bg-black rounded-xl overflow-hidden border border-gray-700 relative group aspect-video">
-        {/* Hidden Canvas for Extraction */}
+    <div className="flex flex-col items-center justify-center w-full h-full p-2 animate-in fade-in">
+      {/* ✅ FIX: Flexible Container that doesn't force aspect-video off-screen */}
+      <div className="bg-black rounded-xl overflow-hidden border border-gray-700 relative group w-full flex-1 min-h-0 flex items-center justify-center mb-4">
         <canvas ref={canvasRef} className="hidden" />
 
         <video
           key={videoUrl}
           ref={videoRef}
           src={videoUrl}
-          className="w-full h-full object-contain bg-black"
+          // ✅ FIX: Object-contain ensures it fits inside the box without cropping
+          className="w-full h-full object-contain max-h-[60vh]"
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={() => {
             setDuration(videoRef.current?.duration || 0);
@@ -96,15 +97,12 @@ export function DriftFrameExtractor({
           crossOrigin="anonymous"
         />
 
-        {/* Play/Pause Overlay */}
+        {/* Play Overlay */}
         <div
           className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/30 transition-colors cursor-pointer"
           onClick={() => {
-            if (videoRef.current?.paused) {
-              videoRef.current.play();
-            } else {
-              videoRef.current?.pause();
-            }
+            if (videoRef.current?.paused) videoRef.current.play();
+            else videoRef.current?.pause();
           }}
         >
           {!isPlaying && (
@@ -115,53 +113,55 @@ export function DriftFrameExtractor({
         </div>
       </div>
 
-      {/* Scrubber Controls */}
-      <div className="space-y-2 px-2">
-        <div className="flex justify-between text-xs text-gray-400 font-mono">
-          <span>Frame: {((currentTime || 0) * 30).toFixed(0)}</span>
-          <span>
-            {currentTime.toFixed(2)}s / {duration.toFixed(2)}s
-          </span>
+      {/* Controls Container - Width constrained */}
+      <div className="w-full max-w-2xl space-y-4">
+        {/* Scrubber */}
+        <div className="space-y-1 px-1">
+          <div className="flex justify-between text-[10px] text-gray-400 font-mono uppercase tracking-wider">
+            <span>Frame: {((currentTime || 0) * 30).toFixed(0)}</span>
+            <span>
+              {currentTime.toFixed(2)}s / {duration.toFixed(2)}s
+            </span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max={duration || 100}
+            step="0.033"
+            value={currentTime}
+            disabled={!isReady}
+            onChange={handleSliderChange}
+            className="w-full accent-rose-500 cursor-pointer disabled:opacity-50 h-2 bg-gray-700 rounded-lg appearance-none"
+          />
         </div>
-        <input
-          type="range"
-          min="0"
-          max={duration || 100}
-          step="0.033"
-          value={currentTime}
-          disabled={!isReady}
-          onChange={handleSliderChange}
-          className="w-full accent-rose-500 cursor-pointer disabled:opacity-50"
-        />
-      </div>
 
-      {/* Actions */}
-      <div className="flex gap-3 pt-2">
-        <button
-          onClick={captureFrame}
-          disabled={!isReady}
-          className="flex-1 py-3 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-        >
-          <span></span> Extract This Frame
-        </button>
+        {/* Actions */}
+        <div className="flex gap-2">
+          <button
+            onClick={captureFrame}
+            disabled={!isReady}
+            className="flex-1 py-3 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+          >
+            <span>📸</span> Extract Frame
+          </button>
 
-        {/* ✅ UPDATED: Big visible Download Button */}
-        <a
-          href={videoUrl}
-          download
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-xl text-white font-bold text-center flex items-center justify-center gap-2"
-        >
-          <span></span> Download Clip
-        </a>
+          <a
+            href={videoUrl}
+            download
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-xl text-white font-bold text-center flex items-center justify-center gap-2 text-sm"
+          >
+            <span>⬇️</span> Download Clip
+          </a>
 
-        <button
-          onClick={onCancel}
-          className="px-4 py-3 bg-gray-800 text-gray-400 rounded-xl hover:bg-gray-700"
-        >
-          Cancel
-        </button>
+          <button
+            onClick={onCancel}
+            className="px-4 py-3 bg-gray-800 text-gray-400 rounded-xl hover:bg-gray-700 text-sm"
+          >
+            Back
+          </button>
+        </div>
       </div>
     </div>
   );
