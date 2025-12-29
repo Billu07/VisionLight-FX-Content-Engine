@@ -40,7 +40,7 @@ const getOptimizedUrl = (url: string) => {
 const getKlingCameraPrompt = (h: number, v: number, z: number) => {
   const parts: string[] = [];
 
-  // Horizontal (Orbit/Pan)
+  // Horizontal (Orbit/Pan) - Threshold 3 for strong move
   if (h >= 3) parts.push("Camera orbits right");
   else if (h > 0) parts.push("Camera pans right");
 
@@ -200,39 +200,23 @@ export const contentEngine = {
     prompt: string,
     horizontal: number,
     vertical: number,
-    zoom: number,
-    userAspectRatio?: string // ✅ ADDED: Accept user preference
+    zoom: number
   ) {
     try {
       console.log(
-        `🎬 Kling Drift Request: H${horizontal} V${vertical} Z${zoom} | AR: ${userAspectRatio}`
+        `🎬 Kling Drift Request: H${horizontal} V${vertical} Z${zoom}`
       );
 
-      // Default Logic
+      const imageResponse = await axios.get(getOptimizedUrl(assetUrl), {
+        responseType: "arraybuffer",
+      });
+      const metadata = await sharp(Buffer.from(imageResponse.data)).metadata();
+
       let targetRatio = "16:9";
-
-      // 1. Prioritize User Selection
-      if (userAspectRatio === "9:16" || userAspectRatio === "portrait") {
-        targetRatio = "9:16";
-      } else if (
-        userAspectRatio === "16:9" ||
-        userAspectRatio === "landscape"
-      ) {
-        targetRatio = "16:9";
-      } else {
-        // 2. Fallback to Auto-detect
-        const imageResponse = await axios.get(getOptimizedUrl(assetUrl), {
-          responseType: "arraybuffer",
-        });
-        const metadata = await sharp(
-          Buffer.from(imageResponse.data)
-        ).metadata();
-
-        if (metadata.width && metadata.height) {
-          if (Math.abs(metadata.width - metadata.height) < 100)
-            targetRatio = "1:1";
-          else if (metadata.height > metadata.width) targetRatio = "9:16";
-        }
+      if (metadata.width && metadata.height) {
+        if (Math.abs(metadata.width - metadata.height) < 100)
+          targetRatio = "1:1";
+        else if (metadata.height > metadata.width) targetRatio = "9:16";
       }
 
       const cameraMove = getKlingCameraPrompt(horizontal, vertical, zoom);
@@ -460,7 +444,7 @@ export const contentEngine = {
       return await airtableService.createAsset(
         userId,
         cloudUrl,
-        "original", // Maintain original or detect? Usually 1:1 or as input.
+        "original",
         "IMAGE"
       );
     } catch (e: any) {
@@ -787,16 +771,10 @@ export const contentEngine = {
       generationStep: "COMPLETED",
     });
 
-    // ✅ FIX: Use aspect ratio from params, not hardcoded
     const params = post.generationParams as any;
     if (params?.source === "DRIFT_EDITOR") {
       console.log("💾 Auto-saving Drift result to Asset Library...");
-      await airtableService.createAsset(
-        userId,
-        url,
-        params.aspectRatio || "16:9",
-        "VIDEO"
-      );
+      await airtableService.createAsset(userId, url, "16:9", "VIDEO");
     }
     await ROIService.incrementMediaGenerated(userId);
   },
