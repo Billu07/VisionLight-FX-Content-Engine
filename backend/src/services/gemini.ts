@@ -5,15 +5,15 @@ const client = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY });
 export const GeminiService = {
   /**
    * CORE GENERATION & EDITING
-   * If aspectRatio is "original" or undefined, we DO NOT send imageConfig.
-   * This tells Gemini to match the input image dimensions.
+   * Now supports explicit Image Size (1K, 2K, 4K) to preserve high resolution.
    */
   async generateOrEditImage(params: {
     prompt: string;
-    aspectRatio?: "16:9" | "9:16" | "1:1" | "original" | string; // Updated type
+    aspectRatio?: string;
     referenceImages?: Buffer[];
     modelType?: "speed" | "quality";
     useGrounding?: boolean;
+    imageSize?: "1K" | "2K" | "4K"; // 👈 NEW: Allow explicit size request
   }): Promise<Buffer> {
     // 1. Model Selection
     const modelId =
@@ -22,7 +22,9 @@ export const GeminiService = {
         : "gemini-3-pro-image-preview";
 
     console.log(
-      `🍌 Gemini Engine: ${modelId} | Ratio: ${params.aspectRatio || "Auto"}`
+      `🍌 Gemini Engine: ${modelId} | Ratio: ${params.aspectRatio} | Size: ${
+        params.imageSize || "Default"
+      }`
     );
 
     // 2. Payload
@@ -40,7 +42,6 @@ export const GeminiService = {
     }
 
     // 3. Configuration
-    // Only add imageConfig if we are forcing a specific aspect ratio
     let config: any = {
       responseModalities: ["IMAGE"],
       tools:
@@ -49,10 +50,13 @@ export const GeminiService = {
           : undefined,
     };
 
+    // Only apply image config if we have a valid ratio (calculated by contentEngine)
     if (params.aspectRatio && params.aspectRatio !== "original") {
       config.imageConfig = {
         aspectRatio: params.aspectRatio,
-        imageSize: modelId.includes("pro") ? "2K" : undefined,
+        // 🚀 CRITICAL FIX: Use requested size, or default to 2K for Pro
+        imageSize:
+          params.imageSize || (modelId.includes("pro") ? "2K" : undefined),
       };
     }
 

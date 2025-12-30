@@ -19,7 +19,7 @@ console.log("🔧 Environment Check:", {
 import { ROIService } from "./services/roi";
 import { AuthService } from "./services/auth";
 import { dbService as airtableService } from "./services/database";
-import { contentEngine } from "./services/contentEngine";
+import { contentEngine } from "./services/engine";
 
 const app = express();
 const PORT = process.env.PORT || 4000;
