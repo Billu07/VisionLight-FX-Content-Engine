@@ -209,19 +209,40 @@ export const imageLogic = {
   },
 
   // === ENHANCE (TOPAZ) ===
+  // === ENHANCE (TOPAZ) ===
   async enhanceAsset(userId: string, assetUrl: string): Promise<Asset> {
     try {
       console.log(`✨ Enhancing Asset for ${userId}...`);
-      // Use rawUrl to ensure max quality
+
+      // 1. Use Raw URL (Do not downscale input)
       const rawUrl = assetUrl;
-      const buffer = await FalService.upscaleImage({ imageUrl: rawUrl });
+
+      // 2. Get the High-Res Buffer from Topaz (Often >10MB PNG)
+      const bigBuffer = await FalService.upscaleImage({ imageUrl: rawUrl });
+
+      // 🛠️ FIX: Compress before Cloudinary upload
+      // Convert huge PNG to High-Quality JPEG (95%) to stay under 10MB limit
+      const optimizedBuffer = await sharp(bigBuffer)
+        .jpeg({ quality: 95, mozjpeg: true })
+        .toBuffer();
+
+      console.log(
+        `📉 Compression: ${(bigBuffer.length / 1024 / 1024).toFixed(2)}MB -> ${(
+          optimizedBuffer.length /
+          1024 /
+          1024
+        ).toFixed(2)}MB`
+      );
+
+      // 3. Upload the optimized buffer
       const cloudUrl = await uploadToCloudinary(
-        buffer,
+        optimizedBuffer,
         `enhanced_${userId}_${Date.now()}`,
         userId,
         "Enhanced Asset",
         "image"
       );
+
       return await airtableService.createAsset(
         userId,
         cloudUrl,
@@ -229,6 +250,7 @@ export const imageLogic = {
         "IMAGE"
       );
     } catch (e: any) {
+      console.error("Enhance Error:", e.message);
       throw e;
     }
   },
