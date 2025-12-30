@@ -410,6 +410,7 @@ export const videoLogic = {
     provider: string,
     userId: string
   ) {
+    // 1. Update the Post status first
     const post = await airtableService.updatePost(postId, {
       mediaUrl: url,
       mediaProvider: provider,
@@ -417,15 +418,30 @@ export const videoLogic = {
       progress: 100,
       generationStep: "COMPLETED",
     });
+
+    // 2. Check if this was a "Utility Job" (Drift Editor)
     const params = post.generationParams as any;
+
     if (params?.source === "DRIFT_EDITOR") {
+      console.log(
+        "💾 Drift Job Complete. Saving to Assets & Cleaning up Timeline..."
+      );
+
+      // A. Save to Asset Library (The Permanent Home)
       await airtableService.createAsset(
         userId,
         url,
         params.aspectRatio || "16:9",
         "VIDEO"
       );
+
+      // B. Delete the Temporary Post from Timeline (Keep Timeline Clean)
+      // We don't need the "Job Ticket" anymore since we have the Asset.
+      await airtableService.deletePost(postId);
+      console.log("🧹 Temporary Drift Post deleted.");
     }
+
+    // 3. Track Stats
     await ROIService.incrementMediaGenerated(userId);
   },
 };

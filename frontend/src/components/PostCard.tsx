@@ -14,6 +14,8 @@ interface PostCardProps {
   // NEW PROPS
   onPreview?: () => void;
   onMoveToAsset?: () => void;
+  onDrift?: () => void;
+  onDelete?: () => void; // Added onDelete here as well just in case
 }
 
 const getCleanUrl = (url: string) => {
@@ -36,6 +38,8 @@ export function PostCard({
   compact = false,
   onPreview,
   onMoveToAsset,
+  onDrift, // ✅ FIXED: Added this here
+  onDelete, // ✅ Ensure this is here too
 }: PostCardProps) {
   const [mediaError, setMediaError] = useState(false);
   const [videoLoading, setVideoLoading] = useState(true);
@@ -131,7 +135,7 @@ export function PostCard({
     }
   };
 
-  // --- DOWNLOAD END FRAME HANDLER (Updated for Quality) ---
+  // --- DOWNLOAD END FRAME HANDLER ---
   const handleDownloadEndFrame = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -172,6 +176,17 @@ export function PostCard({
               <div className="text-red-400">
                 <span className="text-2xl block mb-2">⚠️</span>
                 <span className="text-xs font-bold">Generation Failed</span>
+                {onDelete && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete();
+                    }}
+                    className="mt-2 text-xs bg-red-900/40 hover:bg-red-900/60 text-red-200 px-2 py-1 rounded transition-colors"
+                  >
+                    Delete
+                  </button>
+                )}
               </div>
             ) : (
               <>
@@ -220,6 +235,17 @@ export function PostCard({
             >
               Retry
             </button>
+            {onDelete && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                className="block mx-auto mt-2 text-xs text-red-400 hover:text-red-200"
+              >
+                Delete
+              </button>
+            )}
           </div>
         </div>
       );
@@ -242,7 +268,7 @@ export function PostCard({
       return (
         <div
           className="relative aspect-video group cursor-pointer hover:opacity-90 transition-opacity"
-          onClick={onPreview || nextSlide} // Use preview if available, else local nav
+          onClick={onPreview || nextSlide}
         >
           {slides.length > 0 && (
             <img
@@ -251,7 +277,6 @@ export function PostCard({
               className="w-full h-full object-cover rounded-xl"
             />
           )}
-          {/* Overlay to indicate clickability */}
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
             <span className="text-white text-3xl drop-shadow-lg">⤢</span>
           </div>
@@ -268,7 +293,7 @@ export function PostCard({
       return (
         <div
           className="relative aspect-video bg-black rounded-xl overflow-hidden border border-white/10 group cursor-pointer"
-          onClick={onPreview} // CLICK TO OPEN FULLSCREEN
+          onClick={onPreview}
         >
           {videoLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
@@ -276,18 +301,16 @@ export function PostCard({
             </div>
           )}
           <video
-            muted={true} // Auto-mute for preview
+            muted={true}
             loop
             className="w-full h-full object-cover"
             onLoadedData={handleVideoLoad}
             onError={handleMediaError}
             playsInline
-            // Remove controls so click goes to parent div
           >
             <source src={getCleanUrl(post.mediaUrl)} type="video/mp4" />
           </video>
 
-          {/* Play/Expand Icon Overlay */}
           <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
             <span className="text-white text-3xl drop-shadow-lg opacity-80 group-hover:opacity-100 transition-opacity">
               ▶
@@ -301,7 +324,7 @@ export function PostCard({
     return (
       <div
         className="aspect-video bg-gray-900 rounded-xl overflow-hidden border border-white/10 cursor-pointer group relative"
-        onClick={onPreview} // CLICK TO OPEN FULLSCREEN
+        onClick={onPreview}
       >
         <img
           src={getCleanUrl(post.mediaUrl)}
@@ -394,7 +417,23 @@ export function PostCard({
                 )}
               </button>
 
-              {/* SAVE TO ASSET LIBRARY BUTTON (New) */}
+              {/* OPEN IN DRIFT BUTTON (Videos Only) */}
+              {(post.mediaType === "VIDEO" ||
+                post.mediaProvider?.includes("kling")) &&
+                onDrift && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDrift();
+                    }}
+                    className="w-8 h-8 flex items-center justify-center bg-rose-600/20 hover:bg-rose-600/40 border border-rose-500/30 rounded-lg text-rose-300 transition-colors"
+                    title="Open in Drift / Extract Frames"
+                  >
+                    ✂️
+                  </button>
+                )}
+
+              {/* SAVE TO ASSET LIBRARY BUTTON */}
               {onMoveToAsset && (
                 <button
                   onClick={onMoveToAsset}
@@ -414,6 +453,20 @@ export function PostCard({
               >
                 ℹ️
               </button>
+
+              {/* DELETE BUTTON */}
+              {onDelete && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                  }}
+                  className="w-8 h-8 flex items-center justify-center bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 rounded-lg text-red-300 transition-colors"
+                  title="Delete Post"
+                >
+                  🗑️
+                </button>
+              )}
             </div>
 
             {/* END FRAME DOWNLOAD BUTTON */}
@@ -437,6 +490,17 @@ export function PostCard({
         {post.status === "FAILED" && post.error && !isContentVisible && (
           <div className="p-2 bg-red-900/20 border border-red-500/20 rounded text-[10px] text-red-300 break-words">
             {post.error}
+            {onDelete && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                className="block mt-2 text-xs bg-red-900/40 hover:bg-red-900/60 text-white px-2 py-1 rounded transition-colors w-full"
+              >
+                Delete
+              </button>
+            )}
           </div>
         )}
       </div>

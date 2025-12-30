@@ -15,11 +15,11 @@ interface Asset {
 interface EditAssetModalProps {
   asset: Asset;
   onClose: () => void;
+  initialVideoUrl?: string;
 }
 
 type EditorMode = "standard" | "pro" | "drift";
 
-// ✅ FIXED: Defined Interface for Presets
 interface DriftPreset {
   label: string;
   h: number;
@@ -28,47 +28,53 @@ interface DriftPreset {
   icon: string;
 }
 
-// ✅ UPDATED PRESETS (-10 to 10 scale)
+// ✅ FIXED PRESETS: Using the -10 to 10 scale
 const DRIFT_PRESETS: DriftPreset[] = [
-  { label: "Orbit Right", h: 10, v: 0, z: 0, icon: "↪️" },
-  { label: "Orbit Left", h: -10, v: 0, z: 0, icon: "↩️" },
-  { label: "Dolly Right", h: 5, v: 0, z: 0, icon: "➡️" },
-  { label: "Dolly Left", h: -5, v: 0, z: 0, icon: "⬅️" },
-  { label: "Crane Up", h: 0, v: 10, z: 0, icon: "⬆️" },
-  { label: "Crane Down", h: 0, v: -10, z: 0, icon: "⬇️" },
+  { label: "Orbit Right", h: 5, v: 0, z: 0, icon: "↪️" },
+  { label: "Orbit Left", h: -5, v: 0, z: 0, icon: "↩️" },
+  { label: "Dolly Right", h: 3, v: 0, z: 0, icon: "➡️" },
+  { label: "Dolly Left", h: -3, v: 0, z: 0, icon: "⬅️" },
+  { label: "Crane Up", h: 0, v: 5, z: 0, icon: "⬆️" },
+  { label: "Crane Down", h: 0, v: -5, z: 0, icon: "⬇️" },
+  { label: "Zoom In", h: 0, v: 0, z: 5, icon: "🔍" },
 ];
 
 export function EditAssetModal({
   asset: initialAsset,
   onClose,
+  initialVideoUrl,
 }: EditAssetModalProps) {
   const queryClient = useQueryClient();
   const refFileInput = useRef<HTMLInputElement>(null);
-
-  // ✅ NEW: Enhance State
-  const [isEnhancing, setIsEnhancing] = useState(false);
 
   const [history, setHistory] = useState<Asset[]>([initialAsset]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentAsset = history[currentIndex];
 
-  const [activeTab, setActiveTab] = useState<EditorMode>("pro");
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [activeTab, setActiveTab] = useState<EditorMode>(
+    initialVideoUrl ? "drift" : "pro"
+  );
 
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+
+  // Text Edit State
   const [prompt, setPrompt] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [referenceAsset, setReferenceAsset] = useState<Asset | null>(null);
   const [showRefSelector, setShowRefSelector] = useState(false);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
 
-  // ✅ UPDATED DEFAULTS (Start in Middle = 0)
+  // Drift State
   const [driftParams, setDriftParams] = useState({
     horizontal: 0,
     vertical: 0,
     zoom: 0,
   });
 
-  const [driftVideoUrl, setDriftVideoUrl] = useState<string | null>(null);
+  const [driftVideoUrl, setDriftVideoUrl] = useState<string | null>(
+    initialVideoUrl || null
+  );
   const [driftStatusMsg, setDriftStatusMsg] = useState("Processing...");
   const [driftProgress, setDriftProgress] = useState(0);
   const [driftPostId, setDriftPostId] = useState<string | null>(null);
@@ -79,6 +85,7 @@ export function EditAssetModal({
     enabled: showRefSelector,
   });
 
+  // 1. RECOVERY LOGIC (Checks LocalStorage on mount)
   useEffect(() => {
     const pendingPostId = localStorage.getItem(
       `active_drift_post_${currentAsset.id}`
@@ -90,6 +97,7 @@ export function EditAssetModal({
     }
   }, [currentAsset.id]);
 
+  // 2. POLLING LOGIC (Polls DB Status)
   useEffect(() => {
     if (!driftPostId) return;
 
@@ -105,10 +113,13 @@ export function EditAssetModal({
           clearInterval(interval);
           setDriftProgress(100);
           setDriftStatusMsg("Loading Video...");
+
           localStorage.removeItem(`active_drift_post_${currentAsset.id}`);
           setDriftPostId(null);
           setDriftVideoUrl(mediaUrl);
           setIsProcessing(false);
+
+          // Refresh Library to show the new video asset
           queryClient.invalidateQueries({ queryKey: ["assets"] });
         } else if (status === "FAILED") {
           clearInterval(interval);
@@ -118,6 +129,7 @@ export function EditAssetModal({
           alert("Drift Generation Failed: " + (error || "Unknown error"));
         }
       } catch (e: any) {
+        // If post deleted/lost, stop polling
         if (e.message?.includes("404") || e.response?.status === 404) {
           clearInterval(interval);
           localStorage.removeItem(`active_drift_post_${currentAsset.id}`);
@@ -125,11 +137,12 @@ export function EditAssetModal({
           setIsProcessing(false);
         }
       }
-    }, 10000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [driftPostId, currentAsset.id, queryClient]);
 
+  // === MUTATION 1: TEXT EDIT ===
   const textEditMutation = useMutation({
     mutationFn: async () => {
       return apiEndpoints.editAsset({
@@ -147,7 +160,7 @@ export function EditAssetModal({
     onSettled: () => setIsProcessing(false),
   });
 
-  // ✅ NEW: Enhance Mutation
+  // === MUTATION 2: ENHANCE ===
   const enhanceMutation = useMutation({
     mutationFn: async () => {
       return apiEndpoints.enhanceAsset({ assetUrl: currentAsset.url });
@@ -161,6 +174,7 @@ export function EditAssetModal({
     onSettled: () => setIsEnhancing(false),
   });
 
+  // === MUTATION 3: DRIFT START ===
   const driftStartMutation = useMutation({
     mutationFn: async () => {
       return apiEndpoints.startDriftVideo({
@@ -169,7 +183,7 @@ export function EditAssetModal({
         horizontal: driftParams.horizontal,
         vertical: driftParams.vertical,
         zoom: driftParams.zoom,
-        aspectRatio: currentAsset.aspectRatio, // ✅ PASS CORRECT RATIO
+        aspectRatio: currentAsset.aspectRatio,
       });
     },
     onMutate: () => {
@@ -188,6 +202,7 @@ export function EditAssetModal({
     },
   });
 
+  // FRAME EXTRACTION
   const handleFrameExtraction = async (blob: Blob) => {
     const file = new File([blob], "drift_frame.jpg", { type: "image/jpeg" });
     const formData = new FormData();
@@ -196,11 +211,11 @@ export function EditAssetModal({
 
     try {
       setIsProcessing(true);
-      setDriftStatusMsg("Saving extracted frame...");
+      setDriftStatusMsg("Saving frame...");
       const res = await apiEndpoints.uploadAssetSync(formData);
       if (res.data.success) {
         handleSuccess(res.data.asset);
-        setDriftVideoUrl(null);
+        setDriftVideoUrl(null); // Return to editor to edit the new frame
       }
     } catch (e: any) {
       alert("Failed to save frame: " + e.message);
@@ -218,6 +233,7 @@ export function EditAssetModal({
     queryClient.invalidateQueries({ queryKey: ["assets"] });
   };
 
+  // Helper Mutations
   const analyzeMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch(currentAsset.url);
@@ -263,7 +279,7 @@ export function EditAssetModal({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 p-4 backdrop-blur-md">
       <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-6xl flex flex-col md:flex-row overflow-hidden shadow-2xl h-[90vh] relative">
-        {/* ✅ FIXED: Close Button Top-Left */}
+        {/* CLOSE BUTTON */}
         <button
           onClick={onClose}
           className="absolute top-4 left-4 z-50 bg-black/50 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors font-bold border border-white/20"
@@ -283,7 +299,7 @@ export function EditAssetModal({
             </div>
           ) : (
             <>
-              {/* ✅ FIXED: Undo/Redo Top-Right */}
+              {/* Undo/Redo */}
               <div className="absolute top-4 right-4 z-10 flex gap-2">
                 <button
                   onClick={handleUndo}
@@ -377,7 +393,7 @@ export function EditAssetModal({
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {/* ✅ NEW: Action Bar (Analyze + Enhance) */}
+            {/* ACTIONS: Analyze / Enhance */}
             <div className="flex gap-2 mb-4">
               <button
                 onClick={() => analyzeMutation.mutate()}
@@ -400,6 +416,7 @@ export function EditAssetModal({
               </button>
             </div>
 
+            {/* STANDARD / PRO UI */}
             {activeTab !== "drift" && (
               <>
                 <div className="space-y-2">
@@ -469,10 +486,10 @@ export function EditAssetModal({
               </>
             )}
 
-            {/* ✅ UPDATED: Drift Controls with -10 to 10 Range */}
+            {/* DRIFT UI */}
             {activeTab === "drift" && (
               <div className="space-y-6 animate-in fade-in">
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {DRIFT_PRESETS.map((preset) => (
                     <button
                       key={preset.label}
@@ -483,10 +500,10 @@ export function EditAssetModal({
                           zoom: preset.z,
                         })
                       }
-                      className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-2 text-left flex items-center gap-2 transition-all active:scale-95"
+                      className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-2 text-center transition-all active:scale-95 flex flex-col items-center"
                     >
                       <span className="text-lg">{preset.icon}</span>
-                      <span className="text-[10px] text-gray-300 font-bold">
+                      <span className="text-[9px] text-gray-300 font-bold block mt-1">
                         {preset.label}
                       </span>
                     </button>
@@ -501,7 +518,7 @@ export function EditAssetModal({
                   {/* Horizontal */}
                   <div className="space-y-2 mb-4">
                     <div className="flex justify-between text-xs text-gray-400">
-                      <span>Orbit / Dolly (Feet)</span>
+                      <span>Orbit (H)</span>
                       <span className="text-cyan-400">
                         {driftParams.horizontal}
                       </span>
@@ -530,7 +547,7 @@ export function EditAssetModal({
                   {/* Vertical */}
                   <div className="space-y-2 mb-4">
                     <div className="flex justify-between text-xs text-gray-400">
-                      <span>Elevation (Feet)</span>
+                      <span>Elevation (V)</span>
                       <span className="text-purple-400">
                         {driftParams.vertical}
                       </span>
@@ -559,14 +576,14 @@ export function EditAssetModal({
                   {/* Zoom */}
                   <div className="space-y-2">
                     <div className="flex justify-between text-xs text-gray-400">
-                      <span>Zoom (Feet)</span>
+                      <span>Zoom (Z)</span>
                       <span className="text-green-400">{driftParams.zoom}</span>
                     </div>
                     <input
                       type="range"
                       min="-10"
                       max="10"
-                      step="1"
+                      step="0.5"
                       value={driftParams.zoom}
                       onChange={(e) =>
                         setDriftParams((p) => ({
@@ -586,13 +603,12 @@ export function EditAssetModal({
               </div>
             )}
 
-            {/* SHARED PROMPT INPUT */}
+            {/* Prompt Box */}
             <div className="space-y-3">
               <div className="flex justify-between items-end">
                 <label className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
-                  {/* ✅ UPDATED LABEL */}
                   {activeTab === "drift"
-                    ? "Describe Camera Move (Optional)"
+                    ? "Subject Description (Optional)"
                     : "Instruction"}
                 </label>
               </div>
@@ -600,7 +616,7 @@ export function EditAssetModal({
                 className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none leading-relaxed placeholder-gray-500"
                 placeholder={
                   activeTab === "drift"
-                    ? "e.g. 'Slow pan right', 'Fast zoom'..."
+                    ? "e.g. 'A silver robot' (Helps maintain identity)"
                     : "e.g. 'Make it night time', 'Add neon lights'..."
                 }
                 value={prompt}
@@ -617,6 +633,7 @@ export function EditAssetModal({
             </div>
           </div>
 
+          {/* FOOTER */}
           <div className="p-6 border-t border-gray-800 bg-gray-900/50 flex flex-col gap-3">
             {activeTab === "drift" ? (
               <button
@@ -624,7 +641,11 @@ export function EditAssetModal({
                 disabled={isProcessing || !!driftPostId}
                 className="w-full py-4 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isProcessing ? "Drifting..." : <span>🌀 Generate Path</span>}
+                {isProcessing ? (
+                  "Processing Path..."
+                ) : (
+                  <span>🌀 Generate Path</span>
+                )}
               </button>
             ) : (
               <button

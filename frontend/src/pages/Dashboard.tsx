@@ -114,6 +114,9 @@ function Dashboard() {
 
   // State for Magic Edit Asset (if triggered directly)
   const [editingAsset, setEditingAsset] = useState<any | null>(null);
+  const [editingVideoUrl, setEditingVideoUrl] = useState<string | undefined>(
+    undefined
+  );
 
   const queryClient = useQueryClient();
   const { user, isLoading: authLoading, logout } = useAuth();
@@ -127,6 +130,19 @@ function Dashboard() {
       ? "picdrift"
       : "videofx";
 
+  // HANDLER: Open Timeline Video in Drift
+  const handleDriftFromPost = (post: any) => {
+    // Create a temporary asset object wrapper
+    const tempAsset = {
+      id: post.id,
+      url: post.mediaUrl, // This serves as the "reference"
+      aspectRatio: "16:9",
+      type: "VIDEO",
+    };
+
+    setEditingVideoUrl(post.mediaUrl); // Pass the video to open extractor directly
+    setEditingAsset(tempAsset);
+  };
   // Reset Files on Engine Change
   useEffect(() => {
     setReferenceImages([]);
@@ -1487,6 +1503,7 @@ function Dashboard() {
                         primaryColor={brandConfig?.primaryColor}
                         compact={true}
                         onUseAsStartFrame={handleUseAsStartFrame}
+                        onDrift={() => handleDriftFromPost(post)}
                         onPreview={() => {
                           let type = "image";
                           if (post.mediaType === "VIDEO") type = "video";
@@ -1539,7 +1556,11 @@ function Dashboard() {
         {editingAsset && (
           <EditAssetModal
             asset={editingAsset}
-            onClose={() => setEditingAsset(null)}
+            initialVideoUrl={editingVideoUrl}
+            onClose={() => {
+              setEditingAsset(null);
+              setEditingVideoUrl(undefined); // Reset
+            }}
           />
         )}
       </div>
