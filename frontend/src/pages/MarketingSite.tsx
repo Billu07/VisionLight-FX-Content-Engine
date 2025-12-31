@@ -1,3 +1,5 @@
+// 1. Import Link from react-router-dom
+import { Link } from "react-router-dom";
 import { Hero } from "../components/marketing/Hero";
 
 export const MarketingSite = () => {
@@ -17,20 +19,24 @@ export const MarketingSite = () => {
               carousel generation.
             </p>
             <div className="flex justify-center gap-6 mb-6">
-              <a
-                href="#"
+              {/* 2. Update these to Link components */}
+              <Link
+                to="/terms"
                 className="text-purple-400 hover:text-cyan-400 transition-colors"
               >
                 Terms
-              </a>
-              <a
-                href="#"
+              </Link>
+
+              <Link
+                to="/privacy"
                 className="text-purple-400 hover:text-cyan-400 transition-colors"
               >
                 Privacy
-              </a>
+              </Link>
+
+              {/* 3. Update Contact to a mailto link */}
               <a
-                href="#"
+                href="mailto:picdrift@picdrift.com"
                 className="text-purple-400 hover:text-cyan-400 transition-colors"
               >
                 Contact

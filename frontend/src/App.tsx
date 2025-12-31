@@ -7,6 +7,8 @@ import {
   useLocation,
 } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+// --- EXISTING IMPORTS ---
 import { MarketingSite } from "./pages/MarketingSite";
 import Dashboard from "./pages/Dashboard";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -15,7 +17,11 @@ import { BrandProvider } from "./contexts/BrandContext";
 import { useAuth } from "./hooks/useAuth";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 
-// Define your Admin Email here (or use import.meta.env.VITE_ADMIN_EMAIL)
+// --- NEW IMPORTS (Add these) ---
+import { Terms } from "./pages/Terms";
+import { Privacy } from "./pages/Privacy";
+
+// Define your Admin Email here
 const ADMIN_EMAILS = ["snowfix07@gmail.com", "keith@picdrift.com"];
 
 const queryClient = new QueryClient({
@@ -65,7 +71,7 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   // 1. Must be logged in
   if (!user) return <Navigate to="/" replace />;
 
-  // 2. Must be in the Allowed List (CHANGED)
+  // 2. Must be in the Allowed List
   if (!ADMIN_EMAILS.includes(user.email)) {
     return <Navigate to="/app" replace />;
   }
@@ -79,7 +85,13 @@ function App() {
       <BrandProvider>
         <Router>
           <Routes>
+            {/* Public Routes */}
             <Route path="/" element={<MarketingSite />} />
+
+            {/* --- ADD THESE NEW ROUTES --- */}
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
+            {/* --------------------------- */}
 
             <Route
               path="/app"
@@ -92,7 +104,7 @@ function App() {
               }
             />
 
-            {/* 🔒 ADMIN ROUTE UPDATED */}
+            {/* 🔒 ADMIN ROUTE */}
             <Route
               path="/admin"
               element={

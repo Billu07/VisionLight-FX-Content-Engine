@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { LoginModal } from "../LoginModal";
-import fxLogo from "../../assets/fx.png";
 import picdriftLogo from "../../assets/picdrift.png";
 
 export const Hero = () => {
@@ -20,22 +19,12 @@ export const Hero = () => {
           <div className="max-w-4xl mx-auto text-center">
             {/* Enhanced Navigation Bar */}
             <div className="flex flex-col sm:flex-row justify-between items-center mb-12 sm:mb-16 gap-6 sm:gap-0">
-              {/* Dual Logos (Side by Side) */}
+              {/* Logo Section - FX Logo and Divider Removed */}
               <div className="flex items-center gap-4 sm:gap-6">
-                {/* 3. PicDrift Logo (Right) */}
                 <img
                   src={picdriftLogo}
                   alt="PicDrift"
                   className="h-12 sm:h-16 w-auto object-contain transition-transform hover:scale-105"
-                />
-                {/* 2. Divider */}
-                <div className="h-8 w-px bg-white/20"></div>
-
-                {/* 1. FX Logo (Left) */}
-                <img
-                  src={fxLogo}
-                  alt="FX"
-                  className="h-10 sm:h-14 w-auto object-contain transition-transform hover:scale-105"
                 />
               </div>
 
