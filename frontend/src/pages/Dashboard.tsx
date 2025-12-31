@@ -975,14 +975,14 @@ function Dashboard() {
                 {currentVisualTab === "studio" && studioMode === "edit" ? (
                   <div className="bg-gray-900/50 border border-cyan-500/30 rounded-2xl p-8 text-center space-y-5 animate-in fade-in">
                     <div className="w-20 h-20 bg-cyan-900/20 rounded-full flex items-center justify-center mx-auto border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
-                      <span className="text-4xl">🪄</span>
+                      <span className="text-4xl"></span>
                     </div>
                     <div>
                       <h3 className="text-white font-bold text-xl mb-2">
-                        Conversational Magic Edit
+                        Picture Editor
                       </h3>
                       <p className="text-gray-400 text-sm max-w-md mx-auto">
-                        Upload an image to start a chat session. Ask Gemini to
+                        Upload an image to start a chat session. Ask PicFX to
                         change lighting, add objects, or completely
                         style-transfer your image.
                       </p>
@@ -1015,8 +1015,8 @@ function Dashboard() {
                     {currentVisualTab === "picdrift" && (
                       <div className="grid grid-cols-2 gap-4 mb-4 animate-in fade-in">
                         <div className="flex flex-col gap-2">
-                          <label className="text-xs text-rose-300 uppercase font-bold">
-                            Start Frame
+                          <label className="text-xs text-rose-300 font-bold">
+                            Pic 1 - Start Frame
                           </label>
                           <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
                             {picDriftUrls.start ? (
@@ -1068,8 +1068,8 @@ function Dashboard() {
                         </div>
 
                         <div className="flex flex-col gap-2">
-                          <label className="text-xs text-rose-300 uppercase font-bold">
-                            End Frame (optional)
+                          <label className="text-xs text-rose-300 font-bold">
+                            Pic 2 - End Frame (optional)
                           </label>
                           <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
                             {picDriftUrls.end ? (
@@ -1084,6 +1084,15 @@ function Dashboard() {
                                   className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
                                 >
                                   ✕
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setActiveLibrarySlot("generic")
+                                  }
+                                  className="text-xs bg-cyan-900/50 text-cyan-300 px-3 py-1.5 rounded-lg hover:bg-cyan-800 border border-cyan-700/50 flex items-center gap-1 transition-colors"
+                                >
+                                  <span></span> Open Library
                                 </button>
                               </>
                             ) : (
