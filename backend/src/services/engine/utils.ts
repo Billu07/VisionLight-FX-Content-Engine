@@ -63,16 +63,19 @@ export const resizeWithBlurFill = async (
   }
 };
 
-// Helper: AI Outpainting (Gemini)
+// Helper: AI Outpainting
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
-  targetHeight: number
+  targetHeight: number,
+  targetRatioString: "16:9" | "9:16" | "1:1" = "16:9" // 👈 NEW PARAM
 ): Promise<Buffer> => {
   try {
     console.log(
-      `✨ Gemini 3 Pro: Outpainting ${targetWidth}x${targetHeight}...`
+      `✨ Gemini 3 Pro: Outpainting to ${targetRatioString} (${targetWidth}x${targetHeight})...`
     );
+
+    // Create canvas (Black Background)
     const backgroundGuide = await sharp({
       create: {
         width: targetWidth,
@@ -84,6 +87,7 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
+    // Composite original image centered
     const compositeBuffer = await sharp(backgroundGuide)
       .composite([
         {
@@ -96,11 +100,10 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    const isPortrait = targetHeight > targetWidth;
-
     return await GeminiService.generateOrEditImage({
-      prompt: "Outpaint and fill the black bars naturally. Seamless extension.",
-      aspectRatio: isPortrait ? "9:16" : "16:9",
+      prompt:
+        "Outpaint and fill the black empty space naturally. Seamless extension of the scene.",
+      aspectRatio: targetRatioString, // 👈 Pass strict ratio
       referenceImages: [compositeBuffer],
       modelType: "quality",
     });

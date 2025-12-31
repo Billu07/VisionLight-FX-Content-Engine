@@ -8,7 +8,7 @@ import { ProgressBar } from "./ProgressBar";
 interface Asset {
   id: string;
   url: string;
-  aspectRatio: "16:9" | "9:16" | "original";
+  aspectRatio: "16:9" | "9:16" | "original" | "1:1";
   type?: "IMAGE" | "VIDEO";
 }
 

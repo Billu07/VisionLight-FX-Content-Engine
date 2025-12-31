@@ -50,6 +50,7 @@ export const apiEndpoints = {
     api.put(`/api/posts/${postId}/title`, { title }),
   getPostStatus: (id: string) => api.get(`/api/post/${id}/status`),
   checkActiveJobs: () => api.get("/api/jobs/check-active"),
+  deletePost: (id: string) => api.delete(`/api/posts/${id}`),
 
   // === Vision & Analysis ===
   analyzeImage: (formData: FormData) =>

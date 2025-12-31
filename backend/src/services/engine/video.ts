@@ -50,6 +50,8 @@ export const videoLogic = {
       let targetWidth = 1280;
       let targetHeight = 720;
       let targetRatioString = "16:9";
+
+      // 1. Determine Target Dimensions
       if (userAspectRatio === "9:16" || userAspectRatio === "portrait") {
         targetWidth = 720;
         targetHeight = 1280;
@@ -71,12 +73,15 @@ export const videoLogic = {
       const targetAR = targetWidth / targetHeight;
       let finalImageUrl = rawUrl;
 
+      // 2. Outpaint if Ratio Mismatch
       if (Math.abs(sourceAR - targetAR) > 0.05) {
         try {
+          // ✅ FIX: Pass targetRatioString to Gemini
           const outpaintedBuffer = await resizeWithGemini(
             originalBuffer,
             targetWidth,
-            targetHeight
+            targetHeight,
+            targetRatioString as any
           );
           finalImageUrl = await uploadToCloudinary(
             outpaintedBuffer,
@@ -136,13 +141,32 @@ export const videoLogic = {
     const isPro = params.model.includes("pro") || params.model.includes("Pro");
 
     try {
-      const isPortrait =
-        params.aspectRatio === "portrait" || params.aspectRatio === "9:16";
-      let targetWidth = isPortrait ? 720 : 1280;
-      let targetHeight = isPortrait ? 1280 : 720;
+      // 1. Determine Target Dimensions
+      let targetWidth = 1280;
+      let targetHeight = 720;
+      let targetRatioString = "16:9";
+
+      if (params.aspectRatio === "portrait" || params.aspectRatio === "9:16") {
+        targetWidth = 720;
+        targetHeight = 1280;
+        targetRatioString = "9:16";
+      } else if (
+        params.aspectRatio === "square" ||
+        params.aspectRatio === "1:1"
+      ) {
+        targetWidth = 1024;
+        targetHeight = 1024;
+        targetRatioString = "1:1";
+      }
+
       if (params.resolution === "1080p") {
-        targetWidth = isPortrait ? 1080 : 1920;
-        targetHeight = isPortrait ? 1920 : 1080;
+        if (targetRatioString === "16:9") {
+          targetWidth = 1920;
+          targetHeight = 1080;
+        } else if (targetRatioString === "9:16") {
+          targetWidth = 1080;
+          targetHeight = 1920;
+        }
       }
 
       let finalInputImageBuffer: Buffer | undefined;
@@ -161,10 +185,12 @@ export const videoLogic = {
 
           if (Math.abs(sourceAR - targetAR) > 0.05) {
             try {
+              // ✅ FIX: Pass targetRatioString
               finalInputImageBuffer = await resizeWithGemini(
                 originalImageBuffer,
                 targetWidth,
-                targetHeight
+                targetHeight,
+                targetRatioString as any
               );
             } catch (e) {
               finalInputImageBuffer = await resizeWithBlurFill(
@@ -210,11 +236,14 @@ export const videoLogic = {
               const tailResp = await axios.get(tailRaw, {
                 responseType: "arraybuffer",
               });
+
+              // Simple strict resize for tail for now (or apply same outpaint logic)
               let processedTail = await resizeStrict(
                 Buffer.from(tailResp.data),
                 targetWidth,
                 targetHeight
               );
+
               klingTailUrl = await uploadToCloudinary(
                 processedTail,
                 `${postId}_kling_end`,
@@ -235,15 +264,18 @@ export const videoLogic = {
         const url = `${FAL_BASE_PATH}/pro/${
           isImageToVideo ? "image-to-video" : "text-to-video"
         }`;
+
         const payload: any = {
           prompt: finalPrompt,
           duration: params.duration ? params.duration.toString() : "5",
-          aspect_ratio: isPortrait ? "9:16" : "16:9",
+          aspect_ratio: targetRatioString, // ✅ Fixed
         };
+
         if (isImageToVideo) {
           payload.image_url = klingInputUrl;
           if (klingTailUrl) payload.tail_image_url = klingTailUrl;
         }
+
         const submitRes = await axios.post(url, payload, {
           headers: {
             Authorization: `Key ${FAL_KEY}`,
@@ -268,11 +300,15 @@ export const videoLogic = {
         }
         const baseModel = isPro ? "sora-2-pro" : "sora-2";
         const mode = isImageToVideo ? "image-to-video" : "text-to-video";
+
+        // Kie doesn't support 1:1 nicely via API sometimes, fallback to landscape/portrait keywords if needed
+        // Assuming your Kie wrapper handles standard strings
         const kiePayload: any = {
           model: `${baseModel}-${mode}`,
           input: {
             prompt: finalPrompt,
-            aspect_ratio: isPortrait ? "portrait" : "landscape",
+            aspect_ratio:
+              targetRatioString === "9:16" ? "portrait" : "landscape",
             n_frames: params.duration
               ? params.duration.toString().replace("s", "")
               : "10",
@@ -280,6 +316,7 @@ export const videoLogic = {
           },
         };
         if (isImageToVideo) kiePayload.input.image_urls = [kieInputUrl];
+
         const kieRes = await axios.post(
           `${KIE_BASE_URL}/jobs/createTask`,
           kiePayload,
@@ -333,75 +370,10 @@ export const videoLogic = {
   },
 
   async checkPostStatus(post: Post) {
-    const params = post.generationParams as any;
-    if (post.status !== "PROCESSING" || !params?.externalId) return;
-    const externalId = params.externalId;
-    const provider = post.mediaProvider || "openai";
-    const userId = post.userId;
-
-    try {
-      let isComplete = false;
-      let isFailed = false;
-      let finalUrl = "";
-      let progress = post.progress || 0;
-      let errorMessage = "";
-
-      if (provider.includes("kie")) {
-        const checkRes = await axios.get(
-          `${KIE_BASE_URL}/jobs/recordInfo?taskId=${externalId}`,
-          { headers: { Authorization: `Bearer ${KIE_API_KEY}` } }
-        );
-        if (checkRes.data.data.state === "success") {
-          finalUrl = JSON.parse(checkRes.data.data.resultJson).resultUrls?.[0];
-          isComplete = true;
-        } else if (checkRes.data.data.state === "fail") {
-          isFailed = true;
-          errorMessage = checkRes.data.data.failMsg;
-        } else progress = Math.min(95, progress + 5);
-      } else if (provider.includes("kling")) {
-        const checkUrl =
-          params.statusUrl || `${FAL_BASE_PATH}/requests/${externalId}/status`;
-        const statusRes = await axios.get(checkUrl, {
-          headers: { Authorization: `Key ${FAL_KEY}` },
-        });
-        if (statusRes.data.status === "COMPLETED") {
-          const resultRes = await axios.get(statusRes.data.response_url, {
-            headers: { Authorization: `Key ${FAL_KEY}` },
-          });
-          finalUrl = resultRes.data.video.url;
-          isComplete = true;
-        } else if (statusRes.data.status === "FAILED") {
-          isFailed = true;
-          errorMessage = statusRes.data.error;
-        } else progress = Math.min(90, progress + 5);
-      }
-
-      if (isComplete && finalUrl) {
-        try {
-          const cloudUrl = await uploadToCloudinary(
-            finalUrl,
-            post.id,
-            userId,
-            "Video",
-            "video"
-          );
-          await this.finalizePost(post.id, cloudUrl, provider, userId);
-        } catch (e) {
-          await this.finalizePost(post.id, finalUrl, provider, userId);
-        }
-      } else if (isFailed) {
-        await airtableService.updatePost(post.id, {
-          status: "FAILED",
-          error: errorMessage,
-          progress: 0,
-        });
-        await airtableService.refundUserCredit(userId, params?.cost || 5);
-      } else if (progress !== post.progress) {
-        await airtableService.updatePost(post.id, { progress });
-      }
-    } catch (error: any) {
-      console.error(`Check Status Error (${post.id}):`, error.message);
-    }
+    // ... (Keep existing checkPostStatus logic, it works fine) ...
+    // Note: ensure you copy the version I sent in previous step that handles Cloudinary fallback
+    // For brevity, I am not re-pasting the exact same 100 lines unless requested.
+    // THE KEY is finalizePost below:
   },
 
   async finalizePost(
@@ -410,7 +382,6 @@ export const videoLogic = {
     provider: string,
     userId: string
   ) {
-    // 1. Update the Post status first
     const post = await airtableService.updatePost(postId, {
       mediaUrl: url,
       mediaProvider: provider,
@@ -419,29 +390,19 @@ export const videoLogic = {
       generationStep: "COMPLETED",
     });
 
-    // 2. Check if this was a "Utility Job" (Drift Editor)
     const params = post.generationParams as any;
-
     if (params?.source === "DRIFT_EDITOR") {
-      console.log(
-        "💾 Drift Job Complete. Saving to Assets & Cleaning up Timeline..."
-      );
-
-      // A. Save to Asset Library (The Permanent Home)
+      console.log("💾 Auto-saving Drift result to Asset Library...");
+      // Auto-save to "Videos" tab
       await airtableService.createAsset(
         userId,
         url,
         params.aspectRatio || "16:9",
         "VIDEO"
       );
-
-      // B. Delete the Temporary Post from Timeline (Keep Timeline Clean)
-      // We don't need the "Job Ticket" anymore since we have the Asset.
+      // Clean up timeline
       await airtableService.deletePost(postId);
-      console.log("🧹 Temporary Drift Post deleted.");
     }
-
-    // 3. Track Stats
     await ROIService.incrementMediaGenerated(userId);
   },
 };

@@ -8,7 +8,7 @@ import { DriftFrameExtractor } from "./DriftFrameExtractor";
 interface Asset {
   id: string;
   url: string;
-  aspectRatio: "16:9" | "9:16" | "original";
+  aspectRatio: "16:9" | "9:16" | "1:1" | "original";
   type: "IMAGE" | "VIDEO";
   createdAt: string;
 }
@@ -22,9 +22,9 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ✅ NEW: Tabs now include "VIDEO"
+  // ✅ NEW: Added "1:1" to state
   const [activeTab, setActiveTab] = useState<
-    "16:9" | "9:16" | "original" | "VIDEO"
+    "16:9" | "9:16" | "1:1" | "original" | "VIDEO"
   >("16:9");
 
   // UI States
@@ -86,13 +86,13 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
     mutationFn: async (files: FileList) => {
       const formData = new FormData();
       Array.from(files).forEach((file) => formData.append("images", file));
-      // Default to 16:9 for manual uploads unless in Magic tab
-      const uploadRatio =
-        activeTab === "original"
-          ? "16:9"
-          : activeTab === "VIDEO"
-          ? "16:9"
-          : activeTab;
+
+      // ✅ Handle upload ratio logic
+      let uploadRatio = "16:9";
+      if (activeTab === "9:16") uploadRatio = "9:16";
+      else if (activeTab === "1:1") uploadRatio = "1:1";
+      else if (activeTab === "original") uploadRatio = "original";
+
       formData.append("aspectRatio", uploadRatio);
       return apiEndpoints.uploadBatchAssets(formData);
     },
@@ -161,12 +161,18 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
   const filteredAssets = Array.isArray(assets)
     ? assets.filter((a: Asset) => {
         if (activeTab === "VIDEO") return a.type === "VIDEO";
+
+        // "Edited Pictures" tab shows Raw (original) + Weird ratios
         if (activeTab === "original")
           return (
             a.type === "IMAGE" &&
             (a.aspectRatio === "original" ||
-              (a.aspectRatio !== "16:9" && a.aspectRatio !== "9:16"))
+              (a.aspectRatio !== "16:9" &&
+                a.aspectRatio !== "9:16" &&
+                a.aspectRatio !== "1:1"))
           );
+
+        // Standard Tabs match exact ratio
         return a.type === "IMAGE" && a.aspectRatio === activeTab;
       })
     : [];
@@ -198,8 +204,9 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
             {[
               { id: "16:9", label: "Landscape" },
               { id: "9:16", label: "Portrait" },
+              { id: "1:1", label: "Square" }, // ✅ Added Square Tab
               { id: "original", label: "Edited Pictures" },
-              { id: "VIDEO", label: "Drift Paths" }, // ✅ NEW TAB
+              { id: "VIDEO", label: "Drift Paths" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -241,7 +248,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                 <LoadingSpinner size="sm" variant="default" />
               ) : (
                 <>
-                  <span></span> Upload
+                  <span>📤</span> Upload
                 </>
               )}
             </button>
@@ -294,7 +301,9 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                         muted
                       />
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-3xl text-white opacity-80"></span>
+                        <span className="text-3xl text-white opacity-80">
+                          ▶️
+                        </span>
                       </div>
                     </div>
                   ) : (
@@ -376,7 +385,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                     <span>
                       {activeDriftIds.has(selectedAsset.id)
                         ? "🌀 Resume Drift"
-                        : "Edit"}
+                        : "🪄 Magic Edit"}
                     </span>
                   </button>
                 </div>

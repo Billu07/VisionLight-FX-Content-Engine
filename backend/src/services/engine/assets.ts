@@ -38,33 +38,47 @@ export const assetsLogic = {
     }
   },
 
-  // ✅ Process & Save
+  // ✅ Updated
   async processAndSaveAsset(
     fileBuffer: Buffer,
     userId: string,
-    targetAspectRatio: "16:9" | "9:16"
+    targetAspectRatio: "16:9" | "9:16" | "1:1"
   ) {
     try {
-      const targetWidth = targetAspectRatio === "16:9" ? 1280 : 720;
-      const targetHeight = targetAspectRatio === "16:9" ? 720 : 1280;
+      let targetWidth = 1280;
+      let targetHeight = 720;
+
+      // Determine Target Dimensions
+      if (targetAspectRatio === "9:16") {
+        targetWidth = 720;
+        targetHeight = 1280;
+      } else if (targetAspectRatio === "1:1") {
+        targetWidth = 1024;
+        targetHeight = 1024; // Standard Square
+      }
+
       const metadata = await sharp(fileBuffer).metadata();
       const sourceAR = (metadata.width || 1) / (metadata.height || 1);
       const targetRatioNum = targetWidth / targetHeight;
-      const isMatch = Math.abs(sourceAR - targetRatioNum) < 0.15;
+
+      // 5% Tolerance
+      const isMatch = Math.abs(sourceAR - targetRatioNum) < 0.05;
 
       let processedBuffer: Buffer;
-      if (isMatch)
+      if (isMatch) {
         processedBuffer = await resizeStrict(
           fileBuffer,
           targetWidth,
           targetHeight
         );
-      else {
+      } else {
         try {
+          // Pass the target ratio string to Gemini logic
           processedBuffer = await resizeWithGemini(
             fileBuffer,
             targetWidth,
-            targetHeight
+            targetHeight,
+            targetAspectRatio
           );
         } catch (e) {
           processedBuffer = await resizeWithBlurFill(
@@ -94,7 +108,7 @@ export const assetsLogic = {
     }
   },
 
-  // ✅ Copy Media
+  // ✅ Updated: Maps "Square" to DB correctly
   async copyPostMediaToAsset(postId: string, userId: string): Promise<Asset> {
     const post = await airtableService.getPostById(postId);
     if (!post || !post.mediaUrl) throw new Error("Post has no media");

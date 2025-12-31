@@ -13,7 +13,6 @@ import { MediaPreview } from "../components/MediaPreview";
 import { EditAssetModal } from "../components/EditAssetModal";
 
 // Import your logo images
-import fxLogo from "../assets/fx.png";
 import picdriftLogo from "../assets/picdrift.png";
 
 // === CONFIGURATION ===
@@ -22,7 +21,7 @@ const ADMIN_EMAILS = ["snowfix07@gmail.com", "keith@picdrift.com"];
 type EngineType = "kie" | "studio" | "openai";
 type StudioMode = "image" | "carousel" | "edit";
 
-// ✅ NEW: Visual Tab Type
+// Visual Tab Type
 type VisualTab = "picdrift" | "studio" | "videofx";
 
 interface GenerationState {
@@ -44,7 +43,6 @@ function Dashboard() {
   >(null);
 
   // Engine Selection
-  // ✅ DEFAULT CHANGED: activeEngine 'kie' + videoFxMode 'picdrift' = PicDrift
   const [activeEngine, setActiveEngine] = useState<EngineType>("kie");
   const [studioMode, setStudioMode] = useState<StudioMode>("image");
 
@@ -59,7 +57,6 @@ function Dashboard() {
   );
 
   // Video FX Sub-mode (Video vs PicDrift)
-  // ✅ DEFAULT CHANGED: PicDrift is now default
   const [videoFxMode, setVideoFxMode] = useState<"video" | "picdrift">(
     "picdrift"
   );
@@ -75,8 +72,9 @@ function Dashboard() {
   >("1792x1024");
 
   // Studio (Gemini) Aspect Ratio
+  // ✅ DEFAULT CHANGED: Portrait is now default
   const [geminiAspect, setGeminiAspect] = useState<"1:1" | "16:9" | "9:16">(
-    "16:9"
+    "9:16"
   );
 
   // Upload & UI
@@ -112,7 +110,7 @@ function Dashboard() {
   } | null>(null);
   const [previewCarouselIndex, setPreviewCarouselIndex] = useState(0);
 
-  // State for Magic Edit Asset (if triggered directly)
+  // State for Magic Edit Asset
   const [editingAsset, setEditingAsset] = useState<any | null>(null);
   const [editingVideoUrl, setEditingVideoUrl] = useState<string | undefined>(
     undefined
@@ -122,7 +120,7 @@ function Dashboard() {
   const { user, isLoading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
 
-  // Helper to determine the current "Visual Tab" based on engine state
+  // Helper to determine the current "Visual Tab"
   const currentVisualTab: VisualTab =
     activeEngine === "studio"
       ? "studio"
@@ -132,17 +130,16 @@ function Dashboard() {
 
   // HANDLER: Open Timeline Video in Drift
   const handleDriftFromPost = (post: any) => {
-    // Create a temporary asset object wrapper
     const tempAsset = {
       id: post.id,
-      url: post.mediaUrl, // This serves as the "reference"
+      url: post.mediaUrl,
       aspectRatio: "16:9",
       type: "VIDEO",
     };
-
-    setEditingVideoUrl(post.mediaUrl); // Pass the video to open extractor directly
+    setEditingVideoUrl(post.mediaUrl);
     setEditingAsset(tempAsset);
   };
+
   // Reset Files on Engine Change
   useEffect(() => {
     setReferenceImages([]);
@@ -151,22 +148,17 @@ function Dashboard() {
     setPicDriftUrls({ start: null, end: null });
   }, [activeEngine, studioMode, videoFxMode]);
 
-  // Mobile detection
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Auth Redirect
   useEffect(() => {
     if (!authLoading && !user) navigate("/");
   }, [user, authLoading, navigate]);
 
-  // Welcome Tour
   useEffect(() => {
     if (user && !localStorage.getItem("visionlight_welcome_shown")) {
       setShowWelcomeTour(true);
@@ -337,7 +329,7 @@ function Dashboard() {
   const handleUseAsStartFrame = async (url: string) => {
     try {
       setActiveEngine("kie");
-      setVideoFxMode("picdrift"); // Go to PicDrift tab
+      setVideoFxMode("picdrift");
       const response = await fetch(url);
       const blob = await response.blob();
       const file = new File([blob], "start_frame_reused.jpg", {
@@ -352,7 +344,6 @@ function Dashboard() {
     }
   };
 
-  // === UPDATED FILE HANDLER ===
   const handleGenericUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -386,6 +377,15 @@ function Dashboard() {
     }
   };
 
+  // Delete Post Mutation
+  const deletePostMutation = useMutation({
+    mutationFn: async (postId: string) => apiEndpoints.deletePost(postId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+    },
+    onError: (err: any) => alert("Failed to delete post: " + err.message),
+  });
+
   const removeGenericImage = (index: number) => {
     setReferenceImages((prev) => prev.filter((_, i) => i !== index));
     setReferenceImageUrls((prev) => prev.filter((_, i) => i !== index));
@@ -412,7 +412,6 @@ function Dashboard() {
     formData.append("title", videoTitle);
 
     if (activeEngine === "kie" && videoFxMode === "picdrift") {
-      // PICDRIFT
       formData.append("mediaType", "video");
       formData.append("model", "kling-2.5");
       if (picDriftFrames.start)
@@ -423,7 +422,6 @@ function Dashboard() {
       formData.append("aspectRatio", kieAspect);
       formData.append("resolution", kieResolution);
     } else if (activeEngine === "kie" && videoFxMode === "video") {
-      // VIDEO FX 1 (Kie)
       formData.append("mediaType", "video");
       formData.append("model", kieModel);
       referenceImages.forEach((file) =>
@@ -433,7 +431,6 @@ function Dashboard() {
       formData.append("aspectRatio", kieAspect);
       formData.append("resolution", kieResolution);
     } else if (activeEngine === "openai") {
-      // VIDEO FX 2 (OpenAI)
       formData.append("mediaType", "video");
       formData.append("model", videoModel);
       formData.append("duration", videoDuration.toString());
@@ -443,7 +440,6 @@ function Dashboard() {
         formData.append("referenceImages", file)
       );
     } else {
-      // STUDIO
       formData.append("mediaType", studioMode);
       let sizeStr = "1024x1024";
       if (geminiAspect === "16:9") sizeStr = "1792x1024";
@@ -663,8 +659,8 @@ function Dashboard() {
             <div className="absolute left-1/2 transform -translate-x-1/2 flex flex-col items-center mt-14">
               <div className="h-14 sm:h-16 flex items-center justify-center mb-1">
                 <img
-                  src={fxLogo}
-                  alt="FX"
+                  src={picdriftLogo}
+                  alt="PICDRIFT"
                   className="h-full w-auto object-contain"
                 />
               </div>
@@ -895,9 +891,9 @@ function Dashboard() {
                   {studioMode !== "edit" && (
                     <div className="flex justify-center gap-3">
                       {[
-                        { id: "1:1", label: "Square" },
                         { id: "16:9", label: "Landscape" },
                         { id: "9:16", label: "Portrait" },
+                        { id: "1:1", label: "Square" },
                       ].map((a) => (
                         <button
                           key={a.id}
@@ -990,6 +986,123 @@ function Dashboard() {
                   </div>
                 ) : (
                   <>
+                    {/* ✅ REORDERED: PicDrift Uploads First */}
+                    {activeEngine === "kie" && videoFxMode === "picdrift" && (
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="flex flex-col gap-2">
+                          <label className="text-xs text-rose-300 uppercase font-bold">
+                            Start Frame
+                          </label>
+                          <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
+                            {picDriftUrls.start ? (
+                              <>
+                                <img
+                                  src={picDriftUrls.start}
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removePicDriftImage("start")}
+                                  className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
+                                >
+                                  ✕
+                                </button>
+                              </>
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                                {/* Option A: Upload File */}
+                                <label className="flex flex-col items-center justify-center cursor-pointer">
+                                  <span className="text-rose-400 text-2xl">
+                                    +
+                                  </span>
+                                  <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
+                                    Upload File
+                                  </span>
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={(e) =>
+                                      handlePicDriftUpload(e, "start")
+                                    }
+                                  />
+                                </label>
+
+                                <div className="text-gray-600 text-[10px]">
+                                  - OR -
+                                </div>
+
+                                {/* Option B: Open Library */}
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveLibrarySlot("start")}
+                                  className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
+                                >
+                                  Select from Library
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* --- END FRAME BOX --- */}
+                        <div className="flex flex-col gap-2">
+                          <label className="text-xs text-rose-300 uppercase font-bold">
+                            End Frame (optional)
+                          </label>
+                          <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
+                            {picDriftUrls.end ? (
+                              <>
+                                <img
+                                  src={picDriftUrls.end}
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removePicDriftImage("end")}
+                                  className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
+                                >
+                                  ✕
+                                </button>
+                              </>
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                                <label className="flex flex-col items-center justify-center cursor-pointer">
+                                  <span className="text-rose-400 text-2xl">
+                                    +
+                                  </span>
+                                  <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
+                                    Upload File
+                                  </span>
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={(e) =>
+                                      handlePicDriftUpload(e, "end")
+                                    }
+                                  />
+                                </label>
+
+                                <div className="text-gray-600 text-[10px]">
+                                  - OR -
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveLibrarySlot("end")}
+                                  className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
+                                >
+                                  Select from Library
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* PROMPT AREA */}
                     <div>
                       <label className="block text-sm font-semibold text-white mb-2">
                         Your Creative Vision
@@ -1015,7 +1128,6 @@ function Dashboard() {
                       />
                     </div>
 
-                    {/* KIE AI SETTINGS (Visible in PicDrift OR Video FX 1) */}
                     {activeEngine === "kie" && (
                       <div className="space-y-4 sm:space-y-6 animate-in fade-in">
                         {videoFxMode === "video" && (
@@ -1125,7 +1237,6 @@ function Dashboard() {
                       </div>
                     )}
 
-                    {/* OPENAI SETTINGS (Video FX 2) */}
                     {activeEngine === "openai" && (
                       <div className="space-y-4 sm:space-y-6 animate-in fade-in">
                         <div className="space-y-2">
@@ -1245,129 +1356,21 @@ function Dashboard() {
                       </div>
                     )}
 
-                    <div className="space-y-2 sm:space-y-3">
-                      <div className="flex justify-between items-center">
-                        <label className="block text-sm font-semibold text-white">
-                          Reference Images
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => setActiveLibrarySlot("generic")}
-                          className="text-xs bg-cyan-900/50 text-cyan-300 px-3 py-1.5 rounded-lg hover:bg-cyan-800 border border-cyan-700/50 flex items-center gap-1 transition-colors"
-                        >
-                          <span></span> Open Library
-                        </button>
-                      </div>
-
-                      {/* PICDRIFT SPECIFIC UI */}
-                      {currentVisualTab === "picdrift" ? (
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="flex flex-col gap-2">
-                            <label className="text-xs text-rose-300 uppercase font-bold">
-                              Start Frame
-                            </label>
-                            <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
-                              {picDriftUrls.start ? (
-                                <>
-                                  <img
-                                    src={picDriftUrls.start}
-                                    className="w-full h-full object-cover"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => removePicDriftImage("start")}
-                                    className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
-                                  >
-                                    ✕
-                                  </button>
-                                </>
-                              ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-                                  <label className="flex flex-col items-center justify-center cursor-pointer">
-                                    <span className="text-rose-400 text-2xl">
-                                      +
-                                    </span>
-                                    <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
-                                      Upload File
-                                    </span>
-                                    <input
-                                      type="file"
-                                      className="hidden"
-                                      accept="image/*"
-                                      onChange={(e) =>
-                                        handlePicDriftUpload(e, "start")
-                                      }
-                                    />
-                                  </label>
-                                  <div className="text-gray-600 text-[10px]">
-                                    - OR -
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setActiveLibrarySlot("start")
-                                    }
-                                    className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
-                                  >
-                                    Select from Library
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex flex-col gap-2">
-                            <label className="text-xs text-rose-300 uppercase font-bold">
-                              End Frame (optional)
-                            </label>
-                            <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
-                              {picDriftUrls.end ? (
-                                <>
-                                  <img
-                                    src={picDriftUrls.end}
-                                    className="w-full h-full object-cover"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => removePicDriftImage("end")}
-                                    className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
-                                  >
-                                    ✕
-                                  </button>
-                                </>
-                              ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-                                  <label className="flex flex-col items-center justify-center cursor-pointer">
-                                    <span className="text-rose-400 text-2xl">
-                                      +
-                                    </span>
-                                    <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
-                                      Upload File
-                                    </span>
-                                    <input
-                                      type="file"
-                                      className="hidden"
-                                      accept="image/*"
-                                      onChange={(e) =>
-                                        handlePicDriftUpload(e, "end")
-                                      }
-                                    />
-                                  </label>
-                                  <div className="text-gray-600 text-[10px]">
-                                    - OR -
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => setActiveLibrarySlot("end")}
-                                    className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
-                                  >
-                                    Select from Library
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                    {/* Generic Upload Box (Only if NOT PicDrift, because PicDrift has its own) */}
+                    {activeEngine !== "kie" || videoFxMode !== "picdrift" ? (
+                      <div className="space-y-2 sm:space-y-3">
+                        <div className="flex justify-between items-center">
+                          <label className="block text-sm font-semibold text-white">
+                            Reference Images
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setActiveLibrarySlot("generic")}
+                            className="text-xs bg-cyan-900/50 text-cyan-300 px-3 py-1.5 rounded-lg hover:bg-cyan-800 border border-cyan-700/50 flex items-center gap-1 transition-colors"
+                          >
+                            <span></span> Open Library
+                          </button>
                         </div>
-                      ) : (
                         <div className="space-y-3">
                           <div className="w-full h-24 border-2 border-dashed border-gray-600 rounded-xl hover:border-cyan-500 hover:bg-gray-800/50 transition-all group relative flex items-center justify-center">
                             <div className="flex items-center gap-6">
@@ -1430,8 +1433,8 @@ function Dashboard() {
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    ) : null}
 
                     <button
                       type="submit"
@@ -1453,8 +1456,14 @@ function Dashboard() {
                         <>
                           <span className="text-xl"></span>
                           <span>
-                            Generate{" "}
-                            {activeEngine === "studio" ? studioMode : "Video"}
+                            {activeEngine === "kie" &&
+                            videoFxMode === "picdrift"
+                              ? "Generate PicDrift"
+                              : `Generate ${
+                                  activeEngine === "studio"
+                                    ? studioMode
+                                    : "Video"
+                                }`}
                           </span>
                         </>
                       )}
@@ -1522,6 +1531,15 @@ function Dashboard() {
                             ? () => handleMoveToAssets(post.id)
                             : undefined
                         }
+                        onDelete={() => {
+                          if (
+                            confirm(
+                              "Are you sure you want to delete this post?"
+                            )
+                          ) {
+                            deletePostMutation.mutate(post.id);
+                          }
+                        }}
                       />
                     ))
                 ) : !postsLoading ? (
