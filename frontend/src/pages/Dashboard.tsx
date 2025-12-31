@@ -910,7 +910,7 @@ function Dashboard() {
                           : "text-gray-400 hover:text-white"
                       }`}
                     >
-                      Magic Edit
+                      Picture Editor
                     </button>
                   </div>
                   {studioMode !== "edit" && (
