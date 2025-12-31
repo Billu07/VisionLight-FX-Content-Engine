@@ -47,12 +47,15 @@ function Dashboard() {
   const [activeEngine, setActiveEngine] = useState<EngineType>("kie");
   const [studioMode, setStudioMode] = useState<StudioMode>("image");
 
-  // Kie AI (Video FX)
+  // Kie AI (Video FX & PicDrift)
   const [kieDuration, setKieDuration] = useState<5 | 10 | 15>(5);
   const [kieResolution, setKieResolution] = useState<"720p" | "1080p">("720p");
-  const [kieAspect, setKieAspect] = useState<"landscape" | "portrait">(
-    "landscape"
-  );
+
+  // ✅ CHANGED: Added "square" to type and set default to "portrait"
+  const [kieAspect, setKieAspect] = useState<
+    "landscape" | "portrait" | "square"
+  >("portrait");
+
   const [kieModel, setKieModel] = useState<"kie-sora-2" | "kie-sora-2-pro">(
     "kie-sora-2"
   );
@@ -1019,6 +1022,14 @@ function Dashboard() {
                             <label className="text-xs text-rose-300 font-bold">
                               Pic 1 - Start Frame
                             </label>
+                            {/* Open Library Button for Start Frame */}
+                            <button
+                              type="button"
+                              onClick={() => setActiveLibrarySlot("start")}
+                              className="text-xs bg-rose-900/50 text-rose-300 px-3 py-1 rounded-lg hover:bg-rose-800 border border-rose-700/50 flex items-center gap-1 transition-colors"
+                            >
+                              Open Library
+                            </button>
                           </div>
                           <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
                             {picDriftUrls.start ? (
@@ -1074,6 +1085,13 @@ function Dashboard() {
                             <label className="text-xs text-rose-300 font-bold">
                               Pic 2 - End Frame
                             </label>
+                            <button
+                              type="button"
+                              onClick={() => setActiveLibrarySlot("end")}
+                              className="text-xs bg-rose-900/50 text-rose-300 px-3 py-1 rounded-lg hover:bg-rose-800 border border-rose-700/50 flex items-center gap-1 transition-colors"
+                            >
+                              Open Library
+                            </button>
                           </div>
                           <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
                             {picDriftUrls.end ? (
@@ -1208,9 +1226,11 @@ function Dashboard() {
                                 Aspect Ratio
                               </label>
                               <div className="flex gap-2">
+                                {/* ✅ ADDED SQUARE HERE TOO FOR CONSISTENCY */}
                                 {[
                                   { id: "landscape", label: "Landscape" },
                                   { id: "portrait", label: "Portrait" },
+                                  { id: "square", label: "Square" },
                                 ].map((a) => (
                                   <button
                                     key={a.id}
@@ -1286,9 +1306,11 @@ function Dashboard() {
                             Aspect Ratio
                           </label>
                           <div className="flex gap-2">
+                            {/* ✅ ADDED SQUARE OPTION HERE */}
                             {[
                               { id: "landscape", label: "Landscape" },
                               { id: "portrait", label: "Portrait" },
+                              { id: "square", label: "Square" },
                             ].map((a) => (
                               <button
                                 key={a.id}

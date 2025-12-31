@@ -370,10 +370,75 @@ export const videoLogic = {
   },
 
   async checkPostStatus(post: Post) {
-    // ... (Keep existing checkPostStatus logic, it works fine) ...
-    // Note: ensure you copy the version I sent in previous step that handles Cloudinary fallback
-    // For brevity, I am not re-pasting the exact same 100 lines unless requested.
-    // THE KEY is finalizePost below:
+    const params = post.generationParams as any;
+    if (post.status !== "PROCESSING" || !params?.externalId) return;
+    const externalId = params.externalId;
+    const provider = post.mediaProvider || "openai";
+    const userId = post.userId;
+
+    try {
+      let isComplete = false;
+      let isFailed = false;
+      let finalUrl = "";
+      let progress = post.progress || 0;
+      let errorMessage = "";
+
+      if (provider.includes("kie")) {
+        const checkRes = await axios.get(
+          `${KIE_BASE_URL}/jobs/recordInfo?taskId=${externalId}`,
+          { headers: { Authorization: `Bearer ${KIE_API_KEY}` } }
+        );
+        if (checkRes.data.data.state === "success") {
+          finalUrl = JSON.parse(checkRes.data.data.resultJson).resultUrls?.[0];
+          isComplete = true;
+        } else if (checkRes.data.data.state === "fail") {
+          isFailed = true;
+          errorMessage = checkRes.data.data.failMsg;
+        } else progress = Math.min(95, progress + 5);
+      } else if (provider.includes("kling")) {
+        const checkUrl =
+          params.statusUrl || `${FAL_BASE_PATH}/requests/${externalId}/status`;
+        const statusRes = await axios.get(checkUrl, {
+          headers: { Authorization: `Key ${FAL_KEY}` },
+        });
+        if (statusRes.data.status === "COMPLETED") {
+          const resultRes = await axios.get(statusRes.data.response_url, {
+            headers: { Authorization: `Key ${FAL_KEY}` },
+          });
+          finalUrl = resultRes.data.video.url;
+          isComplete = true;
+        } else if (statusRes.data.status === "FAILED") {
+          isFailed = true;
+          errorMessage = statusRes.data.error;
+        } else progress = Math.min(90, progress + 5);
+      }
+
+      if (isComplete && finalUrl) {
+        try {
+          const cloudUrl = await uploadToCloudinary(
+            finalUrl,
+            post.id,
+            userId,
+            "Video",
+            "video"
+          );
+          await this.finalizePost(post.id, cloudUrl, provider, userId);
+        } catch (e) {
+          await this.finalizePost(post.id, finalUrl, provider, userId);
+        }
+      } else if (isFailed) {
+        await airtableService.updatePost(post.id, {
+          status: "FAILED",
+          error: errorMessage,
+          progress: 0,
+        });
+        await airtableService.refundUserCredit(userId, params?.cost || 5);
+      } else if (progress !== post.progress) {
+        await airtableService.updatePost(post.id, { progress });
+      }
+    } catch (error: any) {
+      console.error(`Check Status Error (${post.id}):`, error.message);
+    }
   },
 
   async finalizePost(
