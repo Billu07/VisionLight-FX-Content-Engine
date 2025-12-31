@@ -689,7 +689,6 @@ function Dashboard() {
                 </h1>
               </div>
             </div>
-            {/* ❌ REMOVED: Center Logo Div */}
             {isMobile && (
               <div className="flex gap-2">
                 {isAdmin && (
@@ -798,7 +797,7 @@ function Dashboard() {
                 </p>
               </div>
 
-              {/* ✅ UPDATED NAVIGATION BAR */}
+              {/* NAVIGATION BAR */}
               <div className="mb-6 sm:mb-8">
                 <label className="block text-sm font-semibold text-white mb-3 sm:mb-4">
                   Select Content Type
@@ -917,8 +916,8 @@ function Dashboard() {
                     <div className="flex justify-center gap-3">
                       {[
                         { id: "16:9", label: "Landscape" },
-                        { id: "9:16", label: "Portrait" }, // ✅ 2nd
-                        { id: "1:1", label: "Square" }, // ✅ 3rd
+                        { id: "9:16", label: "Portrait" },
+                        { id: "1:1", label: "Square" },
                       ].map((a) => (
                         <button
                           key={a.id}
@@ -1011,13 +1010,24 @@ function Dashboard() {
                   </div>
                 ) : (
                   <>
-                    {/* ✅ PICDRIFT FIRST: Uploads, then Prompt */}
+                    {/* 1. PICDRIFT FRAMES (Always Top for PicDrift Mode) */}
                     {currentVisualTab === "picdrift" && (
                       <div className="grid grid-cols-2 gap-4 mb-4 animate-in fade-in">
+                        {/* Start Frame */}
                         <div className="flex flex-col gap-2">
-                          <label className="text-xs text-rose-300 font-bold">
-                            Pic 1 - Start Frame
-                          </label>
+                          <div className="flex justify-between items-center">
+                            <label className="text-xs text-rose-300 font-bold">
+                              Pic 1 - Start Frame
+                            </label>
+                            {/* ✅ NEW: Open Library Button for Start Frame */}
+                            <button
+                              type="button"
+                              onClick={() => setActiveLibrarySlot("start")}
+                              className="text-xs bg-rose-900/50 text-rose-300 px-3 py-1 rounded-lg hover:bg-rose-800 border border-rose-700/50 flex items-center gap-1 transition-colors"
+                            >
+                              Open Library
+                            </button>
+                          </div>
                           <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
                             {picDriftUrls.start ? (
                               <>
@@ -1035,7 +1045,6 @@ function Dashboard() {
                               </>
                             ) : (
                               <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-                                {/* Option A: Upload File */}
                                 <label className="flex flex-col items-center justify-center cursor-pointer">
                                   <span className="text-rose-400 text-2xl">
                                     +
@@ -1067,10 +1076,20 @@ function Dashboard() {
                           </div>
                         </div>
 
+                        {/* End Frame */}
                         <div className="flex flex-col gap-2">
-                          <label className="text-xs text-rose-300 font-bold">
-                            Pic 2 - End Frame (optional)
-                          </label>
+                          <div className="flex justify-between items-center">
+                            <label className="text-xs text-rose-300 font-bold">
+                              Pic 2 - End Frame
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => setActiveLibrarySlot("end")}
+                              className="text-xs bg-rose-900/50 text-rose-300 px-3 py-1 rounded-lg hover:bg-rose-800 border border-rose-700/50 flex items-center gap-1 transition-colors"
+                            >
+                              Open Library
+                            </button>
+                          </div>
                           <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
                             {picDriftUrls.end ? (
                               <>
@@ -1084,15 +1103,6 @@ function Dashboard() {
                                   className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
                                 >
                                   ✕
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setActiveLibrarySlot("generic")
-                                  }
-                                  className="text-xs bg-cyan-900/50 text-cyan-300 px-3 py-1.5 rounded-lg hover:bg-cyan-800 border border-cyan-700/50 flex items-center gap-1 transition-colors"
-                                >
-                                  <span></span> Open Library
                                 </button>
                               </>
                             ) : (
@@ -1130,86 +1140,7 @@ function Dashboard() {
                       </div>
                     )}
 
-                    {/* VIDEO FX / STUDIO UPLOAD BOX */}
-                    {activeEngine !== "kie" || videoFxMode !== "picdrift" ? (
-                      <div className="space-y-2 sm:space-y-3">
-                        <div className="flex justify-between items-center">
-                          <label className="block text-sm font-semibold text-white">
-                            Reference Images
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => setActiveLibrarySlot("generic")}
-                            className="text-xs bg-cyan-900/50 text-cyan-300 px-3 py-1.5 rounded-lg hover:bg-cyan-800 border border-cyan-700/50 flex items-center gap-1 transition-colors"
-                          >
-                            <span></span> Open Library
-                          </button>
-                        </div>
-                        <div className="space-y-3">
-                          <div className="w-full h-24 border-2 border-dashed border-gray-600 rounded-xl hover:border-cyan-500 hover:bg-gray-800/50 transition-all group relative flex items-center justify-center">
-                            <div className="flex items-center gap-6">
-                              <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
-                                <span className="text-2xl mb-1">📂</span>
-                                <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
-                                  Upload File
-                                </span>
-                                <input
-                                  type="file"
-                                  className="hidden"
-                                  multiple={
-                                    activeEngine === "studio" &&
-                                    studioMode === "carousel"
-                                  }
-                                  accept="image/*"
-                                  onChange={handleGenericUpload}
-                                />
-                              </label>
-                              <div className="h-8 w-px bg-gray-600"></div>
-                              <button
-                                type="button"
-                                onClick={() => setActiveLibrarySlot("generic")}
-                                className="flex flex-col items-center group-hover:scale-105 transition-transform"
-                              >
-                                <span className="text-2xl mb-1">📚</span>
-                                <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
-                                  From Library
-                                </span>
-                              </button>
-                            </div>
-                            <p className="absolute bottom-2 text-[10px] text-gray-600">
-                              {activeEngine === "studio" &&
-                              studioMode === "carousel"
-                                ? "Up to 14 images"
-                                : "Single frame"}{" "}
-                              (PNG/JPG)
-                            </p>
-                          </div>
-                          {referenceImageUrls.length > 0 && (
-                            <div className="grid grid-cols-5 gap-2 animate-in fade-in">
-                              {referenceImageUrls.map((url, index) => (
-                                <div
-                                  key={index}
-                                  className="relative aspect-square group"
-                                >
-                                  <img
-                                    src={url}
-                                    className="w-full h-full object-cover rounded-lg border border-white/20"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => removeGenericImage(index)}
-                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs"
-                                  >
-                                    ✕
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ) : null}
-
+                    {/* 2. PROMPT & TITLE (Moved Up for Non-PicDrift) */}
                     <div>
                       <label className="block text-sm font-semibold text-white mb-2">
                         Your Creative Vision
@@ -1235,7 +1166,9 @@ function Dashboard() {
                       />
                     </div>
 
-                    {/* KIE / OPENAI SETTINGS (Video FX Only) */}
+                    {/* 3. SETTINGS (Moved below Title) */}
+
+                    {/* VIDEO FX / KIE SETTINGS */}
                     {currentVisualTab === "videofx" &&
                       activeEngine === "kie" && (
                         <div className="space-y-4 sm:space-y-6 animate-in fade-in">
@@ -1264,9 +1197,6 @@ function Dashboard() {
                             </div>
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                            {/* ... Duration / Aspect / Resolution ... */}
-                            {/* (Kept your existing inputs here for brevity in this paste) */}
-                            {/* Just ensuring they render correctly */}
                             <div>
                               <label className="text-sm font-semibold text-white mb-2 block">
                                 Duration
@@ -1396,9 +1326,7 @@ function Dashboard() {
                     {/* OPENAI SETTINGS (Video FX 2) */}
                     {currentVisualTab === "videofx" &&
                       activeEngine === "openai" && (
-                        // ... (Your existing OpenAI settings layout)
                         <div className="space-y-4 sm:space-y-6 animate-in fade-in">
-                          {/* ... Model ... */}
                           <div className="space-y-2">
                             <label className="block text-sm font-semibold text-white">
                               AI Model
@@ -1425,8 +1353,6 @@ function Dashboard() {
                               ))}
                             </div>
                           </div>
-                          {/* ... Aspect / Size / Duration ... */}
-                          {/* (Kept your existing code logic) */}
                           <div className="space-y-2">
                             <label className="block text-sm font-semibold text-white">
                               Aspect Ratio
@@ -1520,6 +1446,86 @@ function Dashboard() {
                         </div>
                       )}
 
+                    {/* 4. REFERENCE IMAGES (Moved to End for Non-PicDrift) */}
+                    {activeEngine !== "kie" || videoFxMode !== "picdrift" ? (
+                      <div className="space-y-2 sm:space-y-3">
+                        <div className="flex justify-between items-center">
+                          <label className="block text-sm font-semibold text-white">
+                            Reference Images
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setActiveLibrarySlot("generic")}
+                            className="text-xs bg-cyan-900/50 text-cyan-300 px-3 py-1.5 rounded-lg hover:bg-cyan-800 border border-cyan-700/50 flex items-center gap-1 transition-colors"
+                          >
+                            <span></span> Open Library
+                          </button>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="w-full h-24 border-2 border-dashed border-gray-600 rounded-xl hover:border-cyan-500 hover:bg-gray-800/50 transition-all group relative flex items-center justify-center">
+                            <div className="flex items-center gap-6">
+                              <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
+                                <span className="text-2xl mb-1">📂</span>
+                                <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
+                                  Upload File
+                                </span>
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  multiple={
+                                    activeEngine === "studio" &&
+                                    studioMode === "carousel"
+                                  }
+                                  accept="image/*"
+                                  onChange={handleGenericUpload}
+                                />
+                              </label>
+                              <div className="h-8 w-px bg-gray-600"></div>
+                              <button
+                                type="button"
+                                onClick={() => setActiveLibrarySlot("generic")}
+                                className="flex flex-col items-center group-hover:scale-105 transition-transform"
+                              >
+                                <span className="text-2xl mb-1">📚</span>
+                                <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
+                                  From Library
+                                </span>
+                              </button>
+                            </div>
+                            <p className="absolute bottom-2 text-[10px] text-gray-600">
+                              {activeEngine === "studio" &&
+                              studioMode === "carousel"
+                                ? "Up to 14 images"
+                                : "Single frame"}{" "}
+                              (PNG/JPG)
+                            </p>
+                          </div>
+                          {referenceImageUrls.length > 0 && (
+                            <div className="grid grid-cols-5 gap-2 animate-in fade-in">
+                              {referenceImageUrls.map((url, index) => (
+                                <div
+                                  key={index}
+                                  className="relative aspect-square group"
+                                >
+                                  <img
+                                    src={url}
+                                    className="w-full h-full object-cover rounded-lg border border-white/20"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => removeGenericImage(index)}
+                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+
                     <button
                       type="submit"
                       disabled={
@@ -1540,7 +1546,6 @@ function Dashboard() {
                         <>
                           <span className="text-xl"></span>
                           <span>
-                            {/* ✅ CUSTOM BUTTON LABEL FOR PICDRIFT */}
                             {currentVisualTab === "picdrift"
                               ? "Generate PicDrift"
                               : `Generate ${
