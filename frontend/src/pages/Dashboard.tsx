@@ -1216,7 +1216,6 @@ function Dashboard() {
                                 {[
                                   { id: "landscape", label: "Landscape" },
                                   { id: "portrait", label: "Portrait" },
-                                  { id: "square", label: "Square" },
                                 ].map((a) => (
                                   <button
                                     key={a.id}
