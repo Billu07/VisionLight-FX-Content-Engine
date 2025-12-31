@@ -483,6 +483,7 @@ export const videoLogic = {
     const params = post.generationParams as any;
     if (params?.source === "DRIFT_EDITOR") {
       console.log("💾 Auto-saving Drift result to Asset Library...");
+
       // Auto-save to "Videos" tab
       await airtableService.createAsset(
         userId,
@@ -490,8 +491,9 @@ export const videoLogic = {
         params.aspectRatio || "16:9",
         "VIDEO"
       );
-      // Clean up timeline
-      await airtableService.deletePost(postId);
+
+      // ❌ REMOVED: await airtableService.deletePost(postId);
+      // We must keep the post alive so the frontend gets the final "100%" status!
     }
     await ROIService.incrementMediaGenerated(userId);
   },
