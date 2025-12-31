@@ -1,6 +1,7 @@
 import axios from "axios";
 import sharp from "sharp";
 import FormData from "form-data";
+// ✅ FIXED PATHS: Go up one level to 'services'
 import { dbService as airtableService, Post } from "../database";
 import { ROIService } from "../roi";
 import {
@@ -10,6 +11,7 @@ import {
   resizeWithGemini,
   resizeWithBlurFill,
 } from "./utils";
+// ✅ FIXED PATH: Config is in the same folder
 import {
   KIE_BASE_URL,
   KIE_API_KEY,
@@ -106,6 +108,7 @@ export const videoLogic = {
         duration: "5",
         aspect_ratio: targetRatioString,
       };
+
       const url = `${FAL_BASE_PATH}/pro/image-to-video`;
       const submitRes = await axios.post(url, payload, {
         headers: {
@@ -114,7 +117,28 @@ export const videoLogic = {
         },
       });
 
+      // ✅ CRITICAL FIX: Create DB Record so polling works
+      const post = await airtableService.createPost({
+        userId,
+        title: "Drift Shot",
+        prompt: finalPrompt,
+        mediaType: "VIDEO",
+        platform: "Internal", // Internal = Hidden from main timeline
+        status: "PROCESSING",
+        mediaProvider: "kling",
+        imageReference: assetUrl,
+        generationParams: {
+          source: "DRIFT_EDITOR",
+          externalId: submitRes.data.request_id,
+          statusUrl: submitRes.data.status_url,
+          aspectRatio: targetRatioString,
+          cost: 0,
+        },
+      });
+
       return {
+        success: true,
+        postId: post.id,
         requestId: submitRes.data.request_id,
         statusUrl: submitRes.data.status_url,
       };
@@ -369,6 +393,7 @@ export const videoLogic = {
     }
   },
 
+  // ✅ STATUS POLLING LOGIC
   async checkPostStatus(post: Post) {
     const params = post.generationParams as any;
     if (post.status !== "PROCESSING" || !params?.externalId) return;
