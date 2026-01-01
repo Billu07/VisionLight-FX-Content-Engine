@@ -1143,9 +1143,9 @@ function Dashboard() {
                             type="button"
                             // Opens library to select the Start Frame
                             onClick={() => setActiveLibrarySlot("start")}
-                            className="text-xs bg-rose-900/50 text-rose-300 px-3 py-1.5 rounded-lg hover:bg-rose-800 border border-rose-700/50 flex items-center gap-1 transition-colors"
+                            className="text-xs bg-rose-900/50 text-rose-300 px-3 py-1.5 rounded-lg hover:bg-cyan-600 border border-rose-700/50 flex items-center gap-1 transition-colors"
                           >
-                            <span>📚</span> Open Library
+                            <span></span> Open Library
                           </button>
                         )}
                       </div>
