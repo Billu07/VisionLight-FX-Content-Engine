@@ -446,9 +446,10 @@ app.post(
         Number(horizontal),
         Number(vertical),
         Number(zoom),
-        aspectRatio // 👈 Correctly pass this
+        aspectRatio
       );
-      res.json({ success: true, ...result });
+      // ✅ FIXED: Removed duplicate { success: true } spread
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
