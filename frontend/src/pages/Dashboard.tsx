@@ -51,7 +51,7 @@ function Dashboard() {
   const [kieDuration, setKieDuration] = useState<5 | 10 | 15>(5);
   const [kieResolution, setKieResolution] = useState<"720p" | "1080p">("720p");
 
-  // ✅ Aspect Ratio State (Includes Square)
+  // ✅ CHANGED: Added "square" to type and set default to "portrait"
   const [kieAspect, setKieAspect] = useState<
     "landscape" | "portrait" | "square"
   >("portrait");
@@ -1023,13 +1023,6 @@ function Dashboard() {
                               Pic 1 - Start Frame
                             </label>
                             {/* Open Library Button for Start Frame */}
-                            <button
-                              type="button"
-                              onClick={() => setActiveLibrarySlot("start")}
-                              className="text-xs bg-rose-900/50 text-rose-300 px-3 py-1 rounded-lg hover:bg-rose-800 border border-rose-700/50 flex items-center gap-1 transition-colors"
-                            >
-                              Open Library
-                            </button>
                           </div>
                           <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
                             {picDriftUrls.start ? (
@@ -1083,15 +1076,8 @@ function Dashboard() {
                         <div className="flex flex-col gap-2">
                           <div className="flex justify-between items-center">
                             <label className="text-xs text-rose-300 font-bold">
-                              Pic 2 - End Frame
+                              Pic 2 - End Frame (optional)
                             </label>
-                            <button
-                              type="button"
-                              onClick={() => setActiveLibrarySlot("end")}
-                              className="text-xs bg-rose-900/50 text-rose-300 px-3 py-1 rounded-lg hover:bg-rose-800 border border-rose-700/50 flex items-center gap-1 transition-colors"
-                            >
-                              Open Library
-                            </button>
                           </div>
                           <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
                             {picDriftUrls.end ? (
@@ -1156,6 +1142,7 @@ function Dashboard() {
                         rows={3}
                       />
                     </div>
+
                     <div>
                       {/* ✅ FLEX CONTAINER FOR LABEL + BUTTON */}
                       <div className="flex justify-between items-center mb-2">
@@ -1242,7 +1229,7 @@ function Dashboard() {
                                 Aspect Ratio
                               </label>
                               <div className="flex gap-2">
-                                {/* ✅ REMOVED SQUARE OPTION FROM VIDEO FX 1 */}
+                                {/* ✅ ADDED SQUARE HERE TOO FOR CONSISTENCY */}
                                 {[
                                   { id: "landscape", label: "Landscape" },
                                   { id: "portrait", label: "Portrait" },
