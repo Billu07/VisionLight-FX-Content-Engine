@@ -1154,13 +1154,6 @@ function Dashboard() {
                         placeholder="Name your creation..."
                         className="w-full p-3 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-purple-300/60 backdrop-blur-sm"
                       />
-                      <button
-                        type="button"
-                        onClick={() => setActiveLibrarySlot("generic")}
-                        className="text-xs bg-cyan-900/50 text-cyan-300 px-3 py-1.5 rounded-lg hover:bg-cyan-800 border border-cyan-700/50 flex items-center gap-1 transition-colors"
-                      >
-                        <span></span> Open Library
-                      </button>
                     </div>
 
                     {/* 3. SETTINGS (Moved below Title) */}
