@@ -123,7 +123,7 @@ export const videoLogic = {
         title: "Drift Shot",
         prompt: finalPrompt,
         mediaType: "VIDEO",
-        platform: "Internal", // Internal = Hidden from main timeline
+        platform: "Internal",
         status: "PROCESSING",
         mediaProvider: "kling",
         imageReference: assetUrl,

@@ -1076,7 +1076,7 @@ function Dashboard() {
                         <div className="flex flex-col gap-2">
                           <div className="flex justify-between items-center">
                             <label className="text-xs text-rose-300 font-bold">
-                              Pic 2 - End Frame
+                              Pic 2 - End Frame (optional)
                             </label>
                           </div>
                           <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
@@ -1146,6 +1146,7 @@ function Dashboard() {
                       <label className="block text-sm font-semibold text-white">
                         Title
                       </label>
+
                       <input
                         type="text"
                         value={videoTitle}
@@ -1153,6 +1154,13 @@ function Dashboard() {
                         placeholder="Name your creation..."
                         className="w-full p-3 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-purple-300/60 backdrop-blur-sm"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setActiveLibrarySlot("generic")}
+                        className="text-xs bg-cyan-900/50 text-cyan-300 px-3 py-1.5 rounded-lg hover:bg-cyan-800 border border-cyan-700/50 flex items-center gap-1 transition-colors"
+                      >
+                        <span></span> Open Library
+                      </button>
                     </div>
 
                     {/* 3. SETTINGS (Moved below Title) */}
