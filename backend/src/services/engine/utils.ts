@@ -63,19 +63,19 @@ export const resizeWithBlurFill = async (
   }
 };
 
-// Helper: AI Outpainting
+// ✅ HELPER: AI Outpainting (Updated with Robust Logic)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
   targetHeight: number,
-  targetRatioString: "16:9" | "9:16" | "1:1" = "16:9" // 👈 NEW PARAM
+  targetRatioString: "16:9" | "9:16" | "1:1" = "16:9"
 ): Promise<Buffer> => {
   try {
     console.log(
       `✨ Gemini 3 Pro: Outpainting to ${targetRatioString} (${targetWidth}x${targetHeight})...`
     );
 
-    // Create canvas (Black Background)
+    // 1. Create Black Background Canvas
     const backgroundGuide = await sharp({
       create: {
         width: targetWidth,
@@ -87,7 +87,7 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // Composite original image centered
+    // 2. Composite original image centered (Fit Inside)
     const compositeBuffer = await sharp(backgroundGuide)
       .composite([
         {
@@ -100,10 +100,23 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
+    // 3. Logic to determine prompt direction (Crucial for success)
+    const isPortrait = targetHeight > targetWidth;
+    const direction = isPortrait ? "vertical" : "horizontal";
+
+    const fullPrompt = `
+    TASK: Image Extension (Outpainting).
+    INPUT: An image with a sharp central subject and BLACK ${direction} bars.
+    INSTRUCTIONS:
+    1. REMOVE THE BLACK BARS: Paint over them completely with high-definition details.
+    2. SEAMLESS EXTENSION: Match lighting, texture, and style.
+    3. NO LETTERBOXING: Final output must be full-screen.
+    4. PRESERVE CENTER: Do not modify the central subject.
+    `;
+
     return await GeminiService.generateOrEditImage({
-      prompt:
-        "Outpaint and fill the black empty space naturally. Seamless extension of the scene.",
-      aspectRatio: targetRatioString, // 👈 Pass strict ratio
+      prompt: fullPrompt,
+      aspectRatio: targetRatioString,
       referenceImages: [compositeBuffer],
       modelType: "quality",
     });
