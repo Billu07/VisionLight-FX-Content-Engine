@@ -1146,7 +1146,17 @@ function Dashboard() {
                       <label className="block text-sm font-semibold text-white">
                         Title
                       </label>
-
+                      {/* ✅ CONDITIONAL BUTTON FOR PICDRIFT */}
+                        {currentVisualTab === "picdrift" && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveLibrarySlot("start")}
+                            className="text-xs bg-rose-900/50 text-rose-300 px-3 py-1.5 rounded-lg hover:bg-rose-800 border border-rose-700/50 flex items-center gap-1 transition-colors"
+                          >
+                            <span>📚</span> Open Library
+                          </button>
+                        )}
+                      </div>
                       <input
                         type="text"
                         value={videoTitle}
