@@ -1131,25 +1131,17 @@ function Dashboard() {
 
                     {/* 2. PROMPT & TITLE (Moved Up for Non-PicDrift) */}
                     <div>
-                      <label className="block text-sm font-semibold text-white mb-2">
-                        Your Creative Vision
-                      </label>
-                      <textarea
-                        value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
-                        placeholder="Describe your vision with a prompt"
-                        className="w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base leading-relaxed"
-                        rows={3}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-white">
-                        Title
-                      </label>
-                      {/* ✅ CONDITIONAL BUTTON FOR PICDRIFT */}
+                      {/* ✅ FLEX CONTAINER FOR LABEL + BUTTON */}
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="block text-sm font-semibold text-white">
+                          Title
+                        </label>
+
+                        {/* ✅ CONDITIONAL BUTTON FOR PICDRIFT */}
                         {currentVisualTab === "picdrift" && (
                           <button
                             type="button"
+                            // Opens library to select the Start Frame
                             onClick={() => setActiveLibrarySlot("start")}
                             className="text-xs bg-rose-900/50 text-rose-300 px-3 py-1.5 rounded-lg hover:bg-rose-800 border border-rose-700/50 flex items-center gap-1 transition-colors"
                           >
@@ -1157,6 +1149,7 @@ function Dashboard() {
                           </button>
                         )}
                       </div>
+
                       <input
                         type="text"
                         value={videoTitle}
