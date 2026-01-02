@@ -24,22 +24,21 @@ export const resizeStrict = async (
     .toBuffer();
 };
 
-// Helper: Resize with Blur
+// Helper: Resize with Blur (Fallback)
 export const resizeWithBlurFill = async (
   buffer: Buffer,
   width: number,
   height: number
 ): Promise<Buffer> => {
   try {
-    const background = await sharp({
-      create: {
+    const background = await sharp(buffer)
+      .resize({
         width,
         height,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 },
-      },
-    })
-      .png()
+        fit: "cover", // Fill the whole area
+      })
+      .blur(40) // Heavy blur
+      .modulate({ brightness: 0.7 }) // Darken slightly
       .toBuffer();
 
     const foreground = await sharp(buffer)
@@ -63,7 +62,7 @@ export const resizeWithBlurFill = async (
   }
 };
 
-// ✅ HELPER: AI Outpainting (Updated with Robust Logic)
+// ✅ HELPER: AI Outpainting (FIXED for "Three Panel" Issue)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -75,19 +74,19 @@ export const resizeWithGemini = async (
       `✨ Gemini 3 Pro: Outpainting to ${targetRatioString} (${targetWidth}x${targetHeight})...`
     );
 
-    // 1. Create Black Background Canvas
-    const backgroundGuide = await sharp({
-      create: {
+    // 1. Create a "Guide" Background (Blurred version of original)
+    // This removes the "Hard Edge" that confuses the AI into making panels
+    const backgroundGuide = await sharp(originalBuffer)
+      .resize({
         width: targetWidth,
         height: targetHeight,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 },
-      },
-    })
-      .png()
+        fit: "cover", // Force stretch/crop to fill the new ratio
+      })
+      .blur(50) // Heavy blur to act as color hints
+      .modulate({ brightness: 0.8 }) // Slight dimming to emphasize center
       .toBuffer();
 
-    // 2. Composite original image centered (Fit Inside)
+    // 2. Composite original image centered (Sharp)
     const compositeBuffer = await sharp(backgroundGuide)
       .composite([
         {
@@ -100,18 +99,21 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 3. Logic to determine prompt direction (Crucial for success)
+    // 3. Logic to determine prompt direction
     const isPortrait = targetHeight > targetWidth;
     const direction = isPortrait ? "vertical" : "horizontal";
 
+    // 4. IMPROVED PROMPT to forbid panels
     const fullPrompt = `
-    TASK: Image Extension (Outpainting).
-    INPUT: An image with a sharp central subject and BLACK ${direction} bars.
-    INSTRUCTIONS:
-    1. REMOVE THE BLACK BARS: Paint over them completely with high-definition details.
-    2. SEAMLESS EXTENSION: Match lighting, texture, and style.
-    3. NO LETTERBOXING: Final output must be full-screen.
-    4. PRESERVE CENTER: Do not modify the central subject.
+    TASK: Seamless Image Outpainting.
+    INPUT: A sharp central image placed over a blurred background guide.
+    
+    CRITICAL RULES:
+    1. MERGE: You must paint over the blurred areas to extend the central image seamlessly.
+    2. NO PANELS: Do NOT create a split-screen, triptych, or collage. The result must be ONE single continuous scene.
+    3. NO BORDERS: Do not draw frames or lines around the central subject.
+    4. MATCHING: Extend the sky, ground, or background texture naturally from the center outwards.
+    5. STYLE: Keep high-fidelity photorealism.
     `;
 
     return await GeminiService.generateOrEditImage({
