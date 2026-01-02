@@ -6,7 +6,6 @@ interface TimelineExpanderProps {
   onClose: () => void;
   userCredits: number;
   brandConfig: any;
-  // These props come from Dashboard (functions that take arguments)
   onPublishPost: (prompt: string) => void;
   onUseAsStartFrame: (url: string) => void;
   onDrift: (post: any) => void;
@@ -37,50 +36,54 @@ export const TimelineExpander = ({
   });
 
   return (
-    <div className="fixed inset-0 z-[60] bg-gray-950 text-white overflow-hidden animate-in fade-in duration-300">
-      {/* === TESSERACT BACKGROUND ELEMENTS === */}
+    <div className="fixed inset-0 z-[60] bg-[#030305] text-white overflow-hidden animate-in fade-in duration-500 font-sans">
+      {/* === SUBTLE ATMOSPHERE (No heavy gradients) === */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* Deep Grid */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:100px_100px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_100%)]"></div>
+        {/* Faint Grid - Barely visible */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px] [mask-image:radial-gradient(circle_at_center,black_30%,transparent_80%)]"></div>
 
-        {/* Floating Tesseracts (Cubes) */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 border border-cyan-500/10 rounded-3xl animate-[spin_60s_linear_infinite] opacity-30"></div>
-        <div className="absolute top-1/4 left-1/4 w-80 h-80 border border-purple-500/10 rounded-3xl animate-[spin_40s_linear_infinite_reverse] opacity-30"></div>
-
-        <div className="absolute bottom-1/4 right-1/4 w-64 h-64 border border-rose-500/10 rounded-full animate-pulse opacity-20 filter blur-3xl"></div>
+        {/* The Tesseract - Slow, Monochromatic Rotation */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-white/5 rounded-full animate-[spin_120s_linear_infinite] opacity-20 pointer-events-none"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] border border-white/5 rounded-[3rem] animate-[spin_80s_linear_infinite_reverse] opacity-10 pointer-events-none"></div>
       </div>
 
       {/* === HEADER === */}
-      <div className="relative z-10 container mx-auto px-6 py-6 flex flex-col md:flex-row items-center justify-between gap-4 border-b border-white/5 bg-gray-950/50 backdrop-blur-md">
-        <div className="flex items-center gap-4">
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 pt-8 pb-4 flex flex-col md:flex-row items-center justify-between gap-6">
+        {/* Left: Branding & Stats */}
+        <div className="flex items-center gap-6">
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-white/10 transition-colors group"
+            className="group flex items-center justify-center w-10 h-10 rounded-full border border-white/10 text-gray-400 hover:text-white hover:border-white/30 hover:bg-white/5 transition-all duration-300"
+            title="Close Matrix"
           >
-            <span className="text-2xl group-hover:-translate-x-1 transition-transform block">
-              ←
+            <span className="text-xl group-hover:scale-90 transition-transform">
+              ✕
             </span>
           </button>
-          <div>
-            <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-purple-400 to-rose-400">
+
+          <div className="flex flex-col">
+            <h2 className="text-2xl font-light tracking-wide text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]">
               Creation Matrix
             </h2>
-            <p className="text-xs text-gray-400 tracking-widest uppercase">
-              {filteredPosts.length} Artifacts Stored
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="w-1 h-1 bg-green-500 rounded-full animate-pulse"></span>
+              <p className="text-[10px] text-gray-500 uppercase tracking-[0.2em] font-medium">
+                {filteredPosts.length} Artifacts Online
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex bg-gray-900/80 p-1 rounded-xl border border-white/10">
+        {/* Right: Minimalist Filter Tabs */}
+        <div className="flex items-center gap-1 bg-white/5 p-1 rounded-full border border-white/5 backdrop-blur-md">
           {["ALL", "VIDEO", "IMAGE"].map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f as any)}
-              className={`px-6 py-2 rounded-lg text-xs font-bold transition-all ${
+              className={`px-5 py-1.5 rounded-full text-[10px] font-bold tracking-wider transition-all duration-300 ${
                 filter === f
-                  ? "bg-white text-black shadow-[0_0_15px_rgba(255,255,255,0.3)]"
-                  : "text-gray-400 hover:text-white"
+                  ? "bg-white text-black shadow-lg shadow-white/10"
+                  : "text-gray-500 hover:text-white"
               }`}
             >
               {f}
@@ -89,48 +92,58 @@ export const TimelineExpander = ({
         </div>
       </div>
 
-      {/* === SCROLLABLE GRID CONTENT === */}
-      <div className="relative z-10 container mx-auto px-6 py-8 h-[calc(100vh-100px)] overflow-y-auto custom-scrollbar">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
-          {filteredPosts.map((post) => (
-            <div
-              key={post.id}
-              className="bg-gray-900/40 backdrop-blur-sm border border-white/5 rounded-2xl p-3 hover:border-cyan-500/30 transition-all duration-300 hover:shadow-[0_0_30px_rgba(0,0,0,0.5)] group hover:-translate-y-1"
-            >
-              {/* ✅ FIXED: Wrapped functions to match PostCard signature () => void */}
-              <PostCard
-                post={post}
-                userCredits={userCredits}
-                publishingPost={null}
-                primaryColor={brandConfig?.primaryColor}
-                compact={true}
-                // Fix 1: Pass prompt string
-                onPublishPost={() => onPublishPost(post.prompt)}
-                // Fix 2: Pass url string
-                onUseAsStartFrame={onUseAsStartFrame}
-                // Fix 3: Wrap drift with post
-                onDrift={() => onDrift(post)}
-                // Fix 4: Wrap preview with post
-                onPreview={() => onPreview(post)}
-                // Fix 5: Wrap delete with ID
-                onDelete={() => onDelete(post.id)}
-                // Fix 6: Check media type before creating move function
-                onMoveToAsset={
-                  post.mediaType === "IMAGE" || post.mediaType === "CAROUSEL"
-                    ? () => onMoveToAsset(post.id)
-                    : undefined
-                }
-              />
-            </div>
-          ))}
-        </div>
+      {/* === CONTENT GRID === */}
+      <div className="relative z-10 h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar px-6 pb-20">
+        <div className="max-w-7xl mx-auto pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredPosts.map((post) => (
+              <div
+                key={post.id}
+                className="group relative rounded-2xl transition-all duration-500 hover:-translate-y-1"
+              >
+                {/* Glass Card Background */}
+                <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-md rounded-2xl border border-white/5 group-hover:border-white/20 transition-colors"></div>
 
-        {filteredPosts.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-96 text-gray-500">
-            <div className="text-6xl mb-4 opacity-20">❖</div>
-            <p>The void is empty.</p>
+                {/* Hover Glow Effect */}
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl pointer-events-none"></div>
+
+                <div className="relative p-3">
+                  <PostCard
+                    post={post}
+                    userCredits={userCredits}
+                    publishingPost={null}
+                    primaryColor={brandConfig?.primaryColor}
+                    compact={true}
+                    // Callbacks wrapped correctly
+                    onPublishPost={() => onPublishPost(post.prompt)}
+                    onUseAsStartFrame={onUseAsStartFrame}
+                    onDrift={() => onDrift(post)}
+                    onPreview={() => onPreview(post)}
+                    onDelete={() => onDelete(post.id)}
+                    onMoveToAsset={
+                      post.mediaType === "IMAGE" ||
+                      post.mediaType === "CAROUSEL"
+                        ? () => onMoveToAsset(post.id)
+                        : undefined
+                    }
+                  />
+                </div>
+              </div>
+            ))}
           </div>
-        )}
+
+          {/* Empty State */}
+          {filteredPosts.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-[50vh] text-gray-600">
+              <div className="w-16 h-16 border border-gray-800 rounded-full flex items-center justify-center mb-4">
+                <span className="text-2xl">❖</span>
+              </div>
+              <p className="text-sm font-light tracking-widest uppercase">
+                No Artifacts Detected
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
