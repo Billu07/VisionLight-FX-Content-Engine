@@ -203,6 +203,9 @@ export const TimelineExpander = ({
                     publishingPost={null}
                     primaryColor={brandConfig?.primaryColor}
                     compact={true}
+                    // ✅ MINIMAL MODE: Hides buttons, cleaner visuals
+                    minimal={true}
+                    // Wrapped callbacks to match types
                     onPublishPost={() => onPublishPost(post.prompt)}
                     onUseAsStartFrame={onUseAsStartFrame}
                     onDrift={() => onDrift(post)}

@@ -15,7 +15,10 @@ interface PostCardProps {
   onPreview?: () => void;
   onMoveToAsset?: () => void;
   onDrift?: () => void;
-  onDelete?: () => void; // Added onDelete here as well just in case
+  onDelete?: () => void;
+
+  // ✅ MINIMAL PROP
+  minimal?: boolean;
 }
 
 const getCleanUrl = (url: string) => {
@@ -38,8 +41,9 @@ export function PostCard({
   compact = false,
   onPreview,
   onMoveToAsset,
-  onDrift, // ✅ FIXED: Added this here
-  onDelete, // ✅ Ensure this is here too
+  onDrift,
+  onDelete,
+  minimal = false,
 }: PostCardProps) {
   const [mediaError, setMediaError] = useState(false);
   const [videoLoading, setVideoLoading] = useState(true);
@@ -52,6 +56,13 @@ export function PostCard({
   const [isDownloadingEndFrame, setIsDownloadingEndFrame] = useState(false);
 
   const [slideIndex, setSlideIndex] = useState(0);
+
+  // Helper to handle clicks in minimal mode
+  const handleCardClick = () => {
+    if (minimal && onPreview) {
+      onPreview();
+    }
+  };
 
   useEffect(() => {
     setEditedTitle(post.title || "");
@@ -98,7 +109,7 @@ export function PostCard({
   // --- DOWNLOAD VIDEO HANDLER ---
   const handleDownloadVideo = async (e: React.MouseEvent) => {
     e.preventDefault();
-    e.stopPropagation(); // Stop propagation to prevent preview trigger
+    e.stopPropagation();
     if (!post.mediaUrl) return;
     try {
       setIsDownloadingVideo(true);
@@ -167,6 +178,7 @@ export function PostCard({
   const hasMedia = !!post.mediaUrl && post.mediaUrl.length > 5;
   const isContentVisible = hasMedia && !isProcessing;
 
+  // Media Rendering Logic
   const renderMedia = () => {
     if (!hasMedia || isProcessing) {
       return (
@@ -307,6 +319,8 @@ export function PostCard({
             onLoadedData={handleVideoLoad}
             onError={handleMediaError}
             playsInline
+            onMouseOver={(e) => minimal && e.currentTarget.play()} // Auto-play on hover in minimal mode
+            onMouseOut={(e) => minimal && e.currentTarget.pause()}
           >
             <source src={getCleanUrl(post.mediaUrl)} type="video/mp4" />
           </video>
@@ -348,6 +362,59 @@ export function PostCard({
     post.title ||
     (post.prompt ? post.prompt.substring(0, 50) + "..." : "Untitled");
 
+  // === ✅ MINIMAL MODE UI ===
+  if (minimal) {
+    return (
+      <div
+        className="relative rounded-xl overflow-hidden cursor-pointer group transition-transform duration-300"
+        onClick={handleCardClick}
+      >
+        {/* Media Container - Reuse existing render logic */}
+        <div className="w-full h-full aspect-square bg-black">
+          {/* Force the media to cover square for grid */}
+          <div className="w-full h-full [&_video]:object-cover [&_img]:object-cover [&_div]:h-full [&_div]:rounded-none">
+            {renderMedia()}
+          </div>
+        </div>
+
+        {/* Hover Overlay: Info at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/90 via-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+          <p className="text-white text-xs font-bold truncate">
+            {displayTitle}
+          </p>
+          <p className="text-[10px] text-gray-400 truncate">{formattedDate}</p>
+        </div>
+
+        {/* Delete Button (Top Right, Hover Only) */}
+        {onDelete && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="absolute top-2 right-2 p-1.5 bg-red-500/20 text-red-200 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 hover:text-white backdrop-blur-md z-20"
+            title="Delete"
+          >
+            <svg
+              className="w-3 h-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M6 18L18 6M6 6l12 12"
+              ></path>
+            </svg>
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // === ✅ STANDARD UI (Original) ===
   return (
     <div
       className={`bg-gray-800/40 backdrop-blur-sm rounded-xl border border-white/10 p-4 hover:border-white/20 transition-all duration-300 ${
@@ -417,7 +484,6 @@ export function PostCard({
                 )}
               </button>
 
-              {/* OPEN IN DRIFT BUTTON (Videos Only) */}
               {(post.mediaType === "VIDEO" ||
                 post.mediaProvider?.includes("kling")) &&
                 onDrift && (
@@ -433,7 +499,6 @@ export function PostCard({
                   </button>
                 )}
 
-              {/* SAVE TO ASSET LIBRARY BUTTON */}
               {onMoveToAsset && (
                 <button
                   onClick={onMoveToAsset}
@@ -454,7 +519,6 @@ export function PostCard({
                 ℹ️
               </button>
 
-              {/* DELETE BUTTON */}
               {onDelete && (
                 <button
                   onClick={(e) => {
@@ -469,7 +533,6 @@ export function PostCard({
               )}
             </div>
 
-            {/* END FRAME DOWNLOAD BUTTON */}
             {post.generatedEndFrame && (
               <button
                 onClick={handleDownloadEndFrame}
