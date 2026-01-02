@@ -24,11 +24,24 @@ export function DriftFrameExtractor({
     if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
   };
 
+  const togglePlay = () => {
+    if (videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play();
+        setIsPlaying(true);
+      } else {
+        videoRef.current.pause();
+        setIsPlaying(false);
+      }
+    }
+  };
+
   // Pause while scrubbing for precision
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const time = parseFloat(e.target.value);
     if (videoRef.current) {
       videoRef.current.pause(); // Pause so frame doesn't drift
+      setIsPlaying(false);
       videoRef.current.currentTime = time;
       setCurrentTime(time);
     }
@@ -75,15 +88,17 @@ export function DriftFrameExtractor({
 
   return (
     <div className="flex flex-col items-center justify-center w-full h-full p-2 animate-in fade-in">
-      {/* ✅ FIX: Flexible Container that doesn't force aspect-video off-screen */}
-      <div className="bg-black rounded-xl overflow-hidden border border-gray-700 relative group w-full flex-1 min-h-0 flex items-center justify-center mb-4">
+      {/* Video Container */}
+      <div
+        className="bg-black rounded-xl overflow-hidden border border-gray-700 relative group w-full flex-1 min-h-0 flex items-center justify-center mb-4 cursor-pointer"
+        onClick={togglePlay} // Click video to toggle play, but no icon overlay
+      >
         <canvas ref={canvasRef} className="hidden" />
 
         <video
           key={videoUrl}
           ref={videoRef}
           src={videoUrl}
-          // ✅ FIX: Object-contain ensures it fits inside the box without cropping
           className="w-full h-full object-contain max-h-[60vh]"
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={() => {
@@ -97,52 +112,55 @@ export function DriftFrameExtractor({
           crossOrigin="anonymous"
         />
 
-        {/* Play Overlay */}
-        <div
-          className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/30 transition-colors cursor-pointer"
-          onClick={() => {
-            if (videoRef.current?.paused) videoRef.current.play();
-            else videoRef.current?.pause();
-          }}
-        >
-          {!isPlaying && (
-            <div className="bg-black/50 rounded-full p-4 backdrop-blur-sm border border-white/20">
-              <span className="text-4xl text-white ml-1">▶</span>
-            </div>
-          )}
-        </div>
+        {/* Removed the big centered Play button Overlay from here */}
       </div>
 
-      {/* Controls Container - Width constrained */}
-      <div className="w-full max-w-2xl space-y-4">
-        {/* Scrubber */}
-        <div className="space-y-1 px-1">
-          <div className="flex justify-between text-[10px] text-gray-400 font-mono uppercase tracking-wider">
-            <span>Frame: {((currentTime || 0) * 30).toFixed(0)}</span>
-            <span>
-              {currentTime.toFixed(2)}s / {duration.toFixed(2)}s
-            </span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max={duration || 100}
-            step="0.033"
-            value={currentTime}
+      {/* Controls Container */}
+      <div className="w-full max-w-3xl space-y-4 bg-gray-900/80 p-4 rounded-2xl border border-gray-700">
+        {/* Scrubber Row */}
+        <div className="flex items-center gap-4">
+          {/* ✅ NEW: Dedicated Play/Pause Button on toolbar */}
+          <button
+            onClick={togglePlay}
             disabled={!isReady}
-            onChange={handleSliderChange}
-            className="w-full accent-rose-500 cursor-pointer disabled:opacity-50 h-2 bg-gray-700 rounded-lg appearance-none"
-          />
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+          >
+            {isPlaying ? (
+              <span className="text-sm font-bold">⏸</span>
+            ) : (
+              <span className="text-sm font-bold ml-0.5">▶</span>
+            )}
+          </button>
+
+          {/* Timeline Slider */}
+          <div className="flex-1 space-y-1">
+            <div className="flex justify-between text-[10px] text-gray-400 font-mono uppercase tracking-wider">
+              <span>Frame: {((currentTime || 0) * 30).toFixed(0)}</span>
+              <span>
+                {currentTime.toFixed(2)}s / {duration.toFixed(2)}s
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max={duration || 100}
+              step="0.033" // ~30fps precision
+              value={currentTime}
+              disabled={!isReady}
+              onChange={handleSliderChange}
+              className="w-full accent-rose-500 cursor-pointer disabled:opacity-50 h-2 bg-gray-700 rounded-lg appearance-none"
+            />
+          </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex gap-2">
+        {/* Action Buttons Row */}
+        <div className="flex gap-3 pt-2 border-t border-gray-700/50">
           <button
             onClick={captureFrame}
             disabled={!isReady}
-            className="flex-1 py-3 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+            className="flex-1 py-3 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg hover:from-rose-500 hover:to-orange-500 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
           >
-            <span>📸</span> Extract Frame
+            <span>📸</span> Extract This Frame
           </button>
 
           <a
@@ -150,16 +168,16 @@ export function DriftFrameExtractor({
             download
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-xl text-white font-bold text-center flex items-center justify-center gap-2 text-sm"
+            className="px-6 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-xl text-white font-semibold text-center flex items-center justify-center gap-2 text-sm transition-colors"
           >
-            <span>⬇️</span> Download Clip
+            <span></span> Download Video
           </a>
 
           <button
             onClick={onCancel}
-            className="px-4 py-3 bg-gray-800 text-gray-400 rounded-xl hover:bg-gray-700 text-sm"
+            className="px-6 py-3 bg-gray-800 text-gray-400 hover:text-white rounded-xl hover:bg-gray-700 text-sm transition-colors"
           >
-            Back
+            Cancel
           </button>
         </div>
       </div>
