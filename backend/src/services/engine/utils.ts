@@ -111,9 +111,10 @@ export const resizeWithGemini = async (
     1. REMOVE THE BLACK BARS: Paint over them completely with high-definition details.
     2. SEAMLESS EXTENSION: Match lighting, texture, and style.
     3.NO PANELS: Do NOT create a split-screen, triptych, or collage. The result must be ONE single continuous scene.
-    4. NO LETTERBOXING: Final output must be full-screen.
-    5. NO BORDERS: Do not draw frames or lines around the central subject.
-    6. PRESERVE CENTER: Do not modify the central subject.
+    5. MATCHING: Extend the sky, ground, or background texture naturally from the center outwards.
+    6. NO LETTERBOXING: Final output must be full-screen.
+    7. NO BORDERS: Do not draw frames or lines around the central subject.
+    8. PRESERVE CENTER: Do not modify the central subject.
     `;
 
     return await GeminiService.generateOrEditImage({
