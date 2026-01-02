@@ -17,7 +17,7 @@ interface PostCardProps {
   onDrift?: () => void;
   onDelete?: () => void;
 
-  // ✅ MINIMAL PROP
+  // ✅ MINIMAL PROP (For Expanded Gallery)
   minimal?: boolean;
 }
 
@@ -51,6 +51,7 @@ export function PostCard({
   const [editedTitle, setEditedTitle] = useState(post.title || "");
   const [isPossiblyStuck, setIsPossiblyStuck] = useState(false);
 
+  // Separate loading states for the two download buttons
   const [isDownloadingVideo, setIsDownloadingVideo] = useState(false);
   const [isDownloadingEndFrame, setIsDownloadingEndFrame] = useState(false);
 
@@ -105,6 +106,7 @@ export function PostCard({
     }
   };
 
+  // --- DOWNLOAD VIDEO HANDLER ---
   const handleDownloadVideo = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -144,6 +146,7 @@ export function PostCard({
     }
   };
 
+  // --- DOWNLOAD END FRAME HANDLER ---
   const handleDownloadEndFrame = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -175,9 +178,9 @@ export function PostCard({
   const hasMedia = !!post.mediaUrl && post.mediaUrl.length > 5;
   const isContentVisible = hasMedia && !isProcessing;
 
-  // ✅ UPDATED MEDIA RENDERING (Fixes Expanded View)
+  // Media Rendering Logic
   const renderMedia = () => {
-    // Common classes: If minimal, fill parent. If standard, enforce aspect-video.
+    // ✅ FIX: Dynamic classes to support Minimal Gallery View
     const containerClasses = minimal
       ? "w-full h-full bg-gray-900 flex items-center justify-center relative overflow-hidden"
       : "aspect-video bg-gray-900 rounded-xl flex items-center justify-center border border-white/10 relative overflow-hidden";
@@ -198,14 +201,15 @@ export function PostCard({
                     }}
                     className="mt-2 text-xs bg-red-900/40 hover:bg-red-900/60 text-red-200 px-2 py-1 rounded transition-colors"
                   >
-                    Del
+                    Delete
                   </button>
                 )}
               </div>
             ) : (
               <>
                 <LoadingSpinner size={minimal ? "sm" : "md"} variant="neon" />
-                {!minimal && (
+                {/* Only show text details if NOT minimal, or if stuck/checking status */}
+                {(!minimal || isPossiblyStuck) && (
                   <>
                     <p className="text-purple-300 text-xs mt-3 font-medium tracking-wide">
                       Generating...
@@ -221,6 +225,18 @@ export function PostCard({
                         ></div>
                       </div>
                     </div>
+                    {/* ✅ RESTORED: Uses isPossiblyStuck & manuallyCheckPostStatus */}
+                    {isPossiblyStuck && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          manuallyCheckPostStatus();
+                        }}
+                        className="mt-3 text-[10px] text-yellow-500 underline z-20 relative"
+                      >
+                        Check Status
+                      </button>
+                    )}
                   </>
                 )}
               </>
@@ -244,6 +260,17 @@ export function PostCard({
             >
               Retry
             </button>
+            {onDelete && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                className="block mx-auto mt-2 text-xs text-red-400 hover:text-red-200"
+              >
+                Delete
+              </button>
+            )}
           </div>
         </div>
       );
@@ -274,7 +301,7 @@ export function PostCard({
             <img
               src={slides[slideIndex]}
               alt="Carousel"
-              className="w-full h-full object-cover" // Removed rounded-xl here for minimal mode consistency
+              className="w-full h-full object-cover"
             />
           )}
           {!minimal && (
@@ -314,7 +341,7 @@ export function PostCard({
             onLoadedData={handleVideoLoad}
             onError={handleMediaError}
             playsInline
-            onMouseOver={(e) => minimal && e.currentTarget.play()}
+            onMouseOver={(e) => minimal && e.currentTarget.play()} // Auto-play on hover in minimal mode
             onMouseOut={(e) => minimal && e.currentTarget.pause()}
           >
             <source src={getCleanUrl(post.mediaUrl)} type="video/mp4" />
@@ -365,19 +392,19 @@ export function PostCard({
     post.title ||
     (post.prompt ? post.prompt.substring(0, 50) + "..." : "Untitled");
 
-  // === ✅ MINIMAL MODE UI ===
+  // === ✅ MINIMAL MODE UI (New Gallery View) ===
   if (minimal) {
     return (
       <div
         className="relative rounded-xl overflow-hidden cursor-pointer group transition-transform duration-300 w-full h-full"
         onClick={handleCardClick}
       >
-        {/* Force square aspect for grid */}
         <div className="w-full h-full aspect-square bg-black">
-          {renderMedia()}
+          <div className="w-full h-full [&_video]:object-cover [&_img]:object-cover [&_div]:h-full [&_div]:rounded-none">
+            {renderMedia()}
+          </div>
         </div>
 
-        {/* Hover Overlay */}
         <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/90 via-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
           <p className="text-white text-xs font-bold truncate">
             {displayTitle}
@@ -385,7 +412,6 @@ export function PostCard({
           <p className="text-[10px] text-gray-400 truncate">{formattedDate}</p>
         </div>
 
-        {/* Delete Button */}
         {onDelete && (
           <button
             onClick={(e) => {
@@ -414,7 +440,7 @@ export function PostCard({
     );
   }
 
-  // === ✅ STANDARD UI (Your original code) ===
+  // === ✅ STANDARD UI (Your original Layout preserved) ===
   return (
     <div
       className={`bg-gray-800/40 backdrop-blur-sm rounded-xl border border-white/10 p-4 hover:border-white/20 transition-all duration-300 ${
@@ -462,7 +488,7 @@ export function PostCard({
             </h3>
             <button
               onClick={() => setIsEditingTitle(true)}
-              className="absolute right-0 top-0 text-gray-500 hover:text-white opacity-100 group-hover:opacity-100"
+              className="absolute right-0 top-0 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100"
             >
               ✏️
             </button>
