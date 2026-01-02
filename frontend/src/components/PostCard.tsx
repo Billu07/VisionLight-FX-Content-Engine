@@ -51,7 +51,6 @@ export function PostCard({
   const [editedTitle, setEditedTitle] = useState(post.title || "");
   const [isPossiblyStuck, setIsPossiblyStuck] = useState(false);
 
-  // Separate loading states for the two download buttons
   const [isDownloadingVideo, setIsDownloadingVideo] = useState(false);
   const [isDownloadingEndFrame, setIsDownloadingEndFrame] = useState(false);
 
@@ -106,7 +105,6 @@ export function PostCard({
     }
   };
 
-  // --- DOWNLOAD VIDEO HANDLER ---
   const handleDownloadVideo = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -146,7 +144,6 @@ export function PostCard({
     }
   };
 
-  // --- DOWNLOAD END FRAME HANDLER ---
   const handleDownloadEndFrame = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -178,16 +175,21 @@ export function PostCard({
   const hasMedia = !!post.mediaUrl && post.mediaUrl.length > 5;
   const isContentVisible = hasMedia && !isProcessing;
 
-  // Media Rendering Logic
+  // ✅ UPDATED MEDIA RENDERING (Fixes Expanded View)
   const renderMedia = () => {
+    // Common classes: If minimal, fill parent. If standard, enforce aspect-video.
+    const containerClasses = minimal
+      ? "w-full h-full bg-gray-900 flex items-center justify-center relative overflow-hidden"
+      : "aspect-video bg-gray-900 rounded-xl flex items-center justify-center border border-white/10 relative overflow-hidden";
+
     if (!hasMedia || isProcessing) {
       return (
-        <div className="aspect-video bg-gray-900 rounded-xl flex items-center justify-center border border-white/10 relative overflow-hidden">
+        <div className={containerClasses}>
           <div className="text-center w-full p-4 relative z-10">
             {post.status === "FAILED" && !hasMedia ? (
               <div className="text-red-400">
                 <span className="text-2xl block mb-2">⚠️</span>
-                <span className="text-xs font-bold">Generation Failed</span>
+                <span className="text-xs font-bold">Failed</span>
                 {onDelete && (
                   <button
                     onClick={(e) => {
@@ -196,35 +198,30 @@ export function PostCard({
                     }}
                     className="mt-2 text-xs bg-red-900/40 hover:bg-red-900/60 text-red-200 px-2 py-1 rounded transition-colors"
                   >
-                    Delete
+                    Del
                   </button>
                 )}
               </div>
             ) : (
               <>
-                <LoadingSpinner size="md" variant="neon" />
-                <p className="text-purple-300 text-xs mt-3 font-medium tracking-wide">
-                  Generating...
-                </p>
-                <div className="mt-3 w-full max-w-[140px] mx-auto">
-                  <div className="flex justify-between text-[10px] text-purple-300 mb-1">
-                    <span>Progress</span>
-                    <span>{progress}%</span>
-                  </div>
-                  <div className="w-full bg-gray-700 rounded-full h-1.5 overflow-hidden">
-                    <div
-                      className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full rounded-full transition-all duration-500 ease-out"
-                      style={{ width: `${progress}%` }}
-                    ></div>
-                  </div>
-                </div>
-                {isPossiblyStuck && (
-                  <button
-                    onClick={manuallyCheckPostStatus}
-                    className="mt-3 text-[10px] text-yellow-500 underline"
-                  >
-                    Check Status
-                  </button>
+                <LoadingSpinner size={minimal ? "sm" : "md"} variant="neon" />
+                {!minimal && (
+                  <>
+                    <p className="text-purple-300 text-xs mt-3 font-medium tracking-wide">
+                      Generating...
+                    </p>
+                    <div className="mt-3 w-full max-w-[140px] mx-auto">
+                      <div className="flex justify-between text-[10px] text-purple-300 mb-1">
+                        <span>{progress}%</span>
+                      </div>
+                      <div className="w-full bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full rounded-full transition-all duration-500 ease-out"
+                          style={{ width: `${progress}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </>
                 )}
               </>
             )}
@@ -235,7 +232,7 @@ export function PostCard({
 
     if (mediaError) {
       return (
-        <div className="aspect-video bg-red-900/10 rounded-xl flex items-center justify-center border border-red-500/20">
+        <div className={`${containerClasses} border-red-500/20 bg-red-900/10`}>
           <div className="text-center">
             <span className="text-xl block mb-2">❌</span>
             <button
@@ -247,17 +244,6 @@ export function PostCard({
             >
               Retry
             </button>
-            {onDelete && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete();
-                }}
-                className="block mx-auto mt-2 text-xs text-red-400 hover:text-red-200"
-              >
-                Delete
-              </button>
-            )}
           </div>
         </div>
       );
@@ -279,23 +265,28 @@ export function PostCard({
 
       return (
         <div
-          className="relative aspect-video group cursor-pointer hover:opacity-90 transition-opacity"
+          className={`${
+            minimal ? "w-full h-full relative" : "relative aspect-video"
+          } group cursor-pointer hover:opacity-90 transition-opacity`}
           onClick={onPreview || nextSlide}
         >
           {slides.length > 0 && (
             <img
               src={slides[slideIndex]}
               alt="Carousel"
-              className="w-full h-full object-cover rounded-xl"
+              className="w-full h-full object-cover" // Removed rounded-xl here for minimal mode consistency
             />
           )}
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
-            <span className="text-white text-3xl drop-shadow-lg">⤢</span>
-          </div>
-
-          <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-1 rounded border border-white/20">
-            {slideIndex + 1} / {slides.length}
-          </div>
+          {!minimal && (
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
+              <span className="text-white text-3xl drop-shadow-lg">⤢</span>
+            </div>
+          )}
+          {!minimal && (
+            <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-1 rounded border border-white/20">
+              {slideIndex + 1} / {slides.length}
+            </div>
+          )}
         </div>
       );
     }
@@ -304,10 +295,14 @@ export function PostCard({
     if (post.mediaType === "VIDEO" || post.mediaProvider === "sora") {
       return (
         <div
-          className="relative aspect-video bg-black rounded-xl overflow-hidden border border-white/10 group cursor-pointer"
+          className={`${
+            minimal
+              ? "w-full h-full relative"
+              : "relative aspect-video bg-black rounded-xl border border-white/10"
+          } overflow-hidden group cursor-pointer`}
           onClick={onPreview}
         >
-          {videoLoading && (
+          {videoLoading && !minimal && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
               <LoadingSpinner size="md" variant="neon" />
             </div>
@@ -319,17 +314,19 @@ export function PostCard({
             onLoadedData={handleVideoLoad}
             onError={handleMediaError}
             playsInline
-            onMouseOver={(e) => minimal && e.currentTarget.play()} // Auto-play on hover in minimal mode
+            onMouseOver={(e) => minimal && e.currentTarget.play()}
             onMouseOut={(e) => minimal && e.currentTarget.pause()}
           >
             <source src={getCleanUrl(post.mediaUrl)} type="video/mp4" />
           </video>
 
-          <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
-            <span className="text-white text-3xl drop-shadow-lg opacity-80 group-hover:opacity-100 transition-opacity">
-              ▶
-            </span>
-          </div>
+          {!minimal && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
+              <span className="text-white text-3xl drop-shadow-lg opacity-80 group-hover:opacity-100 transition-opacity">
+                ▶
+              </span>
+            </div>
+          )}
         </div>
       );
     }
@@ -337,7 +334,11 @@ export function PostCard({
     // IMAGE
     return (
       <div
-        className="aspect-video bg-gray-900 rounded-xl overflow-hidden border border-white/10 cursor-pointer group relative"
+        className={`${
+          minimal
+            ? "w-full h-full relative"
+            : "aspect-video bg-gray-900 rounded-xl border border-white/10"
+        } overflow-hidden cursor-pointer group relative`}
         onClick={onPreview}
       >
         <img
@@ -347,9 +348,11 @@ export function PostCard({
           onError={handleMediaError}
           loading="lazy"
         />
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
-          <span className="text-white text-3xl drop-shadow-lg">⤢</span>
-        </div>
+        {!minimal && (
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
+            <span className="text-white text-3xl drop-shadow-lg">⤢</span>
+          </div>
+        )}
       </div>
     );
   };
@@ -366,18 +369,15 @@ export function PostCard({
   if (minimal) {
     return (
       <div
-        className="relative rounded-xl overflow-hidden cursor-pointer group transition-transform duration-300"
+        className="relative rounded-xl overflow-hidden cursor-pointer group transition-transform duration-300 w-full h-full"
         onClick={handleCardClick}
       >
-        {/* Media Container - Reuse existing render logic */}
+        {/* Force square aspect for grid */}
         <div className="w-full h-full aspect-square bg-black">
-          {/* Force the media to cover square for grid */}
-          <div className="w-full h-full [&_video]:object-cover [&_img]:object-cover [&_div]:h-full [&_div]:rounded-none">
-            {renderMedia()}
-          </div>
+          {renderMedia()}
         </div>
 
-        {/* Hover Overlay: Info at bottom */}
+        {/* Hover Overlay */}
         <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/90 via-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
           <p className="text-white text-xs font-bold truncate">
             {displayTitle}
@@ -385,7 +385,7 @@ export function PostCard({
           <p className="text-[10px] text-gray-400 truncate">{formattedDate}</p>
         </div>
 
-        {/* Delete Button (Top Right, Hover Only) */}
+        {/* Delete Button */}
         {onDelete && (
           <button
             onClick={(e) => {
@@ -414,7 +414,7 @@ export function PostCard({
     );
   }
 
-  // === ✅ STANDARD UI (Original) ===
+  // === ✅ STANDARD UI (Your original code) ===
   return (
     <div
       className={`bg-gray-800/40 backdrop-blur-sm rounded-xl border border-white/10 p-4 hover:border-white/20 transition-all duration-300 ${
@@ -462,7 +462,7 @@ export function PostCard({
             </h3>
             <button
               onClick={() => setIsEditingTitle(true)}
-              className="absolute right-0 top-0 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100"
+              className="absolute right-0 top-0 text-gray-500 hover:text-white opacity-100 group-hover:opacity-100"
             >
               ✏️
             </button>
@@ -480,7 +480,7 @@ export function PostCard({
                 {isDownloadingVideo ? (
                   <LoadingSpinner size="sm" />
                 ) : (
-                  <span>⬇️ Download</span>
+                  <span>Download</span>
                 )}
               </button>
 
@@ -543,7 +543,7 @@ export function PostCard({
                 {isDownloadingEndFrame ? (
                   <LoadingSpinner size="sm" variant="light" />
                 ) : (
-                  "📥 Download End Frame"
+                  "Download End Frame"
                 )}
               </button>
             )}
