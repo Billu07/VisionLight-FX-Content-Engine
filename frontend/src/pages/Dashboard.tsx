@@ -8,6 +8,7 @@ import { ErrorAlert } from "../components/ErrorAlert";
 import { PostCard } from "../components/PostCard";
 import { BrandConfigModal } from "../components/BrandConfigModal";
 import { AssetLibrary } from "../components/AssetLibrary";
+import { TimelineExpander } from "../components/TimelineExpander";
 import { WelcomeTour } from "../components/WelcomeTour";
 import { MediaPreview } from "../components/MediaPreview";
 import { EditAssetModal } from "../components/EditAssetModal";
@@ -105,6 +106,7 @@ function Dashboard() {
   const [showNoCreditsModal, setShowNoCreditsModal] = useState(false);
   const [showPromptInfo, setShowPromptInfo] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [showFullTimeline, setShowFullTimeline] = useState(false);
 
   // === NEW PREVIEW STATE ===
   const [previewMedia, setPreviewMedia] = useState<{
@@ -1589,6 +1591,26 @@ function Dashboard() {
                 <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
                   <span></span> Timeline
                 </h2>
+                {/* EXPAND BUTTON */}
+                <button
+                  onClick={() => setShowFullTimeline(true)}
+                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-cyan-400 transition-colors border border-transparent hover:border-cyan-500/30"
+                  title="Expand Timeline"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                    />
+                  </svg>
+                </button>
                 {postsLoading && <LoadingSpinner size="sm" variant="neon" />}
               </div>
               <div className="space-y-3 max-h-[500px] sm:max-h-[600px] overflow-y-auto custom-scrollbar">
@@ -1676,6 +1698,36 @@ function Dashboard() {
             onClose={() => {
               setEditingAsset(null);
               setEditingVideoUrl(undefined); // Reset
+            }}
+          />
+        )}
+
+        {/* ✅ ADD THIS BLOCK */}
+        {showFullTimeline && (
+          <TimelineExpander
+            posts={posts}
+            onClose={() => setShowFullTimeline(false)}
+            userCredits={userCredits}
+            brandConfig={brandConfig}
+            onPublishPost={(t) => handleShowPromptInfo(t)}
+            onUseAsStartFrame={handleUseAsStartFrame}
+            onDrift={(p) => handleDriftFromPost(p)}
+            onPreview={(media) => {
+              // Re-use your preview logic
+              let type = "image";
+              if (media.mediaType === "VIDEO") type = "video";
+              if (media.mediaType === "CAROUSEL") type = "carousel";
+              let url = media.mediaUrl;
+              if (type === "carousel") {
+                try {
+                  url = JSON.parse(media.mediaUrl);
+                } catch (e) {}
+              }
+              setPreviewMedia({ type: type as any, url });
+            }}
+            onMoveToAsset={(id) => handleMoveToAssets(id)}
+            onDelete={(id) => {
+              if (confirm("Delete this post?")) deletePostMutation.mutate(id);
             }}
           />
         )}
