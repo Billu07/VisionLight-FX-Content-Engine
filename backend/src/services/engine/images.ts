@@ -2,9 +2,8 @@ import axios from "axios";
 import sharp from "sharp";
 import { dbService as airtableService, Asset } from "../database"; // Fixed path
 import { GeminiService } from "../gemini";
-import { FalService } from "../fal"; // Assuming fal.ts is in ../fal or move it to ./fal later
+import { FalService } from "../fal";
 import { ROIService } from "../roi";
-import { FAL_TOPAZ_PATH, FAL_KEY } from "./config";
 import {
   uploadToCloudinary,
   getOptimizedUrl,

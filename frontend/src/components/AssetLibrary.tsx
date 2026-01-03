@@ -16,16 +16,31 @@ interface Asset {
 interface AssetLibraryProps {
   onSelect?: (file: File, url: string) => void;
   onClose: () => void;
+  // ✅ NEW PROP: Receive context from Dashboard
+  initialAspectRatio?: string;
 }
 
-export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
+export function AssetLibrary({
+  onSelect,
+  onClose,
+  initialAspectRatio,
+}: AssetLibraryProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ✅ NEW: Added "1:1" to state
   const [activeTab, setActiveTab] = useState<
     "16:9" | "9:16" | "1:1" | "original" | "VIDEO"
   >("16:9");
+
+  // ✅ NEW: Auto-switch tab based on Dashboard context
+  useEffect(() => {
+    if (!initialAspectRatio) return;
+    const ratio = initialAspectRatio.toLowerCase();
+
+    if (ratio === "portrait" || ratio === "9:16") setActiveTab("9:16");
+    else if (ratio === "landscape" || ratio === "16:9") setActiveTab("16:9");
+    else if (ratio === "square" || ratio === "1:1") setActiveTab("1:1");
+  }, [initialAspectRatio]);
 
   // UI States
   const [isUploading, setIsUploading] = useState(false);
@@ -41,13 +56,17 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
   const [processingCount, setProcessingCount] = useState(0);
   const [activeDriftIds, setActiveDriftIds] = useState<Set<string>>(new Set());
 
-  const isProcessing = pollingUntil > 0;
-
-  // 1. Fetch Assets
-  const { data: assets = [], isLoading } = useQuery({
+  // 1. Fetch Assets (✅ Modified for Auto-Refresh)
+  const {
+    data: assets = [],
+    isLoading,
+    isRefetching,
+    refetch,
+  } = useQuery({
     queryKey: ["assets"],
     queryFn: async () => (await apiEndpoints.getAssets()).data.assets,
-    refetchInterval: isProcessing ? 2000 : false,
+    // ✅ Poll every 3 seconds to show new generations automatically
+    refetchInterval: 3000,
     refetchIntervalInBackground: true,
   });
 
@@ -68,7 +87,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // 3. Timer Logic
+  // 3. Timer Logic (Kept your original logic for upload counting)
   useEffect(() => {
     if (pollingUntil === 0) return;
     const checkInterval = setInterval(() => {
@@ -157,12 +176,11 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
     }
   };
 
-  // ✅ FILTER LOGIC
+  // ✅ FILTER LOGIC (Unchanged)
   const filteredAssets = Array.isArray(assets)
     ? assets.filter((a: Asset) => {
         if (activeTab === "VIDEO") return a.type === "VIDEO";
 
-        // "Edited Pictures" tab shows Raw (original) + Weird ratios
         if (activeTab === "original")
           return (
             a.type === "IMAGE" &&
@@ -172,7 +190,6 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
                 a.aspectRatio !== "1:1"))
           );
 
-        // Standard Tabs match exact ratio
         return a.type === "IMAGE" && a.aspectRatio === activeTab;
       })
     : [];
@@ -204,7 +221,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
             {[
               { id: "16:9", label: "Landscape" },
               { id: "9:16", label: "Portrait" },
-              { id: "1:1", label: "Square" }, // ✅ Added Square Tab
+              { id: "1:1", label: "Square" },
               { id: "original", label: "Edited Pictures" },
               { id: "VIDEO", label: "Drift Paths" },
             ].map((tab) => (
@@ -231,17 +248,18 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
               className="hidden"
               onChange={handleFileChange}
             />
+            {/* ✅ UPDATED: Refresh Button with Spinner */}
             <button
-              onClick={() =>
-                queryClient.invalidateQueries({ queryKey: ["assets"] })
-              }
-              className="p-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white border border-gray-700"
+              onClick={() => refetch()}
+              className="p-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white border border-gray-700 transition-colors"
+              disabled={isRefetching}
+              title="Refresh Library"
             >
-              🔄
+              <div className={isRefetching ? "animate-spin" : ""}>🔄</div>
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading || isProcessing}
+              disabled={isUploading || pollingUntil > 0}
               className="px-6 py-2.5 font-bold rounded-lg bg-white text-black hover:bg-gray-200 flex items-center gap-2 transition-colors"
             >
               {isUploading ? (
@@ -255,8 +273,8 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
           </div>
         </div>
 
-        {/* PROCESSING BANNER */}
-        {isProcessing && (
+        {/* PROCESSING BANNER (Kept Original) */}
+        {pollingUntil > 0 && (
           <div className="bg-blue-900/30 border-b border-blue-500/30 p-2 text-center animate-pulse">
             <span className="text-blue-200 text-xs font-bold uppercase tracking-wider">
               Processing {processingCount} items...
@@ -266,11 +284,11 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
 
         {/* GRID VIEW */}
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-black/40">
-          {isLoading && !isProcessing ? (
+          {isLoading && !isRefetching ? (
             <div className="flex justify-center items-center h-full">
               <LoadingSpinner size="lg" variant="neon" />
             </div>
-          ) : filteredAssets.length === 0 && !isProcessing ? (
+          ) : filteredAssets.length === 0 && pollingUntil === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-gray-500 opacity-60">
               <span className="text-6xl mb-4">
                 {activeTab === "VIDEO" ? "🎬" : "🖼️"}
@@ -332,7 +350,7 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
         </div>
       </div>
 
-      {/* --- IMAGE EDIT MODAL --- */}
+      {/* MODALS (Kept exactly as original) */}
       {selectedAsset && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 p-4 animate-in fade-in duration-200">
           <div
@@ -410,7 +428,6 @@ export function AssetLibrary({ onSelect, onClose }: AssetLibraryProps) {
         </div>
       )}
 
-      {/* --- VIDEO EXTRACTOR MODAL --- */}
       {viewingVideoAsset && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 p-4">
           <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-4xl p-6 relative flex flex-col items-center">

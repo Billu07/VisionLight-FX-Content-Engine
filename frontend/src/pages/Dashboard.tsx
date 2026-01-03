@@ -483,6 +483,13 @@ function Dashboard() {
     );
   if (!user) return null;
 
+  // ✅ HELPER: Get currently selected aspect ratio string for context-aware library
+  const getCurrentRatioForLibrary = () => {
+    if (activeEngine === "kie") return kieAspect; // "portrait", "landscape", "square"
+    if (activeEngine === "openai") return aspectRatio; // "16:9", "9:16"
+    if (activeEngine === "studio") return geminiAspect; // "1:1", "16:9", "9:16"
+    return undefined;
+  };
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900">
       {/* ... MODALS ... */}
@@ -490,6 +497,7 @@ function Dashboard() {
         <AssetLibrary
           onClose={() => setActiveLibrarySlot(null)}
           onSelect={handleAssetSelect}
+          initialAspectRatio={getCurrentRatioForLibrary()}
         />
       )}
 
