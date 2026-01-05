@@ -51,7 +51,7 @@ export const resizeWithBlurFill = async (
   }
 };
 
-// ✅ HELPER: AI Outpainting (FIXED: "Mirrored Glitch" Strategy)
+// ✅ HELPER: AI Outpainting (Black Bars + Optimized Directional Prompting)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -63,27 +63,17 @@ export const resizeWithGemini = async (
       `✨ Gemini Outpaint: ${targetRatioString} (${targetWidth}x${targetHeight})`
     );
 
-    // 1. Calculate Padding Dimensions
-    const metadata = await sharp(originalBuffer).metadata();
-    const origW = metadata.width || 1000;
-    const origH = metadata.height || 1000;
-
-    // We use a 'contain' strategy on a transparent background first
-    // Then we fill the transparency with a MIRROR of the image
-    // This creates a seamless color transition at the edge, stopping the "Frame" effect.
-
-    // Step A: Create the canvas filled with the image stretched/mirrored (approximate via blur/flop)
-    // A simple robust way in Sharp without complex tiling is to use 'extend' with 'mirror'
-    // but Sharp's extend doesn't always support 'mirror' mode in all versions perfectly for layout.
-    // So we use a resizing trick:
-
-    const backgroundGuide = await sharp(originalBuffer)
-      .resize({
+    // 1. Create Solid Black Canvas (The "Void")
+    // We use pure black so the AI creates a hard contrast we can reference in the prompt
+    const backgroundGuide = await sharp({
+      create: {
         width: targetWidth,
         height: targetHeight,
-        fit: "fill", // Stretch it distored
-      })
-      .blur(10) // Light blur to obscure details but keep exact colors
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 255 },
+      },
+    })
+      .png()
       .toBuffer();
 
     // 2. Place Original Image in Center
@@ -99,39 +89,43 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 3. ✅ NEW PROMPT STRATEGY: "Uncrop / Glitch Fix"
-    // We explicitly tell Gemini that the outer area is "distorted" and needs "reconstruction".
-    // This breaks the "3-panel" hallucination because it sees the outer area as *broken* parts of the same image.
-
-    let instructions = "";
+    // 3. ✅ OPTIMIZED PROMPTS: Directional & "Anti-Panel" Logic
+    let specificInstruction = "";
 
     if (targetRatioString === "9:16" || targetRatioString === "portrait") {
-      instructions = `
-      TASK: Uncrop to Portrait.
-      INPUT: A central photo surrounded by distorted/stretched background data.
-      ACTION: Regenerate the top and bottom areas. Replace the distorted pixels with realistic sky/ceiling (top) and ground/floor (bottom).
+      specificInstruction = `
+      CONTEXT: This is a Landscape photo placed on a Portrait canvas.
+      ACTION: GENERATE THE MISSING TOP AND BOTTOM. 
+      - If the center is outdoors, extend the sky upwards and the ground downwards.
+      - If indoors, extend the ceiling and floor.
       `;
     } else if (
       targetRatioString === "16:9" ||
       targetRatioString === "landscape"
     ) {
-      instructions = `
-      TASK: Uncrop to Landscape.
-      INPUT: A central photo surrounded by distorted/stretched background data.
-      ACTION: Regenerate the left and right sides. Replace the distorted pixels with realistic scenery extensions.
+      specificInstruction = `
+      CONTEXT: This is a Portrait photo placed on a Landscape canvas.
+      ACTION: GENERATE THE MISSING LEFT AND RIGHT SIDES.
+      - Widen the field of view naturally. Extend the background scenery horizontally.
       `;
     } else {
-      instructions = `TASK: Expand Image. Fill the outer areas naturally.`;
+      specificInstruction = `
+      CONTEXT: An image floating on a black canvas.
+      ACTION: Fill the black areas to create a full-frame photograph.
+      `;
     }
 
     const fullPrompt = `
-    ${instructions}
+    TASK: Image Uncropping / Canvas Extension.
     
-    CRITICAL RULES:
-    1. SEAMLESS: The transition from the sharp center to the new edges must be invisible.
-    2. SINGLE IMAGE: The final result must look like ONE continuous photo. Do NOT create panels, borders, or split screens.
-    3. MATCH TEXTURE: If the center is a photo, the edges must be photorealistic. If art, match the art style.
-    4. FIX DISTORTION: The outer areas are placeholders. You must overwrite them completely.
+    ${specificInstruction}
+
+    CRITICAL RULES TO PREVENT ERRORS:
+    1. IGNORE THE BLACK BARS: The black areas are "void" / "missing data". You must completely overwrite them with realistic texture.
+    2. SINGLE IMAGE: The final result must look like ONE continuous photograph taken with a wide-angle lens. 
+    3. NO PANELS: Do NOT create a triptych, collage, or split-screen. Do NOT draw frame lines. 
+    4. INVISIBLE SEAMS: The transition from the center image to the new edges must be undetectable. Match lighting, noise, and focus exactly.
+    5. PRESERVE CENTER: Do not modify the face, body, or main subject in the center box.
     `;
 
     return await GeminiService.generateOrEditImage({
