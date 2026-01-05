@@ -14,9 +14,9 @@ interface Asset {
 }
 
 interface AssetLibraryProps {
-  onSelect?: (file: File, url: string) => void;
+  // ✅ CHANGE 1: Update function signature to accept aspectRatio
+  onSelect?: (file: File, url: string, aspectRatio?: string) => void;
   onClose: () => void;
-  // ✅ NEW PROP: Receive context from Dashboard
   initialAspectRatio?: string;
 }
 
@@ -148,7 +148,9 @@ export function AssetLibrary({
       const file = new File([blob], `asset_${asset.id}.jpg`, {
         type: "image/jpeg",
       });
-      onSelect(file, asset.url);
+
+      onSelect(file, asset.url, asset.aspectRatio);
+
       onClose();
     } catch (e) {
       alert("Could not load image.");
@@ -383,6 +385,7 @@ export function AssetLibrary({
                 <div className="space-y-3">
                   {onSelect && (
                     <button
+                      // ✅ CHANGE 4: This button now triggers the updated handler
                       onClick={() => handleUseImage(selectedAsset)}
                       className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-lg"
                     >

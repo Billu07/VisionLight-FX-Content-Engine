@@ -120,7 +120,10 @@ export function PostCard({
       const link = document.createElement("a");
       link.href = url;
       const contentDisposition = response.headers["content-disposition"];
-      let filename = `visionlight-${post.id}`;
+
+      // ✅ CHANGED: Prefix from 'visionlight-' to 'picdrift-'
+      let filename = `picdrift-${post.id}`;
+
       if (contentDisposition) {
         const matches = /filename="([^"]*)"/.exec(contentDisposition);
         if (matches != null && matches[1]) filename = matches[1];
@@ -160,7 +163,8 @@ export function PostCard({
 
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `end-frame-${post.id}.jpg`);
+      // ✅ CHANGED: Consistent naming
+      link.setAttribute("download", `picdrift-end-frame-${post.id}.jpg`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -180,7 +184,7 @@ export function PostCard({
 
   // Media Rendering Logic
   const renderMedia = () => {
-    // ✅ FIX: Dynamic classes to support Minimal Gallery View
+    // Dynamic classes to support Minimal Gallery View vs Standard Timeline
     const containerClasses = minimal
       ? "w-full h-full bg-gray-900 flex items-center justify-center relative overflow-hidden"
       : "aspect-video bg-gray-900 rounded-xl flex items-center justify-center border border-white/10 relative overflow-hidden";
@@ -201,7 +205,7 @@ export function PostCard({
                     }}
                     className="mt-2 text-xs bg-red-900/40 hover:bg-red-900/60 text-red-200 px-2 py-1 rounded transition-colors"
                   >
-                    Delete
+                    Del
                   </button>
                 )}
               </div>
@@ -225,6 +229,7 @@ export function PostCard({
                         ></div>
                       </div>
                     </div>
+
                     {/* ✅ RESTORED: Uses isPossiblyStuck & manuallyCheckPostStatus */}
                     {isPossiblyStuck && (
                       <button
@@ -341,7 +346,7 @@ export function PostCard({
             onLoadedData={handleVideoLoad}
             onError={handleMediaError}
             playsInline
-            onMouseOver={(e) => minimal && e.currentTarget.play()} // Auto-play on hover in minimal mode
+            onMouseOver={(e) => minimal && e.currentTarget.play()}
             onMouseOut={(e) => minimal && e.currentTarget.pause()}
           >
             <source src={getCleanUrl(post.mediaUrl)} type="video/mp4" />
@@ -392,7 +397,7 @@ export function PostCard({
     post.title ||
     (post.prompt ? post.prompt.substring(0, 50) + "..." : "Untitled");
 
-  // === ✅ MINIMAL MODE UI (New Gallery View) ===
+  // === ✅ MINIMAL MODE UI (Expanded Gallery View) ===
   if (minimal) {
     return (
       <div
@@ -440,7 +445,7 @@ export function PostCard({
     );
   }
 
-  // === ✅ STANDARD UI (Your original Layout preserved) ===
+  // === ✅ STANDARD UI (Timeline View) ===
   return (
     <div
       className={`bg-gray-800/40 backdrop-blur-sm rounded-xl border border-white/10 p-4 hover:border-white/20 transition-all duration-300 ${
@@ -498,13 +503,18 @@ export function PostCard({
         {isContentVisible && (
           <div className="flex flex-col gap-2 pt-1">
             <div className="flex items-center gap-2">
+              {/* ✅ BRIGHT "DOWNLOADING..." BUTTON */}
               <button
                 onClick={handleDownloadVideo}
                 disabled={isDownloadingVideo}
-                className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-cyan-400 text-xs py-2 rounded-lg transition-colors flex items-center justify-center gap-1"
+                className={`flex-1 text-xs py-2 rounded-lg transition-all flex items-center justify-center gap-1 border ${
+                  isDownloadingVideo
+                    ? "bg-cyan-600/20 text-cyan-300 border-cyan-500 animate-pulse font-bold shadow-[0_0_10px_rgba(6,182,212,0.4)]"
+                    : "bg-white/5 hover:bg-white/10 border-white/10 text-cyan-400"
+                }`}
               >
                 {isDownloadingVideo ? (
-                  <LoadingSpinner size="sm" />
+                  <span>Downloading...</span>
                 ) : (
                   <span>Download</span>
                 )}
@@ -521,7 +531,7 @@ export function PostCard({
                     className="w-8 h-8 flex items-center justify-center bg-rose-600/20 hover:bg-rose-600/40 border border-rose-500/30 rounded-lg text-rose-300 transition-colors"
                     title="Open in Drift / Extract Frames"
                   >
-                    ✂️
+                    📸
                   </button>
                 )}
 
@@ -559,18 +569,21 @@ export function PostCard({
               )}
             </div>
 
+            {/* ✅ BRIGHT "DOWNLOADING FRAME..." BUTTON */}
             {post.generatedEndFrame && (
               <button
                 onClick={handleDownloadEndFrame}
                 disabled={isDownloadingEndFrame}
-                className="w-full bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 text-[10px] py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1"
+                className={`w-full text-[10px] py-1.5 rounded-lg transition-all flex items-center justify-center gap-1 border ${
+                  isDownloadingEndFrame
+                    ? "bg-purple-600/20 text-purple-300 border-purple-500 animate-pulse font-bold shadow-[0_0_10px_rgba(168,85,247,0.4)]"
+                    : "bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/30 text-purple-300"
+                }`}
                 title="Use this as the Start Frame for your next clip"
               >
-                {isDownloadingEndFrame ? (
-                  <LoadingSpinner size="sm" variant="light" />
-                ) : (
-                  "Download End Frame"
-                )}
+                {isDownloadingEndFrame
+                  ? "Downloading Frame..."
+                  : "Download End Frame"}
               </button>
             )}
           </div>

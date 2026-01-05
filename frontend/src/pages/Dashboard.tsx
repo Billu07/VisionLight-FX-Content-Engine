@@ -310,7 +310,8 @@ function Dashboard() {
   };
 
   // --- 1. ASSET LIBRARY SELECTION HANDLER ---
-  const handleAssetSelect = (file: File, url: string) => {
+  const handleAssetSelect = (file: File, url: string, ratio?: string) => {
+    // 1. Handle File Setting (Existing Logic)
     if (activeLibrarySlot === "start") {
       setPicDriftFrames((prev) => ({ ...prev, start: file }));
       setPicDriftUrls((prev) => ({ ...prev, start: url }));
@@ -326,6 +327,39 @@ function Dashboard() {
         setReferenceImageUrls([url]);
       }
     }
+
+    // 2. ✅ NEW: Auto-Update Aspect Ratio based on Selection
+    if (ratio && ratio !== "original") {
+      console.log(`Auto-setting ratio to: ${ratio}`);
+
+      // Determine standardized Ratio ID
+      const r = ratio as "16:9" | "9:16" | "1:1";
+
+      // A. KIE / VIDEO FX 1 / PICDRIFT
+      if (activeEngine === "kie") {
+        if (r === "16:9") setKieAspect("landscape");
+        else if (r === "9:16") setKieAspect("portrait");
+        else if (r === "1:1") setKieAspect("square");
+      }
+
+      // B. OPENAI / VIDEO FX 2
+      else if (activeEngine === "openai") {
+        // OpenAI typically only supports 16:9 / 9:16 in standard UI, fallback to 1:1 if needed
+        if (r === "16:9") {
+          setAspectRatio("16:9");
+          setVideoSize("1792x1024");
+        } else if (r === "9:16") {
+          setAspectRatio("9:16");
+          setVideoSize("1024x1792");
+        }
+      }
+
+      // C. STUDIO / GEMINI
+      else if (activeEngine === "studio") {
+        setGeminiAspect(r);
+      }
+    }
+
     setActiveLibrarySlot(null);
   };
 
@@ -795,19 +829,40 @@ function Dashboard() {
         <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
           <div className="flex-1">
             <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 lg:p-8 shadow-2xl">
-              <div className="mb-6 sm:mb-8">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="h-12 sm:h-14 flex items-center justify-center">
-                    <img
-                      src={picdriftLogo}
-                      alt="PICDRIFT"
-                      className="h-full w-auto object-contain"
-                    />
+              {/* ✅ UPDATED HEADER: Logo Left, Library Button Right */}
+              <div className="mb-6 sm:mb-8 flex justify-between items-start">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="h-12 sm:h-14 flex items-center justify-center">
+                      <img
+                        src={picdriftLogo}
+                        alt="PICDRIFT"
+                        className="h-full w-auto object-contain"
+                      />
+                    </div>
                   </div>
+                  <p className="text-purple-300 text-sm ml-1">
+                    Create Something Cinematic
+                  </p>
                 </div>
-                <p className="text-purple-300 text-sm ml-1">
-                  Create Something Cinematic
-                </p>
+
+                {/* ✅ GLOBAL OPEN LIBRARY BUTTON */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    // For PicDrift, open 'Start Frame' slot. For others, open 'Generic'.
+                    setActiveLibrarySlot(
+                      currentVisualTab === "picdrift" ? "start" : "generic"
+                    );
+                  }}
+                  className={`text-xs px-4 py-2 rounded-lg border flex items-center gap-2 transition-all font-semibold shadow-lg ${
+                    currentVisualTab === "picdrift"
+                      ? "bg-rose-900/50 text-rose-300 border-rose-700/50 hover:bg-rose-800 hover:border-rose-500"
+                      : "bg-cyan-900/50 text-cyan-300 border-cyan-700/50 hover:bg-cyan-800 hover:border-cyan-500"
+                  }`}
+                >
+                  <span>📚</span> Open Library
+                </button>
               </div>
 
               {/* NAVIGATION BAR */}
@@ -1159,18 +1214,6 @@ function Dashboard() {
                         <label className="block text-sm font-semibold text-white">
                           Title
                         </label>
-
-                        {/* ✅ CONDITIONAL BUTTON FOR PICDRIFT */}
-                        {currentVisualTab === "picdrift" && (
-                          <button
-                            type="button"
-                            // Opens library to select the Start Frame
-                            onClick={() => setActiveLibrarySlot("start")}
-                            className="text-xs bg-rose-900/50 text-rose-300 px-3 py-1.5 rounded-lg hover:bg-rose-800 border border-rose-700/50 flex items-center gap-1 transition-colors"
-                          >
-                            <span></span> Open Library
-                          </button>
-                        )}
                       </div>
 
                       <input

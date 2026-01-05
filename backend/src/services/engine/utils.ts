@@ -24,22 +24,16 @@ export const resizeStrict = async (
     .toBuffer();
 };
 
-// Helper: Resize with Blur
+// Helper: Resize with Blur (Fallback)
 export const resizeWithBlurFill = async (
   buffer: Buffer,
   width: number,
   height: number
 ): Promise<Buffer> => {
   try {
-    const background = await sharp({
-      create: {
-        width,
-        height,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 },
-      },
-    })
-      .png()
+    const background = await sharp(buffer)
+      .resize({ width, height, fit: "cover" }) // Stretch to fill
+      .blur(40)
       .toBuffer();
 
     const foreground = await sharp(buffer)
@@ -56,14 +50,11 @@ export const resizeWithBlurFill = async (
       .toFormat("jpeg", { quality: 95 })
       .toBuffer();
   } catch (e) {
-    return await sharp(buffer)
-      .resize(width, height, { fit: "cover", position: "center" })
-      .toFormat("jpeg")
-      .toBuffer();
+    return buffer; // Fallback
   }
 };
 
-// ✅ HELPER: AI Outpainting (Updated with Robust Logic)
+// ✅ HELPER: AI Outpainting (FIXED: "Blurred Context" Strategy)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -72,22 +63,22 @@ export const resizeWithGemini = async (
 ): Promise<Buffer> => {
   try {
     console.log(
-      `✨ Gemini 3 Pro: Outpainting to ${targetRatioString} (${targetWidth}x${targetHeight})...`
+      `✨ Gemini Outpaint: ${targetRatioString} (${targetWidth}x${targetHeight})`
     );
 
-    // 1. Create Black Background Canvas
-    const backgroundGuide = await sharp({
-      create: {
+    // 1. Create a "Blurred Context" Background
+    // Instead of black bars, we stretch the original image to fill the screen
+    // and blur it. This gives the AI color cues and prevents the "Panel" effect.
+    const backgroundGuide = await sharp(originalBuffer)
+      .resize({
         width: targetWidth,
         height: targetHeight,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 },
-      },
-    })
-      .png()
+        fit: "cover", // Forces image to fill the whole area
+      })
+      .blur(30) // Blur enough so it looks like "background", but keeps colors
       .toBuffer();
 
-    // 2. Composite original image centered (Fit Inside)
+    // 2. Place Original Sharp Image on Top
     const compositeBuffer = await sharp(backgroundGuide)
       .composite([
         {
@@ -100,22 +91,15 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 3. Logic to determine prompt direction (Crucial for success)
-    const isPortrait = targetHeight > targetWidth;
-    const direction = isPortrait ? "vertical" : "horizontal";
-
     const fullPrompt = `
-    TASK: Image Extension (Outpainting).
-    INPUT: An image with a sharp central subject and BLACK ${direction} bars.
+    TASK: Photo Restoration & Extension.
+    INPUT: A high-quality central subject surrounded by low-quality blurry edges.
     
-    CRITICAL INSTRUCTIONS:
-    1.COVER THE BLACK BARS: Paint over them completely with high-definition details consistent with the central original image.
-    2. SEAMLESS EXTENSION: Match lighting, texture, and style.
-    3.NO PANELS: Do NOT create a split-screen, triptych, or collage. The result must be ONE single continuous image, there should be no inconsistencies.
-    5. MATCHING: Extend the sky, ground, or background texture naturally from the center outwards.
-    6. NO LETTERBOXING: Final output must be full-screen.
-    7. NO BORDERS: Do not draw frames or lines around the central subject.
-    8. PRESERVE CENTER: Do not modify the original subject of the image.
+    INSTRUCTIONS:
+    1. UN-BLUR THE EDGES: Re-draw the blurry outer areas to match the sharpness, texture, and lighting of the center perfectly.
+    2. SEAMLESS EXTENSION: The final result must look like ONE single continuous photograph taken with a wide-angle lens.
+    3. NO PANELS OR FRAMES: Do not create split screens. Do not draw borders. The image must be uniform.
+    4. PRESERVE CENTER: The sharp central subject is perfect. Do not change it. Only fix the surroundings.
     `;
 
     return await GeminiService.generateOrEditImage({
