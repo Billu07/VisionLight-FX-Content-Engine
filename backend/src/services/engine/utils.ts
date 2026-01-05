@@ -3,7 +3,6 @@ import axios from "axios";
 import { cloudinaryClient } from "./config";
 import { GeminiService } from "../gemini";
 
-// Helper: Fix Cloudinary URLs
 export const getOptimizedUrl = (url: string) => {
   if (!url || typeof url !== "string") return url;
   if (url.includes("cloudinary.com") && url.includes("/upload/")) {
@@ -12,7 +11,6 @@ export const getOptimizedUrl = (url: string) => {
   return url;
 };
 
-// Helper: Resize Strict
 export const resizeStrict = async (
   buffer: Buffer,
   width: number,
@@ -24,22 +22,15 @@ export const resizeStrict = async (
     .toBuffer();
 };
 
-// Helper: Resize with Blur (Fallback)
 export const resizeWithBlurFill = async (
   buffer: Buffer,
   width: number,
   height: number
 ): Promise<Buffer> => {
   try {
-    const background = await sharp({
-      create: {
-        width,
-        height,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 },
-      },
-    })
-      .png()
+    const background = await sharp(buffer)
+      .resize({ width, height, fit: "cover" })
+      .blur(40)
       .toBuffer();
 
     const foreground = await sharp(buffer)
@@ -53,17 +44,14 @@ export const resizeWithBlurFill = async (
 
     return await sharp(background)
       .composite([{ input: foreground, gravity: "center" }])
-      .toFormat("jpeg", { quality: 95 })
-      .toBuffer();
-  } catch (e) {
-    return await sharp(buffer)
-      .resize(width, height, { fit: "cover", position: "center" })
       .toFormat("jpeg")
       .toBuffer();
+  } catch (e) {
+    return buffer;
   }
 };
 
-// ✅ HELPER: AI Outpainting (REVERTED TO BLACK BAR METHOD)
+// ✅ HELPER: AI Outpainting (Context-Aware Logic)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -72,23 +60,23 @@ export const resizeWithGemini = async (
 ): Promise<Buffer> => {
   try {
     console.log(
-      `✨ Gemini 3 Pro: Outpainting to ${targetRatioString} (${targetWidth}x${targetHeight})...`
+      `✨ Gemini Outpaint: ${targetRatioString} (${targetWidth}x${targetHeight})`
     );
 
-    // 1. Create Canvas (Black Background)
-    // This creates the "Letterbox" look that the AI recognizes
+    // 1. Create a Solid Black Canvas (The "Void")
+    // Black works best IF the prompt explicitly identifies it as "empty space to fill"
     const backgroundGuide = await sharp({
       create: {
         width: targetWidth,
         height: targetHeight,
         channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 }, // Solid Black
+        background: { r: 0, g: 0, b: 0, alpha: 255 },
       },
     })
       .png()
       .toBuffer();
 
-    // 2. Composite original image centered (Fit Inside)
+    // 2. Place Original Image in Center
     const compositeBuffer = await sharp(backgroundGuide)
       .composite([
         {
@@ -101,25 +89,58 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 3. Prompt Logic (Directional Black Bars)
-    const isPortrait = targetHeight > targetWidth;
-    const direction = isPortrait ? "vertical" : "horizontal";
+    // 3. ✅ CONTEXT-AWARE PROMPTS
+    // We treat Portrait vs Landscape differently to stop the "3-panel" hallucination.
+
+    let instructions = "";
+
+    if (targetRatioString === "9:16" || targetRatioString === "portrait") {
+      // VERTICAL LOGIC
+      instructions = `
+      TASK: Vertical Image Expansion (Tall Format).
+      INPUT: A central image with BLACK BARS at the TOP and BOTTOM.
+      ACTION:
+      - EXTEND VERTICALLY: You must generate new content for the top (sky/ceiling) and bottom (ground/floor).
+      - CONTINUITY: The new top/bottom areas must seamlessly connect to the center.
+      - NO PANELS: Do NOT create a triptych. This is ONE single tall image.
+      `;
+    } else if (
+      targetRatioString === "16:9" ||
+      targetRatioString === "landscape"
+    ) {
+      // HORIZONTAL LOGIC
+      instructions = `
+      TASK: Horizontal Image Expansion (Wide Format).
+      INPUT: A central image with BLACK BARS on the LEFT and RIGHT.
+      ACTION:
+      - EXTEND HORIZONTALLY: You must generate new content for the left and right sides.
+      - CONTINUITY: Widen the horizon or scene naturally.
+      - NO PANELS: Do NOT create a split-screen. This is ONE single wide image.
+      `;
+    } else {
+      // SQUARE/GENERAL LOGIC
+      instructions = `
+      TASK: Image Uncropping.
+      INPUT: An image centered on a black background.
+      ACTION: Fill the black background with natural scene extensions that match the center.
+      - NO FRAMES: The result must look like a full-frame photograph.
+      `;
+    }
 
     const fullPrompt = `
-    TASK: Image Extension (Outpainting).
-    INPUT: An image with a sharp central subject and BLACK ${direction} bars.
-    INSTRUCTIONS:
-    1. REMOVE THE BLACK BARS: Paint over them completely with high-definition details.
-    2. SEAMLESS EXTENSION: Match lighting, texture, and style.
-    3. NO LETTERBOXING: Final output must be full-screen.
-    4. PRESERVE CENTER: Do not modify the central subject.
+    ${instructions}
+    
+    STRICT RULES:
+    1. PRESERVE THE CENTER: The central rectangular image is the source of truth. Do not modify the subject inside it.
+    2. MATCH LIGHTING: The generated extensions must match the lighting direction of the source.
+    3. HIGH FIDELITY: Generate photorealistic textures for the new areas.
     `;
 
     return await GeminiService.generateOrEditImage({
       prompt: fullPrompt,
       aspectRatio: targetRatioString,
       referenceImages: [compositeBuffer],
-      modelType: "quality",
+      modelType: "quality", // Ensures Gemini 3 Pro
     });
   } catch (error: any) {
     console.error("❌ Gemini Resize Error:", error.message);
@@ -127,7 +148,6 @@ export const resizeWithGemini = async (
   }
 };
 
-// Helper: Upload
 export const uploadToCloudinary = async (
   f: any,
   p: string,
@@ -159,7 +179,6 @@ export const uploadToCloudinary = async (
   });
 };
 
-// Helper: Download
 export const downloadAndOptimizeImages = async (
   urls: string[]
 ): Promise<Buffer[]> => {
@@ -180,7 +199,6 @@ export const downloadAndOptimizeImages = async (
   return results.filter((buf): buf is Buffer => buf !== null);
 };
 
-// Helper: Ratio Matcher
 export const getClosestAspectRatio = (
   width: number,
   height: number
@@ -188,15 +206,8 @@ export const getClosestAspectRatio = (
   const ratio = width / height;
   const targets = [
     { id: "1:1", val: 1.0 },
-    { id: "4:3", val: 1.33 },
-    { id: "3:4", val: 0.75 },
-    { id: "3:2", val: 1.5 },
-    { id: "2:3", val: 0.66 },
     { id: "16:9", val: 1.77 },
     { id: "9:16", val: 0.56 },
-    { id: "21:9", val: 2.33 },
-    { id: "5:4", val: 1.25 },
-    { id: "4:5", val: 0.8 },
   ];
   const closest = targets.reduce((prev, curr) =>
     Math.abs(curr.val - ratio) < Math.abs(prev.val - ratio) ? curr : prev
