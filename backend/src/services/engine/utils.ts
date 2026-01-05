@@ -3,7 +3,6 @@ import axios from "axios";
 import { cloudinaryClient } from "./config";
 import { GeminiService } from "../gemini";
 
-// Helper: Fix Cloudinary URLs
 export const getOptimizedUrl = (url: string) => {
   if (!url || typeof url !== "string") return url;
   if (url.includes("cloudinary.com") && url.includes("/upload/")) {
@@ -12,7 +11,6 @@ export const getOptimizedUrl = (url: string) => {
   return url;
 };
 
-// Helper: Resize Strict
 export const resizeStrict = async (
   buffer: Buffer,
   width: number,
@@ -24,22 +22,15 @@ export const resizeStrict = async (
     .toBuffer();
 };
 
-// Helper: Resize with Blur
 export const resizeWithBlurFill = async (
   buffer: Buffer,
   width: number,
   height: number
 ): Promise<Buffer> => {
   try {
-    const background = await sharp({
-      create: {
-        width,
-        height,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 },
-      },
-    })
-      .png()
+    const background = await sharp(buffer)
+      .resize({ width, height, fit: "cover" })
+      .blur(40)
       .toBuffer();
 
     const foreground = await sharp(buffer)
@@ -53,29 +44,26 @@ export const resizeWithBlurFill = async (
 
     return await sharp(background)
       .composite([{ input: foreground, gravity: "center" }])
-      .toFormat("jpeg", { quality: 95 })
-      .toBuffer();
-  } catch (e) {
-    return await sharp(buffer)
-      .resize(width, height, { fit: "cover", position: "center" })
       .toFormat("jpeg")
       .toBuffer();
+  } catch (e) {
+    return buffer;
   }
 };
 
-// ✅ HELPER: AI Outpainting (Restored Original Logic)
+// ✅ HELPER: AI Outpainting (Black Bars + Perspective/Scale Locked Prompt)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
   targetHeight: number,
-  targetRatioString: string = "16:9" // Kept string type to avoid TS errors
+  targetRatioString: string = "16:9"
 ): Promise<Buffer> => {
   try {
     console.log(
-      `✨ Gemini 3 Pro: Outpainting to ${targetRatioString} (${targetWidth}x${targetHeight})...`
+      `✨ Gemini Outpaint: ${targetRatioString} (${targetWidth}x${targetHeight})`
     );
 
-    // 1. Create Black Background Guide
+    // 1. Create Solid Black Canvas
     const backgroundGuide = await sharp({
       create: {
         width: targetWidth,
@@ -87,7 +75,7 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 2. Composite original image centered (Fit Inside)
+    // 2. Place Original Image in Center
     const compositeBuffer = await sharp(backgroundGuide)
       .composite([
         {
@@ -100,19 +88,47 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 3. Original Prompt Logic
-    const isPortrait = targetHeight > targetWidth;
-    const direction = isPortrait ? "vertical" : "horizontal";
+    // 3. ✅ SCALE-AWARE PROMPTS
+    // We explicitly tell the AI to lock the focal length and perspective lines.
+
+    let specificContext = "";
+
+    if (targetRatioString === "9:16" || targetRatioString === "portrait") {
+      specificContext = `
+      GOAL: Vertical Uncrop.
+      ACTION: The central image is a crop. The black bars at TOP and BOTTOM are the rest of the scene.
+      Reveal the ceiling/sky and floor/ground.
+      `;
+    } else if (
+      targetRatioString === "16:9" ||
+      targetRatioString === "landscape"
+    ) {
+      specificContext = `
+      GOAL: Horizontal Uncrop.
+      ACTION: The central image is a crop. The black bars at LEFT and RIGHT are the rest of the scene.
+      Reveal the surroundings to the sides.
+      `;
+    } else {
+      specificContext = `
+      GOAL: Expand Field of View.
+      ACTION: Fill the surrounding black void with the rest of the environment.
+      `;
+    }
 
     const fullPrompt = `
-    TASK: Image Extension (Outpainting).
-    INPUT: An image with a sharp central subject and BLACK ${direction} bars.
-    INSTRUCTIONS:
-    1. REMOVE THE BLACK BARS: Paint over them completely with high-definition details.
-    2. SEAMLESS EXTENSION: Match lighting, texture, and style.
-    3. NO LETTERBOXING: Final output must be full-screen.
-    4. PRESERVE CENTER: Do not modify the central subject.
-    5. The output is a single, complete visually consistent scene.
+    TASK: Photorealistic Image Extension (Outpainting).
+    INPUT: A photo placed on a black canvas.
+    
+    ${specificContext}
+
+    GEOMETRY & SCALE RULES (CRITICAL):
+    1. LOCK FOCAL LENGTH: Do not change the zoom level. The new areas must have the EXACT SAME pixel scale as the center. 
+       - Do NOT make objects in the extension tiny or giant compared to the center.
+    2. EXTEND PERSPECTIVE LINES: Follow the vanishing points of the central image. 
+       - If there are lines (roads, walls, horizon), continue them straight into the black area.
+    3. MATCH DEPTH OF FIELD: If the background in the center is blurry, the new background must also be blurry. If sharp, make it sharp.
+    4. NO VISIBLE SEAMS: The transition from the center to the generated area must be invisible.
+    5. NO PANELS: This is ONE SINGLE continuous photograph. Do not draw frame lines.
     `;
 
     return await GeminiService.generateOrEditImage({
@@ -127,7 +143,6 @@ export const resizeWithGemini = async (
   }
 };
 
-// Helper: Upload
 export const uploadToCloudinary = async (
   f: any,
   p: string,
@@ -159,7 +174,6 @@ export const uploadToCloudinary = async (
   });
 };
 
-// Helper: Download
 export const downloadAndOptimizeImages = async (
   urls: string[]
 ): Promise<Buffer[]> => {
@@ -180,7 +194,6 @@ export const downloadAndOptimizeImages = async (
   return results.filter((buf): buf is Buffer => buf !== null);
 };
 
-// Helper: Ratio Matcher
 export const getClosestAspectRatio = (
   width: number,
   height: number
@@ -188,15 +201,8 @@ export const getClosestAspectRatio = (
   const ratio = width / height;
   const targets = [
     { id: "1:1", val: 1.0 },
-    { id: "4:3", val: 1.33 },
-    { id: "3:4", val: 0.75 },
-    { id: "3:2", val: 1.5 },
-    { id: "2:3", val: 0.66 },
     { id: "16:9", val: 1.77 },
     { id: "9:16", val: 0.56 },
-    { id: "21:9", val: 2.33 },
-    { id: "5:4", val: 1.25 },
-    { id: "4:5", val: 0.8 },
   ];
   const closest = targets.reduce((prev, curr) =>
     Math.abs(curr.val - ratio) < Math.abs(prev.val - ratio) ? curr : prev
