@@ -861,7 +861,7 @@ function Dashboard() {
                       : "bg-cyan-900/50 text-cyan-300 border-cyan-700/50 hover:bg-cyan-800 hover:border-cyan-500"
                   }`}
                 >
-                  <span>📚</span> Open Library
+                  <span></span> Open Library
                 </button>
               </div>
 
@@ -1515,13 +1515,6 @@ function Dashboard() {
                           <label className="block text-sm font-semibold text-white">
                             Reference Images
                           </label>
-                          <button
-                            type="button"
-                            onClick={() => setActiveLibrarySlot("generic")}
-                            className="text-xs bg-cyan-900/50 text-cyan-300 px-3 py-1.5 rounded-lg hover:bg-cyan-800 border border-cyan-700/50 flex items-center gap-1 transition-colors"
-                          >
-                            <span></span> Open Library
-                          </button>
                         </div>
                         <div className="space-y-3">
                           <div className="w-full h-24 border-2 border-dashed border-gray-600 rounded-xl hover:border-cyan-500 hover:bg-gray-800/50 transition-all group relative flex items-center justify-center">

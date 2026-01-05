@@ -19,13 +19,20 @@ export const Hero = () => {
           <div className="max-w-4xl mx-auto text-center">
             {/* Enhanced Navigation Bar */}
             <div className="flex flex-col sm:flex-row justify-between items-center mb-12 sm:mb-16 gap-6 sm:gap-0">
-              {/* Logo Section - FX Logo and Divider Removed */}
+              {/* Logo Section - Linked to PicDrift.com */}
               <div className="flex items-center gap-4 sm:gap-6">
-                <img
-                  src={picdriftLogo}
-                  alt="PicDrift"
-                  className="h-12 sm:h-16 w-auto object-contain transition-transform hover:scale-105"
-                />
+                <a
+                  href="https://picdrift.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block" // Ensures the link behaves correctly in the flex container
+                >
+                  <img
+                    src={picdriftLogo}
+                    alt="PicDrift"
+                    className="h-12 sm:h-16 w-auto object-contain transition-transform hover:scale-105"
+                  />
+                </a>
               </div>
 
               {/* Login Button */}
@@ -70,16 +77,6 @@ export const Hero = () => {
                     className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white px-4 sm:px-6 md:px-8 py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg transition-all duration-300 hover:shadow-2xl hover:scale-105 flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-center"
                   >
                     Sign Up Now
-                  </a>
-
-                  {/* Button 2: Try Free Demo */}
-                  <a
-                    href="https://www.picdrift.com/fx-demo"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="border border-white/20 bg-white/5 hover:bg-white/10 text-white px-4 sm:px-6 md:px-8 py-3 sm:py-4 rounded-xl font-semibold text-base sm:text-lg transition-all duration-300 backdrop-blur-sm flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-center"
-                  >
-                    Try Free Demo
                   </a>
                 </div>
               </div>

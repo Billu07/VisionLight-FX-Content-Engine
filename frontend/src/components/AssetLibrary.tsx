@@ -268,7 +268,7 @@ export function AssetLibrary({
                 <LoadingSpinner size="sm" variant="default" />
               ) : (
                 <>
-                  <span>📤</span> Upload
+                  <span></span> Upload
                 </>
               )}
             </button>
@@ -420,7 +420,15 @@ export function AssetLibrary({
                   {isDownloading ? <LoadingSpinner size="sm" /> : "Download"}
                 </button>
                 <button
-                  onClick={() => deleteMutation.mutate(selectedAsset.id)}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Are you sure you want to delete this asset? This cannot be undone."
+                      )
+                    ) {
+                      deleteMutation.mutate(selectedAsset.id);
+                    }
+                  }}
                   className="w-full py-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg text-sm"
                 >
                   Delete

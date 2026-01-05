@@ -36,7 +36,7 @@ export const MarketingSite = () => {
 
               {/* 3. Update Contact to a mailto link */}
               <a
-                href="mailto:picdrift@picdrift.com"
+                href="https://www.picdrift.com/contact"
                 className="text-purple-400 hover:text-cyan-400 transition-colors"
               >
                 Contact
