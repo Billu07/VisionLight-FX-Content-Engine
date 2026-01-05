@@ -97,7 +97,7 @@ export const resizeWithGemini = async (
       specificContext = `
       GOAL: Vertical Uncrop.
       ACTION: The central image is a crop. The black bars at TOP and BOTTOM are the rest of the scene.
-      Reveal those parts with visually consistent painting.
+      Reveal those parts with visually consistent painting. The whole canvas represent one continuous scene.
       `;
     } else if (
       targetRatioString === "16:9" ||
@@ -106,12 +106,12 @@ export const resizeWithGemini = async (
       specificContext = `
       GOAL: Horizontal Uncrop.
       ACTION: The central image is a crop. The black bars at LEFT and RIGHT are the rest of the scene.
-      Reveal the surroundings to the sides with visually consistent painting. You don't create borders, you complete the scene seamlessly.
+      Reveal the surroundings to the sides with visually consistent painting. You don't create borders, you complete the scene seamlessly. The whole canvas represent one single continuous scene.
       `;
     } else {
       specificContext = `
       GOAL: Expand Field of View.
-      ACTION: Fill the surrounding black void with the rest of the environment with visually consistent painting.
+      ACTION: Fill the surrounding black void with the rest of the environment with visually consistent painting. The whole canvas represent one single continuous scene.
       `;
     }
 
@@ -128,8 +128,8 @@ export const resizeWithGemini = async (
        - If there are lines (roads, walls, horizon), continue them straight into the black area.
     3. MATCH DEPTH OF FIELD: If the background in the center is blurry, the new background must also be blurry. If sharp, make it sharp.
     4. NO VISIBLE SEAMS: The transition from the center to the generated area must be invisible.
-    5. NO PANELS: This is ONE SINGLE continuous photograph. Do not draw frame lines. Do not duplicate center image.
-    6. Don't create borders at the junction of the original image and the painting, you complete the scene, make it look seamless.
+    5. NO PANELS: This is ONE SINGLE continuous photograph. Do not draw frame lines.
+    6. Don't create borders at the junction of the original image and the painting, you complete the scene, make it look continuous and spotless.
     `;
 
     return await GeminiService.generateOrEditImage({
