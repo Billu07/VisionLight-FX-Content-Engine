@@ -3,6 +3,7 @@ import axios from "axios";
 import { cloudinaryClient } from "./config";
 import { GeminiService } from "../gemini";
 
+// Helper: Fix Cloudinary URLs
 export const getOptimizedUrl = (url: string) => {
   if (!url || typeof url !== "string") return url;
   if (url.includes("cloudinary.com") && url.includes("/upload/")) {
@@ -11,6 +12,7 @@ export const getOptimizedUrl = (url: string) => {
   return url;
 };
 
+// Helper: Resize Strict
 export const resizeStrict = async (
   buffer: Buffer,
   width: number,
@@ -22,15 +24,22 @@ export const resizeStrict = async (
     .toBuffer();
 };
 
+// Helper: Resize with Blur (Fallback)
 export const resizeWithBlurFill = async (
   buffer: Buffer,
   width: number,
   height: number
 ): Promise<Buffer> => {
   try {
-    const background = await sharp(buffer)
-      .resize({ width, height, fit: "cover" })
-      .blur(40)
+    const background = await sharp({
+      create: {
+        width,
+        height,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 255 },
+      },
+    })
+      .png()
       .toBuffer();
 
     const foreground = await sharp(buffer)
@@ -44,14 +53,17 @@ export const resizeWithBlurFill = async (
 
     return await sharp(background)
       .composite([{ input: foreground, gravity: "center" }])
-      .toFormat("jpeg")
+      .toFormat("jpeg", { quality: 95 })
       .toBuffer();
   } catch (e) {
-    return buffer;
+    return await sharp(buffer)
+      .resize(width, height, { fit: "cover", position: "center" })
+      .toFormat("jpeg")
+      .toBuffer();
   }
 };
 
-// ✅ HELPER: AI Outpainting (FIXED: "Stretched seamless" strategy)
+// ✅ HELPER: AI Outpainting (REVERTED TO BLACK BAR METHOD)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -60,22 +72,23 @@ export const resizeWithGemini = async (
 ): Promise<Buffer> => {
   try {
     console.log(
-      `✨ Gemini Outpaint: ${targetRatioString} (${targetWidth}x${targetHeight})`
+      `✨ Gemini 3 Pro: Outpainting to ${targetRatioString} (${targetWidth}x${targetHeight})...`
     );
 
-    // 1. Create a "Stretched" Background
-    // We use fit: 'fill' to distort the image to cover the whole canvas.
-    // This ensures that the colors at the seam MATCH perfectly (unlike black bars or pixelation).
-    const backgroundGuide = await sharp(originalBuffer)
-      .resize({
+    // 1. Create Canvas (Black Background)
+    // This creates the "Letterbox" look that the AI recognizes
+    const backgroundGuide = await sharp({
+      create: {
         width: targetWidth,
         height: targetHeight,
-        fit: "fill", // 👈 DISTORT to fill. Ensures edge colors align.
-      })
-      .blur(20) // Soft blur to hide the distortion, but keep it looking like a "photo"
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 255 }, // Solid Black
+      },
+    })
+      .png()
       .toBuffer();
 
-    // 2. Place Sharp Original on Top
+    // 2. Composite original image centered (Fit Inside)
     const compositeBuffer = await sharp(backgroundGuide)
       .composite([
         {
@@ -88,18 +101,18 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 3. ✅ NEW PROMPT: Explicitly forbid "3 parts" or "triptych"
+    // 3. Prompt Logic (Directional Black Bars)
+    const isPortrait = targetHeight > targetWidth;
+    const direction = isPortrait ? "vertical" : "horizontal";
+
     const fullPrompt = `
-    TASK: Seamless Image Outpainting.
-    
-    INPUT: A sharp central image over a stretched background guide.
-    
+    TASK: Image Extension (Outpainting).
+    INPUT: An image with a sharp central subject and BLACK ${direction} bars.
     INSTRUCTIONS:
-    1. IGNORE THE DISTORTION: The stretched background is just a color guide. You must repaint it with realistic textures.
-    2. UNIFIED SCENE: The final result must be ONE SINGLE IMAGE. Do not create a collage, triptych, or 3-panel layout.
-    3. BLEND SEAMS: The transition from the center to the edges must be invisible. Extend clouds, walls, or landscapes naturally.
-    4. NO FRAMES: Do not draw lines or borders around the central box.
-    5. PRESERVE IDENTITY: Do not change the person or object in the center.
+    1. REMOVE THE BLACK BARS: Paint over them completely with high-definition details.
+    2. SEAMLESS EXTENSION: Match lighting, texture, and style.
+    3. NO LETTERBOXING: Final output must be full-screen.
+    4. PRESERVE CENTER: Do not modify the central subject.
     `;
 
     return await GeminiService.generateOrEditImage({
@@ -114,6 +127,7 @@ export const resizeWithGemini = async (
   }
 };
 
+// Helper: Upload
 export const uploadToCloudinary = async (
   f: any,
   p: string,
@@ -145,6 +159,7 @@ export const uploadToCloudinary = async (
   });
 };
 
+// Helper: Download
 export const downloadAndOptimizeImages = async (
   urls: string[]
 ): Promise<Buffer[]> => {
@@ -165,6 +180,7 @@ export const downloadAndOptimizeImages = async (
   return results.filter((buf): buf is Buffer => buf !== null);
 };
 
+// Helper: Ratio Matcher
 export const getClosestAspectRatio = (
   width: number,
   height: number
@@ -172,8 +188,15 @@ export const getClosestAspectRatio = (
   const ratio = width / height;
   const targets = [
     { id: "1:1", val: 1.0 },
+    { id: "4:3", val: 1.33 },
+    { id: "3:4", val: 0.75 },
+    { id: "3:2", val: 1.5 },
+    { id: "2:3", val: 0.66 },
     { id: "16:9", val: 1.77 },
     { id: "9:16", val: 0.56 },
+    { id: "21:9", val: 2.33 },
+    { id: "5:4", val: 1.25 },
+    { id: "4:5", val: 0.8 },
   ];
   const closest = targets.reduce((prev, curr) =>
     Math.abs(curr.val - ratio) < Math.abs(prev.val - ratio) ? curr : prev
