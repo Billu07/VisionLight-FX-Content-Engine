@@ -97,7 +97,7 @@ export const resizeWithGemini = async (
       specificContext = `
       GOAL: Vertical Uncrop.
       ACTION: The central image is a crop. The black bars at TOP and BOTTOM are the rest of the scene.
-      Reveal the ceiling/sky and floor/ground.
+      Reveal those parts with visually consistent painting.
       `;
     } else if (
       targetRatioString === "16:9" ||
