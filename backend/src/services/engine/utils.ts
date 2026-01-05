@@ -51,12 +51,13 @@ export const resizeWithBlurFill = async (
   }
 };
 
-// ✅ HELPER: AI Outpainting (Context-Aware Logic)
+// ✅ HELPER: AI Outpainting (Black Bars Context-Aware)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
   targetHeight: number,
-  targetRatioString: "16:9" | "9:16" | "1:1" = "16:9"
+  // 🔽 FIXED: Changed type to 'string' to allow "portrait" and "landscape"
+  targetRatioString: string = "16:9"
 ): Promise<Buffer> => {
   try {
     console.log(
@@ -64,13 +65,12 @@ export const resizeWithGemini = async (
     );
 
     // 1. Create a Solid Black Canvas (The "Void")
-    // Black works best IF the prompt explicitly identifies it as "empty space to fill"
     const backgroundGuide = await sharp({
       create: {
         width: targetWidth,
         height: targetHeight,
         channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 },
+        background: { r: 0, g: 0, b: 0, alpha: 255 }, // Solid Black
       },
     })
       .png()
@@ -90,17 +90,16 @@ export const resizeWithGemini = async (
       .toBuffer();
 
     // 3. ✅ CONTEXT-AWARE PROMPTS
-    // We treat Portrait vs Landscape differently to stop the "3-panel" hallucination.
-
     let instructions = "";
 
+    // Normalize input to handle both "9:16" and "portrait"
     if (targetRatioString === "9:16" || targetRatioString === "portrait") {
       // VERTICAL LOGIC
       instructions = `
       TASK: Vertical Image Expansion (Tall Format).
       INPUT: A central image with BLACK BARS at the TOP and BOTTOM.
       ACTION:
-      - EXTEND VERTICALLY: You must generate new content for the top (sky/ceiling) and bottom (ground/floor).
+      - EXTEND VERTICALLY: You must generate new content for the top (sky/ceiling) and bottom (ground/floor) to replace the black bars.
       - CONTINUITY: The new top/bottom areas must seamlessly connect to the center.
       - NO PANELS: Do NOT create a triptych. This is ONE single tall image.
       `;
@@ -113,7 +112,7 @@ export const resizeWithGemini = async (
       TASK: Horizontal Image Expansion (Wide Format).
       INPUT: A central image with BLACK BARS on the LEFT and RIGHT.
       ACTION:
-      - EXTEND HORIZONTALLY: You must generate new content for the left and right sides.
+      - EXTEND HORIZONTALLY: You must generate new content for the left and right sides to replace the black bars.
       - CONTINUITY: Widen the horizon or scene naturally.
       - NO PANELS: Do NOT create a split-screen. This is ONE single wide image.
       `;
