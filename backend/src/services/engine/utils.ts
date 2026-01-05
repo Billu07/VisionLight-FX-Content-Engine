@@ -51,7 +51,7 @@ export const resizeWithBlurFill = async (
   }
 };
 
-// ✅ HELPER: AI Uncropping (Fixed "Blurry Bottom" Issue)
+// ✅ HELPER: AI Outpainting (FIXED: "Stretched seamless" strategy)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -60,21 +60,19 @@ export const resizeWithGemini = async (
 ): Promise<Buffer> => {
   try {
     console.log(
-      `✨ Gemini Uncrop: ${targetRatioString} (${targetWidth}x${targetHeight})`
+      `✨ Gemini Outpaint: ${targetRatioString} (${targetWidth}x${targetHeight})`
     );
 
-    // 1. Create a "Low Res" Guide Background
-    // Instead of smooth blur (which looks like bokeh), we create a pixelated stretch.
-    // This looks like "bad data" that the AI feels compelled to fix.
+    // 1. Create a "Stretched" Background
+    // We use fit: 'fill' to distort the image to cover the whole canvas.
+    // This ensures that the colors at the seam MATCH perfectly (unlike black bars or pixelation).
     const backgroundGuide = await sharp(originalBuffer)
       .resize({
-        width: Math.round(targetWidth / 10),
-        height: Math.round(targetHeight / 10),
-        fit: "cover",
-      }) // Shrink
-      .resize({ width: targetWidth, height: targetHeight, kernel: "nearest" }) // Blow up pixelated
-      .blur(5) // Slight soften to blend edges
-      .modulate({ brightness: 0.7 }) // Darken slightly to de-emphasize
+        width: targetWidth,
+        height: targetHeight,
+        fit: "fill", // 👈 DISTORT to fill. Ensures edge colors align.
+      })
+      .blur(20) // Soft blur to hide the distortion, but keep it looking like a "photo"
       .toBuffer();
 
     // 2. Place Sharp Original on Top
@@ -90,18 +88,18 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 3. ✅ NEW PROMPT: "Uncrop" logic
-    // We explicitly tell it to extend the field of view and fix resolution.
+    // 3. ✅ NEW PROMPT: Explicitly forbid "3 parts" or "triptych"
     const fullPrompt = `
-    TASK: Uncrop / Image Extension.
+    TASK: Seamless Image Outpainting.
     
-    INPUT: A central high-quality image placed on a low-resolution placeholder canvas.
+    INPUT: A sharp central image over a stretched background guide.
     
     INSTRUCTIONS:
-    1. EXPAND THE SCENE: The pixelated/blurry outer areas are missing data. You must regenerate them completely.
-    2. MATCH RESOLUTION: The new edges must be High Resolution and sharp, matching the center perfectly. Do not leave them blurry.
-    3. INFINITE DEPTH: If the image is a landscape, extend the horizon. If it is a portrait, extend the body/background.
-    4. NO BORDERS: The final result must look like a single wide-angle photo.
+    1. IGNORE THE DISTORTION: The stretched background is just a color guide. You must repaint it with realistic textures.
+    2. UNIFIED SCENE: The final result must be ONE SINGLE IMAGE. Do not create a collage, triptych, or 3-panel layout.
+    3. BLEND SEAMS: The transition from the center to the edges must be invisible. Extend clouds, walls, or landscapes naturally.
+    4. NO FRAMES: Do not draw lines or borders around the central box.
+    5. PRESERVE IDENTITY: Do not change the person or object in the center.
     `;
 
     return await GeminiService.generateOrEditImage({
