@@ -63,7 +63,7 @@ export const resizeWithBlurFill = async (
   }
 };
 
-// ✅ HELPER: AI Outpainting (Black Bars + Seam-Blending Prompt)
+// ✅ HELPER: AI Outpainting (Restored from contentEngine.ts)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -72,22 +72,22 @@ export const resizeWithGemini = async (
 ): Promise<Buffer> => {
   try {
     console.log(
-      `✨ Gemini Outpaint: ${targetRatioString} (${targetWidth}x${targetHeight})...`
+      `✨ Gemini 3 Pro: Outpainting to ${targetRatioString} (${targetWidth}x${targetHeight})...`
     );
 
-    // 1. Create Solid Black Canvas
+    // 1. Create Black Background Canvas
     const backgroundGuide = await sharp({
       create: {
         width: targetWidth,
         height: targetHeight,
         channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 }, // Solid Black
+        background: { r: 0, g: 0, b: 0, alpha: 255 },
       },
     })
       .png()
       .toBuffer();
 
-    // 2. Composite original image centered
+    // 2. Composite original image centered (Fit Inside)
     const compositeBuffer = await sharp(backgroundGuide)
       .composite([
         {
@@ -100,21 +100,19 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 3. Logic: Determine Direction
+    // 3. Logic to determine prompt direction (Crucial for success)
     const isPortrait = targetHeight > targetWidth;
     const direction = isPortrait ? "vertical" : "horizontal";
 
-    // 4. ✅ REFINED PROMPT: Focus on "Invisible Seams"
     const fullPrompt = `
-    TASK: Seamless Image Outpainting.
-    INPUT: A photograph placed centrally on a black background.
-    
+    TASK: Image Extension (Outpainting).
+    INPUT: An image with a sharp central subject and BLACK ${direction} bars.
     INSTRUCTIONS:
-    1. FILL THE BLACK VOID: Completely overwrite the black ${direction} bars with realistic scenery that extends from the central image.
-    2. DISSOLVE THE BORDER: There must be NO VISIBLE LINE or SEAM between the original image and the generated extension. Blend the pixels perfectly.
-    3. MATCH THE CENTER: The new areas must match the focus, noise, grain, and lighting of the central photo exactly.
-    4. SINGLE CONTINUOUS SHOT: The final result must look like ONE single photo taken with a wider lens. 
-    5. NO PANELS/FRAMES: Do not create a comic-book style layout. Do not draw lines separating the center from the edges.
+    1. REMOVE THE BLACK BARS: Paint over them completely with high-definition details.
+    2. SEAMLESS EXTENSION: Match lighting, texture, and style.
+    3. NO PANELS/FRAMES: Do not create a comic-book style layout. Do not draw lines separating the center from the edges.
+    4. NO LETTERBOXING: Final output must be full-screen.
+    5.DISSOLVE THE BORDER: There must be NO VISIBLE LINE or SEAM between the original image and the generated extension. Blend the pixels perfectly.
     6. PRESERVE SUBJECT: Keep the central subject exactly as it is, but merge the background smoothly.
     `;
 
