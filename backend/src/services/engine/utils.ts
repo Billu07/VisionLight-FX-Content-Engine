@@ -110,10 +110,9 @@ export const resizeWithGemini = async (
     INSTRUCTIONS:
     1. REMOVE THE BLACK BARS: Paint over them completely with high-definition details. The center image is a cropped one, you need to uncover those "got cut" parts and complete the image consistently.
     2. SEAMLESS EXTENSION: Match lighting, texture, and style.
-    3. NO PANELS/FRAMES: Do not create a comic-book style layout. Do not draw lines separating the center from the edges.
-    4. NO LETTERBOXING: Final output must be full-screen.
-    5.DISSOLVE THE BORDER: There must be NO VISIBLE LINE or SEAM between the original image and the generated extension. Blend the pixels perfectly.
-    6. PRESERVE SUBJECT: Keep the central subject exactly as it is, but merge the background smoothly.
+    3. NO LETTERBOXING: Final output must be full-screen.
+    4.DISSOLVE THE BORDER: There must be NO VISIBLE LINE or SEAM between the original image and the generated extension. Blend the pixels perfectly.
+    5. PRESERVE SUBJECT: Keep the central subject exactly as it is, but merge the background smoothly.
     `;
 
     return await GeminiService.generateOrEditImage({
