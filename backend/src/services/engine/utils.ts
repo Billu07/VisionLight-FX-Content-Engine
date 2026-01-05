@@ -106,7 +106,7 @@ export const resizeWithGemini = async (
       specificContext = `
       GOAL: Horizontal Uncrop.
       ACTION: The central image is a crop. The black bars at LEFT and RIGHT are the rest of the scene.
-      Reveal the surroundings to the sides with visually consistent painting.
+      Reveal the surroundings to the sides with visually consistent painting. You don't create borders, you complete the scene seamlessly.
       `;
     } else {
       specificContext = `
@@ -129,6 +129,7 @@ export const resizeWithGemini = async (
     3. MATCH DEPTH OF FIELD: If the background in the center is blurry, the new background must also be blurry. If sharp, make it sharp.
     4. NO VISIBLE SEAMS: The transition from the center to the generated area must be invisible.
     5. NO PANELS: This is ONE SINGLE continuous photograph. Do not draw frame lines. Do not duplicate center image.
+    6. Don't create borders at the junction of the original image and the painting, you complete the scene, make it look seamless.
     `;
 
     return await GeminiService.generateOrEditImage({
