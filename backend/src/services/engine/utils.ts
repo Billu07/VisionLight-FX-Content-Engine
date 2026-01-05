@@ -3,7 +3,6 @@ import axios from "axios";
 import { cloudinaryClient } from "./config";
 import { GeminiService } from "../gemini";
 
-// Helper: Fix Cloudinary URLs
 export const getOptimizedUrl = (url: string) => {
   if (!url || typeof url !== "string") return url;
   if (url.includes("cloudinary.com") && url.includes("/upload/")) {
@@ -12,7 +11,6 @@ export const getOptimizedUrl = (url: string) => {
   return url;
 };
 
-// Helper: Resize Strict
 export const resizeStrict = async (
   buffer: Buffer,
   width: number,
@@ -24,7 +22,6 @@ export const resizeStrict = async (
     .toBuffer();
 };
 
-// Helper: Resize with Blur (Fallback)
 export const resizeWithBlurFill = async (
   buffer: Buffer,
   width: number,
@@ -32,7 +29,7 @@ export const resizeWithBlurFill = async (
 ): Promise<Buffer> => {
   try {
     const background = await sharp(buffer)
-      .resize({ width, height, fit: "cover" }) // Stretch to fill
+      .resize({ width, height, fit: "cover" })
       .blur(40)
       .toBuffer();
 
@@ -47,14 +44,14 @@ export const resizeWithBlurFill = async (
 
     return await sharp(background)
       .composite([{ input: foreground, gravity: "center" }])
-      .toFormat("jpeg", { quality: 95 })
+      .toFormat("jpeg")
       .toBuffer();
   } catch (e) {
-    return buffer; // Fallback
+    return buffer;
   }
 };
 
-// ✅ HELPER: AI Outpainting (FIXED: "Blurred Context" Strategy)
+// ✅ HELPER: AI Uncropping (Fixed "Blurry Bottom" Issue)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -63,22 +60,24 @@ export const resizeWithGemini = async (
 ): Promise<Buffer> => {
   try {
     console.log(
-      `✨ Gemini Outpaint: ${targetRatioString} (${targetWidth}x${targetHeight})`
+      `✨ Gemini Uncrop: ${targetRatioString} (${targetWidth}x${targetHeight})`
     );
 
-    // 1. Create a "Blurred Context" Background
-    // Instead of black bars, we stretch the original image to fill the screen
-    // and blur it. This gives the AI color cues and prevents the "Panel" effect.
+    // 1. Create a "Low Res" Guide Background
+    // Instead of smooth blur (which looks like bokeh), we create a pixelated stretch.
+    // This looks like "bad data" that the AI feels compelled to fix.
     const backgroundGuide = await sharp(originalBuffer)
       .resize({
-        width: targetWidth,
-        height: targetHeight,
-        fit: "cover", // Forces image to fill the whole area
-      })
-      .blur(30) // Blur enough so it looks like "background", but keeps colors
+        width: Math.round(targetWidth / 10),
+        height: Math.round(targetHeight / 10),
+        fit: "cover",
+      }) // Shrink
+      .resize({ width: targetWidth, height: targetHeight, kernel: "nearest" }) // Blow up pixelated
+      .blur(5) // Slight soften to blend edges
+      .modulate({ brightness: 0.7 }) // Darken slightly to de-emphasize
       .toBuffer();
 
-    // 2. Place Original Sharp Image on Top
+    // 2. Place Sharp Original on Top
     const compositeBuffer = await sharp(backgroundGuide)
       .composite([
         {
@@ -91,15 +90,18 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
+    // 3. ✅ NEW PROMPT: "Uncrop" logic
+    // We explicitly tell it to extend the field of view and fix resolution.
     const fullPrompt = `
-    TASK: Photo Restoration & Extension.
-    INPUT: A high-quality central subject surrounded by low-quality blurry edges.
+    TASK: Uncrop / Image Extension.
+    
+    INPUT: A central high-quality image placed on a low-resolution placeholder canvas.
     
     INSTRUCTIONS:
-    1. UN-BLUR THE EDGES: Re-draw the blurry outer areas to match the sharpness, texture, and lighting of the center perfectly.
-    2. SEAMLESS EXTENSION: The final result must look like ONE single continuous photograph taken with a wide-angle lens.
-    3. NO PANELS OR FRAMES: Do not create split screens. Do not draw borders. The image must be uniform.
-    4. PRESERVE CENTER: The sharp central subject is perfect. Do not change it. Only fix the surroundings.
+    1. EXPAND THE SCENE: The pixelated/blurry outer areas are missing data. You must regenerate them completely.
+    2. MATCH RESOLUTION: The new edges must be High Resolution and sharp, matching the center perfectly. Do not leave them blurry.
+    3. INFINITE DEPTH: If the image is a landscape, extend the horizon. If it is a portrait, extend the body/background.
+    4. NO BORDERS: The final result must look like a single wide-angle photo.
     `;
 
     return await GeminiService.generateOrEditImage({
@@ -114,7 +116,6 @@ export const resizeWithGemini = async (
   }
 };
 
-// Helper: Upload
 export const uploadToCloudinary = async (
   f: any,
   p: string,
@@ -146,7 +147,6 @@ export const uploadToCloudinary = async (
   });
 };
 
-// Helper: Download
 export const downloadAndOptimizeImages = async (
   urls: string[]
 ): Promise<Buffer[]> => {
@@ -167,7 +167,6 @@ export const downloadAndOptimizeImages = async (
   return results.filter((buf): buf is Buffer => buf !== null);
 };
 
-// Helper: Ratio Matcher
 export const getClosestAspectRatio = (
   width: number,
   height: number
@@ -175,15 +174,8 @@ export const getClosestAspectRatio = (
   const ratio = width / height;
   const targets = [
     { id: "1:1", val: 1.0 },
-    { id: "4:3", val: 1.33 },
-    { id: "3:4", val: 0.75 },
-    { id: "3:2", val: 1.5 },
-    { id: "2:3", val: 0.66 },
     { id: "16:9", val: 1.77 },
     { id: "9:16", val: 0.56 },
-    { id: "21:9", val: 2.33 },
-    { id: "5:4", val: 1.25 },
-    { id: "4:5", val: 0.8 },
   ];
   const closest = targets.reduce((prev, curr) =>
     Math.abs(curr.val - ratio) < Math.abs(prev.val - ratio) ? curr : prev
