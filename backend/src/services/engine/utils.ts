@@ -112,7 +112,7 @@ export const resizeWithGemini = async (
     2. SEAMLESS EXTENSION: Match lighting, texture, and style.
     3. NO LETTERBOXING: Final output must be full-screen.
     4. PRESERVE CENTER: Do not modify the central subject.
-    5. Remember, you're just completing an image, not creating anything new, we just lost some visuals from a continuous image by those black bars, so you need to give me back my complete image by filling those black bars.
+    5. The output is a single, complete visually consistent scene.
     `;
 
     return await GeminiService.generateOrEditImage({
