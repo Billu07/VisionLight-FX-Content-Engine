@@ -51,7 +51,7 @@ export const resizeWithBlurFill = async (
   }
 };
 
-// ✅ HELPER: AI Outpainting (Intent-Based Prompting)
+// ✅ HELPER: AI Outpainting (FIXED: "Mirrored Glitch" Strategy)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -63,17 +63,27 @@ export const resizeWithGemini = async (
       `✨ Gemini Outpaint: ${targetRatioString} (${targetWidth}x${targetHeight})`
     );
 
-    // 1. Create the Black Canvas (Letterboxing)
-    // We use this because it's the cleanest "No Data" signal.
-    const backgroundGuide = await sharp({
-      create: {
+    // 1. Calculate Padding Dimensions
+    const metadata = await sharp(originalBuffer).metadata();
+    const origW = metadata.width || 1000;
+    const origH = metadata.height || 1000;
+
+    // We use a 'contain' strategy on a transparent background first
+    // Then we fill the transparency with a MIRROR of the image
+    // This creates a seamless color transition at the edge, stopping the "Frame" effect.
+
+    // Step A: Create the canvas filled with the image stretched/mirrored (approximate via blur/flop)
+    // A simple robust way in Sharp without complex tiling is to use 'extend' with 'mirror'
+    // but Sharp's extend doesn't always support 'mirror' mode in all versions perfectly for layout.
+    // So we use a resizing trick:
+
+    const backgroundGuide = await sharp(originalBuffer)
+      .resize({
         width: targetWidth,
         height: targetHeight,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 },
-      },
-    })
-      .png()
+        fit: "fill", // Stretch it distored
+      })
+      .blur(10) // Light blur to obscure details but keep exact colors
       .toBuffer();
 
     // 2. Place Original Image in Center
@@ -89,46 +99,39 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 3. ✅ NEW INTENT-BASED PROMPT LOGIC
-    // Instead of complaining about black bars, we command the transformation.
+    // 3. ✅ NEW PROMPT STRATEGY: "Uncrop / Glitch Fix"
+    // We explicitly tell Gemini that the outer area is "distorted" and needs "reconstruction".
+    // This breaks the "3-panel" hallucination because it sees the outer area as *broken* parts of the same image.
 
-    let role = "";
-    let action = "";
-    let context = "";
+    let instructions = "";
 
     if (targetRatioString === "9:16" || targetRatioString === "portrait") {
-      role =
-        "You are an expert photo editor converting a Landscape photo into a Vertical Portrait.";
-      action =
-        "EXTEND THE CANVAS VERTICALLY. Generate realistic sky/ceiling above and ground/floor below.";
-      context =
-        "The input image is in the center. The black areas are empty canvas waiting to be filled.";
+      instructions = `
+      TASK: Uncrop to Portrait.
+      INPUT: A central photo surrounded by distorted/stretched background data.
+      ACTION: Regenerate the top and bottom areas. Replace the distorted pixels with realistic sky/ceiling (top) and ground/floor (bottom).
+      `;
     } else if (
       targetRatioString === "16:9" ||
       targetRatioString === "landscape"
     ) {
-      role =
-        "You are an expert photo editor converting a Portrait photo into a Wide Landscape.";
-      action =
-        "EXTEND THE CANVAS HORIZONTALLY. Generate realistic scenery to the left and right.";
-      context =
-        "The input image is in the center. The black areas are empty canvas waiting to be filled.";
+      instructions = `
+      TASK: Uncrop to Landscape.
+      INPUT: A central photo surrounded by distorted/stretched background data.
+      ACTION: Regenerate the left and right sides. Replace the distorted pixels with realistic scenery extensions.
+      `;
     } else {
-      role = "You are an expert photo editor uncropping an image.";
-      action = "Expand the field of view naturally in all directions.";
-      context = "The central image is the source of truth.";
+      instructions = `TASK: Expand Image. Fill the outer areas naturally.`;
     }
 
     const fullPrompt = `
-    ${role}
+    ${instructions}
     
-    ${context}
-    
-    YOUR MISSION:
-    1. ${action}
-    2. SEAMLESS BLEND: The new areas must match the perspective, lighting, and texture of the original center exactly.
-    3. SINGLE CONTINUOUS SHOT: The final result must look like one wide-angle photograph. Do NOT create a collage, triptych, or split-screen.
-    4. PRESERVE CENTER: Do not change the subject, face, or main details of the original central image. Only paint the black areas.
+    CRITICAL RULES:
+    1. SEAMLESS: The transition from the sharp center to the new edges must be invisible.
+    2. SINGLE IMAGE: The final result must look like ONE continuous photo. Do NOT create panels, borders, or split screens.
+    3. MATCH TEXTURE: If the center is a photo, the edges must be photorealistic. If art, match the art style.
+    4. FIX DISTORTION: The outer areas are placeholders. You must overwrite them completely.
     `;
 
     return await GeminiService.generateOrEditImage({
