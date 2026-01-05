@@ -106,12 +106,12 @@ export const resizeWithGemini = async (
       specificContext = `
       GOAL: Horizontal Uncrop.
       ACTION: The central image is a crop. The black bars at LEFT and RIGHT are the rest of the scene.
-      Reveal the surroundings to the sides.
+      Reveal the surroundings to the sides with visually consistent painting.
       `;
     } else {
       specificContext = `
       GOAL: Expand Field of View.
-      ACTION: Fill the surrounding black void with the rest of the environment.
+      ACTION: Fill the surrounding black void with the rest of the environment with visually consistent painting.
       `;
     }
 
@@ -128,7 +128,7 @@ export const resizeWithGemini = async (
        - If there are lines (roads, walls, horizon), continue them straight into the black area.
     3. MATCH DEPTH OF FIELD: If the background in the center is blurry, the new background must also be blurry. If sharp, make it sharp.
     4. NO VISIBLE SEAMS: The transition from the center to the generated area must be invisible.
-    5. NO PANELS: This is ONE SINGLE continuous photograph. Do not draw frame lines.
+    5. NO PANELS: This is ONE SINGLE continuous photograph. Do not draw frame lines. Do not duplicate center image.
     `;
 
     return await GeminiService.generateOrEditImage({
