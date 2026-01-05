@@ -51,12 +51,11 @@ export const resizeWithBlurFill = async (
   }
 };
 
-// ✅ HELPER: AI Outpainting (Black Bars Context-Aware)
+// ✅ HELPER: AI Outpainting (Intent-Based Prompting)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
   targetHeight: number,
-  // 🔽 FIXED: Changed type to 'string' to allow "portrait" and "landscape"
   targetRatioString: string = "16:9"
 ): Promise<Buffer> => {
   try {
@@ -64,13 +63,14 @@ export const resizeWithGemini = async (
       `✨ Gemini Outpaint: ${targetRatioString} (${targetWidth}x${targetHeight})`
     );
 
-    // 1. Create a Solid Black Canvas (The "Void")
+    // 1. Create the Black Canvas (Letterboxing)
+    // We use this because it's the cleanest "No Data" signal.
     const backgroundGuide = await sharp({
       create: {
         width: targetWidth,
         height: targetHeight,
         channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 }, // Solid Black
+        background: { r: 0, g: 0, b: 0, alpha: 255 },
       },
     })
       .png()
@@ -89,57 +89,53 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 3. ✅ CONTEXT-AWARE PROMPTS
-    let instructions = "";
+    // 3. ✅ NEW INTENT-BASED PROMPT LOGIC
+    // Instead of complaining about black bars, we command the transformation.
 
-    // Normalize input to handle both "9:16" and "portrait"
+    let role = "";
+    let action = "";
+    let context = "";
+
     if (targetRatioString === "9:16" || targetRatioString === "portrait") {
-      // VERTICAL LOGIC
-      instructions = `
-      TASK: Vertical Image Expansion (Tall Format).
-      INPUT: A central image with BLACK BARS at the TOP and BOTTOM.
-      ACTION:
-      - EXTEND VERTICALLY: You must generate new content for the top (sky/ceiling) and bottom (ground/floor) to replace the black bars.
-      - CONTINUITY: The new top/bottom areas must seamlessly connect to the center.
-      - NO PANELS: Do NOT create a triptych. This is ONE single tall image.
-      `;
+      role =
+        "You are an expert photo editor converting a Landscape photo into a Vertical Portrait.";
+      action =
+        "EXTEND THE CANVAS VERTICALLY. Generate realistic sky/ceiling above and ground/floor below.";
+      context =
+        "The input image is in the center. The black areas are empty canvas waiting to be filled.";
     } else if (
       targetRatioString === "16:9" ||
       targetRatioString === "landscape"
     ) {
-      // HORIZONTAL LOGIC
-      instructions = `
-      TASK: Horizontal Image Expansion (Wide Format).
-      INPUT: A central image with BLACK BARS on the LEFT and RIGHT.
-      ACTION:
-      - EXTEND HORIZONTALLY: You must generate new content for the left and right sides to replace the black bars.
-      - CONTINUITY: Widen the horizon or scene naturally.
-      - NO PANELS: Do NOT create a split-screen. This is ONE single wide image.
-      `;
+      role =
+        "You are an expert photo editor converting a Portrait photo into a Wide Landscape.";
+      action =
+        "EXTEND THE CANVAS HORIZONTALLY. Generate realistic scenery to the left and right.";
+      context =
+        "The input image is in the center. The black areas are empty canvas waiting to be filled.";
     } else {
-      // SQUARE/GENERAL LOGIC
-      instructions = `
-      TASK: Image Uncropping.
-      INPUT: An image centered on a black background.
-      ACTION: Fill the black background with natural scene extensions that match the center.
-      - NO FRAMES: The result must look like a full-frame photograph.
-      `;
+      role = "You are an expert photo editor uncropping an image.";
+      action = "Expand the field of view naturally in all directions.";
+      context = "The central image is the source of truth.";
     }
 
     const fullPrompt = `
-    ${instructions}
+    ${role}
     
-    STRICT RULES:
-    1. PRESERVE THE CENTER: The central rectangular image is the source of truth. Do not modify the subject inside it.
-    2. MATCH LIGHTING: The generated extensions must match the lighting direction of the source.
-    3. HIGH FIDELITY: Generate photorealistic textures for the new areas.
+    ${context}
+    
+    YOUR MISSION:
+    1. ${action}
+    2. SEAMLESS BLEND: The new areas must match the perspective, lighting, and texture of the original center exactly.
+    3. SINGLE CONTINUOUS SHOT: The final result must look like one wide-angle photograph. Do NOT create a collage, triptych, or split-screen.
+    4. PRESERVE CENTER: Do not change the subject, face, or main details of the original central image. Only paint the black areas.
     `;
 
     return await GeminiService.generateOrEditImage({
       prompt: fullPrompt,
       aspectRatio: targetRatioString,
       referenceImages: [compositeBuffer],
-      modelType: "quality", // Ensures Gemini 3 Pro
+      modelType: "quality",
     });
   } catch (error: any) {
     console.error("❌ Gemini Resize Error:", error.message);
