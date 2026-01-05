@@ -3,6 +3,7 @@ import axios from "axios";
 import { cloudinaryClient } from "./config";
 import { GeminiService } from "../gemini";
 
+// Helper: Fix Cloudinary URLs
 export const getOptimizedUrl = (url: string) => {
   if (!url || typeof url !== "string") return url;
   if (url.includes("cloudinary.com") && url.includes("/upload/")) {
@@ -11,6 +12,7 @@ export const getOptimizedUrl = (url: string) => {
   return url;
 };
 
+// Helper: Resize Strict
 export const resizeStrict = async (
   buffer: Buffer,
   width: number,
@@ -22,15 +24,22 @@ export const resizeStrict = async (
     .toBuffer();
 };
 
+// Helper: Resize with Blur
 export const resizeWithBlurFill = async (
   buffer: Buffer,
   width: number,
   height: number
 ): Promise<Buffer> => {
   try {
-    const background = await sharp(buffer)
-      .resize({ width, height, fit: "cover" })
-      .blur(40)
+    const background = await sharp({
+      create: {
+        width,
+        height,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 255 },
+      },
+    })
+      .png()
       .toBuffer();
 
     const foreground = await sharp(buffer)
@@ -47,11 +56,14 @@ export const resizeWithBlurFill = async (
       .toFormat("jpeg")
       .toBuffer();
   } catch (e) {
-    return buffer;
+    return await sharp(buffer)
+      .resize(width, height, { fit: "cover", position: "center" })
+      .toFormat("jpeg")
+      .toBuffer();
   }
 };
 
-// ✅ HELPER: AI Outpainting (Black Bars + Perspective/Scale Locked Prompt)
+// ✅ HELPER: AI Outpainting (Black Bars + Seam-Blending Prompt)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -60,7 +72,7 @@ export const resizeWithGemini = async (
 ): Promise<Buffer> => {
   try {
     console.log(
-      `✨ Gemini Outpaint: ${targetRatioString} (${targetWidth}x${targetHeight})`
+      `✨ Gemini Outpaint: ${targetRatioString} (${targetWidth}x${targetHeight})...`
     );
 
     // 1. Create Solid Black Canvas
@@ -69,13 +81,13 @@ export const resizeWithGemini = async (
         width: targetWidth,
         height: targetHeight,
         channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 },
+        background: { r: 0, g: 0, b: 0, alpha: 255 }, // Solid Black
       },
     })
       .png()
       .toBuffer();
 
-    // 2. Place Original Image in Center
+    // 2. Composite original image centered
     const compositeBuffer = await sharp(backgroundGuide)
       .composite([
         {
@@ -88,48 +100,22 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 3. ✅ SCALE-AWARE PROMPTS
-    // We explicitly tell the AI to lock the focal length and perspective lines.
+    // 3. Logic: Determine Direction
+    const isPortrait = targetHeight > targetWidth;
+    const direction = isPortrait ? "vertical" : "horizontal";
 
-    let specificContext = "";
-
-    if (targetRatioString === "9:16" || targetRatioString === "portrait") {
-      specificContext = `
-      GOAL: Vertical Uncrop.
-      ACTION: The central image is a crop. The black bars at TOP and BOTTOM are the rest of the scene.
-      Reveal those parts with visually consistent painting. The whole canvas represent one continuous scene.
-      `;
-    } else if (
-      targetRatioString === "16:9" ||
-      targetRatioString === "landscape"
-    ) {
-      specificContext = `
-      GOAL: Horizontal Uncrop.
-      ACTION: The central image is a crop. The black bars at LEFT and RIGHT are the rest of the scene.
-      Reveal the surroundings to the sides with visually consistent painting. You don't create borders, you complete the scene seamlessly. The whole canvas represent one single continuous scene.
-      `;
-    } else {
-      specificContext = `
-      GOAL: Expand Field of View.
-      ACTION: Fill the surrounding black void with the rest of the environment with visually consistent painting. The whole canvas represent one single continuous scene.
-      `;
-    }
-
+    // 4. ✅ REFINED PROMPT: Focus on "Invisible Seams"
     const fullPrompt = `
-    TASK: Photorealistic Image Extension (Outpainting).
-    INPUT: A photo placed on a black canvas.
+    TASK: Seamless Image Outpainting.
+    INPUT: A photograph placed centrally on a black background.
     
-    ${specificContext}
-
-    GEOMETRY & SCALE RULES (CRITICAL):
-    1. LOCK FOCAL LENGTH: Do not change the zoom level. The new areas must have the EXACT SAME pixel scale as the center. 
-       - Do NOT make objects in the extension tiny or giant compared to the center.
-    2. EXTEND PERSPECTIVE LINES: Follow the vanishing points of the central image. 
-       - If there are lines (roads, walls, horizon), continue them straight into the black area.
-    3. MATCH DEPTH OF FIELD: If the background in the center is blurry, the new background must also be blurry. If sharp, make it sharp.
-    4. NO VISIBLE SEAMS: The transition from the center to the generated area must be invisible.
-    5. NO PANELS: This is ONE SINGLE continuous photograph. Do not draw frame lines.
-    6. Don't create borders at the junction of the original image and the painting, you complete the scene, make it look continuous and spotless.
+    INSTRUCTIONS:
+    1. FILL THE BLACK VOID: Completely overwrite the black ${direction} bars with realistic scenery that extends from the central image.
+    2. DISSOLVE THE BORDER: There must be NO VISIBLE LINE or SEAM between the original image and the generated extension. Blend the pixels perfectly.
+    3. MATCH THE CENTER: The new areas must match the focus, noise, grain, and lighting of the central photo exactly.
+    4. SINGLE CONTINUOUS SHOT: The final result must look like ONE single photo taken with a wider lens. 
+    5. NO PANELS/FRAMES: Do not create a comic-book style layout. Do not draw lines separating the center from the edges.
+    6. PRESERVE SUBJECT: Keep the central subject exactly as it is, but merge the background smoothly.
     `;
 
     return await GeminiService.generateOrEditImage({
@@ -144,6 +130,7 @@ export const resizeWithGemini = async (
   }
 };
 
+// Helper: Upload
 export const uploadToCloudinary = async (
   f: any,
   p: string,
@@ -175,6 +162,7 @@ export const uploadToCloudinary = async (
   });
 };
 
+// Helper: Download
 export const downloadAndOptimizeImages = async (
   urls: string[]
 ): Promise<Buffer[]> => {
@@ -195,6 +183,7 @@ export const downloadAndOptimizeImages = async (
   return results.filter((buf): buf is Buffer => buf !== null);
 };
 
+// Helper: Ratio Matcher
 export const getClosestAspectRatio = (
   width: number,
   height: number
@@ -202,8 +191,15 @@ export const getClosestAspectRatio = (
   const ratio = width / height;
   const targets = [
     { id: "1:1", val: 1.0 },
+    { id: "4:3", val: 1.33 },
+    { id: "3:4", val: 0.75 },
+    { id: "3:2", val: 1.5 },
+    { id: "2:3", val: 0.66 },
     { id: "16:9", val: 1.77 },
     { id: "9:16", val: 0.56 },
+    { id: "21:9", val: 2.33 },
+    { id: "5:4", val: 1.25 },
+    { id: "4:5", val: 0.8 },
   ];
   const closest = targets.reduce((prev, curr) =>
     Math.abs(curr.val - ratio) < Math.abs(prev.val - ratio) ? curr : prev
