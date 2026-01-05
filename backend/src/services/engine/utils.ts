@@ -108,7 +108,7 @@ export const resizeWithGemini = async (
     TASK: Image Extension (Outpainting).
     INPUT: An image with a sharp central subject and BLACK ${direction} bars.
     INSTRUCTIONS:
-    1. REMOVE THE BLACK BARS: Paint over them completely with high-definition details.
+    1. REMOVE THE BLACK BARS: Paint over them completely with high-definition details. The center image is a cropped one, you need to uncover those "got cut" parts and complete the image consistently.
     2. SEAMLESS EXTENSION: Match lighting, texture, and style.
     3. NO PANELS/FRAMES: Do not create a comic-book style layout. Do not draw lines separating the center from the edges.
     4. NO LETTERBOXING: Final output must be full-screen.
