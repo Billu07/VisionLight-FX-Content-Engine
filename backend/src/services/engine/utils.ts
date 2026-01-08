@@ -1,6 +1,7 @@
 import sharp from "sharp";
 import axios from "axios";
 import { cloudinaryClient, FAL_KEY } from "./config";
+import { GeminiService } from "../gemini";
 
 // Helper: Fix Cloudinary URLs
 export const getOptimizedUrl = (url: string) => {
@@ -23,18 +24,17 @@ export const resizeStrict = async (
     .toBuffer();
 };
 
-// Helper: Resize with Blur (FALLBACK)
-// ✅ Updated to ensure it blurs, so we know if fallback was triggered
+// ⚠️ FALLBACK: Blur Fill
 export const resizeWithBlurFill = async (
   buffer: Buffer,
   width: number,
   height: number
 ): Promise<Buffer> => {
-  console.log("⚠️ Triggering Fallback: Blur Fill");
+  console.log("⚠️ Fallback Triggered: Generating Blur Background");
   try {
     const background = await sharp(buffer)
-      .resize({ width, height, fit: "cover" }) // Stretch
-      .blur(50) // Strong Blur
+      .resize({ width, height, fit: "cover" })
+      .blur(60)
       .toBuffer();
 
     const foreground = await sharp(buffer)
@@ -87,7 +87,7 @@ export const uploadToCloudinary = async (
   });
 };
 
-// ✅ HELPER: FLUX FILL (With Debug Logs)
+// ✅ HELPER: FLUX FILL (Standard Endpoint)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -96,20 +96,15 @@ export const resizeWithGemini = async (
 ): Promise<Buffer> => {
   try {
     console.log(
-      `🚀 STARTING FLUX FILL: ${targetRatioString} (${targetWidth}x${targetHeight})`
+      `✨ STARTING FLUX FILL: ${targetRatioString} (${targetWidth}x${targetHeight})`
     );
 
-    // 1. Check API Key
-    if (!FAL_KEY) {
-      throw new Error("❌ FAL_KEY is missing in env variables!");
-    }
+    if (!FAL_KEY) throw new Error("❌ FAL_KEY is missing in env variables!");
 
-    // 2. Prepare Input Image (Blurred Stretch Context)
-    // We fill the void with a blurred stretch so Flux has color context
-    console.log("... Preparing Input Canvas");
+    // 1. Prepare Input Image (Original centered on Gray canvas)
     const backgroundBase = await sharp(originalBuffer)
       .resize({ width: targetWidth, height: targetHeight, fit: "fill" })
-      .blur(40)
+      .blur(50)
       .toBuffer();
 
     const inputCanvas = await sharp(backgroundBase)
@@ -124,17 +119,15 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 3. Prepare Mask (White=Fill, Black=Keep)
-    console.log("... Preparing Mask");
+    // 2. Prepare Mask (White=Fill, Black=Keep)
     const metadata = await sharp(originalBuffer).metadata();
     const { width: origW = 1, height: origH = 1 } = metadata;
 
-    // Exact inner dimensions
     const scale = Math.min(targetWidth / origW, targetHeight / origH);
     const innerW = Math.floor(origW * scale);
     const innerH = Math.floor(origH * scale);
 
-    // Overlap: We shrink the "Keep" (Black) area by 20px so Flux blends the edges
+    // Overlap: Shrink keep area by 20px
     const maskPadding = 20;
     const keepW = Math.max(1, innerW - maskPadding);
     const keepH = Math.max(1, innerH - maskPadding);
@@ -166,8 +159,7 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 4. Upload to Cloudinary
-    console.log("... Uploading resources to Cloudinary");
+    // 3. Upload to Cloudinary
     const tempId = `temp_${Date.now()}`;
     const imageUrl = await uploadToCloudinary(
       inputCanvas,
@@ -184,20 +176,20 @@ export const resizeWithGemini = async (
       "image"
     );
 
-    console.log("📤 Sending Request to Fal.ai...", { imageUrl, maskUrl });
+    console.log("📤 Sending to Fal (Standard Flux Fill)...", { imageUrl });
 
-    // 5. Call Flux
+    // 4. Call Flux (Standard Endpoint)
     const result = await axios.post(
-      "https://queue.fal.run/fal-ai/flux-pro/v1/fill-finetuned",
+      "https://queue.fal.run/fal-ai/flux/v1/fill", // ✅ Switched to standard v1/fill
       {
         image_url: imageUrl,
         mask_url: maskUrl,
         prompt:
           "High quality, photorealistic, seamless extension of the scene. The new areas must match the center perfectly in lighting and texture.",
         num_inference_steps: 28,
-        guidance_scale: 30, // Strict adherence
-        sync_mode: true, // Wait for result
-        safety_tolerance: "2",
+        guidance_scale: 30,
+        sync_mode: true,
+        enable_safety_checker: false, // ✅ Prevent blocking generic textures
       },
       {
         headers: {
@@ -208,21 +200,21 @@ export const resizeWithGemini = async (
     );
 
     if (result.data.images && result.data.images.length > 0) {
-      console.log("✅ Flux Success! Downloading result...");
+      console.log("✅ Flux Success!");
       const finalUrl = result.data.images[0].url;
       const response = await axios.get(finalUrl, {
         responseType: "arraybuffer",
       });
       return Buffer.from(response.data);
     } else {
+      console.error("❌ RAW FAL RESPONSE:", JSON.stringify(result.data)); // Log full response if empty
       throw new Error("Flux returned no images.");
     }
   } catch (error: any) {
-    console.error("❌ OUTPAINTING FAILED:", error.message);
-    if (error.response) {
-      console.error("Fal Response Data:", JSON.stringify(error.response.data));
-    }
-    // Fallback to Blur so we know it failed
+    console.error("❌ FLUX FAILED:", error.message);
+    if (error.response)
+      console.error("Fal Error Details:", JSON.stringify(error.response.data));
+
     return resizeWithBlurFill(originalBuffer, targetWidth, targetHeight);
   }
 };
