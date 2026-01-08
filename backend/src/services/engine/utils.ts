@@ -87,7 +87,7 @@ export const uploadToCloudinary = async (
   });
 };
 
-// ✅ HELPER: FLUX FILL (Fixed Polling)
+// ✅ HELPER: FLUX FILL (Fixed Polling URL)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -186,7 +186,7 @@ export const resizeWithGemini = async (
         prompt:
           "High quality, photorealistic, seamless extension of the scene. 4k resolution.",
         num_inference_steps: 28,
-        sync_mode: true,
+        sync_mode: true, // Try sync first
         enable_safety_checker: false,
       },
       {
@@ -199,7 +199,7 @@ export const resizeWithGemini = async (
 
     let resultData = response.data;
 
-    // 5. 🔄 ROBUST POLLING LOOP
+    // 5. 🔄 ROBUST POLLING LOOP (Using Dynamic URL)
     if (
       resultData.status === "IN_QUEUE" ||
       resultData.status === "IN_PROGRESS"
@@ -207,32 +207,36 @@ export const resizeWithGemini = async (
       console.log(
         `🕒 Request Queued (ID: ${resultData.request_id}). Polling...`
       );
-      const requestId = resultData.request_id;
+
+      // ✅ USE THE EXACT URL FROM THE RESPONSE
+      const statusUrl = resultData.status_url;
+
       let attempts = 0;
 
-      while (true) {
+      while (
+        resultData.status === "IN_QUEUE" ||
+        resultData.status === "IN_PROGRESS"
+      ) {
         attempts++;
         if (attempts > 60) throw new Error("Flux Generation Timeout (60s)");
 
         await new Promise((r) => setTimeout(r, 1000)); // Wait 1s
 
-        // Check status specific endpoint
-        const check = await axios.get(
-          `https://queue.fal.run/fal-ai/flux/requests/${requestId}/status`,
-          { headers: { Authorization: `Key ${FAL_KEY}` } }
-        );
+        // Check status using the URL Fal gave us
+        const check = await axios.get(statusUrl, {
+          headers: { Authorization: `Key ${FAL_KEY}` },
+        });
+        resultData = check.data;
+      }
 
-        if (check.data.status === "COMPLETED") {
-          // Fetch result from the specific result endpoint
-          const finalRes = await axios.get(
-            `https://queue.fal.run/fal-ai/flux/requests/${requestId}`,
-            { headers: { Authorization: `Key ${FAL_KEY}` } }
-          );
-          resultData = finalRes.data;
-          break;
-        } else if (check.data.status === "FAILED") {
-          throw new Error(`Flux Failed: ${JSON.stringify(check.data)}`);
-        }
+      if (resultData.status === "COMPLETED") {
+        // If completed, fetch the final result from the response_url
+        const finalRes = await axios.get(resultData.response_url, {
+          headers: { Authorization: `Key ${FAL_KEY}` },
+        });
+        resultData = finalRes.data;
+      } else {
+        throw new Error(`Flux Failed with status: ${resultData.status}`);
       }
     }
 
