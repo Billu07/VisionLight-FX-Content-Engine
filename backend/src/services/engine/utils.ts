@@ -1,7 +1,6 @@
 import sharp from "sharp";
 import axios from "axios";
 import { cloudinaryClient, FAL_KEY } from "./config";
-import { GeminiService } from "../gemini";
 
 // Helper: Fix Cloudinary URLs
 export const getOptimizedUrl = (url: string) => {
@@ -87,7 +86,7 @@ export const uploadToCloudinary = async (
   });
 };
 
-// ✅ HELPER: FLUX FILL (Standard Endpoint)
+// ✅ HELPER: FLUX FILL (Timeout Fix + Enhanced Debug)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -101,7 +100,7 @@ export const resizeWithGemini = async (
 
     if (!FAL_KEY) throw new Error("❌ FAL_KEY is missing in env variables!");
 
-    // 1. Prepare Input Image (Original centered on Gray canvas)
+    // 1. Prepare Input Image
     const backgroundBase = await sharp(originalBuffer)
       .resize({ width: targetWidth, height: targetHeight, fit: "fill" })
       .blur(50)
@@ -119,7 +118,7 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 2. Prepare Mask (White=Fill, Black=Keep)
+    // 2. Prepare Mask
     const metadata = await sharp(originalBuffer).metadata();
     const { width: origW = 1, height: origH = 1 } = metadata;
 
@@ -127,7 +126,6 @@ export const resizeWithGemini = async (
     const innerW = Math.floor(origW * scale);
     const innerH = Math.floor(origH * scale);
 
-    // Overlap: Shrink keep area by 20px
     const maskPadding = 20;
     const keepW = Math.max(1, innerW - maskPadding);
     const keepH = Math.max(1, innerH - maskPadding);
@@ -137,7 +135,7 @@ export const resizeWithGemini = async (
         width: targetWidth,
         height: targetHeight,
         channels: 4,
-        background: { r: 255, g: 255, b: 255, alpha: 255 }, // White (Fill)
+        background: { r: 255, g: 255, b: 255, alpha: 255 },
       },
     })
       .png()
@@ -148,7 +146,7 @@ export const resizeWithGemini = async (
         width: keepW,
         height: keepH,
         channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 }, // Black (Keep)
+        background: { r: 0, g: 0, b: 0, alpha: 255 },
       },
     })
       .png()
@@ -159,7 +157,7 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 3. Upload to Cloudinary
+    // 3. Upload
     const tempId = `temp_${Date.now()}`;
     const imageUrl = await uploadToCloudinary(
       inputCanvas,
@@ -176,26 +174,26 @@ export const resizeWithGemini = async (
       "image"
     );
 
-    console.log("📤 Sending to Fal (Standard Flux Fill)...", { imageUrl });
+    console.log("📤 Sending to Fal...", { imageUrl });
 
-    // 4. Call Flux (Standard Endpoint)
+    // 4. Call Flux (Added Timeout)
     const result = await axios.post(
-      "https://queue.fal.run/fal-ai/flux/v1/fill", // ✅ Switched to standard v1/fill
+      "https://queue.fal.run/fal-ai/flux/v1/fill",
       {
         image_url: imageUrl,
         mask_url: maskUrl,
         prompt:
-          "High quality, photorealistic, seamless extension of the scene. The new areas must match the center perfectly in lighting and texture.",
+          "High quality, photorealistic, seamless extension of the scene. 4k resolution.",
         num_inference_steps: 28,
-        guidance_scale: 30,
         sync_mode: true,
-        enable_safety_checker: false, // ✅ Prevent blocking generic textures
+        enable_safety_checker: false,
       },
       {
         headers: {
           Authorization: `Key ${FAL_KEY}`,
           "Content-Type": "application/json",
         },
+        timeout: 300000, // ✅ 5 Minute Timeout (Prevents premature connection close)
       }
     );
 
@@ -207,13 +205,18 @@ export const resizeWithGemini = async (
       });
       return Buffer.from(response.data);
     } else {
-      console.error("❌ RAW FAL RESPONSE:", JSON.stringify(result.data)); // Log full response if empty
+      console.error(
+        "❌ RAW FAL RESPONSE:",
+        JSON.stringify(result.data, null, 2)
+      );
       throw new Error("Flux returned no images.");
     }
   } catch (error: any) {
-    console.error("❌ FLUX FAILED:", error.message);
-    if (error.response)
-      console.error("Fal Error Details:", JSON.stringify(error.response.data));
+    console.error("❌ FLUX FAILED (Detailed):", JSON.stringify(error.message));
+    if (error.response) {
+      console.error("Status:", error.response.status);
+      console.error("Data:", JSON.stringify(error.response.data));
+    }
 
     return resizeWithBlurFill(originalBuffer, targetWidth, targetHeight);
   }
