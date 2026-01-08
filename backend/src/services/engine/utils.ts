@@ -1,7 +1,6 @@
 import sharp from "sharp";
 import axios from "axios";
 import { cloudinaryClient, FAL_KEY } from "./config";
-import { GeminiService } from "../gemini";
 
 // Helper: Fix Cloudinary URLs
 export const getOptimizedUrl = (url: string) => {
@@ -24,16 +23,18 @@ export const resizeStrict = async (
     .toBuffer();
 };
 
-// Helper: Resize with Blur (Fallback)
+// Helper: Resize with Blur (FALLBACK)
+// ✅ Updated to ensure it blurs, so we know if fallback was triggered
 export const resizeWithBlurFill = async (
   buffer: Buffer,
   width: number,
   height: number
 ): Promise<Buffer> => {
+  console.log("⚠️ Triggering Fallback: Blur Fill");
   try {
     const background = await sharp(buffer)
-      .resize({ width, height, fit: "cover" })
-      .blur(40)
+      .resize({ width, height, fit: "cover" }) // Stretch
+      .blur(50) // Strong Blur
       .toBuffer();
 
     const foreground = await sharp(buffer)
@@ -54,7 +55,7 @@ export const resizeWithBlurFill = async (
   }
 };
 
-// ✅ HELPER: Upload Buffer to Cloudinary (Required for Flux Input)
+// Helper: Upload
 export const uploadToCloudinary = async (
   f: any,
   p: string,
@@ -86,16 +87,7 @@ export const uploadToCloudinary = async (
   });
 };
 
-/* 
-// ---------------------------------------------------------
-// 🔴 GEMINI IMPLEMENTATION (Deprecated / Backup)
-// ---------------------------------------------------------
-export const resizeWithGemini = async (...) => { ... }
-*/
-
-// ✅ HELPER: FLUX FILL (State-of-the-Art Outpainting)
-// We keep the function name 'resizeWithGemini' to avoid breaking imports in other files,
-// but the logic is now 100% Flux.
+// ✅ HELPER: FLUX FILL (With Debug Logs)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -104,19 +96,23 @@ export const resizeWithGemini = async (
 ): Promise<Buffer> => {
   try {
     console.log(
-      `✨ Flux Fill (Fal.ai): ${targetRatioString} (${targetWidth}x${targetHeight})...`
+      `🚀 STARTING FLUX FILL: ${targetRatioString} (${targetWidth}x${targetHeight})`
     );
 
-    // 1. Prepare Input Image (Original centered on Gray canvas)
-    // Flux needs a base image. Gray works best for the "empty" areas.
-    const inputCanvas = await sharp({
-      create: {
-        width: targetWidth,
-        height: targetHeight,
-        channels: 4,
-        background: { r: 128, g: 128, b: 128, alpha: 255 },
-      },
-    })
+    // 1. Check API Key
+    if (!FAL_KEY) {
+      throw new Error("❌ FAL_KEY is missing in env variables!");
+    }
+
+    // 2. Prepare Input Image (Blurred Stretch Context)
+    // We fill the void with a blurred stretch so Flux has color context
+    console.log("... Preparing Input Canvas");
+    const backgroundBase = await sharp(originalBuffer)
+      .resize({ width: targetWidth, height: targetHeight, fit: "fill" })
+      .blur(40)
+      .toBuffer();
+
+    const inputCanvas = await sharp(backgroundBase)
       .composite([
         {
           input: await sharp(originalBuffer)
@@ -128,51 +124,51 @@ export const resizeWithGemini = async (
       .png()
       .toBuffer();
 
-    // 2. Prepare Mask (White = Fill, Black = Keep)
-    // We create a white canvas (fill everything) and place a black box (keep) in the center.
+    // 3. Prepare Mask (White=Fill, Black=Keep)
+    console.log("... Preparing Mask");
+    const metadata = await sharp(originalBuffer).metadata();
+    const { width: origW = 1, height: origH = 1 } = metadata;
 
-    // A. Base White Mask
+    // Exact inner dimensions
+    const scale = Math.min(targetWidth / origW, targetHeight / origH);
+    const innerW = Math.floor(origW * scale);
+    const innerH = Math.floor(origH * scale);
+
+    // Overlap: We shrink the "Keep" (Black) area by 20px so Flux blends the edges
+    const maskPadding = 20;
+    const keepW = Math.max(1, innerW - maskPadding);
+    const keepH = Math.max(1, innerH - maskPadding);
+
     const baseMask = await sharp({
       create: {
         width: targetWidth,
         height: targetHeight,
         channels: 4,
-        background: { r: 255, g: 255, b: 255, alpha: 255 }, // White
+        background: { r: 255, g: 255, b: 255, alpha: 255 }, // White (Fill)
       },
     })
       .png()
       .toBuffer();
 
-    // B. Calculate Inner Box Dimensions
-    const metadata = await sharp(originalBuffer).metadata();
-    const { width: origW = 1, height: origH = 1 } = metadata;
-
-    // Calculate the dimensions of the image when "fit: inside" is applied
-    const scale = Math.min(targetWidth / origW, targetHeight / origH);
-    const innerW = Math.floor(origW * scale);
-    const innerH = Math.floor(origH * scale);
-
-    // C. Create Black Rect
     const blackRect = await sharp({
       create: {
-        width: innerW,
-        height: innerH,
+        width: keepW,
+        height: keepH,
         channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 }, // Black
+        background: { r: 0, g: 0, b: 0, alpha: 255 }, // Black (Keep)
       },
     })
       .png()
       .toBuffer();
 
-    // D. Composite Black Rect onto White Mask
     const finalMaskBuffer = await sharp(baseMask)
       .composite([{ input: blackRect, gravity: "center" }])
       .png()
       .toBuffer();
 
-    // 3. Upload to Cloudinary (Fal needs public URLs)
+    // 4. Upload to Cloudinary
+    console.log("... Uploading resources to Cloudinary");
     const tempId = `temp_${Date.now()}`;
-    // Use a dummy user ID 'system' for temp uploads
     const imageUrl = await uploadToCloudinary(
       inputCanvas,
       `${tempId}_img`,
@@ -188,19 +184,18 @@ export const resizeWithGemini = async (
       "image"
     );
 
-    console.log("📤 Sending to Flux Pro...", { imageUrl, maskUrl });
+    console.log("📤 Sending Request to Fal.ai...", { imageUrl, maskUrl });
 
-    // 4. Call Fal.ai (Flux Pro 1.6 Fill)
-    // Using sync_mode=true so we don't have to poll
+    // 5. Call Flux
     const result = await axios.post(
       "https://queue.fal.run/fal-ai/flux-pro/v1/fill-finetuned",
       {
         image_url: imageUrl,
         mask_url: maskUrl,
         prompt:
-          "High quality, photorealistic, seamless extension of the scene. 4k resolution.",
+          "High quality, photorealistic, seamless extension of the scene. The new areas must match the center perfectly in lighting and texture.",
         num_inference_steps: 28,
-        guidance_scale: 3.5, // Standard for Flux
+        guidance_scale: 30, // Strict adherence
         sync_mode: true, // Wait for result
         safety_tolerance: "2",
       },
@@ -212,8 +207,8 @@ export const resizeWithGemini = async (
       }
     );
 
-    // 5. Download Result
     if (result.data.images && result.data.images.length > 0) {
+      console.log("✅ Flux Success! Downloading result...");
       const finalUrl = result.data.images[0].url;
       const response = await axios.get(finalUrl, {
         responseType: "arraybuffer",
@@ -223,8 +218,11 @@ export const resizeWithGemini = async (
       throw new Error("Flux returned no images.");
     }
   } catch (error: any) {
-    console.error("❌ Flux Fill Error:", error.message, error.response?.data);
-    // Fallback to Blur if Flux fails (e.g., rate limit)
+    console.error("❌ OUTPAINTING FAILED:", error.message);
+    if (error.response) {
+      console.error("Fal Response Data:", JSON.stringify(error.response.data));
+    }
+    // Fallback to Blur so we know it failed
     return resizeWithBlurFill(originalBuffer, targetWidth, targetHeight);
   }
 };
@@ -256,15 +254,8 @@ export const getClosestAspectRatio = (
   const ratio = width / height;
   const targets = [
     { id: "1:1", val: 1.0 },
-    { id: "4:3", val: 1.33 },
-    { id: "3:4", val: 0.75 },
-    { id: "3:2", val: 1.5 },
-    { id: "2:3", val: 0.66 },
     { id: "16:9", val: 1.77 },
     { id: "9:16", val: 0.56 },
-    { id: "21:9", val: 2.33 },
-    { id: "5:4", val: 1.25 },
-    { id: "4:5", val: 0.8 },
   ];
   const closest = targets.reduce((prev, curr) =>
     Math.abs(curr.val - ratio) < Math.abs(prev.val - ratio) ? curr : prev
