@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import axios from "axios";
-import { cloudinaryClient, FAL_KEY } from "./config";
+import { cloudinaryClient } from "./config";
 import { GeminiService } from "../gemini";
 
 // Helper: Fix Cloudinary URLs
@@ -24,17 +24,22 @@ export const resizeStrict = async (
     .toBuffer();
 };
 
-// ⚠️ FALLBACK: Blur Fill
+// Helper: Resize with Blur
 export const resizeWithBlurFill = async (
   buffer: Buffer,
   width: number,
   height: number
 ): Promise<Buffer> => {
-  console.log("⚠️ Fallback Triggered: Generating Blur Background");
   try {
-    const background = await sharp(buffer)
-      .resize({ width, height, fit: "cover" })
-      .blur(60)
+    const background = await sharp({
+      create: {
+        width,
+        height,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 255 },
+      },
+    })
+      .png()
       .toBuffer();
 
     const foreground = await sharp(buffer)
@@ -51,7 +56,73 @@ export const resizeWithBlurFill = async (
       .toFormat("jpeg")
       .toBuffer();
   } catch (e) {
-    return buffer;
+    return await sharp(buffer)
+      .resize(width, height, { fit: "cover", position: "center" })
+      .toFormat("jpeg")
+      .toBuffer();
+  }
+};
+
+// ✅ HELPER: AI Outpainting (Restored from contentEngine.ts)
+export const resizeWithGemini = async (
+  originalBuffer: Buffer,
+  targetWidth: number,
+  targetHeight: number,
+  targetRatioString: string = "16:9"
+): Promise<Buffer> => {
+  try {
+    console.log(
+      `✨ Gemini 3 Pro: Outpainting to ${targetRatioString} (${targetWidth}x${targetHeight})...`
+    );
+
+    // 1. Create Black Background Canvas
+    const backgroundGuide = await sharp({
+      create: {
+        width: targetWidth,
+        height: targetHeight,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 255 },
+      },
+    })
+      .png()
+      .toBuffer();
+
+    // 2. Composite original image centered (Fit Inside)
+    const compositeBuffer = await sharp(backgroundGuide)
+      .composite([
+        {
+          input: await sharp(originalBuffer)
+            .resize({ width: targetWidth, height: targetHeight, fit: "inside" })
+            .toBuffer(),
+          gravity: "center",
+        },
+      ])
+      .png()
+      .toBuffer();
+
+    // 3. Logic to determine prompt direction (Crucial for success)
+    const isPortrait = targetHeight > targetWidth;
+    const direction = isPortrait ? "vertical" : "horizontal";
+    const fullPrompt = `
+    TASK: Image Extension (Outpainting).
+    INPUT: An image with a sharp central subject and BLACK ${direction} bars.
+    INSTRUCTIONS:
+    1. REMOVE THE BLACK BARS: Paint over them completely with high-definition details. The center image is a cropped one, you need to uncover those "got cut" parts and complete the image consistently.
+    2. SEAMLESS EXTENSION: Match lighting, texture, and style.
+    3. NO LETTERBOXING: Final output must be full-screen.
+    4.DISSOLVE THE BORDER: There must be NO VISIBLE LINE or SEAM between the original image and the generated extension. Blend the pixels perfectly.
+    5. PRESERVE SUBJECT: Keep the central subject exactly as it is, but merge the background smoothly.
+    `;
+
+    return await GeminiService.generateOrEditImage({
+      prompt: fullPrompt,
+      aspectRatio: targetRatioString,
+      referenceImages: [compositeBuffer],
+      modelType: "quality",
+    });
+  } catch (error: any) {
+    console.error("❌ Gemini Resize Error:", error.message);
+    throw error;
   }
 };
 
@@ -87,180 +158,7 @@ export const uploadToCloudinary = async (
   });
 };
 
-// ✅ HELPER: FLUX FILL (Fixed Polling URL)
-export const resizeWithGemini = async (
-  originalBuffer: Buffer,
-  targetWidth: number,
-  targetHeight: number,
-  targetRatioString: string = "16:9"
-): Promise<Buffer> => {
-  try {
-    console.log(
-      `✨ STARTING FLUX FILL: ${targetRatioString} (${targetWidth}x${targetHeight})`
-    );
-
-    if (!FAL_KEY) throw new Error("❌ FAL_KEY is missing in env variables!");
-
-    // 1. Prepare Input Image
-    const backgroundBase = await sharp(originalBuffer)
-      .resize({ width: targetWidth, height: targetHeight, fit: "fill" })
-      .blur(50)
-      .toBuffer();
-
-    const inputCanvas = await sharp(backgroundBase)
-      .composite([
-        {
-          input: await sharp(originalBuffer)
-            .resize({ width: targetWidth, height: targetHeight, fit: "inside" })
-            .toBuffer(),
-          gravity: "center",
-        },
-      ])
-      .png()
-      .toBuffer();
-
-    // 2. Prepare Mask
-    const metadata = await sharp(originalBuffer).metadata();
-    const { width: origW = 1, height: origH = 1 } = metadata;
-
-    const scale = Math.min(targetWidth / origW, targetHeight / origH);
-    const innerW = Math.floor(origW * scale);
-    const innerH = Math.floor(origH * scale);
-
-    const maskPadding = 20;
-    const keepW = Math.max(1, innerW - maskPadding);
-    const keepH = Math.max(1, innerH - maskPadding);
-
-    const baseMask = await sharp({
-      create: {
-        width: targetWidth,
-        height: targetHeight,
-        channels: 4,
-        background: { r: 255, g: 255, b: 255, alpha: 255 },
-      },
-    })
-      .png()
-      .toBuffer();
-
-    const blackRect = await sharp({
-      create: {
-        width: keepW,
-        height: keepH,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 },
-      },
-    })
-      .png()
-      .toBuffer();
-
-    const finalMaskBuffer = await sharp(baseMask)
-      .composite([{ input: blackRect, gravity: "center" }])
-      .png()
-      .toBuffer();
-
-    // 3. Upload
-    const tempId = `temp_${Date.now()}`;
-    const imageUrl = await uploadToCloudinary(
-      inputCanvas,
-      `${tempId}_img`,
-      "system",
-      "temp",
-      "image"
-    );
-    const maskUrl = await uploadToCloudinary(
-      finalMaskBuffer,
-      `${tempId}_mask`,
-      "system",
-      "temp",
-      "image"
-    );
-
-    console.log("📤 Sending to Fal...", { imageUrl });
-
-    // 4. Submit to Flux
-    const response = await axios.post(
-      "https://queue.fal.run/fal-ai/flux/v1/fill",
-      {
-        image_url: imageUrl,
-        mask_url: maskUrl,
-        prompt:
-          "High quality, photorealistic, seamless extension of the scene. 4k resolution.",
-        num_inference_steps: 28,
-        sync_mode: true, // Try sync first
-        enable_safety_checker: false,
-      },
-      {
-        headers: {
-          Authorization: `Key ${FAL_KEY}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    let resultData = response.data;
-
-    // 5. 🔄 ROBUST POLLING LOOP (Using Dynamic URL)
-    if (
-      resultData.status === "IN_QUEUE" ||
-      resultData.status === "IN_PROGRESS"
-    ) {
-      console.log(
-        `🕒 Request Queued (ID: ${resultData.request_id}). Polling...`
-      );
-
-      // ✅ USE THE EXACT URL FROM THE RESPONSE
-      const statusUrl = resultData.status_url;
-
-      let attempts = 0;
-
-      while (
-        resultData.status === "IN_QUEUE" ||
-        resultData.status === "IN_PROGRESS"
-      ) {
-        attempts++;
-        if (attempts > 60) throw new Error("Flux Generation Timeout (60s)");
-
-        await new Promise((r) => setTimeout(r, 1000)); // Wait 1s
-
-        // Check status using the URL Fal gave us
-        const check = await axios.get(statusUrl, {
-          headers: { Authorization: `Key ${FAL_KEY}` },
-        });
-        resultData = check.data;
-      }
-
-      if (resultData.status === "COMPLETED") {
-        // If completed, fetch the final result from the response_url
-        const finalRes = await axios.get(resultData.response_url, {
-          headers: { Authorization: `Key ${FAL_KEY}` },
-        });
-        resultData = finalRes.data;
-      } else {
-        throw new Error(`Flux Failed with status: ${resultData.status}`);
-      }
-    }
-
-    // 6. Download Final Image
-    if (resultData.images && resultData.images.length > 0) {
-      console.log("✅ Flux Success!");
-      const finalUrl = resultData.images[0].url;
-      const finalImg = await axios.get(finalUrl, {
-        responseType: "arraybuffer",
-      });
-      return Buffer.from(finalImg.data);
-    } else {
-      console.error(
-        "❌ RAW FAL RESPONSE:",
-        JSON.stringify(resultData, null, 2)
-      );
-      throw new Error("Flux returned no images.");
-    }
-  } catch (error: any) {
-    console.error("❌ FLUX FAILED (Detailed):", JSON.stringify(error.message));
-    return resizeWithBlurFill(originalBuffer, targetWidth, targetHeight);
-  }
-};
-
+// Helper: Download
 export const downloadAndOptimizeImages = async (
   urls: string[]
 ): Promise<Buffer[]> => {
@@ -281,6 +179,7 @@ export const downloadAndOptimizeImages = async (
   return results.filter((buf): buf is Buffer => buf !== null);
 };
 
+// Helper: Ratio Matcher
 export const getClosestAspectRatio = (
   width: number,
   height: number
@@ -288,8 +187,15 @@ export const getClosestAspectRatio = (
   const ratio = width / height;
   const targets = [
     { id: "1:1", val: 1.0 },
+    { id: "4:3", val: 1.33 },
+    { id: "3:4", val: 0.75 },
+    { id: "3:2", val: 1.5 },
+    { id: "2:3", val: 0.66 },
     { id: "16:9", val: 1.77 },
     { id: "9:16", val: 0.56 },
+    { id: "21:9", val: 2.33 },
+    { id: "5:4", val: 1.25 },
+    { id: "4:5", val: 0.8 },
   ];
   const closest = targets.reduce((prev, curr) =>
     Math.abs(curr.val - ratio) < Math.abs(prev.val - ratio) ? curr : prev
