@@ -1,6 +1,7 @@
 import sharp from "sharp";
 import axios from "axios";
 import { cloudinaryClient, FAL_KEY } from "./config";
+import { GeminiService } from "../gemini";
 
 // Helper: Fix Cloudinary URLs
 export const getOptimizedUrl = (url: string) => {
@@ -86,7 +87,7 @@ export const uploadToCloudinary = async (
   });
 };
 
-// ✅ HELPER: FLUX FILL (Timeout Fix + Enhanced Debug)
+// ✅ HELPER: FLUX FILL (With Queue Polling)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -176,8 +177,8 @@ export const resizeWithGemini = async (
 
     console.log("📤 Sending to Fal...", { imageUrl });
 
-    // 4. Call Flux (Added Timeout)
-    const result = await axios.post(
+    // 4. Call Flux (Submit Request)
+    const response = await axios.post(
       "https://queue.fal.run/fal-ai/flux/v1/fill",
       {
         image_url: imageUrl,
@@ -185,7 +186,7 @@ export const resizeWithGemini = async (
         prompt:
           "High quality, photorealistic, seamless extension of the scene. 4k resolution.",
         num_inference_steps: 28,
-        sync_mode: true,
+        sync_mode: true, // Try sync, but handle queue if it fails
         enable_safety_checker: false,
       },
       {
@@ -193,31 +194,65 @@ export const resizeWithGemini = async (
           Authorization: `Key ${FAL_KEY}`,
           "Content-Type": "application/json",
         },
-        timeout: 300000, // ✅ 5 Minute Timeout (Prevents premature connection close)
       }
     );
 
-    if (result.data.images && result.data.images.length > 0) {
+    let resultData = response.data;
+
+    // 5. 🔄 HANDLE POLLING (If response is IN_QUEUE)
+    if (
+      resultData.status === "IN_QUEUE" ||
+      resultData.status === "IN_PROGRESS"
+    ) {
+      console.log(
+        `🕒 Request Queued. Polling status... (ID: ${resultData.request_id})`
+      );
+
+      const statusUrl = resultData.status_url;
+      let attempts = 0;
+
+      while (
+        resultData.status === "IN_QUEUE" ||
+        resultData.status === "IN_PROGRESS"
+      ) {
+        if (attempts > 30) throw new Error("Flux Generation Timeout (30s)");
+        await new Promise((r) => setTimeout(r, 1000)); // Wait 1s
+
+        const check = await axios.get(statusUrl, {
+          headers: { Authorization: `Key ${FAL_KEY}` },
+        });
+        resultData = check.data;
+        attempts++;
+      }
+
+      // Once completed, fetch the final result JSON from response_url
+      if (resultData.status === "COMPLETED") {
+        const finalRes = await axios.get(resultData.response_url, {
+          headers: { Authorization: `Key ${FAL_KEY}` },
+        });
+        resultData = finalRes.data;
+      } else {
+        throw new Error(`Flux Failed with status: ${resultData.status}`);
+      }
+    }
+
+    // 6. Download Final Image
+    if (resultData.images && resultData.images.length > 0) {
       console.log("✅ Flux Success!");
-      const finalUrl = result.data.images[0].url;
-      const response = await axios.get(finalUrl, {
+      const finalUrl = resultData.images[0].url;
+      const finalImg = await axios.get(finalUrl, {
         responseType: "arraybuffer",
       });
-      return Buffer.from(response.data);
+      return Buffer.from(finalImg.data);
     } else {
       console.error(
         "❌ RAW FAL RESPONSE:",
-        JSON.stringify(result.data, null, 2)
+        JSON.stringify(resultData, null, 2)
       );
       throw new Error("Flux returned no images.");
     }
   } catch (error: any) {
     console.error("❌ FLUX FAILED (Detailed):", JSON.stringify(error.message));
-    if (error.response) {
-      console.error("Status:", error.response.status);
-      console.error("Data:", JSON.stringify(error.response.data));
-    }
-
     return resizeWithBlurFill(originalBuffer, targetWidth, targetHeight);
   }
 };
