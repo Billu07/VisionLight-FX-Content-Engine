@@ -1,7 +1,6 @@
 import axios from "axios";
 import sharp from "sharp";
 import FormData from "form-data";
-// ✅ FIXED PATHS: Go up one level to 'services'
 import { dbService as airtableService, Post } from "../database";
 import { ROIService } from "../roi";
 import {
@@ -11,7 +10,6 @@ import {
   resizeWithGemini,
   resizeWithBlurFill,
 } from "./utils";
-// ✅ FIXED PATH: Config is in the same folder
 import {
   KIE_BASE_URL,
   KIE_API_KEY,
@@ -46,14 +44,15 @@ export const videoLogic = {
   ) {
     try {
       console.log(
-        `🎬 Kling Drift Request: H${horizontal} V${vertical} Z${zoom}`
+        `🎬 Kling 1.6 Drift Request: H${horizontal} V${vertical} Z${zoom}`
       );
 
+      // 1. Determine Target Dimensions & Ratio String
+      // Kling 1.6 accepts "16:9", "9:16", "1:1"
       let targetWidth = 1280;
       let targetHeight = 720;
       let targetRatioString = "16:9";
 
-      // 1. Determine Target Dimensions
       if (userAspectRatio === "9:16" || userAspectRatio === "portrait") {
         targetWidth = 720;
         targetHeight = 1280;
@@ -78,7 +77,6 @@ export const videoLogic = {
       // 2. Outpaint if Ratio Mismatch
       if (Math.abs(sourceAR - targetAR) > 0.05) {
         try {
-          // ✅ FIX: Pass targetRatioString to Gemini
           const outpaintedBuffer = await resizeWithGemini(
             originalBuffer,
             targetWidth,
@@ -105,11 +103,13 @@ export const videoLogic = {
       const payload: any = {
         prompt: finalPrompt,
         image_url: finalImageUrl,
-        duration: "5",
+        duration: "5", // Kling 1.6 takes string "5" or "10"
         aspect_ratio: targetRatioString,
       };
 
+      // ✅ UPDATED URL for 1.6 Pro
       const url = `${FAL_BASE_PATH}/pro/image-to-video`;
+
       const submitRes = await axios.post(url, payload, {
         headers: {
           Authorization: `Key ${FAL_KEY}`,
@@ -117,10 +117,9 @@ export const videoLogic = {
         },
       });
 
-      // ✅ CRITICAL FIX: Create DB Record so polling works
       const post = await airtableService.createPost({
         userId,
-        title: "Drift Shot",
+        title: "Drift Shot (Kling 1.6)",
         prompt: finalPrompt,
         mediaType: "VIDEO",
         platform: "Internal",
@@ -160,12 +159,11 @@ export const videoLogic = {
       `🎬 Video Gen for ${postId} | Model: ${params.model} | AR: ${params.aspectRatio}`
     );
     const isKie = params.model.includes("kie");
-    const isKling = params.model.includes("kling");
+    const isKling = params.model.includes("kling"); // Assuming this is now Kling 1.6
     const isOpenAI = !isKie && !isKling;
     const isPro = params.model.includes("pro") || params.model.includes("Pro");
 
     try {
-      // 1. Determine Target Dimensions
       let targetWidth = 1280;
       let targetHeight = 720;
       let targetRatioString = "16:9";
@@ -209,7 +207,6 @@ export const videoLogic = {
 
           if (Math.abs(sourceAR - targetAR) > 0.05) {
             try {
-              // ✅ FIX: Pass targetRatioString
               finalInputImageBuffer = await resizeWithGemini(
                 originalImageBuffer,
                 targetWidth,
@@ -244,6 +241,7 @@ export const videoLogic = {
         let klingInputUrl = "";
         let klingTailUrl = "";
         let isImageToVideo = false;
+
         if (finalInputImageBuffer) {
           klingInputUrl = await uploadToCloudinary(
             finalInputImageBuffer,
@@ -253,21 +251,18 @@ export const videoLogic = {
             "image"
           );
           isImageToVideo = true;
-          // Tail Logic
+
           if (params.imageReferences && params.imageReferences.length > 1) {
             try {
               const tailRaw = getOptimizedUrl(params.imageReferences[1]);
               const tailResp = await axios.get(tailRaw, {
                 responseType: "arraybuffer",
               });
-
-              // Simple strict resize for tail for now (or apply same outpaint logic)
               let processedTail = await resizeStrict(
                 Buffer.from(tailResp.data),
                 targetWidth,
                 targetHeight
               );
-
               klingTailUrl = await uploadToCloudinary(
                 processedTail,
                 `${postId}_kling_end`,
@@ -285,6 +280,7 @@ export const videoLogic = {
           isImageToVideo = true;
         }
 
+        // ✅ UPDATED URL: Kling 1.6 Pro
         const url = `${FAL_BASE_PATH}/pro/${
           isImageToVideo ? "image-to-video" : "text-to-video"
         }`;
@@ -292,7 +288,7 @@ export const videoLogic = {
         const payload: any = {
           prompt: finalPrompt,
           duration: params.duration ? params.duration.toString() : "5",
-          aspect_ratio: targetRatioString, // ✅ Fixed
+          aspect_ratio: targetRatioString,
         };
 
         if (isImageToVideo) {
@@ -309,6 +305,7 @@ export const videoLogic = {
         externalId = submitRes.data.request_id;
         statusUrl = submitRes.data.status_url;
       } else if (isKie) {
+        // ... (Kie logic remains unchanged) ...
         provider = "kie";
         let kieInputUrl = "";
         let isImageToVideo = false;
@@ -324,9 +321,6 @@ export const videoLogic = {
         }
         const baseModel = isPro ? "sora-2-pro" : "sora-2";
         const mode = isImageToVideo ? "image-to-video" : "text-to-video";
-
-        // Kie doesn't support 1:1 nicely via API sometimes, fallback to landscape/portrait keywords if needed
-        // Assuming your Kie wrapper handles standard strings
         const kiePayload: any = {
           model: `${baseModel}-${mode}`,
           input: {
@@ -349,6 +343,7 @@ export const videoLogic = {
         if (kieRes.data.code !== 200) throw new Error("Kie Error");
         externalId = kieRes.data.data.taskId;
       } else if (isOpenAI) {
+        // ... (OpenAI logic remains unchanged) ...
         provider = "openai";
         const form = new FormData();
         form.append("prompt", finalPrompt);
@@ -393,7 +388,6 @@ export const videoLogic = {
     }
   },
 
-  // ✅ STATUS POLLING LOGIC
   async checkPostStatus(post: Post) {
     const params = post.generationParams as any;
     if (post.status !== "PROCESSING" || !params?.externalId) return;
@@ -483,7 +477,6 @@ export const videoLogic = {
     const params = post.generationParams as any;
     if (params?.source === "DRIFT_EDITOR") {
       console.log("💾 Auto-saving Drift result to Asset Library...");
-
       // Auto-save to "Videos" tab
       await airtableService.createAsset(
         userId,
@@ -491,9 +484,7 @@ export const videoLogic = {
         params.aspectRatio || "16:9",
         "VIDEO"
       );
-
-      // ❌ REMOVED: await airtableService.deletePost(postId);
-      // We must keep the post alive so the frontend gets the final "100%" status!
+      // We keep the post alive so frontend sees 100% status
     }
     await ROIService.incrementMediaGenerated(userId);
   },

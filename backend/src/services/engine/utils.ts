@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import axios from "axios";
-import { cloudinaryClient } from "./config";
+import { cloudinaryClient, FAL_KEY } from "./config";
 import { GeminiService } from "../gemini";
 
 // Helper: Fix Cloudinary URLs
@@ -24,22 +24,16 @@ export const resizeStrict = async (
     .toBuffer();
 };
 
-// Helper: Resize with Blur
+// Helper: Resize with Blur (Fallback)
 export const resizeWithBlurFill = async (
   buffer: Buffer,
   width: number,
   height: number
 ): Promise<Buffer> => {
   try {
-    const background = await sharp({
-      create: {
-        width,
-        height,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 },
-      },
-    })
-      .png()
+    const background = await sharp(buffer)
+      .resize({ width, height, fit: "cover" })
+      .blur(40)
       .toBuffer();
 
     const foreground = await sharp(buffer)
@@ -56,78 +50,11 @@ export const resizeWithBlurFill = async (
       .toFormat("jpeg")
       .toBuffer();
   } catch (e) {
-    return await sharp(buffer)
-      .resize(width, height, { fit: "cover", position: "center" })
-      .toFormat("jpeg")
-      .toBuffer();
+    return buffer;
   }
 };
 
-// ✅ HELPER: AI Outpainting (Restored from contentEngine.ts)
-export const resizeWithGemini = async (
-  originalBuffer: Buffer,
-  targetWidth: number,
-  targetHeight: number,
-  targetRatioString: string = "16:9"
-): Promise<Buffer> => {
-  try {
-    console.log(
-      `✨ Gemini 3 Pro: Outpainting to ${targetRatioString} (${targetWidth}x${targetHeight})...`
-    );
-
-    // 1. Create Black Background Canvas
-    const backgroundGuide = await sharp({
-      create: {
-        width: targetWidth,
-        height: targetHeight,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 },
-      },
-    })
-      .png()
-      .toBuffer();
-
-    // 2. Composite original image centered (Fit Inside)
-    const compositeBuffer = await sharp(backgroundGuide)
-      .composite([
-        {
-          input: await sharp(originalBuffer)
-            .resize({ width: targetWidth, height: targetHeight, fit: "inside" })
-            .toBuffer(),
-          gravity: "center",
-        },
-      ])
-      .png()
-      .toBuffer();
-
-    // 3. Logic to determine prompt direction (Crucial for success)
-    const isPortrait = targetHeight > targetWidth;
-    const direction = isPortrait ? "vertical" : "horizontal";
-
-    const fullPrompt = `
-    TASK: Image Extension (Outpainting).
-    INPUT: An image with a sharp central subject and BLACK ${direction} bars.
-    INSTRUCTIONS:
-    1. REMOVE THE BLACK BARS: Paint over them completely with high-definition details. The center image is a cropped one, you need to uncover those "got cut" parts and complete the image consistently.
-    2. SEAMLESS EXTENSION: Match lighting, texture, and style.
-    3. NO LETTERBOXING: Final output must be full-screen.
-    4.DISSOLVE THE BORDER: There must be NO VISIBLE LINE or SEAM between the original image and the generated extension. Blend the pixels perfectly.
-    5. PRESERVE SUBJECT: Keep the central subject exactly as it is, but merge the background smoothly.
-    `;
-
-    return await GeminiService.generateOrEditImage({
-      prompt: fullPrompt,
-      aspectRatio: targetRatioString,
-      referenceImages: [compositeBuffer],
-      modelType: "quality",
-    });
-  } catch (error: any) {
-    console.error("❌ Gemini Resize Error:", error.message);
-    throw error;
-  }
-};
-
-// Helper: Upload
+// ✅ HELPER: Upload Buffer to Cloudinary (Required for Flux Input)
 export const uploadToCloudinary = async (
   f: any,
   p: string,
@@ -159,7 +86,149 @@ export const uploadToCloudinary = async (
   });
 };
 
-// Helper: Download
+/* 
+// ---------------------------------------------------------
+// 🔴 GEMINI IMPLEMENTATION (Deprecated / Backup)
+// ---------------------------------------------------------
+export const resizeWithGemini = async (...) => { ... }
+*/
+
+// ✅ HELPER: FLUX FILL (State-of-the-Art Outpainting)
+// We keep the function name 'resizeWithGemini' to avoid breaking imports in other files,
+// but the logic is now 100% Flux.
+export const resizeWithGemini = async (
+  originalBuffer: Buffer,
+  targetWidth: number,
+  targetHeight: number,
+  targetRatioString: string = "16:9"
+): Promise<Buffer> => {
+  try {
+    console.log(
+      `✨ Flux Fill (Fal.ai): ${targetRatioString} (${targetWidth}x${targetHeight})...`
+    );
+
+    // 1. Prepare Input Image (Original centered on Gray canvas)
+    // Flux needs a base image. Gray works best for the "empty" areas.
+    const inputCanvas = await sharp({
+      create: {
+        width: targetWidth,
+        height: targetHeight,
+        channels: 4,
+        background: { r: 128, g: 128, b: 128, alpha: 255 },
+      },
+    })
+      .composite([
+        {
+          input: await sharp(originalBuffer)
+            .resize({ width: targetWidth, height: targetHeight, fit: "inside" })
+            .toBuffer(),
+          gravity: "center",
+        },
+      ])
+      .png()
+      .toBuffer();
+
+    // 2. Prepare Mask (White = Fill, Black = Keep)
+    // We create a white canvas (fill everything) and place a black box (keep) in the center.
+
+    // A. Base White Mask
+    const baseMask = await sharp({
+      create: {
+        width: targetWidth,
+        height: targetHeight,
+        channels: 4,
+        background: { r: 255, g: 255, b: 255, alpha: 255 }, // White
+      },
+    })
+      .png()
+      .toBuffer();
+
+    // B. Calculate Inner Box Dimensions
+    const metadata = await sharp(originalBuffer).metadata();
+    const { width: origW = 1, height: origH = 1 } = metadata;
+
+    // Calculate the dimensions of the image when "fit: inside" is applied
+    const scale = Math.min(targetWidth / origW, targetHeight / origH);
+    const innerW = Math.floor(origW * scale);
+    const innerH = Math.floor(origH * scale);
+
+    // C. Create Black Rect
+    const blackRect = await sharp({
+      create: {
+        width: innerW,
+        height: innerH,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 255 }, // Black
+      },
+    })
+      .png()
+      .toBuffer();
+
+    // D. Composite Black Rect onto White Mask
+    const finalMaskBuffer = await sharp(baseMask)
+      .composite([{ input: blackRect, gravity: "center" }])
+      .png()
+      .toBuffer();
+
+    // 3. Upload to Cloudinary (Fal needs public URLs)
+    const tempId = `temp_${Date.now()}`;
+    // Use a dummy user ID 'system' for temp uploads
+    const imageUrl = await uploadToCloudinary(
+      inputCanvas,
+      `${tempId}_img`,
+      "system",
+      "temp",
+      "image"
+    );
+    const maskUrl = await uploadToCloudinary(
+      finalMaskBuffer,
+      `${tempId}_mask`,
+      "system",
+      "temp",
+      "image"
+    );
+
+    console.log("📤 Sending to Flux Pro...", { imageUrl, maskUrl });
+
+    // 4. Call Fal.ai (Flux Pro 1.6 Fill)
+    // Using sync_mode=true so we don't have to poll
+    const result = await axios.post(
+      "https://queue.fal.run/fal-ai/flux-pro/v1/fill-finetuned",
+      {
+        image_url: imageUrl,
+        mask_url: maskUrl,
+        prompt:
+          "High quality, photorealistic, seamless extension of the scene. 4k resolution.",
+        num_inference_steps: 28,
+        guidance_scale: 3.5, // Standard for Flux
+        sync_mode: true, // Wait for result
+        safety_tolerance: "2",
+      },
+      {
+        headers: {
+          Authorization: `Key ${FAL_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    // 5. Download Result
+    if (result.data.images && result.data.images.length > 0) {
+      const finalUrl = result.data.images[0].url;
+      const response = await axios.get(finalUrl, {
+        responseType: "arraybuffer",
+      });
+      return Buffer.from(response.data);
+    } else {
+      throw new Error("Flux returned no images.");
+    }
+  } catch (error: any) {
+    console.error("❌ Flux Fill Error:", error.message, error.response?.data);
+    // Fallback to Blur if Flux fails (e.g., rate limit)
+    return resizeWithBlurFill(originalBuffer, targetWidth, targetHeight);
+  }
+};
+
 export const downloadAndOptimizeImages = async (
   urls: string[]
 ): Promise<Buffer[]> => {
@@ -180,7 +249,6 @@ export const downloadAndOptimizeImages = async (
   return results.filter((buf): buf is Buffer => buf !== null);
 };
 
-// Helper: Ratio Matcher
 export const getClosestAspectRatio = (
   width: number,
   height: number
