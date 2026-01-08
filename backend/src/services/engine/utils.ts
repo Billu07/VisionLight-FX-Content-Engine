@@ -87,7 +87,7 @@ export const uploadToCloudinary = async (
   });
 };
 
-// ✅ HELPER: FLUX FILL (With Queue Polling)
+// ✅ HELPER: FLUX FILL (Fixed Polling)
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number,
@@ -177,7 +177,7 @@ export const resizeWithGemini = async (
 
     console.log("📤 Sending to Fal...", { imageUrl });
 
-    // 4. Call Flux (Submit Request)
+    // 4. Submit to Flux
     const response = await axios.post(
       "https://queue.fal.run/fal-ai/flux/v1/fill",
       {
@@ -186,7 +186,7 @@ export const resizeWithGemini = async (
         prompt:
           "High quality, photorealistic, seamless extension of the scene. 4k resolution.",
         num_inference_steps: 28,
-        sync_mode: true, // Try sync, but handle queue if it fails
+        sync_mode: true,
         enable_safety_checker: false,
       },
       {
@@ -199,40 +199,40 @@ export const resizeWithGemini = async (
 
     let resultData = response.data;
 
-    // 5. 🔄 HANDLE POLLING (If response is IN_QUEUE)
+    // 5. 🔄 ROBUST POLLING LOOP
     if (
       resultData.status === "IN_QUEUE" ||
       resultData.status === "IN_PROGRESS"
     ) {
       console.log(
-        `🕒 Request Queued. Polling status... (ID: ${resultData.request_id})`
+        `🕒 Request Queued (ID: ${resultData.request_id}). Polling...`
       );
-
-      const statusUrl = resultData.status_url;
+      const requestId = resultData.request_id;
       let attempts = 0;
 
-      while (
-        resultData.status === "IN_QUEUE" ||
-        resultData.status === "IN_PROGRESS"
-      ) {
-        if (attempts > 30) throw new Error("Flux Generation Timeout (30s)");
+      while (true) {
+        attempts++;
+        if (attempts > 60) throw new Error("Flux Generation Timeout (60s)");
+
         await new Promise((r) => setTimeout(r, 1000)); // Wait 1s
 
-        const check = await axios.get(statusUrl, {
-          headers: { Authorization: `Key ${FAL_KEY}` },
-        });
-        resultData = check.data;
-        attempts++;
-      }
+        // Check status specific endpoint
+        const check = await axios.get(
+          `https://queue.fal.run/fal-ai/flux/requests/${requestId}/status`,
+          { headers: { Authorization: `Key ${FAL_KEY}` } }
+        );
 
-      // Once completed, fetch the final result JSON from response_url
-      if (resultData.status === "COMPLETED") {
-        const finalRes = await axios.get(resultData.response_url, {
-          headers: { Authorization: `Key ${FAL_KEY}` },
-        });
-        resultData = finalRes.data;
-      } else {
-        throw new Error(`Flux Failed with status: ${resultData.status}`);
+        if (check.data.status === "COMPLETED") {
+          // Fetch result from the specific result endpoint
+          const finalRes = await axios.get(
+            `https://queue.fal.run/fal-ai/flux/requests/${requestId}`,
+            { headers: { Authorization: `Key ${FAL_KEY}` } }
+          );
+          resultData = finalRes.data;
+          break;
+        } else if (check.data.status === "FAILED") {
+          throw new Error(`Flux Failed: ${JSON.stringify(check.data)}`);
+        }
       }
     }
 
