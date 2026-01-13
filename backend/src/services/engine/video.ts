@@ -32,7 +32,7 @@ const getKlingCameraPrompt = (h: number, v: number, z: number) => {
 };
 
 export const videoLogic = {
-  // === DRIFT VIDEO PATH (Kling 2.6) ===
+  // === DRIFT VIDEO PATH (Kling 2.6 Pro) ===
   async processKlingDrift(
     userId: string,
     assetUrl: string,
@@ -51,7 +51,6 @@ export const videoLogic = {
       let targetHeight = 720;
       let targetRatioString = "16:9";
 
-      // 1. Determine Target Dimensions
       if (userAspectRatio === "9:16" || userAspectRatio === "portrait") {
         targetWidth = 720;
         targetHeight = 1280;
@@ -73,7 +72,7 @@ export const videoLogic = {
       const targetAR = targetWidth / targetHeight;
       let finalImageUrl = rawUrl;
 
-      // 2. Outpaint if Ratio Mismatch
+      // Outpaint if Ratio Mismatch (Kling 2.6 uses image size for ratio)
       if (Math.abs(sourceAR - targetAR) > 0.05) {
         try {
           const outpaintedBuffer = await resizeWithGemini(
@@ -99,12 +98,11 @@ export const videoLogic = {
         prompt || "The main subject"
       }. Action: ${cameraMove}. Style: High fidelity, smooth motion, 3D depth.`;
 
-      // ✅ 2.6 Payload Schema
+      // ✅ 2.6 PAYLOAD
       const payload: any = {
         prompt: finalPrompt,
-        start_image_url: finalImageUrl, // 2.6 uses start_image_url
+        start_image_url: finalImageUrl, // 2.6 uses this
         duration: "5",
-        // Aspect ratio inferred from image in 2.6
       };
 
       const url = `${FAL_BASE_PATH}/image-to-video`;
@@ -115,7 +113,6 @@ export const videoLogic = {
         },
       });
 
-      // DB Record
       const post = await airtableService.createPost({
         userId,
         title: "Drift Shot (2.6)",
@@ -123,7 +120,7 @@ export const videoLogic = {
         mediaType: "VIDEO",
         platform: "Internal",
         status: "PROCESSING",
-        mediaProvider: "kling",
+        mediaProvider: "kling", // Used in polling
         imageReference: assetUrl,
         generationParams: {
           source: "DRIFT_EDITOR",
@@ -163,7 +160,6 @@ export const videoLogic = {
     const isPro = params.model.includes("pro") || params.model.includes("Pro");
 
     try {
-      // Dimensions Logic (Preserved)
       let targetWidth = 1280;
       let targetHeight = 720;
       let targetRatioString = "16:9";
@@ -252,6 +248,7 @@ export const videoLogic = {
           );
           isImageToVideo = true;
 
+          // Tail Logic
           if (params.imageReferences && params.imageReferences.length > 1) {
             try {
               const tailRaw = getOptimizedUrl(params.imageReferences[1]);
@@ -284,16 +281,17 @@ export const videoLogic = {
           isImageToVideo ? "image-to-video" : "text-to-video"
         }`;
 
-        // ✅ 2.6 Schema
+        // ✅ 2.6 Payload Schema
         const payload: any = {
           prompt: finalPrompt,
           duration: params.duration ? params.duration.toString() : "5",
         };
 
         if (isImageToVideo) {
-          payload.start_image_url = klingInputUrl; // 2.6 Key
-          if (klingEndUrl) payload.end_image_url = klingEndUrl; // 2.6 Key
+          payload.start_image_url = klingInputUrl; // 2.6 Uses start_image_url
+          if (klingEndUrl) payload.end_image_url = klingEndUrl; // 2.6 Uses end_image_url
         } else {
+          // Text-to-Video still needs explicit aspect ratio
           payload.aspect_ratio = targetRatioString;
         }
 
@@ -306,7 +304,7 @@ export const videoLogic = {
         externalId = submitRes.data.request_id;
         statusUrl = submitRes.data.status_url;
       } else if (isKie) {
-        // === KIE LOGIC (Unchanged) ===
+        // ... (Kie Logic - Unchanged) ...
         provider = "kie";
         let kieInputUrl = "";
         let isImageToVideo = false;
@@ -344,7 +342,7 @@ export const videoLogic = {
         if (kieRes.data.code !== 200) throw new Error("Kie Error");
         externalId = kieRes.data.data.taskId;
       } else if (isOpenAI) {
-        // === OPENAI LOGIC (Unchanged) ===
+        // ... (OpenAI Logic - Unchanged) ...
         provider = "openai";
         const form = new FormData();
         form.append("prompt", finalPrompt);
@@ -389,6 +387,7 @@ export const videoLogic = {
     }
   },
 
+  // ✅ POLLING LOGIC (Supports 2.6)
   async checkPostStatus(post: Post) {
     const params = post.generationParams as any;
     if (post.status !== "PROCESSING" || !params?.externalId) return;
@@ -415,24 +414,45 @@ export const videoLogic = {
           isFailed = true;
           errorMessage = checkRes.data.data.failMsg;
         } else progress = Math.min(95, progress + 5);
-      } else if (provider.includes("kling")) {
+      }
+
+      // ✅ KLING (FAL) CHECK
+      else if (provider.includes("kling")) {
+        // Safe check using status_url or fallback
         const checkUrl =
           params.statusUrl || `${FAL_BASE_PATH}/requests/${externalId}/status`;
 
-        // 2.6 status check works the same way
-        const statusRes = await axios.get(checkUrl, {
-          headers: { Authorization: `Key ${FAL_KEY}` },
-        });
-        if (statusRes.data.status === "COMPLETED") {
-          const resultRes = await axios.get(statusRes.data.response_url, {
+        console.log(`🔍 Polling Kling: ${checkUrl}`);
+
+        try {
+          const statusRes = await axios.get(checkUrl, {
             headers: { Authorization: `Key ${FAL_KEY}` },
           });
-          finalUrl = resultRes.data.video.url;
-          isComplete = true;
-        } else if (statusRes.data.status === "FAILED") {
-          isFailed = true;
-          errorMessage = statusRes.data.error;
-        } else progress = Math.min(90, progress + 5);
+          const data = statusRes.data;
+          console.log(`🔍 Status: ${data.status}`);
+
+          if (data.status === "COMPLETED") {
+            const resultRes = await axios.get(data.response_url, {
+              headers: { Authorization: `Key ${FAL_KEY}` },
+            });
+            finalUrl = resultRes.data.video.url;
+            isComplete = true;
+          } else if (data.status === "FAILED") {
+            isFailed = true;
+            errorMessage = statusRes.data.error;
+          } else if (data.status === "IN_QUEUE") {
+            progress = Math.max(10, progress); // Queued
+          } else if (data.status === "IN_PROGRESS") {
+            progress = Math.min(90, progress + 5); // Processing
+          }
+        } catch (pollErr: any) {
+          // Handle 404 (Request expired/Invalid ID)
+          console.error("Poll Error:", pollErr.message);
+          if (pollErr.response?.status === 404) {
+            isFailed = true;
+            errorMessage = "Job expired or not found.";
+          }
+        }
       }
 
       if (isComplete && finalUrl) {
@@ -456,6 +476,8 @@ export const videoLogic = {
         });
         await airtableService.refundUserCredit(userId, params?.cost || 5);
       } else if (progress !== post.progress) {
+        // Update DB
+        console.log(`🚀 Updating Progress: ${progress}%`);
         await airtableService.updatePost(post.id, { progress });
       }
     } catch (error: any) {
@@ -486,7 +508,6 @@ export const videoLogic = {
         params.aspectRatio || "16:9",
         "VIDEO"
       );
-      // Post kept alive
     }
     await ROIService.incrementMediaGenerated(userId);
   },
