@@ -72,7 +72,7 @@ export const videoLogic = {
       const targetAR = targetWidth / targetHeight;
       let finalImageUrl = rawUrl;
 
-      // Outpaint if Ratio Mismatch (Kling 2.6 uses image size for ratio)
+      // Outpaint if Ratio Mismatch
       if (Math.abs(sourceAR - targetAR) > 0.05) {
         try {
           const outpaintedBuffer = await resizeWithGemini(
@@ -98,11 +98,12 @@ export const videoLogic = {
         prompt || "The main subject"
       }. Action: ${cameraMove}. Style: High fidelity, smooth motion, 3D depth.`;
 
-      // ✅ 2.6 PAYLOAD
       const payload: any = {
         prompt: finalPrompt,
-        start_image_url: finalImageUrl, // 2.6 uses this
+        start_image_url: finalImageUrl,
         duration: "5",
+        // ✅ FIX: Explicitly disable audio to support end frames in future
+        generate_audio: false,
       };
 
       const url = `${FAL_BASE_PATH}/image-to-video`;
@@ -120,7 +121,7 @@ export const videoLogic = {
         mediaType: "VIDEO",
         platform: "Internal",
         status: "PROCESSING",
-        mediaProvider: "kling", // Used in polling
+        mediaProvider: "kling",
         imageReference: assetUrl,
         generationParams: {
           source: "DRIFT_EDITOR",
@@ -248,7 +249,6 @@ export const videoLogic = {
           );
           isImageToVideo = true;
 
-          // Tail Logic
           if (params.imageReferences && params.imageReferences.length > 1) {
             try {
               const tailRaw = getOptimizedUrl(params.imageReferences[1]);
@@ -281,17 +281,20 @@ export const videoLogic = {
           isImageToVideo ? "image-to-video" : "text-to-video"
         }`;
 
-        // ✅ 2.6 Payload Schema
         const payload: any = {
           prompt: finalPrompt,
           duration: params.duration ? params.duration.toString() : "5",
         };
 
         if (isImageToVideo) {
-          payload.start_image_url = klingInputUrl; // 2.6 Uses start_image_url
-          if (klingEndUrl) payload.end_image_url = klingEndUrl; // 2.6 Uses end_image_url
+          payload.start_image_url = klingInputUrl;
+
+          if (klingEndUrl) {
+            payload.end_image_url = klingEndUrl;
+            // ✅ CRITICAL FIX: End frames conflict with audio in Kling 2.6
+            payload.generate_audio = false;
+          }
         } else {
-          // Text-to-Video still needs explicit aspect ratio
           payload.aspect_ratio = targetRatioString;
         }
 
@@ -304,7 +307,7 @@ export const videoLogic = {
         externalId = submitRes.data.request_id;
         statusUrl = submitRes.data.status_url;
       } else if (isKie) {
-        // ... (Kie Logic - Unchanged) ...
+        // ... (Kie Logic Unchanged) ...
         provider = "kie";
         let kieInputUrl = "";
         let isImageToVideo = false;
@@ -342,7 +345,7 @@ export const videoLogic = {
         if (kieRes.data.code !== 200) throw new Error("Kie Error");
         externalId = kieRes.data.data.taskId;
       } else if (isOpenAI) {
-        // ... (OpenAI Logic - Unchanged) ...
+        // ... (OpenAI Logic Unchanged) ...
         provider = "openai";
         const form = new FormData();
         form.append("prompt", finalPrompt);
@@ -446,11 +449,16 @@ export const videoLogic = {
             progress = Math.min(90, progress + 5); // Processing
           }
         } catch (pollErr: any) {
-          // Handle 404 (Request expired/Invalid ID)
+          // Handle 404/422 gracefully
           console.error("Poll Error:", pollErr.message);
-          if (pollErr.response?.status === 404) {
+          // If it's a 422 here, it usually means the request ID was valid but something internal to Fal logic failed
+          // We might want to mark it as failed to stop the loop
+          if (
+            pollErr.response?.status === 422 ||
+            pollErr.response?.status === 404
+          ) {
             isFailed = true;
-            errorMessage = "Job expired or not found.";
+            errorMessage = "Job failed or expired (422/404)";
           }
         }
       }
@@ -502,12 +510,14 @@ export const videoLogic = {
     const params = post.generationParams as any;
     if (params?.source === "DRIFT_EDITOR") {
       console.log("💾 Auto-saving Drift result to Asset Library...");
+      // Auto-save to "Videos" tab
       await airtableService.createAsset(
         userId,
         url,
         params.aspectRatio || "16:9",
         "VIDEO"
       );
+      // Post kept alive
     }
     await ROIService.incrementMediaGenerated(userId);
   },
