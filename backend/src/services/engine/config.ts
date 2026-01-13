@@ -26,8 +26,9 @@ export const KIE_API_KEY = process.env.KIE_AI_API_KEY;
 
 export const FAL_KEY = process.env.FAL_KEY;
 
-// ✅ UPDATED: Kling 1.6 Pro Endpoint
-export const FAL_BASE_PATH = "https://queue.fal.run/fal-ai/kling-video/v1.6";
+// ✅ UPDATED: Kling 2.6 Pro Endpoint
+export const FAL_BASE_PATH =
+  "https://queue.fal.run/fal-ai/kling-video/v2.6/pro";
 
 export const FAL_TOPAZ_PATH =
   "https://queue.fal.run/fal-ai/topaz/upscale/image";
