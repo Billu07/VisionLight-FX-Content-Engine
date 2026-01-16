@@ -32,14 +32,9 @@ interface GenerationState {
   error?: string;
 }
 
-/**
- * Premium Dashboard Component
- * Redesigned for visual consistency, premium feel, and soothing aesthetics.
- * Preserves all original logic and functionality.
- */
 function Dashboard() {
   // ==========================================
-  // STATE (Preserved)
+  // STATE
   // ==========================================
 
   // Core
@@ -55,10 +50,13 @@ function Dashboard() {
 
   // Kie AI (Video FX & PicDrift)
   const [kieDuration, setKieDuration] = useState<5 | 10 | 15>(5);
-  const [kieResolution] = useState<"720p" | "1080p">("720p");
+  const [kieResolution, setKieResolution] = useState<"720p" | "1080p">("720p");
+
+  // ✅ CHANGED: Added "square" to type and set default to "portrait"
   const [kieAspect, setKieAspect] = useState<
     "landscape" | "portrait" | "square"
   >("portrait");
+
   const [kieModel, setKieModel] = useState<"kie-sora-2" | "kie-sora-2-pro">(
     "kie-sora-2"
   );
@@ -69,15 +67,19 @@ function Dashboard() {
   );
 
   // OpenAI (Video FX 2)
-  const [videoDuration] = useState<4 | 8 | 12>(4);
-  const [videoModel] = useState<"sora-2" | "sora-2-pro">("sora-2-pro");
-  const [aspectRatio] = useState<"16:9" | "9:16">("16:9");
-  const [videoSize] = useState<
+  const [videoDuration, setVideoDuration] = useState<4 | 8 | 12>(4);
+  const [videoModel, setVideoModel] = useState<"sora-2" | "sora-2-pro">(
+    "sora-2-pro"
+  );
+  const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16">("16:9");
+  const [videoSize, setVideoSize] = useState<
     "1280x720" | "1792x1024" | "720x1280" | "1024x1792"
   >("1792x1024");
 
   // Studio (Gemini) Aspect Ratio
-  const [geminiAspect] = useState<"1:1" | "16:9" | "9:16">("9:16");
+  const [geminiAspect, setGeminiAspect] = useState<"1:1" | "16:9" | "9:16">(
+    "9:16"
+  );
 
   // Upload & UI
   const [referenceImages, setReferenceImages] = useState<File[]>([]);
@@ -103,6 +105,7 @@ function Dashboard() {
   const [showQueuedModal, setShowQueuedModal] = useState(false);
   const [showNoCreditsModal, setShowNoCreditsModal] = useState(false);
   const [showPromptInfo, setShowPromptInfo] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const [showFullTimeline, setShowFullTimeline] = useState(false);
 
   // === NEW PREVIEW STATE ===
@@ -135,20 +138,26 @@ function Dashboard() {
       ? "picdrift"
       : "videofx";
 
-  // ==========================================
-  // LOGIC & HANDLERS (Preserved)
-  // ==========================================
-
+  // HANDLER: Open Timeline Video in Drift
   const handleDriftFromPost = (post: any) => {
+    // If it's a video, open the extractor directly
     setExtractingVideoUrl(post.mediaUrl);
   };
 
+  // Reset Files on Engine Change
   useEffect(() => {
     setReferenceImages([]);
     setReferenceImageUrls([]);
     setPicDriftFrames({ start: null, end: null });
     setPicDriftUrls({ start: null, end: null });
   }, [activeEngine, studioMode, videoFxMode]);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/");
@@ -161,6 +170,7 @@ function Dashboard() {
     }
   }, [user]);
 
+  // === DATA FETCHING ===
   const { data: brandConfig } = useQuery({
     queryKey: ["brand-config"],
     queryFn: async () => (await apiEndpoints.getBrandConfig()).data.config,
@@ -229,13 +239,17 @@ function Dashboard() {
     enabled: !!user && posts.length > 0,
   });
 
+  // @ts-ignore
   const isCommercial = user?.creditSystem !== "INTERNAL";
+  const [isRequesting, setIsRequesting] = useState(false);
   const creditLink = isCommercial
     ? "https://www.picdrift.com/fx-credits"
     : "https://www.picdrift.com/fx-request";
   const creditBtnText = isCommercial ? "Buy Credits" : "Request Credits";
   const isAdmin =
     user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
+
+  // === ACTIONS ===
 
   const generateMediaMutation = useMutation({
     mutationFn: async (formData: FormData) =>
@@ -281,113 +295,210 @@ function Dashboard() {
     }
   };
 
-  const deletePostMutation = useMutation({
-    mutationFn: (postId: string) => apiEndpoints.deletePost(postId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-    },
-  });
-
-  const handleUseAsStartFrame = (mediaUrl: string) => {
-    setVideoFxMode("picdrift");
-    setActiveEngine("kie");
-    setPicDriftUrls((prev) => ({ ...prev, start: mediaUrl }));
-    setPicDriftFrames((prev) => ({ ...prev, start: null }));
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  const handleRequestCredits = async () => {
+    if (!confirm("Send a notification to Admin requesting more credits?"))
+      return;
+    setIsRequesting(true);
+    try {
+      await apiEndpoints.requestCredits();
+      alert("✅ Request sent! The admin has been notified.");
+    } catch (err) {
+      alert("Failed to send request.");
+    } finally {
+      setIsRequesting(false);
+    }
   };
 
-  const handleAssetSelect = (asset: any) => {
+  // --- 1. ASSET LIBRARY SELECTION HANDLER ---
+  const handleAssetSelect = (file: File, url: string, ratio?: string) => {
+    // 1. Handle File Setting (Existing Logic)
     if (activeLibrarySlot === "start") {
-      setPicDriftUrls((prev) => ({ ...prev, start: asset.mediaUrl }));
-      setPicDriftFrames((prev) => ({ ...prev, start: null }));
+      setPicDriftFrames((prev) => ({ ...prev, start: file }));
+      setPicDriftUrls((prev) => ({ ...prev, start: url }));
     } else if (activeLibrarySlot === "end") {
-      setPicDriftUrls((prev) => ({ ...prev, end: asset.mediaUrl }));
-      setPicDriftFrames((prev) => ({ ...prev, end: null }));
-    } else if (activeLibrarySlot === "generic") {
-      setReferenceImageUrls((prev) => [...prev, asset.mediaUrl]);
-      setReferenceImages((prev) => [...prev, null as any]);
+      setPicDriftFrames((prev) => ({ ...prev, end: file }));
+      setPicDriftUrls((prev) => ({ ...prev, end: url }));
+    } else {
+      if (activeEngine === "studio" && studioMode === "carousel") {
+        setReferenceImages((prev) => [...prev, file]);
+        setReferenceImageUrls((prev) => [...prev, url]);
+      } else {
+        setReferenceImages([file]);
+        setReferenceImageUrls([url]);
+      }
     }
+
+    // 2. ✅ NEW: Auto-Update Aspect Ratio based on Selection
+    if (ratio && ratio !== "original") {
+      console.log(`Auto-setting ratio to: ${ratio}`);
+
+      // Determine standardized Ratio ID
+      const r = ratio as "16:9" | "9:16" | "1:1";
+
+      // A. KIE / VIDEO FX 1 / PICDRIFT
+      if (activeEngine === "kie") {
+        if (r === "16:9") setKieAspect("landscape");
+        else if (r === "9:16") setKieAspect("portrait");
+        else if (r === "1:1") setKieAspect("square");
+      }
+
+      // B. OPENAI / VIDEO FX 2
+      else if (activeEngine === "openai") {
+        // OpenAI typically only supports 16:9 / 9:16 in standard UI, fallback to 1:1 if needed
+        if (r === "16:9") {
+          setAspectRatio("16:9");
+          setVideoSize("1792x1024");
+        } else if (r === "9:16") {
+          setAspectRatio("9:16");
+          setVideoSize("1024x1792");
+        }
+      }
+
+      // C. STUDIO / GEMINI
+      else if (activeEngine === "studio") {
+        setGeminiAspect(r);
+      }
+    }
+
     setActiveLibrarySlot(null);
   };
 
-  const handlePicDriftUpload = (slot: "start" | "end", file: File) => {
-    setPicDriftFrames((prev) => ({ ...prev, [slot]: file }));
-    setPicDriftUrls((prev) => ({ ...prev, [slot]: URL.createObjectURL(file) }));
+  // --- 2. REUSE END FRAME HANDLER ---
+  const handleUseAsStartFrame = async (url: string) => {
+    try {
+      setActiveEngine("kie");
+      setVideoFxMode("picdrift");
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const file = new File([blob], "start_frame_reused.jpg", {
+        type: "image/jpeg",
+      });
+      setPicDriftFrames({ start: file, end: null });
+      setPicDriftUrls({ start: url, end: null });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) {
+      console.error("Failed to reuse frame:", error);
+      alert("Could not load frame. Please try downloading it.");
+    }
   };
 
   const handleGenericUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    setReferenceImages((prev) => [...prev, ...files]);
-    setReferenceImageUrls((prev) => [
-      ...prev,
-      ...files.map((f) => URL.createObjectURL(f)),
-    ]);
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const maxFiles = 14;
+    if (files.length + referenceImages.length > maxFiles) {
+      alert(`❌ Only ${maxFiles} image(s) allowed for this mode.`);
+      return;
+    }
+    const newFiles = Array.from(files);
+    setReferenceImages((prev) => [...prev, ...newFiles]);
+    const newUrls = newFiles.map((file) => URL.createObjectURL(file));
+    setReferenceImageUrls((prev) => [...prev, ...newUrls]);
   };
 
-  const removePicDriftImage = (slot: "start" | "end") => {
-    setPicDriftFrames((prev) => ({ ...prev, [slot]: null }));
-    setPicDriftUrls((prev) => ({ ...prev, [slot]: null }));
+  const handleMagicEditUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("raw", "true");
+      const res = await apiEndpoints.uploadAssetSync(formData);
+      if (res.data.success && res.data.asset) {
+        setEditingAsset(res.data.asset);
+        e.target.value = "";
+      }
+    } catch (err: any) {
+      alert("Upload failed: " + err.message);
+    }
   };
+
+  // Delete Post Mutation
+  const deletePostMutation = useMutation({
+    mutationFn: async (postId: string) => apiEndpoints.deletePost(postId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+    },
+    onError: (err: any) => alert("Failed to delete post: " + err.message),
+  });
 
   const removeGenericImage = (index: number) => {
     setReferenceImages((prev) => prev.filter((_, i) => i !== index));
     setReferenceImageUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handlePicDriftUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: "start" | "end"
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPicDriftFrames((prev) => ({ ...prev, [type]: file }));
+    setPicDriftUrls((prev) => ({ ...prev, [type]: URL.createObjectURL(file) }));
+  };
+
+  const removePicDriftImage = (type: "start" | "end") => {
+    setPicDriftFrames((prev) => ({ ...prev, [type]: null }));
+    setPicDriftUrls((prev) => ({ ...prev, [type]: null }));
+  };
+
   const buildFormData = () => {
     const formData = new FormData();
     formData.append("prompt", prompt);
-    formData.append("title", videoTitle || "Untitled Creation");
-    formData.append("engine", activeEngine);
+    formData.append("title", videoTitle);
 
-    if (activeEngine === "kie") {
-      formData.append("mode", videoFxMode);
-      formData.append("duration", String(kieDuration));
-      formData.append("resolution", kieResolution);
+    if (activeEngine === "kie" && videoFxMode === "picdrift") {
+      formData.append("mediaType", "video");
+      formData.append("model", "kling-2.5");
+      if (picDriftFrames.start)
+        formData.append("referenceImages", picDriftFrames.start);
+      if (picDriftFrames.end)
+        formData.append("referenceImages", picDriftFrames.end);
+      formData.append("duration", kieDuration.toString());
       formData.append("aspectRatio", kieAspect);
+      formData.append("resolution", kieResolution);
+    } else if (activeEngine === "kie" && videoFxMode === "video") {
+      formData.append("mediaType", "video");
       formData.append("model", kieModel);
-
-      if (videoFxMode === "picdrift") {
-        if (picDriftFrames.start)
-          formData.append("startFrame", picDriftFrames.start);
-        else if (picDriftUrls.start)
-          formData.append("startFrameUrl", picDriftUrls.start);
-
-        if (picDriftFrames.end) formData.append("endFrame", picDriftFrames.end);
-        else if (picDriftUrls.end)
-          formData.append("endFrameUrl", picDriftUrls.end);
-      } else {
-        if (referenceImages[0]) formData.append("image", referenceImages[0]);
-        else if (referenceImageUrls[0])
-          formData.append("imageUrl", referenceImageUrls[0]);
-      }
-    } else if (activeEngine === "studio") {
-      formData.append("mode", studioMode);
-      formData.append("aspectRatio", geminiAspect);
-      referenceImages.forEach((file) => {
-        if (file) formData.append("images", file);
-      });
-      referenceImageUrls.forEach((url, idx) => {
-        if (!referenceImages[idx]) formData.append("imageUrls", url);
-      });
+      referenceImages.forEach((file) =>
+        formData.append("referenceImages", file)
+      );
+      formData.append("duration", kieDuration.toString());
+      formData.append("aspectRatio", kieAspect);
+      formData.append("resolution", kieResolution);
     } else if (activeEngine === "openai") {
-      formData.append("duration", String(videoDuration));
+      formData.append("mediaType", "video");
       formData.append("model", videoModel);
-      formData.append("aspectRatio", aspectRatio);
+      formData.append("duration", videoDuration.toString());
       formData.append("size", videoSize);
-      if (referenceImages[0]) formData.append("image", referenceImages[0]);
-      else if (referenceImageUrls[0])
-        formData.append("imageUrl", referenceImageUrls[0]);
+      formData.append("aspectRatio", aspectRatio);
+      referenceImages.forEach((file) =>
+        formData.append("referenceImages", file)
+      );
+    } else {
+      formData.append("mediaType", studioMode);
+      let sizeStr = "1024x1024";
+      if (geminiAspect === "16:9") sizeStr = "1792x1024";
+      if (geminiAspect === "9:16") sizeStr = "1024x1792";
+      formData.append("size", sizeStr);
+      formData.append("aspectRatio", geminiAspect);
+      referenceImages.forEach((file) =>
+        formData.append("referenceImages", file)
+      );
     }
-
     return formData;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (userCredits <= 0) {
+      setShowNoCreditsModal(true);
+      return;
+    }
     if (!prompt.trim()) return;
-    setGenerationState({ status: "generating" });
+    setGenerationState({ status: "idle" });
     generateMediaMutation.mutate(buildFormData());
   };
 
@@ -395,39 +506,27 @@ function Dashboard() {
     logout();
     navigate("/");
   };
-
   const companyName =
     brandConfig?.companyName || user?.name || "Visionlight AI";
 
   if (authLoading)
     return (
-      <div className="min-h-screen bg-[#0a0a0c] flex items-center justify-center">
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <LoadingSpinner size="lg" variant="neon" />
       </div>
     );
   if (!user) return null;
 
+  // ✅ HELPER: Get currently selected aspect ratio string for context-aware library
   const getCurrentRatioForLibrary = () => {
-    if (activeEngine === "kie") return kieAspect;
-    if (activeEngine === "openai") return aspectRatio;
-    if (activeEngine === "studio") return geminiAspect;
+    if (activeEngine === "kie") return kieAspect; // "portrait", "landscape", "square"
+    if (activeEngine === "openai") return aspectRatio; // "16:9", "9:16"
+    if (activeEngine === "studio") return geminiAspect; // "1:1", "16:9", "9:16"
     return undefined;
   };
-
-  // ==========================================
-  // RENDER
-  // ==========================================
-
   return (
-    <div className="min-h-screen bg-[#0a0a0c] text-slate-200 selection:bg-indigo-500/30">
-      {/* Background Glows */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-indigo-600/10 blur-[120px] rounded-full" />
-        <div className="absolute top-[20%] -right-[10%] w-[30%] h-[30%] bg-purple-600/10 blur-[120px] rounded-full" />
-        <div className="absolute -bottom-[10%] left-[20%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full" />
-      </div>
-
-      {/* MODALS (Preserved) */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900">
+      {/* ... MODALS ... */}
       {activeLibrarySlot !== null && (
         <AssetLibrary
           onClose={() => setActiveLibrarySlot(null)}
@@ -436,30 +535,18 @@ function Dashboard() {
         />
       )}
 
+      {/* EXTRACTOR MODAL */}
       {extractingVideoUrl && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-[#121216] border border-white/10 rounded-3xl w-full max-w-4xl p-8 relative shadow-2xl">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 p-4 animate-in fade-in">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-4xl p-6 relative flex flex-col items-center">
             <button
               onClick={() => setExtractingVideoUrl(null)}
-              className="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors"
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
             >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
+              ✕
             </button>
-            <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
-              <span className="text-indigo-400">✂️</span> Extract Frame from
-              Video
+            <h3 className="text-white font-bold mb-4 self-start">
+              ✂️ Extract Frame from Video
             </h3>
             <DriftFrameExtractor
               videoUrl={extractingVideoUrl}
@@ -483,7 +570,7 @@ function Dashboard() {
 
       {previewMedia && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 animate-in fade-in duration-300"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 animate-in fade-in duration-200"
           onClick={() => {
             setPreviewMedia(null);
             setPreviewCarouselIndex(0);
@@ -498,18 +585,18 @@ function Dashboard() {
               <div className="flex flex-col items-center w-full">
                 <img
                   src={previewMedia.url[previewCarouselIndex]}
-                  className="max-h-[80vh] w-auto rounded-2xl shadow-2xl border border-white/10"
+                  className="max-h-[80vh] w-auto rounded-lg shadow-2xl border border-gray-800"
                 />
                 {previewMedia.url.length > 1 && (
-                  <div className="flex gap-3 mt-6">
+                  <div className="flex gap-2 mt-4">
                     {previewMedia.url.map((_, idx) => (
                       <button
                         key={idx}
                         onClick={() => setPreviewCarouselIndex(idx)}
-                        className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                        className={`w-3 h-3 rounded-full transition-all ${
                           idx === previewCarouselIndex
-                            ? "bg-indigo-500 w-8"
-                            : "bg-white/20 hover:bg-white/40"
+                            ? "bg-white scale-125"
+                            : "bg-white/30 hover:bg-white/60"
                         }`}
                       />
                     ))}
@@ -518,7 +605,7 @@ function Dashboard() {
               </div>
             ) : (
               <div className="w-full flex justify-center">
-                <div className="max-w-full max-h-[85vh] rounded-2xl overflow-hidden shadow-2xl border border-white/10">
+                <div className="max-w-full max-h-[85vh]">
                   <MediaPreview
                     mediaUrl={previewMedia.url as string}
                     mediaType={
@@ -533,95 +620,100 @@ function Dashboard() {
                 setPreviewMedia(null);
                 setPreviewCarouselIndex(0);
               }}
-              className="absolute -top-14 right-0 text-white/60 hover:text-white flex items-center gap-2 text-sm font-medium transition-colors"
+              className="absolute -top-12 right-0 bg-white/10 hover:bg-white/20 text-white p-2 rounded-full transition-colors"
             >
-              <span>Close</span>
-              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                ✕
-              </div>
+              ✕ Close
             </button>
           </div>
         </div>
       )}
-
       {showQueuedModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-          <div className="bg-[#121216] border border-white/10 p-8 rounded-3xl max-w-md w-full text-center shadow-2xl animate-in zoom-in duration-300">
-            <div className="w-20 h-20 bg-indigo-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <span className="text-4xl">🚀</span>
-            </div>
-            <h3 className="text-2xl font-bold text-white mb-3">
-              Generation Started!
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="bg-gray-900 rounded-2xl border border-cyan-400/40 shadow-2xl max-w-sm w-full p-6">
+            <h3 className="text-lg font-semibold text-white mb-2">
+              Queued Successfully
             </h3>
-            <p className="text-slate-400 mb-8 leading-relaxed">
-              Your content is being processed. You can track its progress in the
-              timeline.
+            <p className="text-sm text-purple-200 mb-4">
+              We are processing your request. Check library for updates.
             </p>
-            <button
-              onClick={() => setShowQueuedModal(false)}
-              className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-bold transition-all shadow-lg shadow-indigo-500/20"
-            >
-              Got it
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showNoCreditsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-          <div className="bg-[#121216] border border-white/10 p-8 rounded-3xl max-w-md w-full text-center shadow-2xl">
-            <div className="w-20 h-20 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <span className="text-4xl">💎</span>
-            </div>
-            <h3 className="text-2xl font-bold text-white mb-3">
-              Insufficient Credits
-            </h3>
-            <p className="text-slate-400 mb-8 leading-relaxed">
-              You don't have enough credits to start this generation. Please top
-              up to continue.
-            </p>
-            <div className="flex flex-col gap-3">
-              <a
-                href={creditLink}
-                target="_blank"
-                rel="noreferrer"
-                className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-bold transition-all text-center"
-              >
-                {creditBtnText}
-              </a>
+            <div className="flex justify-end">
               <button
-                onClick={() => setShowNoCreditsModal(false)}
-                className="w-full py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-bold transition-all"
+                onClick={() => setShowQueuedModal(false)}
+                className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium"
               >
-                Maybe later
+                Got it
               </button>
             </div>
           </div>
         </div>
       )}
-
-      {showPromptInfo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-          <div className="bg-[#121216] border border-white/10 p-8 rounded-3xl max-w-2xl w-full shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-4">
-              Prompt Details
+      {showNoCreditsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
+          <div className="bg-gray-800 rounded-2xl border border-red-500/30 shadow-2xl max-w-sm w-full p-6 text-center">
+            <div className="text-4xl mb-3">💎</div>
+            <h3 className="text-xl font-bold text-white mb-2">
+              Insufficient Credits
             </h3>
-            <div className="bg-black/40 p-6 rounded-2xl text-slate-300 text-sm mb-6 max-h-80 overflow-y-auto leading-relaxed border border-white/5">
+            <p className="text-sm text-gray-300 mb-6">
+              You need more credits to start this generation.
+            </p>
+            <div className="flex flex-col gap-3">
+              {isCommercial ? (
+                <a
+                  href={creditLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-3 bg-green-600 rounded-xl font-bold"
+                >
+                  {creditBtnText}
+                </a>
+              ) : (
+                <button
+                  onClick={handleRequestCredits}
+                  disabled={isRequesting}
+                  className="w-full py-3 bg-purple-600 rounded-xl font-bold"
+                >
+                  {isRequesting ? "Sending..." : "Request Credits"}
+                </button>
+              )}
+              <button
+                onClick={() => setShowNoCreditsModal(false)}
+                className="text-gray-400 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showPromptInfo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4"
+          onClick={() => setShowPromptInfo(null)}
+        >
+          <div
+            className="bg-gray-800 rounded-2xl border border-gray-600 max-w-md w-full p-6 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-white mb-3">
+              Generation Prompt
+            </h3>
+            <div className="bg-gray-900 p-4 rounded-lg text-gray-300 text-sm mb-4 max-h-60 overflow-y-auto">
               {showPromptInfo}
             </div>
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-2">
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(showPromptInfo);
                   setShowPromptInfo(null);
                 }}
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white text-sm font-bold transition-all"
+                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white text-sm"
               >
-                Copy Prompt
+                Copy
               </button>
               <button
                 onClick={() => setShowPromptInfo(null)}
-                className="px-6 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-white text-sm font-bold transition-all"
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white text-sm"
               >
                 Close
               </button>
@@ -629,156 +721,925 @@ function Dashboard() {
           </div>
         </div>
       )}
-
       {showWelcomeTour && (
         <WelcomeTour onClose={() => setShowWelcomeTour(false)} />
       )}
 
-      {/* MAIN CONTENT */}
-      <div className="container mx-auto px-4 py-8 max-w-7xl relative z-10">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
         {/* HEADER */}
-        <header className="mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <span className="text-2xl font-bold text-white">V</span>
+        <div className="mb-6 sm:mb-8 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div>
+                <h1 className="text-xl sm:text-3xl md:text-4xl font-bold leading-tight brand-gradient-text">
+                  {companyName}
+                </h1>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
-                {companyName}
-              </h1>
-              <p className="text-slate-400 text-sm font-medium">
-                Content Engine
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl px-5 py-2.5 flex items-center gap-4">
-              {!creditsLoading ? (
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-indigo-500/20 rounded-lg flex items-center justify-center">
-                    <span className="text-lg">💎</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-white font-bold text-base leading-none">
-                      {userCredits}
-                    </span>
-                    <span className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mt-0.5">
-                      Credits
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <LoadingSpinner size="sm" />
-              )}
-              <div className="w-px h-8 bg-white/10" />
+            {isMobile && (
               <div className="flex gap-2">
                 {isAdmin && (
                   <button
                     onClick={() => navigate("/admin")}
-                    className="p-2 text-slate-400 hover:text-red-400 transition-colors"
-                    title="Admin Panel"
+                    className="p-2 bg-red-900/50 border border-red-500/30 rounded-xl text-red-300"
                   >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                    </svg>
+                    ⚙️
                   </button>
                 )}
                 <button
                   onClick={() => setShowBrandModal(true)}
-                  className="p-2 text-slate-400 hover:text-indigo-400 transition-colors"
-                  title="Dashboard Settings"
+                  className="p-2 bg-gray-800/60 border border-cyan-400/30 rounded-xl"
                 >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
-                    />
-                  </svg>
+                  🎨
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="p-2 text-slate-400 hover:text-white transition-colors"
-                  title="Logout"
+                  className="p-2 bg-gray-800/60 border border-purple-400/30 rounded-xl"
                 >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                    />
-                  </svg>
+                  🚪
                 </button>
               </div>
-            </div>
-            <a
-              href={creditLink}
-              target="_blank"
-              rel="noreferrer"
-              className="hidden sm:flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-bold text-sm transition-all shadow-lg shadow-indigo-500/20"
-            >
-              {creditBtnText}
-            </a>
+            )}
           </div>
-        </header>
-
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* GENERATOR PANEL */}
-          <div className="flex-1">
-            <div className="bg-[#121216]/60 backdrop-blur-xl rounded-[32px] border border-white/10 p-6 md:p-10 shadow-2xl">
-              {/* BRANDING & LIBRARY */}
-              <div className="mb-10 flex justify-between items-center">
-                <div className="flex items-center gap-4">
-                  <div className="h-10 flex items-center">
-                    <img
-                      src={picdriftLogo}
-                      alt="PICDRIFT"
-                      className="h-full w-auto object-contain opacity-90"
-                    />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="bg-gray-800/60 backdrop-blur-lg rounded-2xl px-3 sm:px-4 py-2 sm:py-3 border border-purple-500/20 w-full sm:w-auto">
+              <div className="flex items-center justify-between sm:justify-start gap-4">
+                {!creditsLoading ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">💎</span>
+                    <div className="flex flex-col">
+                      <span className="text-white font-bold text-lg leading-none">
+                        {userCredits}
+                      </span>
+                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
+                        Credits
+                      </span>
+                    </div>
                   </div>
-                  <div className="w-px h-6 bg-white/10" />
-                  <p className="text-slate-400 text-sm font-medium tracking-wide">
+                ) : (
+                  <LoadingSpinner size="sm" />
+                )}
+              </div>
+            </div>
+            {!isMobile && (
+              <div className="flex gap-2">
+                {isAdmin && (
+                  <button
+                    onClick={() => navigate("/admin")}
+                    className="px-4 py-2.5 bg-red-600/20 border border-red-500/50 rounded-xl text-red-300 text-sm font-bold"
+                  >
+                    Admin Panel
+                  </button>
+                )}
+                {isCommercial ? (
+                  <a
+                    href={creditLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2.5 bg-gray-800/60 border border-green-400/30 rounded-xl text-green-400 text-sm hover:bg-green-400/10 flex items-center gap-2"
+                  >
+                    {creditBtnText}
+                  </a>
+                ) : (
+                  <button
+                    onClick={handleRequestCredits}
+                    disabled={isRequesting}
+                    className="px-4 py-2.5 bg-purple-600/20 border border-purple-500/50 rounded-xl text-purple-300 text-sm"
+                  >
+                    {isRequesting ? "Sending..." : "Request Credits 🔔"}
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowBrandModal(true)}
+                  className="px-4 py-2.5 bg-gray-800/60 border border-cyan-400/30 rounded-xl text-cyan-400 text-sm hover:bg-cyan-400/10"
+                >
+                  Edit Dashboard
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="px-4 py-2.5 bg-gray-800/60 border border-purple-400/30 rounded-xl text-purple-300 text-sm hover:bg-purple-400/10"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
+          <div className="flex-1">
+            <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 lg:p-8 shadow-2xl">
+              {/* ✅ UPDATED HEADER: Logo Left, Library Button Right */}
+              <div className="mb-6 sm:mb-8 flex justify-between items-start">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="h-12 sm:h-14 flex items-center justify-center">
+                      <img
+                        src={picdriftLogo}
+                        alt="PICDRIFT"
+                        className="h-full w-auto object-contain"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-purple-300 text-sm ml-1">
                     Create Something Cinematic
                   </p>
                 </div>
 
+                {/* ✅ GLOBAL OPEN LIBRARY BUTTON */}
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    // For PicDrift, open 'Start Frame' slot. For others, open 'Generic'.
                     setActiveLibrarySlot(
                       currentVisualTab === "picdrift" ? "start" : "generic"
-                    )
-                  }
-                  className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-300 transition-all"
+                    );
+                  }}
+                  className={`text-xs px-4 py-2 rounded-lg border flex items-center gap-2 transition-all font-semibold shadow-lg ${
+                    currentVisualTab === "picdrift"
+                      ? "bg-rose-900/50 text-rose-300 border-rose-700/50 hover:bg-rose-800 hover:border-rose-500"
+                      : "bg-cyan-900/50 text-cyan-300 border-cyan-700/50 hover:bg-cyan-800 hover:border-cyan-500"
+                  }`}
+                >
+                  <span></span> Open Library
+                </button>
+              </div>
+
+              {/* NAVIGATION BAR */}
+              <div className="mb-6 sm:mb-8">
+                <label className="block text-sm font-semibold text-white mb-3 sm:mb-4">
+                  Select Content Type
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+                  {/* TAB 1: PICDRIFT (Default) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveEngine("kie");
+                      setVideoFxMode("picdrift");
+                    }}
+                    className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
+                      currentVisualTab === "picdrift"
+                        ? "border-white/20 bg-gradient-to-br from-pink-500 to-rose-500 shadow-2xl scale-105"
+                        : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className="flex-1">
+                        <div className="font-semibold text-sm text-white">
+                          PicDrift
+                        </div>
+                      </div>
+                      {currentVisualTab === "picdrift" && (
+                        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* TAB 2: PIC FX */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveEngine("studio")}
+                    className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
+                      currentVisualTab === "studio"
+                        ? "border-white/20 bg-gradient-to-br from-violet-700 to-purple-700 shadow-2xl scale-105"
+                        : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className="flex-1">
+                        <div className="font-semibold text-sm text-white">
+                          Pic FX
+                        </div>
+                      </div>
+                      {currentVisualTab === "studio" && (
+                        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* TAB 3: VIDEO FX */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveEngine("kie");
+                      setVideoFxMode("video");
+                    }}
+                    className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
+                      currentVisualTab === "videofx"
+                        ? "border-white/20 bg-gradient-to-br from-blue-700 to-cyan-700 shadow-2xl scale-105"
+                        : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className="flex-1">
+                        <div className="font-semibold text-sm text-white">
+                          Video FX
+                        </div>
+                      </div>
+                      {currentVisualTab === "videofx" && (
+                        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                      )}
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* STUDIO SUB-MENU */}
+              {currentVisualTab === "studio" && (
+                <div className="mb-6 animate-in fade-in space-y-4">
+                  <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
+                    <button
+                      onClick={() => setStudioMode("image")}
+                      className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
+                        studioMode === "image"
+                          ? "bg-violet-600 text-white shadow-lg"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      Image FX
+                    </button>
+                    <button
+                      onClick={() => setStudioMode("carousel")}
+                      className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
+                        studioMode === "carousel"
+                          ? "bg-fuchsia-600 text-white shadow-lg"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      Carousel
+                    </button>
+                    <button
+                      onClick={() => setStudioMode("edit")}
+                      className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
+                        studioMode === "edit"
+                          ? "bg-cyan-600 text-white shadow-lg"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      Picture Editor
+                    </button>
+                  </div>
+                  {studioMode !== "edit" && (
+                    <div className="flex justify-center gap-3">
+                      {[
+                        { id: "16:9", label: "Landscape" },
+                        { id: "9:16", label: "Portrait" },
+                        { id: "1:1", label: "Square" },
+                      ].map((a) => (
+                        <button
+                          key={a.id}
+                          onClick={() => setGeminiAspect(a.id as any)}
+                          className={`px-4 py-2 rounded-lg border text-xs font-bold ${
+                            geminiAspect === a.id
+                              ? "bg-violet-600 border-violet-500 text-white"
+                              : "bg-gray-800 border-gray-700 text-gray-400"
+                          }`}
+                        >
+                          {a.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* VIDEO FX SUB-MENU */}
+              {currentVisualTab === "videofx" && (
+                <div className="mb-6 animate-in fade-in space-y-4">
+                  <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveEngine("kie");
+                        setVideoFxMode("video");
+                      }}
+                      className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                        activeEngine === "kie"
+                          ? "bg-cyan-600 text-white shadow-lg"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      Video FX 1
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveEngine("openai")}
+                      className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                        activeEngine === "openai"
+                          ? "bg-cyan-600 text-white shadow-lg"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      Video FX 2
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+                {/* MAGIC EDIT UI */}
+                {currentVisualTab === "studio" && studioMode === "edit" ? (
+                  <div className="bg-gray-900/50 border border-cyan-500/30 rounded-2xl p-8 text-center space-y-5 animate-in fade-in">
+                    <div className="w-20 h-20 bg-cyan-900/20 rounded-full flex items-center justify-center mx-auto border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+                      <span className="text-4xl"></span>
+                    </div>
+                    <div>
+                      <h3 className="text-white font-bold text-xl mb-2">
+                        Picture Editor
+                      </h3>
+                      <p className="text-gray-400 text-sm max-w-md mx-auto">
+                        Upload an image to start a chat session. Ask PicFX to
+                        change lighting, add objects, or completely
+                        style-transfer your image.
+                      </p>
+                    </div>
+                    <label className="block w-full max-w-sm mx-auto cursor-pointer group">
+                      <div className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl text-white font-bold group-hover:shadow-lg group-hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
+                        <span>📤 Upload to Start</span>
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleMagicEditUpload}
+                      />
+                    </label>
+                    <p className="text-[10px] text-gray-500">
+                      Or select from{" "}
+                      <button
+                        type="button"
+                        onClick={() => setActiveLibrarySlot("generic")}
+                        className="underline text-cyan-400"
+                      >
+                        Asset Library
+                      </button>
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {/* 1. PICDRIFT FRAMES (Always Top for PicDrift Mode) */}
+                    {currentVisualTab === "picdrift" && (
+                      <div className="grid grid-cols-2 gap-4 mb-4 animate-in fade-in">
+                        {/* Start Frame */}
+                        <div className="flex flex-col gap-2">
+                          <div className="flex justify-between items-center">
+                            <label className="text-xs text-rose-300 font-bold">
+                              Pic 1 - Start Frame
+                            </label>
+                            {/* Open Library Button for Start Frame */}
+                          </div>
+                          <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
+                            {picDriftUrls.start ? (
+                              <>
+                                <img
+                                  src={picDriftUrls.start}
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removePicDriftImage("start")}
+                                  className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
+                                >
+                                  ✕
+                                </button>
+                              </>
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                                <label className="flex flex-col items-center justify-center cursor-pointer">
+                                  <span className="text-rose-400 text-2xl">
+                                    +
+                                  </span>
+                                  <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
+                                    Upload File
+                                  </span>
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={(e) =>
+                                      handlePicDriftUpload(e, "start")
+                                    }
+                                  />
+                                </label>
+                                <div className="text-gray-600 text-[10px]">
+                                  - OR -
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveLibrarySlot("start")}
+                                  className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
+                                >
+                                  Select from Library
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* End Frame */}
+                        <div className="flex flex-col gap-2">
+                          <div className="flex justify-between items-center">
+                            <label className="text-xs text-rose-300 font-bold">
+                              Pic 2 - End Frame (optional)
+                            </label>
+                          </div>
+                          <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
+                            {picDriftUrls.end ? (
+                              <>
+                                <img
+                                  src={picDriftUrls.end}
+                                  className="w-full h-full object-cover"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removePicDriftImage("end")}
+                                  className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
+                                >
+                                  ✕
+                                </button>
+                              </>
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                                <label className="flex flex-col items-center justify-center cursor-pointer">
+                                  <span className="text-rose-400 text-2xl">
+                                    +
+                                  </span>
+                                  <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
+                                    Upload File
+                                  </span>
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={(e) =>
+                                      handlePicDriftUpload(e, "end")
+                                    }
+                                  />
+                                </label>
+                                <div className="text-gray-600 text-[10px]">
+                                  - OR -
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveLibrarySlot("end")}
+                                  className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
+                                >
+                                  Select from Library
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 2. PROMPT & TITLE (Moved Up for Non-PicDrift) */}
+                    <div>
+                      <label className="block text-sm font-semibold text-white mb-2">
+                        Your Creative Vision
+                      </label>
+                      <textarea
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder="Describe your vision with a prompt"
+                        className="w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base leading-relaxed"
+                        rows={3}
+                      />
+                    </div>
+
+                    <div>
+                      {/* ✅ FLEX CONTAINER FOR LABEL + BUTTON */}
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="block text-sm font-semibold text-white">
+                          Title
+                        </label>
+                      </div>
+
+                      <input
+                        type="text"
+                        value={videoTitle}
+                        onChange={(e) => setVideoTitle(e.target.value)}
+                        placeholder="Name your creation..."
+                        className="w-full p-3 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-purple-300/60 backdrop-blur-sm"
+                      />
+                    </div>
+
+                    {/* 3. SETTINGS (Moved below Title) */}
+
+                    {/* VIDEO FX / KIE SETTINGS */}
+                    {currentVisualTab === "videofx" &&
+                      activeEngine === "kie" && (
+                        <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+                          <div className="space-y-2">
+                            <label className="block text-sm font-semibold text-white">
+                              AI Model
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              {[
+                                { id: "kie-sora-2", label: "Video FX" },
+                                { id: "kie-sora-2-pro", label: "Video FX Pro" },
+                              ].map((m) => (
+                                <button
+                                  key={m.id}
+                                  type="button"
+                                  onClick={() => setKieModel(m.id as any)}
+                                  className={`p-3 rounded-xl border text-left text-sm font-medium ${
+                                    kieModel === m.id
+                                      ? "bg-cyan-600 border-cyan-500 text-white"
+                                      : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
+                                  }`}
+                                >
+                                  {m.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                            <div>
+                              <label className="text-sm font-semibold text-white mb-2 block">
+                                Duration
+                              </label>
+                              <div className="flex gap-2">
+                                {[10, 15].map((d) => (
+                                  <button
+                                    key={d}
+                                    type="button"
+                                    onClick={() => setKieDuration(d as any)}
+                                    className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                                      kieDuration === d
+                                        ? "bg-cyan-600 border-cyan-600 text-white"
+                                        : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                    }`}
+                                  >
+                                    {d}s
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-sm font-semibold text-white mb-2 block">
+                                Aspect Ratio
+                              </label>
+                              <div className="flex gap-2">
+                                {/* ✅ ADDED SQUARE HERE TOO FOR CONSISTENCY */}
+                                {[
+                                  { id: "landscape", label: "Landscape" },
+                                  { id: "portrait", label: "Portrait" },
+                                ].map((a) => (
+                                  <button
+                                    key={a.id}
+                                    type="button"
+                                    onClick={() => setKieAspect(a.id as any)}
+                                    className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                                      kieAspect === a.id
+                                        ? "bg-cyan-600 border-cyan-600 text-white"
+                                        : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                    }`}
+                                  >
+                                    {a.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="sm:col-span-2">
+                              <label className="text-sm font-semibold text-white mb-2 block">
+                                Resolution
+                              </label>
+                              <div className="flex gap-2">
+                                {[
+                                  { id: "720p", label: "720p (Fast)" },
+                                  { id: "1080p", label: "1080p (HD)" },
+                                ].map((r) => (
+                                  <button
+                                    key={r.id}
+                                    type="button"
+                                    onClick={() =>
+                                      setKieResolution(r.id as any)
+                                    }
+                                    className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                                      kieResolution === r.id
+                                        ? "bg-cyan-600 border-cyan-600 text-white"
+                                        : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                    }`}
+                                  >
+                                    {r.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                    {/* PICDRIFT SETTINGS */}
+                    {currentVisualTab === "picdrift" && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mb-6">
+                        <div>
+                          <label className="text-sm font-semibold text-white mb-2 block">
+                            Duration
+                          </label>
+                          <div className="flex gap-2">
+                            {[5, 10].map((d) => (
+                              <button
+                                key={d}
+                                type="button"
+                                onClick={() => setKieDuration(d as any)}
+                                className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                                  kieDuration === d
+                                    ? "bg-rose-600 border-rose-600 text-white"
+                                    : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                }`}
+                              >
+                                {d}s
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm font-semibold text-white mb-2 block">
+                            Aspect Ratio
+                          </label>
+                          <div className="flex gap-2">
+                            {/* ✅ ADDED SQUARE OPTION HERE */}
+                            {[
+                              { id: "landscape", label: "Landscape" },
+                              { id: "portrait", label: "Portrait" },
+                              { id: "square", label: "Square" },
+                            ].map((a) => (
+                              <button
+                                key={a.id}
+                                type="button"
+                                onClick={() => setKieAspect(a.id as any)}
+                                className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                                  kieAspect === a.id
+                                    ? "bg-rose-600 border-rose-600 text-white"
+                                    : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                }`}
+                              >
+                                {a.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* OPENAI SETTINGS (Video FX 2) */}
+                    {currentVisualTab === "videofx" &&
+                      activeEngine === "openai" && (
+                        <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+                          <div className="space-y-2">
+                            <label className="block text-sm font-semibold text-white">
+                              AI Model
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              {[
+                                { id: "sora-2", label: "Video FX 2" },
+                                { id: "sora-2-pro", label: "Video FX 2 Pro" },
+                              ].map((model) => (
+                                <button
+                                  key={model.id}
+                                  type="button"
+                                  onClick={() => setVideoModel(model.id as any)}
+                                  className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${
+                                    videoModel === model.id
+                                      ? "border-cyan-400 bg-cyan-500/20"
+                                      : "border-white/10 bg-gray-800/50"
+                                  }`}
+                                >
+                                  <div className="font-semibold text-white text-sm">
+                                    {model.label}
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="block text-sm font-semibold text-white">
+                              Aspect Ratio
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              {[
+                                { ratio: "16:9", label: "Landscape" },
+                                { ratio: "9:16", label: "Portrait" },
+                              ].map(({ ratio, label }) => (
+                                <button
+                                  key={ratio}
+                                  type="button"
+                                  onClick={() => {
+                                    setAspectRatio(ratio as any);
+                                    setVideoSize(
+                                      ratio === "16:9"
+                                        ? "1792x1024"
+                                        : "1024x1792"
+                                    );
+                                  }}
+                                  className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${
+                                    aspectRatio === ratio
+                                      ? "border-purple-400 bg-purple-500/20"
+                                      : "border-white/10 bg-gray-800/50"
+                                  }`}
+                                >
+                                  <div className="font-semibold text-white text-sm">
+                                    {label}
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="block text-sm font-semibold text-white">
+                              Video Size
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              {(aspectRatio === "16:9"
+                                ? [
+                                    { size: "1280x720", label: "720p HD" },
+                                    ...(videoModel === "sora-2-pro"
+                                      ? [{ size: "1792x1024", label: "1080p" }]
+                                      : []),
+                                  ]
+                                : [
+                                    { size: "720x1280", label: "720p HD" },
+                                    ...(videoModel === "sora-2-pro"
+                                      ? [{ size: "1024x1792", label: "1080p" }]
+                                      : []),
+                                  ]
+                              ).map(({ size, label }) => (
+                                <button
+                                  key={size}
+                                  type="button"
+                                  onClick={() => setVideoSize(size as any)}
+                                  className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${
+                                    videoSize === size
+                                      ? "border-green-400 bg-green-500/20"
+                                      : "border-white/10 bg-gray-800/50"
+                                  }`}
+                                >
+                                  <div className="font-semibold text-white text-sm">
+                                    {label}
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="block text-sm font-semibold text-white">
+                              Duration
+                            </label>
+                            <div className="flex gap-2">
+                              {[4, 8, 12].map((sec) => (
+                                <button
+                                  key={sec}
+                                  type="button"
+                                  onClick={() => setVideoDuration(sec as any)}
+                                  className={`px-3 py-2 rounded-xl border text-sm flex-1 ${
+                                    videoDuration === sec
+                                      ? "bg-cyan-500 border-cyan-500 text-white"
+                                      : "bg-gray-800/50 border-white/10 text-purple-200"
+                                  }`}
+                                >
+                                  {sec}s
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                    {/* 4. REFERENCE IMAGES (Moved to End for Non-PicDrift) */}
+                    {activeEngine !== "kie" || videoFxMode !== "picdrift" ? (
+                      <div className="space-y-2 sm:space-y-3">
+                        <div className="flex justify-between items-center">
+                          <label className="block text-sm font-semibold text-white">
+                            Reference Images
+                          </label>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="w-full h-24 border-2 border-dashed border-gray-600 rounded-xl hover:border-cyan-500 hover:bg-gray-800/50 transition-all group relative flex items-center justify-center">
+                            <div className="flex items-center gap-6">
+                              <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
+                                <span className="text-2xl mb-1">📂</span>
+                                <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
+                                  Upload File
+                                </span>
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  multiple={
+                                    activeEngine === "studio" &&
+                                    studioMode === "carousel"
+                                  }
+                                  accept="image/*"
+                                  onChange={handleGenericUpload}
+                                />
+                              </label>
+                              <div className="h-8 w-px bg-gray-600"></div>
+                              <button
+                                type="button"
+                                onClick={() => setActiveLibrarySlot("generic")}
+                                className="flex flex-col items-center group-hover:scale-105 transition-transform"
+                              >
+                                <span className="text-2xl mb-1">📚</span>
+                                <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
+                                  From Library
+                                </span>
+                              </button>
+                            </div>
+                            <p className="absolute bottom-2 text-[10px] text-gray-600">
+                              {activeEngine === "studio" &&
+                              studioMode === "carousel"
+                                ? "Up to 14 images"
+                                : "Single frame"}{" "}
+                              (PNG/JPG)
+                            </p>
+                          </div>
+                          {referenceImageUrls.length > 0 && (
+                            <div className="grid grid-cols-5 gap-2 animate-in fade-in">
+                              {referenceImageUrls.map((url, index) => (
+                                <div
+                                  key={index}
+                                  className="relative aspect-square group"
+                                >
+                                  <img
+                                    src={url}
+                                    className="w-full h-full object-cover rounded-lg border border-white/20"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => removeGenericImage(index)}
+                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <button
+                      type="submit"
+                      disabled={
+                        generateMediaMutation.isPending || !prompt.trim()
+                      }
+                      className="w-full gradient-brand text-white py-4 sm:py-5 px-6 sm:px-8 rounded-2xl hover:shadow-2xl disabled:opacity-50 font-bold text-base sm:text-lg flex items-center justify-center gap-3"
+                    >
+                      {generateMediaMutation.isPending ? (
+                        <>
+                          <LoadingSpinner size="sm" variant="light" />
+                          <span>
+                            Starting{" "}
+                            {activeEngine === "studio" ? studioMode : "video"}
+                            ...
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-xl"></span>
+                          <span>
+                            {currentVisualTab === "picdrift"
+                              ? "Generate PicDrift"
+                              : `Generate ${
+                                  activeEngine === "studio"
+                                    ? studioMode
+                                    : "Video"
+                                }`}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  </>
+                )}
+              </form>
+
+              {generationState.status === "error" && (
+                <ErrorAlert
+                  message={generationState.error || "Generation failed"}
+                  onRetry={() => {
+                    if (!prompt.trim()) return;
+                    generateMediaMutation.mutate(buildFormData());
+                  }}
+                  type="error"
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="lg:w-96">
+            <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 shadow-2xl sticky top-4">
+              <div className="flex items-center justify-between mb-4 sm:mb-6">
+                <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                  <span></span> Timeline
+                </h2>
+                {/* EXPAND BUTTON */}
+                <button
+                  onClick={() => setShowFullTimeline(true)}
+                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-cyan-400 transition-colors border border-transparent hover:border-cyan-500/30"
+                  title="Expand Timeline"
                 >
                   <svg
                     className="w-4 h-4"
@@ -790,557 +1651,13 @@ function Dashboard() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
+                      d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
                     />
                   </svg>
-                  Asset Library
                 </button>
+                {postsLoading && <LoadingSpinner size="sm" variant="neon" />}
               </div>
-
-              {/* ENGINE NAVIGATION */}
-              <div className="mb-10">
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 ml-1">
-                  Select Content Engine
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {[
-                    {
-                      id: "picdrift",
-                      label: "PicDrift",
-                      icon: "✨",
-                      color: "from-rose-500 to-pink-600",
-                      active: currentVisualTab === "picdrift",
-                    },
-                    {
-                      id: "studio",
-                      label: "Pic FX",
-                      icon: "🎨",
-                      color: "from-violet-500 to-purple-600",
-                      active: currentVisualTab === "studio",
-                    },
-                    {
-                      id: "videofx",
-                      label: "Video FX",
-                      icon: "🎬",
-                      color: "from-blue-500 to-indigo-600",
-                      active: currentVisualTab === "videofx",
-                    },
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => {
-                        if (tab.id === "picdrift") {
-                          setActiveEngine("kie");
-                          setVideoFxMode("picdrift");
-                        } else if (tab.id === "studio") {
-                          setActiveEngine("studio");
-                        } else {
-                          setActiveEngine("kie");
-                          setVideoFxMode("video");
-                        }
-                      }}
-                      className={`relative p-5 rounded-2xl border-2 transition-all duration-500 text-left group overflow-hidden ${
-                        tab.active
-                          ? `border-transparent bg-gradient-to-br ${tab.color} shadow-xl scale-[1.02]`
-                          : "border-white/5 bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/10"
-                      }`}
-                    >
-                      <div className="relative z-10 flex items-center justify-between">
-                        <div>
-                          <span
-                            className={`text-xl mb-1 block ${
-                              tab.active ? "opacity-100" : "opacity-50"
-                            }`}
-                          >
-                            {tab.icon}
-                          </span>
-                          <div
-                            className={`font-bold text-sm ${
-                              tab.active ? "text-white" : "text-slate-400"
-                            }`}
-                          >
-                            {tab.label}
-                          </div>
-                        </div>
-                        {tab.active && (
-                          <div className="w-2 h-2 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.8)] animate-pulse" />
-                        )}
-                      </div>
-                      {tab.active && (
-                        <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-white/10 rounded-full blur-2xl" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* FORM */}
-              <form onSubmit={handleSubmit} className="space-y-8">
-                {/* PICDRIFT SPECIFIC: START/END FRAMES */}
-                {currentVisualTab === "picdrift" && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {[
-                      {
-                        slot: "start" as const,
-                        label: "Start Frame",
-                        url: picDriftUrls.start,
-                      },
-                      {
-                        slot: "end" as const,
-                        label: "End Frame",
-                        url: picDriftUrls.end,
-                      },
-                    ].map((item) => (
-                      <div key={item.slot} className="space-y-3">
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">
-                          {item.label}
-                        </label>
-                        <div className="relative aspect-video bg-black/40 rounded-2xl border-2 border-dashed border-white/10 hover:border-indigo-500/50 hover:bg-indigo-500/[0.02] transition-all group overflow-hidden">
-                          {item.url ? (
-                            <>
-                              <img
-                                src={item.url}
-                                className="w-full h-full object-cover"
-                              />
-                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => removePicDriftImage(item.slot)}
-                                  className="p-3 bg-red-500/20 hover:bg-red-500 text-white rounded-xl transition-all"
-                                >
-                                  <svg
-                                    className="w-5 h-5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                    />
-                                  </svg>
-                                </button>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-                              <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                                <svg
-                                  className="w-6 h-6 text-slate-500"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M12 4v16m8-8H4"
-                                  />
-                                </svg>
-                              </div>
-                              <div className="flex gap-4">
-                                <label className="cursor-pointer text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors">
-                                  Upload
-                                  <input
-                                    type="file"
-                                    className="hidden"
-                                    accept="image/*"
-                                    onChange={(e) =>
-                                      e.target.files?.[0] &&
-                                      handlePicDriftUpload(
-                                        item.slot,
-                                        e.target.files[0]
-                                      )
-                                    }
-                                  />
-                                </label>
-                                <span className="text-slate-600 text-xs">
-                                  •
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setActiveLibrarySlot(item.slot)
-                                  }
-                                  className="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors"
-                                >
-                                  Library
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* STUDIO SPECIFIC: MODES */}
-                {currentVisualTab === "studio" && (
-                  <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">
-                      Studio Mode
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        { id: "image", label: "Single Image", icon: "🖼️" },
-                        { id: "carousel", label: "Carousel", icon: "🎠" },
-                        { id: "edit", label: "Magic Edit", icon: "🪄" },
-                      ].map((mode) => (
-                        <button
-                          key={mode.id}
-                          type="button"
-                          onClick={() => setStudioMode(mode.id as any)}
-                          className={`px-6 py-3 rounded-xl border-2 font-bold text-sm transition-all flex items-center gap-2 ${
-                            studioMode === mode.id
-                              ? "bg-indigo-600/20 border-indigo-500 text-white shadow-lg shadow-indigo-500/10"
-                              : "bg-white/[0.02] border-white/5 text-slate-400 hover:border-white/10"
-                          }`}
-                        >
-                          <span>{mode.icon}</span>
-                          {mode.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* PROMPT & TITLE */}
-                <div className="space-y-6">
-                  <div className="space-y-3">
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">
-                      Describe your vision
-                    </label>
-                    <textarea
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      placeholder="A cinematic shot of a futuristic city at sunset, neon lights reflecting on wet pavement..."
-                      className="w-full p-6 bg-black/40 border border-white/10 rounded-2xl focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition-all resize-none text-white placeholder-slate-600 text-base leading-relaxed"
-                      rows={4}
-                    />
-                  </div>
-
-                  <div className="space-y-3">
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">
-                      Creation Title
-                    </label>
-                    <input
-                      type="text"
-                      value={videoTitle}
-                      onChange={(e) => setVideoTitle(e.target.value)}
-                      placeholder="Name your masterpiece..."
-                      className="w-full p-4 bg-black/40 border border-white/10 rounded-2xl focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent text-white placeholder-slate-600 font-medium"
-                    />
-                  </div>
-                </div>
-
-                {/* SETTINGS GRID */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-white/5">
-                  {/* DYNAMIC SETTINGS BASED ON TAB */}
-                  {currentVisualTab === "videofx" && activeEngine === "kie" && (
-                    <>
-                      <div className="space-y-4">
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">
-                          AI Model
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {[
-                            { id: "kie-sora-2", label: "Standard" },
-                            { id: "kie-sora-2-pro", label: "Pro" },
-                          ].map((m) => (
-                            <button
-                              key={m.id}
-                              type="button"
-                              onClick={() => setKieModel(m.id as any)}
-                              className={`p-3 rounded-xl border-2 text-center text-sm font-bold transition-all ${
-                                kieModel === m.id
-                                  ? "bg-indigo-600/20 border-indigo-500 text-white"
-                                  : "bg-white/[0.02] border-white/5 text-slate-500 hover:border-white/10"
-                              }`}
-                            >
-                              {m.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="space-y-4">
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">
-                          Duration
-                        </label>
-                        <div className="flex gap-2">
-                          {[10, 15].map((d) => (
-                            <button
-                              key={d}
-                              type="button"
-                              onClick={() => setKieDuration(d as any)}
-                              className={`flex-1 py-3 rounded-xl border-2 text-sm font-bold transition-all ${
-                                kieDuration === d
-                                  ? "bg-indigo-600/20 border-indigo-500 text-white"
-                                  : "bg-white/[0.02] border-white/5 text-slate-500 hover:border-white/10"
-                              }`}
-                            >
-                              {d}s
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {currentVisualTab === "picdrift" && (
-                    <>
-                      <div className="space-y-4">
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">
-                          Duration
-                        </label>
-                        <div className="flex gap-2">
-                          {[5, 10].map((d) => (
-                            <button
-                              key={d}
-                              type="button"
-                              onClick={() => setKieDuration(d as any)}
-                              className={`flex-1 py-3 rounded-xl border-2 text-sm font-bold transition-all ${
-                                kieDuration === d
-                                  ? "bg-rose-600/20 border-rose-500 text-white"
-                                  : "bg-white/[0.02] border-white/5 text-slate-500 hover:border-white/10"
-                              }`}
-                            >
-                              {d}s
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="space-y-4">
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">
-                          Aspect Ratio
-                        </label>
-                        <div className="flex gap-2">
-                          {[
-                            { id: "landscape", label: "16:9" },
-                            { id: "portrait", label: "9:16" },
-                            { id: "square", label: "1:1" },
-                          ].map((a) => (
-                            <button
-                              key={a.id}
-                              type="button"
-                              onClick={() => setKieAspect(a.id as any)}
-                              className={`flex-1 py-3 rounded-xl border-2 text-sm font-bold transition-all ${
-                                kieAspect === a.id
-                                  ? "bg-rose-600/20 border-rose-500 text-white"
-                                  : "bg-white/[0.02] border-white/5 text-slate-500 hover:border-white/10"
-                              }`}
-                            >
-                              {a.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* REFERENCE IMAGES (Generic) */}
-                  {(activeEngine !== "kie" || videoFxMode !== "picdrift") && (
-                    <div className="md:col-span-2 space-y-4">
-                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">
-                        Reference Assets
-                      </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="h-32 border-2 border-dashed border-white/10 rounded-2xl hover:border-indigo-500/50 hover:bg-indigo-500/[0.02] transition-all group relative flex items-center justify-center">
-                          <div className="flex items-center gap-8">
-                            <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
-                              <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center mb-2">
-                                <svg
-                                  className="w-5 h-5 text-slate-400"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                                  />
-                                </svg>
-                              </div>
-                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                Upload
-                              </span>
-                              <input
-                                type="file"
-                                className="hidden"
-                                multiple={
-                                  activeEngine === "studio" &&
-                                  studioMode === "carousel"
-                                }
-                                accept="image/*"
-                                onChange={handleGenericUpload}
-                              />
-                            </label>
-                            <div className="w-px h-10 bg-white/10" />
-                            <button
-                              type="button"
-                              onClick={() => setActiveLibrarySlot("generic")}
-                              className="flex flex-col items-center group-hover:scale-105 transition-transform"
-                            >
-                              <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center mb-2">
-                                <svg
-                                  className="w-5 h-5 text-slate-400"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={2}
-                                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                                  />
-                                </svg>
-                              </div>
-                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                Library
-                              </span>
-                            </button>
-                          </div>
-                        </div>
-
-                        {referenceImageUrls.length > 0 && (
-                          <div className="flex flex-wrap gap-3 content-start">
-                            {referenceImageUrls.map((url, index) => (
-                              <div
-                                key={index}
-                                className="relative w-20 h-20 group"
-                              >
-                                <img
-                                  src={url}
-                                  className="w-full h-full object-cover rounded-xl border border-white/10 shadow-lg"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => removeGenericImage(index)}
-                                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* SUBMIT BUTTON */}
-                <button
-                  type="submit"
-                  disabled={generateMediaMutation.isPending || !prompt.trim()}
-                  className={`w-full py-6 rounded-[24px] font-bold text-lg flex items-center justify-center gap-3 transition-all shadow-xl ${
-                    generateMediaMutation.isPending || !prompt.trim()
-                      ? "bg-white/5 text-slate-600 cursor-not-allowed"
-                      : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/20 hover:scale-[1.01] active:scale-[0.99]"
-                  }`}
-                >
-                  {generateMediaMutation.isPending ? (
-                    <>
-                      <LoadingSpinner size="sm" variant="light" />
-                      <span>Processing Vision...</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg
-                        className="w-6 h-6"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M13 10V3L4 14h7v7l9-11h-7z"
-                        />
-                      </svg>
-                      <span>
-                        {currentVisualTab === "picdrift"
-                          ? "Generate PicDrift"
-                          : `Generate ${
-                              activeEngine === "studio" ? studioMode : "Video"
-                            }`}
-                      </span>
-                    </>
-                  )}
-                </button>
-              </form>
-
-              {generationState.status === "error" && (
-                <div className="mt-6">
-                  <ErrorAlert
-                    message={generationState.error || "Generation failed"}
-                    onRetry={() =>
-                      prompt.trim() &&
-                      generateMediaMutation.mutate(buildFormData())
-                    }
-                    type="error"
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* TIMELINE PANEL */}
-          <aside className="lg:w-[400px]">
-            <div className="bg-[#121216]/60 backdrop-blur-xl rounded-[32px] border border-white/10 p-6 shadow-2xl sticky top-8">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center">
-                    <svg
-                      className="w-4 h-4 text-slate-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                  </div>
-                  <h2 className="text-lg font-bold text-white">Timeline</h2>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {postsLoading && <LoadingSpinner size="sm" variant="neon" />}
-                  <button
-                    onClick={() => setShowFullTimeline(true)}
-                    className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-indigo-400 transition-all border border-white/5"
-                    title="Expand Timeline"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="space-y-3 max-h-[500px] sm:max-h-[600px] overflow-y-auto custom-scrollbar">
                 {posts && Array.isArray(posts) && posts.length > 0 ? (
                   posts
                     .filter((post: any) => post.status !== "CANCELLED")
@@ -1350,63 +1667,56 @@ function Dashboard() {
                         new Date(a.createdAt).getTime()
                     )
                     .map((post: any) => (
-                      <div
+                      <PostCard
                         key={post.id}
-                        className="animate-in fade-in slide-in-from-right-4 duration-500"
-                      >
-                        <PostCard
-                          post={post}
-                          onPublishPost={() =>
-                            handleShowPromptInfo(post.prompt)
+                        post={post}
+                        onPublishPost={() => handleShowPromptInfo(post.prompt)}
+                        userCredits={userCredits}
+                        publishingPost={null}
+                        primaryColor={brandConfig?.primaryColor}
+                        compact={true}
+                        onUseAsStartFrame={handleUseAsStartFrame}
+                        onDrift={() => handleDriftFromPost(post)}
+                        onPreview={() => {
+                          let type = "image";
+                          if (post.mediaType === "VIDEO") type = "video";
+                          if (post.mediaType === "CAROUSEL") type = "carousel";
+                          let url = post.mediaUrl;
+                          if (type === "carousel") {
+                            try {
+                              url = JSON.parse(post.mediaUrl);
+                            } catch (e) {}
                           }
-                          userCredits={userCredits}
-                          publishingPost={null}
-                          primaryColor={brandConfig?.primaryColor}
-                          compact={true}
-                          onUseAsStartFrame={handleUseAsStartFrame}
-                          onDrift={() => handleDriftFromPost(post)}
-                          onPreview={() => {
-                            let type = "image";
-                            if (post.mediaType === "VIDEO") type = "video";
-                            if (post.mediaType === "CAROUSEL")
-                              type = "carousel";
-                            let url = post.mediaUrl;
-                            if (type === "carousel") {
-                              try {
-                                url = JSON.parse(post.mediaUrl);
-                              } catch (e) {}
-                            }
-                            setPreviewMedia({ type: type as any, url });
-                          }}
-                          onMoveToAsset={
-                            post.mediaType === "IMAGE" ||
-                            post.mediaType === "CAROUSEL"
-                              ? () => handleMoveToAssets(post.id)
-                              : undefined
-                          }
-                          onDelete={() =>
+                          setPreviewMedia({ type: type as any, url });
+                        }}
+                        onMoveToAsset={
+                          post.mediaType === "IMAGE" ||
+                          post.mediaType === "CAROUSEL"
+                            ? () => handleMoveToAssets(post.id)
+                            : undefined
+                        }
+                        onDelete={() => {
+                          if (
                             confirm(
                               "Are you sure you want to delete this post?"
-                            ) && deletePostMutation.mutate(post.id)
+                            )
+                          ) {
+                            deletePostMutation.mutate(post.id);
                           }
-                        />
-                      </div>
+                        }}
+                      />
                     ))
                 ) : !postsLoading ? (
-                  <div className="text-center py-16 bg-white/[0.02] rounded-3xl border border-dashed border-white/5">
-                    <div className="text-4xl mb-4 opacity-20">✨</div>
-                    <p className="text-slate-500 text-sm font-medium">
-                      No creations yet
-                    </p>
-                    <p className="text-slate-600 text-xs mt-1">
-                      Start generating to see them here
-                    </p>
+                  <div className="text-center py-8">
+                    <div className="text-purple-300 text-sm mb-3">
+                      No content yet
+                    </div>
+                    <div className="text-4xl mb-2">✨</div>
                   </div>
                 ) : null}
               </div>
-
               {postsError && (
-                <div className="mt-6">
+                <div className="text-center py-6">
                   <ErrorAlert
                     message="Failed to load your content"
                     onRetry={() =>
@@ -1417,10 +1727,8 @@ function Dashboard() {
                 </div>
               )}
             </div>
-          </aside>
+          </div>
         </div>
-
-        {/* FOOTER MODALS (Preserved) */}
         {showBrandModal && (
           <BrandConfigModal
             onClose={() => setShowBrandModal(false)}
@@ -1433,10 +1741,12 @@ function Dashboard() {
             initialVideoUrl={editingVideoUrl}
             onClose={() => {
               setEditingAsset(null);
-              setEditingVideoUrl(undefined);
+              setEditingVideoUrl(undefined); // Reset
             }}
           />
         )}
+
+        {/* ✅ ADD THIS BLOCK */}
         {showFullTimeline && (
           <TimelineExpander
             posts={posts}
@@ -1447,6 +1757,7 @@ function Dashboard() {
             onUseAsStartFrame={handleUseAsStartFrame}
             onDrift={(p) => handleDriftFromPost(p)}
             onPreview={(media) => {
+              // Re-use your preview logic
               let type = "image";
               if (media.mediaType === "VIDEO") type = "video";
               if (media.mediaType === "CAROUSEL") type = "carousel";
@@ -1459,29 +1770,12 @@ function Dashboard() {
               setPreviewMedia({ type: type as any, url });
             }}
             onMoveToAsset={(id) => handleMoveToAssets(id)}
-            onDelete={(id) =>
-              confirm("Delete this post?") && deletePostMutation.mutate(id)
-            }
+            onDelete={(id) => {
+              if (confirm("Delete this post?")) deletePostMutation.mutate(id);
+            }}
           />
         )}
       </div>
-
-      {/* Custom Scrollbar Styles */}
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.1);
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.2);
-        }
-      `}</style>
     </div>
   );
 }
