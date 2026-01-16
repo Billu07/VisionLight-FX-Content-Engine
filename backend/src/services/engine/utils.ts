@@ -24,22 +24,16 @@ export const resizeStrict = async (
     .toBuffer();
 };
 
-// Helper: Resize with Blur
+// Helper: Resize with Blur (Fallback)
 export const resizeWithBlurFill = async (
   buffer: Buffer,
   width: number,
   height: number
 ): Promise<Buffer> => {
   try {
-    const background = await sharp({
-      create: {
-        width,
-        height,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 },
-      },
-    })
-      .png()
+    const background = await sharp(buffer)
+      .resize({ width, height, fit: "cover" })
+      .blur(40)
       .toBuffer();
 
     const foreground = await sharp(buffer)
@@ -56,71 +50,70 @@ export const resizeWithBlurFill = async (
       .toFormat("jpeg")
       .toBuffer();
   } catch (e) {
-    return await sharp(buffer)
-      .resize(width, height, { fit: "cover", position: "center" })
-      .toFormat("jpeg")
-      .toBuffer();
+    return buffer;
   }
 };
 
-// ✅ HELPER: AI Outpainting (Restored from contentEngine.ts)
+// ✅ HELPER: Direct Prompting (No Canvas Hacks)
+// We rely on Gemini 3's native ability to uncrop/resize based on instructions.
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
-  targetWidth: number,
-  targetHeight: number,
+  targetWidth: number, // (Unused but kept for signature compatibility)
+  targetHeight: number, // (Unused but kept for signature compatibility)
   targetRatioString: string = "16:9"
 ): Promise<Buffer> => {
   try {
-    console.log(
-      `✨ Gemini 3 Pro: Outpainting to ${targetRatioString} (${targetWidth}x${targetHeight})...`
-    );
+    console.log(`✨ Gemini Direct Outpaint: Target ${targetRatioString}`);
 
-    // 1. Create Black Background Canvas
-    const backgroundGuide = await sharp({
-      create: {
-        width: targetWidth,
-        height: targetHeight,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 255 },
-      },
-    })
-      .png()
-      .toBuffer();
+    let instruction = "";
 
-    // 2. Composite original image centered (Fit Inside)
-    const compositeBuffer = await sharp(backgroundGuide)
-      .composite([
-        {
-          input: await sharp(originalBuffer)
-            .resize({ width: targetWidth, height: targetHeight, fit: "inside" })
-            .toBuffer(),
-          gravity: "center",
-        },
-      ])
-      .png()
-      .toBuffer();
+    // 1. Construct Specific "Uncrop" Prompt
+    if (targetRatioString === "9:16" || targetRatioString === "portrait") {
+      instruction = `
+      TASK: Convert this image to Vertical Portrait (9:16).
+      ACTION: Expand the field of view vertically.
+      - Generate more sky/ceiling above and ground/floor below.
+      - Keep the original subject centered and unchanged.
+      - Ensure the new areas seamlessly match the lighting and perspective of the original.
+      `;
+    } else if (
+      targetRatioString === "16:9" ||
+      targetRatioString === "landscape"
+    ) {
+      instruction = `
+      TASK: Convert this image to Wide Landscape (16:9).
+      ACTION: Expand the field of view horizontally.
+      - Widen the scene to the left and right.
+      - Keep the original subject centered and unchanged.
+      - Ensure the new scenery matches the environment perfectly.
+      `;
+    } else {
+      instruction = `
+      TASK: Expand the image canvas to a Square (1:1).
+      ACTION: Reveal more of the surroundings on all sides without altering the central subject.
+      `;
+    }
 
-    // 3. Logic to determine prompt direction (Crucial for success)
-    const isPortrait = targetHeight > targetWidth;
-    const direction = isPortrait ? "vertical" : "horizontal";
     const fullPrompt = `
-    TASK: Image Extension (Outpainting).
-    INPUT: An image with a sharp central subject and BLACK ${direction} bars.
-    INSTRUCTIONS:
-    1. REMOVE THE BLACK BARS: Paint over them completely with high-definition details. The center image is a cropped one, you need to uncover those "got cut" parts and complete the image consistently.
-    2. SEAMLESS EXTENSION: Match lighting, texture, and style.
-    3.DISSOLVE THE BORDER: There must be NO VISIBLE LINE or SEAM between the original image and the generated extension. Blend the pixels perfectly.
-    5. PRESERVE SUBJECT: (IMPORTANT) Keep the central subject exactly as it is, but merge the background smoothly.
+    ${instruction}
+    
+    STRICT CONSTRAINT: 
+    Do NOT crop the original subject. Do NOT distort or squash the image. 
+    You are revealing the "rest of the photo" that was outside the frame.
+    High fidelity, photorealistic style.
     `;
 
+    // 2. Call Gemini (Passing original buffer directly)
+    // Your gemini.ts handles the actual aspect_ratio param in the config
     return await GeminiService.generateOrEditImage({
       prompt: fullPrompt,
       aspectRatio: targetRatioString,
-      referenceImages: [compositeBuffer],
+      referenceImages: [originalBuffer], // Passing the raw image, no black bars
       modelType: "quality",
+      imageSize: "2K", // Request high res for the expansion
     });
   } catch (error: any) {
-    console.error("❌ Gemini Resize Error:", error.message);
+    console.error("❌ Gemini Direct Error:", error.message);
     throw error;
   }
 };
