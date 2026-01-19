@@ -5,16 +5,18 @@ import { LoadingSpinner } from "./LoadingSpinner";
 import { EditAssetModal } from "./EditAssetModal";
 import { DriftFrameExtractor } from "./DriftFrameExtractor";
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB Limit
+
 interface Asset {
   id: string;
   url: string;
-  aspectRatio: "16:9" | "9:16" | "1:1" | "original";
+  aspectRatio: "16:9" | "9:16" | "1:1" | "original" | "custom";
   type: "IMAGE" | "VIDEO";
   createdAt: string;
+  originalAssetId?: string | null; // ✅ Link to Parent
 }
 
 interface AssetLibraryProps {
-  // ✅ CHANGE 1: Update function signature to accept aspectRatio
   onSelect?: (file: File, url: string, aspectRatio?: string) => void;
   onClose: () => void;
   initialAspectRatio?: string;
@@ -29,10 +31,10 @@ export function AssetLibrary({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [activeTab, setActiveTab] = useState<
-    "16:9" | "9:16" | "1:1" | "original" | "VIDEO"
+    "16:9" | "9:16" | "1:1" | "original" | "custom" | "VIDEO"
   >("16:9");
 
-  // ✅ NEW: Auto-switch tab based on Dashboard context
+  // Auto-switch based on context
   useEffect(() => {
     if (!initialAspectRatio) return;
     const ratio = initialAspectRatio.toLowerCase();
@@ -40,6 +42,7 @@ export function AssetLibrary({
     if (ratio === "portrait" || ratio === "9:16") setActiveTab("9:16");
     else if (ratio === "landscape" || ratio === "16:9") setActiveTab("16:9");
     else if (ratio === "square" || ratio === "1:1") setActiveTab("1:1");
+    else setActiveTab("original");
   }, [initialAspectRatio]);
 
   // UI States
@@ -48,15 +51,17 @@ export function AssetLibrary({
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [viewingVideoAsset, setViewingVideoAsset] = useState<Asset | null>(
-    null
+    null,
   );
 
-  // Polling State
+  // Polling
   const [pollingUntil, setPollingUntil] = useState<number>(0);
   const [processingCount, setProcessingCount] = useState(0);
   const [activeDriftIds, setActiveDriftIds] = useState<Set<string>>(new Set());
 
-  // 1. Fetch Assets (✅ Modified for Auto-Refresh)
+  const isProcessing = pollingUntil > 0;
+
+  // 1. Fetch Assets
   const {
     data: assets = [],
     isLoading,
@@ -65,12 +70,11 @@ export function AssetLibrary({
   } = useQuery({
     queryKey: ["assets"],
     queryFn: async () => (await apiEndpoints.getAssets()).data.assets,
-    // ✅ Poll every 3 seconds to show new generations automatically
     refetchInterval: 3000,
     refetchIntervalInBackground: true,
   });
 
-  // 2. Scan LocalStorage for Active Drift Jobs
+  // 2. Drift Monitoring
   useEffect(() => {
     const checkDrifts = () => {
       const found = new Set<string>();
@@ -87,7 +91,7 @@ export function AssetLibrary({
     return () => clearInterval(interval);
   }, []);
 
-  // 3. Timer Logic (Kept your original logic for upload counting)
+  // 3. Polling Timer
   useEffect(() => {
     if (pollingUntil === 0) return;
     const checkInterval = setInterval(() => {
@@ -106,13 +110,9 @@ export function AssetLibrary({
       const formData = new FormData();
       Array.from(files).forEach((file) => formData.append("images", file));
 
-      // ✅ Handle upload ratio logic
-      let uploadRatio = "16:9";
-      if (activeTab === "9:16") uploadRatio = "9:16";
-      else if (activeTab === "1:1") uploadRatio = "1:1";
-      else if (activeTab === "original") uploadRatio = "original";
+      // ✅ LOGIC: Manual uploads are always Originals (V1)
+      formData.append("aspectRatio", "original");
 
-      formData.append("aspectRatio", uploadRatio);
       return apiEndpoints.uploadBatchAssets(formData);
     },
     onMutate: () => setIsUploading(true),
@@ -120,6 +120,7 @@ export function AssetLibrary({
       const fileCount = variables.length;
       setProcessingCount(fileCount);
       setPollingUntil(Date.now() + fileCount * 20000);
+      setActiveTab("original"); // Switch to Originals tab
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     },
     onError: (err: any) => alert("Upload failed: " + err.message),
@@ -136,8 +137,23 @@ export function AssetLibrary({
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0)
-      uploadMutation.mutate(e.target.files);
+    if (e.target.files && e.target.files.length > 0) {
+      const validFiles = new DataTransfer();
+      let hasError = false;
+
+      Array.from(e.target.files).forEach((file) => {
+        if (file.size > MAX_FILE_SIZE) {
+          alert(`Skipped "${file.name}": Exceeds 10MB limit.`);
+          hasError = true;
+        } else {
+          validFiles.items.add(file);
+        }
+      });
+
+      if (validFiles.files.length > 0) {
+        uploadMutation.mutate(validFiles.files);
+      }
+    }
   };
 
   const handleUseImage = async (asset: Asset) => {
@@ -148,9 +164,7 @@ export function AssetLibrary({
       const file = new File([blob], `asset_${asset.id}.jpg`, {
         type: "image/jpeg",
       });
-
       onSelect(file, asset.url, asset.aspectRatio);
-
       onClose();
     } catch (e) {
       alert("Could not load image.");
@@ -178,23 +192,76 @@ export function AssetLibrary({
     }
   };
 
-  // ✅ FILTER LOGIC (Unchanged)
+  // ✅ FILTER LOGIC
   const filteredAssets = Array.isArray(assets)
     ? assets.filter((a: Asset) => {
         if (activeTab === "VIDEO") return a.type === "VIDEO";
 
-        if (activeTab === "original")
+        // ✅ REFINEMENT 2: Split "Originals" and "Edited"
+        if (activeTab === "original") {
+          return a.type === "IMAGE" && a.aspectRatio === "original";
+        }
+        if (activeTab === "custom") {
           return (
             a.type === "IMAGE" &&
-            (a.aspectRatio === "original" ||
+            (a.aspectRatio === "custom" ||
               (a.aspectRatio !== "16:9" &&
                 a.aspectRatio !== "9:16" &&
-                a.aspectRatio !== "1:1"))
+                a.aspectRatio !== "1:1" &&
+                a.aspectRatio !== "original"))
           );
+        }
 
         return a.type === "IMAGE" && a.aspectRatio === activeTab;
       })
     : [];
+
+  // ✅ NAVIGATION LOGIC
+  const handleNextAsset = () => {
+    if (!selectedAsset) return;
+    const currentIndex = filteredAssets.findIndex(
+      (a) => a.id === selectedAsset.id,
+    );
+    if (currentIndex < filteredAssets.length - 1) {
+      setSelectedAsset(filteredAssets[currentIndex + 1]);
+    }
+  };
+
+  const handlePrevAsset = () => {
+    if (!selectedAsset) return;
+    const currentIndex = filteredAssets.findIndex(
+      (a) => a.id === selectedAsset.id,
+    );
+    if (currentIndex > 0) {
+      setSelectedAsset(filteredAssets[currentIndex - 1]);
+    }
+  };
+
+  // ✅ GO TO ORIGINAL LOGIC
+  const handleGoToOriginal = () => {
+    if (!selectedAsset || !selectedAsset.originalAssetId) return;
+    const original = assets.find(
+      (a: Asset) => a.id === selectedAsset.originalAssetId,
+    );
+
+    if (original) {
+      setActiveTab("original"); // Switch context to Originals tab
+      setSelectedAsset(original); // Open it
+    } else {
+      alert("Original asset not found (it may have been deleted).");
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedAsset) return;
+      if (e.key === "ArrowRight") handleNextAsset();
+      if (e.key === "ArrowLeft") handlePrevAsset();
+      if (e.key === "Escape") setSelectedAsset(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedAsset, filteredAssets]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 backdrop-blur-md">
@@ -220,11 +287,13 @@ export function AssetLibrary({
         {/* CONTROLS */}
         <div className="p-6 bg-gray-800/50 flex flex-col md:flex-row gap-4 items-center justify-between border-b border-gray-800">
           <div className="flex bg-gray-950 p-1 rounded-lg border border-gray-700 overflow-x-auto">
+            {/* ✅ UPDATED TABS: Originals first */}
             {[
+              { id: "original", label: "Originals" },
               { id: "16:9", label: "Landscape" },
               { id: "9:16", label: "Portrait" },
               { id: "1:1", label: "Square" },
-              { id: "original", label: "Edited Pictures" },
+              { id: "custom", label: "Edited Pictures" },
               { id: "VIDEO", label: "Drift Paths" },
             ].map((tab) => (
               <button
@@ -250,7 +319,6 @@ export function AssetLibrary({
               className="hidden"
               onChange={handleFileChange}
             />
-            {/* ✅ UPDATED: Refresh Button with Spinner */}
             <button
               onClick={() => refetch()}
               className="p-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white border border-gray-700 transition-colors"
@@ -268,14 +336,14 @@ export function AssetLibrary({
                 <LoadingSpinner size="sm" variant="default" />
               ) : (
                 <>
-                  <span></span> Upload
+                  <span>📤</span> Upload
                 </>
               )}
             </button>
           </div>
         </div>
 
-        {/* PROCESSING BANNER (Kept Original) */}
+        {/* PROCESSING BANNER */}
         {pollingUntil > 0 && (
           <div className="bg-blue-900/30 border-b border-blue-500/30 p-2 text-center animate-pulse">
             <span className="text-blue-200 text-xs font-bold uppercase tracking-wider">
@@ -340,11 +408,12 @@ export function AssetLibrary({
                     </div>
                   )}
 
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <span className="bg-black/50 text-white px-3 py-1 rounded-full text-xs backdrop-blur-sm border border-white/20">
-                      View
-                    </span>
-                  </div>
+                  {/* V2 Badge */}
+                  {asset.originalAssetId && (
+                    <div className="absolute top-2 left-2 bg-purple-600/80 text-white text-[8px] font-bold px-1.5 py-0.5 rounded backdrop-blur-md">
+                      V2
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -352,7 +421,7 @@ export function AssetLibrary({
         </div>
       </div>
 
-      {/* MODALS (Kept exactly as original) */}
+      {/* --- IMAGE DETAILS MODAL --- */}
       {selectedAsset && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 p-4 animate-in fade-in duration-200">
           <div
@@ -360,11 +429,32 @@ export function AssetLibrary({
             onClick={() => setSelectedAsset(null)}
           ></div>
           <div className="relative bg-gray-900 border border-gray-700 rounded-2xl max-w-6xl w-full h-[85vh] flex overflow-hidden shadow-2xl z-10">
-            <div className="flex-1 bg-black flex items-center justify-center p-8 border-r border-gray-800 relative">
+            {/* LEFT: IMAGE PREVIEW */}
+            <div className="flex-1 bg-black flex items-center justify-center p-8 border-r border-gray-800 relative group">
               <img
                 src={selectedAsset.url}
                 className="max-w-full max-h-full object-contain rounded shadow-lg"
               />
+
+              {/* Navigation */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePrevAsset();
+                }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-white/20 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all"
+              >
+                ◀
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNextAsset();
+                }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-white/20 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all"
+              >
+                ▶
+              </button>
               <button
                 onClick={() => setSelectedAsset(null)}
                 className="absolute top-4 left-4 bg-black/50 text-white p-2 rounded-full hover:bg-white/20"
@@ -372,20 +462,36 @@ export function AssetLibrary({
                 ✕
               </button>
             </div>
+
+            {/* RIGHT: DETAILS */}
             <div className="w-80 p-8 flex flex-col justify-between bg-gray-900">
               <div>
                 <h3 className="text-2xl font-bold text-white mb-2">
                   Asset Details
                 </h3>
-                <p className="text-gray-400 text-sm mb-6">
-                  {selectedAsset.aspectRatio === "original"
-                    ? "Raw"
-                    : selectedAsset.aspectRatio}
-                </p>
+
+                <div className="flex justify-between items-center mb-6">
+                  <p className="text-gray-400 text-sm">
+                    {selectedAsset.aspectRatio === "original"
+                      ? "Raw Original"
+                      : selectedAsset.aspectRatio}
+                  </p>
+
+                  {/* ✅ VIEW ORIGINAL BUTTON */}
+                  {selectedAsset.originalAssetId && (
+                    <button
+                      onClick={handleGoToOriginal}
+                      className="text-xs bg-gray-800 hover:bg-gray-700 text-purple-300 px-3 py-1.5 rounded border border-purple-500/30 flex items-center gap-1 transition-colors"
+                      title="Go to Original Version"
+                    >
+                      <span>↩️</span> View Original
+                    </button>
+                  )}
+                </div>
+
                 <div className="space-y-3">
                   {onSelect && (
                     <button
-                      // ✅ CHANGE 4: This button now triggers the updated handler
                       onClick={() => handleUseImage(selectedAsset)}
                       className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-lg"
                     >
@@ -397,11 +503,7 @@ export function AssetLibrary({
                       setEditingAsset(selectedAsset);
                       setSelectedAsset(null);
                     }}
-                    className={`w-full py-3 border rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
-                      activeDriftIds.has(selectedAsset.id)
-                        ? "bg-rose-600 text-white border-rose-500"
-                        : "bg-purple-600/20 text-purple-300 border-purple-500/50"
-                    }`}
+                    className={`w-full py-3 border rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${activeDriftIds.has(selectedAsset.id) ? "bg-rose-600 text-white border-rose-500" : "bg-purple-600/20 text-purple-300 border-purple-500/50"}`}
                   >
                     <span>
                       {activeDriftIds.has(selectedAsset.id)
@@ -411,6 +513,7 @@ export function AssetLibrary({
                   </button>
                 </div>
               </div>
+
               <div className="space-y-3 pt-6 border-t border-gray-800">
                 <button
                   onClick={() => handleDownloadAsset(selectedAsset)}
@@ -419,15 +522,11 @@ export function AssetLibrary({
                 >
                   {isDownloading ? <LoadingSpinner size="sm" /> : "Download"}
                 </button>
+
                 <button
                   onClick={() => {
-                    if (
-                      window.confirm(
-                        "Are you sure you want to delete this asset? This cannot be undone."
-                      )
-                    ) {
+                    if (window.confirm("Delete this asset?"))
                       deleteMutation.mutate(selectedAsset.id);
-                    }
                   }}
                   className="w-full py-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg text-sm"
                 >
