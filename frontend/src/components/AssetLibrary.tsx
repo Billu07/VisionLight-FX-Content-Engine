@@ -61,8 +61,6 @@ export function AssetLibrary({
   const [processingCount, setProcessingCount] = useState(0);
   const [activeDriftIds, setActiveDriftIds] = useState<Set<string>>(new Set());
 
-  const isProcessing = pollingUntil > 0;
-
   // 1. Fetch Assets
   const {
     data: assets = [],
@@ -144,12 +142,10 @@ export function AssetLibrary({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const validFiles = new DataTransfer();
-      let hasError = false;
 
       Array.from(e.target.files).forEach((file) => {
         if (file.size > MAX_FILE_SIZE) {
           alert(`Skipped "${file.name}": Exceeds 10MB limit.`);
-          hasError = true;
         } else {
           validFiles.items.add(file);
         }
