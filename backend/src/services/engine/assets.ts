@@ -9,16 +9,16 @@ import {
 
 export const assetsLogic = {
   // ✅ Upload Raw
+  // ✅ Upload Raw (Forced "original" tag)
   async uploadRawAsset(fileBuffer: Buffer, userId: string) {
     try {
       const metadata = await sharp(fileBuffer).metadata();
       const width = metadata.width || 1000;
       const height = metadata.height || 1000;
-      let ratio = "16:9";
-      if (Math.abs(width / height - 1) < 0.1) ratio = "1:1";
-      else if (height > width) ratio = "9:16";
 
-      console.log(`🚀 Uploading Raw Asset: ${width}x${height} (${ratio})`);
+      // We log the ratio but we SAVE it as "original" so it goes to the correct tab
+      console.log(`🚀 Uploading Raw Asset: ${width}x${height}`);
+
       const url = await uploadToCloudinary(
         fileBuffer,
         `raw_${userId}_${Date.now()}`,
@@ -26,10 +26,11 @@ export const assetsLogic = {
         "Raw Upload",
         "image",
       );
+
       return await airtableService.createAsset(
         userId,
         url,
-        ratio as any,
+        "original",
         "IMAGE",
       );
     } catch (e: any) {

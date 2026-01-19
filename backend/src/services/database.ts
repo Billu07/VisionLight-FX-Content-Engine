@@ -69,10 +69,16 @@ export const dbService = {
       },
     });
   },
+  // === ASSETS ===
   async getUserAssets(userId: string) {
     return prisma.asset.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
+      // ✅ NEW: Include relationships so we know if an asset has a parent or children
+      include: {
+        variations: true, // "Children" (Processed versions)
+        originalAsset: true, // "Parent" (Original version)
+      },
     });
   },
   async deleteAsset(id: string) {

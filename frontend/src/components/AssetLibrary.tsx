@@ -14,6 +14,8 @@ interface Asset {
   type: "IMAGE" | "VIDEO";
   createdAt: string;
   originalAssetId?: string | null;
+  // ✅ NEW: Frontend needs to know about children
+  variations?: Asset[];
 }
 
 interface AssetLibraryProps {
@@ -34,6 +36,7 @@ export function AssetLibrary({
     "16:9" | "9:16" | "1:1" | "original" | "custom" | "VIDEO"
   >("16:9");
 
+  // Auto-switch tab based on Dashboard context
   useEffect(() => {
     if (!initialAspectRatio) return;
     const ratio = initialAspectRatio.toLowerCase();
@@ -44,6 +47,7 @@ export function AssetLibrary({
     else setActiveTab("original");
   }, [initialAspectRatio]);
 
+  // UI States
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
@@ -52,10 +56,14 @@ export function AssetLibrary({
     null,
   );
 
+  // Polling State
   const [pollingUntil, setPollingUntil] = useState<number>(0);
   const [processingCount, setProcessingCount] = useState(0);
   const [activeDriftIds, setActiveDriftIds] = useState<Set<string>>(new Set());
 
+  const isProcessing = pollingUntil > 0;
+
+  // 1. Fetch Assets
   const {
     data: assets = [],
     isLoading,
@@ -68,6 +76,7 @@ export function AssetLibrary({
     refetchIntervalInBackground: true,
   });
 
+  // 2. Scan LocalStorage for Active Drift Jobs
   useEffect(() => {
     const checkDrifts = () => {
       const found = new Set<string>();
@@ -84,6 +93,7 @@ export function AssetLibrary({
     return () => clearInterval(interval);
   }, []);
 
+  // 3. Timer Logic
   useEffect(() => {
     if (pollingUntil === 0) return;
     const checkInterval = setInterval(() => {
@@ -96,51 +106,26 @@ export function AssetLibrary({
     return () => clearInterval(checkInterval);
   }, [pollingUntil, queryClient]);
 
-  // ✅ UPDATED UPLOAD LOGIC: Original + Auto-Process V2
+  // Upload Mutation
   const uploadMutation = useMutation({
     mutationFn: async (files: FileList) => {
-      const uploadPromises = Array.from(files).map(async (file) => {
-        // 1. Upload Raw (V1)
-        const formData = new FormData();
-        formData.append("image", file);
-        formData.append("raw", "true"); // Always save raw first
-        formData.append("aspectRatio", "original");
+      const formData = new FormData();
+      Array.from(files).forEach((file) => formData.append("images", file));
 
-        const rawRes = await apiEndpoints.uploadAssetSync(formData);
-        const originalAsset = rawRes.data.asset;
+      // ✅ LOGIC: All manual uploads are "Originals" (V1)
+      formData.append("aspectRatio", "original");
 
-        // 2. If we are in a specific tab (not Originals/Videos), Generate V2
-        if (
-          activeTab !== "original" &&
-          activeTab !== "VIDEO" &&
-          activeTab !== "custom"
-        ) {
-          // Trigger processing for the specific ratio
-          // We use the same 'uploadAssetSync' but with 'raw=false' and pass the original ID
-          const processFormData = new FormData();
-          processFormData.append("image", file); // Re-send file or use URL if backend supports it
-          processFormData.append("raw", "false");
-          processFormData.append("aspectRatio", activeTab);
-          processFormData.append("originalAssetId", originalAsset.id);
-
-          await apiEndpoints.uploadAssetSync(processFormData);
-        }
-        return originalAsset;
-      });
-
-      return Promise.all(uploadPromises);
+      return apiEndpoints.uploadBatchAssets(formData);
     },
     onMutate: () => setIsUploading(true),
-    onSuccess: (results) => {
-      const fileCount = results.length;
-      // If we triggered processing, give it time to show up
-      if (activeTab !== "original" && activeTab !== "VIDEO") {
-        setProcessingCount(fileCount);
-        setPollingUntil(Date.now() + fileCount * 15000); // 15s per image estimation
-      } else {
-        // If just originals, show immediately
-        setActiveTab("original");
-      }
+    onSuccess: (_, variables: FileList) => {
+      const fileCount = variables.length;
+      setProcessingCount(fileCount);
+      setPollingUntil(Date.now() + fileCount * 20000);
+
+      // Auto-switch to Originals tab
+      setActiveTab("original");
+
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     },
     onError: (err: any) => alert("Upload failed: " + err.message),
@@ -159,10 +144,12 @@ export function AssetLibrary({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const validFiles = new DataTransfer();
+      let hasError = false;
 
       Array.from(e.target.files).forEach((file) => {
         if (file.size > MAX_FILE_SIZE) {
           alert(`Skipped "${file.name}": Exceeds 10MB limit.`);
+          hasError = true;
         } else {
           validFiles.items.add(file);
         }
@@ -215,6 +202,7 @@ export function AssetLibrary({
     ? assets.filter((a: Asset) => {
         if (activeTab === "VIDEO") return a.type === "VIDEO";
 
+        // Originals Tab
         if (activeTab === "original") {
           return (
             a.type === "IMAGE" &&
@@ -223,22 +211,12 @@ export function AssetLibrary({
               a.aspectRatio === "custom")
           );
         }
-        if (activeTab === "custom") {
-          return (
-            a.type === "IMAGE" &&
-            (a.aspectRatio === "custom" ||
-              (a.aspectRatio !== "16:9" &&
-                a.aspectRatio !== "9:16" &&
-                a.aspectRatio !== "1:1" &&
-                a.aspectRatio !== "original"))
-          );
-        }
 
+        // Standard Ratios
         return a.type === "IMAGE" && a.aspectRatio === activeTab;
       })
     : [];
 
-  // ✅ NAVIGATION LOGIC
   const handleNextAsset = () => {
     if (!selectedAsset) return;
     const currentIndex = filteredAssets.findIndex(
@@ -272,6 +250,27 @@ export function AssetLibrary({
     } else {
       alert("Original asset not found (it may have been deleted).");
     }
+  };
+
+  // ✅ GO TO PROCESSED LOGIC
+  const handleGoToProcessed = () => {
+    if (
+      !selectedAsset ||
+      !selectedAsset.variations ||
+      selectedAsset.variations.length === 0
+    )
+      return;
+
+    // Pick the most recent processed version
+    const latestVersion =
+      selectedAsset.variations[selectedAsset.variations.length - 1];
+
+    // Switch tab to match the processed version
+    if (latestVersion.aspectRatio === "16:9") setActiveTab("16:9");
+    else if (latestVersion.aspectRatio === "9:16") setActiveTab("9:16");
+    else if (latestVersion.aspectRatio === "1:1") setActiveTab("1:1");
+
+    setSelectedAsset(latestVersion);
   };
 
   useEffect(() => {
@@ -309,7 +308,6 @@ export function AssetLibrary({
         {/* CONTROLS */}
         <div className="p-6 bg-gray-800/50 flex flex-col md:flex-row gap-4 items-center justify-between border-b border-gray-800">
           <div className="flex bg-gray-950 p-1 rounded-lg border border-gray-700 overflow-x-auto">
-            {/* ✅ TABS */}
             {[
               { id: "original", label: "Originals" },
               { id: "16:9", label: "Landscape" },
@@ -402,7 +400,6 @@ export function AssetLibrary({
                       : "border-gray-800 hover:border-cyan-500/50"
                   }`}
                 >
-                  {/* THUMBNAIL LOGIC */}
                   {asset.type === "VIDEO" ? (
                     <div className="w-full h-full relative aspect-video">
                       <video
@@ -435,6 +432,11 @@ export function AssetLibrary({
                       V2
                     </div>
                   )}
+                  {asset.variations && asset.variations.length > 0 && (
+                    <div className="absolute top-2 right-2 bg-cyan-600/80 text-white text-[8px] font-bold px-1.5 py-0.5 rounded backdrop-blur-md">
+                      HAS V2
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -450,14 +452,12 @@ export function AssetLibrary({
             onClick={() => setSelectedAsset(null)}
           ></div>
           <div className="relative bg-gray-900 border border-gray-700 rounded-2xl max-w-6xl w-full h-[85vh] flex overflow-hidden shadow-2xl z-10">
-            {/* LEFT: IMAGE PREVIEW + NAV */}
+            {/* LEFT: IMAGE PREVIEW */}
             <div className="flex-1 bg-black flex items-center justify-center p-8 border-r border-gray-800 relative group">
               <img
                 src={selectedAsset.url}
                 className="max-w-full max-h-full object-contain rounded shadow-lg"
               />
-
-              {/* Navigation Arrows */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -497,16 +497,28 @@ export function AssetLibrary({
                       : selectedAsset.aspectRatio}
                   </p>
 
-                  {/* VIEW ORIGINAL BUTTON */}
+                  {/* NAVIGATE V2 -> V1 */}
                   {selectedAsset.originalAssetId && (
                     <button
                       onClick={handleGoToOriginal}
                       className="text-xs bg-gray-800 hover:bg-gray-700 text-purple-300 px-3 py-1.5 rounded border border-purple-500/30 flex items-center gap-1 transition-colors"
                       title="Go to Original Version"
                     >
-                      <span>↩️</span> View Original
+                      <span>↩️</span> V1
                     </button>
                   )}
+
+                  {/* NAVIGATE V1 -> V2 */}
+                  {selectedAsset.variations &&
+                    selectedAsset.variations.length > 0 && (
+                      <button
+                        onClick={handleGoToProcessed}
+                        className="text-xs bg-cyan-900/50 hover:bg-cyan-800 text-cyan-300 px-3 py-1.5 rounded border border-cyan-500/30 flex items-center gap-1 transition-colors"
+                        title="View Processed Version"
+                      >
+                        <span>↪️</span> V2
+                      </button>
+                    )}
                 </div>
 
                 <div className="space-y-3">
@@ -541,7 +553,6 @@ export function AssetLibrary({
                 >
                   {isDownloading ? <LoadingSpinner size="sm" /> : "Download"}
                 </button>
-
                 <button
                   onClick={() => {
                     if (window.confirm("Delete this asset?"))
