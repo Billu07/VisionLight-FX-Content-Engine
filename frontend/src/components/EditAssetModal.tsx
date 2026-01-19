@@ -8,8 +8,10 @@ import { ProgressBar } from "./ProgressBar";
 interface Asset {
   id: string;
   url: string;
-  aspectRatio: "16:9" | "9:16" | "original" | "1:1";
+  // ✅ UPDATED: Matches AssetLibrary definitions
+  aspectRatio: "16:9" | "9:16" | "original" | "1:1" | "custom";
   type?: "IMAGE" | "VIDEO";
+  originalAssetId?: string | null;
 }
 
 interface EditAssetModalProps {
@@ -52,7 +54,7 @@ export function EditAssetModal({
   const currentAsset = history[currentIndex];
 
   const [activeTab, setActiveTab] = useState<EditorMode>(
-    initialVideoUrl ? "drift" : "pro"
+    initialVideoUrl ? "drift" : "pro",
   );
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -73,7 +75,7 @@ export function EditAssetModal({
   });
 
   const [driftVideoUrl, setDriftVideoUrl] = useState<string | null>(
-    initialVideoUrl || null
+    initialVideoUrl || null,
   );
   const [driftStatusMsg, setDriftStatusMsg] = useState("Processing...");
   const [driftProgress, setDriftProgress] = useState(0);
@@ -88,7 +90,7 @@ export function EditAssetModal({
   // 1. RECOVERY LOGIC (Checks LocalStorage on mount)
   useEffect(() => {
     const pendingPostId = localStorage.getItem(
-      `active_drift_post_${currentAsset.id}`
+      `active_drift_post_${currentAsset.id}`,
     );
     if (pendingPostId) {
       setActiveTab("drift");
