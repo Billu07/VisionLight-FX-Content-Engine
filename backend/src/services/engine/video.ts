@@ -40,13 +40,32 @@ export const videoLogic = {
     horizontal: number,
     vertical: number,
     zoom: number,
-    userAspectRatio?: string
+    userAspectRatio?: string,
   ) {
     try {
       console.log(
-        `🎬 Kling 2.6 Drift Request: H${horizontal} V${vertical} Z${zoom}`
+        `🎬 Kling 2.6 Drift Request: H${horizontal} V${vertical} Z${zoom} | AR: ${userAspectRatio}`,
       );
 
+      // ✅ FIX: Download Image FIRST to detect aspect ratio
+      const rawUrl = getOptimizedUrl(assetUrl);
+      const imageResponse = await axios.get(rawUrl, {
+        responseType: "arraybuffer",
+      });
+      const originalBuffer = Buffer.from(imageResponse.data);
+      const metadata = await sharp(originalBuffer).metadata();
+      const width = metadata.width || 1024;
+      const height = metadata.height || 576;
+
+      // ✅ FIX: Auto-Detect Ratio if "original" or undefined is passed
+      if (!userAspectRatio || userAspectRatio === "original") {
+        if (height > width) userAspectRatio = "9:16";
+        else if (Math.abs(width - height) < 100) userAspectRatio = "1:1";
+        else userAspectRatio = "16:9";
+        console.log(`📏 Auto-detected Drift Ratio: ${userAspectRatio}`);
+      }
+
+      // Now set target dimensions based on the (potentially auto-detected) ratio
       let targetWidth = 1280;
       let targetHeight = 720;
       let targetRatioString = "16:9";
@@ -61,32 +80,27 @@ export const videoLogic = {
         targetRatioString = "1:1";
       }
 
-      const rawUrl = getOptimizedUrl(assetUrl);
-      const imageResponse = await axios.get(rawUrl, {
-        responseType: "arraybuffer",
-      });
-      const originalBuffer = Buffer.from(imageResponse.data);
-      const metadata = await sharp(originalBuffer).metadata();
-
-      const sourceAR = (metadata.width || 1) / (metadata.height || 1);
+      const sourceAR = width / height;
       const targetAR = targetWidth / targetHeight;
       let finalImageUrl = rawUrl;
 
-      // Outpaint if Ratio Mismatch
+      // Outpaint ONLY if Ratio Mismatch > 5%
+      // Since we auto-detected above, this should barely ever trigger for "original" images,
+      // preserving the exact image you uploaded.
       if (Math.abs(sourceAR - targetAR) > 0.05) {
         try {
           const outpaintedBuffer = await resizeWithGemini(
             originalBuffer,
             targetWidth,
             targetHeight,
-            targetRatioString as any
+            targetRatioString as any,
           );
           finalImageUrl = await uploadToCloudinary(
             outpaintedBuffer,
             `drift_temp_${userId}_${Date.now()}`,
             userId,
             "Drift Temp Frame",
-            "image"
+            "image",
           );
         } catch (e) {
           console.warn("Outpaint failed, proceeding with original.");
@@ -101,9 +115,9 @@ export const videoLogic = {
       // ✅ 2.6 Payload
       const payload: any = {
         prompt: finalPrompt,
-        start_image_url: finalImageUrl, // 2.6 uses start_image_url
+        start_image_url: finalImageUrl,
         duration: "5",
-        generate_audio: false, // 2.6 audio default true, disable for safety
+        generate_audio: false,
       };
 
       const url = `${FAL_BASE_PATH}/image-to-video`;
@@ -114,35 +128,27 @@ export const videoLogic = {
         },
       });
 
-      // Wrap DB call to prevent crash on ID mismatch
-      let post;
-      try {
-        post = await airtableService.createPost({
-          userId,
-          title: "Drift Shot (2.6)",
-          prompt: finalPrompt,
-          mediaType: "VIDEO",
-          platform: "Internal",
-          status: "PROCESSING",
-          mediaProvider: "kling",
-          imageReference: assetUrl,
-          generationParams: {
-            source: "DRIFT_EDITOR",
-            externalId: submitRes.data.request_id,
-            statusUrl: submitRes.data.status_url,
-            aspectRatio: targetRatioString,
-            cost: 0,
-          },
-        });
-      } catch (dbErr: any) {
-        console.error("DB Create Error:", dbErr.message);
-        // Create a fake post object so frontend gets something back
-        post = { id: "temp_" + Date.now() };
-      }
+      const post = await airtableService.createPost({
+        userId,
+        title: "Drift Shot (2.6)",
+        prompt: finalPrompt,
+        mediaType: "VIDEO",
+        platform: "Internal",
+        status: "PROCESSING",
+        mediaProvider: "kling",
+        imageReference: assetUrl,
+        generationParams: {
+          source: "DRIFT_EDITOR",
+          externalId: submitRes.data.request_id,
+          statusUrl: submitRes.data.status_url,
+          aspectRatio: targetRatioString,
+          cost: 0,
+        },
+      });
 
       return {
         success: true,
-        postId: post?.id,
+        postId: post.id,
         requestId: submitRes.data.request_id,
         statusUrl: submitRes.data.status_url,
       };
@@ -161,7 +167,7 @@ export const videoLogic = {
   // === TIMELINE VIDEO GEN ===
   async startVideoGeneration(postId: string, finalPrompt: string, params: any) {
     console.log(
-      `🎬 Video Gen for ${postId} | Model: ${params.model} | AR: ${params.aspectRatio}`
+      `🎬 Video Gen for ${postId} | Model: ${params.model} | AR: ${params.aspectRatio}`,
     );
     const isKie = params.model.includes("kie");
     const isKling = params.model.includes("kling");
@@ -216,20 +222,20 @@ export const videoLogic = {
                 originalImageBuffer,
                 targetWidth,
                 targetHeight,
-                targetRatioString as any
+                targetRatioString as any,
               );
             } catch (e) {
               finalInputImageBuffer = await resizeWithBlurFill(
                 originalImageBuffer,
                 targetWidth,
-                targetHeight
+                targetHeight,
               );
             }
           } else {
             finalInputImageBuffer = await resizeStrict(
               originalImageBuffer,
               targetWidth,
-              targetHeight
+              targetHeight,
             );
           }
         } catch (e: any) {
@@ -253,7 +259,7 @@ export const videoLogic = {
             `${postId}_kling_start`,
             params.userId,
             "Kling Start",
-            "image"
+            "image",
           );
           isImageToVideo = true;
 
@@ -266,14 +272,14 @@ export const videoLogic = {
               let processedTail = await resizeStrict(
                 Buffer.from(tailResp.data),
                 targetWidth,
-                targetHeight
+                targetHeight,
               );
               klingEndUrl = await uploadToCloudinary(
                 processedTail,
                 `${postId}_kling_end`,
                 params.userId,
                 "Kling End",
-                "image"
+                "image",
               );
               await airtableService.updatePost(postId, {
                 generatedEndFrame: klingEndUrl,
@@ -289,7 +295,6 @@ export const videoLogic = {
           isImageToVideo ? "image-to-video" : "text-to-video"
         }`;
 
-        // ✅ 2.6 Payload
         const payload: any = {
           prompt: finalPrompt,
           duration: params.duration ? params.duration.toString() : "5",
@@ -299,10 +304,9 @@ export const videoLogic = {
           payload.start_image_url = klingInputUrl;
           if (klingEndUrl) {
             payload.end_image_url = klingEndUrl;
-            payload.generate_audio = false; // Disable audio for end frame support
+            payload.generate_audio = false;
           }
         } else {
-          // Text to Video needs aspect_ratio
           payload.aspect_ratio = targetRatioString;
         }
 
@@ -315,7 +319,6 @@ export const videoLogic = {
         externalId = submitRes.data.request_id;
         statusUrl = submitRes.data.status_url;
       } else if (isKie) {
-        // === KIE (Correct) ===
         provider = "kie";
         let kieInputUrl = "";
         let isImageToVideo = false;
@@ -325,7 +328,7 @@ export const videoLogic = {
             `${postId}_input`,
             params.userId,
             "Kie Input",
-            "image"
+            "image",
           );
           isImageToVideo = true;
         }
@@ -348,19 +351,18 @@ export const videoLogic = {
         const kieRes = await axios.post(
           `${KIE_BASE_URL}/jobs/createTask`,
           kiePayload,
-          { headers: { Authorization: `Bearer ${KIE_API_KEY}` } }
+          { headers: { Authorization: `Bearer ${KIE_API_KEY}` } },
         );
         if (kieRes.data.code !== 200) throw new Error("Kie Error");
         externalId = kieRes.data.data.taskId;
       } else if (isOpenAI) {
-        // === OPENAI (Correct) ===
         provider = "openai";
         const form = new FormData();
         form.append("prompt", finalPrompt);
         form.append("model", params.model || "sora-2-pro");
         form.append(
           "seconds",
-          parseInt(params.duration?.toString().replace("s", "") || "4")
+          parseInt(params.duration?.toString().replace("s", "") || "4"),
         );
         form.append("size", `${targetWidth}x${targetHeight}`);
         if (finalInputImageBuffer) {
@@ -378,7 +380,7 @@ export const videoLogic = {
               Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
             },
             timeout: VIDEO_UPLOAD_TIMEOUT,
-          }
+          },
         );
         externalId = genResponse.data.id;
       }
@@ -398,7 +400,6 @@ export const videoLogic = {
     }
   },
 
-  // ✅ POLLING LOGIC (PicDrift Polling preserved)
   async checkPostStatus(post: Post) {
     const params = post.generationParams as any;
     if (post.status !== "PROCESSING" || !params?.externalId) return;
@@ -413,11 +414,10 @@ export const videoLogic = {
       let progress = post.progress || 0;
       let errorMessage = "";
 
-      // === KIE CHECK ===
       if (provider.includes("kie")) {
         const checkRes = await axios.get(
           `${KIE_BASE_URL}/jobs/recordInfo?taskId=${externalId}`,
-          { headers: { Authorization: `Bearer ${KIE_API_KEY}` } }
+          { headers: { Authorization: `Bearer ${KIE_API_KEY}` } },
         );
         if (checkRes.data.data.state === "success") {
           finalUrl = JSON.parse(checkRes.data.data.resultJson).resultUrls?.[0];
@@ -426,11 +426,7 @@ export const videoLogic = {
           isFailed = true;
           errorMessage = checkRes.data.data.failMsg;
         } else progress = Math.min(95, progress + 5);
-      }
-
-      // === KLING CHECK (PicDrift) ===
-      else if (provider.includes("kling")) {
-        // Robust 2.6 Check: Use saved status URL or fallback to standard structure
+      } else if (provider.includes("kling")) {
         const checkUrl =
           params.statusUrl || `${FAL_BASE_PATH}/requests/${externalId}/status`;
 
@@ -466,7 +462,7 @@ export const videoLogic = {
             post.id,
             userId,
             "Video",
-            "video"
+            "video",
           );
           await this.finalizePost(post.id, cloudUrl, provider, userId);
         } catch (e) {
@@ -495,7 +491,7 @@ export const videoLogic = {
     postId: string,
     url: string,
     provider: string,
-    userId: string
+    userId: string,
   ) {
     try {
       const post = await airtableService.updatePost(postId, {
@@ -513,7 +509,7 @@ export const videoLogic = {
             userId,
             url,
             params.aspectRatio || "16:9",
-            "VIDEO"
+            "VIDEO",
           );
         } catch (e) {
           console.warn("Asset Save Failed");

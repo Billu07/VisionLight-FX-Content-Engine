@@ -24,13 +24,13 @@ export const assetsLogic = {
         `raw_${userId}_${Date.now()}`,
         userId,
         "Raw Upload",
-        "image"
+        "image",
       );
       return await airtableService.createAsset(
         userId,
         url,
         ratio as any,
-        "IMAGE"
+        "IMAGE",
       );
     } catch (e: any) {
       console.error("Raw Upload Failed:", e.message);
@@ -42,7 +42,8 @@ export const assetsLogic = {
   async processAndSaveAsset(
     fileBuffer: Buffer,
     userId: string,
-    targetAspectRatio: "16:9" | "9:16" | "1:1"
+    targetAspectRatio: "16:9" | "9:16" | "1:1",
+    originalAssetId?: string, // 👈 NEW PARAMETER
   ) {
     try {
       let targetWidth = 1280;
@@ -69,7 +70,7 @@ export const assetsLogic = {
         processedBuffer = await resizeStrict(
           fileBuffer,
           targetWidth,
-          targetHeight
+          targetHeight,
         );
       } else {
         try {
@@ -78,13 +79,13 @@ export const assetsLogic = {
             fileBuffer,
             targetWidth,
             targetHeight,
-            targetAspectRatio
+            targetAspectRatio,
           );
         } catch (e) {
           processedBuffer = await resizeWithBlurFill(
             fileBuffer,
             targetWidth,
-            targetHeight
+            targetHeight,
           );
         }
       }
@@ -94,13 +95,16 @@ export const assetsLogic = {
         `asset_${userId}_${Date.now()}`,
         userId,
         "Processed Asset",
-        "image"
+        "image",
       );
+
+      // ✅ Pass originalAssetId to DB service
       return await airtableService.createAsset(
         userId,
         url,
         targetAspectRatio,
-        "IMAGE"
+        "IMAGE",
+        originalAssetId, // 👈 Pass it here
       );
     } catch (e: any) {
       console.error("Asset Processing Failed:", e.message);
@@ -138,7 +142,7 @@ export const assetsLogic = {
       userId,
       targetUrl,
       dbAspectRatio,
-      type
+      type,
     );
   },
 };

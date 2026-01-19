@@ -52,9 +52,13 @@ model Asset {
   userId      String
   url         String
   aspectRatio String
-  type        String   @default("IMAGE") // ✅ NEW: "IMAGE" or "VIDEO"
+  type        String   @default("IMAGE") 
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  originalAssetId String?  
+  originalAsset   Asset?   @relation("AssetHistory", fields: [originalAssetId], references: [id])
+  variations      Asset[]  @relation("AssetHistory")
 }
 
 model BrandConfig {

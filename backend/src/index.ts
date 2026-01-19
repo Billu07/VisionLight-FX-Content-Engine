@@ -36,7 +36,7 @@ app.use(
     origin: true, // Allow any domain (safer for PWA/Mobile)
     credentials: true,
     exposedHeaders: ["Content-Disposition", "Content-Length", "Content-Type"],
-  })
+  }),
 );
 
 app.use(express.json({ limit: "50mb" }));
@@ -59,7 +59,7 @@ interface AuthenticatedRequest extends Request {
 const authenticateToken = async (
   req: AuthenticatedRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   const token = req.headers.authorization?.replace("Bearer ", "");
   if (!token) return res.status(401).json({ error: "Authentication required" });
@@ -81,7 +81,7 @@ const authenticateToken = async (
 const requireAdmin = (
   req: AuthenticatedRequest,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   if (!req.user?.email || !ADMIN_EMAILS.includes(req.user.email)) {
     return res.status(403).json({ error: "Access Denied: Admins only." });
@@ -99,13 +99,13 @@ app.post(
       await airtableService.createCreditRequest(
         req.user.id,
         req.user.email,
-        req.user.name
+        req.user.name,
       );
       res.json({ success: true, message: "Request sent to admin." });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 app.get(
@@ -119,7 +119,7 @@ app.get(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 app.put(
@@ -133,7 +133,7 @@ app.put(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 // ==================== ADMIN MANAGEMENT ROUTES ====================
@@ -151,13 +151,13 @@ app.post(
       const newUser = await AuthService.createSystemUser(
         email,
         password,
-        name || "New User"
+        name || "New User",
       );
       res.json({ success: true, user: newUser });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 app.get(
@@ -171,7 +171,7 @@ app.get(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 app.put(
@@ -201,7 +201,7 @@ app.put(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 app.delete(
@@ -224,7 +224,7 @@ app.delete(
       console.error("Delete Error:", error);
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 // ==================== AUTH ROUTES ====================
@@ -233,7 +233,7 @@ app.get(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     res.json({ success: true, user: req.user });
-  }
+  },
 );
 
 // ==================== DATA ROUTES ====================
@@ -247,7 +247,7 @@ app.get(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 app.put(
@@ -267,7 +267,7 @@ app.put(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 app.get(
@@ -280,7 +280,7 @@ app.get(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 app.get(
@@ -294,7 +294,7 @@ app.get(
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch credits" });
     }
-  }
+  },
 );
 
 app.post(
@@ -309,7 +309,7 @@ app.post(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 // ==================== ASSET MANAGEMENT ====================
@@ -325,7 +325,7 @@ app.post(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 // ✅ Sync Upload (Magic Edit & Direct Reference)
@@ -338,22 +338,24 @@ app.post(
       if (!req.file)
         return res.status(400).json({ error: "No image provided" });
 
-      const { aspectRatio, raw } = req.body;
+      // ✅ Destructure originalAssetId from body
+      const { aspectRatio, raw, originalAssetId } = req.body;
 
       let asset;
 
       if (raw === "true") {
-        // Raw Mode: No resizing
+        // Raw Mode (V1 Upload)
         asset = await contentEngine.uploadRawAsset(
           req.file.buffer,
-          req.user!.id
+          req.user!.id,
         );
       } else {
-        // Process Mode: Resize/Outpaint
+        // Process Mode (V2 Generation)
         asset = await contentEngine.processAndSaveAsset(
           req.file.buffer,
           req.user!.id,
-          aspectRatio || "16:9"
+          aspectRatio || "16:9",
+          originalAssetId, // 👈 Pass ID from frontend
         );
       }
 
@@ -361,7 +363,7 @@ app.post(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 // ✅ Batch Upload
@@ -389,7 +391,7 @@ app.post(
             await contentEngine.processAndSaveAsset(
               file.buffer,
               req.user!.id,
-              aspectRatio || "16:9"
+              aspectRatio || "16:9",
             );
           } catch (e) {
             console.error("Failed to process one asset in batch", e);
@@ -399,7 +401,7 @@ app.post(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 // ✅ Edit Asset (Standard/Pro)
@@ -420,14 +422,14 @@ app.post(
         req.user!.id,
         aspectRatio || "16:9",
         referenceUrl,
-        mode || "pro"
+        mode || "pro",
       );
 
       res.json({ success: true, asset: newAsset });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 // ✅ Start Drift Video Path (Kling)
@@ -446,14 +448,14 @@ app.post(
         Number(horizontal),
         Number(vertical),
         Number(zoom),
-        aspectRatio
+        aspectRatio,
       );
       // ✅ FIXED: Removed duplicate { success: true } spread
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 // ✅ Check Tool Status (For Drift Polling)
@@ -468,7 +470,7 @@ app.post(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 // ✅ Save Extracted Frame / Video URL
@@ -485,14 +487,14 @@ app.post(
         req.user!.id,
         url,
         aspectRatio || "16:9",
-        type || "IMAGE"
+        type || "IMAGE",
       );
 
       res.json({ success: true, asset });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 // ✅ NEW: Enhance Asset
@@ -507,7 +509,7 @@ app.post(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 // ✅ Vision Analysis
@@ -532,7 +534,7 @@ app.post(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 // ✅ Get Assets
@@ -546,7 +548,7 @@ app.get(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 // ✅ Delete Asset
@@ -560,7 +562,7 @@ app.delete(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 // ==================== CONTENT ROUTES (TIMELINE) ====================
@@ -574,7 +576,7 @@ app.get(
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch posts" });
     }
-  }
+  },
 );
 
 app.put(
@@ -593,7 +595,7 @@ app.put(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 // ✅ FIXED: Dynamic Download Extension
@@ -642,7 +644,7 @@ app.get(
         res.setHeader("Content-Length", response.headers["content-length"]);
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="${filename}"`
+        `attachment; filename="${filename}"`,
       );
       response.data.pipe(res);
     } catch (error: any) {
@@ -650,7 +652,7 @@ app.get(
       if (!res.headersSent)
         res.status(500).json({ error: "Failed to download media" });
     }
-  }
+  },
 );
 
 // ✅ Delete Post (Timeline)
@@ -671,7 +673,7 @@ app.delete(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 // ==================== GENERATION WORKFLOW (UNIFIED) ====================
@@ -698,7 +700,7 @@ app.post(
       const cost = calculateCost(
         mediaType,
         duration ? parseInt(duration) : undefined,
-        model
+        model,
       );
 
       const user = await airtableService.findUserById(req.user!.id);
@@ -765,19 +767,19 @@ app.post(
             await contentEngine.startCarouselGeneration(
               post.id,
               prompt,
-              generationParams
+              generationParams,
             );
           } else if (mediaType === "image") {
             await contentEngine.startImageGeneration(
               post.id,
               prompt,
-              generationParams
+              generationParams,
             );
           } else {
             contentEngine.startVideoGeneration(
               post.id,
               prompt,
-              generationParams
+              generationParams,
             );
           }
         } catch (err: any) {
@@ -793,7 +795,7 @@ app.post(
       console.error("API Error:", error);
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 // ✅ POST STATUS (Active Polling)
@@ -821,7 +823,7 @@ app.get(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 // 2. JOB CHECK (Active Jobs List)
@@ -832,7 +834,7 @@ app.get(
     try {
       const allPosts = await airtableService.getUserPosts(req.user!.id);
       const activePosts = allPosts.filter(
-        (p: any) => p.status === "PROCESSING"
+        (p: any) => p.status === "PROCESSING",
       );
 
       if (activePosts.length === 0) {
@@ -851,7 +853,7 @@ app.get(
     } catch (error: any) {
       res.json({ success: false, error: error.message });
     }
-  }
+  },
 );
 
 app.get(
@@ -866,7 +868,7 @@ app.get(
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 );
 
 app.use((req, res) => res.status(404).json({ error: "Route not found" }));
