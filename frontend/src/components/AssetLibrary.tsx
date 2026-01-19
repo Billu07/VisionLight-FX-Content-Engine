@@ -13,7 +13,7 @@ interface Asset {
   aspectRatio: "16:9" | "9:16" | "1:1" | "original" | "custom";
   type: "IMAGE" | "VIDEO";
   createdAt: string;
-  originalAssetId?: string | null; // ✅ Link to Parent
+  originalAssetId?: string | null;
 }
 
 interface AssetLibraryProps {
@@ -34,7 +34,6 @@ export function AssetLibrary({
     "16:9" | "9:16" | "1:1" | "original" | "custom" | "VIDEO"
   >("16:9");
 
-  // Auto-switch based on context
   useEffect(() => {
     if (!initialAspectRatio) return;
     const ratio = initialAspectRatio.toLowerCase();
@@ -45,7 +44,6 @@ export function AssetLibrary({
     else setActiveTab("original");
   }, [initialAspectRatio]);
 
-  // UI States
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
@@ -54,12 +52,10 @@ export function AssetLibrary({
     null,
   );
 
-  // Polling
   const [pollingUntil, setPollingUntil] = useState<number>(0);
   const [processingCount, setProcessingCount] = useState(0);
   const [activeDriftIds, setActiveDriftIds] = useState<Set<string>>(new Set());
 
-  // 1. Fetch Assets
   const {
     data: assets = [],
     isLoading,
@@ -72,7 +68,6 @@ export function AssetLibrary({
     refetchIntervalInBackground: true,
   });
 
-  // 2. Drift Monitoring
   useEffect(() => {
     const checkDrifts = () => {
       const found = new Set<string>();
@@ -89,7 +84,6 @@ export function AssetLibrary({
     return () => clearInterval(interval);
   }, []);
 
-  // 3. Polling Timer
   useEffect(() => {
     if (pollingUntil === 0) return;
     const checkInterval = setInterval(() => {
@@ -102,23 +96,51 @@ export function AssetLibrary({
     return () => clearInterval(checkInterval);
   }, [pollingUntil, queryClient]);
 
-  // Upload Mutation
+  // ✅ UPDATED UPLOAD LOGIC: Original + Auto-Process V2
   const uploadMutation = useMutation({
     mutationFn: async (files: FileList) => {
-      const formData = new FormData();
-      Array.from(files).forEach((file) => formData.append("images", file));
+      const uploadPromises = Array.from(files).map(async (file) => {
+        // 1. Upload Raw (V1)
+        const formData = new FormData();
+        formData.append("image", file);
+        formData.append("raw", "true"); // Always save raw first
+        formData.append("aspectRatio", "original");
 
-      // ✅ LOGIC: Manual uploads are always Originals (V1)
-      formData.append("aspectRatio", "original");
+        const rawRes = await apiEndpoints.uploadAssetSync(formData);
+        const originalAsset = rawRes.data.asset;
 
-      return apiEndpoints.uploadBatchAssets(formData);
+        // 2. If we are in a specific tab (not Originals/Videos), Generate V2
+        if (
+          activeTab !== "original" &&
+          activeTab !== "VIDEO" &&
+          activeTab !== "custom"
+        ) {
+          // Trigger processing for the specific ratio
+          // We use the same 'uploadAssetSync' but with 'raw=false' and pass the original ID
+          const processFormData = new FormData();
+          processFormData.append("image", file); // Re-send file or use URL if backend supports it
+          processFormData.append("raw", "false");
+          processFormData.append("aspectRatio", activeTab);
+          processFormData.append("originalAssetId", originalAsset.id);
+
+          await apiEndpoints.uploadAssetSync(processFormData);
+        }
+        return originalAsset;
+      });
+
+      return Promise.all(uploadPromises);
     },
     onMutate: () => setIsUploading(true),
-    onSuccess: (_, variables: FileList) => {
-      const fileCount = variables.length;
-      setProcessingCount(fileCount);
-      setPollingUntil(Date.now() + fileCount * 20000);
-      setActiveTab("original"); // Switch to Originals tab
+    onSuccess: (results) => {
+      const fileCount = results.length;
+      // If we triggered processing, give it time to show up
+      if (activeTab !== "original" && activeTab !== "VIDEO") {
+        setProcessingCount(fileCount);
+        setPollingUntil(Date.now() + fileCount * 15000); // 15s per image estimation
+      } else {
+        // If just originals, show immediately
+        setActiveTab("original");
+      }
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     },
     onError: (err: any) => alert("Upload failed: " + err.message),
@@ -176,7 +198,7 @@ export function AssetLibrary({
       const link = document.createElement("a");
       link.href = url;
       const ext = asset.type === "VIDEO" ? "mp4" : "jpg";
-      link.setAttribute("download", `visionlight-asset-${asset.id}.${ext}`);
+      link.setAttribute("download", `picdrift-asset-${asset.id}.${ext}`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -193,9 +215,13 @@ export function AssetLibrary({
     ? assets.filter((a: Asset) => {
         if (activeTab === "VIDEO") return a.type === "VIDEO";
 
-        // ✅ REFINEMENT 2: Split "Originals" and "Edited"
         if (activeTab === "original") {
-          return a.type === "IMAGE" && a.aspectRatio === "original";
+          return (
+            a.type === "IMAGE" &&
+            (a.aspectRatio === "original" ||
+              !a.aspectRatio ||
+              a.aspectRatio === "custom")
+          );
         }
         if (activeTab === "custom") {
           return (
@@ -241,8 +267,8 @@ export function AssetLibrary({
     );
 
     if (original) {
-      setActiveTab("original"); // Switch context to Originals tab
-      setSelectedAsset(original); // Open it
+      setActiveTab("original");
+      setSelectedAsset(original);
     } else {
       alert("Original asset not found (it may have been deleted).");
     }
@@ -283,7 +309,7 @@ export function AssetLibrary({
         {/* CONTROLS */}
         <div className="p-6 bg-gray-800/50 flex flex-col md:flex-row gap-4 items-center justify-between border-b border-gray-800">
           <div className="flex bg-gray-950 p-1 rounded-lg border border-gray-700 overflow-x-auto">
-            {/* ✅ UPDATED TABS: Originals first */}
+            {/* ✅ TABS */}
             {[
               { id: "original", label: "Originals" },
               { id: "16:9", label: "Landscape" },
@@ -404,7 +430,6 @@ export function AssetLibrary({
                     </div>
                   )}
 
-                  {/* V2 Badge */}
                   {asset.originalAssetId && (
                     <div className="absolute top-2 left-2 bg-purple-600/80 text-white text-[8px] font-bold px-1.5 py-0.5 rounded backdrop-blur-md">
                       V2
@@ -425,14 +450,14 @@ export function AssetLibrary({
             onClick={() => setSelectedAsset(null)}
           ></div>
           <div className="relative bg-gray-900 border border-gray-700 rounded-2xl max-w-6xl w-full h-[85vh] flex overflow-hidden shadow-2xl z-10">
-            {/* LEFT: IMAGE PREVIEW */}
+            {/* LEFT: IMAGE PREVIEW + NAV */}
             <div className="flex-1 bg-black flex items-center justify-center p-8 border-r border-gray-800 relative group">
               <img
                 src={selectedAsset.url}
                 className="max-w-full max-h-full object-contain rounded shadow-lg"
               />
 
-              {/* Navigation */}
+              {/* Navigation Arrows */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -465,7 +490,6 @@ export function AssetLibrary({
                 <h3 className="text-2xl font-bold text-white mb-2">
                   Asset Details
                 </h3>
-
                 <div className="flex justify-between items-center mb-6">
                   <p className="text-gray-400 text-sm">
                     {selectedAsset.aspectRatio === "original"
@@ -473,7 +497,7 @@ export function AssetLibrary({
                       : selectedAsset.aspectRatio}
                   </p>
 
-                  {/* ✅ VIEW ORIGINAL BUTTON */}
+                  {/* VIEW ORIGINAL BUTTON */}
                   {selectedAsset.originalAssetId && (
                     <button
                       onClick={handleGoToOriginal}
@@ -509,7 +533,6 @@ export function AssetLibrary({
                   </button>
                 </div>
               </div>
-
               <div className="space-y-3 pt-6 border-t border-gray-800">
                 <button
                   onClick={() => handleDownloadAsset(selectedAsset)}
