@@ -58,18 +58,18 @@ function Dashboard() {
   >("portrait");
 
   const [kieModel, setKieModel] = useState<"kie-sora-2" | "kie-sora-2-pro">(
-    "kie-sora-2"
+    "kie-sora-2",
   );
 
   // Video FX Sub-mode (Video vs PicDrift)
   const [videoFxMode, setVideoFxMode] = useState<"video" | "picdrift">(
-    "picdrift"
+    "picdrift",
   );
 
   // OpenAI (Video FX 2)
   const [videoDuration, setVideoDuration] = useState<4 | 8 | 12>(4);
   const [videoModel, setVideoModel] = useState<"sora-2" | "sora-2-pro">(
-    "sora-2-pro"
+    "sora-2-pro",
   );
   const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16">("16:9");
   const [videoSize, setVideoSize] = useState<
@@ -78,7 +78,7 @@ function Dashboard() {
 
   // Studio (Gemini) Aspect Ratio
   const [geminiAspect, setGeminiAspect] = useState<"1:1" | "16:9" | "9:16">(
-    "9:16"
+    "9:16",
   );
 
   // Upload & UI
@@ -118,12 +118,12 @@ function Dashboard() {
   // State for Magic Edit Asset
   const [editingAsset, setEditingAsset] = useState<any | null>(null);
   const [editingVideoUrl, setEditingVideoUrl] = useState<string | undefined>(
-    undefined
+    undefined,
   );
 
   // New State for Extraction (Timeline Scissors)
   const [extractingVideoUrl, setExtractingVideoUrl] = useState<string | null>(
-    null
+    null,
   );
 
   const queryClient = useQueryClient();
@@ -135,8 +135,8 @@ function Dashboard() {
     activeEngine === "studio"
       ? "studio"
       : activeEngine === "kie" && videoFxMode === "picdrift"
-      ? "picdrift"
-      : "videofx";
+        ? "picdrift"
+        : "videofx";
 
   // HANDLER: Open Timeline Video in Drift
   const handleDriftFromPost = (post: any) => {
@@ -203,7 +203,7 @@ function Dashboard() {
       const hasProcessing = currentPosts.some(
         (p: any) =>
           (p.status === "PROCESSING" || p.status === "NEW") &&
-          (p.progress || 0) < 100
+          (p.progress || 0) < 100,
       );
       return hasProcessing ? 5000 : false;
     },
@@ -223,7 +223,7 @@ function Dashboard() {
     queryKey: ["check-jobs"],
     queryFn: async () => {
       const hasActive = posts.some(
-        (p: any) => p.status === "PROCESSING" || p.status === "NEW"
+        (p: any) => p.status === "PROCESSING" || p.status === "NEW",
       );
       if (hasActive) {
         await apiEndpoints.checkActiveJobs();
@@ -232,7 +232,7 @@ function Dashboard() {
     },
     refetchInterval: () => {
       const hasActive = posts.some(
-        (p: any) => p.status === "PROCESSING" || p.status === "NEW"
+        (p: any) => p.status === "PROCESSING" || p.status === "NEW",
       );
       return hasActive ? 5000 : false;
     },
@@ -397,7 +397,7 @@ function Dashboard() {
   };
 
   const handleMagicEditUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -431,7 +431,7 @@ function Dashboard() {
 
   const handlePicDriftUpload = (
     e: React.ChangeEvent<HTMLInputElement>,
-    type: "start" | "end"
+    type: "start" | "end",
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -463,7 +463,7 @@ function Dashboard() {
       formData.append("mediaType", "video");
       formData.append("model", kieModel);
       referenceImages.forEach((file) =>
-        formData.append("referenceImages", file)
+        formData.append("referenceImages", file),
       );
       formData.append("duration", kieDuration.toString());
       formData.append("aspectRatio", kieAspect);
@@ -475,7 +475,7 @@ function Dashboard() {
       formData.append("size", videoSize);
       formData.append("aspectRatio", aspectRatio);
       referenceImages.forEach((file) =>
-        formData.append("referenceImages", file)
+        formData.append("referenceImages", file),
       );
     } else {
       formData.append("mediaType", studioMode);
@@ -485,7 +485,7 @@ function Dashboard() {
       formData.append("size", sizeStr);
       formData.append("aspectRatio", geminiAspect);
       referenceImages.forEach((file) =>
-        formData.append("referenceImages", file)
+        formData.append("referenceImages", file),
       );
     }
     return formData;
@@ -852,7 +852,7 @@ function Dashboard() {
                   onClick={() => {
                     // For PicDrift, open 'Start Frame' slot. For others, open 'Generic'.
                     setActiveLibrarySlot(
-                      currentVisualTab === "picdrift" ? "start" : "generic"
+                      currentVisualTab === "picdrift" ? "start" : "generic",
                     );
                   }}
                   className={`text-xs px-4 py-2 rounded-lg border flex items-center gap-2 transition-all font-semibold shadow-lg ${
@@ -865,184 +865,342 @@ function Dashboard() {
                 </button>
               </div>
 
-              {/* NAVIGATION BAR */}
-              <div className="mb-6 sm:mb-8">
-                <label className="block text-sm font-semibold text-white mb-3 sm:mb-4">
-                  Select Content Type
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-                  {/* TAB 1: PICDRIFT (Default) */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveEngine("kie");
-                      setVideoFxMode("picdrift");
-                    }}
-                    className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
-                      currentVisualTab === "picdrift"
-                        ? "border-white/20 bg-gradient-to-br from-pink-500 to-rose-500 shadow-2xl scale-105"
-                        : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 sm:gap-3">
-                      <div className="flex-1">
-                        <div className="font-semibold text-sm text-white">
-                          PicDrift
-                        </div>
-                      </div>
-                      {currentVisualTab === "picdrift" && (
-                        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                      )}
-                    </div>
-                  </button>
-
-                  {/* TAB 2: PIC FX */}
-                  <button
-                    type="button"
-                    onClick={() => setActiveEngine("studio")}
-                    className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
-                      currentVisualTab === "studio"
-                        ? "border-white/20 bg-gradient-to-br from-violet-700 to-purple-700 shadow-2xl scale-105"
-                        : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 sm:gap-3">
-                      <div className="flex-1">
-                        <div className="font-semibold text-sm text-white">
-                          Pic FX
-                        </div>
-                      </div>
-                      {currentVisualTab === "studio" && (
-                        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                      )}
-                    </div>
-                  </button>
-
-                  {/* TAB 3: VIDEO FX */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveEngine("kie");
-                      setVideoFxMode("video");
-                    }}
-                    className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
-                      currentVisualTab === "videofx"
-                        ? "border-white/20 bg-gradient-to-br from-blue-700 to-cyan-700 shadow-2xl scale-105"
-                        : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 sm:gap-3">
-                      <div className="flex-1">
-                        <div className="font-semibold text-sm text-white">
-                          Video FX
-                        </div>
-                      </div>
-                      {currentVisualTab === "videofx" && (
-                        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                      )}
-                    </div>
-                  </button>
-                </div>
+              {/* === MODERN ENGINE SELECTOR === */}
+              <div className="mb-6 bg-black/40 p-1.5 rounded-xl flex gap-1 border border-white/5 relative">
+                {[
+                  { id: "picdrift", label: "PicDrift", icon: "✨" },
+                  { id: "studio", label: "Pic FX", icon: "🎨" },
+                  { id: "videofx", label: "Video FX", icon: "🎥" },
+                ].map((tab) => {
+                  const isActive = currentVisualTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => {
+                        if (tab.id === "picdrift") {
+                          setActiveEngine("kie");
+                          setVideoFxMode("picdrift");
+                        } else if (tab.id === "studio") {
+                          setActiveEngine("studio");
+                        } else {
+                          setActiveEngine("kie");
+                          setVideoFxMode("video");
+                        }
+                      }}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                        isActive
+                          ? "bg-gray-700/80 text-white shadow-lg shadow-black/20 border border-white/10"
+                          : "text-gray-400 hover:text-white hover:bg-white/5"
+                      }`}
+                    >
+                      <span>{tab.icon}</span>
+                      {tab.label}
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* STUDIO SUB-MENU */}
-              {currentVisualTab === "studio" && (
-                <div className="mb-6 animate-in fade-in space-y-4">
-                  <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
-                    <button
-                      onClick={() => setStudioMode("image")}
-                      className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
-                        studioMode === "image"
-                          ? "bg-violet-600 text-white shadow-lg"
-                          : "text-gray-400 hover:text-white"
-                      }`}
-                    >
-                      Image FX
-                    </button>
-                    <button
-                      onClick={() => setStudioMode("carousel")}
-                      className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
-                        studioMode === "carousel"
-                          ? "bg-fuchsia-600 text-white shadow-lg"
-                          : "text-gray-400 hover:text-white"
-                      }`}
-                    >
-                      Carousel
-                    </button>
-                    <button
-                      onClick={() => setStudioMode("edit")}
-                      className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
-                        studioMode === "edit"
-                          ? "bg-cyan-600 text-white shadow-lg"
-                          : "text-gray-400 hover:text-white"
-                      }`}
-                    >
-                      Picture Editor
-                    </button>
-                  </div>
-                  {studioMode !== "edit" && (
-                    <div className="flex justify-center gap-3">
-                      {[
-                        { id: "16:9", label: "Landscape" },
-                        { id: "9:16", label: "Portrait" },
-                        { id: "1:1", label: "Square" },
-                      ].map((a) => (
+              {/* === INTEGRATED SETTINGS PANEL === */}
+              <div className="bg-gray-900/40 border border-white/5 rounded-2xl p-4 sm:p-5 mb-6 backdrop-blur-sm shadow-inner">
+                {/* STUDIO MODES */}
+                {currentVisualTab === "studio" && (
+                  <div className="animate-in fade-in slide-in-from-top-2">
+                    <div className="flex gap-4 mb-4 border-b border-white/5 pb-4">
+                      {["image", "carousel", "edit"].map((m) => (
                         <button
-                          key={a.id}
-                          onClick={() => setGeminiAspect(a.id as any)}
-                          className={`px-4 py-2 rounded-lg border text-xs font-bold ${
-                            geminiAspect === a.id
-                              ? "bg-violet-600 border-violet-500 text-white"
-                              : "bg-gray-800 border-gray-700 text-gray-400"
+                          key={m}
+                          type="button"
+                          onClick={() => setStudioMode(m as StudioMode)}
+                          className={`text-xs font-bold uppercase tracking-wider pb-2 -mb-4.5 border-b-2 transition-all ${
+                            studioMode === m
+                              ? "text-cyan-400 border-cyan-400"
+                              : "text-gray-500 border-transparent hover:text-gray-300"
                           }`}
                         >
-                          {a.label}
+                          {m === "edit" ? "Magic Editor" : `${m} FX`}
                         </button>
                       ))}
                     </div>
-                  )}
-                </div>
-              )}
-
-              {/* VIDEO FX SUB-MENU */}
-              {currentVisualTab === "videofx" && (
-                <div className="mb-6 animate-in fade-in space-y-4">
-                  <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveEngine("kie");
-                        setVideoFxMode("video");
-                      }}
-                      className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
-                        activeEngine === "kie"
-                          ? "bg-cyan-600 text-white shadow-lg"
-                          : "text-gray-400 hover:text-white"
-                      }`}
-                    >
-                      Video FX 1
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveEngine("openai")}
-                      className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
-                        activeEngine === "openai"
-                          ? "bg-cyan-600 text-white shadow-lg"
-                          : "text-gray-400 hover:text-white"
-                      }`}
-                    >
-                      Video FX 2
-                    </button>
+                    {/* STUDIO RATIO TOOLBAR */}
+                    {studioMode !== "edit" && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-gray-500 font-semibold uppercase">
+                          Aspect Ratio
+                        </span>
+                        <div className="flex bg-black/30 rounded-lg p-1 border border-white/5">
+                          {[
+                            { id: "16:9", label: "16:9" },
+                            { id: "9:16", label: "9:16" },
+                            { id: "1:1", label: "1:1" },
+                          ].map((a) => (
+                            <button
+                              key={a.id}
+                              type="button"
+                              onClick={() => setGeminiAspect(a.id as any)}
+                              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                                geminiAspect === a.id
+                                  ? "bg-gray-700 text-white shadow-sm"
+                                  : "text-gray-400 hover:text-white"
+                              }`}
+                            >
+                              {a.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                )}
+
+                {/* VIDEO FX MODES & SETTINGS */}
+                {currentVisualTab === "videofx" && (
+                  <div className="animate-in fade-in slide-in-from-top-2">
+                    {/* ENGINE SWITCHER */}
+                    <div className="flex gap-4 mb-4 border-b border-white/5 pb-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveEngine("kie");
+                          setVideoFxMode("video");
+                        }}
+                        className={`text-xs font-bold uppercase tracking-wider pb-2 -mb-4.5 border-b-2 transition-all ${
+                          activeEngine === "kie"
+                            ? "text-cyan-400 border-cyan-400"
+                            : "text-gray-500 border-transparent hover:text-gray-300"
+                        }`}
+                      >
+                        Gen-1 (Kling)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveEngine("openai")}
+                        className={`text-xs font-bold uppercase tracking-wider pb-2 -mb-4.5 border-b-2 transition-all ${
+                          activeEngine === "openai"
+                            ? "text-cyan-400 border-cyan-400"
+                            : "text-gray-500 border-transparent hover:text-gray-300"
+                        }`}
+                      >
+                        Gen-2 (Sora)
+                      </button>
+                    </div>
+
+                    {/* ✅ NEW: MODEL & QUALITY SETTINGS (Fixes the TS Error) */}
+                    <div className="flex flex-wrap items-center gap-4 mb-4 border-b border-white/5 pb-4">
+                      {/* 1. MODEL SELECTION */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500 font-semibold uppercase">
+                          Model
+                        </span>
+                        <div className="flex bg-black/30 rounded-lg p-1 border border-white/5">
+                          {activeEngine === "kie"
+                            ? // KIE MODELS
+                              [
+                                { id: "kie-sora-2", label: "Standard" },
+                                { id: "kie-sora-2-pro", label: "Pro" },
+                              ].map((m) => (
+                                <button
+                                  key={m.id}
+                                  type="button"
+                                  onClick={() => setKieModel(m.id as any)}
+                                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                                    kieModel === m.id
+                                      ? "bg-gray-700 text-white shadow-sm"
+                                      : "text-gray-400 hover:text-white"
+                                  }`}
+                                >
+                                  {m.label}
+                                </button>
+                              ))
+                            : // OPENAI MODELS
+                              [
+                                { id: "sora-2", label: "Standard" },
+                                { id: "sora-2-pro", label: "Pro" },
+                              ].map((m) => (
+                                <button
+                                  key={m.id}
+                                  type="button"
+                                  onClick={() => setVideoModel(m.id as any)}
+                                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                                    videoModel === m.id
+                                      ? "bg-gray-700 text-white shadow-sm"
+                                      : "text-gray-400 hover:text-white"
+                                  }`}
+                                >
+                                  {m.label}
+                                </button>
+                              ))}
+                        </div>
+                      </div>
+
+                      {/* 2. RESOLUTION (Only for Kie/Kling) */}
+                      {activeEngine === "kie" && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500 font-semibold uppercase">
+                            Quality
+                          </span>
+                          <div className="flex bg-black/30 rounded-lg p-1 border border-white/5">
+                            {[
+                              { id: "720p", label: "720p" },
+                              { id: "1080p", label: "1080p" },
+                            ].map((r) => (
+                              <button
+                                key={r.id}
+                                type="button"
+                                onClick={() => setKieResolution(r.id as any)}
+                                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                                  kieResolution === r.id
+                                    ? "bg-gray-700 text-white shadow-sm"
+                                    : "text-gray-400 hover:text-white"
+                                }`}
+                              >
+                                {r.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* DURATION & RATIO */}
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500 font-semibold uppercase">
+                          Duration
+                        </span>
+                        <div className="flex bg-black/30 rounded-lg p-1 border border-white/5">
+                          {(activeEngine === "kie" ? [5, 10] : [4, 8, 12]).map(
+                            (d) => (
+                              <button
+                                key={d}
+                                type="button"
+                                onClick={() =>
+                                  activeEngine === "kie"
+                                    ? setKieDuration(d as any)
+                                    : setVideoDuration(d as any)
+                                }
+                                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                                  (
+                                    activeEngine === "kie"
+                                      ? kieDuration === d
+                                      : videoDuration === d
+                                  )
+                                    ? "bg-gray-700 text-white shadow-sm"
+                                    : "text-gray-400 hover:text-white"
+                                }`}
+                              >
+                                {d}s
+                              </button>
+                            ),
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500 font-semibold uppercase">
+                          Ratio
+                        </span>
+                        <div className="flex bg-black/30 rounded-lg p-1 border border-white/5">
+                          {(activeEngine === "kie"
+                            ? [
+                                { id: "landscape", label: "16:9" },
+                                { id: "portrait", label: "9:16" },
+                              ]
+                            : [
+                                { id: "16:9", label: "16:9" },
+                                { id: "9:16", label: "9:16" },
+                              ]
+                          ).map((a) => (
+                            <button
+                              key={a.id}
+                              type="button"
+                              onClick={() => {
+                                if (activeEngine === "kie")
+                                  setKieAspect(a.id as any);
+                                else {
+                                  setAspectRatio(a.id as any);
+                                  setVideoSize(
+                                    a.id === "16:9" ? "1792x1024" : "1024x1792",
+                                  );
+                                }
+                              }}
+                              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                                (
+                                  activeEngine === "kie"
+                                    ? kieAspect === a.id
+                                    : aspectRatio === a.id
+                                )
+                                  ? "bg-gray-700 text-white shadow-sm"
+                                  : "text-gray-400 hover:text-white"
+                              }`}
+                            >
+                              {a.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* PICDRIFT SETTINGS */}
+                {currentVisualTab === "picdrift" && (
+                  <div className="animate-in fade-in flex flex-wrap items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-rose-400 font-semibold uppercase">
+                        Duration
+                      </span>
+                      <div className="flex bg-black/30 rounded-lg p-1 border border-rose-500/20">
+                        {[5, 10].map((d) => (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={() => setKieDuration(d as any)}
+                            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                              kieDuration === d
+                                ? "bg-rose-900/60 text-white shadow-sm border border-rose-500/30"
+                                : "text-gray-400 hover:text-white"
+                            }`}
+                          >
+                            {d}s
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-rose-400 font-semibold uppercase">
+                        Ratio
+                      </span>
+                      <div className="flex bg-black/30 rounded-lg p-1 border border-rose-500/20">
+                        {[
+                          { id: "landscape", label: "16:9" },
+                          { id: "portrait", label: "9:16" },
+                          { id: "square", label: "1:1" },
+                        ].map((a) => (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => setKieAspect(a.id as any)}
+                            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                              kieAspect === a.id
+                                ? "bg-rose-900/60 text-white shadow-sm border border-rose-500/30"
+                                : "text-gray-400 hover:text-white"
+                            }`}
+                          >
+                            {a.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
                 {/* MAGIC EDIT UI */}
                 {currentVisualTab === "studio" && studioMode === "edit" ? (
                   <div className="bg-gray-900/50 border border-cyan-500/30 rounded-2xl p-8 text-center space-y-5 animate-in fade-in">
                     <div className="w-20 h-20 bg-cyan-900/20 rounded-full flex items-center justify-center mx-auto border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
-                      <span className="text-4xl"></span>
+                      <span className="text-4xl">🪄</span>
                     </div>
                     <div>
                       <h3 className="text-white font-bold text-xl mb-2">
@@ -1087,7 +1245,6 @@ function Dashboard() {
                             <label className="text-xs text-rose-300 font-bold">
                               Pic 1 - Start Frame
                             </label>
-                            {/* Open Library Button for Start Frame */}
                           </div>
                           <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
                             {picDriftUrls.start ? (
@@ -1194,323 +1351,45 @@ function Dashboard() {
                       </div>
                     )}
 
-                    {/* 2. PROMPT & TITLE (Moved Up for Non-PicDrift) */}
-                    <div>
-                      <label className="block text-sm font-semibold text-white mb-2">
-                        Your Creative Vision
-                      </label>
-                      <textarea
-                        value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
-                        placeholder="Describe your vision with a prompt"
-                        className="w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base leading-relaxed"
-                        rows={3}
-                      />
-                    </div>
-
-                    <div>
-                      {/* ✅ FLEX CONTAINER FOR LABEL + BUTTON */}
-                      <div className="flex justify-between items-center mb-2">
-                        <label className="block text-sm font-semibold text-white">
-                          Title
+                    {/* 2. PROMPT & TITLE */}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-white mb-2">
+                          Your Creative Vision
                         </label>
+                        <textarea
+                          value={prompt}
+                          onChange={(e) => setPrompt(e.target.value)}
+                          placeholder={
+                            currentVisualTab === "picdrift"
+                              ? "Describe the camera movement (e.g., 'Slow pan right, cinematic lighting')"
+                              : "Describe your vision..."
+                          }
+                          className="w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-gray-500 backdrop-blur-sm text-base leading-relaxed"
+                          rows={3}
+                        />
                       </div>
 
-                      <input
-                        type="text"
-                        value={videoTitle}
-                        onChange={(e) => setVideoTitle(e.target.value)}
-                        placeholder="Name your creation..."
-                        className="w-full p-3 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-purple-300/60 backdrop-blur-sm"
-                      />
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <label className="block text-sm font-semibold text-white">
+                            Title
+                          </label>
+                        </div>
+
+                        <input
+                          type="text"
+                          value={videoTitle}
+                          onChange={(e) => setVideoTitle(e.target.value)}
+                          placeholder="Name your creation..."
+                          className="w-full p-3 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-gray-500 backdrop-blur-sm"
+                        />
+                      </div>
                     </div>
-
-                    {/* 3. SETTINGS (Moved below Title) */}
-
-                    {/* VIDEO FX / KIE SETTINGS */}
-                    {currentVisualTab === "videofx" &&
-                      activeEngine === "kie" && (
-                        <div className="space-y-4 sm:space-y-6 animate-in fade-in">
-                          <div className="space-y-2">
-                            <label className="block text-sm font-semibold text-white">
-                              AI Model
-                            </label>
-                            <div className="grid grid-cols-2 gap-2">
-                              {[
-                                { id: "kie-sora-2", label: "Video FX" },
-                                { id: "kie-sora-2-pro", label: "Video FX Pro" },
-                              ].map((m) => (
-                                <button
-                                  key={m.id}
-                                  type="button"
-                                  onClick={() => setKieModel(m.id as any)}
-                                  className={`p-3 rounded-xl border text-left text-sm font-medium ${
-                                    kieModel === m.id
-                                      ? "bg-cyan-600 border-cyan-500 text-white"
-                                      : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
-                                  }`}
-                                >
-                                  {m.label}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                            <div>
-                              <label className="text-sm font-semibold text-white mb-2 block">
-                                Duration
-                              </label>
-                              <div className="flex gap-2">
-                                {[10, 15].map((d) => (
-                                  <button
-                                    key={d}
-                                    type="button"
-                                    onClick={() => setKieDuration(d as any)}
-                                    className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                      kieDuration === d
-                                        ? "bg-cyan-600 border-cyan-600 text-white"
-                                        : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                    }`}
-                                  >
-                                    {d}s
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                            <div>
-                              <label className="text-sm font-semibold text-white mb-2 block">
-                                Aspect Ratio
-                              </label>
-                              <div className="flex gap-2">
-                                {/* ✅ ADDED SQUARE HERE TOO FOR CONSISTENCY */}
-                                {[
-                                  { id: "landscape", label: "Landscape" },
-                                  { id: "portrait", label: "Portrait" },
-                                ].map((a) => (
-                                  <button
-                                    key={a.id}
-                                    type="button"
-                                    onClick={() => setKieAspect(a.id as any)}
-                                    className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                      kieAspect === a.id
-                                        ? "bg-cyan-600 border-cyan-600 text-white"
-                                        : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                    }`}
-                                  >
-                                    {a.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                            <div className="sm:col-span-2">
-                              <label className="text-sm font-semibold text-white mb-2 block">
-                                Resolution
-                              </label>
-                              <div className="flex gap-2">
-                                {[
-                                  { id: "720p", label: "720p (Fast)" },
-                                  { id: "1080p", label: "1080p (HD)" },
-                                ].map((r) => (
-                                  <button
-                                    key={r.id}
-                                    type="button"
-                                    onClick={() =>
-                                      setKieResolution(r.id as any)
-                                    }
-                                    className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                      kieResolution === r.id
-                                        ? "bg-cyan-600 border-cyan-600 text-white"
-                                        : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                    }`}
-                                  >
-                                    {r.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                    {/* PICDRIFT SETTINGS */}
-                    {currentVisualTab === "picdrift" && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mb-6">
-                        <div>
-                          <label className="text-sm font-semibold text-white mb-2 block">
-                            Duration
-                          </label>
-                          <div className="flex gap-2">
-                            {[5, 10].map((d) => (
-                              <button
-                                key={d}
-                                type="button"
-                                onClick={() => setKieDuration(d as any)}
-                                className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                  kieDuration === d
-                                    ? "bg-rose-600 border-rose-600 text-white"
-                                    : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                }`}
-                              >
-                                {d}s
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-sm font-semibold text-white mb-2 block">
-                            Aspect Ratio
-                          </label>
-                          <div className="flex gap-2">
-                            {/* ✅ ADDED SQUARE OPTION HERE */}
-                            {[
-                              { id: "landscape", label: "Landscape" },
-                              { id: "portrait", label: "Portrait" },
-                              { id: "square", label: "Square" },
-                            ].map((a) => (
-                              <button
-                                key={a.id}
-                                type="button"
-                                onClick={() => setKieAspect(a.id as any)}
-                                className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                  kieAspect === a.id
-                                    ? "bg-rose-600 border-rose-600 text-white"
-                                    : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                }`}
-                              >
-                                {a.label}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* OPENAI SETTINGS (Video FX 2) */}
-                    {currentVisualTab === "videofx" &&
-                      activeEngine === "openai" && (
-                        <div className="space-y-4 sm:space-y-6 animate-in fade-in">
-                          <div className="space-y-2">
-                            <label className="block text-sm font-semibold text-white">
-                              AI Model
-                            </label>
-                            <div className="grid grid-cols-2 gap-2">
-                              {[
-                                { id: "sora-2", label: "Video FX 2" },
-                                { id: "sora-2-pro", label: "Video FX 2 Pro" },
-                              ].map((model) => (
-                                <button
-                                  key={model.id}
-                                  type="button"
-                                  onClick={() => setVideoModel(model.id as any)}
-                                  className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${
-                                    videoModel === model.id
-                                      ? "border-cyan-400 bg-cyan-500/20"
-                                      : "border-white/10 bg-gray-800/50"
-                                  }`}
-                                >
-                                  <div className="font-semibold text-white text-sm">
-                                    {model.label}
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <label className="block text-sm font-semibold text-white">
-                              Aspect Ratio
-                            </label>
-                            <div className="grid grid-cols-2 gap-2">
-                              {[
-                                { ratio: "16:9", label: "Landscape" },
-                                { ratio: "9:16", label: "Portrait" },
-                              ].map(({ ratio, label }) => (
-                                <button
-                                  key={ratio}
-                                  type="button"
-                                  onClick={() => {
-                                    setAspectRatio(ratio as any);
-                                    setVideoSize(
-                                      ratio === "16:9"
-                                        ? "1792x1024"
-                                        : "1024x1792"
-                                    );
-                                  }}
-                                  className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${
-                                    aspectRatio === ratio
-                                      ? "border-purple-400 bg-purple-500/20"
-                                      : "border-white/10 bg-gray-800/50"
-                                  }`}
-                                >
-                                  <div className="font-semibold text-white text-sm">
-                                    {label}
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <label className="block text-sm font-semibold text-white">
-                              Video Size
-                            </label>
-                            <div className="grid grid-cols-2 gap-2">
-                              {(aspectRatio === "16:9"
-                                ? [
-                                    { size: "1280x720", label: "720p HD" },
-                                    ...(videoModel === "sora-2-pro"
-                                      ? [{ size: "1792x1024", label: "1080p" }]
-                                      : []),
-                                  ]
-                                : [
-                                    { size: "720x1280", label: "720p HD" },
-                                    ...(videoModel === "sora-2-pro"
-                                      ? [{ size: "1024x1792", label: "1080p" }]
-                                      : []),
-                                  ]
-                              ).map(({ size, label }) => (
-                                <button
-                                  key={size}
-                                  type="button"
-                                  onClick={() => setVideoSize(size as any)}
-                                  className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${
-                                    videoSize === size
-                                      ? "border-green-400 bg-green-500/20"
-                                      : "border-white/10 bg-gray-800/50"
-                                  }`}
-                                >
-                                  <div className="font-semibold text-white text-sm">
-                                    {label}
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <label className="block text-sm font-semibold text-white">
-                              Duration
-                            </label>
-                            <div className="flex gap-2">
-                              {[4, 8, 12].map((sec) => (
-                                <button
-                                  key={sec}
-                                  type="button"
-                                  onClick={() => setVideoDuration(sec as any)}
-                                  className={`px-3 py-2 rounded-xl border text-sm flex-1 ${
-                                    videoDuration === sec
-                                      ? "bg-cyan-500 border-cyan-500 text-white"
-                                      : "bg-gray-800/50 border-white/10 text-purple-200"
-                                  }`}
-                                >
-                                  {sec}s
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      )}
 
                     {/* 4. REFERENCE IMAGES (Moved to End for Non-PicDrift) */}
                     {activeEngine !== "kie" || videoFxMode !== "picdrift" ? (
-                      <div className="space-y-2 sm:space-y-3">
+                      <div className="space-y-2 sm:space-y-3 pt-4 border-t border-white/5">
                         <div className="flex justify-between items-center">
                           <label className="block text-sm font-semibold text-white">
                             Reference Images
@@ -1586,7 +1465,11 @@ function Dashboard() {
                       disabled={
                         generateMediaMutation.isPending || !prompt.trim()
                       }
-                      className="w-full gradient-brand text-white py-4 sm:py-5 px-6 sm:px-8 rounded-2xl hover:shadow-2xl disabled:opacity-50 font-bold text-base sm:text-lg flex items-center justify-center gap-3"
+                      className={`w-full py-4 sm:py-5 px-6 sm:px-8 rounded-2xl hover:shadow-2xl disabled:opacity-50 font-bold text-base sm:text-lg flex items-center justify-center gap-3 transition-all transform hover:scale-[1.01] ${
+                        currentVisualTab === "picdrift"
+                          ? "bg-gradient-to-r from-rose-600 to-pink-600 shadow-[0_0_20px_rgba(225,29,72,0.4)]"
+                          : "bg-gradient-to-r from-cyan-600 to-blue-600 shadow-[0_0_20px_rgba(8,145,178,0.4)]"
+                      }`}
                     >
                       {generateMediaMutation.isPending ? (
                         <>
@@ -1599,13 +1482,15 @@ function Dashboard() {
                         </>
                       ) : (
                         <>
-                          <span className="text-xl"></span>
+                          <span className="text-xl">🚀</span>
                           <span>
                             {currentVisualTab === "picdrift"
                               ? "Generate PicDrift"
                               : `Generate ${
                                   activeEngine === "studio"
-                                    ? studioMode
+                                    ? studioMode === "carousel"
+                                      ? "Carousel"
+                                      : "Image"
                                     : "Video"
                                 }`}
                           </span>
@@ -1664,7 +1549,7 @@ function Dashboard() {
                     .sort(
                       (a: any, b: any) =>
                         new Date(b.createdAt).getTime() -
-                        new Date(a.createdAt).getTime()
+                        new Date(a.createdAt).getTime(),
                     )
                     .map((post: any) => (
                       <PostCard
@@ -1698,7 +1583,7 @@ function Dashboard() {
                         onDelete={() => {
                           if (
                             confirm(
-                              "Are you sure you want to delete this post?"
+                              "Are you sure you want to delete this post?",
                             )
                           ) {
                             deletePostMutation.mutate(post.id);

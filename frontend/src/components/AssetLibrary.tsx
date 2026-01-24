@@ -349,7 +349,7 @@ export function AssetLibrary({
               { id: "16:9", label: "Landscape" },
               { id: "9:16", label: "Portrait" },
               { id: "1:1", label: "Square" },
-              { id: "custom", label: "Edited Pictures" },
+              { id: "custom", label: "Edited" },
               { id: "VIDEO", label: "Drift Paths" },
             ].map((tab) => (
               <button
@@ -414,68 +414,81 @@ export function AssetLibrary({
             <div className="flex justify-center items-center h-full">
               <LoadingSpinner size="lg" variant="neon" />
             </div>
-          ) : filteredAssets.length === 0 && pollingUntil === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-gray-500 opacity-60">
-              <span className="text-6xl mb-4">
-                {activeTab === "VIDEO" ? "🎬" : "🖼️"}
-              </span>
-              <p>No {activeTab === "VIDEO" ? "videos" : "images"} found.</p>
-            </div>
           ) : (
             <div className="grid gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {filteredAssets.map((asset: Asset) => (
-                <div
-                  key={asset.id}
-                  onClick={() => {
-                    if (asset.type === "VIDEO") setViewingVideoAsset(asset);
-                    else setSelectedAsset(asset);
-                  }}
-                  className={`relative group border rounded-xl overflow-hidden bg-black cursor-pointer transition-all hover:shadow-2xl hover:shadow-cyan-900/20 ${
-                    activeDriftIds.has(asset.id)
-                      ? "border-rose-500 ring-2 ring-rose-500/50"
-                      : "border-gray-800 hover:border-cyan-500/50"
-                  }`}
-                >
-                  {/* THUMBNAIL LOGIC */}
-                  {asset.type === "VIDEO" ? (
-                    <div className="w-full h-full relative aspect-video">
-                      <video
-                        src={asset.url}
-                        className="w-full h-full object-cover opacity-80"
-                        muted
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-3xl text-white opacity-80">
-                          ▶️
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <img
-                      src={asset.url}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
-                    />
-                  )}
+              {/* ✅ UX FIX: SKELETON CARDS */}
+              {/* Show these while waiting for V2 processing so the grid isn't empty */}
+              {pollingUntil > 0 &&
+                Array.from({ length: processingCount }).map((_, i) => (
+                  <div
+                    key={`skeleton-${i}`}
+                    className="aspect-square rounded-xl border border-cyan-500/30 bg-gray-900/50 flex flex-col items-center justify-center animate-pulse"
+                  >
+                    <LoadingSpinner size="md" variant="default" />
+                    <span className="text-cyan-400 text-xs font-bold mt-3 tracking-wide">
+                      Generating{" "}
+                      {activeTab !== "original" &&
+                      activeTab !== "VIDEO" &&
+                      activeTab !== "custom"
+                        ? activeTab
+                        : "Asset"}
+                      ...
+                    </span>
+                  </div>
+                ))}
 
-                  {activeDriftIds.has(asset.id) && (
-                    <div className="absolute top-2 right-2 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg z-10 animate-pulse">
-                      🌀 Drift Ready
-                    </div>
-                  )}
-
-                  {asset.originalAssetId && (
-                    <div className="absolute top-2 left-2 bg-purple-600/80 text-white text-[8px] font-bold px-1.5 py-0.5 rounded backdrop-blur-md">
-                      V2
-                    </div>
-                  )}
-                  {asset.variations && asset.variations.length > 0 && (
-                    <div className="absolute top-2 right-2 bg-cyan-600/80 text-white text-[8px] font-bold px-1.5 py-0.5 rounded backdrop-blur-md">
-                      HAS V2
-                    </div>
-                  )}
+              {/* REAL ASSETS */}
+              {filteredAssets.length === 0 && pollingUntil === 0 ? (
+                <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-500 opacity-60">
+                  <span className="text-6xl mb-4">
+                    {activeTab === "VIDEO" ? "🎬" : "🖼️"}
+                  </span>
+                  <p>No {activeTab === "VIDEO" ? "videos" : "images"} found.</p>
                 </div>
-              ))}
+              ) : (
+                filteredAssets.map((asset: Asset) => (
+                  <div
+                    key={asset.id}
+                    onClick={() => {
+                      if (asset.type === "VIDEO") setViewingVideoAsset(asset);
+                      else setSelectedAsset(asset);
+                    }}
+                    className={`relative group border rounded-xl overflow-hidden bg-black cursor-pointer transition-all hover:shadow-2xl hover:shadow-cyan-900/20 ${
+                      activeDriftIds.has(asset.id)
+                        ? "border-rose-500 ring-2 ring-rose-500/50"
+                        : "border-gray-800 hover:border-cyan-500/50"
+                    }`}
+                  >
+                    {/* THUMBNAIL LOGIC */}
+                    {asset.type === "VIDEO" ? (
+                      <div className="w-full h-full relative aspect-video">
+                        <video
+                          src={asset.url}
+                          className="w-full h-full object-cover opacity-80"
+                          muted
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-3xl text-white opacity-80">
+                            ▶️
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <img
+                        src={asset.url}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    )}
+
+                    {activeDriftIds.has(asset.id) && (
+                      <div className="absolute top-2 right-2 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg z-10 animate-pulse">
+                        🌀 Drift Ready
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           )}
         </div>
@@ -491,18 +504,53 @@ export function AssetLibrary({
           <div className="relative bg-gray-900 border border-gray-700 rounded-2xl max-w-6xl w-full h-[85vh] flex overflow-hidden shadow-2xl z-10">
             {/* LEFT: IMAGE PREVIEW */}
             <div className="flex-1 bg-black flex items-center justify-center p-8 border-r border-gray-800 relative group">
+              {/* ✅ NEW: UNIFIED OVERLAY CONTROLS (Top Right) */}
+              <div className="absolute top-4 right-4 z-20 flex gap-2">
+                <button
+                  onClick={handleGoToOriginal}
+                  disabled={!selectedAsset.originalAssetId}
+                  className={`p-2 rounded-full text-white backdrop-blur-md transition-all border border-white/10 ${
+                    selectedAsset.originalAssetId
+                      ? "bg-gray-800/80 hover:bg-gray-700 hover:border-white/30"
+                      : "bg-gray-800/30 opacity-30 cursor-not-allowed"
+                  }`}
+                  title="Go to Original (v1)"
+                >
+                  ↩️
+                </button>
+                <span className="bg-black/50 text-white px-3 py-1.5 rounded-full text-xs font-mono backdrop-blur-md flex items-center border border-white/10 select-none">
+                  {selectedAsset.originalAssetId ? "v2" : "v1"}
+                </span>
+                <button
+                  onClick={handleGoToProcessed}
+                  disabled={
+                    !selectedAsset.variations ||
+                    selectedAsset.variations.length === 0
+                  }
+                  className={`p-2 rounded-full text-white backdrop-blur-md transition-all border border-white/10 ${
+                    selectedAsset.variations &&
+                    selectedAsset.variations.length > 0
+                      ? "bg-gray-800/80 hover:bg-gray-700 hover:border-white/30"
+                      : "bg-gray-800/30 opacity-30 cursor-not-allowed"
+                  }`}
+                  title="Go to Processed (v2)"
+                >
+                  ↪️
+                </button>
+              </div>
+
               <img
                 src={selectedAsset.url}
                 className="max-w-full max-h-full object-contain rounded shadow-lg"
               />
 
-              {/* Navigation Arrows */}
+              {/* Navigation Arrows (Previous/Next in List) */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   handlePrevAsset();
                 }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-white/20 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-white/20 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all z-10"
               >
                 ◀
               </button>
@@ -511,13 +559,13 @@ export function AssetLibrary({
                   e.stopPropagation();
                   handleNextAsset();
                 }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-white/20 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all"
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-white/20 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all z-10"
               >
                 ▶
               </button>
               <button
                 onClick={() => setSelectedAsset(null)}
-                className="absolute top-4 left-4 bg-black/50 text-white p-2 rounded-full hover:bg-white/20"
+                className="absolute top-4 left-4 bg-black/50 text-white p-2 rounded-full hover:bg-white/20 z-10"
               >
                 ✕
               </button>
@@ -529,35 +577,20 @@ export function AssetLibrary({
                 <h3 className="text-2xl font-bold text-white mb-2">
                   Asset Details
                 </h3>
-                <div className="flex justify-between items-center mb-6">
-                  <p className="text-gray-400 text-sm">
-                    {selectedAsset.aspectRatio === "original"
-                      ? "Raw Original"
-                      : selectedAsset.aspectRatio}
-                  </p>
 
-                  {/* NAVIGATE V2 -> V1 */}
-                  {selectedAsset.originalAssetId && (
-                    <button
-                      onClick={handleGoToOriginal}
-                      className="text-xs bg-gray-800 hover:bg-gray-700 text-purple-300 px-3 py-1.5 rounded border border-purple-500/30 flex items-center gap-1 transition-colors"
-                      title="Go to Original Version"
-                    >
-                      <span>↩️</span> V1
-                    </button>
-                  )}
-
-                  {/* NAVIGATE V1 -> V2 */}
-                  {selectedAsset.variations &&
-                    selectedAsset.variations.length > 0 && (
-                      <button
-                        onClick={handleGoToProcessed}
-                        className="text-xs bg-cyan-900/50 hover:bg-cyan-800 text-cyan-300 px-3 py-1.5 rounded border border-cyan-500/30 flex items-center gap-1 transition-colors"
-                        title="View Processed Version"
-                      >
-                        <span>↪️</span> V2
-                      </button>
-                    )}
+                {/* METADATA */}
+                <div className="mb-6 space-y-4">
+                  <div className="bg-gray-800/50 p-3 rounded-lg border border-gray-700">
+                    <span className="text-xs text-gray-500 uppercase font-bold block mb-1">
+                      Type
+                    </span>
+                    <p className="text-gray-300 text-sm font-medium">
+                      {selectedAsset.aspectRatio === "original"
+                        ? "Raw Original"
+                        : selectedAsset.aspectRatio}
+                    </p>
+                  </div>
+                  {/* Removed Sidebar buttons, logic is now in the Overlay above */}
                 </div>
 
                 <div className="space-y-3">
