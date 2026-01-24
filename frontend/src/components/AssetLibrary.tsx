@@ -101,7 +101,7 @@ export function AssetLibrary({
     return () => clearInterval(checkInterval);
   }, [pollingUntil, queryClient]);
 
-  // ✅ UPDATED UPLOAD LOGIC: Original V1 + Auto-Process V2
+  // ✅ UPDATED UPLOAD LOGIC: Instant Feedback
   const uploadMutation = useMutation({
     mutationFn: async (files: FileList) => {
       const uploadPromises = Array.from(files).map(async (file) => {
@@ -134,27 +134,41 @@ export function AssetLibrary({
 
       return Promise.all(uploadPromises);
     },
-    onMutate: () => setIsUploading(true),
-    onSuccess: (results) => {
-      const fileCount = results.length;
-
-      // If we triggered processing (V2), show polling banner and STAY on current tab
+    // ✅ UX FIX: Show skeletons IMMEDIATELY when upload starts (onMutate)
+    onMutate: (files) => {
+      setIsUploading(true);
       if (
         activeTab !== "original" &&
         activeTab !== "VIDEO" &&
         activeTab !== "custom"
       ) {
-        setProcessingCount(fileCount);
-        setPollingUntil(Date.now() + fileCount * 15000); // Wait for V2s
-        // DO NOT SWITCH TABS. Stay here to see results appear.
-      } else {
-        // If just originals, go to originals
-        setActiveTab("original");
+        setProcessingCount(files.length);
+        // Start polling visual timer immediately
+        setPollingUntil(Date.now() + files.length * 20000);
       }
+    },
+    onSuccess: (results) => {
+      // If we are in Originals, just switch there and clear loaders
+      if (
+        activeTab === "original" ||
+        activeTab === "VIDEO" ||
+        activeTab === "custom"
+      ) {
+        setActiveTab("original");
+        setPollingUntil(0);
+        setProcessingCount(0);
+      }
+      // If we are in a Processing tab, we keep the polling active
+      // (it was already set in onMutate, but we can extend it if needed)
 
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     },
-    onError: (err: any) => alert("Upload failed: " + err.message),
+    onError: (err: any) => {
+      alert("Upload failed: " + err.message);
+      // Clear skeletons on error
+      setPollingUntil(0);
+      setProcessingCount(0);
+    },
     onSettled: () => setIsUploading(false),
   });
 
@@ -345,11 +359,11 @@ export function AssetLibrary({
         <div className="p-6 bg-gray-800/50 flex flex-col md:flex-row gap-4 items-center justify-between border-b border-gray-800">
           <div className="flex bg-gray-950 p-1 rounded-lg border border-gray-700 overflow-x-auto">
             {[
-              { id: "original", label: "Originals" },
               { id: "16:9", label: "Landscape" },
               { id: "9:16", label: "Portrait" },
               { id: "1:1", label: "Square" },
               { id: "custom", label: "Edited" },
+              { id: "original", label: "Originals" },
               { id: "VIDEO", label: "Drift Paths" },
             ].map((tab) => (
               <button
@@ -399,15 +413,6 @@ export function AssetLibrary({
           </div>
         </div>
 
-        {/* PROCESSING BANNER */}
-        {pollingUntil > 0 && (
-          <div className="bg-blue-900/30 border-b border-blue-500/30 p-2 text-center animate-pulse">
-            <span className="text-blue-200 text-xs font-bold uppercase tracking-wider">
-              Processing {processingCount} items...
-            </span>
-          </div>
-        )}
-
         {/* GRID VIEW */}
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-black/40">
           {isLoading && !isRefetching ? (
@@ -416,8 +421,7 @@ export function AssetLibrary({
             </div>
           ) : (
             <div className="grid gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {/* ✅ UX FIX: SKELETON CARDS */}
-              {/* Show these while waiting for V2 processing so the grid isn't empty */}
+              {/* ✅ UX FIX: SKELETON CARDS appear immediately */}
               {pollingUntil > 0 &&
                 Array.from({ length: processingCount }).map((_, i) => (
                   <div
@@ -437,7 +441,6 @@ export function AssetLibrary({
                   </div>
                 ))}
 
-              {/* REAL ASSETS */}
               {filteredAssets.length === 0 && pollingUntil === 0 ? (
                 <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-500 opacity-60">
                   <span className="text-6xl mb-4">
@@ -504,7 +507,7 @@ export function AssetLibrary({
           <div className="relative bg-gray-900 border border-gray-700 rounded-2xl max-w-6xl w-full h-[85vh] flex overflow-hidden shadow-2xl z-10">
             {/* LEFT: IMAGE PREVIEW */}
             <div className="flex-1 bg-black flex items-center justify-center p-8 border-r border-gray-800 relative group">
-              {/* ✅ NEW: UNIFIED OVERLAY CONTROLS (Top Right) */}
+              {/* ✅ UNIFIED OVERLAY CONTROLS (Top Right) */}
               <div className="absolute top-4 right-4 z-20 flex gap-2">
                 <button
                   onClick={handleGoToOriginal}
@@ -590,7 +593,6 @@ export function AssetLibrary({
                         : selectedAsset.aspectRatio}
                     </p>
                   </div>
-                  {/* Removed Sidebar buttons, logic is now in the Overlay above */}
                 </div>
 
                 <div className="space-y-3">
