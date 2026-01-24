@@ -147,7 +147,7 @@ export function AssetLibrary({
         setPollingUntil(Date.now() + files.length * 20000);
       }
     },
-    onSuccess: (results) => {
+    onSuccess: () => {
       // If we are in Originals, just switch there and clear loaders
       if (
         activeTab === "original" ||
