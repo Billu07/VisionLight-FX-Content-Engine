@@ -55,7 +55,7 @@ export const resizeWithBlurFill = async (
 };
 
 // ✅ HELPER: Direct Prompting (No Canvas Hacks)
-// Updated to prevent "split screen" or "panel" hallucinations
+// We rely on Gemini 3's native ability to uncrop/resize based on instructions.
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number, // (Unused but kept for signature compatibility)
@@ -66,56 +66,52 @@ export const resizeWithGemini = async (
     console.log(`✨ Gemini Direct Outpaint: Target ${targetRatioString}`);
 
     let instruction = "";
-    let orientationContext = "";
 
-    // 1. Construct Specific "Outpaint" Prompt
+    // 1. Construct Specific "Uncrop" Prompt
     if (targetRatioString === "9:16" || targetRatioString === "portrait") {
-      orientationContext = "Vertical Portrait (9:16)";
       instruction = `
-      TASK: Seamlessly OUTPAINT this image vertically.
-      ACTION: Extend the physical reality upwards (sky/ceiling) and downwards (ground/floor).
-      - Make the camera lens appear "taller".
-      - Ensure the new vertical areas blend perfectly with the existing lighting and perspective.
+      TASK: Convert this image to Vertical Portrait (9:16).
+      ACTION: Expand the field of view vertically.
+      - Generate more sky/ceiling above and ground/floor below.
+      - Keep the original subject centered and unchanged.
+      - Ensure the new areas seamlessly match the lighting and perspective of the original.
       `;
     } else if (
       targetRatioString === "16:9" ||
       targetRatioString === "landscape"
     ) {
-      orientationContext = "Wide Landscape (16:9)";
       instruction = `
-      TASK: Seamlessly OUTPAINT this image horizontally.
-      ACTION: Extend the physical reality to the far left and far right.
-      - Make the camera lens appear "wider".
-      - Ensure the new side areas blend perfectly with the existing environment.
+      TASK: Convert this image to Wide Landscape (16:9).
+      ACTION: Expand the field of view horizontally.
+      - Widen the scene to the left and right.
+      - Keep the original subject centered and unchanged.
+      - Ensure the new scenery matches the environment perfectly.
       `;
     } else {
-      orientationContext = "Square (1:1)";
       instruction = `
-      TASK: Seamlessly OUTPAINT this image on all sides to form a square.
-      ACTION: Reveal the immediate surroundings that were cut off by the frame.
+      TASK: Expand the image canvas to a Square (1:1).
+      ACTION: Reveal more of the surroundings on all sides without altering the central subject.
       `;
     }
 
     const fullPrompt = `
     ${instruction}
     
-    CRITICAL VISUAL CONSTRAINTS:
-    1. SINGLE CONTINUOUS SCENE: The result must be one single, coherent photograph.
-    2. NO PANELS OR SPLIT SCREENS: Do not create a diptych, triptych, or comic-book layout.
-    3. NO FRAMES OR BORDERS: The image must extend to the very edge of the canvas.
-    4. NO ARTIFACTS: Do not include text, color bars, or visible seams.
-    
-    The final image should look exactly like the original photo, just taken with a lens that has a ${orientationContext} field of view.
+    STRICT CONSTRAINT: 
+    Do NOT crop the original subject. Do NOT distort or squash the image.
+    The output must be a single, continuous image. Do NOT create panels, borders, or split-screens.
+    You are revealing the "rest of the photo" that was outside the frame.
     High fidelity, photorealistic style.
     `;
 
     // 2. Call Gemini (Passing original buffer directly)
+    // Your gemini.ts handles the actual aspect_ratio param in the config
     return await GeminiService.generateOrEditImage({
       prompt: fullPrompt,
       aspectRatio: targetRatioString,
-      referenceImages: [originalBuffer],
+      referenceImages: [originalBuffer], // Passing the raw image, no black bars
       modelType: "quality",
-      imageSize: "2K",
+      imageSize: "2K", // Request high res for the expansion
     });
   } catch (error: any) {
     console.error("❌ Gemini Direct Error:", error.message);

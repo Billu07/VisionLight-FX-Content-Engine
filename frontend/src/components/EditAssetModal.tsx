@@ -199,7 +199,7 @@ export function EditAssetModal({
     onMutate: () => {
       setIsProcessing(true);
       setIsConverting(true);
-      setDriftStatusMsg("Converting Ratio...");
+      setDriftStatusMsg("Creating Your View...");
     },
     onSuccess: (res: any) => {
       handleSuccess(res.data.asset);
@@ -465,7 +465,7 @@ export function EditAssetModal({
                   <div className="w-full py-2 bg-gray-800 rounded-lg flex items-center justify-center gap-2 border border-cyan-500/30 animate-pulse">
                     <LoadingSpinner size="sm" variant="default" />
                     <span className="text-xs text-cyan-400 font-bold">
-                      Converting Format...
+                      Converting Your Image...
                     </span>
                   </div>
                 ) : (
