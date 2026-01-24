@@ -16,7 +16,7 @@ export const getOptimizedUrl = (url: string) => {
 export const resizeStrict = async (
   buffer: Buffer,
   width: number,
-  height: number
+  height: number,
 ): Promise<Buffer> => {
   return await sharp(buffer)
     .resize(width, height, { fit: "cover", position: "center" })
@@ -28,7 +28,7 @@ export const resizeStrict = async (
 export const resizeWithBlurFill = async (
   buffer: Buffer,
   width: number,
-  height: number
+  height: number,
 ): Promise<Buffer> => {
   try {
     const background = await sharp(buffer)
@@ -55,62 +55,67 @@ export const resizeWithBlurFill = async (
 };
 
 // ✅ HELPER: Direct Prompting (No Canvas Hacks)
-// We rely on Gemini 3's native ability to uncrop/resize based on instructions.
+// Updated to prevent "split screen" or "panel" hallucinations
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
   targetWidth: number, // (Unused but kept for signature compatibility)
   targetHeight: number, // (Unused but kept for signature compatibility)
-  targetRatioString: string = "16:9"
+  targetRatioString: string = "16:9",
 ): Promise<Buffer> => {
   try {
     console.log(`✨ Gemini Direct Outpaint: Target ${targetRatioString}`);
 
     let instruction = "";
+    let orientationContext = "";
 
-    // 1. Construct Specific "Uncrop" Prompt
+    // 1. Construct Specific "Outpaint" Prompt
     if (targetRatioString === "9:16" || targetRatioString === "portrait") {
+      orientationContext = "Vertical Portrait (9:16)";
       instruction = `
-      TASK: Convert this image to Vertical Portrait (9:16).
-      ACTION: Expand the field of view vertically.
-      - Generate more sky/ceiling above and ground/floor below.
-      - Keep the original subject centered and unchanged.
-      - Ensure the new areas seamlessly match the lighting and perspective of the original.
+      TASK: Seamlessly OUTPAINT this image vertically.
+      ACTION: Extend the physical reality upwards (sky/ceiling) and downwards (ground/floor).
+      - Make the camera lens appear "taller".
+      - Ensure the new vertical areas blend perfectly with the existing lighting and perspective.
       `;
     } else if (
       targetRatioString === "16:9" ||
       targetRatioString === "landscape"
     ) {
+      orientationContext = "Wide Landscape (16:9)";
       instruction = `
-      TASK: Convert this image to Wide Landscape (16:9).
-      ACTION: Expand the field of view horizontally.
-      - Widen the scene to the left and right.
-      - Keep the original subject centered and unchanged.
-      - Ensure the new scenery matches the environment perfectly.
+      TASK: Seamlessly OUTPAINT this image horizontally.
+      ACTION: Extend the physical reality to the far left and far right.
+      - Make the camera lens appear "wider".
+      - Ensure the new side areas blend perfectly with the existing environment.
       `;
     } else {
+      orientationContext = "Square (1:1)";
       instruction = `
-      TASK: Expand the image canvas to a Square (1:1).
-      ACTION: Reveal more of the surroundings on all sides without altering the central subject.
+      TASK: Seamlessly OUTPAINT this image on all sides to form a square.
+      ACTION: Reveal the immediate surroundings that were cut off by the frame.
       `;
     }
 
     const fullPrompt = `
     ${instruction}
     
-    STRICT CONSTRAINT: 
-    Do NOT crop the original subject. Do NOT distort or squash the image. 
-    You are revealing the "rest of the photo" that was outside the frame.
+    CRITICAL VISUAL CONSTRAINTS:
+    1. SINGLE CONTINUOUS SCENE: The result must be one single, coherent photograph.
+    2. NO PANELS OR SPLIT SCREENS: Do not create a diptych, triptych, or comic-book layout.
+    3. NO FRAMES OR BORDERS: The image must extend to the very edge of the canvas.
+    4. NO ARTIFACTS: Do not include text, color bars, or visible seams.
+    
+    The final image should look exactly like the original photo, just taken with a lens that has a ${orientationContext} field of view.
     High fidelity, photorealistic style.
     `;
 
     // 2. Call Gemini (Passing original buffer directly)
-    // Your gemini.ts handles the actual aspect_ratio param in the config
     return await GeminiService.generateOrEditImage({
       prompt: fullPrompt,
       aspectRatio: targetRatioString,
-      referenceImages: [originalBuffer], // Passing the raw image, no black bars
+      referenceImages: [originalBuffer],
       modelType: "quality",
-      imageSize: "2K", // Request high res for the expansion
+      imageSize: "2K",
     });
   } catch (error: any) {
     console.error("❌ Gemini Direct Error:", error.message);
@@ -124,7 +129,7 @@ export const uploadToCloudinary = async (
   p: string,
   u: string,
   t: string,
-  r: string
+  r: string,
 ): Promise<string> => {
   return new Promise<string>((resolve, reject) => {
     const options = {
@@ -137,14 +142,14 @@ export const uploadToCloudinary = async (
     if (Buffer.isBuffer(f)) {
       cloudinaryClient.uploader
         .upload_stream(options, (err, res) =>
-          err ? reject(err) : resolve(res!.secure_url)
+          err ? reject(err) : resolve(res!.secure_url),
         )
         .end(f);
     } else {
       cloudinaryClient.uploader.upload(
         f,
         { ...options, timeout: 120000 },
-        (err, res) => (err ? reject(err) : resolve(res!.secure_url))
+        (err, res) => (err ? reject(err) : resolve(res!.secure_url)),
       );
     }
   });
@@ -152,7 +157,7 @@ export const uploadToCloudinary = async (
 
 // Helper: Download
 export const downloadAndOptimizeImages = async (
-  urls: string[]
+  urls: string[],
 ): Promise<Buffer[]> => {
   if (urls.length === 0) return [];
   const promises = urls.map(async (rawUrl) => {
@@ -174,7 +179,7 @@ export const downloadAndOptimizeImages = async (
 // Helper: Ratio Matcher
 export const getClosestAspectRatio = (
   width: number,
-  height: number
+  height: number,
 ): string => {
   const ratio = width / height;
   const targets = [
@@ -190,7 +195,7 @@ export const getClosestAspectRatio = (
     { id: "4:5", val: 0.8 },
   ];
   const closest = targets.reduce((prev, curr) =>
-    Math.abs(curr.val - ratio) < Math.abs(prev.val - ratio) ? curr : prev
+    Math.abs(curr.val - ratio) < Math.abs(prev.val - ratio) ? curr : prev,
   );
   return closest.id;
 };

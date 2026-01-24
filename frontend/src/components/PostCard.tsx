@@ -132,8 +132,8 @@ export function PostCard({
           post.mediaType === "CAROUSEL"
             ? "zip"
             : post.mediaType === "VIDEO"
-            ? "mp4"
-            : "jpg";
+              ? "mp4"
+              : "jpg";
         filename = `${filename}.${ext}`;
       }
       link.setAttribute("download", filename);
@@ -216,7 +216,7 @@ export function PostCard({
                 {(!minimal || isPossiblyStuck) && (
                   <>
                     <p className="text-purple-300 text-xs mt-3 font-medium tracking-wide">
-                      Generating...
+                      AI Model is Generating...
                     </p>
                     <div className="mt-3 w-full max-w-[140px] mx-auto">
                       <div className="flex justify-between text-[10px] text-purple-300 mb-1">

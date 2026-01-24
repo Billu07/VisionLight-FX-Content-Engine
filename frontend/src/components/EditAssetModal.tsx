@@ -8,7 +8,6 @@ import { ProgressBar } from "./ProgressBar";
 interface Asset {
   id: string;
   url: string;
-  // ✅ UPDATED: Matches AssetLibrary definitions
   aspectRatio: "16:9" | "9:16" | "original" | "1:1" | "custom";
   type?: "IMAGE" | "VIDEO";
   originalAssetId?: string | null;
@@ -30,7 +29,6 @@ interface DriftPreset {
   icon: string;
 }
 
-// ✅ FIXED PRESETS: Using the -10 to 10 scale
 const DRIFT_PRESETS: DriftPreset[] = [
   { label: "Orbit Right", h: 5, v: 0, z: 0, icon: "↪️" },
   { label: "Orbit Left", h: -5, v: 0, z: 0, icon: "↩️" },
@@ -59,6 +57,7 @@ export function EditAssetModal({
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
 
   // Text Edit State
   const [prompt, setPrompt] = useState("");
@@ -87,7 +86,7 @@ export function EditAssetModal({
     enabled: showRefSelector,
   });
 
-  // 1. RECOVERY LOGIC (Checks LocalStorage on mount)
+  // 1. RECOVERY LOGIC
   useEffect(() => {
     const pendingPostId = localStorage.getItem(
       `active_drift_post_${currentAsset.id}`,
@@ -99,7 +98,7 @@ export function EditAssetModal({
     }
   }, [currentAsset.id]);
 
-  // 2. POLLING LOGIC (Polls DB Status)
+  // 2. POLLING LOGIC
   useEffect(() => {
     if (!driftPostId) return;
 
@@ -121,7 +120,6 @@ export function EditAssetModal({
           setDriftVideoUrl(mediaUrl);
           setIsProcessing(false);
 
-          // Refresh Library to show the new video asset
           queryClient.invalidateQueries({ queryKey: ["assets"] });
         } else if (status === "FAILED") {
           clearInterval(interval);
@@ -131,7 +129,6 @@ export function EditAssetModal({
           alert("Drift Generation Failed: " + (error || "Unknown error"));
         }
       } catch (e: any) {
-        // If post deleted/lost, stop polling
         if (e.message?.includes("404") || e.response?.status === 404) {
           clearInterval(interval);
           localStorage.removeItem(`active_drift_post_${currentAsset.id}`);
@@ -176,7 +173,45 @@ export function EditAssetModal({
     onSettled: () => setIsEnhancing(false),
   });
 
-  // === MUTATION 3: DRIFT START ===
+  // === MUTATION 3: RATIO CONVERSION (New Feature) ===
+  const ratioMutation = useMutation({
+    mutationFn: async (targetRatio: string) => {
+      // 1. Fetch current image as Blob
+      const response = await fetch(currentAsset.url);
+      const blob = await response.blob();
+      const file = new File([blob], "convert.jpg", { type: "image/jpeg" });
+
+      // 2. Upload to Sync Endpoint (same logic as Library Tabs)
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("raw", "false"); // Force Processing
+      formData.append("aspectRatio", targetRatio);
+
+      // Keep lineage if possible
+      if (currentAsset.originalAssetId) {
+        formData.append("originalAssetId", currentAsset.originalAssetId);
+      } else {
+        formData.append("originalAssetId", currentAsset.id);
+      }
+
+      return apiEndpoints.uploadAssetSync(formData);
+    },
+    onMutate: () => {
+      setIsProcessing(true);
+      setIsConverting(true);
+      setDriftStatusMsg("Converting Ratio...");
+    },
+    onSuccess: (res: any) => {
+      handleSuccess(res.data.asset);
+    },
+    onError: (err: any) => alert("Conversion failed: " + err.message),
+    onSettled: () => {
+      setIsProcessing(false);
+      setIsConverting(false);
+    },
+  });
+
+  // === MUTATION 4: DRIFT START ===
   const driftStartMutation = useMutation({
     mutationFn: async () => {
       return apiEndpoints.startDriftVideo({
@@ -217,7 +252,7 @@ export function EditAssetModal({
       const res = await apiEndpoints.uploadAssetSync(formData);
       if (res.data.success) {
         handleSuccess(res.data.asset);
-        setDriftVideoUrl(null); // Return to editor to edit the new frame
+        setDriftVideoUrl(null);
       }
     } catch (e: any) {
       alert("Failed to save frame: " + e.message);
@@ -395,8 +430,8 @@ export function EditAssetModal({
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {/* ACTIONS: Analyze / Enhance */}
-            <div className="flex gap-2 mb-4">
+            {/* 1. ACTIONS: Analyze / Enhance */}
+            <div className="flex gap-2">
               <button
                 onClick={() => analyzeMutation.mutate()}
                 disabled={isAnalyzing || isProcessing || isEnhancing}
@@ -417,6 +452,55 @@ export function EditAssetModal({
                 )}
               </button>
             </div>
+
+            {/* ✅ NEW: RATIO CONVERSION BUTTONS */}
+            {activeTab !== "drift" && (
+              <div className="space-y-2 pb-4 border-b border-gray-800">
+                <label className="text-xs font-bold text-purple-300 uppercase tracking-wider">
+                  Quick Convert
+                </label>
+
+                {/* ✅ UX FIX: Show Loader when converting */}
+                {isConverting ? (
+                  <div className="w-full py-2 bg-gray-800 rounded-lg flex items-center justify-center gap-2 border border-cyan-500/30 animate-pulse">
+                    <LoadingSpinner size="sm" variant="default" />
+                    <span className="text-xs text-cyan-400 font-bold">
+                      Converting Format...
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    {currentAsset.aspectRatio !== "16:9" && (
+                      <button
+                        onClick={() => ratioMutation.mutate("16:9")}
+                        disabled={isProcessing}
+                        className="flex-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 py-2 rounded-lg border border-gray-700 hover:border-cyan-500/50 transition-colors"
+                      >
+                        Landscape
+                      </button>
+                    )}
+                    {currentAsset.aspectRatio !== "9:16" && (
+                      <button
+                        onClick={() => ratioMutation.mutate("9:16")}
+                        disabled={isProcessing}
+                        className="flex-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 py-2 rounded-lg border border-gray-700 hover:border-cyan-500/50 transition-colors"
+                      >
+                        Portrait
+                      </button>
+                    )}
+                    {currentAsset.aspectRatio !== "1:1" && (
+                      <button
+                        onClick={() => ratioMutation.mutate("1:1")}
+                        disabled={isProcessing}
+                        className="flex-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 py-2 rounded-lg border border-gray-700 hover:border-cyan-500/50 transition-colors"
+                      >
+                        Square
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* STANDARD / PRO UI */}
             {activeTab !== "drift" && (
