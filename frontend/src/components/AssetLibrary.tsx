@@ -55,9 +55,10 @@ export function AssetLibrary({
     null,
   );
 
-  // Polling State
+  // Polling & Skeleton State
   const [pollingUntil, setPollingUntil] = useState<number>(0);
   const [processingCount, setProcessingCount] = useState(0);
+  const [targetAssetCount, setTargetAssetCount] = useState(0);
   const [activeDriftIds, setActiveDriftIds] = useState<Set<string>>(new Set());
 
   // 1. Fetch Assets
@@ -72,6 +73,59 @@ export function AssetLibrary({
     refetchInterval: 3000,
     refetchIntervalInBackground: true,
   });
+
+  // ✅ FILTER LOGIC
+  const filteredAssets = Array.isArray(assets)
+    ? assets.filter((a: Asset) => {
+        if (activeTab === "VIDEO") return a.type === "VIDEO";
+
+        // Originals Tab
+        if (activeTab === "original") {
+          return (
+            a.type === "IMAGE" &&
+            (a.aspectRatio === "original" ||
+              !a.aspectRatio ||
+              a.aspectRatio === "custom")
+          );
+        }
+
+        // Custom Tab
+        if (activeTab === "custom") {
+          return (
+            a.type === "IMAGE" &&
+            (a.aspectRatio === "custom" ||
+              (a.aspectRatio !== "16:9" &&
+                a.aspectRatio !== "9:16" &&
+                a.aspectRatio !== "1:1" &&
+                a.aspectRatio !== "original"))
+          );
+        }
+
+        // Standard Ratios
+        return a.type === "IMAGE" && a.aspectRatio === activeTab;
+      })
+    : [];
+
+  // ✅ NAVIGATION HELPERS (Moved up to ensure scope availability)
+  const handleNextAsset = () => {
+    if (!selectedAsset) return;
+    const currentIndex = filteredAssets.findIndex(
+      (a) => a.id === selectedAsset.id,
+    );
+    if (currentIndex < filteredAssets.length - 1) {
+      setSelectedAsset(filteredAssets[currentIndex + 1]);
+    }
+  };
+
+  const handlePrevAsset = () => {
+    if (!selectedAsset) return;
+    const currentIndex = filteredAssets.findIndex(
+      (a) => a.id === selectedAsset.id,
+    );
+    if (currentIndex > 0) {
+      setSelectedAsset(filteredAssets[currentIndex - 1]);
+    }
+  };
 
   useEffect(() => {
     const checkDrifts = () => {
@@ -89,23 +143,34 @@ export function AssetLibrary({
     return () => clearInterval(interval);
   }, []);
 
+  // ✅ UPDATED POLLING CLEANUP
   useEffect(() => {
-    if (pollingUntil === 0) return;
-    const checkInterval = setInterval(() => {
-      if (Date.now() > pollingUntil) {
-        setPollingUntil(0);
-        setProcessingCount(0);
-        queryClient.invalidateQueries({ queryKey: ["assets"] });
-      }
-    }, 1000);
-    return () => clearInterval(checkInterval);
+    if (pollingUntil > 0) {
+      const checkInterval = setInterval(() => {
+        if (Date.now() > pollingUntil) {
+          setPollingUntil(0);
+          setProcessingCount(0);
+          setTargetAssetCount(0);
+          queryClient.invalidateQueries({ queryKey: ["assets"] });
+        }
+      }, 1000);
+      return () => clearInterval(checkInterval);
+    }
   }, [pollingUntil, queryClient]);
 
-  // ✅ UPDATED UPLOAD LOGIC: Instant Feedback
+  // ✅ Clear skeletons when real assets arrive
+  useEffect(() => {
+    if (targetAssetCount > 0 && filteredAssets.length >= targetAssetCount) {
+      setPollingUntil(0);
+      setProcessingCount(0);
+      setTargetAssetCount(0);
+    }
+  }, [filteredAssets.length, targetAssetCount]);
+
+  // ✅ UPDATED UPLOAD LOGIC
   const uploadMutation = useMutation({
     mutationFn: async (files: FileList) => {
       const uploadPromises = Array.from(files).map(async (file) => {
-        // 1. Always Upload Raw (V1) to Originals
         const formData = new FormData();
         formData.append("image", file);
         formData.append("raw", "true");
@@ -114,19 +179,16 @@ export function AssetLibrary({
         const rawRes = await apiEndpoints.uploadAssetSync(formData);
         const originalAsset = rawRes.data.asset;
 
-        // 2. If we are in a specific Ratio Tab (e.g. Landscape), Generate V2 immediately
         if (
           activeTab !== "original" &&
           activeTab !== "VIDEO" &&
           activeTab !== "custom"
         ) {
-          // Trigger V2 generation linked to V1
           const processFormData = new FormData();
           processFormData.append("image", file);
-          processFormData.append("raw", "false"); // Process it!
-          processFormData.append("aspectRatio", activeTab); // e.g. "16:9"
-          processFormData.append("originalAssetId", originalAsset.id); // Link it
-
+          processFormData.append("raw", "false");
+          processFormData.append("aspectRatio", activeTab);
+          processFormData.append("originalAssetId", originalAsset.id);
           await apiEndpoints.uploadAssetSync(processFormData);
         }
         return originalAsset;
@@ -134,40 +196,20 @@ export function AssetLibrary({
 
       return Promise.all(uploadPromises);
     },
-    // ✅ UX FIX: Show skeletons IMMEDIATELY when upload starts (onMutate)
     onMutate: (files) => {
       setIsUploading(true);
-      if (
-        activeTab !== "original" &&
-        activeTab !== "VIDEO" &&
-        activeTab !== "custom"
-      ) {
-        setProcessingCount(files.length);
-        // Start polling visual timer immediately
-        setPollingUntil(Date.now() + files.length * 20000);
-      }
+      setTargetAssetCount(filteredAssets.length + files.length);
+      setProcessingCount(files.length);
+      setPollingUntil(Date.now() + files.length * 40000);
     },
     onSuccess: () => {
-      // If we are in Originals, just switch there and clear loaders
-      if (
-        activeTab === "original" ||
-        activeTab === "VIDEO" ||
-        activeTab === "custom"
-      ) {
-        setActiveTab("original");
-        setPollingUntil(0);
-        setProcessingCount(0);
-      }
-      // If we are in a Processing tab, we keep the polling active
-      // (it was already set in onMutate, but we can extend it if needed)
-
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     },
     onError: (err: any) => {
       alert("Upload failed: " + err.message);
-      // Clear skeletons on error
       setPollingUntil(0);
       setProcessingCount(0);
+      setTargetAssetCount(0);
     },
     onSettled: () => setIsUploading(false),
   });
@@ -184,7 +226,6 @@ export function AssetLibrary({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const validFiles = new DataTransfer();
-
       Array.from(e.target.files).forEach((file) => {
         if (file.size > MAX_FILE_SIZE) {
           alert(`Skipped "${file.name}": Exceeds 10MB limit.`);
@@ -192,7 +233,6 @@ export function AssetLibrary({
           validFiles.items.add(file);
         }
       });
-
       if (validFiles.files.length > 0) {
         uploadMutation.mutate(validFiles.files);
       }
@@ -235,58 +275,6 @@ export function AssetLibrary({
     }
   };
 
-  // ✅ FILTER LOGIC
-  const filteredAssets = Array.isArray(assets)
-    ? assets.filter((a: Asset) => {
-        if (activeTab === "VIDEO") return a.type === "VIDEO";
-
-        // Originals Tab
-        if (activeTab === "original") {
-          return (
-            a.type === "IMAGE" &&
-            (a.aspectRatio === "original" ||
-              !a.aspectRatio ||
-              a.aspectRatio === "custom")
-          );
-        }
-
-        // Custom Tab
-        if (activeTab === "custom") {
-          return (
-            a.type === "IMAGE" &&
-            (a.aspectRatio === "custom" ||
-              (a.aspectRatio !== "16:9" &&
-                a.aspectRatio !== "9:16" &&
-                a.aspectRatio !== "1:1" &&
-                a.aspectRatio !== "original"))
-          );
-        }
-
-        // Standard Ratios
-        return a.type === "IMAGE" && a.aspectRatio === activeTab;
-      })
-    : [];
-
-  const handleNextAsset = () => {
-    if (!selectedAsset) return;
-    const currentIndex = filteredAssets.findIndex(
-      (a) => a.id === selectedAsset.id,
-    );
-    if (currentIndex < filteredAssets.length - 1) {
-      setSelectedAsset(filteredAssets[currentIndex + 1]);
-    }
-  };
-
-  const handlePrevAsset = () => {
-    if (!selectedAsset) return;
-    const currentIndex = filteredAssets.findIndex(
-      (a) => a.id === selectedAsset.id,
-    );
-    if (currentIndex > 0) {
-      setSelectedAsset(filteredAssets[currentIndex - 1]);
-    }
-  };
-
   // ✅ GO TO ORIGINAL LOGIC
   const handleGoToOriginal = () => {
     if (!selectedAsset || !selectedAsset.originalAssetId) return;
@@ -311,11 +299,9 @@ export function AssetLibrary({
     )
       return;
 
-    // Pick the most recent processed version
     const latestVersion =
       selectedAsset.variations[selectedAsset.variations.length - 1];
 
-    // Switch tab to match the processed version
     if (latestVersion.aspectRatio === "16:9") setActiveTab("16:9");
     else if (latestVersion.aspectRatio === "9:16") setActiveTab("9:16");
     else if (latestVersion.aspectRatio === "1:1") setActiveTab("1:1");
@@ -323,6 +309,7 @@ export function AssetLibrary({
     setSelectedAsset(latestVersion);
   };
 
+  // Keyboard Navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!selectedAsset) return;
@@ -362,8 +349,8 @@ export function AssetLibrary({
               { id: "16:9", label: "Landscape" },
               { id: "9:16", label: "Portrait" },
               { id: "1:1", label: "Square" },
-              { id: "custom", label: "Edited" },
               { id: "original", label: "Originals" },
+              { id: "custom", label: "Edited" },
               { id: "VIDEO", label: "Drift Paths" },
             ].map((tab) => (
               <button
@@ -421,7 +408,7 @@ export function AssetLibrary({
             </div>
           ) : (
             <div className="grid gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {/* ✅ UX FIX: SKELETON CARDS appear immediately */}
+              {/* ✅ SKELETON CARDS */}
               {pollingUntil > 0 &&
                 Array.from({ length: processingCount }).map((_, i) => (
                   <div
@@ -547,7 +534,7 @@ export function AssetLibrary({
                 className="max-w-full max-h-full object-contain rounded shadow-lg"
               />
 
-              {/* Navigation Arrows (Previous/Next in List) */}
+              {/* Navigation Arrows */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -581,7 +568,6 @@ export function AssetLibrary({
                   Asset Details
                 </h3>
 
-                {/* METADATA */}
                 <div className="mb-6 space-y-4">
                   <div className="bg-gray-800/50 p-3 rounded-lg border border-gray-700">
                     <span className="text-xs text-gray-500 uppercase font-bold block mb-1">
