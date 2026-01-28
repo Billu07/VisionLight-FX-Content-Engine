@@ -14,7 +14,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || "",
 );
 
-// Load Admins from Backend ENV (Security Best Practice)
+// Load Super Admins from Backend ENV (Safety Net)
 const ADMIN_EMAILS_RAW = process.env.ADMIN_EMAILS || "";
 const ADMIN_EMAILS = ADMIN_EMAILS_RAW.split(",").map((email) =>
   email.trim().toLowerCase(),
@@ -22,7 +22,7 @@ const ADMIN_EMAILS = ADMIN_EMAILS_RAW.split(",").map((email) =>
 
 export class AuthService {
   /**
-   * ADMIN ONLY: Creates a user in Supabase AND ensures they exist in Airtable.
+   * ADMIN ONLY: Creates a user in Supabase AND ensures they exist in Database.
    */
   static async createSystemUser(email: string, password: string, name: string) {
     // 1. Create in Supabase (Auth Provider)
@@ -37,10 +37,10 @@ export class AuthService {
       throw new Error(`Supabase Create Failed: ${error.message}`);
     }
 
-    // 2. Sync with Airtable (Data Provider)
-    const existingAirtableUser = await airtableService.findUserByEmail(email);
+    // 2. Sync with Database
+    const existingUser = await airtableService.findUserByEmail(email);
 
-    if (!existingAirtableUser) {
+    if (!existingUser) {
       await airtableService.createUser({ email, name });
     }
 
@@ -75,7 +75,7 @@ export class AuthService {
 
   /**
    * Validates the Bearer token (JWT) from Supabase.
-   * ✅ UPDATED: Returns creditSystem and calculates Role.
+   * ✅ UPDATED: Checks .env AND Database for Admin Role.
    */
   static async validateSession(token: string) {
     try {
@@ -102,17 +102,22 @@ export class AuthService {
         });
       }
 
-      // ✅ CALCULATE ROLE ON SERVER
-      const role = ADMIN_EMAILS.includes(user.email.toLowerCase())
-        ? "ADMIN"
-        : "USER";
+      // 1. Check .env (Super Admin Safety Net)
+      const isSuperAdmin = ADMIN_EMAILS.includes(user.email.toLowerCase());
+
+      // 2. Check Database (Dynamic Role)
+      // Note: user.role comes from Prisma. If column doesn't exist yet, this is undefined (falsy).
+      const isDbAdmin = user.role === "ADMIN";
+
+      // 3. Determine Final Role
+      const finalRole = isSuperAdmin || isDbAdmin ? "ADMIN" : "USER";
 
       return {
         id: user.id,
         email: user.email,
         name: user.name,
-        creditSystem: user.creditSystem, // 👈 PASSING THIS NOW
-        role: role, // 👈 PASSING THIS NOW
+        creditSystem: user.creditSystem,
+        role: finalRole, // ✅ Returns 'ADMIN' if either check passes
       };
     } catch (error) {
       console.error("Auth Validation Error:", error);

@@ -8,7 +8,8 @@ interface User {
   email: string;
   name: string;
   creditSystem: "COMMERCIAL" | "INTERNAL";
-  creditBalance: number; // CHANGED: Single number
+  creditBalance: number;
+  role?: string; // ✅ Added Role field
 }
 
 interface CreditRequest {
@@ -86,11 +87,9 @@ export default function AdminDashboard() {
     }
   };
 
-  // Simplified Add Credits Action
   const handleAddCredits = async (userId: string, amount: number) => {
     setActionLoading(true);
     try {
-      // We assume adminUpdateUser now handles "addCredits" key
       await apiEndpoints.adminUpdateUser(userId, { addCredits: amount });
       setMsg(`✅ Added ${amount} credits!`);
       fetchData();
@@ -110,16 +109,32 @@ export default function AdminDashboard() {
       });
       setMsg("✅ System updated");
       fetchData();
-      setEditingUser(null);
+      // Keep modal open to see changes, or update local state
+      setEditingUser((prev) =>
+        prev ? { ...prev, creditSystem: system } : null,
+      );
     } catch (err) {
-      alert("Failed");
+      alert("Failed to update system");
+    }
+  };
+
+  // ✅ NEW: Update User Role (Admin vs User)
+  const handleUpdateRole = async (role: "ADMIN" | "USER") => {
+    if (!editingUser) return;
+    try {
+      await apiEndpoints.adminUpdateUser(editingUser.id, { role });
+      setMsg(`✅ User promoted/demoted to ${role}`);
+      fetchData();
+      setEditingUser((prev) => (prev ? { ...prev, role: role } : null));
+    } catch (err: any) {
+      setMsg("❌ Failed to update role");
     }
   };
 
   const handleDeleteUser = async (user: User) => {
     if (
       !window.confirm(
-        `Are you sure you want to delete ${user.email}? This cannot be undone.`
+        `Are you sure you want to delete ${user.email}? This cannot be undone.`,
       )
     ) {
       return;
@@ -139,7 +154,7 @@ export default function AdminDashboard() {
   const filteredUsers = users.filter(
     (u) =>
       u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      u.name?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (
@@ -217,7 +232,7 @@ export default function AdminDashboard() {
                       onClick={() => {
                         setSearchTerm(req.email);
                         setMsg(
-                          `🔍 Filtered for ${req.email}. Click 'Manage' to grant credits.`
+                          `🔍 Filtered for ${req.email}. Click 'Manage' to grant credits.`,
                         );
                       }}
                       className="text-cyan-400 hover:text-white text-sm underline"
@@ -276,8 +291,15 @@ export default function AdminDashboard() {
                       className="hover:bg-gray-750 transition-colors"
                     >
                       <td className="p-4">
-                        <div className="font-bold text-white text-base">
-                          {u.name || "Unnamed"}
+                        <div className="flex items-center gap-2">
+                          <div className="font-bold text-white text-base">
+                            {u.name || "Unnamed"}
+                          </div>
+                          {u.role === "ADMIN" && (
+                            <span className="bg-red-900/50 text-red-300 text-[10px] px-1.5 py-0.5 rounded uppercase font-bold border border-red-500/30">
+                              Admin
+                            </span>
+                          )}
                         </div>
                         <div className="text-sm text-cyan-400/80">
                           {u.email}
@@ -422,7 +444,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* MODAL: EDIT USER (SIMPLIFIED FOR CREDITS) */}
+        {/* MODAL: EDIT USER (FULL MANAGEMENT) */}
         {editingUser && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-gray-800 rounded-2xl border border-cyan-500/30 p-8 w-full max-w-lg shadow-2xl relative">
@@ -436,6 +458,7 @@ export default function AdminDashboard() {
               <p className="text-sm text-cyan-400 mb-6">{editingUser.email}</p>
 
               <div className="space-y-6">
+                {/* 1. CREDIT SYSTEM */}
                 <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700">
                   <label className="block text-xs uppercase text-gray-400 font-bold mb-3">
                     Credit System Mode
@@ -466,6 +489,38 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                {/* 2. ROLE MANAGEMENT (NEW) */}
+                <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700">
+                  <label className="block text-xs uppercase text-gray-400 font-bold mb-3">
+                    Security Role
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateRole("USER")}
+                      className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-all ${
+                        editingUser.role !== "ADMIN"
+                          ? "bg-gray-700 border-gray-500 text-white"
+                          : "bg-gray-800 border-gray-600 text-gray-400"
+                      }`}
+                    >
+                      👤 User
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateRole("ADMIN")}
+                      className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-all ${
+                        editingUser.role === "ADMIN"
+                          ? "bg-red-600 border-red-500 text-white"
+                          : "bg-gray-800 border-gray-600 text-gray-400"
+                      }`}
+                    >
+                      🛡️ Admin
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. BALANCE */}
                 <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700 text-center">
                   <div className="text-sm text-gray-400 mb-2">
                     Current Balance
