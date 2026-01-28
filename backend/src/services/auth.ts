@@ -1,4 +1,3 @@
-// backend/src/services/auth.ts
 import { createClient } from "@supabase/supabase-js";
 import { dbService as airtableService } from "./database";
 import dotenv from "dotenv";
@@ -12,7 +11,13 @@ if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
 
 const supabase = createClient(
   process.env.SUPABASE_URL || "",
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ""
+  process.env.SUPABASE_SERVICE_ROLE_KEY || "",
+);
+
+// Load Admins from Backend ENV (Security Best Practice)
+const ADMIN_EMAILS_RAW = process.env.ADMIN_EMAILS || "";
+const ADMIN_EMAILS = ADMIN_EMAILS_RAW.split(",").map((email) =>
+  email.trim().toLowerCase(),
 );
 
 export class AuthService {
@@ -44,7 +49,6 @@ export class AuthService {
 
   /**
    * ADMIN ONLY: Deletes a user from Supabase to prevent login.
-   * Supabase doesn't have a direct 'deleteByEmail', so we find ID first.
    */
   static async deleteSupabaseUserByEmail(email: string) {
     // 1. Find the Supabase User ID (UUID)
@@ -60,17 +64,18 @@ export class AuthService {
     // 2. If found, delete by ID
     if (userToDelete) {
       const { error: deleteError } = await supabase.auth.admin.deleteUser(
-        userToDelete.id
+        userToDelete.id,
       );
       if (deleteError) throw deleteError;
       return true;
     }
 
-    return false; // User wasn't in Supabase (maybe already deleted)
+    return false;
   }
 
   /**
    * Validates the Bearer token (JWT) from Supabase.
+   * ✅ UPDATED: Returns creditSystem and calculates Role.
    */
   static async validateSession(token: string) {
     try {
@@ -87,7 +92,7 @@ export class AuthService {
 
       if (!user) {
         console.log(
-          `⚠️ User ${supabaseUser.email} found in Supabase but missing in Airtable. Re-syncing...`
+          `⚠️ User ${supabaseUser.email} found in Supabase but missing in DB. Re-syncing...`,
         );
         user = await airtableService.createUser({
           email: supabaseUser.email,
@@ -97,10 +102,17 @@ export class AuthService {
         });
       }
 
+      // ✅ CALCULATE ROLE ON SERVER
+      const role = ADMIN_EMAILS.includes(user.email.toLowerCase())
+        ? "ADMIN"
+        : "USER";
+
       return {
         id: user.id,
         email: user.email,
         name: user.name,
+        creditSystem: user.creditSystem, // 👈 PASSING THIS NOW
+        role: role, // 👈 PASSING THIS NOW
       };
     } catch (error) {
       console.error("Auth Validation Error:", error);

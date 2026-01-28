@@ -6,8 +6,8 @@ interface User {
   id: string;
   email: string;
   name: string;
-  // FIX: Added this field so Dashboard.tsx stops complaining
   creditSystem?: "COMMERCIAL" | "INTERNAL";
+  role?: "ADMIN" | "USER"; // ✅ Added Role
 }
 
 interface AuthState {
@@ -37,7 +37,7 @@ export const useAuth = create<AuthState>((set) => ({
 
       setAuthToken(session.access_token);
 
-      // This URL should now be http://localhost:4000/api/auth/me
+      // This calls the backend which now returns role & creditSystem
       const response = await apiEndpoints.getMe();
 
       if (response.data.success) {

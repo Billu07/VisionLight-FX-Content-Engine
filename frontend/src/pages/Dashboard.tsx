@@ -18,9 +18,6 @@ import { DriftFrameExtractor } from "../components/DriftFrameExtractor";
 import picdriftLogo from "../assets/picdrift.png";
 import fxLogo from "../assets/fx.png";
 
-// === CONFIGURATION ===
-const ADMIN_EMAILS = ["snowfix07@gmail.com", "keith@picdrift.com"];
-
 type EngineType = "kie" | "studio" | "openai";
 type StudioMode = "image" | "carousel" | "edit";
 
@@ -255,8 +252,7 @@ function Dashboard() {
     ? "http://picdrift.com/fx-Credits"
     : "http://PicDrift.com/fx-request";
   const creditBtnText = isCommercial ? "Buy Credit" : "Request Credit";
-  const isAdmin =
-    user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
+  const isAdmin = user?.role === "ADMIN";
 
   // === ACTIONS ===
 

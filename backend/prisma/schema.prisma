@@ -18,6 +18,7 @@ model User {
   updatedAt     DateTime  @updatedAt
   posts         Post[]
   assets        Asset[]
+  role          String    @default("USER")
   brandConfig   BrandConfig?
   roiMetrics    ROIMetrics?
   creditRequests CreditRequest[]
