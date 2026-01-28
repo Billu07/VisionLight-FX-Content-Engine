@@ -9,7 +9,7 @@ interface User {
   name: string;
   creditSystem: "COMMERCIAL" | "INTERNAL";
   creditBalance: number;
-  role?: string; // ✅ Added Role field
+  role?: string;
 }
 
 interface CreditRequest {
@@ -30,7 +30,12 @@ export default function AdminDashboard() {
 
   // UI State
   const [showInviteModal, setShowInviteModal] = useState(false);
+
+  // ✅ STAGED EDITING STATE
+  // 'editingUser' holds the original user
+  // 'pendingUpdates' holds the changes before clicking Save
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [pendingUpdates, setPendingUpdates] = useState<Partial<User>>({});
 
   // Forms State
   const [newUser, setNewUser] = useState({ email: "", password: "", name: "" });
@@ -62,7 +67,7 @@ export default function AdminDashboard() {
   const handleResolveRequest = async (id: string) => {
     try {
       await apiEndpoints.adminResolveRequest(id);
-      fetchData(); // Refresh list
+      fetchData();
     } catch (err) {
       console.error(err);
     }
@@ -101,36 +106,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleUpdateUserSystem = async (system: "COMMERCIAL" | "INTERNAL") => {
-    if (!editingUser) return;
-    try {
-      await apiEndpoints.adminUpdateUser(editingUser.id, {
-        creditSystem: system,
-      });
-      setMsg("✅ System updated");
-      fetchData();
-      // Keep modal open to see changes, or update local state
-      setEditingUser((prev) =>
-        prev ? { ...prev, creditSystem: system } : null,
-      );
-    } catch (err) {
-      alert("Failed to update system");
-    }
-  };
-
-  // ✅ NEW: Update User Role (Admin vs User)
-  const handleUpdateRole = async (role: "ADMIN" | "USER") => {
-    if (!editingUser) return;
-    try {
-      await apiEndpoints.adminUpdateUser(editingUser.id, { role });
-      setMsg(`✅ User promoted/demoted to ${role}`);
-      fetchData();
-      setEditingUser((prev) => (prev ? { ...prev, role: role } : null));
-    } catch (err: any) {
-      setMsg("❌ Failed to update role");
-    }
-  };
-
   const handleDeleteUser = async (user: User) => {
     if (
       !window.confirm(
@@ -147,6 +122,34 @@ export default function AdminDashboard() {
     } catch (err: any) {
       alert("Failed to delete user: " + err.message);
       setLoading(false);
+    }
+  };
+
+  // ✅ OPEN MODAL LOGIC
+  const openEditModal = (user: User) => {
+    setEditingUser(user);
+    setPendingUpdates({
+      creditSystem: user.creditSystem,
+      role: user.role || "USER",
+    });
+  };
+
+  // ✅ SAVE CHANGES LOGIC
+  const handleSaveChanges = async () => {
+    if (!editingUser) return;
+    setActionLoading(true);
+
+    try {
+      // Send only the changed fields
+      await apiEndpoints.adminUpdateUser(editingUser.id, pendingUpdates);
+
+      setMsg("✅ User updated successfully");
+      setEditingUser(null);
+      fetchData(); // Refresh list to show new status
+    } catch (err: any) {
+      alert("Failed to save changes: " + err.message);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -206,7 +209,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* === NOTIFICATION CENTER === */}
+        {/* NOTIFICATIONS */}
         {requests.length > 0 && (
           <div className="mb-8 bg-purple-900/20 border border-purple-500/30 rounded-xl p-6 animate-in fade-in">
             <h2 className="text-xl font-bold text-purple-300 mb-4 flex items-center gap-2">
@@ -351,7 +354,7 @@ export default function AdminDashboard() {
                       <td className="p-4 text-right">
                         <div className="flex justify-end gap-2">
                           <button
-                            onClick={() => setEditingUser(u)}
+                            onClick={() => openEditModal(u)}
                             className="text-cyan-400 hover:text-white bg-cyan-950 hover:bg-cyan-600 border border-cyan-800 hover:border-cyan-500 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
                           >
                             Manage
@@ -444,7 +447,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* MODAL: EDIT USER (FULL MANAGEMENT) */}
+        {/* MODAL: EDIT USER (STAGED EDITING) */}
         {editingUser && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-gray-800 rounded-2xl border border-cyan-500/30 p-8 w-full max-w-lg shadow-2xl relative">
@@ -466,9 +469,14 @@ export default function AdminDashboard() {
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => handleUpdateUserSystem("COMMERCIAL")}
+                      onClick={() =>
+                        setPendingUpdates((prev) => ({
+                          ...prev,
+                          creditSystem: "COMMERCIAL",
+                        }))
+                      }
                       className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-all ${
-                        editingUser.creditSystem === "COMMERCIAL"
+                        pendingUpdates.creditSystem === "COMMERCIAL"
                           ? "bg-green-600 border-green-500 text-white"
                           : "bg-gray-800 border-gray-600 text-gray-400"
                       }`}
@@ -477,9 +485,14 @@ export default function AdminDashboard() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleUpdateUserSystem("INTERNAL")}
+                      onClick={() =>
+                        setPendingUpdates((prev) => ({
+                          ...prev,
+                          creditSystem: "INTERNAL",
+                        }))
+                      }
                       className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-all ${
-                        editingUser.creditSystem === "INTERNAL"
+                        pendingUpdates.creditSystem === "INTERNAL"
                           ? "bg-purple-600 border-purple-500 text-white"
                           : "bg-gray-800 border-gray-600 text-gray-400"
                       }`}
@@ -489,7 +502,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* 2. ROLE MANAGEMENT (NEW) */}
+                {/* 2. ROLE MANAGEMENT */}
                 <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700">
                   <label className="block text-xs uppercase text-gray-400 font-bold mb-3">
                     Security Role
@@ -497,9 +510,11 @@ export default function AdminDashboard() {
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => handleUpdateRole("USER")}
+                      onClick={() =>
+                        setPendingUpdates((prev) => ({ ...prev, role: "USER" }))
+                      }
                       className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-all ${
-                        editingUser.role !== "ADMIN"
+                        pendingUpdates.role !== "ADMIN"
                           ? "bg-gray-700 border-gray-500 text-white"
                           : "bg-gray-800 border-gray-600 text-gray-400"
                       }`}
@@ -508,9 +523,14 @@ export default function AdminDashboard() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleUpdateRole("ADMIN")}
+                      onClick={() =>
+                        setPendingUpdates((prev) => ({
+                          ...prev,
+                          role: "ADMIN",
+                        }))
+                      }
                       className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-all ${
-                        editingUser.role === "ADMIN"
+                        pendingUpdates.role === "ADMIN"
                           ? "bg-red-600 border-red-500 text-white"
                           : "bg-gray-800 border-gray-600 text-gray-400"
                       }`}
@@ -520,17 +540,19 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* 3. BALANCE */}
-                <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700 text-center">
-                  <div className="text-sm text-gray-400 mb-2">
-                    Current Balance
-                  </div>
-                  <div className="text-4xl font-bold text-yellow-400 mb-4">
-                    {editingUser.creditBalance}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    Use quick top-up buttons on the main list to add funds.
-                  </div>
+                {/* 3. SAVE BUTTON (NEW) */}
+                <div className="pt-4 border-t border-gray-700">
+                  <button
+                    onClick={handleSaveChanges}
+                    disabled={actionLoading}
+                    className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                  >
+                    {actionLoading ? (
+                      <LoadingSpinner size="sm" variant="light" />
+                    ) : (
+                      "Save Changes"
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
