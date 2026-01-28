@@ -4,6 +4,7 @@ import { apiEndpoints } from "../lib/api";
 import { DriftFrameExtractor } from "./DriftFrameExtractor";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { ProgressBar } from "./ProgressBar";
+import picdriftLogo from "../assets/picdrift.png";
 
 interface Asset {
   id: string;
@@ -19,7 +20,7 @@ interface EditAssetModalProps {
   initialVideoUrl?: string;
 }
 
-type EditorMode = "standard" | "pro" | "drift";
+type EditorMode = "standard" | "pro" | "drift" | "convert";
 
 interface DriftPreset {
   label: string;
@@ -65,6 +66,12 @@ export function EditAssetModal({
   const [referenceAsset, setReferenceAsset] = useState<Asset | null>(null);
   const [showRefSelector, setShowRefSelector] = useState(false);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
+
+  // Convert Tab State
+  const [convertTargetRatio, setConvertTargetRatio] = useState<
+    "16:9" | "9:16" | "1:1"
+  >("16:9");
+  const [convertMode, setConvertMode] = useState<"auto" | "custom">("auto");
 
   // Drift State
   const [driftParams, setDriftParams] = useState({
@@ -143,12 +150,12 @@ export function EditAssetModal({
 
   // === MUTATION 1: TEXT EDIT ===
   const textEditMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (customRatio?: string) => {
       return apiEndpoints.editAsset({
         assetId: currentAsset.id,
         assetUrl: currentAsset.url,
         prompt: prompt,
-        aspectRatio: "original",
+        aspectRatio: customRatio || "original",
         referenceUrl: referenceAsset?.url,
         mode: activeTab as "standard" | "pro",
       });
@@ -173,7 +180,7 @@ export function EditAssetModal({
     onSettled: () => setIsEnhancing(false),
   });
 
-  // === MUTATION 3: RATIO CONVERSION (New Feature) ===
+  // === MUTATION 3: RATIO CONVERSION (Auto Only) ===
   const ratioMutation = useMutation({
     mutationFn: async (targetRatio: string) => {
       // 1. Fetch current image as Blob
@@ -181,13 +188,12 @@ export function EditAssetModal({
       const blob = await response.blob();
       const file = new File([blob], "convert.jpg", { type: "image/jpeg" });
 
-      // 2. Upload to Sync Endpoint (same logic as Library Tabs)
+      // 2. Upload to Sync Endpoint
       const formData = new FormData();
       formData.append("image", file);
       formData.append("raw", "false"); // Force Processing
       formData.append("aspectRatio", targetRatio);
 
-      // Keep lineage if possible
       if (currentAsset.originalAssetId) {
         formData.append("originalAssetId", currentAsset.originalAssetId);
       } else {
@@ -313,6 +319,17 @@ export function EditAssetModal({
     if (e.target.files?.[0]) uploadRefMutation.mutate(e.target.files[0]);
   };
 
+  // Handle Convert Action
+  const handleConvertAction = () => {
+    if (convertMode === "auto") {
+      ratioMutation.mutate(convertTargetRatio);
+    } else {
+      // Custom prompt convert uses Text Edit mutation but with target ratio
+      if (!prompt.trim()) return alert("Please enter a prompt");
+      textEditMutation.mutate(convertTargetRatio);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 p-4 backdrop-blur-md">
       <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-6xl flex flex-col md:flex-row overflow-hidden shadow-2xl h-[90vh] relative">
@@ -357,25 +374,27 @@ export function EditAssetModal({
                 </button>
               </div>
 
-              {referenceAsset && activeTab !== "drift" && (
-                <div className="absolute bottom-4 right-4 w-32 border-2 border-purple-500 rounded-lg overflow-hidden bg-gray-800 shadow-2xl z-20">
-                  <div className="relative aspect-video">
-                    <img
-                      src={referenceAsset.url}
-                      className="w-full h-full object-cover opacity-90"
-                    />
-                    <button
-                      onClick={() => setReferenceAsset(null)}
-                      className="absolute top-1 right-1 bg-red-600/80 text-white w-5 h-5 flex items-center justify-center text-xs rounded-full hover:bg-red-500"
-                    >
-                      ✕
-                    </button>
+              {referenceAsset &&
+                activeTab !== "drift" &&
+                activeTab !== "convert" && (
+                  <div className="absolute bottom-4 right-4 w-32 border-2 border-purple-500 rounded-lg overflow-hidden bg-gray-800 shadow-2xl z-20">
+                    <div className="relative aspect-video">
+                      <img
+                        src={referenceAsset.url}
+                        className="w-full h-full object-cover opacity-90"
+                      />
+                      <button
+                        onClick={() => setReferenceAsset(null)}
+                        className="absolute top-1 right-1 bg-red-600/80 text-white w-5 h-5 flex items-center justify-center text-xs rounded-full hover:bg-red-500"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="bg-purple-900/90 text-[8px] text-center py-0.5 text-white font-bold tracking-wide">
+                      REFERENCE
+                    </div>
                   </div>
-                  <div className="bg-purple-900/90 text-[8px] text-center py-0.5 text-white font-bold tracking-wide">
-                    REFERENCE
-                  </div>
-                </div>
-              )}
+                )}
 
               {isProcessing && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30 backdrop-blur-sm">
@@ -412,6 +431,7 @@ export function EditAssetModal({
               {[
                 { id: "standard", label: "Standard", icon: "⚡" },
                 { id: "pro", label: "Pro", icon: "🧠" },
+                { id: "convert", label: "Convert", icon: "📐" },
                 { id: "drift", label: "Drift", icon: "🌀" },
               ].map((mode) => (
                 <button
@@ -430,80 +450,116 @@ export function EditAssetModal({
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {/* 1. ACTIONS: Analyze / Enhance */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => analyzeMutation.mutate()}
-                disabled={isAnalyzing || isProcessing || isEnhancing}
-                className="flex-1 text-xs bg-gray-800 text-cyan-300 px-3 py-2 rounded-lg border border-cyan-500/30 hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
-              >
-                <span>🔍</span> {isAnalyzing ? "Scanning..." : "Analyze"}
-              </button>
+            {/* ACTIONS: Analyze / Enhance (Only for Std/Pro) */}
+            {activeTab !== "drift" && activeTab !== "convert" && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => analyzeMutation.mutate()}
+                  disabled={isAnalyzing || isProcessing || isEnhancing}
+                  className="flex-1 text-xs bg-gray-800 text-cyan-300 px-3 py-2 rounded-lg border border-cyan-500/30 hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <span>🔍</span> {isAnalyzing ? "Scanning..." : "Analyze"}
+                </button>
 
-              <button
-                onClick={() => enhanceMutation.mutate()}
-                disabled={isAnalyzing || isProcessing || isEnhancing}
-                className="flex-1 text-xs bg-gradient-to-r from-amber-600/20 to-orange-600/20 text-orange-300 px-3 py-2 rounded-lg border border-orange-500/30 hover:bg-orange-900/20 transition-colors flex items-center justify-center gap-2"
-              >
-                {isEnhancing ? (
-                  <LoadingSpinner size="sm" variant="light" />
-                ) : (
-                  <span>✨ Enhance</span>
-                )}
-              </button>
-            </div>
+                <button
+                  onClick={() => enhanceMutation.mutate()}
+                  disabled={isAnalyzing || isProcessing || isEnhancing}
+                  className="flex-1 text-xs bg-gradient-to-r from-amber-600/20 to-orange-600/20 text-orange-300 px-3 py-2 rounded-lg border border-orange-500/30 hover:bg-orange-900/20 transition-colors flex items-center justify-center gap-2"
+                >
+                  {isEnhancing ? (
+                    <LoadingSpinner size="sm" variant="light" />
+                  ) : (
+                    <span>✨ Enhance</span>
+                  )}
+                </button>
+              </div>
+            )}
 
-            {/* ✅ NEW: RATIO CONVERSION BUTTONS */}
-            {activeTab !== "drift" && (
-              <div className="space-y-2 pb-4 border-b border-gray-800">
-                <label className="text-xs font-bold text-purple-300 uppercase tracking-wider">
-                  Quick Convert
-                </label>
-
-                {/* ✅ UX FIX: Show Loader when converting */}
-                {isConverting ? (
-                  <div className="w-full py-2 bg-gray-800 rounded-lg flex items-center justify-center gap-2 border border-cyan-500/30 animate-pulse">
-                    <LoadingSpinner size="sm" variant="default" />
-                    <span className="text-xs text-cyan-400 font-bold">
-                      Converting Your Image...
-                    </span>
+            {/* CONVERT UI */}
+            {activeTab === "convert" && (
+              <div className="space-y-6 animate-in fade-in">
+                {/* 1. Select Ratio */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    Destination Ratio
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: "16:9", label: "Landscape" },
+                      { id: "9:16", label: "Portrait" },
+                      { id: "1:1", label: "Square" },
+                    ].map((ratio) => (
+                      <button
+                        key={ratio.id}
+                        onClick={() => setConvertTargetRatio(ratio.id as any)}
+                        className={`py-3 text-xs font-bold rounded-lg border transition-all ${
+                          convertTargetRatio === ratio.id
+                            ? "bg-purple-600 border-purple-500 text-white"
+                            : "bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500"
+                        }`}
+                      >
+                        {ratio.label}
+                      </button>
+                    ))}
                   </div>
-                ) : (
-                  <div className="flex gap-2">
-                    {currentAsset.aspectRatio !== "16:9" && (
-                      <button
-                        onClick={() => ratioMutation.mutate("16:9")}
-                        disabled={isProcessing}
-                        className="flex-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 py-2 rounded-lg border border-gray-700 hover:border-cyan-500/50 transition-colors"
-                      >
-                        Landscape
-                      </button>
-                    )}
-                    {currentAsset.aspectRatio !== "9:16" && (
-                      <button
-                        onClick={() => ratioMutation.mutate("9:16")}
-                        disabled={isProcessing}
-                        className="flex-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 py-2 rounded-lg border border-gray-700 hover:border-cyan-500/50 transition-colors"
-                      >
-                        Portrait
-                      </button>
-                    )}
-                    {currentAsset.aspectRatio !== "1:1" && (
-                      <button
-                        onClick={() => ratioMutation.mutate("1:1")}
-                        disabled={isProcessing}
-                        className="flex-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 py-2 rounded-lg border border-gray-700 hover:border-cyan-500/50 transition-colors"
-                      >
-                        Square
-                      </button>
-                    )}
+                </div>
+
+                {/* 2. Mode Select */}
+                <div className="bg-gray-800/50 p-1 rounded-lg flex border border-gray-700">
+                  <button
+                    onClick={() => setConvertMode("auto")}
+                    className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${
+                      convertMode === "auto"
+                        ? "bg-gray-700 text-white shadow-sm"
+                        : "text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    ⚡ Auto Convert
+                  </button>
+                  <button
+                    onClick={() => setConvertMode("custom")}
+                    className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${
+                      convertMode === "custom"
+                        ? "bg-gray-700 text-white shadow-sm"
+                        : "text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    ✏️ Custom Prompt
+                  </button>
+                </div>
+
+                {/* 3. Custom Prompt Input */}
+                {convertMode === "custom" && (
+                  <div className="animate-in slide-in-from-top-2">
+                    <textarea
+                      className="w-full h-24 bg-gray-800 border border-gray-700 rounded-xl p-3 text-sm text-white focus:ring-2 focus:ring-purple-500 outline-none resize-none leading-relaxed placeholder-gray-500"
+                      placeholder="e.g. 'Expand the sky and add clouds'"
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                    />
                   </div>
                 )}
+
+                {/* 4. Action Button */}
+                <button
+                  onClick={handleConvertAction}
+                  disabled={isProcessing || isConverting}
+                  className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isConverting ? (
+                    <>
+                      <LoadingSpinner size="sm" variant="light" />
+                      <span>Converting...</span>
+                    </>
+                  ) : (
+                    <span>🔄 Convert to {convertTargetRatio}</span>
+                  )}
+                </button>
               </div>
             )}
 
             {/* STANDARD / PRO UI */}
-            {activeTab !== "drift" && (
+            {(activeTab === "standard" || activeTab === "pro") && (
               <>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
@@ -568,6 +624,28 @@ export function EditAssetModal({
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* Prompt Box */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-end">
+                    <label className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
+                      Instruction
+                    </label>
+                  </div>
+                  <textarea
+                    className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none leading-relaxed placeholder-gray-500"
+                    placeholder="e.g. 'Make it night time', 'Add neon lights'..."
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    disabled={isProcessing}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        if (prompt.trim()) textEditMutation.mutate(undefined);
+                      }
+                    }}
+                  />
                 </div>
               </>
             )}
@@ -686,37 +764,30 @@ export function EditAssetModal({
                     </div>
                   </div>
                 </div>
+
+                {/* Prompt Box */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-end">
+                    <label className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
+                      Subject Description (Optional)
+                    </label>
+                  </div>
+                  <textarea
+                    className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none leading-relaxed placeholder-gray-500"
+                    placeholder="e.g. 'A silver robot' (Helps maintain identity)"
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    disabled={isProcessing}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        driftStartMutation.mutate();
+                      }
+                    }}
+                  />
+                </div>
               </div>
             )}
-
-            {/* Prompt Box */}
-            <div className="space-y-3">
-              <div className="flex justify-between items-end">
-                <label className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
-                  {activeTab === "drift"
-                    ? "Subject Description (Optional)"
-                    : "Instruction"}
-                </label>
-              </div>
-              <textarea
-                className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none leading-relaxed placeholder-gray-500"
-                placeholder={
-                  activeTab === "drift"
-                    ? "e.g. 'A silver robot' (Helps maintain identity)"
-                    : "e.g. 'Make it night time', 'Add neon lights'..."
-                }
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                disabled={isProcessing}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    if (activeTab === "drift") driftStartMutation.mutate();
-                    else if (prompt.trim()) textEditMutation.mutate();
-                  }
-                }}
-              />
-            </div>
           </div>
 
           {/* FOOTER */}
@@ -725,30 +796,45 @@ export function EditAssetModal({
               <button
                 onClick={() => driftStartMutation.mutate()}
                 disabled={isProcessing || !!driftPostId}
-                className="w-full py-4 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-4 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-3"
               >
                 {isProcessing ? (
                   "Processing Path..."
                 ) : (
-                  <span>🌀 Generate Path</span>
+                  <>
+                    <img src={picdriftLogo} alt="Logo" className="h-5 w-auto" />
+                    <span>Generate Path</span>
+                  </>
                 )}
+              </button>
+            ) : activeTab === "convert" ? (
+              // Convert button handled in Convert UI block
+              <button
+                onClick={onClose}
+                disabled={isProcessing}
+                className="w-full py-2 text-gray-500 hover:text-white text-sm"
+              >
+                Cancel
               </button>
             ) : (
               <button
-                onClick={() => textEditMutation.mutate()}
+                onClick={() => textEditMutation.mutate(undefined)}
                 disabled={!prompt.trim() || isProcessing}
                 className="w-full py-4 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isProcessing ? "Refining..." : <span>Apply Edit</span>}
               </button>
             )}
-            <button
-              onClick={onClose}
-              disabled={isProcessing}
-              className="w-full py-2 text-gray-500 hover:text-white text-sm"
-            >
-              Save & Close
-            </button>
+
+            {activeTab !== "convert" && (
+              <button
+                onClick={onClose}
+                disabled={isProcessing}
+                className="w-full py-2 text-gray-500 hover:text-white text-sm"
+              >
+                Save & Close
+              </button>
+            )}
           </div>
         </div>
       </div>

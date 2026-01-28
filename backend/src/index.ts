@@ -26,7 +26,9 @@ const PORT = process.env.PORT || 4000;
 
 // === ADMIN CONFIGURATION ===
 const ADMIN_EMAILS_RAW = process.env.ADMIN_EMAILS || "snowfix07@gmail.com";
-const ADMIN_EMAILS = ADMIN_EMAILS_RAW.split(",").map((email) => email.trim());
+const ADMIN_EMAILS = ADMIN_EMAILS_RAW.split(",").map((email) =>
+  email.trim().toLowerCase(),
+);
 
 const allowedOrigins = ["https://picdrift.studio", "http://localhost:5173"];
 if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL);
@@ -45,7 +47,7 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.get("/", (req, res) => {
   res.json({
     message: "Visionlight FX Backend - Stable",
-    version: "4.5.0",
+    version: "4.6.0", // Bumped version for Role Support
     status: "Healthy",
   });
 });
@@ -77,16 +79,22 @@ const authenticateToken = async (
   }
 };
 
-// ==================== ADMIN MIDDLEWARE ====================
+// ==================== ADMIN MIDDLEWARE (UPDATED) ====================
 const requireAdmin = (
   req: AuthenticatedRequest,
   res: Response,
   next: NextFunction,
 ) => {
-  if (!req.user?.email || !ADMIN_EMAILS.includes(req.user.email)) {
+  // ✅ Check Database Role OR Super Admin Email List
+  const isDbAdmin = req.user?.role === "ADMIN";
+  const isSuperAdmin =
+    req.user?.email && ADMIN_EMAILS.includes(req.user.email.toLowerCase());
+
+  if (isDbAdmin || isSuperAdmin) {
+    next();
+  } else {
     return res.status(403).json({ error: "Access Denied: Admins only." });
   }
-  next();
 };
 
 // ==================== NOTIFICATION ROUTES ====================
@@ -180,7 +188,8 @@ app.put(
   requireAdmin,
   async (req: AuthenticatedRequest, res) => {
     const { userId } = req.params;
-    const { creditBalance, addCredits, creditSystem, name } = req.body;
+    // ✅ ADDED 'role' here so we can update it
+    const { creditBalance, addCredits, creditSystem, name, role } = req.body;
 
     try {
       if (addCredits) {
@@ -192,6 +201,9 @@ app.put(
       const otherUpdates: any = {};
       if (creditSystem) otherUpdates.creditSystem = creditSystem;
       if (name) otherUpdates.name = name;
+
+      // ✅ ADDED: Update Role if provided
+      if (role) otherUpdates.role = role;
 
       if (Object.keys(otherUpdates).length > 0) {
         await airtableService.adminUpdateUser(userId, otherUpdates);

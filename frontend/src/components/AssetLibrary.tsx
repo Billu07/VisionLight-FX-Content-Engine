@@ -74,26 +74,29 @@ export function AssetLibrary({
     refetchIntervalInBackground: true,
   });
 
-  // ✅ FILTER LOGIC
+  // ✅ REFINED FILTER LOGIC
   const filteredAssets = Array.isArray(assets)
     ? assets.filter((a: Asset) => {
         if (activeTab === "VIDEO") return a.type === "VIDEO";
 
-        // Originals Tab
+        // Originals Tab: STRICTLY raw uploads (no parent)
         if (activeTab === "original") {
           return (
             a.type === "IMAGE" &&
-            (a.aspectRatio === "original" ||
-              !a.aspectRatio ||
-              a.aspectRatio === "custom")
+            a.aspectRatio === "original" &&
+            !a.originalAssetId // Must be a root asset
           );
         }
 
-        // Custom Tab
+        // Edited/Custom Tab:
+        // 1. Explicit 'custom' ratio
+        // 2. 'original' ratio BUT has a parent (meaning it was edited but size kept)
+        // 3. Weird ratios that aren't the standard 3
         if (activeTab === "custom") {
           return (
             a.type === "IMAGE" &&
             (a.aspectRatio === "custom" ||
+              (a.aspectRatio === "original" && a.originalAssetId) ||
               (a.aspectRatio !== "16:9" &&
                 a.aspectRatio !== "9:16" &&
                 a.aspectRatio !== "1:1" &&
@@ -101,12 +104,12 @@ export function AssetLibrary({
           );
         }
 
-        // Standard Ratios
+        // Standard Ratios (16:9, 9:16, 1:1)
         return a.type === "IMAGE" && a.aspectRatio === activeTab;
       })
     : [];
 
-  // ✅ NAVIGATION HELPERS (Moved up to ensure scope availability)
+  // Navigation Helpers
   const handleNextAsset = () => {
     if (!selectedAsset) return;
     const currentIndex = filteredAssets.findIndex(
@@ -143,7 +146,7 @@ export function AssetLibrary({
     return () => clearInterval(interval);
   }, []);
 
-  // ✅ UPDATED POLLING CLEANUP
+  // Polling Cleanup
   useEffect(() => {
     if (pollingUntil > 0) {
       const checkInterval = setInterval(() => {
@@ -158,7 +161,6 @@ export function AssetLibrary({
     }
   }, [pollingUntil, queryClient]);
 
-  // ✅ Clear skeletons when real assets arrive
   useEffect(() => {
     if (targetAssetCount > 0 && filteredAssets.length >= targetAssetCount) {
       setPollingUntil(0);
@@ -167,7 +169,7 @@ export function AssetLibrary({
     }
   }, [filteredAssets.length, targetAssetCount]);
 
-  // ✅ UPDATED UPLOAD LOGIC
+  // Upload Logic
   const uploadMutation = useMutation({
     mutationFn: async (files: FileList) => {
       const uploadPromises = Array.from(files).map(async (file) => {
@@ -275,7 +277,6 @@ export function AssetLibrary({
     }
   };
 
-  // ✅ GO TO ORIGINAL LOGIC
   const handleGoToOriginal = () => {
     if (!selectedAsset || !selectedAsset.originalAssetId) return;
     const original = assets.find(
@@ -290,7 +291,6 @@ export function AssetLibrary({
     }
   };
 
-  // ✅ GO TO PROCESSED LOGIC
   const handleGoToProcessed = () => {
     if (
       !selectedAsset ||
@@ -346,10 +346,10 @@ export function AssetLibrary({
         <div className="p-6 bg-gray-800/50 flex flex-col md:flex-row gap-4 items-center justify-between border-b border-gray-800">
           <div className="flex bg-gray-950 p-1 rounded-lg border border-gray-700 overflow-x-auto">
             {[
+              { id: "original", label: "Originals" },
               { id: "16:9", label: "Landscape" },
               { id: "9:16", label: "Portrait" },
               { id: "1:1", label: "Square" },
-              { id: "original", label: "Originals" },
               { id: "custom", label: "Edited" },
               { id: "VIDEO", label: "Drift Paths" },
             ].map((tab) => (
@@ -408,7 +408,7 @@ export function AssetLibrary({
             </div>
           ) : (
             <div className="grid gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {/* ✅ SKELETON CARDS */}
+              {/* SKELETON CARDS */}
               {pollingUntil > 0 &&
                 Array.from({ length: processingCount }).map((_, i) => (
                   <div
@@ -494,7 +494,7 @@ export function AssetLibrary({
           <div className="relative bg-gray-900 border border-gray-700 rounded-2xl max-w-6xl w-full h-[85vh] flex overflow-hidden shadow-2xl z-10">
             {/* LEFT: IMAGE PREVIEW */}
             <div className="flex-1 bg-black flex items-center justify-center p-8 border-r border-gray-800 relative group">
-              {/* ✅ UNIFIED OVERLAY CONTROLS (Top Right) */}
+              {/* UNIFIED OVERLAY CONTROLS */}
               <div className="absolute top-4 right-4 z-20 flex gap-2">
                 <button
                   onClick={handleGoToOriginal}
