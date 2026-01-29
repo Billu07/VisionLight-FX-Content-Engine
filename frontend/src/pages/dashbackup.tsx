@@ -16,9 +16,7 @@ import { DriftFrameExtractor } from "../components/DriftFrameExtractor";
 
 // Import your logo images
 import picdriftLogo from "../assets/picdrift.png";
-
-// === CONFIGURATION ===
-const ADMIN_EMAILS = ["snowfix07@gmail.com", "keith@picdrift.com"];
+import fxLogo from "../assets/fx.png";
 
 type EngineType = "kie" | "studio" | "openai";
 type StudioMode = "image" | "carousel" | "edit";
@@ -49,36 +47,43 @@ function Dashboard() {
   const [studioMode, setStudioMode] = useState<StudioMode>("image");
 
   // Kie AI (Video FX & PicDrift)
-  const [kieDuration, setKieDuration] = useState<5 | 10 | 15>(5);
-  const [kieResolution, setKieResolution] = useState<"720p" | "1080p">("720p");
+  // ✅ UPDATED DEFAULT: 15s
+  const [kieDuration, setKieDuration] = useState<5 | 10 | 15>(15);
+  // ✅ UPDATED DEFAULT: 1080p
+  const [kieResolution, setKieResolution] = useState<"720p" | "1080p">("1080p");
 
-  // ✅ CHANGED: Added "square" to type and set default to "portrait"
+  // ✅ UPDATED DEFAULT: Portrait
   const [kieAspect, setKieAspect] = useState<
     "landscape" | "portrait" | "square"
   >("portrait");
 
+  // ✅ UPDATED DEFAULT: Pro Model
   const [kieModel, setKieModel] = useState<"kie-sora-2" | "kie-sora-2-pro">(
-    "kie-sora-2"
+    "kie-sora-2-pro",
   );
 
   // Video FX Sub-mode (Video vs PicDrift)
   const [videoFxMode, setVideoFxMode] = useState<"video" | "picdrift">(
-    "picdrift"
+    "picdrift",
   );
 
   // OpenAI (Video FX 2)
-  const [videoDuration, setVideoDuration] = useState<4 | 8 | 12>(4);
+  // ✅ UPDATED DEFAULT: 12s
+  const [videoDuration, setVideoDuration] = useState<4 | 8 | 12>(12);
+  // ✅ UPDATED DEFAULT: Pro Model
   const [videoModel, setVideoModel] = useState<"sora-2" | "sora-2-pro">(
-    "sora-2-pro"
+    "sora-2-pro",
   );
-  const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16">("16:9");
+  // ✅ UPDATED DEFAULT: 9:16 (Portrait)
+  const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16">("9:16");
+  // ✅ UPDATED DEFAULT: Portrait Resolution
   const [videoSize, setVideoSize] = useState<
     "1280x720" | "1792x1024" | "720x1280" | "1024x1792"
-  >("1792x1024");
+  >("1024x1792");
 
   // Studio (Gemini) Aspect Ratio
   const [geminiAspect, setGeminiAspect] = useState<"1:1" | "16:9" | "9:16">(
-    "9:16"
+    "9:16",
   );
 
   // Upload & UI
@@ -118,12 +123,12 @@ function Dashboard() {
   // State for Magic Edit Asset
   const [editingAsset, setEditingAsset] = useState<any | null>(null);
   const [editingVideoUrl, setEditingVideoUrl] = useState<string | undefined>(
-    undefined
+    undefined,
   );
 
   // New State for Extraction (Timeline Scissors)
   const [extractingVideoUrl, setExtractingVideoUrl] = useState<string | null>(
-    null
+    null,
   );
 
   const queryClient = useQueryClient();
@@ -135,8 +140,8 @@ function Dashboard() {
     activeEngine === "studio"
       ? "studio"
       : activeEngine === "kie" && videoFxMode === "picdrift"
-      ? "picdrift"
-      : "videofx";
+        ? "picdrift"
+        : "videofx";
 
   // HANDLER: Open Timeline Video in Drift
   const handleDriftFromPost = (post: any) => {
@@ -203,7 +208,7 @@ function Dashboard() {
       const hasProcessing = currentPosts.some(
         (p: any) =>
           (p.status === "PROCESSING" || p.status === "NEW") &&
-          (p.progress || 0) < 100
+          (p.progress || 0) < 100,
       );
       return hasProcessing ? 5000 : false;
     },
@@ -223,7 +228,7 @@ function Dashboard() {
     queryKey: ["check-jobs"],
     queryFn: async () => {
       const hasActive = posts.some(
-        (p: any) => p.status === "PROCESSING" || p.status === "NEW"
+        (p: any) => p.status === "PROCESSING" || p.status === "NEW",
       );
       if (hasActive) {
         await apiEndpoints.checkActiveJobs();
@@ -232,22 +237,22 @@ function Dashboard() {
     },
     refetchInterval: () => {
       const hasActive = posts.some(
-        (p: any) => p.status === "PROCESSING" || p.status === "NEW"
+        (p: any) => p.status === "PROCESSING" || p.status === "NEW",
       );
       return hasActive ? 5000 : false;
     },
     enabled: !!user && posts.length > 0,
   });
 
+  // ✅ UPDATED CREDIT LOGIC
   // @ts-ignore
   const isCommercial = user?.creditSystem !== "INTERNAL";
   const [isRequesting, setIsRequesting] = useState(false);
   const creditLink = isCommercial
-    ? "https://www.picdrift.com/fx-credits"
-    : "https://www.picdrift.com/fx-request";
-  const creditBtnText = isCommercial ? "Buy Credits" : "Request Credits";
-  const isAdmin =
-    user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase());
+    ? "http://picdrift.com/fx-Credits"
+    : "http://PicDrift.com/fx-request";
+  const creditBtnText = isCommercial ? "Buy Credit" : "Request Credit";
+  const isAdmin = user?.role === "ADMIN";
 
   // === ACTIONS ===
 
@@ -397,7 +402,7 @@ function Dashboard() {
   };
 
   const handleMagicEditUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -431,7 +436,7 @@ function Dashboard() {
 
   const handlePicDriftUpload = (
     e: React.ChangeEvent<HTMLInputElement>,
-    type: "start" | "end"
+    type: "start" | "end",
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -463,7 +468,7 @@ function Dashboard() {
       formData.append("mediaType", "video");
       formData.append("model", kieModel);
       referenceImages.forEach((file) =>
-        formData.append("referenceImages", file)
+        formData.append("referenceImages", file),
       );
       formData.append("duration", kieDuration.toString());
       formData.append("aspectRatio", kieAspect);
@@ -475,7 +480,7 @@ function Dashboard() {
       formData.append("size", videoSize);
       formData.append("aspectRatio", aspectRatio);
       referenceImages.forEach((file) =>
-        formData.append("referenceImages", file)
+        formData.append("referenceImages", file),
       );
     } else {
       formData.append("mediaType", studioMode);
@@ -485,7 +490,7 @@ function Dashboard() {
       formData.append("size", sizeStr);
       formData.append("aspectRatio", geminiAspect);
       referenceImages.forEach((file) =>
-        formData.append("referenceImages", file)
+        formData.append("referenceImages", file),
       );
     }
     return formData;
@@ -524,6 +529,17 @@ function Dashboard() {
     if (activeEngine === "studio") return geminiAspect; // "1:1", "16:9", "9:16"
     return undefined;
   };
+
+  // ✅ HELPER: Header Logic
+  const getHeaderContent = () => {
+    if (currentVisualTab === "picdrift")
+      return { logo: picdriftLogo, text: "Photo to Photo Movement" };
+    if (currentVisualTab === "studio")
+      return { logo: fxLogo, text: "Image Generation" };
+    return { logo: fxLogo, text: "Video Generation" }; // videofx
+  };
+  const { logo: currentLogo, text: currentHeaderText } = getHeaderContent();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900">
       {/* ... MODALS ... */}
@@ -631,10 +647,11 @@ function Dashboard() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="bg-gray-900 rounded-2xl border border-cyan-400/40 shadow-2xl max-w-sm w-full p-6">
             <h3 className="text-lg font-semibold text-white mb-2">
-              Queued Successfully
+              Request Received Successfully
             </h3>
             <p className="text-sm text-purple-200 mb-4">
-              We are processing your request. Check library for updates.
+              Our AI model is now generating your result. Check Timeline for
+              updates.
             </p>
             <div className="flex justify-end">
               <button
@@ -806,7 +823,7 @@ function Dashboard() {
                     disabled={isRequesting}
                     className="px-4 py-2.5 bg-purple-600/20 border border-purple-500/50 rounded-xl text-purple-300 text-sm"
                   >
-                    {isRequesting ? "Sending..." : "Request Credits 🔔"}
+                    {isRequesting ? "Sending..." : "Request Credit 🔔"}
                   </button>
                 )}
                 <button
@@ -835,14 +852,14 @@ function Dashboard() {
                   <div className="flex items-center gap-3 mb-2">
                     <div className="h-12 sm:h-14 flex items-center justify-center">
                       <img
-                        src={picdriftLogo}
-                        alt="PICDRIFT"
+                        src={currentLogo}
+                        alt="LOGO"
                         className="h-full w-auto object-contain"
                       />
                     </div>
                   </div>
                   <p className="text-purple-300 text-sm ml-1">
-                    Create Something Cinematic
+                    {currentHeaderText}
                   </p>
                 </div>
 
@@ -852,7 +869,7 @@ function Dashboard() {
                   onClick={() => {
                     // For PicDrift, open 'Start Frame' slot. For others, open 'Generic'.
                     setActiveLibrarySlot(
-                      currentVisualTab === "picdrift" ? "start" : "generic"
+                      currentVisualTab === "picdrift" ? "start" : "generic",
                     );
                   }}
                   className={`text-xs px-4 py-2 rounded-lg border flex items-center gap-2 transition-all font-semibold shadow-lg ${
@@ -1432,7 +1449,7 @@ function Dashboard() {
                                     setVideoSize(
                                       ratio === "16:9"
                                         ? "1792x1024"
-                                        : "1024x1792"
+                                        : "1024x1792",
                                     );
                                   }}
                                   className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${
@@ -1581,6 +1598,7 @@ function Dashboard() {
                       </div>
                     ) : null}
 
+                    {/* ✅ UPDATED GENERATE BUTTON */}
                     <button
                       type="submit"
                       disabled={
@@ -1592,8 +1610,11 @@ function Dashboard() {
                         <>
                           <LoadingSpinner size="sm" variant="light" />
                           <span>
-                            Starting{" "}
-                            {activeEngine === "studio" ? studioMode : "video"}
+                            {currentVisualTab === "picdrift"
+                              ? "Generating Drift"
+                              : currentVisualTab === "studio"
+                                ? "Painting Your Image"
+                                : "Creating Your Video"}
                             ...
                           </span>
                         </>
@@ -1603,11 +1624,9 @@ function Dashboard() {
                           <span>
                             {currentVisualTab === "picdrift"
                               ? "Generate PicDrift"
-                              : `Generate ${
-                                  activeEngine === "studio"
-                                    ? studioMode
-                                    : "Video"
-                                }`}
+                              : currentVisualTab === "studio"
+                                ? "Generate Image"
+                                : "Generate Video"}
                           </span>
                         </>
                       )}
@@ -1664,7 +1683,7 @@ function Dashboard() {
                     .sort(
                       (a: any, b: any) =>
                         new Date(b.createdAt).getTime() -
-                        new Date(a.createdAt).getTime()
+                        new Date(a.createdAt).getTime(),
                     )
                     .map((post: any) => (
                       <PostCard
@@ -1698,7 +1717,7 @@ function Dashboard() {
                         onDelete={() => {
                           if (
                             confirm(
-                              "Are you sure you want to delete this post?"
+                              "Are you sure you want to delete this post?",
                             )
                           ) {
                             deletePostMutation.mutate(post.id);
