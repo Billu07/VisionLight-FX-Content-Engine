@@ -287,7 +287,7 @@ export default function AdminDashboard() {
               <div className="space-y-6">
                 <div className="space-y-4 bg-gray-950 p-4 rounded-xl border border-gray-800">
                   <h3 className="text-xs font-bold text-pink-500 uppercase tracking-widest border-b border-pink-500/20 pb-2">
-                    PicDrift (Kling 2.5)
+                    PicDrift
                   </h3>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-400">5s Gen</span>
@@ -319,7 +319,7 @@ export default function AdminDashboard() {
 
                 <div className="space-y-4 bg-gray-950 p-4 rounded-xl border border-gray-800">
                   <h3 className="text-xs font-bold text-violet-500 uppercase tracking-widest border-b border-violet-500/20 pb-2">
-                    Pic FX (Studio)
+                    Pic FX
                   </h3>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-400">
@@ -371,7 +371,7 @@ export default function AdminDashboard() {
               <div className="space-y-6">
                 <div className="space-y-4 bg-gray-950 p-4 rounded-xl border border-gray-800">
                   <h3 className="text-xs font-bold text-blue-500 uppercase tracking-widest border-b border-blue-500/20 pb-2">
-                    Video FX 1 (Kling)
+                    Video FX 1
                   </h3>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-400">10s Gen</span>
@@ -403,7 +403,7 @@ export default function AdminDashboard() {
 
                 <div className="space-y-4 bg-gray-950 p-4 rounded-xl border border-gray-800">
                   <h3 className="text-xs font-bold text-cyan-500 uppercase tracking-widest border-b border-cyan-500/20 pb-2">
-                    Video FX 2 (Sora)
+                    Video FX 2
                   </h3>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-400">4s Gen</span>

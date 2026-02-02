@@ -472,7 +472,7 @@ export function EditAssetModal({
                 <button
                   onClick={() => enhanceMutation.mutate()}
                   disabled={isAnalyzing || isProcessing || isEnhancing}
-                  className="..."
+                  className="flex-1 text-xs bg-gradient-to-r from-amber-600/20 to-orange-600/20 text-orange-300 px-3 py-2 rounded-lg border border-orange-500/30 hover:bg-orange-900/20 transition-colors flex items-center justify-center gap-2"
                 >
                   {isEnhancing ? (
                     <LoadingSpinner size="sm" variant="light" />
@@ -555,7 +555,7 @@ export function EditAssetModal({
                 <button
                   onClick={handleConvertAction}
                   disabled={isProcessing || isConverting}
-                  className="..."
+                  className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isConverting ? (
                     <>
@@ -564,7 +564,8 @@ export function EditAssetModal({
                     </>
                   ) : (
                     <span>
-                      🔄 Convert ({credits?.prices?.priceEditor_Convert}
+                      🔄 Convert to {convertTargetRatio} (
+                      {credits?.prices?.priceEditor_Convert}
                       {unit})
                     </span>
                   )}
@@ -810,7 +811,7 @@ export function EditAssetModal({
               <button
                 onClick={() => driftStartMutation.mutate()}
                 disabled={isProcessing || !!driftPostId}
-                className="..."
+                className="w-full py-4 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-3"
               >
                 {isProcessing ? (
                   "Processing Path..."
@@ -837,7 +838,7 @@ export function EditAssetModal({
               <button
                 onClick={() => textEditMutation.mutate(undefined)}
                 disabled={!prompt.trim() || isProcessing}
-                className="..."
+                className="w-full py-4 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isProcessing ? (
                   "Refining..."

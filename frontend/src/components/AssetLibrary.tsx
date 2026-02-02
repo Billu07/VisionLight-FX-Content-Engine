@@ -395,7 +395,7 @@ export function AssetLibrary({
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading || pollingUntil > 0}
-              className="px-6 py-2.5 font-bold rounded-lg bg-white text-black hover:bg-gray-200 flex flex-col items-center justify-center transition-colors"
+              className="px-6 py-2.5 font-bold rounded-lg bg-white text-black hover:bg-gray-200 flex flex-col items-center justify-center transition-colors min-w-[140px]"
             >
               {isUploading ? (
                 <LoadingSpinner size="sm" variant="default" />
@@ -404,8 +404,7 @@ export function AssetLibrary({
                   <div className="flex items-center gap-2">
                     <span>📤</span> Upload
                   </div>
-                  {/* ✅ Shows cost per image for batch processing */}
-                  <span className="text-[8px] opacity-60 uppercase">
+                  <span className="text-[9px] text-gray-500 font-bold uppercase tracking-tighter leading-none mt-1">
                     {credits?.prices?.pricePicFX_Batch}
                     {unit} Per Img
                   </span>

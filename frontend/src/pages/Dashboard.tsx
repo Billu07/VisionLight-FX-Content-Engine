@@ -817,7 +817,7 @@ function Dashboard() {
                   <>
                     {/* PICDRIFT POOL */}
                     <div className="flex items-center gap-2 border-r border-white/10 pr-4">
-                      <span className="text-lg">🌀</span>
+                      <span className="text-lg"></span>
                       <div className="flex flex-col">
                         <span className="text-pink-400 font-bold text-sm leading-none">
                           {formatBal(credits.creditsPicDrift)}
@@ -830,7 +830,7 @@ function Dashboard() {
 
                     {/* PIC FX POOL */}
                     <div className="flex items-center gap-2 border-r border-white/10 pr-4">
-                      <span className="text-lg">🖼️</span>
+                      <span className="text-lg"></span>
                       <div className="flex flex-col">
                         <span className="text-violet-400 font-bold text-sm leading-none">
                           {formatBal(credits.creditsImageFX)}
@@ -843,7 +843,7 @@ function Dashboard() {
 
                     {/* VIDEO FX 1 POOL */}
                     <div className="flex items-center gap-2 border-r border-white/10 pr-4">
-                      <span className="text-lg">🎬</span>
+                      <span className="text-lg"></span>
                       <div className="flex flex-col">
                         <span className="text-blue-400 font-bold text-sm leading-none">
                           {formatBal(credits.creditsVideoFX1)}
@@ -856,7 +856,7 @@ function Dashboard() {
 
                     {/* VIDEO FX 2 POOL */}
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">🎥</span>
+                      <span className="text-lg"></span>
                       <div className="flex flex-col">
                         <span className="text-cyan-400 font-bold text-sm leading-none">
                           {formatBal(credits.creditsVideoFX2)}
