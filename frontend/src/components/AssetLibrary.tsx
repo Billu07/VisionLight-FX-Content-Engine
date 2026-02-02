@@ -354,11 +354,11 @@ export function AssetLibrary({
         <div className="p-6 bg-gray-800/50 flex flex-col md:flex-row gap-4 items-center justify-between border-b border-gray-800">
           <div className="flex bg-gray-950 p-1 rounded-lg border border-gray-700 overflow-x-auto">
             {[
-              { id: "original", label: "Originals" },
               { id: "16:9", label: "Landscape" },
               { id: "9:16", label: "Portrait" },
               { id: "1:1", label: "Square" },
               { id: "custom", label: "Edited" },
+              { id: "original", label: "Originals" },
               { id: "VIDEO", label: "Drift Paths" },
             ].map((tab) => (
               <button
@@ -408,6 +408,7 @@ export function AssetLibrary({
                     {credits?.prices?.pricePicFX_Batch}
                     {unit} Per Img
                   </span>
+                  <span> Max size Limit: 10mb</span>
                 </>
               )}
             </button>
