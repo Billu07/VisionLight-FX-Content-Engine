@@ -408,7 +408,6 @@ export function AssetLibrary({
                     {credits?.prices?.pricePicFX_Batch}
                     {unit} Per Img
                   </span>
-                  <span> Max size Limit: 10mb</span>
                 </>
               )}
             </button>
