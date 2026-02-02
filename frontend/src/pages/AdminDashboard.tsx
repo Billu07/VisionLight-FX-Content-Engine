@@ -204,7 +204,7 @@ export default function AdminDashboard() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/app")}
               className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 transition-colors border border-gray-700"
             >
               ← Back
