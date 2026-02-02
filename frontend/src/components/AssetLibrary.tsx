@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiEndpoints } from "../lib/api";
 import { LoadingSpinner } from "./LoadingSpinner";
+import { useAuth } from "../hooks/useAuth";
 import { EditAssetModal } from "./EditAssetModal";
 import { DriftFrameExtractor } from "./DriftFrameExtractor";
 
@@ -30,6 +31,13 @@ export function AssetLibrary({
 }: AssetLibraryProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { data: credits } = useQuery({
+    queryKey: ["user-credits"],
+    queryFn: async () => (await apiEndpoints.getUserCredits()).data,
+  });
+  const { user } = useAuth();
+  const isCommercial = user?.creditSystem !== "INTERNAL";
+  const unit = isCommercial ? "$" : "pts";
 
   const [activeTab, setActiveTab] = useState<
     "16:9" | "9:16" | "1:1" | "original" | "custom" | "VIDEO"
@@ -387,13 +395,20 @@ export function AssetLibrary({
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading || pollingUntil > 0}
-              className="px-6 py-2.5 font-bold rounded-lg bg-white text-black hover:bg-gray-200 flex items-center gap-2 transition-colors"
+              className="px-6 py-2.5 font-bold rounded-lg bg-white text-black hover:bg-gray-200 flex flex-col items-center justify-center transition-colors"
             >
               {isUploading ? (
                 <LoadingSpinner size="sm" variant="default" />
               ) : (
                 <>
-                  <span>📤</span> Upload
+                  <div className="flex items-center gap-2">
+                    <span>📤</span> Upload
+                  </div>
+                  {/* ✅ Shows cost per image for batch processing */}
+                  <span className="text-[8px] opacity-60 uppercase">
+                    {credits?.prices?.pricePicFX_Batch}
+                    {unit} Per Img
+                  </span>
                 </>
               )}
             </button>

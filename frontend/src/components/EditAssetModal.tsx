@@ -4,6 +4,7 @@ import { apiEndpoints } from "../lib/api";
 import { DriftFrameExtractor } from "./DriftFrameExtractor";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { ProgressBar } from "./ProgressBar";
+import { useAuth } from "../hooks/useAuth";
 import picdriftLogo from "../assets/picdrift.png";
 
 interface Asset {
@@ -47,7 +48,14 @@ export function EditAssetModal({
 }: EditAssetModalProps) {
   const queryClient = useQueryClient();
   const refFileInput = useRef<HTMLInputElement>(null);
-
+  // ✅ Fetch pricing and user info
+  const { data: credits } = useQuery({
+    queryKey: ["user-credits"],
+    queryFn: async () => (await apiEndpoints.getUserCredits()).data,
+  });
+  const { user } = useAuth();
+  const isCommercial = user?.creditSystem !== "INTERNAL";
+  const unit = isCommercial ? "$" : "pts";
   const [history, setHistory] = useState<Asset[]>([initialAsset]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentAsset = history[currentIndex];
@@ -464,12 +472,15 @@ export function EditAssetModal({
                 <button
                   onClick={() => enhanceMutation.mutate()}
                   disabled={isAnalyzing || isProcessing || isEnhancing}
-                  className="flex-1 text-xs bg-gradient-to-r from-amber-600/20 to-orange-600/20 text-orange-300 px-3 py-2 rounded-lg border border-orange-500/30 hover:bg-orange-900/20 transition-colors flex items-center justify-center gap-2"
+                  className="..."
                 >
                   {isEnhancing ? (
                     <LoadingSpinner size="sm" variant="light" />
                   ) : (
-                    <span>✨ Enhance</span>
+                    <span>
+                      Enhance ({credits?.prices?.priceEditor_Enhance}
+                      {unit})
+                    </span>
                   )}
                 </button>
               </div>
@@ -544,7 +555,7 @@ export function EditAssetModal({
                 <button
                   onClick={handleConvertAction}
                   disabled={isProcessing || isConverting}
-                  className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="..."
                 >
                   {isConverting ? (
                     <>
@@ -552,7 +563,10 @@ export function EditAssetModal({
                       <span>Converting...</span>
                     </>
                   ) : (
-                    <span>🔄 Convert to {convertTargetRatio}</span>
+                    <span>
+                      🔄 Convert ({credits?.prices?.priceEditor_Convert}
+                      {unit})
+                    </span>
                   )}
                 </button>
               </div>
@@ -796,14 +810,17 @@ export function EditAssetModal({
               <button
                 onClick={() => driftStartMutation.mutate()}
                 disabled={isProcessing || !!driftPostId}
-                className="w-full py-4 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-3"
+                className="..."
               >
                 {isProcessing ? (
                   "Processing Path..."
                 ) : (
                   <>
                     <img src={picdriftLogo} alt="Logo" className="h-5 w-auto" />
-                    <span>Generate Path</span>
+                    <span>
+                      Generate Path ({credits?.prices?.priceAsset_DriftPath}
+                      {unit})
+                    </span>
                   </>
                 )}
               </button>
@@ -820,9 +837,19 @@ export function EditAssetModal({
               <button
                 onClick={() => textEditMutation.mutate(undefined)}
                 disabled={!prompt.trim() || isProcessing}
-                className="w-full py-4 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                className="..."
               >
-                {isProcessing ? "Refining..." : <span>Apply Edit</span>}
+                {isProcessing ? (
+                  "Refining..."
+                ) : (
+                  <span>
+                    Apply Edit (
+                    {activeTab === "pro"
+                      ? credits?.prices?.priceEditor_Pro
+                      : credits?.prices?.priceEditor_Standard}
+                    {unit})
+                  </span>
+                )}
               </button>
             )}
 
