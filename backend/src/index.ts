@@ -2,7 +2,7 @@ import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import axios from "axios";
 import dotenv from "dotenv";
-import { calculateCost } from "./config/pricing";
+import { calculateGranularCost, getTargetPool } from "./config/pricing";
 import { upload, uploadToCloudinary } from "./utils/fileUpload";
 
 dotenv.config();
@@ -341,12 +341,14 @@ app.get(
       const user = await airtableService.findUserById(req.user!.id);
       if (!user) return res.json({ credits: 0 });
 
+      // ✅ Cast to any to bypass temporary type mismatch
+      const u = user as any;
       res.json({
-        credits: user.creditBalance, // legacy
-        creditsPicDrift: user.creditsPicDrift,
-        creditsImageFX: user.creditsImageFX,
-        creditsVideoFX1: user.creditsVideoFX1,
-        creditsVideoFX2: user.creditsVideoFX2,
+        credits: u.creditBalance,
+        creditsPicDrift: u.creditsPicDrift,
+        creditsImageFX: u.creditsImageFX,
+        creditsVideoFX1: u.creditsVideoFX1,
+        creditsVideoFX2: u.creditsVideoFX2,
       });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch credits" });
@@ -465,11 +467,9 @@ app.post(
       const totalCost = files.length * costPerImg;
 
       if (user!.creditsImageFX < totalCost) {
-        return res
-          .status(403)
-          .json({
-            error: `Need ${totalCost} Image FX credits for this batch.`,
-          });
+        return res.status(403).json({
+          error: `Need ${totalCost} Image FX credits for this batch.`,
+        });
       }
 
       // Deduct total upfront
@@ -879,10 +879,11 @@ app.post(
         settings,
       );
 
-      // 3. Granular Balance Check (Check specific pool instead of generic creditBalance)
-      if (user[pool] < cost) {
+      // 3. Granular Balance Check (Casted to any to fix TS7053)
+      const userAny = user as any;
+      if (userAny[pool] < cost) {
         return res.status(403).json({
-          error: `Insufficient credits in your ${pool.replace("credits", "")} wallet. Required: ${cost}, Current: ${user[pool]}`,
+          error: `Insufficient credits in your ${pool.replace("credits", "")} wallet. Required: ${cost}, Current: ${userAny[pool]}`,
         });
       }
 

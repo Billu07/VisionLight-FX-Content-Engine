@@ -107,7 +107,7 @@ export class AuthService {
 
       // 2. Check Database (Dynamic Role)
       // Note: user.role comes from Prisma. If column doesn't exist yet, this is undefined (falsy).
-      const isDbAdmin = user.role === "ADMIN";
+      const isDbAdmin = (user as any).role === "ADMIN";
 
       // 3. Determine Final Role
       const finalRole = isSuperAdmin || isDbAdmin ? "ADMIN" : "USER";
