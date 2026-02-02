@@ -9,8 +9,27 @@ export type {
   ROIMetrics,
 } from "@prisma/client";
 
-// Map DB Service to match your old Airtable Service exactly
 export const dbService = {
+  // === NEW: GLOBAL SETTINGS (PRICING CONTROL) ===
+  async getGlobalSettings() {
+    let settings = await prisma.globalSettings.findUnique({
+      where: { id: "singleton" },
+    });
+    if (!settings) {
+      settings = await prisma.globalSettings.create({
+        data: { id: "singleton" },
+      });
+    }
+    return settings;
+  },
+
+  async updateGlobalSettings(data: any) {
+    return prisma.globalSettings.update({
+      where: { id: "singleton" },
+      data,
+    });
+  },
+
   // === USER ===
   async findUserByEmail(email: string) {
     return prisma.user.findUnique({ where: { email } });
@@ -20,7 +39,16 @@ export const dbService = {
   },
   async createUser(data: { email: string; name?: string }) {
     return prisma.user.create({
-      data: { ...data, creditBalance: 20, creditSystem: "COMMERCIAL" },
+      data: {
+        ...data,
+        creditBalance: 20, // Keep legacy balance
+        creditsPicDrift: 10,
+        creditsImageFX: 10,
+        creditsVideoFX1: 10,
+        creditsVideoFX2: 10,
+        creditSystem: "COMMERCIAL",
+        role: "USER",
+      },
     });
   },
   async deleteUser(id: string) {
@@ -30,10 +58,22 @@ export const dbService = {
     return prisma.user.findMany({ orderBy: { createdAt: "desc" } });
   },
   async adminUpdateUser(id: string, data: any) {
-    return prisma.user.update({ where: { id }, data });
+    const { addCredits, creditType, ...otherData } = data;
+
+    // Handle Granular Credit Top-ups from the new Admin Panel
+    if (addCredits && creditType) {
+      return prisma.user.update({
+        where: { id },
+        data: {
+          [creditType]: { increment: parseInt(addCredits) },
+          ...otherData,
+        },
+      });
+    }
+    return prisma.user.update({ where: { id }, data: otherData });
   },
 
-  // === CREDITS ===
+  // === CREDITS (Kept Intact for Backward Compatibility) ===
   async deductCredits(id: string, amount: number) {
     return prisma.user.update({
       where: { id },
@@ -50,14 +90,44 @@ export const dbService = {
     return this.addCredits(id, amount);
   },
 
-  // === ASSETS ===
-  // === ASSETS ===
+  // === NEW: GRANULAR CREDIT LOGIC ===
+  async deductGranularCredits(
+    userId: string,
+    pool:
+      | "creditsPicDrift"
+      | "creditsImageFX"
+      | "creditsVideoFX1"
+      | "creditsVideoFX2",
+    amount: number,
+  ) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: { [pool]: { decrement: amount } },
+    });
+  },
+
+  async refundGranularCredits(
+    userId: string,
+    pool:
+      | "creditsPicDrift"
+      | "creditsImageFX"
+      | "creditsVideoFX1"
+      | "creditsVideoFX2",
+    amount: number,
+  ) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: { [pool]: { increment: amount } },
+    });
+  },
+
+  // === ASSETS (Intact) ===
   async createAsset(
     userId: string,
     url: string,
     aspectRatio: string,
     type: string = "IMAGE",
-    originalAssetId?: string, // 👈 NEW PARAMETER
+    originalAssetId?: string,
   ) {
     return prisma.asset.create({
       data: {
@@ -69,15 +139,13 @@ export const dbService = {
       },
     });
   },
-  // === ASSETS ===
   async getUserAssets(userId: string) {
     return prisma.asset.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
-      // ✅ NEW: Include relationships so we know if an asset has a parent or children
       include: {
-        variations: true, // "Children" (Processed versions)
-        originalAsset: true, // "Parent" (Original version)
+        variations: true,
+        originalAsset: true,
       },
     });
   },
@@ -85,7 +153,7 @@ export const dbService = {
     return prisma.asset.delete({ where: { id } });
   },
 
-  // === POSTS ===
+  // === POSTS (Intact) ===
   async createPost(data: any) {
     const script =
       typeof data.script === "string" ? JSON.parse(data.script) : data.script;
@@ -102,7 +170,6 @@ export const dbService = {
         mediaType: data.mediaType,
         mediaProvider: data.mediaProvider,
         platform: data.platform,
-        // ✅ FIX: Use provided status, or default to NEW
         status: data.status || "NEW",
         imageReference: data.imageReference,
         enhancedPrompt: data.enhancedPrompt,
@@ -119,7 +186,6 @@ export const dbService = {
   async getPostById(id: string) {
     return prisma.post.findUnique({ where: { id } });
   },
-  // ✅ UPDATED: Filter out Internal (Drift) jobs from Timeline
   async getUserPosts(userId: string) {
     return prisma.post.findMany({
       where: {
@@ -133,7 +199,7 @@ export const dbService = {
     return prisma.post.update({ where: { id }, data });
   },
 
-  // === CONFIG & ROI ===
+  // === CONFIG & ROI (Restored getROIMetrics) ===
   async getBrandConfig(userId: string) {
     return prisma.brandConfig.findUnique({ where: { userId } });
   },
@@ -151,7 +217,8 @@ export const dbService = {
     }
     return metrics;
   },
-  // Notifications
+
+  // === NOTIFICATIONS (Intact) ===
   async createCreditRequest(userId: string, email: string, name: string) {
     return prisma.creditRequest.create({ data: { userId, email, name } });
   },

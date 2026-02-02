@@ -11,17 +11,61 @@ model User {
   id            String    @id @default(uuid())
   email         String    @unique
   name          String?
+  
+  // 1. Granular Credit Balances (Separate Pools)
+  creditsPicDrift  Int    @default(10)
+  creditsImageFX   Int    @default(10)
+  creditsVideoFX1  Int    @default(10)
+  creditsVideoFX2  Int    @default(10)
+
+  // Keep legacy field for safety/compatibility
   creditBalance Int       @default(20)
-  creditSystem  String    @default("COMMERCIAL")
+
+  creditSystem  String    @default("COMMERCIAL") // COMMERCIAL ($) or INTERNAL (pts)
+  role          String    @default("USER")       // USER or ADMIN
   adminNotes    String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  
   posts         Post[]
   assets        Asset[]
-  role          String    @default("USER")
   brandConfig   BrandConfig?
   roiMetrics    ROIMetrics?
   creditRequests CreditRequest[]
+}
+
+// TOTAL ADMIN CONTROL: Pricing for every parameter in your UI
+model GlobalSettings {
+  id             String @id @default("singleton")
+
+  // --- PICDRIFT (Dashboard) ---
+  pricePicDrift_5s   Int @default(1)
+  pricePicDrift_10s  Int @default(2)
+
+  // --- PIC FX (Dashboard) ---
+  pricePicFX_Standard Int @default(1)
+  pricePicFX_Carousel Int @default(3) 
+  pricePicFX_Batch    Int @default(1) // Per image cost for batch uploads
+
+  // --- VIDEO FX 1 (Dashboard - Kling) ---
+  priceVideoFX1_10s   Int @default(2)
+  priceVideoFX1_15s   Int @default(3)
+
+  // --- VIDEO FX 2 (Dashboard - Sora/OpenAI) ---
+  priceVideoFX2_4s    Int @default(2)
+  priceVideoFX2_8s    Int @default(4)
+  priceVideoFX2_12s   Int @default(6)
+
+  // --- ASSET EDITOR (EditAssetModal) ---
+  priceEditor_Standard Int @default(1)
+  priceEditor_Pro      Int @default(2)
+  priceEditor_Enhance  Int @default(1)
+  priceEditor_Convert  Int @default(1) // Auto/Custom Ratio Conversion
+
+  // --- DRIFT PATH (EditAssetModal) ---
+  priceAsset_DriftPath Int @default(2) // Generate Path button
+
+  updatedAt      DateTime @updatedAt
 }
 
 model Post {

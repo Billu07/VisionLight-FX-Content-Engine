@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
@@ -8,8 +9,30 @@ interface User {
   email: string;
   name: string;
   creditSystem: "COMMERCIAL" | "INTERNAL";
-  creditBalance: number;
+  creditBalance: number; // Legacy
+  creditsPicDrift: number;
+  creditsImageFX: number;
+  creditsVideoFX1: number;
+  creditsVideoFX2: number;
   role?: string;
+}
+
+interface GlobalSettings {
+  pricePicDrift_5s: number;
+  pricePicDrift_10s: number;
+  pricePicFX_Standard: number;
+  pricePicFX_Carousel: number;
+  pricePicFX_Batch: number;
+  priceVideoFX1_10s: number;
+  priceVideoFX1_15s: number;
+  priceVideoFX2_4s: number;
+  priceVideoFX2_8s: number;
+  priceVideoFX2_12s: number;
+  priceEditor_Standard: number;
+  priceEditor_Pro: number;
+  priceEditor_Enhance: number;
+  priceEditor_Convert: number;
+  priceAsset_DriftPath: number;
 }
 
 interface CreditRequest {
@@ -20,26 +43,22 @@ interface CreditRequest {
 }
 
 export default function AdminDashboard() {
-  const { user: adminUser } = useAuth();
+  const { user: adminUser } = useAuth(); // ✅ FIX 1: Used below in header
+  const navigate = useNavigate();
 
   // Data State
   const [users, setUsers] = useState<User[]>([]);
-  const [requests, setRequests] = useState<CreditRequest[]>([]);
+  const [requests, setRequests] = useState<CreditRequest[]>([]); // ✅ FIX 2: Used below in notifications
+  const [settings, setSettings] = useState<GlobalSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
   // UI State
   const [showInviteModal, setShowInviteModal] = useState(false);
-
-  // ✅ STAGED EDITING STATE
-  // 'editingUser' holds the original user
-  // 'pendingUpdates' holds the changes before clicking Save
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [pendingUpdates, setPendingUpdates] = useState<Partial<User>>({});
-
-  // Forms State
   const [newUser, setNewUser] = useState({ email: "", password: "", name: "" });
-  const [actionLoading, setActionLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false); // ✅ FIX 3: Used on buttons
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
@@ -49,13 +68,15 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [usersRes, reqRes] = await Promise.all([
+      const [usersRes, reqRes, settingsRes] = await Promise.all([
         apiEndpoints.adminGetUsers(),
         apiEndpoints.adminGetRequests(),
+        apiEndpoints.adminGetSettings(),
       ]);
 
       if (usersRes.data.success) setUsers(usersRes.data.users);
       if (reqRes.data.success) setRequests(reqRes.data.requests);
+      if (settingsRes.data.success) setSettings(settingsRes.data.settings);
     } catch (err) {
       console.error("Failed to load data", err);
     } finally {
@@ -63,7 +84,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- NOTIFICATION ACTIONS ---
   const handleResolveRequest = async (id: string) => {
     try {
       await apiEndpoints.adminResolveRequest(id);
@@ -73,7 +93,27 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- USER ACTIONS ---
+  const handleUpdateGlobalSettings = async (
+    updatedSettings: Partial<GlobalSettings>,
+  ) => {
+    try {
+      const res = await apiEndpoints.adminUpdateSettings(updatedSettings);
+      if (res.data.success) {
+        setSettings(res.data.settings);
+        setMsg("✅ Pricing updated globally!");
+      }
+    } catch (err: any) {
+      alert("Failed to update settings: " + err.message);
+    }
+  };
+
+  const formatCurrency = (
+    amount: number,
+    system: "COMMERCIAL" | "INTERNAL",
+  ) => {
+    if (system === "COMMERCIAL") return `$${amount}`;
+    return `${amount} pts`;
+  };
 
   const handleInviteUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,40 +132,54 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleAddCredits = async (userId: string, amount: number) => {
+  const handleQuickAddCredits = async (
+    userId: string,
+    type: string,
+    amount: number,
+  ) => {
     setActionLoading(true);
     try {
-      await apiEndpoints.adminUpdateUser(userId, { addCredits: amount });
-      setMsg(`✅ Added ${amount} credits!`);
+      await apiEndpoints.adminUpdateUser(userId, {
+        addCredits: amount,
+        creditType: type,
+      });
+      setMsg(`✅ Added credits successfully!`);
       fetchData();
-      if (editingUser) setEditingUser(null);
     } catch (err: any) {
-      alert("Failed to add credits: " + err.message);
+      alert("Failed: " + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSaveChanges = async () => {
+    if (!editingUser) return;
+    setActionLoading(true);
+    try {
+      await apiEndpoints.adminUpdateUser(editingUser.id, pendingUpdates);
+      setMsg("✅ User updated successfully");
+      setEditingUser(null);
+      fetchData();
+    } catch (err: any) {
+      alert("Failed to save changes: " + err.message);
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleDeleteUser = async (user: User) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to delete ${user.email}? This cannot be undone.`,
-      )
-    ) {
-      return;
-    }
+    if (!window.confirm(`Delete ${user.email}?`)) return;
     setLoading(true);
     try {
       await apiEndpoints.adminDeleteUser(user.id);
-      setMsg(`✅ User ${user.email} deleted.`);
+      setMsg(`✅ User deleted.`);
       fetchData();
     } catch (err: any) {
-      alert("Failed to delete user: " + err.message);
+      alert("Failed: " + err.message);
       setLoading(false);
     }
   };
 
-  // ✅ OPEN MODAL LOGIC
   const openEditModal = (user: User) => {
     setEditingUser(user);
     setPendingUpdates({
@@ -134,26 +188,6 @@ export default function AdminDashboard() {
     });
   };
 
-  // ✅ SAVE CHANGES LOGIC
-  const handleSaveChanges = async () => {
-    if (!editingUser) return;
-    setActionLoading(true);
-
-    try {
-      // Send only the changed fields
-      await apiEndpoints.adminUpdateUser(editingUser.id, pendingUpdates);
-
-      setMsg("✅ User updated successfully");
-      setEditingUser(null);
-      fetchData(); // Refresh list to show new status
-    } catch (err: any) {
-      alert("Failed to save changes: " + err.message);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Filter
   const filteredUsers = users.filter(
     (u) =>
       u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -161,31 +195,38 @@ export default function AdminDashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-6">
+    <div className="min-h-screen bg-gray-950 text-white p-4 sm:p-8">
       <div className="max-w-7xl mx-auto">
-        {/* HEADER */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-cyan-400">
-              Admin Dashboard
-            </h1>
-            <p className="text-sm text-gray-400">
-              Logged in as: {adminUser?.email}
-            </p>
+        {/* TOP NAVIGATION & HEADER */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 transition-colors border border-gray-700"
+            >
+              ← Back
+            </button>
+            <div>
+              <h1 className="text-3xl font-bold text-cyan-400">Admin Panel</h1>
+              {/* ✅ Uses adminUser */}
+              <p className="text-sm text-gray-500">
+                Logged in as: {adminUser?.email}
+              </p>
+            </div>
           </div>
 
           <div className="flex gap-4 w-full md:w-auto">
             <input
               placeholder="Search users..."
-              className="bg-gray-800 border border-gray-700 rounded-lg p-3 w-full md:w-64 focus:ring-2 focus:ring-cyan-500 outline-none"
+              className="bg-gray-900 border border-gray-800 rounded-xl p-3 w-full md:w-64 focus:ring-2 focus:ring-cyan-500 outline-none"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
             <button
               onClick={() => setShowInviteModal(true)}
-              className="bg-green-600 hover:bg-green-500 text-white font-bold px-6 py-3 rounded-lg transition-all shadow-lg shadow-green-900/20 whitespace-nowrap"
+              className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-6 py-3 rounded-xl transition-all shadow-lg"
             >
-              + Invite User
+              + New User
             </button>
           </div>
         </div>
@@ -193,23 +234,18 @@ export default function AdminDashboard() {
         {/* ALERTS */}
         {msg && (
           <div
-            className={`mb-6 p-4 rounded-lg border ${
+            className={`mb-6 p-4 rounded-xl border flex justify-between items-center ${
               msg.startsWith("✅")
                 ? "bg-green-900/20 border-green-500/30 text-green-300"
                 : "bg-red-900/20 border-red-500/30 text-red-300"
             }`}
           >
-            {msg}
-            <button
-              onClick={() => setMsg("")}
-              className="float-right font-bold ml-4"
-            >
-              ✕
-            </button>
+            <span>{msg}</span>
+            <button onClick={() => setMsg("")}>✕</button>
           </div>
         )}
 
-        {/* NOTIFICATIONS */}
+        {/* ✅ FIX 2: Added Pending Requests Block back (Uses 'requests') */}
         {requests.length > 0 && (
           <div className="mb-8 bg-purple-900/20 border border-purple-500/30 rounded-xl p-6 animate-in fade-in">
             <h2 className="text-xl font-bold text-purple-300 mb-4 flex items-center gap-2">
@@ -219,71 +255,209 @@ export default function AdminDashboard() {
               {requests.map((req) => (
                 <div
                   key={req.id}
-                  className="flex items-center justify-between bg-gray-800 p-4 rounded-lg border border-gray-700"
+                  className="flex items-center justify-between bg-gray-900 p-4 rounded-lg border border-gray-800"
                 >
                   <div>
                     <span className="font-bold text-white">{req.name}</span>
                     <span className="text-gray-400 text-sm ml-2">
                       ({req.email})
                     </span>
-                    <span className="text-xs text-gray-500 block mt-1">
-                      Requested: {new Date(req.createdAt).toLocaleString()}
-                    </span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => {
-                        setSearchTerm(req.email);
-                        setMsg(
-                          `🔍 Filtered for ${req.email}. Click 'Manage' to grant credits.`,
-                        );
-                      }}
-                      className="text-cyan-400 hover:text-white text-sm underline"
-                    >
-                      Find User
-                    </button>
-                    <button
-                      onClick={() => handleResolveRequest(req.id)}
-                      className="bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded text-xs text-white uppercase font-bold"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => handleResolveRequest(req.id)}
+                    className="bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded text-xs text-white uppercase font-bold"
+                  >
+                    Dismiss
+                  </button>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* USERS TABLE */}
-        <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow-2xl">
+        {/* 1. GLOBAL PRICING CONFIGURATION */}
+        {settings && (
+          <div className="mb-10 bg-gray-900/50 border border-gray-800 rounded-2xl p-6 shadow-xl">
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-cyan-400">
+              ⚙️ Global Pricing Engine
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* PicDrift Section */}
+              <div className="space-y-4 bg-gray-950 p-4 rounded-xl border border-gray-800">
+                <h3 className="text-xs font-bold text-pink-500 uppercase tracking-widest">
+                  PicDrift
+                </h3>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-400">5s Gen</span>
+                  <input
+                    type="number"
+                    className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
+                    value={settings.pricePicDrift_5s}
+                    onChange={(e) =>
+                      handleUpdateGlobalSettings({
+                        pricePicDrift_5s: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-400">10s Gen</span>
+                  <input
+                    type="number"
+                    className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
+                    value={settings.pricePicDrift_10s}
+                    onChange={(e) =>
+                      handleUpdateGlobalSettings({
+                        pricePicDrift_10s: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Pic FX Section */}
+              <div className="space-y-4 bg-gray-950 p-4 rounded-xl border border-gray-800">
+                <h3 className="text-xs font-bold text-violet-500 uppercase tracking-widest">
+                  Pic FX
+                </h3>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-400">Standard</span>
+                  <input
+                    type="number"
+                    className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
+                    value={settings.pricePicFX_Standard}
+                    onChange={(e) =>
+                      handleUpdateGlobalSettings({
+                        pricePicFX_Standard: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-400">Carousel</span>
+                  <input
+                    type="number"
+                    className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
+                    value={settings.pricePicFX_Carousel}
+                    onChange={(e) =>
+                      handleUpdateGlobalSettings({
+                        pricePicFX_Carousel: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-400">Batch (per img)</span>
+                  <input
+                    type="number"
+                    className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
+                    value={settings.pricePicFX_Batch}
+                    onChange={(e) =>
+                      handleUpdateGlobalSettings({
+                        pricePicFX_Batch: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Video FX 1 */}
+              <div className="space-y-4 bg-gray-950 p-4 rounded-xl border border-gray-800">
+                <h3 className="text-xs font-bold text-blue-500 uppercase tracking-widest">
+                  Video FX 1
+                </h3>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-400">10s Gen</span>
+                  <input
+                    type="number"
+                    className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
+                    value={settings.priceVideoFX1_10s}
+                    onChange={(e) =>
+                      handleUpdateGlobalSettings({
+                        priceVideoFX1_10s: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-400">15s Gen</span>
+                  <input
+                    type="number"
+                    className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
+                    value={settings.priceVideoFX1_15s}
+                    onChange={(e) =>
+                      handleUpdateGlobalSettings({
+                        priceVideoFX1_15s: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Video FX 2 */}
+              <div className="space-y-4 bg-gray-950 p-4 rounded-xl border border-gray-800">
+                <h3 className="text-xs font-bold text-cyan-500 uppercase tracking-widest">
+                  Video FX 2
+                </h3>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-400">12s Gen</span>
+                  <input
+                    type="number"
+                    className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
+                    value={settings.priceVideoFX2_12s}
+                    onChange={(e) =>
+                      handleUpdateGlobalSettings({
+                        priceVideoFX2_12s: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-400">Editor (Pro)</span>
+                  <input
+                    type="number"
+                    className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
+                    value={settings.priceEditor_Pro}
+                    onChange={(e) =>
+                      handleUpdateGlobalSettings({
+                        priceEditor_Pro: parseInt(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 2. USER MANAGEMENT TABLE */}
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
-              <thead className="bg-gray-900/50 text-gray-400 text-xs uppercase tracking-wider">
+              <thead className="bg-gray-800/50 text-gray-400 text-[10px] uppercase tracking-widest">
                 <tr>
-                  <th className="p-4 border-b border-gray-700">User Details</th>
-                  <th className="p-4 border-b border-gray-700">System</th>
-                  <th className="p-4 border-b border-gray-700">
-                    Wallet Balance
+                  <th className="p-5 border-b border-gray-800">
+                    User Identity
                   </th>
-                  <th className="p-4 border-b border-gray-700 text-right">
-                    Quick Top-Up
-                  </th>
-                  <th className="p-4 border-b border-gray-700 text-right">
+                  <th className="p-5 border-b border-gray-800">PicDrift</th>
+                  <th className="p-5 border-b border-gray-800">Pic FX</th>
+                  <th className="p-5 border-b border-gray-800">Video FX 1</th>
+                  <th className="p-5 border-b border-gray-800">Video FX 2</th>
+                  <th className="p-5 border-b border-gray-800 text-right">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700">
+              <tbody className="divide-y divide-gray-800">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="p-12 text-center">
+                    <td colSpan={6} className="p-20 text-center">
                       <LoadingSpinner size="lg" variant="neon" />
                     </td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-gray-500">
+                    <td colSpan={6} className="p-20 text-center text-gray-500">
                       No users found.
                     </td>
                   </tr>
@@ -291,77 +465,96 @@ export default function AdminDashboard() {
                   filteredUsers.map((u) => (
                     <tr
                       key={u.id}
-                      className="hover:bg-gray-750 transition-colors"
+                      className="hover:bg-gray-800/30 transition-colors"
                     >
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <div className="font-bold text-white text-base">
-                            {u.name || "Unnamed"}
-                          </div>
+                      <td className="p-5">
+                        <div className="font-bold flex items-center gap-2">
+                          {u.name}{" "}
                           {u.role === "ADMIN" && (
-                            <span className="bg-red-900/50 text-red-300 text-[10px] px-1.5 py-0.5 rounded uppercase font-bold border border-red-500/30">
-                              Admin
+                            <span className="text-[9px] bg-red-900 text-red-200 px-1 rounded">
+                              ADMIN
                             </span>
                           )}
                         </div>
-                        <div className="text-sm text-cyan-400/80">
-                          {u.email}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-bold border ${
-                            u.creditSystem === "COMMERCIAL"
-                              ? "bg-green-500/10 border-green-500/30 text-green-400"
-                              : "bg-purple-500/10 border-purple-500/30 text-purple-300"
-                          }`}
+                        <div className="text-xs text-gray-500">{u.email}</div>
+                        <div
+                          className={`mt-1 text-[9px] font-bold uppercase ${u.creditSystem === "COMMERCIAL" ? "text-green-500" : "text-purple-400"}`}
                         >
                           {u.creditSystem === "COMMERCIAL"
-                            ? "💵 COMMERCIAL"
-                            : "🏢 INTERNAL"}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <span className="text-2xl font-bold text-yellow-400">
-                          {u.creditBalance}
-                        </span>
-                        <span className="text-xs text-gray-500 ml-1">
-                          Credits
-                        </span>
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className="flex justify-end gap-1">
-                          <button
-                            onClick={() => handleAddCredits(u.id, 10)}
-                            className="px-2 py-1 bg-gray-700 hover:bg-green-700 rounded text-xs text-white border border-gray-600"
-                          >
-                            +10
-                          </button>
-                          <button
-                            onClick={() => handleAddCredits(u.id, 50)}
-                            className="px-2 py-1 bg-gray-700 hover:bg-green-700 rounded text-xs text-white border border-gray-600"
-                          >
-                            +50
-                          </button>
-                          <button
-                            onClick={() => handleAddCredits(u.id, 100)}
-                            className="px-2 py-1 bg-gray-700 hover:bg-green-700 rounded text-xs text-white border border-gray-600"
-                          >
-                            +100
-                          </button>
+                            ? "💵 Commercial"
+                            : "🏢 Internal"}
                         </div>
                       </td>
-                      <td className="p-4 text-right">
+
+                      {/* Granular Pools */}
+                      <td className="p-5">
+                        <div className="text-lg font-bold text-pink-400">
+                          {formatCurrency(u.creditsPicDrift, u.creditSystem)}
+                        </div>
+                        <button
+                          disabled={actionLoading}
+                          onClick={() =>
+                            handleQuickAddCredits(u.id, "creditsPicDrift", 10)
+                          }
+                          className="text-[10px] text-gray-600 hover:text-white disabled:opacity-30"
+                        >
+                          +10
+                        </button>
+                      </td>
+                      <td className="p-5">
+                        <div className="text-lg font-bold text-violet-400">
+                          {formatCurrency(u.creditsImageFX, u.creditSystem)}
+                        </div>
+                        <button
+                          disabled={actionLoading}
+                          onClick={() =>
+                            handleQuickAddCredits(u.id, "creditsImageFX", 10)
+                          }
+                          className="text-[10px] text-gray-600 hover:text-white disabled:opacity-30"
+                        >
+                          +10
+                        </button>
+                      </td>
+                      <td className="p-5">
+                        <div className="text-lg font-bold text-blue-400">
+                          {formatCurrency(u.creditsVideoFX1, u.creditSystem)}
+                        </div>
+                        <button
+                          disabled={actionLoading}
+                          onClick={() =>
+                            handleQuickAddCredits(u.id, "creditsVideoFX1", 10)
+                          }
+                          className="text-[10px] text-gray-600 hover:text-white disabled:opacity-30"
+                        >
+                          +10
+                        </button>
+                      </td>
+                      <td className="p-5">
+                        <div className="text-lg font-bold text-cyan-400">
+                          {formatCurrency(u.creditsVideoFX2, u.creditSystem)}
+                        </div>
+                        <button
+                          disabled={actionLoading}
+                          onClick={() =>
+                            handleQuickAddCredits(u.id, "creditsVideoFX2", 10)
+                          }
+                          className="text-[10px] text-gray-600 hover:text-white disabled:opacity-30"
+                        >
+                          +10
+                        </button>
+                      </td>
+
+                      <td className="p-5 text-right">
                         <div className="flex justify-end gap-2">
                           <button
                             onClick={() => openEditModal(u)}
-                            className="text-cyan-400 hover:text-white bg-cyan-950 hover:bg-cyan-600 border border-cyan-800 hover:border-cyan-500 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                            className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs"
                           >
                             Manage
                           </button>
                           <button
                             onClick={() => handleDeleteUser(u)}
-                            className="text-red-400 hover:text-white bg-red-950/50 hover:bg-red-600 border border-red-900 hover:border-red-500 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                            className="p-2 bg-red-900/20 hover:bg-red-600 rounded-lg text-xs text-red-400 hover:text-white"
                           >
                             🗑️
                           </button>
@@ -377,68 +570,55 @@ export default function AdminDashboard() {
 
         {/* MODAL: INVITE USER */}
         {showInviteModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-800 rounded-2xl border border-gray-600 p-8 w-full max-w-md shadow-2xl">
-              <h3 className="text-2xl font-bold mb-6 text-white">
-                Invite New User
-              </h3>
+          <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 w-full max-w-md shadow-2xl">
+              <h3 className="text-xl font-bold mb-6">Invite User</h3>
               <form onSubmit={handleInviteUser} className="space-y-4">
-                <div>
-                  <label className="text-xs uppercase text-gray-400 font-bold">
-                    Email
-                  </label>
-                  <input
-                    className="w-full p-3 bg-gray-900 rounded border border-gray-700 mt-1"
-                    value={newUser.email}
-                    onChange={(e) =>
-                      setNewUser({ ...newUser, email: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-xs uppercase text-gray-400 font-bold">
-                    Full Name
-                  </label>
-                  <input
-                    className="w-full p-3 bg-gray-900 rounded border border-gray-700 mt-1"
-                    value={newUser.name}
-                    onChange={(e) =>
-                      setNewUser({ ...newUser, name: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-xs uppercase text-gray-400 font-bold">
-                    Password
-                  </label>
-                  <input
-                    className="w-full p-3 bg-gray-900 rounded border border-gray-700 mt-1"
-                    value={newUser.password}
-                    onChange={(e) =>
-                      setNewUser({ ...newUser, password: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div className="flex gap-3 mt-6">
+                <input
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-xl focus:ring-1 focus:ring-cyan-500 outline-none"
+                  placeholder="Email"
+                  value={newUser.email}
+                  onChange={(e) =>
+                    setNewUser({ ...newUser, email: e.target.value })
+                  }
+                  required
+                />
+                <input
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-xl focus:ring-1 focus:ring-cyan-500 outline-none"
+                  placeholder="Full Name"
+                  value={newUser.name}
+                  onChange={(e) =>
+                    setNewUser({ ...newUser, name: e.target.value })
+                  }
+                  required
+                />
+                <input
+                  type="password"
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-xl focus:ring-1 focus:ring-cyan-500 outline-none"
+                  placeholder="Password"
+                  value={newUser.password}
+                  onChange={(e) =>
+                    setNewUser({ ...newUser, password: e.target.value })
+                  }
+                  required
+                />
+                <div className="flex gap-4 pt-4">
                   <button
                     type="button"
                     onClick={() => setShowInviteModal(false)}
-                    className="flex-1 py-3 bg-gray-700 rounded hover:bg-gray-600"
+                    className="flex-1 py-3 text-gray-400 hover:text-white transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={actionLoading}
-                    className="flex-1 py-3 bg-green-600 rounded font-bold hover:bg-green-500"
+                    className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 rounded-xl font-bold disabled:opacity-50 flex justify-center"
                   >
                     {actionLoading ? (
                       <LoadingSpinner size="sm" variant="light" />
                     ) : (
-                      "Create User"
+                      "Create"
                     )}
                   </button>
                 </div>
@@ -447,113 +627,85 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* MODAL: EDIT USER (STAGED EDITING) */}
+        {/* MODAL: MANAGE USER */}
         {editingUser && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-800 rounded-2xl border border-cyan-500/30 p-8 w-full max-w-lg shadow-2xl relative">
-              <button
-                onClick={() => setEditingUser(null)}
-                className="absolute top-4 right-4 text-gray-500 hover:text-white"
-              >
-                ✕
-              </button>
-              <h3 className="text-xl font-bold mb-2 text-white">Manage User</h3>
-              <p className="text-sm text-cyan-400 mb-6">{editingUser.email}</p>
+          <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 w-full max-w-lg shadow-2xl">
+              <h3 className="text-xl font-bold mb-1">Manage User</h3>
+              <p className="text-sm text-gray-500 mb-6">{editingUser.email}</p>
 
               <div className="space-y-6">
-                {/* 1. CREDIT SYSTEM */}
-                <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700">
-                  <label className="block text-xs uppercase text-gray-400 font-bold mb-3">
-                    Credit System Mode
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">
+                    Billing Mode
                   </label>
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <button
-                      type="button"
                       onClick={() =>
-                        setPendingUpdates((prev) => ({
-                          ...prev,
+                        setPendingUpdates({
+                          ...pendingUpdates,
                           creditSystem: "COMMERCIAL",
-                        }))
+                        })
                       }
-                      className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-all ${
-                        pendingUpdates.creditSystem === "COMMERCIAL"
-                          ? "bg-green-600 border-green-500 text-white"
-                          : "bg-gray-800 border-gray-600 text-gray-400"
-                      }`}
+                      className={`p-3 rounded-xl border font-bold text-sm transition-all ${pendingUpdates.creditSystem === "COMMERCIAL" ? "bg-green-600 border-green-500" : "bg-gray-950 border-gray-800 text-gray-500"}`}
                     >
-                      💵 Commercial
+                      💵 Commercial ($)
                     </button>
                     <button
-                      type="button"
                       onClick={() =>
-                        setPendingUpdates((prev) => ({
-                          ...prev,
+                        setPendingUpdates({
+                          ...pendingUpdates,
                           creditSystem: "INTERNAL",
-                        }))
+                        })
                       }
-                      className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-all ${
-                        pendingUpdates.creditSystem === "INTERNAL"
-                          ? "bg-purple-600 border-purple-500 text-white"
-                          : "bg-gray-800 border-gray-600 text-gray-400"
-                      }`}
+                      className={`p-3 rounded-xl border font-bold text-sm transition-all ${pendingUpdates.creditSystem === "INTERNAL" ? "bg-purple-600 border-purple-500" : "bg-gray-950 border-gray-800 text-gray-500"}`}
                     >
-                      🏢 Internal
+                      🏢 Internal (pts)
                     </button>
                   </div>
                 </div>
 
-                {/* 2. ROLE MANAGEMENT */}
-                <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700">
-                  <label className="block text-xs uppercase text-gray-400 font-bold mb-3">
-                    Security Role
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">
+                    Permission Level
                   </label>
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <button
-                      type="button"
                       onClick={() =>
-                        setPendingUpdates((prev) => ({ ...prev, role: "USER" }))
+                        setPendingUpdates({ ...pendingUpdates, role: "USER" })
                       }
-                      className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-all ${
-                        pendingUpdates.role !== "ADMIN"
-                          ? "bg-gray-700 border-gray-500 text-white"
-                          : "bg-gray-800 border-gray-600 text-gray-400"
-                      }`}
+                      className={`p-3 rounded-xl border font-bold text-sm transition-all ${pendingUpdates.role === "USER" ? "bg-gray-700 border-gray-600" : "bg-gray-950 border-gray-800 text-gray-500"}`}
                     >
-                      👤 User
+                      👤 Regular User
                     </button>
                     <button
-                      type="button"
                       onClick={() =>
-                        setPendingUpdates((prev) => ({
-                          ...prev,
-                          role: "ADMIN",
-                        }))
+                        setPendingUpdates({ ...pendingUpdates, role: "ADMIN" })
                       }
-                      className={`flex-1 py-2 rounded-lg text-sm font-bold border transition-all ${
-                        pendingUpdates.role === "ADMIN"
-                          ? "bg-red-600 border-red-500 text-white"
-                          : "bg-gray-800 border-gray-600 text-gray-400"
-                      }`}
+                      className={`p-3 rounded-xl border font-bold text-sm transition-all ${pendingUpdates.role === "ADMIN" ? "bg-red-600 border-red-500" : "bg-gray-950 border-gray-800 text-gray-500"}`}
                     >
-                      🛡️ Admin
+                      🛡️ Super Admin
                     </button>
                   </div>
                 </div>
 
-                {/* 3. SAVE BUTTON (NEW) */}
-                <div className="pt-4 border-t border-gray-700">
-                  <button
-                    onClick={handleSaveChanges}
-                    disabled={actionLoading}
-                    className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
-                  >
-                    {actionLoading ? (
-                      <LoadingSpinner size="sm" variant="light" />
-                    ) : (
-                      "Save Changes"
-                    )}
-                  </button>
-                </div>
+                <button
+                  onClick={handleSaveChanges}
+                  disabled={actionLoading}
+                  className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 rounded-xl font-bold shadow-xl transition-all disabled:opacity-50 flex justify-center"
+                >
+                  {actionLoading ? (
+                    <LoadingSpinner size="sm" variant="light" />
+                  ) : (
+                    "Save Changes"
+                  )}
+                </button>
+                <button
+                  onClick={() => setEditingUser(null)}
+                  className="w-full text-gray-500 text-sm hover:text-gray-300"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>

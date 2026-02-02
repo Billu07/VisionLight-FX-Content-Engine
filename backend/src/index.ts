@@ -46,8 +46,8 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 app.get("/", (req, res) => {
   res.json({
-    message: "Visionlight FX Backend - Stable",
-    version: "4.6.0", // Bumped version for Role Support
+    message: "PicDrift Studio FX Backend - Stable",
+    version: "4.7.0", // Bumped version for Role Support
     status: "Healthy",
   });
 });
@@ -96,6 +96,36 @@ const requireAdmin = (
     return res.status(403).json({ error: "Access Denied: Admins only." });
   }
 };
+
+// ==================== GLOBAL PRICING SETTINGS ====================
+
+app.get(
+  "/api/admin/settings",
+  authenticateToken,
+  requireAdmin,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const settings = await airtableService.getGlobalSettings();
+      res.json({ success: true, settings });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+app.put(
+  "/api/admin/settings",
+  authenticateToken,
+  requireAdmin,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const settings = await airtableService.updateGlobalSettings(req.body);
+      res.json({ success: true, settings });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
 
 // ==================== NOTIFICATION ROUTES ====================
 
@@ -188,21 +218,29 @@ app.put(
   requireAdmin,
   async (req: AuthenticatedRequest, res) => {
     const { userId } = req.params;
-    // ✅ ADDED 'role' here so we can update it
-    const { creditBalance, addCredits, creditSystem, name, role } = req.body;
+    // UPDATED: Destructure creditType for pool-specific top-ups
+    const { creditBalance, addCredits, creditType, creditSystem, name, role } =
+      req.body;
 
     try {
-      if (addCredits) {
+      // 1. Handle Credits
+      if (addCredits && creditType) {
+        // New Granular Top-up
+        await airtableService.adminUpdateUser(userId, {
+          addCredits,
+          creditType,
+        });
+      } else if (addCredits) {
+        // Fallback for legacy balance top-up
         await airtableService.addCredits(userId, parseInt(addCredits));
       } else if (creditBalance !== undefined) {
         await airtableService.adminUpdateUser(userId, { creditBalance });
       }
 
+      // 2. Handle Other Profile Updates
       const otherUpdates: any = {};
       if (creditSystem) otherUpdates.creditSystem = creditSystem;
       if (name) otherUpdates.name = name;
-
-      // ✅ ADDED: Update Role if provided
       if (role) otherUpdates.role = role;
 
       if (Object.keys(otherUpdates).length > 0) {
@@ -302,7 +340,14 @@ app.get(
     try {
       const user = await airtableService.findUserById(req.user!.id);
       if (!user) return res.json({ credits: 0 });
-      res.json({ credits: user.creditBalance });
+
+      res.json({
+        credits: user.creditBalance, // legacy
+        creditsPicDrift: user.creditsPicDrift,
+        creditsImageFX: user.creditsImageFX,
+        creditsVideoFX1: user.creditsVideoFX1,
+        creditsVideoFX2: user.creditsVideoFX2,
+      });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch credits" });
     }
@@ -315,9 +360,12 @@ app.post(
   async (req: AuthenticatedRequest, res) => {
     try {
       await airtableService.adminUpdateUser(req.user!.id, {
-        creditBalance: 20,
+        creditsPicDrift: 10,
+        creditsImageFX: 10,
+        creditsVideoFX1: 10,
+        creditsVideoFX2: 10,
       });
-      res.json({ success: true, message: "Demo credits reset to 20" });
+      res.json({ success: true, message: "Demo credits reset to all pools" });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -350,28 +398,45 @@ app.post(
       if (!req.file)
         return res.status(400).json({ error: "No image provided" });
 
-      // ✅ Destructure originalAssetId from body
       const { aspectRatio, raw, originalAssetId } = req.body;
 
-      let asset;
-
       if (raw === "true") {
-        // Raw Mode (V1 Upload)
-        asset = await contentEngine.uploadRawAsset(
+        // Raw Uploads (v1) remain free/standard upload logic
+        const asset = await contentEngine.uploadRawAsset(
           req.file.buffer,
           req.user!.id,
         );
+        return res.json({ success: true, asset });
       } else {
-        // Process Mode (V2 Generation)
-        asset = await contentEngine.processAndSaveAsset(
+        // Process Mode (Ratio Conversion)
+        const [settings, user] = await Promise.all([
+          airtableService.getGlobalSettings(),
+          airtableService.findUserById(req.user!.id),
+        ]);
+
+        const cost = calculateGranularCost(
+          { mediaType: "image", mode: "convert" },
+          settings,
+        );
+        if (user!.creditsImageFX < cost)
+          return res
+            .status(403)
+            .json({ error: "Insufficient Image FX credits" });
+
+        await airtableService.deductGranularCredits(
+          req.user!.id,
+          "creditsImageFX",
+          cost,
+        );
+
+        const asset = await contentEngine.processAndSaveAsset(
           req.file.buffer,
           req.user!.id,
           aspectRatio || "16:9",
-          originalAssetId, // 👈 Pass ID from frontend
+          originalAssetId, // Keep original reference intact
         );
+        res.json({ success: true, asset });
       }
-
-      res.json({ success: true, asset });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -391,12 +456,35 @@ app.post(
       if (files.length === 0)
         return res.status(400).json({ error: "No images provided" });
 
+      const [settings, user] = await Promise.all([
+        airtableService.getGlobalSettings(),
+        airtableService.findUserById(req.user!.id),
+      ]);
+
+      const costPerImg = settings.pricePicFX_Batch;
+      const totalCost = files.length * costPerImg;
+
+      if (user!.creditsImageFX < totalCost) {
+        return res
+          .status(403)
+          .json({
+            error: `Need ${totalCost} Image FX credits for this batch.`,
+          });
+      }
+
+      // Deduct total upfront
+      await airtableService.deductGranularCredits(
+        req.user!.id,
+        "creditsImageFX",
+        totalCost,
+      );
+
       res.json({
         success: true,
-        message: `Started processing ${files.length} images. They will appear in your library shortly.`,
+        message: `Processing batch of ${files.length}. Cost: ${totalCost} credits.`,
       });
 
-      // Background Processing
+      // Background Processing (Original logic intact)
       (async () => {
         for (const file of files) {
           try {
@@ -406,7 +494,13 @@ app.post(
               aspectRatio || "16:9",
             );
           } catch (e) {
-            console.error("Failed to process one asset in batch", e);
+            console.error("Failed batch item", e);
+            // Optional: refund individual failures
+            await airtableService.refundGranularCredits(
+              req.user!.id,
+              "creditsImageFX",
+              costPerImg,
+            );
           }
         }
       })();
@@ -423,10 +517,28 @@ app.post(
   async (req: AuthenticatedRequest, res) => {
     try {
       const { prompt, assetUrl, aspectRatio, referenceUrl, mode } = req.body;
+      if (!assetUrl || !prompt)
+        return res.status(400).json({ error: "Missing data" });
 
-      if (!assetUrl || !prompt) {
-        return res.status(400).json({ error: "Missing asset or prompt" });
-      }
+      const [settings, user] = await Promise.all([
+        airtableService.getGlobalSettings(),
+        airtableService.findUserById(req.user!.id),
+      ]);
+
+      const cost = calculateGranularCost(
+        { mediaType: "image", mode: mode || "pro" },
+        settings,
+      );
+
+      // Editor always uses ImageFX pool
+      if (user!.creditsImageFX < cost)
+        return res.status(403).json({ error: "Insufficient Image FX credits" });
+
+      await airtableService.deductGranularCredits(
+        req.user!.id,
+        "creditsImageFX",
+        cost,
+      );
 
       const newAsset = await contentEngine.editAsset(
         assetUrl,
@@ -452,7 +564,27 @@ app.post(
     try {
       const { assetUrl, prompt, horizontal, vertical, zoom, aspectRatio } =
         req.body;
-      // We pass the user-selected aspect ratio if provided
+
+      const [settings, user] = await Promise.all([
+        airtableService.getGlobalSettings(),
+        airtableService.findUserById(req.user!.id),
+      ]);
+
+      const cost = calculateGranularCost(
+        { mediaType: "video", mode: "drift-path" },
+        settings,
+      );
+
+      // Drift Path uses PicDrift pool
+      if (user!.creditsPicDrift < cost)
+        return res.status(403).json({ error: "Insufficient PicDrift credits" });
+
+      await airtableService.deductGranularCredits(
+        req.user!.id,
+        "creditsPicDrift",
+        cost,
+      );
+
       const result = await contentEngine.processKlingDrift(
         req.user!.id,
         assetUrl,
@@ -462,7 +594,6 @@ app.post(
         Number(zoom),
         aspectRatio,
       );
-      // ✅ FIXED: Removed duplicate { success: true } spread
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -516,6 +647,26 @@ app.post(
   async (req: AuthenticatedRequest, res) => {
     try {
       const { assetUrl } = req.body;
+
+      const [settings, user] = await Promise.all([
+        airtableService.getGlobalSettings(),
+        airtableService.findUserById(req.user!.id),
+      ]);
+
+      const cost = calculateGranularCost(
+        { mediaType: "image", mode: "enhance" },
+        settings,
+      );
+
+      if (user!.creditsImageFX < cost)
+        return res.status(403).json({ error: "Insufficient Image FX credits" });
+
+      await airtableService.deductGranularCredits(
+        req.user!.id,
+        "creditsImageFX",
+        cost,
+      );
+
       const asset = await contentEngine.enhanceAsset(req.user!.id, assetUrl);
       res.json({ success: true, asset });
     } catch (error: any) {
@@ -709,22 +860,33 @@ app.post(
         title,
       } = req.body;
 
-      const cost = calculateCost(
-        mediaType,
-        duration ? parseInt(duration) : undefined,
-        model,
+      // 1. Fetch Global Pricing & User (Keeps original data fetch intact)
+      const [settings, user] = await Promise.all([
+        airtableService.getGlobalSettings(),
+        airtableService.findUserById(req.user!.id),
+      ]);
+
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      // 2. Identify the correct Pool and calculate Cost based on Admin Settings
+      const pool = getTargetPool(mediaType, model);
+      const cost = calculateGranularCost(
+        {
+          mediaType,
+          duration: duration ? parseInt(duration) : undefined,
+          model,
+        },
+        settings,
       );
 
-      const user = await airtableService.findUserById(req.user!.id);
-      if (!user || user.creditBalance < cost) {
+      // 3. Granular Balance Check (Check specific pool instead of generic creditBalance)
+      if (user[pool] < cost) {
         return res.status(403).json({
-          error: `Insufficient credits. Required: ${cost}, Balance: ${
-            user?.creditBalance || 0
-          }`,
+          error: `Insufficient credits in your ${pool.replace("credits", "")} wallet. Required: ${cost}, Current: ${user[pool]}`,
         });
       }
 
-      // Handle Uploads
+      // Handle Uploads (Your original setup intact)
       const referenceFiles = (req.files as Express.Multer.File[]) || [];
       const uploadedUrls: string[] = [];
       if (referenceFiles.length > 0) {
@@ -750,13 +912,13 @@ app.post(
         timestamp: new Date().toISOString(),
         title: title || "",
         userId: req.user!.id,
-        cost: cost,
+        cost: cost, // Stores the cost used at time of generation
       };
 
-      // 1. Deduct Credits
-      await airtableService.deductCredits(req.user!.id, cost);
+      // 4. Deduct from the specific Granular Pool
+      await airtableService.deductGranularCredits(req.user!.id, pool, cost);
 
-      // 2. CREATE POST FOR EVERYTHING
+      // 5. CREATE POST (Your original setup intact)
       const post = await airtableService.createPost({
         userId: req.user!.id,
         prompt,
@@ -772,7 +934,7 @@ app.post(
       // 3. RESPOND
       res.json({ success: true, postId: post.id });
 
-      // 4. TRIGGER PROCESS
+      // 4. TRIGGER PROCESS (Your original setup intact)
       (async () => {
         try {
           if (mediaType === "carousel") {
@@ -800,7 +962,8 @@ app.post(
             status: "FAILED",
             error: "Processing failed",
           });
-          await airtableService.refundUserCredit(req.user!.id, cost);
+          // REFUND to the correct Granular Pool
+          await airtableService.refundGranularCredits(req.user!.id, pool, cost);
         }
       })();
     } catch (error: any) {

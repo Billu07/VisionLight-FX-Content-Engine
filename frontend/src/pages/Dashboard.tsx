@@ -215,15 +215,45 @@ function Dashboard() {
     staleTime: 1000,
   });
 
-  const { data: userCredits = 0, isLoading: creditsLoading } = useQuery({
+  // === 1. DATA FETCHING (Credits & Status) ===
+  const {
+    data: credits = {
+      creditsPicDrift: 0,
+      creditsImageFX: 0,
+      creditsVideoFX1: 0,
+      creditsVideoFX2: 0,
+    },
+    isLoading: creditsLoading,
+  } = useQuery({
     queryKey: ["user-credits"],
     queryFn: async () => {
       const res = await apiEndpoints.getUserCredits();
-      return typeof res.data.credits === "number" ? res.data.credits : 0;
+      return res.data;
     },
     enabled: !!user,
   });
 
+  // ✅ 2. CORE LOGIC & PERMISSIONS
+  // @ts-ignore
+  const isCommercial = user?.creditSystem !== "INTERNAL";
+  const isAdmin = user?.role === "ADMIN";
+
+  // ✅ 3. VIRTUAL SUM (Fixes Timeline Build Errors)
+  const userCredits =
+    (credits?.creditsPicDrift || 0) +
+    (credits?.creditsImageFX || 0) +
+    (credits?.creditsVideoFX1 || 0) +
+    (credits?.creditsVideoFX2 || 0);
+
+  // ✅ 4. UI HELPERS
+  const formatBal = (val: number) => (isCommercial ? `$${val}` : `${val} pts`);
+  const [isRequesting, setIsRequesting] = useState(false);
+  const creditLink = isCommercial
+    ? "http://picdrift.com/fx-Credits"
+    : "http://PicDrift.com/fx-request";
+  const creditBtnText = isCommercial ? "Buy Credit" : "Request Credit";
+
+  // ✅ 5. BACKGROUND JOB POLLING
   useQuery({
     queryKey: ["check-jobs"],
     queryFn: async () => {
@@ -243,16 +273,6 @@ function Dashboard() {
     },
     enabled: !!user && posts.length > 0,
   });
-
-  // ✅ UPDATED CREDIT LOGIC
-  // @ts-ignore
-  const isCommercial = user?.creditSystem !== "INTERNAL";
-  const [isRequesting, setIsRequesting] = useState(false);
-  const creditLink = isCommercial
-    ? "http://picdrift.com/fx-Credits"
-    : "http://PicDrift.com/fx-request";
-  const creditBtnText = isCommercial ? "Buy Credit" : "Request Credit";
-  const isAdmin = user?.role === "ADMIN";
 
   // === ACTIONS ===
 
@@ -498,11 +518,23 @@ function Dashboard() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (userCredits <= 0) {
+    if (!prompt.trim()) return;
+
+    // Check correct pool balance based on current visual tab
+    let hasBalance = false;
+    if (currentVisualTab === "picdrift")
+      hasBalance = credits.creditsPicDrift > 0;
+    else if (currentVisualTab === "studio")
+      hasBalance = credits.creditsImageFX > 0;
+    else if (activeEngine === "kie") hasBalance = credits.creditsVideoFX1 > 0;
+    else if (activeEngine === "openai")
+      hasBalance = credits.creditsVideoFX2 > 0;
+
+    if (!hasBalance) {
       setShowNoCreditsModal(true);
       return;
     }
-    if (!prompt.trim()) return;
+
     setGenerationState({ status: "idle" });
     generateMediaMutation.mutate(buildFormData());
   };
@@ -779,20 +811,62 @@ function Dashboard() {
             )}
           </div>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="bg-gray-800/60 backdrop-blur-lg rounded-2xl px-3 sm:px-4 py-2 sm:py-3 border border-purple-500/20 w-full sm:w-auto">
-              <div className="flex items-center justify-between sm:justify-start gap-4">
+            <div className="bg-gray-800/40 backdrop-blur-xl rounded-2xl px-4 py-2 border border-white/5 w-full sm:w-auto overflow-x-auto">
+              <div className="flex items-center gap-6 min-w-max">
                 {!creditsLoading ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">💎</span>
-                    <div className="flex flex-col">
-                      <span className="text-white font-bold text-lg leading-none">
-                        {userCredits}
-                      </span>
-                      <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
-                        Credits
-                      </span>
+                  <>
+                    {/* PICDRIFT POOL */}
+                    <div className="flex items-center gap-2 border-r border-white/10 pr-4">
+                      <span className="text-lg">🌀</span>
+                      <div className="flex flex-col">
+                        <span className="text-pink-400 font-bold text-sm leading-none">
+                          {formatBal(credits.creditsPicDrift)}
+                        </span>
+                        <span className="text-[8px] text-gray-500 uppercase font-black">
+                          PicDrift
+                        </span>
+                      </div>
                     </div>
-                  </div>
+
+                    {/* PIC FX POOL */}
+                    <div className="flex items-center gap-2 border-r border-white/10 pr-4">
+                      <span className="text-lg">🖼️</span>
+                      <div className="flex flex-col">
+                        <span className="text-violet-400 font-bold text-sm leading-none">
+                          {formatBal(credits.creditsImageFX)}
+                        </span>
+                        <span className="text-[8px] text-gray-500 uppercase font-black">
+                          Pic FX
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* VIDEO FX 1 POOL */}
+                    <div className="flex items-center gap-2 border-r border-white/10 pr-4">
+                      <span className="text-lg">🎬</span>
+                      <div className="flex flex-col">
+                        <span className="text-blue-400 font-bold text-sm leading-none">
+                          {formatBal(credits.creditsVideoFX1)}
+                        </span>
+                        <span className="text-[8px] text-gray-500 uppercase font-black">
+                          Video FX 1
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* VIDEO FX 2 POOL */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">🎥</span>
+                      <div className="flex flex-col">
+                        <span className="text-cyan-400 font-bold text-sm leading-none">
+                          {formatBal(credits.creditsVideoFX2)}
+                        </span>
+                        <span className="text-[8px] text-gray-500 uppercase font-black">
+                          Video FX 2
+                        </span>
+                      </div>
+                    </div>
+                  </>
                 ) : (
                   <LoadingSpinner size="sm" />
                 )}
@@ -1730,7 +1804,7 @@ function Dashboard() {
                     <div className="text-purple-300 text-sm mb-3">
                       No content yet
                     </div>
-                    <div className="text-4xl mb-2">✨</div>
+                    <div className="text-4xl mb-2"></div>
                   </div>
                 ) : null}
               </div>

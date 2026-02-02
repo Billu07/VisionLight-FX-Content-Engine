@@ -29,7 +29,7 @@ api.interceptors.response.use(
       });
     }
     return Promise.reject(new Error(message));
-  }
+  },
 );
 
 export const apiEndpoints = {
@@ -40,6 +40,10 @@ export const apiEndpoints = {
   adminUpdateUser: (userId: string, data: any) =>
     api.put(`/api/admin/users/${userId}`, data),
   adminDeleteUser: (userId: string) => api.delete(`/api/admin/users/${userId}`),
+
+  // === Admin Settings (Pricing Control) ===
+  adminGetSettings: () => api.get("/api/admin/settings"),
+  adminUpdateSettings: (data: any) => api.put("/api/admin/settings", data),
 
   // === Data ===
   getBrandConfig: () => api.get("/api/brand-config"),
