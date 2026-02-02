@@ -43,12 +43,12 @@ interface CreditRequest {
 }
 
 export default function AdminDashboard() {
-  const { user: adminUser } = useAuth(); // ✅ FIX 1: Used below in header
+  const { user: adminUser } = useAuth();
   const navigate = useNavigate();
 
   // Data State
   const [users, setUsers] = useState<User[]>([]);
-  const [requests, setRequests] = useState<CreditRequest[]>([]); // ✅ FIX 2: Used below in notifications
+  const [requests, setRequests] = useState<CreditRequest[]>([]);
   const [settings, setSettings] = useState<GlobalSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -58,7 +58,7 @@ export default function AdminDashboard() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [pendingUpdates, setPendingUpdates] = useState<Partial<User>>({});
   const [newUser, setNewUser] = useState({ email: "", password: "", name: "" });
-  const [actionLoading, setActionLoading] = useState(false); // ✅ FIX 3: Used on buttons
+  const [actionLoading, setActionLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
@@ -197,7 +197,7 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-950 text-white p-4 sm:p-8">
       <div className="max-w-7xl mx-auto">
-        {/* TOP NAVIGATION & HEADER */}
+        {/* HEADER & NAVIGATION */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
           <div className="flex items-center gap-4">
             <button
@@ -208,7 +208,6 @@ export default function AdminDashboard() {
             </button>
             <div>
               <h1 className="text-3xl font-bold text-cyan-400">Admin Panel</h1>
-              {/* ✅ Uses adminUser */}
               <p className="text-sm text-gray-500">
                 Logged in as: {adminUser?.email}
               </p>
@@ -231,7 +230,6 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* ALERTS */}
         {msg && (
           <div
             className={`mb-6 p-4 rounded-xl border flex justify-between items-center ${
@@ -245,7 +243,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ✅ FIX 2: Added Pending Requests Block back (Uses 'requests') */}
+        {/* PENDING REQUESTS */}
         {requests.length > 0 && (
           <div className="mb-8 bg-purple-900/20 border border-purple-500/30 rounded-xl p-6 animate-in fade-in">
             <h2 className="text-xl font-bold text-purple-300 mb-4 flex items-center gap-2">
@@ -275,274 +273,255 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* 1. GLOBAL PRICING CONFIGURATION */}
+        {/* GLOBAL PRICING ENGINE - ALL 15 CONTROLS */}
         {settings && (
           <div className="mb-10 bg-gray-900/50 border border-gray-800 rounded-2xl p-6 shadow-xl">
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-cyan-400">
               ⚙️ Global Pricing Engine
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
-              {/* COLUMN 1: PICDRIFT & VIDEO FX 1 */}
-              <div className="space-y-4">
-                <div className="bg-gray-950 p-4 rounded-xl border border-gray-800">
-                  <h3 className="text-xs font-bold text-pink-500 uppercase tracking-widest mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* COLUMN 1: PICDRIFT & PIC FX */}
+              <div className="space-y-6">
+                <div className="space-y-4 bg-gray-950 p-4 rounded-xl border border-gray-800">
+                  <h3 className="text-xs font-bold text-pink-500 uppercase tracking-widest border-b border-pink-500/20 pb-2">
                     PicDrift (Kling 2.5)
                   </h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-400">
-                        5s Generation
-                      </span>
-                      <input
-                        type="number"
-                        className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
-                        value={settings.pricePicDrift_5s}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            pricePicDrift_5s: parseInt(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-400">
-                        10s Generation
-                      </span>
-                      <input
-                        type="number"
-                        className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
-                        value={settings.pricePicDrift_10s}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            pricePicDrift_10s: parseInt(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">5s Gen</span>
+                    <input
+                      type="number"
+                      className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center"
+                      value={settings.pricePicDrift_5s}
+                      onChange={(e) =>
+                        handleUpdateGlobalSettings({
+                          pricePicDrift_5s: parseInt(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">10s Gen</span>
+                    <input
+                      type="number"
+                      className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center"
+                      value={settings.pricePicDrift_10s}
+                      onChange={(e) =>
+                        handleUpdateGlobalSettings({
+                          pricePicDrift_10s: parseInt(e.target.value),
+                        })
+                      }
+                    />
                   </div>
                 </div>
 
-                <div className="bg-gray-950 p-4 rounded-xl border border-gray-800">
-                  <h3 className="text-xs font-bold text-blue-500 uppercase tracking-widest mb-4">
-                    Video FX 1 (Kling)
-                  </h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-400">
-                        10s Generation
-                      </span>
-                      <input
-                        type="number"
-                        className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
-                        value={settings.priceVideoFX1_10s}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceVideoFX1_10s: parseInt(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-400">
-                        15s Generation
-                      </span>
-                      <input
-                        type="number"
-                        className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
-                        value={settings.priceVideoFX1_15s}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceVideoFX1_15s: parseInt(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* COLUMN 2: PIC FX & VIDEO FX 2 */}
-              <div className="space-y-4">
-                <div className="bg-gray-950 p-4 rounded-xl border border-gray-800">
-                  <h3 className="text-xs font-bold text-violet-500 uppercase tracking-widest mb-4">
+                <div className="space-y-4 bg-gray-950 p-4 rounded-xl border border-gray-800">
+                  <h3 className="text-xs font-bold text-violet-500 uppercase tracking-widest border-b border-violet-500/20 pb-2">
                     Pic FX (Studio)
                   </h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-400">
-                        Standard Image
-                      </span>
-                      <input
-                        type="number"
-                        className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
-                        value={settings.pricePicFX_Standard}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            pricePicFX_Standard: parseInt(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-400">
-                        Carousel Gen
-                      </span>
-                      <input
-                        type="number"
-                        className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
-                        value={settings.pricePicFX_Carousel}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            pricePicFX_Carousel: parseInt(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-400">
-                        Batch (per Image)
-                      </span>
-                      <input
-                        type="number"
-                        className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
-                        value={settings.pricePicFX_Batch}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            pricePicFX_Batch: parseInt(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">
+                      Standard Image
+                    </span>
+                    <input
+                      type="number"
+                      className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center"
+                      value={settings.pricePicFX_Standard}
+                      onChange={(e) =>
+                        handleUpdateGlobalSettings({
+                          pricePicFX_Standard: parseInt(e.target.value),
+                        })
+                      }
+                    />
                   </div>
-                </div>
-
-                <div className="bg-gray-950 p-4 rounded-xl border border-gray-800">
-                  <h3 className="text-xs font-bold text-cyan-500 uppercase tracking-widest mb-4">
-                    Video FX 2 (Sora)
-                  </h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-400">4s / 8s Gen</span>
-                      <input
-                        type="number"
-                        className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
-                        value={settings.priceVideoFX2_4s}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceVideoFX2_4s: parseInt(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-400">
-                        12s Generation
-                      </span>
-                      <input
-                        type="number"
-                        className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
-                        value={settings.priceVideoFX2_12s}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceVideoFX2_12s: parseInt(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">Carousel Gen</span>
+                    <input
+                      type="number"
+                      className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center"
+                      value={settings.pricePicFX_Carousel}
+                      onChange={(e) =>
+                        handleUpdateGlobalSettings({
+                          pricePicFX_Carousel: parseInt(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">
+                      Batch (Per Img)
+                    </span>
+                    <input
+                      type="number"
+                      className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center"
+                      value={settings.pricePicFX_Batch}
+                      onChange={(e) =>
+                        handleUpdateGlobalSettings({
+                          pricePicFX_Batch: parseInt(e.target.value),
+                        })
+                      }
+                    />
                   </div>
                 </div>
               </div>
 
-              {/* COLUMN 3: EDITOR & TOOLS (THE MISSING CONTROLS) */}
-              <div className="space-y-4">
-                <div className="bg-gray-950 p-4 rounded-xl border border-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.1)]">
-                  <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-widest mb-4">
-                    Asset Editor Tools
+              {/* COLUMN 2: VIDEO FX ENGINES */}
+              <div className="space-y-6">
+                <div className="space-y-4 bg-gray-950 p-4 rounded-xl border border-gray-800">
+                  <h3 className="text-xs font-bold text-blue-500 uppercase tracking-widest border-b border-blue-500/20 pb-2">
+                    Video FX 1 (Kling)
                   </h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-400">
-                        Standard Edit
-                      </span>
-                      <input
-                        type="number"
-                        className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
-                        value={settings.priceEditor_Standard}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceEditor_Standard: parseInt(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-400">
-                        Pro Edit (AI)
-                      </span>
-                      <input
-                        type="number"
-                        className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
-                        value={settings.priceEditor_Pro}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceEditor_Pro: parseInt(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-400">
-                        Image Enhance
-                      </span>
-                      <input
-                        type="number"
-                        className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
-                        value={settings.priceEditor_Enhance}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceEditor_Enhance: parseInt(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-400">
-                        Ratio Convert
-                      </span>
-                      <input
-                        type="number"
-                        className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
-                        value={settings.priceEditor_Convert}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceEditor_Convert: parseInt(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">10s Gen</span>
+                    <input
+                      type="number"
+                      className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center"
+                      value={settings.priceVideoFX1_10s}
+                      onChange={(e) =>
+                        handleUpdateGlobalSettings({
+                          priceVideoFX1_10s: parseInt(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">15s Gen</span>
+                    <input
+                      type="number"
+                      className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center"
+                      value={settings.priceVideoFX1_15s}
+                      onChange={(e) =>
+                        handleUpdateGlobalSettings({
+                          priceVideoFX1_15s: parseInt(e.target.value),
+                        })
+                      }
+                    />
                   </div>
                 </div>
 
-                <div className="bg-gray-950 p-4 rounded-xl border border-rose-500/20 shadow-[0_0_15px_rgba(244,63,94,0.1)]">
-                  <h3 className="text-xs font-bold text-rose-400 uppercase tracking-widest mb-4">
-                    PicDrift Path Tools
+                <div className="space-y-4 bg-gray-950 p-4 rounded-xl border border-gray-800">
+                  <h3 className="text-xs font-bold text-cyan-500 uppercase tracking-widest border-b border-cyan-500/20 pb-2">
+                    Video FX 2 (Sora)
                   </h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-400">
-                        Generate Drift Path
-                      </span>
-                      <input
-                        type="number"
-                        className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center font-bold"
-                        value={settings.priceAsset_DriftPath}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceAsset_DriftPath: parseInt(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">4s Gen</span>
+                    <input
+                      type="number"
+                      className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center"
+                      value={settings.priceVideoFX2_4s}
+                      onChange={(e) =>
+                        handleUpdateGlobalSettings({
+                          priceVideoFX2_4s: parseInt(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">8s Gen</span>
+                    <input
+                      type="number"
+                      className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center"
+                      value={settings.priceVideoFX2_8s}
+                      onChange={(e) =>
+                        handleUpdateGlobalSettings({
+                          priceVideoFX2_8s: parseInt(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">12s Gen</span>
+                    <input
+                      type="number"
+                      className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center"
+                      value={settings.priceVideoFX2_12s}
+                      onChange={(e) =>
+                        handleUpdateGlobalSettings({
+                          priceVideoFX2_12s: parseInt(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* COLUMN 3: ASSET EDITOR & PATH TOOLS */}
+              <div className="space-y-6">
+                <div className="space-y-4 bg-gray-950 p-4 rounded-xl border border-gray-800">
+                  <h3 className="text-xs font-bold text-emerald-500 uppercase tracking-widest border-b border-emerald-500/20 pb-2">
+                    Editor Tools
+                  </h3>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">Standard Edit</span>
+                    <input
+                      type="number"
+                      className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center"
+                      value={settings.priceEditor_Standard}
+                      onChange={(e) =>
+                        handleUpdateGlobalSettings({
+                          priceEditor_Standard: parseInt(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">Pro Edit (AI)</span>
+                    <input
+                      type="number"
+                      className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center"
+                      value={settings.priceEditor_Pro}
+                      onChange={(e) =>
+                        handleUpdateGlobalSettings({
+                          priceEditor_Pro: parseInt(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">Enhance Tool</span>
+                    <input
+                      type="number"
+                      className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center"
+                      value={settings.priceEditor_Enhance}
+                      onChange={(e) =>
+                        handleUpdateGlobalSettings({
+                          priceEditor_Enhance: parseInt(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">Ratio Convert</span>
+                    <input
+                      type="number"
+                      className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center"
+                      value={settings.priceEditor_Convert}
+                      onChange={(e) =>
+                        handleUpdateGlobalSettings({
+                          priceEditor_Convert: parseInt(e.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4 bg-gray-950 p-4 rounded-xl border border-gray-800">
+                  <h3 className="text-xs font-bold text-rose-500 uppercase tracking-widest border-b border-rose-500/20 pb-2">
+                    Path Tools
+                  </h3>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">
+                      Drift Video Path
+                    </span>
+                    <input
+                      type="number"
+                      className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center"
+                      value={settings.priceAsset_DriftPath}
+                      onChange={(e) =>
+                        handleUpdateGlobalSettings({
+                          priceAsset_DriftPath: parseInt(e.target.value),
+                        })
+                      }
+                    />
                   </div>
                 </div>
               </div>
@@ -550,7 +529,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* 2. USER MANAGEMENT TABLE */}
+        {/* USER MANAGEMENT TABLE */}
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
