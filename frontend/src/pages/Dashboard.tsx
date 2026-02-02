@@ -1678,10 +1678,10 @@ function Dashboard() {
                       disabled={
                         generateMediaMutation.isPending || !prompt.trim()
                       }
-                      className="w-full gradient-brand text-white py-4 sm:py-5 px-6 sm:px-8 rounded-2xl hover:shadow-2xl disabled:opacity-50 font-bold text-base sm:text-lg flex items-center justify-center gap-3"
+                      className="w-full gradient-brand text-white py-4 sm:py-5 px-6 sm:px-8 rounded-2xl hover:shadow-2xl disabled:opacity-50 font-bold text-base sm:text-lg flex flex-col items-center justify-center gap-1"
                     >
                       {generateMediaMutation.isPending ? (
-                        <>
+                        <div className="flex items-center gap-3">
                           <LoadingSpinner size="sm" variant="light" />
                           <span>
                             {currentVisualTab === "picdrift"
@@ -1691,17 +1691,41 @@ function Dashboard() {
                                 : "Creating Your Video"}
                             ...
                           </span>
-                        </>
+                        </div>
                       ) : (
                         <>
-                          <span className="text-xl"></span>
-                          <span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-xl"></span>
+                            <span>
+                              {currentVisualTab === "picdrift"
+                                ? "Generate PicDrift"
+                                : currentVisualTab === "studio"
+                                  ? "Generate Image"
+                                  : "Generate Video"}
+                            </span>
+                          </div>
+                          {/* ✅ DYNAMIC COST LABEL */}
+                          <div className="text-[10px] opacity-70 font-medium tracking-wider uppercase">
+                            Cost:{" "}
                             {currentVisualTab === "picdrift"
-                              ? "Generate PicDrift"
+                              ? kieDuration === 10
+                                ? credits.prices?.pricePicDrift_10s
+                                : credits.prices?.pricePicDrift_5s
                               : currentVisualTab === "studio"
-                                ? "Generate Image"
-                                : "Generate Video"}
-                          </span>
+                                ? studioMode === "carousel"
+                                  ? credits.prices?.pricePicFX_Carousel
+                                  : credits.prices?.pricePicFX_Standard
+                                : activeEngine === "kie"
+                                  ? kieDuration === 15
+                                    ? credits.prices?.priceVideoFX1_15s
+                                    : credits.prices?.priceVideoFX1_10s
+                                  : videoDuration === 12
+                                    ? credits.prices?.priceVideoFX2_12s
+                                    : videoDuration === 8
+                                      ? credits.prices?.priceVideoFX2_8s
+                                      : credits.prices?.priceVideoFX2_4s}{" "}
+                            {isCommercial ? "USD" : "Credits"}
+                          </div>
                         </>
                       )}
                     </button>

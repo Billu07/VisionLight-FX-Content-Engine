@@ -52,6 +52,9 @@ export default function AdminDashboard() {
   const [settings, setSettings] = useState<GlobalSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [customCreditAmount, setCustomCreditAmount] = useState<number>(0);
+  const [targetCreditPool, setTargetCreditPool] =
+    useState<string>("creditsPicDrift");
 
   // UI State
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -729,13 +732,81 @@ export default function AdminDashboard() {
         {/* MODAL: MANAGE USER */}
         {editingUser && (
           <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 w-full max-w-lg shadow-2xl">
-              <h3 className="text-xl font-bold mb-1">Manage User</h3>
-              <p className="text-sm text-gray-500 mb-6">{editingUser.email}</p>
-
-              <div className="space-y-6">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 w-full max-w-lg shadow-2xl overflow-y-auto max-h-[90vh]">
+              <div className="flex justify-between items-start mb-6">
                 <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">
+                  <h3 className="text-xl font-bold mb-1">Manage User</h3>
+                  <p className="text-sm text-gray-500">{editingUser.email}</p>
+                </div>
+                <button
+                  onClick={() => setEditingUser(null)}
+                  className="text-gray-500 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-8">
+                {/* 1. WALLET ADJUSTMENT (THE NEW SECTION) */}
+                <div className="p-4 bg-gray-950 rounded-xl border border-gray-800">
+                  <label className="text-xs font-bold text-cyan-500 uppercase mb-4 block tracking-widest">
+                    Individual Wallet Adjustment
+                  </label>
+                  <div className="space-y-4">
+                    <div>
+                      <span className="text-[10px] text-gray-500 uppercase font-bold block mb-2">
+                        Select Target Wallet
+                      </span>
+                      <select
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2 text-sm text-white"
+                        value={targetCreditPool}
+                        onChange={(e) => setTargetCreditPool(e.target.value)}
+                      >
+                        <option value="creditsPicDrift">PicDrift Wallet</option>
+                        <option value="creditsImageFX">Pic FX Wallet</option>
+                        <option value="creditsVideoFX1">
+                          Video FX 1 Wallet
+                        </option>
+                        <option value="creditsVideoFX2">
+                          Video FX 2 Wallet
+                        </option>
+                      </select>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-gray-500 uppercase font-bold block mb-2">
+                        Amount to Add (Use negative to deduct)
+                      </span>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          className="flex-1 bg-gray-900 border border-gray-700 rounded-lg p-2 text-white font-bold"
+                          value={customCreditAmount}
+                          onChange={(e) =>
+                            setCustomCreditAmount(parseInt(e.target.value))
+                          }
+                        />
+                        <button
+                          onClick={() => {
+                            handleQuickAddCredits(
+                              editingUser.id,
+                              targetCreditPool,
+                              customCreditAmount,
+                            );
+                            setCustomCreditAmount(0); // Reset after adding
+                          }}
+                          disabled={actionLoading || customCreditAmount === 0}
+                          className="px-6 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold text-sm disabled:opacity-30"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. BILLING MODE */}
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-widest">
                     Billing Mode
                   </label>
                   <div className="grid grid-cols-2 gap-2">
@@ -764,8 +835,9 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                {/* 3. PERMISSION LEVEL */}
                 <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-2 block">
+                  <label className="text-xs font-bold text-gray-500 uppercase mb-2 block tracking-widest">
                     Permission Level
                   </label>
                   <div className="grid grid-cols-2 gap-2">
@@ -788,23 +860,25 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <button
-                  onClick={handleSaveChanges}
-                  disabled={actionLoading}
-                  className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 rounded-xl font-bold shadow-xl transition-all disabled:opacity-50 flex justify-center"
-                >
-                  {actionLoading ? (
-                    <LoadingSpinner size="sm" variant="light" />
-                  ) : (
-                    "Save Changes"
-                  )}
-                </button>
-                <button
-                  onClick={() => setEditingUser(null)}
-                  className="w-full text-gray-500 text-sm hover:text-gray-300"
-                >
-                  Cancel
-                </button>
+                <div className="pt-4 border-t border-gray-800 space-y-3">
+                  <button
+                    onClick={handleSaveChanges}
+                    disabled={actionLoading}
+                    className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 rounded-xl font-bold shadow-xl transition-all disabled:opacity-50 flex justify-center"
+                  >
+                    {actionLoading ? (
+                      <LoadingSpinner size="sm" variant="light" />
+                    ) : (
+                      "Save Profile Changes"
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setEditingUser(null)}
+                    className="w-full text-gray-500 text-sm hover:text-gray-300"
+                  >
+                    Close Manager
+                  </button>
+                </div>
               </div>
             </div>
           </div>

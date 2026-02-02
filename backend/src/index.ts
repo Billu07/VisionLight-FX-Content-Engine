@@ -338,10 +338,13 @@ app.get(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const user = await airtableService.findUserById(req.user!.id);
+      const [user, settings] = await Promise.all([
+        airtableService.findUserById(req.user!.id),
+        airtableService.getGlobalSettings(),
+      ]);
+
       if (!user) return res.json({ credits: 0 });
 
-      // ✅ Cast to any to bypass temporary type mismatch
       const u = user as any;
       res.json({
         credits: u.creditBalance,
@@ -349,6 +352,8 @@ app.get(
         creditsImageFX: u.creditsImageFX,
         creditsVideoFX1: u.creditsVideoFX1,
         creditsVideoFX2: u.creditsVideoFX2,
+        // ✅ Add settings so the user knows the prices
+        prices: settings,
       });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch credits" });
