@@ -521,9 +521,17 @@ app.post(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { prompt, assetUrl, aspectRatio, referenceUrl, mode } = req.body;
-      if (!assetUrl || !prompt)
-        return res.status(400).json({ error: "Missing data" });
+      const {
+        prompt,
+        assetUrl,
+        aspectRatio,
+        referenceUrl,
+        mode,
+        originalAssetId,
+      } = req.body;
+      if (!assetUrl || !prompt) {
+        return res.status(400).json({ error: "Missing asset or prompt" });
+      }
 
       const [settings, user] = await Promise.all([
         airtableService.getGlobalSettings(),
@@ -552,6 +560,7 @@ app.post(
         aspectRatio || "16:9",
         referenceUrl,
         mode || "pro",
+        originalAssetId,
       );
 
       res.json({ success: true, asset: newAsset });
@@ -651,7 +660,7 @@ app.post(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { assetUrl } = req.body;
+      const { assetUrl, originalAssetId } = req.body;
 
       const [settings, user] = await Promise.all([
         airtableService.getGlobalSettings(),
@@ -672,7 +681,11 @@ app.post(
         cost,
       );
 
-      const asset = await contentEngine.enhanceAsset(req.user!.id, assetUrl);
+      const asset = await contentEngine.enhanceAsset(
+        req.user!.id,
+        assetUrl,
+        originalAssetId, // 👈 Pass this to your engine
+      );
       res.json({ success: true, asset });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

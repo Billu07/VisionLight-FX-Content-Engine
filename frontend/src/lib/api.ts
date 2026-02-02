@@ -81,7 +81,7 @@ export const apiEndpoints = {
       headers: { "Content-Type": "multipart/form-data" },
     }),
 
-  enhanceAsset: (data: { assetUrl: string }) =>
+  enhanceAsset: (data: { assetUrl: string; originalAssetId?: string }) =>
     api.post("/api/assets/enhance", data),
 
   // Drift Video (Kling)
@@ -99,6 +99,7 @@ export const apiEndpoints = {
   // ✅ UPDATED: Edit Asset supports 'mode'
   editAsset: (data: {
     assetId: string;
+    originalAssetId?: string; // 👈 Added this
     assetUrl: string;
     prompt: string;
     aspectRatio: string;

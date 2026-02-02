@@ -159,8 +159,12 @@ export function EditAssetModal({
   // === MUTATION 1: TEXT EDIT ===
   const textEditMutation = useMutation({
     mutationFn: async (customRatio?: string) => {
+      // ✅ Identify the root parent to ensure it leaves the "Originals" tab
+      const rootId = currentAsset.originalAssetId || currentAsset.id;
+
       return apiEndpoints.editAsset({
         assetId: currentAsset.id,
+        originalAssetId: rootId, // 👈 Added this
         assetUrl: currentAsset.url,
         prompt: prompt,
         aspectRatio: customRatio || "original",
@@ -177,7 +181,13 @@ export function EditAssetModal({
   // === MUTATION 2: ENHANCE ===
   const enhanceMutation = useMutation({
     mutationFn: async () => {
-      return apiEndpoints.enhanceAsset({ assetUrl: currentAsset.url });
+      // ✅ Identify the root parent
+      const rootId = currentAsset.originalAssetId || currentAsset.id;
+
+      return apiEndpoints.enhanceAsset({
+        assetUrl: currentAsset.url,
+        originalAssetId: rootId, // 👈 Added this
+      });
     },
     onMutate: () => setIsEnhancing(true),
     onSuccess: (res: any) => {
