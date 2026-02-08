@@ -46,8 +46,6 @@ function Dashboard() {
   const [activeEngine, setActiveEngine] = useState<EngineType>("kie");
   const [studioMode, setStudioMode] = useState<StudioMode>("image");
 
-  const [showReservePanel, setShowReservePanel] = useState(false); // For the new Render Reserve modal
-  const [driftAudio, setDriftAudio] = useState(false); // For PicDrift Audio toggle
   // Kie AI (Video FX & PicDrift)
   // ✅ UPDATED DEFAULT: 15s
   const [kieDuration, setKieDuration] = useState<5 | 10 | 15>(15);
