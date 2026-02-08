@@ -234,7 +234,6 @@ function Dashboard() {
   });
 
   // ✅ 2. CORE LOGIC & PERMISSIONS
-  // @ts-ignore
   const isCommercial = user?.creditSystem !== "INTERNAL";
   const isAdmin = user?.role === "ADMIN";
 
@@ -1703,28 +1702,6 @@ function Dashboard() {
                                   ? "Generate Image"
                                   : "Generate Video"}
                             </span>
-                          </div>
-                          {/* ✅ DYNAMIC COST LABEL */}
-                          <div className="text-[10px] opacity-70 font-medium tracking-wider uppercase">
-                            Cost:{" "}
-                            {currentVisualTab === "picdrift"
-                              ? kieDuration === 10
-                                ? credits.prices?.pricePicDrift_10s
-                                : credits.prices?.pricePicDrift_5s
-                              : currentVisualTab === "studio"
-                                ? studioMode === "carousel"
-                                  ? credits.prices?.pricePicFX_Carousel
-                                  : credits.prices?.pricePicFX_Standard
-                                : activeEngine === "kie"
-                                  ? kieDuration === 15
-                                    ? credits.prices?.priceVideoFX1_15s
-                                    : credits.prices?.priceVideoFX1_10s
-                                  : videoDuration === 12
-                                    ? credits.prices?.priceVideoFX2_12s
-                                    : videoDuration === 8
-                                      ? credits.prices?.priceVideoFX2_8s
-                                      : credits.prices?.priceVideoFX2_4s}{" "}
-                            {isCommercial ? "USD" : "Credits"}
                           </div>
                         </>
                       )}
