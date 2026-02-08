@@ -60,16 +60,17 @@ export const dbService = {
   async adminUpdateUser(id: string, data: any) {
     const { addCredits, creditType, ...otherData } = data;
 
-    // Handle Granular Credit Top-ups from the new Admin Panel
-    if (addCredits && creditType) {
+    // Logic to handle specific credit pool top-ups
+    if (addCredits !== undefined && creditType) {
       return prisma.user.update({
         where: { id },
         data: {
-          [creditType]: { increment: parseInt(addCredits) },
+          [creditType]: { increment: parseFloat(addCredits) }, // ✅ Changed to parseFloat
           ...otherData,
         },
       });
     }
+
     return prisma.user.update({ where: { id }, data: otherData });
   },
 
@@ -83,7 +84,7 @@ export const dbService = {
   async addCredits(id: string, amount: number) {
     return prisma.user.update({
       where: { id },
-      data: { creditBalance: { increment: amount } },
+      data: { creditBalance: { increment: parseFloat(amount.toString()) } },
     });
   },
   async refundUserCredit(id: string, amount: number) {

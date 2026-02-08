@@ -684,7 +684,7 @@ app.post(
       const asset = await contentEngine.enhanceAsset(
         req.user!.id,
         assetUrl,
-        originalAssetId, // 👈 Pass this to your engine
+        originalAssetId,
       );
       res.json({ success: true, asset });
     } catch (error: any) {
