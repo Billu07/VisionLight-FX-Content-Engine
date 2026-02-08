@@ -7,7 +7,7 @@ interface User {
   email: string;
   name: string;
   creditSystem?: "COMMERCIAL" | "INTERNAL";
-  role?: "ADMIN" | "USER"; // ✅ Added Role
+  role?: "ADMIN" | "USER" | "MANAGER";
 }
 
 interface AuthState {

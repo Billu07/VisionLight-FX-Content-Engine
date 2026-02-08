@@ -15,7 +15,7 @@ export const imageLogic = {
   // === GENERATION ===
   async startImageGeneration(postId: string, finalPrompt: string, params: any) {
     console.log(
-      `🎨 Gemini 3 Pro Gen for Post ${postId} | AR: ${params.aspectRatio}`
+      `🎨 Gemini 3 Pro Gen for Post ${postId} | AR: ${params.aspectRatio}`,
     );
     try {
       const refUrls =
@@ -42,7 +42,7 @@ export const imageLogic = {
         postId,
         params.userId,
         "Gemini 3 Pro Image",
-        "image"
+        "image",
       );
       await airtableService.updatePost(postId, {
         mediaUrl: cloudUrl,
@@ -67,13 +67,13 @@ export const imageLogic = {
   async startCarouselGeneration(
     postId: string,
     finalPrompt: string,
-    params: any
+    params: any,
   ) {
     console.log(`🎠 Gemini 3 Pro Carousel for Post ${postId}`);
     try {
       const imageUrls: string[] = [];
       const userRefBuffers = await downloadAndOptimizeImages(
-        params.imageReferences || []
+        params.imageReferences || [],
       );
       const carouselHistory: Buffer[] = [...userRefBuffers];
 
@@ -106,7 +106,7 @@ export const imageLogic = {
           `${postId}_slide_${i + 1}`,
           params.userId,
           `Slide ${i + 1}`,
-          "image"
+          "image",
         );
         imageUrls.push(url);
       }
@@ -134,9 +134,10 @@ export const imageLogic = {
     originalAssetUrl: string,
     prompt: string,
     userId: string,
-    aspectRatio: "16:9" | "9:16" | "original",
+    aspectRatio: "16:9" | "9:16" | "original" | "1:1",
     referenceUrl?: string,
-    mode: "standard" | "pro" = "pro"
+    mode: "standard" | "pro" = "pro",
+    originalAssetId?: string, // 👈 ADDED PARAMETER
   ): Promise<Asset> {
     try {
       console.log(`🎨 Editing asset for ${userId} [${mode}]: "${prompt}"`);
@@ -154,7 +155,7 @@ export const imageLogic = {
         if (metadata.width && metadata.height) {
           targetConfigRatio = getClosestAspectRatio(
             metadata.width,
-            metadata.height
+            metadata.height,
           ) as any;
           const maxDim = Math.max(metadata.width, metadata.height);
           if (maxDim > 2500) targetSize = "4K";
@@ -194,13 +195,17 @@ export const imageLogic = {
         `edited_${userId}_${Date.now()}`,
         userId,
         `Edited: ${prompt}`,
-        "image"
+        "image",
       );
+
+      // ✅ PASSING originalAssetId and using the selected aspectRatio
+      // This ensures it moves to Landscape/Portrait/Square OR Edited tab
       return await airtableService.createAsset(
         userId,
         newUrl,
-        "original",
-        "IMAGE"
+        aspectRatio,
+        "IMAGE",
+        originalAssetId,
       );
     } catch (e: any) {
       throw new Error(`Edit failed: ${e.message}`);
@@ -208,19 +213,18 @@ export const imageLogic = {
   },
 
   // === ENHANCE (TOPAZ) ===
-  // === ENHANCE (TOPAZ) ===
-  async enhanceAsset(userId: string, assetUrl: string): Promise<Asset> {
+  async enhanceAsset(
+    userId: string,
+    assetUrl: string,
+    originalAssetId?: string, // 👈 ADDED PARAMETER
+  ): Promise<Asset> {
     try {
       console.log(`✨ Enhancing Asset for ${userId}...`);
 
-      // 1. Use Raw URL (Do not downscale input)
       const rawUrl = assetUrl;
-
-      // 2. Get the High-Res Buffer from Topaz (Often >10MB PNG)
       const bigBuffer = await FalService.upscaleImage({ imageUrl: rawUrl });
 
-      // 🛠️ FIX: Compress before Cloudinary upload
-      // Convert huge PNG to High-Quality JPEG (95%) to stay under 10MB limit
+      // FIX: Compress before Cloudinary upload (Mozjpeg 95)
       const optimizedBuffer = await sharp(bigBuffer)
         .jpeg({ quality: 95, mozjpeg: true })
         .toBuffer();
@@ -230,23 +234,24 @@ export const imageLogic = {
           optimizedBuffer.length /
           1024 /
           1024
-        ).toFixed(2)}MB`
+        ).toFixed(2)}MB`,
       );
 
-      // 3. Upload the optimized buffer
       const cloudUrl = await uploadToCloudinary(
         optimizedBuffer,
         `enhanced_${userId}_${Date.now()}`,
         userId,
         "Enhanced Asset",
-        "image"
+        "image",
       );
 
+      // ✅ PASSING originalAssetId
       return await airtableService.createAsset(
         userId,
         cloudUrl,
         "original",
-        "IMAGE"
+        "IMAGE",
+        originalAssetId,
       );
     } catch (e: any) {
       console.error("Enhance Error:", e.message);
