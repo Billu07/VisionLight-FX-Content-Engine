@@ -320,12 +320,11 @@ function Dashboard() {
   };
 
   const handleRequestCredits = async () => {
-    if (!confirm("Send a notification to Admin requesting more credits?"))
-      return;
+    if (!confirm("Request more Render Reserve to Admin?")) return;
     setIsRequesting(true);
     try {
       await apiEndpoints.requestCredits();
-      alert("✅ Request sent! The admin has been notified.");
+      alert("Request sent! The admin has been notified.");
     } catch (err) {
       alert("Failed to send request.");
     } finally {
@@ -1067,7 +1066,7 @@ function Dashboard() {
                           : "text-gray-400 hover:text-white"
                       }`}
                     >
-                      Picture Editor
+                      PicFX Editor
                     </button>
                   </div>
                   {studioMode !== "edit" && (
@@ -1136,7 +1135,7 @@ function Dashboard() {
                     </div>
                     <div>
                       <h3 className="text-white font-bold text-xl mb-2">
-                        Picture Editor
+                        PicFX Editor
                       </h3>
                       <p className="text-gray-400 text-sm max-w-md mx-auto">
                         Upload an image to start a chat session. Ask PicFX to
@@ -1155,7 +1154,7 @@ function Dashboard() {
                         onChange={handleMagicEditUpload}
                       />
                     </label>
-                    <p className="text-[10px] text-gray-500">
+                    <p className="text-[20px] text-gray-500">
                       Or select from{" "}
                       <button
                         type="button"
