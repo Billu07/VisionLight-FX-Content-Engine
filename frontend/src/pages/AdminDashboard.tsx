@@ -205,7 +205,7 @@ export default function AdminDashboard() {
 
           <div className="flex bg-gray-900 p-1 rounded-xl border border-gray-800 shadow-inner">
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/app")}
               className="px-6 py-2 rounded-lg text-sm font-bold text-gray-400 hover:text-white transition-all"
             >
               App
