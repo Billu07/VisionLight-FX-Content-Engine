@@ -13,12 +13,14 @@ import { WelcomeTour } from "../components/WelcomeTour";
 import { MediaPreview } from "../components/MediaPreview";
 import { EditAssetModal } from "../components/EditAssetModal";
 import { DriftFrameExtractor } from "../components/DriftFrameExtractor";
+import { RenderReserveModal } from "../components/RenderReserveModal";
+import { StockPhotosModal } from "../components/StockPhotosModal";
 
 // Import your logo images
 import picdriftLogo from "../assets/picdrift.png";
 import fxLogo from "../assets/fx.png";
 
-type EngineType = "kie" | "studio" | "openai";
+type EngineType = "kie" | "studio" | "openai" | "veo";
 type StudioMode = "image" | "carousel" | "edit";
 
 // Visual Tab Type
@@ -57,6 +59,10 @@ function Dashboard() {
     "landscape" | "portrait" | "square"
   >("portrait");
 
+  // PicDrift Settings
+  const [picDriftAudio, setPicDriftAudio] = useState(false);
+  const [picDriftMode, setPicDriftMode] = useState<"standard" | "plus">("standard");
+
   // ✅ UPDATED DEFAULT: Pro Model
   const [kieModel, setKieModel] = useState<"kie-sora-2" | "kie-sora-2-pro">(
     "kie-sora-2-pro",
@@ -66,6 +72,10 @@ function Dashboard() {
   const [videoFxMode, setVideoFxMode] = useState<"video" | "picdrift">(
     "picdrift",
   );
+
+  // Veo Settings
+  const [veoDuration, setVeoDuration] = useState<4 | 6 | 8>(8);
+  const [veoResolution, setVeoResolution] = useState<"720p" | "1080p" | "4k">("1080p");
 
   // OpenAI (Video FX 2)
   // ✅ UPDATED DEFAULT: 12s
@@ -109,6 +119,8 @@ function Dashboard() {
   const [showWelcomeTour, setShowWelcomeTour] = useState(false);
   const [showQueuedModal, setShowQueuedModal] = useState(false);
   const [showNoCreditsModal, setShowNoCreditsModal] = useState(false);
+  const [showReserveModal, setShowReserveModal] = useState(false);
+  const [showStockModal, setShowStockModal] = useState(false);
   const [showPromptInfo, setShowPromptInfo] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showFullTimeline, setShowFullTimeline] = useState(false);
@@ -474,10 +486,11 @@ function Dashboard() {
 
     if (activeEngine === "kie" && videoFxMode === "picdrift") {
       formData.append("mediaType", "video");
-      formData.append("model", "kling-2.5");
+      formData.append("model", picDriftMode === "plus" ? "kling-3" : "kling-2.5");
+      formData.append("generateAudio", picDriftAudio.toString());
       if (picDriftFrames.start)
         formData.append("referenceImages", picDriftFrames.start);
-      if (picDriftFrames.end)
+      if (picDriftFrames.end && !picDriftAudio)
         formData.append("referenceImages", picDriftFrames.end);
       formData.append("duration", kieDuration.toString());
       formData.append("aspectRatio", kieAspect);
@@ -500,6 +513,12 @@ function Dashboard() {
       referenceImages.forEach((file) =>
         formData.append("referenceImages", file),
       );
+    } else if (activeEngine === "veo") {
+      formData.append("mediaType", "video");
+      formData.append("model", "veo-3");
+      formData.append("duration", veoDuration.toString());
+      formData.append("resolution", veoResolution);
+      formData.append("aspectRatio", aspectRatio); // Reuse aspect ratio state
     } else {
       formData.append("mediaType", studioMode);
       let sizeStr = "1024x1024";
@@ -768,12 +787,39 @@ function Dashboard() {
           </div>
         </div>
       )}
-      {showWelcomeTour && (
-        <WelcomeTour onClose={() => setShowWelcomeTour(false)} />
-      )}
-
-      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
-        {/* HEADER */}
+              {showWelcomeTour && (
+              <WelcomeTour onClose={() => setShowWelcomeTour(false)} />
+            )}
+      
+                  {/* Render Reserve Modal */}
+      
+                  <RenderReserveModal
+      
+                    isOpen={showReserveModal}
+      
+                    onClose={() => setShowReserveModal(false)}
+      
+                    prices={(credits as any)?.prices}
+      
+                    isCommercial={isCommercial}
+      
+                  />
+      
+            
+      
+                  {/* Stock Photos Modal */}
+      
+                  <StockPhotosModal
+      
+                    isOpen={showStockModal}
+      
+                    onClose={() => setShowStockModal(false)}
+      
+                  />
+      
+            
+      
+                  <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">        {/* HEADER */}
         <div className="mb-6 sm:mb-8 flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -870,6 +916,16 @@ function Dashboard() {
                 )}
               </div>
             </div>
+
+            {/* NEW: Render Reserve Button */}
+            <button
+              onClick={() => setShowReserveModal(true)}
+              className="px-4 py-2 bg-gray-800/40 backdrop-blur-xl border border-white/5 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-all flex items-center gap-2 h-full self-stretch sm:self-auto"
+            >
+              <span>💳</span>
+              <span>Render Reserve</span>
+            </button>
+
             {!isMobile && (
               <div className="flex gap-2">
                 {isAdmin && (
@@ -935,23 +991,33 @@ function Dashboard() {
                   </p>
                 </div>
 
-                {/* ✅ GLOBAL OPEN LIBRARY BUTTON */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    // For PicDrift, open 'Start Frame' slot. For others, open 'Generic'.
-                    setActiveLibrarySlot(
-                      currentVisualTab === "picdrift" ? "start" : "generic",
-                    );
-                  }}
-                  className={`text-xs px-4 py-2 rounded-lg border flex items-center gap-2 transition-all font-semibold shadow-lg ${
-                    currentVisualTab === "picdrift"
-                      ? "bg-rose-900/50 text-rose-300 border-rose-700/50 hover:bg-rose-800 hover:border-rose-500"
-                      : "bg-cyan-900/50 text-cyan-300 border-cyan-700/50 hover:bg-cyan-800 hover:border-cyan-500"
-                  }`}
-                >
-                  <span></span> Open Library
-                </button>
+                {/* ✅ GLOBAL HEADER BUTTONS */}
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowStockModal(true)}
+                    className="text-xs px-4 py-2 rounded-lg border border-gray-600 bg-gray-800 text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors"
+                  >
+                    Stock Photos
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // For PicDrift, open 'Start Frame' slot. For others, open 'Generic'.
+                      setActiveLibrarySlot(
+                        currentVisualTab === "picdrift" ? "start" : "generic",
+                      );
+                    }}
+                    className={`text-xs px-4 py-2 rounded-lg border flex items-center gap-2 transition-all font-semibold shadow-lg ${
+                      currentVisualTab === "picdrift"
+                        ? "bg-rose-900/50 text-rose-300 border-rose-700/50 hover:bg-rose-800 hover:border-rose-500"
+                        : "bg-cyan-900/50 text-cyan-300 border-cyan-700/50 hover:bg-cyan-800 hover:border-cyan-500"
+                    }`}
+                  >
+                    <span></span> Open Library
+                  </button>
+                </div>
               </div>
 
               {/* NAVIGATION BAR */}
@@ -1122,6 +1188,17 @@ function Dashboard() {
                     >
                       Video FX 2
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveEngine("veo")}
+                      className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                        activeEngine === "veo"
+                          ? "bg-cyan-600 text-white shadow-lg"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      Video FX 3
+                    </button>
                   </div>
                 </div>
               )}
@@ -1227,10 +1304,10 @@ function Dashboard() {
                         </div>
 
                         {/* End Frame */}
-                        <div className="flex flex-col gap-2">
+                        <div className={`flex flex-col gap-2 ${picDriftAudio ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
                           <div className="flex justify-between items-center">
                             <label className="text-xs text-rose-300 font-bold">
-                              Pic 2 - End Frame (optional)
+                              {picDriftAudio ? 'Pic 2 - Disabled (Audio On)' : 'Pic 2 - End Frame (optional)'}
                             </label>
                           </div>
                           <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
@@ -1423,52 +1500,105 @@ function Dashboard() {
 
                     {/* PICDRIFT SETTINGS */}
                     {currentVisualTab === "picdrift" && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mb-6">
-                        <div>
-                          <label className="text-sm font-semibold text-white mb-2 block">
-                            Duration
-                          </label>
-                          <div className="flex gap-2">
-                            {[5, 10].map((d) => (
-                              <button
-                                key={d}
-                                type="button"
-                                onClick={() => setKieDuration(d as any)}
-                                className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                  kieDuration === d
-                                    ? "bg-rose-600 border-rose-600 text-white"
-                                    : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                }`}
-                              >
-                                {d}s
-                              </button>
-                            ))}
-                          </div>
+                      <div className="space-y-6 mb-6">
+                        {/* Mode Selector */}
+                        <div className="flex bg-gray-900/50 p-1 rounded-xl border border-white/5">
+                          <button
+                            type="button"
+                            onClick={() => setPicDriftMode("standard")}
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                              picDriftMode === "standard"
+                                ? "bg-rose-600 text-white shadow-lg"
+                                : "text-gray-400 hover:text-white"
+                            }`}
+                          >
+                            PicDrift (2.6)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPicDriftMode("plus")}
+                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                              picDriftMode === "plus"
+                                ? "bg-gradient-to-r from-rose-500 to-purple-500 text-white shadow-lg"
+                                : "text-gray-400 hover:text-white"
+                            }`}
+                          >
+                            PicDrift Plus (3.0)
+                          </button>
                         </div>
-                        <div>
-                          <label className="text-sm font-semibold text-white mb-2 block">
-                            Aspect Ratio
-                          </label>
-                          <div className="flex gap-2">
-                            {/* ✅ ADDED SQUARE OPTION HERE */}
-                            {[
-                              { id: "landscape", label: "Landscape" },
-                              { id: "portrait", label: "Portrait" },
-                              { id: "square", label: "Square" },
-                            ].map((a) => (
-                              <button
-                                key={a.id}
-                                type="button"
-                                onClick={() => setKieAspect(a.id as any)}
-                                className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                  kieAspect === a.id
-                                    ? "bg-rose-600 border-rose-600 text-white"
-                                    : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                }`}
-                              >
-                                {a.label}
-                              </button>
-                            ))}
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                          <div>
+                            <label className="text-sm font-semibold text-white mb-2 block">
+                              Duration
+                            </label>
+                            <div className="flex gap-2">
+                              {[5, 10].map((d) => (
+                                <button
+                                  key={d}
+                                  type="button"
+                                  onClick={() => setKieDuration(d as any)}
+                                  className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                                    kieDuration === d
+                                      ? "bg-rose-600 border-rose-600 text-white"
+                                      : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                  }`}
+                                >
+                                  {d}s
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-sm font-semibold text-white mb-2 block">
+                              Aspect Ratio
+                            </label>
+                            <div className="flex gap-2">
+                              {/* ✅ ADDED SQUARE OPTION HERE */}
+                              {[
+                                { id: "landscape", label: "Landscape" },
+                                { id: "portrait", label: "Portrait" },
+                                { id: "square", label: "Square" },
+                              ].map((a) => (
+                                <button
+                                  key={a.id}
+                                  type="button"
+                                  onClick={() => setKieAspect(a.id as any)}
+                                  className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                                    kieAspect === a.id
+                                      ? "bg-rose-600 border-rose-600 text-white"
+                                      : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                  }`}
+                                >
+                                  {a.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          {/* Audio Toggle */}
+                          <div className="sm:col-span-2">
+                            <label className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-gray-800/50 cursor-pointer hover:bg-gray-800 transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={picDriftAudio}
+                                onChange={(e) => {
+                                  setPicDriftAudio(e.target.checked);
+                                  // If audio enabled, clear end frame
+                                  if (e.target.checked) {
+                                    setPicDriftFrames(prev => ({ ...prev, end: null }));
+                                    setPicDriftUrls(prev => ({ ...prev, end: null }));
+                                  }
+                                }}
+                                className="w-5 h-5 rounded border-gray-600 text-rose-600 focus:ring-rose-500 bg-gray-700"
+                              />
+                              <div>
+                                <div className="font-semibold text-white text-sm">Generate Audio</div>
+                                <div className="text-xs text-gray-400">
+                                  AI generated sound effects (Disables End Frame)
+                                </div>
+                              </div>
+                            </label>
                           </div>
                         </div>
                       </div>
@@ -1585,6 +1715,93 @@ function Dashboard() {
                                   onClick={() => setVideoDuration(sec as any)}
                                   className={`px-3 py-2 rounded-xl border text-sm flex-1 ${
                                     videoDuration === sec
+                                      ? "bg-cyan-500 border-cyan-500 text-white"
+                                      : "bg-gray-800/50 border-white/10 text-purple-200"
+                                  }`}
+                                >
+                                  {sec}s
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                    {/* VEO 3 SETTINGS (Video FX 3) */}
+                    {currentVisualTab === "videofx" &&
+                      activeEngine === "veo" && (
+                        <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+                          <div className="space-y-2">
+                            <label className="block text-sm font-semibold text-white">
+                              AI Model
+                            </label>
+                            <div className="p-3 rounded-2xl border-2 border-cyan-400 bg-cyan-500/20 text-left text-sm font-medium">
+                              <div className="font-semibold text-white text-sm">
+                                Veo 3.1 (Google)
+                              </div>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="block text-sm font-semibold text-white">
+                              Aspect Ratio
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              {[
+                                { ratio: "16:9", label: "Landscape" },
+                                { ratio: "9:16", label: "Portrait" },
+                              ].map(({ ratio, label }) => (
+                                <button
+                                  key={ratio}
+                                  type="button"
+                                  onClick={() => setAspectRatio(ratio as any)}
+                                  className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${
+                                    aspectRatio === ratio
+                                      ? "border-purple-400 bg-purple-500/20"
+                                      : "border-white/10 bg-gray-800/50"
+                                  }`}
+                                >
+                                  <div className="font-semibold text-white text-sm">
+                                    {label}
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="block text-sm font-semibold text-white">
+                              Resolution
+                            </label>
+                            <div className="grid grid-cols-3 gap-2">
+                              {["720p", "1080p", "4k"].map((res) => (
+                                <button
+                                  key={res}
+                                  type="button"
+                                  onClick={() => setVeoResolution(res as any)}
+                                  className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${
+                                    veoResolution === res
+                                      ? "border-green-400 bg-green-500/20"
+                                      : "border-white/10 bg-gray-800/50"
+                                  }`}
+                                >
+                                  <div className="font-semibold text-white text-sm">
+                                    {res.toUpperCase()}
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="block text-sm font-semibold text-white">
+                              Duration
+                            </label>
+                            <div className="flex gap-2">
+                              {[4, 6, 8].map((sec) => (
+                                <button
+                                  key={sec}
+                                  type="button"
+                                  onClick={() => setVeoDuration(sec as any)}
+                                  className={`px-3 py-2 rounded-xl border text-sm flex-1 ${
+                                    veoDuration === sec
                                       ? "bg-cyan-500 border-cyan-500 text-white"
                                       : "bg-gray-800/50 border-white/10 text-purple-200"
                                   }`}

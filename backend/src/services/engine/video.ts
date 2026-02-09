@@ -41,10 +41,11 @@ export const videoLogic = {
     vertical: number,
     zoom: number,
     userAspectRatio?: string,
+    generateAudio: boolean = false, // ✅ ADDED
   ) {
     try {
       console.log(
-        `🎬 Kling 2.6 Drift Request: H${horizontal} V${vertical} Z${zoom} | AR: ${userAspectRatio}`,
+        `🎬 Kling 2.6 Drift Request: H${horizontal} V${vertical} Z${zoom} | AR: ${userAspectRatio} | Audio: ${generateAudio}`,
       );
 
       // ✅ FIX: Download Image FIRST to detect aspect ratio

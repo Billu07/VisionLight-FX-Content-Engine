@@ -1,0 +1,24 @@
+# Ignore dependencies
+
+**/node_modules
+**/package-lock.json
+
+# Ignore build artifacts (Crucial for your project)
+
+**/dist
+**/build \*_/_.map
+
+# Ignore environment variables (Security)
+
+**/.env
+**/.env.\*
+
+# Ignore git
+
+\*\*/.git
+
+# Ignore heavy media assets
+
+**/\*.png
+**/_.ico
+\*\*/_.jpg \*_/_.mp4
