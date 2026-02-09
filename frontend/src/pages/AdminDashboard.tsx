@@ -164,11 +164,11 @@ export default function AdminDashboard() {
     const totalCredits = users.reduce(
       (acc, u) =>
         acc +
-        u.creditsPicDrift +
-        u.creditsImageFX +
-        u.creditsVideoFX1 +
-        u.creditsVideoFX2 +
-        u.creditsVideoFX3,
+        (u.creditsPicDrift || 0) +
+        (u.creditsImageFX || 0) +
+        (u.creditsVideoFX1 || 0) +
+        (u.creditsVideoFX2 || 0) +
+        (u.creditsVideoFX3 || 0),
       0,
     );
     return (totalCredits * baseBudgetRate).toLocaleString("en-US", {
@@ -332,27 +332,27 @@ export default function AdminDashboard() {
                         </td>
                         <td className="p-6">
                           <div className="text-base font-bold text-pink-500">
-                            {u.creditsPicDrift.toFixed(2)} pts
+                            {(u.creditsPicDrift || 0).toFixed(2)} pts
                           </div>
                         </td>
                         <td className="p-6">
                           <div className="text-base font-bold text-violet-500">
-                            {u.creditsImageFX.toFixed(2)} pts
+                            {(u.creditsImageFX || 0).toFixed(2)} pts
                           </div>
                         </td>
                         <td className="p-6">
                           <div className="text-base font-bold text-blue-500">
-                            {u.creditsVideoFX1.toFixed(2)} pts
+                            {(u.creditsVideoFX1 || 0).toFixed(2)} pts
                           </div>
                         </td>
                         <td className="p-6">
                           <div className="text-base font-bold text-cyan-500">
-                            {u.creditsVideoFX2.toFixed(2)} pts
+                            {(u.creditsVideoFX2 || 0).toFixed(2)} pts
                           </div>
                         </td>
                         <td className="p-6">
                           <div className="text-base font-bold text-teal-500">
-                            {u.creditsVideoFX3.toFixed(2)} pts
+                            {(u.creditsVideoFX3 || 0).toFixed(2)} pts
                           </div>
                         </td>
                         <td className="p-6 text-right">

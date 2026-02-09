@@ -137,7 +137,7 @@ export function DriftFrameExtractor({
             <div className="flex justify-between text-[10px] text-gray-400 font-mono uppercase tracking-wider">
               <span>Frame: {((currentTime || 0) * 30).toFixed(0)}</span>
               <span>
-                {currentTime.toFixed(2)}s / {duration.toFixed(2)}s
+                {(currentTime || 0).toFixed(2)}s / {(duration || 0).toFixed(2)}s
               </span>
             </div>
             <input
