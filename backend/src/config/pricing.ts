@@ -14,7 +14,12 @@ export const calculateGranularCost = (
 
   // 1. PICDRIFT (Dashboard)
   if (mediaType === "video" && (model === "kling-2.5" || model === "kling-3")) {
-    // Basic duration pricing
+    // Kling 3 (PicDrift Plus)
+    if (model === "kling-3") {
+      if (duration === 10) return settings.pricePicDrift_Plus_10s;
+      return settings.pricePicDrift_Plus_5s;
+    }
+    // Kling 2.5 (Standard)
     if (duration === 10) return settings.pricePicDrift_10s;
     if (duration === 15) return settings.pricePicDrift_10s * 1.5; // Estimated 15s
     return settings.pricePicDrift_5s;
@@ -33,14 +38,21 @@ export const calculateGranularCost = (
     return settings.priceVideoFX1_10s;
   }
 
-  // 4. VIDEO FX 2 (OpenAI/Sora & Veo)
-  if (mediaType === "video" && (model === "sora-2" || model === "sora-2-pro" || model === "veo-3")) {
+  // 4. VIDEO FX 2 (OpenAI/Sora)
+  if (mediaType === "video" && (model === "sora-2" || model === "sora-2-pro")) {
     if (duration === 8) return settings.priceVideoFX2_8s;
-    if (duration === 12) return settings.priceVideoFX2_12s; // Veo doesn't do 12, but safe fallback
+    if (duration === 12) return settings.priceVideoFX2_12s;
     return settings.priceVideoFX2_4s;
   }
 
-  // 5. EDITOR TOOLS (Asset Library)
+  // 5. VIDEO FX 3 (Veo)
+  if (mediaType === "video" && model === "veo-3") {
+    if (duration === 6) return settings.priceVideoFX3_6s;
+    if (duration === 8) return settings.priceVideoFX3_8s;
+    return settings.priceVideoFX3_4s;
+  }
+
+  // 6. EDITOR TOOLS (Asset Library)
   if (mode === "standard") return settings.priceEditor_Standard;
   if (mode === "pro") return settings.priceEditor_Pro;
   if (mode === "enhance") return settings.priceEditor_Enhance;
@@ -60,12 +72,14 @@ export const getTargetPool = (
   | "creditsPicDrift"
   | "creditsImageFX"
   | "creditsVideoFX1"
-  | "creditsVideoFX2" => {
+  | "creditsVideoFX2"
+  | "creditsVideoFX3" => {
   if (model === "kling-2.5" || model === "kling-3") return "creditsPicDrift";
   if (mediaType === "image" || mediaType === "carousel")
     return "creditsImageFX";
   if (model?.includes("kie-sora")) return "creditsVideoFX1";
-  if (model?.includes("sora-2") || model === "veo-3") return "creditsVideoFX2";
+  if (model?.includes("sora-2")) return "creditsVideoFX2";
+  if (model === "veo-3") return "creditsVideoFX3";
 
   // Editor fallback
   return "creditsImageFX";

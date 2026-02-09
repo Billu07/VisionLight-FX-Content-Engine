@@ -17,6 +17,7 @@ model User {
   creditsImageFX   Float    @default(10)
   creditsVideoFX1  Float    @default(10)
   creditsVideoFX2  Float    @default(10)
+  creditsVideoFX3  Float    @default(10)
 
   // Keep legacy field as Float for safety
   creditBalance Float       @default(20)
@@ -41,6 +42,8 @@ model GlobalSettings {
   // --- PICDRIFT (Changed to Float for .01 support) ---
   pricePicDrift_5s   Float @default(1)
   pricePicDrift_10s  Float @default(2)
+  pricePicDrift_Plus_5s Float @default(2)
+  pricePicDrift_Plus_10s Float @default(3)
 
   // --- PIC FX (Changed to Float for .01 support) ---
   pricePicFX_Standard Float @default(1)
@@ -61,6 +64,11 @@ model GlobalSettings {
   priceVideoFX2_4s    Float @default(6)
   priceVideoFX2_8s    Float @default(4)
   priceVideoFX2_12s   Float @default(6)
+
+  // --- VIDEO FX 3 (VEO) ---
+  priceVideoFX3_4s    Float @default(4)
+  priceVideoFX3_6s    Float @default(5)
+  priceVideoFX3_8s    Float @default(6)
 
   // --- PATH TOOLS ---
   priceAsset_DriftPath Float @default(2)

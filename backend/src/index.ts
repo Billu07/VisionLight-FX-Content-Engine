@@ -352,6 +352,7 @@ app.get(
         creditsImageFX: u.creditsImageFX,
         creditsVideoFX1: u.creditsVideoFX1,
         creditsVideoFX2: u.creditsVideoFX2,
+        creditsVideoFX3: u.creditsVideoFX3,
         // ✅ Add settings so the user knows the prices
         prices: settings,
       });
@@ -371,6 +372,7 @@ app.post(
         creditsImageFX: 10,
         creditsVideoFX1: 10,
         creditsVideoFX2: 10,
+        creditsVideoFX3: 10,
       });
       res.json({ success: true, message: "Demo credits reset to all pools" });
     } catch (error: any) {

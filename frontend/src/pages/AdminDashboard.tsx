@@ -13,12 +13,15 @@ interface User {
   creditsImageFX: number;
   creditsVideoFX1: number;
   creditsVideoFX2: number;
+  creditsVideoFX3: number;
   role: "USER" | "MANAGER" | "ADMIN";
 }
 
 interface GlobalSettings {
   pricePicDrift_5s: number;
   pricePicDrift_10s: number;
+  pricePicDrift_Plus_5s: number;
+  pricePicDrift_Plus_10s: number;
   pricePicFX_Standard: number;
   pricePicFX_Carousel: number;
   pricePicFX_Batch: number;
@@ -27,6 +30,9 @@ interface GlobalSettings {
   priceVideoFX2_4s: number;
   priceVideoFX2_8s: number;
   priceVideoFX2_12s: number;
+  priceVideoFX3_4s: number;
+  priceVideoFX3_6s: number;
+  priceVideoFX3_8s: number;
   priceEditor_Standard: number;
   priceEditor_Pro: number;
   priceEditor_Enhance: number;
@@ -161,7 +167,8 @@ export default function AdminDashboard() {
         u.creditsPicDrift +
         u.creditsImageFX +
         u.creditsVideoFX1 +
-        u.creditsVideoFX2,
+        u.creditsVideoFX2 +
+        u.creditsVideoFX3,
       0,
     );
     return (totalCredits * baseBudgetRate).toLocaleString("en-US", {
@@ -291,6 +298,7 @@ export default function AdminDashboard() {
                     <th className="p-6 border-b border-white/5">PicFX</th>
                     <th className="p-6 border-b border-white/5">Video FX 1</th>
                     <th className="p-6 border-b border-white/5">Video FX 2</th>
+                    <th className="p-6 border-b border-white/5">Video FX 3</th>
                     <th className="p-6 border-b border-white/5 text-right">
                       Actions
                     </th>
@@ -340,6 +348,11 @@ export default function AdminDashboard() {
                         <td className="p-6">
                           <div className="text-base font-bold text-cyan-500">
                             {u.creditsVideoFX2.toFixed(2)} pts
+                          </div>
+                        </td>
+                        <td className="p-6">
+                          <div className="text-base font-bold text-teal-500">
+                            {u.creditsVideoFX3.toFixed(2)} pts
                           </div>
                         </td>
                         <td className="p-6 text-right">
@@ -404,6 +417,34 @@ export default function AdminDashboard() {
                         onChange={(e) =>
                           handleUpdateGlobalSettings({
                             pricePicDrift_10s: parseFloat(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex justify-between items-center border-t border-white/5 pt-4">
+                      <span className="text-xs text-rose-400 font-bold">Plus 5s</span>
+                      <input
+                        step="0.01"
+                        type="number"
+                        className="w-20 bg-gray-950 border border-gray-800 rounded p-2 text-center text-xs font-bold outline-none text-rose-400"
+                        value={settings.pricePicDrift_Plus_5s}
+                        onChange={(e) =>
+                          handleUpdateGlobalSettings({
+                            pricePicDrift_Plus_5s: parseFloat(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-rose-400 font-bold">Plus 10s</span>
+                      <input
+                        step="0.01"
+                        type="number"
+                        className="w-20 bg-gray-950 border border-gray-800 rounded p-2 text-center text-xs font-bold outline-none text-rose-400"
+                        value={settings.pricePicDrift_Plus_10s}
+                        onChange={(e) =>
+                          handleUpdateGlobalSettings({
+                            pricePicDrift_Plus_10s: parseFloat(e.target.value),
                           })
                         }
                       />
@@ -526,6 +567,55 @@ export default function AdminDashboard() {
                         onChange={(e) =>
                           handleUpdateGlobalSettings({
                             priceVideoFX2_12s: parseFloat(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-900 p-6 rounded-2xl border border-teal-500/20">
+                  <h3 className="text-[10px] font-black text-teal-500 uppercase tracking-widest mb-6">
+                    Video FX 3
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-400">4s Gen</span>
+                      <input
+                        step="0.01"
+                        type="number"
+                        className="w-20 bg-gray-950 border border-gray-800 rounded p-2 text-center text-xs font-bold"
+                        value={settings.priceVideoFX3_4s}
+                        onChange={(e) =>
+                          handleUpdateGlobalSettings({
+                            priceVideoFX3_4s: parseFloat(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-400">6s Gen</span>
+                      <input
+                        step="0.01"
+                        type="number"
+                        className="w-20 bg-gray-950 border border-gray-800 rounded p-2 text-center text-xs font-bold"
+                        value={settings.priceVideoFX3_6s}
+                        onChange={(e) =>
+                          handleUpdateGlobalSettings({
+                            priceVideoFX3_6s: parseFloat(e.target.value),
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-400">8s Gen</span>
+                      <input
+                        step="0.01"
+                        type="number"
+                        className="w-20 bg-gray-950 border border-gray-800 rounded p-2 text-center text-xs font-bold"
+                        value={settings.priceVideoFX3_8s}
+                        onChange={(e) =>
+                          handleUpdateGlobalSettings({
+                            priceVideoFX3_8s: parseFloat(e.target.value),
                           })
                         }
                       />
@@ -696,6 +786,7 @@ export default function AdminDashboard() {
                         <option value="creditsImageFX">PicFX</option>
                         <option value="creditsVideoFX1">VideoFX 1</option>
                         <option value="creditsVideoFX2">VideoFX 2</option>
+                        <option value="creditsVideoFX3">VideoFX 3</option>
                       </select>
                     </div>
                     <div>

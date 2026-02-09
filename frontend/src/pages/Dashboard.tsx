@@ -234,6 +234,7 @@ function Dashboard() {
       creditsImageFX: 0,
       creditsVideoFX1: 0,
       creditsVideoFX2: 0,
+      creditsVideoFX3: 0,
     },
     isLoading: creditsLoading,
   } = useQuery({
@@ -254,7 +255,8 @@ function Dashboard() {
     (credits?.creditsPicDrift || 0) +
     (credits?.creditsImageFX || 0) +
     (credits?.creditsVideoFX1 || 0) +
-    (credits?.creditsVideoFX2 || 0);
+    (credits?.creditsVideoFX2 || 0) +
+    (credits?.creditsVideoFX3 || 0);
 
   // ✅ 4. UI HELPERS
   const formatBal = (val: number) => (isCommercial ? `$${val}` : `${val}`);
@@ -420,9 +422,13 @@ function Dashboard() {
   const handleGenericUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    const maxFiles = 14;
+    
+    let maxFiles = 1;
+    if (activeEngine === "studio" && studioMode === "carousel") maxFiles = 14;
+    if (activeEngine === "veo") maxFiles = 3;
+
     if (files.length + referenceImages.length > maxFiles) {
-      alert(`❌ Only ${maxFiles} image(s) allowed for this mode.`);
+      alert(`❌ Only ${maxFiles} file(s) allowed for this mode.`);
       return;
     }
     const newFiles = Array.from(files);
@@ -490,7 +496,7 @@ function Dashboard() {
       formData.append("generateAudio", picDriftAudio.toString());
       if (picDriftFrames.start)
         formData.append("referenceImages", picDriftFrames.start);
-      if (picDriftFrames.end && !picDriftAudio)
+      if (picDriftFrames.end && (!picDriftAudio || picDriftMode === 'plus'))
         formData.append("referenceImages", picDriftFrames.end);
       formData.append("duration", kieDuration.toString());
       formData.append("aspectRatio", kieAspect);
@@ -519,6 +525,9 @@ function Dashboard() {
       formData.append("duration", veoDuration.toString());
       formData.append("resolution", veoResolution);
       formData.append("aspectRatio", aspectRatio); // Reuse aspect ratio state
+      referenceImages.forEach((file) =>
+        formData.append("referenceImages", file),
+      );
     } else {
       formData.append("mediaType", studioMode);
       let sizeStr = "1024x1024";
@@ -546,6 +555,8 @@ function Dashboard() {
     else if (activeEngine === "kie") hasBalance = credits.creditsVideoFX1 > 0;
     else if (activeEngine === "openai")
       hasBalance = credits.creditsVideoFX2 > 0;
+    else if (activeEngine === "veo")
+      hasBalance = credits.creditsVideoFX3 > 0;
 
     if (!hasBalance) {
       setShowNoCreditsModal(true);
@@ -899,7 +910,7 @@ function Dashboard() {
                     </div>
 
                     {/* VIDEO FX 2 POOL */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 border-r border-white/10 pr-4">
                       <span className="text-lg"></span>
                       <div className="flex flex-col">
                         <span className="text-cyan-400 font-bold text-sm leading-none">
@@ -907,6 +918,19 @@ function Dashboard() {
                         </span>
                         <span className="text-[8px] text-gray-500 uppercase font-black">
                           Video FX 2
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* VIDEO FX 3 POOL */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg"></span>
+                      <div className="flex flex-col">
+                        <span className="text-indigo-400 font-bold text-sm leading-none">
+                          {formatBal(credits.creditsVideoFX3)}
+                        </span>
+                        <span className="text-[8px] text-gray-500 uppercase font-black">
+                          Video FX 3
                         </span>
                       </div>
                     </div>
@@ -1334,10 +1358,10 @@ function Dashboard() {
                         </div>
 
                         {/* End Frame */}
-                        <div className={`flex flex-col gap-2 ${picDriftAudio ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
+                        <div className={`flex flex-col gap-2 ${picDriftAudio && picDriftMode !== 'plus' ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
                           <div className="flex justify-between items-center">
                             <label className="text-xs text-rose-300 font-bold">
-                              {picDriftAudio ? 'Pic 2 - Disabled (Audio On)' : 'Pic 2 - End Frame (optional)'}
+                              {picDriftAudio && picDriftMode !== 'plus' ? 'Pic 2 - Disabled (Audio On)' : 'Pic 2 - End Frame (optional)'}
                             </label>
                           </div>
                           <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
@@ -1588,8 +1612,8 @@ function Dashboard() {
                                 checked={picDriftAudio}
                                 onChange={(e) => {
                                   setPicDriftAudio(e.target.checked);
-                                  // If audio enabled, clear end frame
-                                  if (e.target.checked) {
+                                  // If audio enabled, clear end frame ONLY if standard mode
+                                  if (e.target.checked && picDriftMode !== 'plus') {
                                     setPicDriftFrames(prev => ({ ...prev, end: null }));
                                     setPicDriftUrls(prev => ({ ...prev, end: null }));
                                   }
@@ -1599,7 +1623,7 @@ function Dashboard() {
                               <div>
                                 <div className="font-semibold text-white text-sm">Generate Audio</div>
                                 <div className="text-xs text-gray-400">
-                                  AI generated sound effects (Disables End Frame)
+                                  AI generated sound effects {picDriftMode === 'plus' ? '(Supported with End Frame)' : '(Disables End Frame)'}
                                 </div>
                               </div>
                             </label>
@@ -1734,151 +1758,235 @@ function Dashboard() {
                     {/* VEO 3 SETTINGS (Video FX 3) */}
                     {currentVisualTab === "videofx" &&
                       activeEngine === "veo" && (
-                        <div className="space-y-4 sm:space-y-6 animate-in fade-in">
-
-                          <div className="space-y-2">
-                            <label className="block text-sm font-semibold text-white">
-                              Aspect Ratio
+                        <div className="space-y-6 animate-in fade-in duration-500">
+                          <div className="space-y-3">
+                            <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
+                              Canvas Ratio
                             </label>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-2 gap-3">
                               {[
-                                { ratio: "16:9", label: "Landscape" },
-                                { ratio: "9:16", label: "Portrait" },
+                                { ratio: "16:9", label: "Cinematic Landscape" },
+                                { ratio: "9:16", label: "Social Portrait" },
                               ].map(({ ratio, label }) => (
                                 <button
                                   key={ratio}
                                   type="button"
                                   onClick={() => setAspectRatio(ratio as any)}
-                                  className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${
+                                  className={`py-4 px-4 rounded-xl border transition-all text-center ${
                                     aspectRatio === ratio
-                                      ? "border-purple-400 bg-purple-500/20"
-                                      : "border-white/10 bg-gray-800/50"
+                                      ? "border-indigo-500 bg-indigo-500/10 text-indigo-100 shadow-[0_0_20px_rgba(99,102,241,0.1)]"
+                                      : "border-slate-800 bg-slate-900/40 text-slate-500 hover:border-slate-700"
                                   }`}
                                 >
-                                  <div className="font-semibold text-white text-sm">
+                                  <div className="text-xs font-medium tracking-tight">
                                     {label}
                                   </div>
                                 </button>
                               ))}
                             </div>
                           </div>
-                          <div className="space-y-2">
-                            <label className="block text-sm font-semibold text-white">
-                              Resolution
-                            </label>
-                            <div className="grid grid-cols-3 gap-2">
-                              {["720p", "1080p", "4k"].map((res) => (
-                                <button
-                                  key={res}
-                                  type="button"
-                                  onClick={() => setVeoResolution(res as any)}
-                                  className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${
-                                    veoResolution === res
-                                      ? "border-green-400 bg-green-500/20"
-                                      : "border-white/10 bg-gray-800/50"
-                                  }`}
-                                >
-                                  <div className="font-semibold text-white text-sm">
+
+                          <div className="grid grid-cols-2 gap-6">
+                            <div className="space-y-3">
+                              <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
+                                Resolution
+                              </label>
+                              <div className="flex bg-slate-900/60 p-1 rounded-xl border border-slate-800">
+                                {["720p", "1080p", "4k"].map((res) => (
+                                  <button
+                                    key={res}
+                                    type="button"
+                                    onClick={() => setVeoResolution(res as any)}
+                                    className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${
+                                      veoResolution === res
+                                        ? "bg-indigo-500 text-white"
+                                        : "text-slate-500 hover:text-slate-300"
+                                    }`}
+                                  >
                                     {res.toUpperCase()}
-                                  </div>
-                                </button>
-                              ))}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                          <div className="space-y-2">
-                            <label className="block text-sm font-semibold text-white">
-                              Duration
-                            </label>
-                            <div className="flex gap-2">
-                              {[4, 6, 8].map((sec) => (
-                                <button
-                                  key={sec}
-                                  type="button"
-                                  onClick={() => setVeoDuration(sec as any)}
-                                  className={`px-3 py-2 rounded-xl border text-sm flex-1 ${
-                                    veoDuration === sec
-                                      ? "bg-cyan-500 border-cyan-500 text-white"
-                                      : "bg-gray-800/50 border-white/10 text-purple-200"
-                                  }`}
-                                >
-                                  {sec}s
-                                </button>
-                              ))}
+
+                            <div className="space-y-3">
+                              <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
+                                Duration
+                              </label>
+                              <div className="flex bg-slate-900/60 p-1 rounded-xl border border-slate-800">
+                                {[4, 6, 8].map((sec) => (
+                                  <button
+                                    key={sec}
+                                    type="button"
+                                    onClick={() => setVeoDuration(sec as any)}
+                                    className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${
+                                      veoDuration === sec
+                                        ? "bg-indigo-500 text-white"
+                                        : "text-slate-500 hover:text-slate-300"
+                                    }`}
+                                  >
+                                    {sec}s
+                                  </button>
+                                ))}
+                              </div>
                             </div>
                           </div>
                         </div>
                       )}
 
-                    {/* 4. REFERENCE IMAGES (Moved to End for Non-PicDrift) */}
+                    {/* 4. REFERENCE IMAGES */}
                     {activeEngine !== "kie" || videoFxMode !== "picdrift" ? (
-                      <div className="space-y-2 sm:space-y-3">
+                      <div className="space-y-4">
                         <div className="flex justify-between items-center">
-                          <label className="block text-sm font-semibold text-white">
-                            Reference Images
+                          <label className={`block text-sm font-semibold ${activeEngine === 'veo' ? 'text-indigo-200' : 'text-white'}`}>
+                            {activeEngine === "veo" ? "Composition Assets" : "Reference Images"}
                           </label>
-                        </div>
-                        <div className="space-y-3">
-                          <div className="w-full h-24 border-2 border-dashed border-gray-600 rounded-xl hover:border-cyan-500 hover:bg-gray-800/50 transition-all group relative flex items-center justify-center">
-                            <div className="flex items-center gap-6">
-                              <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
-                                <span className="text-2xl mb-1">📂</span>
-                                <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
-                                  Upload File
-                                </span>
-                                <input
-                                  type="file"
-                                  className="hidden"
-                                  multiple={
-                                    activeEngine === "studio" &&
-                                    studioMode === "carousel"
-                                  }
-                                  accept="image/*"
-                                  onChange={handleGenericUpload}
-                                />
-                              </label>
-                              <div className="h-8 w-px bg-gray-600"></div>
-                              <button
-                                type="button"
-                                onClick={() => setActiveLibrarySlot("generic")}
-                                className="flex flex-col items-center group-hover:scale-105 transition-transform"
-                              >
-                                <span className="text-2xl mb-1">📚</span>
-                                <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
-                                  From Library
-                                </span>
-                              </button>
-                            </div>
-                            <p className="absolute bottom-2 text-[10px] text-gray-600">
-                              {activeEngine === "studio" &&
-                              studioMode === "carousel"
-                                ? "Up to 14 images"
-                                : "Single frame"}{" "}
-                              (PNG/JPG)
-                            </p>
-                          </div>
-                          {referenceImageUrls.length > 0 && (
-                            <div className="grid grid-cols-5 gap-2 animate-in fade-in">
-                              {referenceImageUrls.map((url, index) => (
-                                <div
-                                  key={index}
-                                  className="relative aspect-square group"
-                                >
-                                  <img
-                                    src={url}
-                                    className="w-full h-full object-cover rounded-lg border border-white/20"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => removeGenericImage(index)}
-                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs"
-                                  >
-                                    ✕
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
+                          {activeEngine === "veo" && (
+                            <span className="text-[9px] text-slate-500 uppercase tracking-widest font-medium">
+                              Input Sequential Logic
+                            </span>
                           )}
                         </div>
+
+                        {activeEngine === "veo" ? (
+                          /* VEO 3 SPECIALIZED SLOTS - MINIMALIST AESTHETIC */
+                          <div className="grid grid-cols-3 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                            {[
+                              { label: "Temporal Start", sub: "I2V Source" },
+                              { label: "Temporal End", sub: "F+L Anchor" },
+                              { label: "Subject Sync", sub: "Identity Ref" },
+                            ].map((slot, idx) => (
+                              <div key={idx} className="flex flex-col gap-3">
+                                <div className="relative aspect-[3/4] bg-[#0a0c10] border border-slate-800 rounded-xl overflow-hidden hover:border-indigo-500/50 transition-all group">
+                                  {referenceImageUrls[idx] ? (
+                                    <>
+                                      {referenceImageUrls[idx].includes("video") || referenceImageUrls[idx].endsWith(".mp4") ? (
+                                        <video 
+                                          src={referenceImageUrls[idx]} 
+                                          className="w-full h-full object-cover"
+                                          muted
+                                          onMouseEnter={(e) => e.currentTarget.play()}
+                                          onMouseLeave={(e) => e.currentTarget.pause()}
+                                        />
+                                      ) : (
+                                        <img
+                                          src={referenceImageUrls[idx]}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      )}
+                                      <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                        <button
+                                          type="button"
+                                          onClick={() => removeGenericImage(idx)}
+                                          className="text-[10px] font-bold text-white uppercase tracking-widest px-3 py-1 bg-red-900/80 rounded-full"
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="w-full h-full flex flex-col items-center justify-center p-4">
+                                      <label className="cursor-pointer w-full h-full flex flex-col items-center justify-center gap-2">
+                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest group-hover:text-indigo-400 transition-colors text-center">
+                                          Select Asset
+                                        </span>
+                                        <input
+                                          type="file"
+                                          className="hidden"
+                                          accept="image/*,video/*"
+                                          onChange={(e) => {
+                                             const file = e.target.files?.[0];
+                                             if(!file) return;
+                                             const newRefs = [...referenceImages];
+                                             const newUrls = [...referenceImageUrls];
+                                             newRefs[idx] = file;
+                                             newUrls[idx] = URL.createObjectURL(file);
+                                             setReferenceImages(newRefs.filter(Boolean));
+                                             setReferenceImageUrls(newUrls.filter(Boolean));
+                                          }}
+                                        />
+                                      </label>
+                                      <button
+                                        type="button"
+                                        onClick={() => setActiveLibrarySlot("generic")}
+                                        className="absolute bottom-3 text-[9px] font-bold text-indigo-400/60 uppercase tracking-tighter hover:text-indigo-400 transition-all"
+                                      >
+                                        Library
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="px-1">
+                                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter truncate">{slot.label}</div>
+                                  <div className="text-[8px] text-slate-600 uppercase tracking-tight">{slot.sub}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          /* GENERIC UPLOAD BOX (Pic FX, Video FX 1&2) */
+                          <div className="space-y-3">
+                            <div className="w-full h-24 border-2 border-dashed border-gray-600 rounded-xl hover:border-cyan-500 hover:bg-gray-800/50 transition-all group relative flex items-center justify-center">
+                              <div className="flex items-center gap-6">
+                                <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
+                                  <span className="text-2xl mb-1">📂</span>
+                                  <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
+                                    Upload File
+                                  </span>
+                                  <input
+                                    type="file"
+                                    className="hidden"
+                                    multiple={activeEngine === "studio" && studioMode === "carousel"}
+                                    accept="image/*,video/*"
+                                    onChange={handleGenericUpload}
+                                  />
+                                </label>
+                                <div className="h-8 w-px bg-gray-600"></div>
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveLibrarySlot("generic")}
+                                  className="flex flex-col items-center group-hover:scale-105 transition-transform"
+                                >
+                                  <span className="text-2xl mb-1">📚</span>
+                                  <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
+                                    From Library
+                                  </span>
+                                </button>
+                              </div>
+                              <p className="absolute bottom-2 text-[10px] text-gray-600">
+                                {activeEngine === "studio" && studioMode === "carousel"
+                                  ? "Up to 14 images"
+                                  : "Single frame (PNG/JPG/MP4)"}
+                              </p>
+                            </div>
+                            {referenceImageUrls.length > 0 && (
+                              <div className="grid grid-cols-5 gap-2 animate-in fade-in">
+                                {referenceImageUrls.map((url, index) => (
+                                  <div key={index} className="relative aspect-square group">
+                                    {url.includes("video") || url.endsWith(".mp4") ? (
+                                      <video 
+                                        src={url} 
+                                        className="w-full h-full object-cover rounded-lg border border-white/20"
+                                        muted
+                                        onMouseEnter={(e) => e.currentTarget.play()}
+                                        onMouseLeave={(e) => e.currentTarget.pause()}
+                                      />
+                                    ) : (
+                                      <img src={url} className="w-full h-full object-cover rounded-lg border border-white/20" />
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => removeGenericImage(index)}
+                                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : null}
 
@@ -1888,7 +1996,11 @@ function Dashboard() {
                       disabled={
                         generateMediaMutation.isPending || !prompt.trim()
                       }
-                      className="w-full gradient-brand text-white py-4 sm:py-5 px-6 sm:px-8 rounded-2xl hover:shadow-2xl disabled:opacity-50 font-bold text-base sm:text-lg flex flex-col items-center justify-center gap-1"
+                      className={`w-full py-4 sm:py-5 px-6 sm:px-8 rounded-2xl transition-all disabled:opacity-50 font-bold text-base sm:text-lg flex flex-col items-center justify-center gap-1 ${
+                        activeEngine === 'veo' 
+                          ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_4px_20px_rgba(79,70,229,0.2)]' 
+                          : 'gradient-brand text-white hover:shadow-2xl'
+                      }`}
                     >
                       {generateMediaMutation.isPending ? (
                         <div className="flex items-center gap-3">
@@ -1903,18 +2015,13 @@ function Dashboard() {
                           </span>
                         </div>
                       ) : (
-                        <>
-                          <div className="flex items-center gap-3">
-                            <span className="text-xl"></span>
-                            <span>
-                              {currentVisualTab === "picdrift"
-                                ? "Generate PicDrift"
-                                : currentVisualTab === "studio"
-                                  ? "Generate Image"
-                                  : "Generate Video"}
-                            </span>
-                          </div>
-                        </>
+                        <div className="flex items-center gap-3 uppercase tracking-widest text-sm">
+                          {currentVisualTab === "picdrift"
+                            ? "Generate PicDrift"
+                            : currentVisualTab === "studio"
+                              ? "Generate Image"
+                              : "Generate Video"}
+                        </div>
                       )}
                     </button>
                   </>

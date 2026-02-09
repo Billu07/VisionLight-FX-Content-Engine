@@ -46,6 +46,7 @@ export const dbService = {
         creditsImageFX: 10,
         creditsVideoFX1: 10,
         creditsVideoFX2: 10,
+        creditsVideoFX3: 10,
         creditSystem: "COMMERCIAL",
         role: "USER",
       },
@@ -98,7 +99,8 @@ export const dbService = {
       | "creditsPicDrift"
       | "creditsImageFX"
       | "creditsVideoFX1"
-      | "creditsVideoFX2",
+      | "creditsVideoFX2"
+      | "creditsVideoFX3",
     amount: number,
   ) {
     return prisma.user.update({
@@ -113,7 +115,8 @@ export const dbService = {
       | "creditsPicDrift"
       | "creditsImageFX"
       | "creditsVideoFX1"
-      | "creditsVideoFX2",
+      | "creditsVideoFX2"
+      | "creditsVideoFX3",
     amount: number,
   ) {
     return prisma.user.update({

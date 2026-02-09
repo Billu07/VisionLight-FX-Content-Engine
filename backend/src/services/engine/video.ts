@@ -171,8 +171,14 @@ export const videoLogic = {
       `🎬 Video Gen for ${postId} | Model: ${params.model} | AR: ${params.aspectRatio}`,
     );
     const isKie = params.model.includes("kie");
+    // Check for Kling variants
     const isKling = params.model.includes("kling");
-    const isOpenAI = !isKie && !isKling;
+    const isKling3 = params.model === "kling-3";
+
+    // Check for Veo
+    const isVeo = params.model === "veo-3";
+
+    const isOpenAI = !isKie && !isKling && !isVeo;
     const isPro = params.model.includes("pro") || params.model.includes("Pro");
 
     try {
@@ -203,10 +209,22 @@ export const videoLogic = {
         }
       }
 
+      // For Veo 4K
+      if (isVeo && params.resolution === "4k") {
+        if (targetRatioString === "16:9") {
+          targetWidth = 3840;
+          targetHeight = 2160;
+        } else if (targetRatioString === "9:16") {
+          targetWidth = 2160;
+          targetHeight = 3840;
+        }
+      }
+
       let finalInputImageBuffer: Buffer | undefined;
       const rawRefUrl = params.imageReferences?.[0] || params.imageReference;
 
-      if (rawRefUrl && params.hasReferenceImage) {
+      // Veo does not support image input (Text-to-Video only)
+      if (rawRefUrl && params.hasReferenceImage && !isVeo) {
         try {
           const imageResponse = await axios.get(getOptimizedUrl(rawRefUrl), {
             responseType: "arraybuffer",
@@ -248,7 +266,78 @@ export const videoLogic = {
       let statusUrl = "";
       let provider = "";
 
-      if (isKling) {
+      if (isVeo) {
+        provider = "kling"; // Using Fal infrastructure
+
+        let endpoint = "fal-ai/veo3.1/image-to-video"; // Default to I2V if image present
+        const payload: any = {
+          prompt: finalPrompt,
+          resolution: params.resolution || "1080p",
+          aspect_ratio: targetRatioString === "16:9" ? "16:9" : "9:16",
+          duration: params.duration ? `${params.duration}s` : "8s",
+          generate_audio: true,
+        };
+
+        // 1. REFERENCE TO VIDEO (3 images)
+        if (params.imageReferences?.length === 3) {
+          endpoint = "fal-ai/veo3.1/reference-to-video";
+          const urls = await Promise.all(
+            params.imageReferences.map((ref: any) => getOptimizedUrl(ref)),
+          );
+          payload.image_urls = urls;
+        }
+        // 2. FIRST + LAST FRAME MODE (Exactly 2 images)
+        else if (params.imageReferences?.length === 2) {
+          endpoint = "fal-ai/veo3.1/first-last-frame-to-video";
+
+          const [firstUrl, lastUrl] = await Promise.all([
+            getOptimizedUrl(params.imageReferences[0]),
+            getOptimizedUrl(params.imageReferences[1]),
+          ]);
+
+          payload.first_frame_url = firstUrl;
+          payload.last_frame_url = lastUrl;
+        }
+        // 3. IMAGE TO VIDEO (Single Image)
+        else if (finalInputImageBuffer) {
+          endpoint = "fal-ai/veo3.1/image-to-video";
+          const veoInputUrl = await uploadToCloudinary(
+            finalInputImageBuffer,
+            `${postId}_veo_input`,
+            params.userId,
+            "Veo Input",
+            "image",
+          );
+          payload.image_url = veoInputUrl;
+        } else if (params.imageReference) {
+          // Check if it's a video for Extension
+          if (
+            params.imageReference.endsWith(".mp4") ||
+            params.imageReference.includes("/video/")
+          ) {
+            endpoint = "fal-ai/veo3.1/extend-video";
+            payload.video_url = getOptimizedUrl(params.imageReference);
+            delete payload.resolution;
+            delete payload.aspect_ratio;
+          } else {
+            endpoint = "fal-ai/veo3.1/image-to-video";
+            payload.image_url = getOptimizedUrl(params.imageReference);
+          }
+        } else {
+          // 4. TEXT TO VIDEO
+          endpoint = "fal-ai/veo3.1";
+        }
+
+        const url = `https://queue.fal.run/${endpoint}`;
+        const submitRes = await axios.post(url, payload, {
+          headers: {
+            Authorization: `Key ${FAL_KEY}`,
+            "Content-Type": "application/json",
+          },
+        });
+        externalId = submitRes.data.request_id;
+        statusUrl = submitRes.data.status_url;
+      } else if (isKling) {
         provider = "kling";
         let klingInputUrl = "";
         let klingEndUrl = "";
@@ -292,23 +381,46 @@ export const videoLogic = {
           isImageToVideo = true;
         }
 
-        const url = `${FAL_BASE_PATH}/${
-          isImageToVideo ? "image-to-video" : "text-to-video"
-        }`;
-
+        // Determine URL and Payload based on Version
+        let url = "";
         const payload: any = {
           prompt: finalPrompt,
           duration: params.duration ? params.duration.toString() : "5",
         };
 
-        if (isImageToVideo) {
-          payload.start_image_url = klingInputUrl;
-          if (klingEndUrl) {
-            payload.end_image_url = klingEndUrl;
-            payload.generate_audio = false;
+        if (isKling3) {
+          // Kling 3 (PicDrift Plus)
+          const base = "https://queue.fal.run/fal-ai/kling-video/o3/standard";
+          url = `${base}/${isImageToVideo ? "image-to-video" : "text-to-video"}`;
+
+          if (isImageToVideo) {
+            payload.image_url = klingInputUrl; // v3 uses image_url
+            if (klingEndUrl) {
+              payload.end_image_url = klingEndUrl;
+            }
+            // Audio allowed with end frame in v3
+            payload.generate_audio =
+              params.generateAudio === "true" || params.generateAudio === true;
+          } else {
+            payload.aspect_ratio = targetRatioString;
+            payload.generate_audio = true;
           }
         } else {
-          payload.aspect_ratio = targetRatioString;
+          // Kling 2.5 (Standard)
+          url = `${FAL_BASE_PATH}/${isImageToVideo ? "image-to-video" : "text-to-video"}`;
+
+          if (isImageToVideo) {
+            payload.start_image_url = klingInputUrl; // v2.6 uses start_image_url
+            if (klingEndUrl) {
+              payload.end_image_url = klingEndUrl;
+              // v2.6 constraint: NO audio with end frame
+              payload.generate_audio = false;
+            } else {
+              payload.generate_audio = false; // Default off for PicDrift unless specified? Dashboard assumes false for v2.5?
+            }
+          } else {
+            payload.aspect_ratio = targetRatioString;
+          }
         }
 
         const submitRes = await axios.post(url, payload, {
