@@ -578,7 +578,7 @@ app.post(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { assetUrl, prompt, horizontal, vertical, zoom, aspectRatio } =
+      const { assetUrl, prompt, horizontal, vertical, zoom, aspectRatio, generateAudio } =
         req.body;
 
       const [settings, user] = await Promise.all([
@@ -609,6 +609,7 @@ app.post(
         Number(vertical),
         Number(zoom),
         aspectRatio,
+        generateAudio === "true" || generateAudio === true,
       );
       res.json(result);
     } catch (error: any) {
@@ -878,6 +879,7 @@ app.post(
         width,
         height,
         title,
+        generateAudio,
       } = req.body;
 
       // 1. Fetch Global Pricing & User (Keeps original data fetch intact)
@@ -927,6 +929,7 @@ app.post(
         duration: duration ? parseInt(duration) : undefined,
         model,
         aspectRatio,
+        generateAudio,
         imageReference: primaryRefUrl,
         imageReferences: uploadedUrls,
         hasReferenceImage: uploadedUrls.length > 0,

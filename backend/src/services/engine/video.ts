@@ -21,12 +21,17 @@ import {
 // Convert Sliders to Prompt
 const getKlingCameraPrompt = (h: number, v: number, z: number) => {
   const parts: string[] = [];
-  if (h > 10) parts.push("Camera orbits right");
-  else if (h < -10) parts.push("Camera orbits left");
-  if (v > 10) parts.push("Camera cranes up");
-  else if (v < -10) parts.push("Camera cranes down");
-  if (z > 5.5) parts.push("Camera zooms in");
-  else if (z < 4.5) parts.push("Camera zooms out");
+  // Thresholds adjusted for -10 to 10 range (Frontend sliders)
+  if (h > 1) parts.push("Camera orbits right");
+  else if (h < -1) parts.push("Camera orbits left");
+  if (v > 1) parts.push("Camera cranes up");
+  else if (v < -1) parts.push("Camera cranes down");
+  
+  // Zoom logic: Zoom slider is -10 to 10 in frontend
+  // Mapping: > 0 is In, < 0 is Out
+  if (z > 1) parts.push("Camera zooms in");
+  else if (z < -1) parts.push("Camera zooms out");
+
   if (parts.length === 0) return "Static camera, subtle motion";
   return parts.join(", ") + ". Smooth cinematic movement.";
 };
@@ -109,16 +114,19 @@ export const videoLogic = {
       }
 
       const cameraMove = getKlingCameraPrompt(horizontal, vertical, zoom);
-      const finalPrompt = `Subject: ${
-        prompt || "The main subject"
-      }. Action: ${cameraMove}. Style: High fidelity, smooth motion, 3D depth.`;
+      
+      // ✅ IMPROVED PROMPT LOGIC:
+      // If user provides a prompt, we use it as the subject.
+      // If not, we describe the scene generally but prioritize the camera movement.
+      const subject = prompt?.trim() || "The scene";
+      const finalPrompt = `${subject}. Action: ${cameraMove}. Style: High fidelity, smooth motion, cinematic 3D depth, professional lighting.`;
 
       // ✅ 2.6 Payload
       const payload: any = {
         prompt: finalPrompt,
         start_image_url: finalImageUrl,
         duration: "5",
-        generate_audio: false,
+        generate_audio: generateAudio,
       };
 
       const url = `${FAL_BASE_PATH}/image-to-video`;
@@ -416,7 +424,8 @@ export const videoLogic = {
               // v2.6 constraint: NO audio with end frame
               payload.generate_audio = false;
             } else {
-              payload.generate_audio = false; // Default off for PicDrift unless specified? Dashboard assumes false for v2.5?
+              payload.generate_audio =
+                params.generateAudio === "true" || params.generateAudio === true;
             }
           } else {
             payload.aspect_ratio = targetRatioString;
