@@ -1159,6 +1159,36 @@ function Dashboard() {
                 </div>
               )}
 
+              {/* PICDRIFT SUB-MENU */}
+              {currentVisualTab === "picdrift" && (
+                <div className="mb-6 animate-in fade-in space-y-4">
+                  <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
+                    <button
+                      type="button"
+                      onClick={() => setPicDriftMode("standard")}
+                      className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                        picDriftMode === "standard"
+                          ? "bg-rose-600 text-white shadow-lg"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      Standard
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPicDriftMode("plus")}
+                      className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                        picDriftMode === "plus"
+                          ? "bg-rose-600 text-white shadow-lg"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      PicDrift Plus
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* VIDEO FX SUB-MENU */}
               {currentVisualTab === "videofx" && (
                 <div className="mb-6 animate-in fade-in space-y-4">
@@ -1501,32 +1531,6 @@ function Dashboard() {
                     {/* PICDRIFT SETTINGS */}
                     {currentVisualTab === "picdrift" && (
                       <div className="space-y-6 mb-6">
-                        {/* Mode Selector */}
-                        <div className="flex bg-gray-900/50 p-1 rounded-xl border border-white/5">
-                          <button
-                            type="button"
-                            onClick={() => setPicDriftMode("standard")}
-                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                              picDriftMode === "standard"
-                                ? "bg-rose-600 text-white shadow-lg"
-                                : "text-gray-400 hover:text-white"
-                            }`}
-                          >
-                            PicDrift (2.6)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setPicDriftMode("plus")}
-                            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                              picDriftMode === "plus"
-                                ? "bg-gradient-to-r from-rose-500 to-purple-500 text-white shadow-lg"
-                                : "text-gray-400 hover:text-white"
-                            }`}
-                          >
-                            PicDrift Plus (3.0)
-                          </button>
-                        </div>
-
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                           <div>
                             <label className="text-sm font-semibold text-white mb-2 block">
@@ -1731,16 +1735,7 @@ function Dashboard() {
                     {currentVisualTab === "videofx" &&
                       activeEngine === "veo" && (
                         <div className="space-y-4 sm:space-y-6 animate-in fade-in">
-                          <div className="space-y-2">
-                            <label className="block text-sm font-semibold text-white">
-                              AI Model
-                            </label>
-                            <div className="p-3 rounded-2xl border-2 border-cyan-400 bg-cyan-500/20 text-left text-sm font-medium">
-                              <div className="font-semibold text-white text-sm">
-                                Veo 3.1 (Google)
-                              </div>
-                            </div>
-                          </div>
+
                           <div className="space-y-2">
                             <label className="block text-sm font-semibold text-white">
                               Aspect Ratio
