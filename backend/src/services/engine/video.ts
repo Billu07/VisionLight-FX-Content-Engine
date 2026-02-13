@@ -275,66 +275,65 @@ export const videoLogic = {
       let provider = "";
 
       if (isVeo) {
-        provider = "kling"; // Using Fal infrastructure
+        provider = "kling"; // Using Fal infrastructure (wrapper)
 
-        let endpoint = "fal-ai/veo3.1/image-to-video"; // Default to I2V if image present
+        let endpoint = "fal-ai/veo3.1"; // Default Text-to-Video
         const payload: any = {
           prompt: finalPrompt,
-          resolution: params.resolution || "1080p",
+          resolution: params.resolution || "720p", // Default to 720p for safety
           aspect_ratio: targetRatioString === "16:9" ? "16:9" : "9:16",
           duration: params.duration ? `${params.duration}s` : "8s",
           generate_audio: true,
         };
 
-        // 1. REFERENCE TO VIDEO (3 images)
-        if (params.imageReferences?.length === 3) {
-          endpoint = "fal-ai/veo3.1/reference-to-video";
-          const urls = await Promise.all(
-            params.imageReferences.map((ref: any) => getOptimizedUrl(ref)),
-          );
-          payload.image_urls = urls;
-        }
-        // 2. FIRST + LAST FRAME MODE (Exactly 2 images)
-        else if (params.imageReferences?.length === 2) {
-          endpoint = "fal-ai/veo3.1/first-last-frame-to-video";
-
-          const [firstUrl, lastUrl] = await Promise.all([
-            getOptimizedUrl(params.imageReferences[0]),
-            getOptimizedUrl(params.imageReferences[1]),
-          ]);
-
-          payload.first_frame_url = firstUrl;
-          payload.last_frame_url = lastUrl;
-        }
-        // 3. IMAGE TO VIDEO (Single Image)
+        // Determine Mode based on Input
+        // 1. EXTEND VIDEO (Input is a Video URL)
+        if (
+          params.imageReference &&
+          (params.imageReference.endsWith(".mp4") ||
+            params.imageReference.includes("/video/") ||
+            params.imageReference.includes("cloudinary.com")) &&
+            // Simple heuristic to check if it looks like a video
+             !params.imageReference.match(/\.(jpg|jpeg|png|webp)$/i)
+        ) {
+          endpoint = "fal-ai/veo3.1/extend-video";
+          payload.video_url = getOptimizedUrl(params.imageReference);
+          
+          // Extend Video specific constraints
+          // API says: "Input videos up to 8 seconds"
+          // API says: "duration" enum: "7s" (Wait, docs say "Default value: 7s", "Possible enum values: 7s")
+          // Let's force 7s or stick to what API allows if different.
+          // The API text says "Possible enum values: 7s" for Extend Video.
+          payload.duration = "7s"; 
+          
+          // Remove unsupported params for extend
+          delete payload.resolution; // API docs don't list resolution for extend input, but output is implicitly defined?
+          // Actually, "resolution" IS listed in Extend Video Input schema in the text provided?
+          // "resolution ResolutionEnum ... Default value: 720p" -> Yes it is.
+          // Wait, earlier I saw "delete payload.resolution" in the old code. 
+          // Re-reading API text for Extend Video:
+          // Input Schema: prompt, aspect_ratio, duration, negative_prompt, resolution, generate_audio, seed, auto_fix, video_url
+          // So resolution IS supported. I will keep it.
+        } 
+        // 2. IMAGE TO VIDEO (Single Image)
         else if (finalInputImageBuffer) {
-          endpoint = "fal-ai/veo3.1/image-to-video";
-          const veoInputUrl = await uploadToCloudinary(
-            finalInputImageBuffer,
-            `${postId}_veo_input`,
-            params.userId,
-            "Veo Input",
-            "image",
-          );
-          payload.image_url = veoInputUrl;
-        } else if (params.imageReference) {
-          // Check if it's a video for Extension
-          if (
-            params.imageReference.endsWith(".mp4") ||
-            params.imageReference.includes("/video/")
-          ) {
-            endpoint = "fal-ai/veo3.1/extend-video";
-            payload.video_url = getOptimizedUrl(params.imageReference);
-            delete payload.resolution;
-            delete payload.aspect_ratio;
-          } else {
-            endpoint = "fal-ai/veo3.1/image-to-video";
-            payload.image_url = getOptimizedUrl(params.imageReference);
-          }
-        } else {
-          // 4. TEXT TO VIDEO
-          endpoint = "fal-ai/veo3.1";
+           endpoint = "fal-ai/veo3.1/image-to-video";
+           const veoInputUrl = await uploadToCloudinary(
+             finalInputImageBuffer,
+             `${postId}_veo_input`,
+             params.userId,
+             "Veo Input",
+             "image",
+           );
+           payload.image_url = veoInputUrl;
+        } 
+        // 3. IMAGE TO VIDEO (URL Reference)
+        else if (params.imageReference) {
+           endpoint = "fal-ai/veo3.1/image-to-video";
+           payload.image_url = getOptimizedUrl(params.imageReference);
         }
+
+        console.log(`🚀 Veo Request: ${endpoint}`, JSON.stringify(payload, null, 2));
 
         const url = `https://queue.fal.run/${endpoint}`;
         const submitRes = await axios.post(url, payload, {

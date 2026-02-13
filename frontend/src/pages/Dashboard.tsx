@@ -425,7 +425,7 @@ function Dashboard() {
     
     let maxFiles = 1;
     if (activeEngine === "studio" && studioMode === "carousel") maxFiles = 14;
-    if (activeEngine === "veo") maxFiles = 3;
+    if (activeEngine === "veo") maxFiles = 1;
 
     if (files.length + referenceImages.length > maxFiles) {
       alert(`❌ Only ${maxFiles} file(s) allowed for this mode.`);
@@ -1849,79 +1849,83 @@ function Dashboard() {
                         </div>
 
                         {activeEngine === "veo" ? (
-                          /* VEO 3 SPECIALIZED SLOTS - MINIMALIST AESTHETIC */
-                          <div className="grid grid-cols-3 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-700">
-                            {[
-                              { label: "Temporal Start", sub: "I2V Source" },
-                              { label: "Temporal End", sub: "F+L Anchor" },
-                              { label: "Subject Sync", sub: "Identity Ref" },
-                            ].map((slot, idx) => (
-                              <div key={idx} className="flex flex-col gap-3">
-                                <div className="relative aspect-[3/4] bg-[#0a0c10] border border-slate-800 rounded-xl overflow-hidden hover:border-indigo-500/50 transition-all group">
-                                  {referenceImageUrls[idx] ? (
-                                    <>
-                                      {referenceImageUrls[idx].includes("video") || referenceImageUrls[idx].endsWith(".mp4") ? (
-                                        <video 
-                                          src={referenceImageUrls[idx]} 
-                                          className="w-full h-full object-cover"
-                                          muted
-                                          onMouseEnter={(e) => e.currentTarget.play()}
-                                          onMouseLeave={(e) => e.currentTarget.pause()}
-                                        />
-                                      ) : (
-                                        <img
-                                          src={referenceImageUrls[idx]}
-                                          className="w-full h-full object-cover"
-                                        />
-                                      )}
-                                      <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          /* VEO 3 SINGLE SOURCE ASSET (SIMPLIFIED) */
+                          <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                             <div className="flex justify-between items-center">
+                                <label className="block text-sm font-semibold text-indigo-200">
+                                  Source Asset
+                                </label>
+                                <span className="text-[9px] text-indigo-400/60 uppercase tracking-widest font-medium">
+                                  Image to Video / Extend Video
+                                </span>
+                             </div>
+
+                             <div className="w-full h-32 border-2 border-dashed border-indigo-500/30 rounded-xl hover:border-indigo-400 hover:bg-indigo-900/10 transition-all group relative flex items-center justify-center overflow-hidden">
+                                {referenceImageUrls[0] ? (
+                                  <>
+                                    {referenceImageUrls[0].includes("video") || referenceImageUrls[0].endsWith(".mp4") ? (
+                                      <video 
+                                        src={referenceImageUrls[0]} 
+                                        className="w-full h-full object-contain"
+                                        muted
+                                        autoPlay
+                                        loop
+                                      />
+                                    ) : (
+                                      <img 
+                                        src={referenceImageUrls[0]} 
+                                        className="w-full h-full object-contain"
+                                      />
+                                    )}
+                                    <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                                         <button
                                           type="button"
-                                          onClick={() => removeGenericImage(idx)}
-                                          className="text-[10px] font-bold text-white uppercase tracking-widest px-3 py-1 bg-red-900/80 rounded-full"
+                                          onClick={() => removeGenericImage(0)}
+                                          className="px-3 py-1.5 bg-red-500/80 hover:bg-red-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg backdrop-blur-md transition-colors"
                                         >
                                           Remove
                                         </button>
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <div className="w-full h-full flex flex-col items-center justify-center p-4">
-                                      <label className="cursor-pointer w-full h-full flex flex-col items-center justify-center gap-2">
-                                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest group-hover:text-indigo-400 transition-colors text-center">
-                                          Select Asset
-                                        </span>
-                                        <input
-                                          type="file"
-                                          className="hidden"
-                                          accept="image/*,video/*"
-                                          onChange={(e) => {
-                                             const file = e.target.files?.[0];
-                                             if(!file) return;
-                                             const newRefs = [...referenceImages];
-                                             const newUrls = [...referenceImageUrls];
-                                             newRefs[idx] = file;
-                                             newUrls[idx] = URL.createObjectURL(file);
-                                             setReferenceImages(newRefs.filter(Boolean));
-                                             setReferenceImageUrls(newUrls.filter(Boolean));
-                                          }}
-                                        />
-                                      </label>
-                                      <button
-                                        type="button"
-                                        onClick={() => setActiveLibrarySlot("generic")}
-                                        className="absolute bottom-3 text-[9px] font-bold text-indigo-400/60 uppercase tracking-tighter hover:text-indigo-400 transition-all"
-                                      >
-                                        Library
-                                      </button>
                                     </div>
-                                  )}
-                                </div>
-                                <div className="px-1">
-                                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter truncate">{slot.label}</div>
-                                  <div className="text-[8px] text-slate-600 uppercase tracking-tight">{slot.sub}</div>
-                                </div>
-                              </div>
-                            ))}
+                                    <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-md rounded-md text-[9px] font-bold text-white uppercase tracking-wider border border-white/10">
+                                      {referenceImageUrls[0].includes("video") || referenceImageUrls[0].endsWith(".mp4") ? "Extend Video Mode" : "Image-to-Video Mode"}
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="flex items-center gap-8">
+                                    <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
+                                      <span className="text-2xl mb-1">📂</span>
+                                      <span className="text-xs text-indigo-300 font-bold group-hover:text-white">
+                                        Upload File
+                                      </span>
+                                      <input
+                                        type="file"
+                                        className="hidden"
+                                        accept="image/*,video/*"
+                                        onChange={(e) => {
+                                           const file = e.target.files?.[0];
+                                           if(!file) return;
+                                           setReferenceImages([file]);
+                                           setReferenceImageUrls([URL.createObjectURL(file)]);
+                                        }}
+                                      />
+                                    </label>
+                                    <div className="h-8 w-px bg-indigo-500/30"></div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setActiveLibrarySlot("generic")}
+                                      className="flex flex-col items-center group-hover:scale-105 transition-transform"
+                                    >
+                                      <span className="text-2xl mb-1">📚</span>
+                                      <span className="text-xs text-indigo-300 font-bold group-hover:text-white">
+                                        From Library
+                                      </span>
+                                    </button>
+                                  </div>
+                                )}
+                             </div>
+                             <p className="text-[10px] text-slate-500 text-center">
+                               Upload an <b>Image</b> to animate it, or a <b>Video</b> to extend it.
+                             </p>
                           </div>
                         ) : (
                           /* GENERIC UPLOAD BOX (Pic FX, Video FX 1&2) */
