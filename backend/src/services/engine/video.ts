@@ -207,7 +207,7 @@ export const videoLogic = {
         targetRatioString = "1:1";
       }
 
-      if (params.resolution === "1080p") {
+      if (params.resolution === "1080p" || isKling3) {
         if (targetRatioString === "16:9") {
           targetWidth = 1920;
           targetHeight = 1080;
@@ -397,7 +397,7 @@ export const videoLogic = {
 
         if (isKling3) {
           // Kling 3 (PicDrift Plus)
-          const base = "https://queue.fal.run/fal-ai/kling-video/o3/standard";
+          const base = "https://queue.fal.run/fal-ai/kling-video/o3/pro";
           url = `${base}/${isImageToVideo ? "image-to-video" : "text-to-video"}`;
 
           if (isImageToVideo) {
