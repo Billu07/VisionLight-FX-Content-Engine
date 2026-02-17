@@ -401,7 +401,7 @@ export const videoLogic = {
           url = `${base}/${isImageToVideo ? "image-to-video" : "text-to-video"}`;
 
           if (isImageToVideo) {
-            payload.image_url = klingInputUrl; // v3 uses image_url
+            payload.start_image_url = klingInputUrl; // v3 Pro uses start_image_url
             if (klingEndUrl) {
               payload.end_image_url = klingEndUrl;
             }
@@ -561,8 +561,16 @@ export const videoLogic = {
             const resultRes = await axios.get(data.response_url, {
               headers: { Authorization: `Key ${FAL_KEY}` },
             });
-            finalUrl = resultRes.data.video.url;
-            isComplete = true;
+            // Robust parsing for different Fal models
+            finalUrl = resultRes.data.video?.url || resultRes.data.url || resultRes.data.file_url;
+            
+            if (finalUrl) {
+              isComplete = true;
+            } else {
+              isFailed = true;
+              errorMessage = "Completed but no video URL found in response";
+              console.error("❌ Missing URL in result:", JSON.stringify(resultRes.data));
+            }
           } else if (data.status === "FAILED") {
             isFailed = true;
             errorMessage = statusRes.data.error;
@@ -573,6 +581,7 @@ export const videoLogic = {
           }
         } catch (pollErr: any) {
           console.error("Poll Error:", pollErr.message);
+          // If 404, maybe it's gone? But safer to just log for now.
         }
       }
 
@@ -592,7 +601,7 @@ export const videoLogic = {
       } else if (isFailed) {
         await airtableService.updatePost(post.id, {
           status: "FAILED",
-          error: errorMessage,
+          error: errorMessage || "Generation failed",
           progress: 0,
         });
         await airtableService.refundUserCredit(userId, params?.cost || 5);
