@@ -396,12 +396,13 @@ export const videoLogic = {
         };
 
         if (isKling3) {
-          // Kling 3 (PicDrift Plus)
-          const base = "https://queue.fal.run/fal-ai/kling-video/o3/pro";
+          // Kling 3 (PicDrift Plus) - Using Standard Endpoint with High-Res Input
+          // We feed 1080p input (handled above) to force higher quality output.
+          const base = "https://queue.fal.run/fal-ai/kling-video/o3/standard";
           url = `${base}/${isImageToVideo ? "image-to-video" : "text-to-video"}`;
 
           if (isImageToVideo) {
-            payload.start_image_url = klingInputUrl; // v3 Pro uses start_image_url
+            payload.image_url = klingInputUrl; // O3 Standard uses image_url
             if (klingEndUrl) {
               payload.end_image_url = klingEndUrl;
             }
