@@ -12,6 +12,7 @@ interface TimelineExpanderProps {
   onPreview: (post: any) => void;
   onMoveToAsset: (id: string) => void;
   onDelete: (id: string) => void;
+  onAddToSequence?: (post: any) => void; // ✅ NEW
 }
 
 type Theme = "VOID" | "ARCANE" | "MATRIX";
@@ -27,6 +28,7 @@ export const TimelineExpander = ({
   onPreview,
   onMoveToAsset,
   onDelete,
+  onAddToSequence, // Destructure
 }: TimelineExpanderProps) => {
   const [filter, setFilter] = useState<"ALL" | "VIDEO" | "IMAGE">("ALL");
   const [theme, setTheme] = useState<Theme>("VOID");
@@ -211,6 +213,7 @@ export const TimelineExpander = ({
                     onDrift={() => onDrift(post)}
                     onPreview={() => onPreview(post)}
                     onDelete={() => onDelete(post.id)}
+                    onAddToSequence={() => onAddToSequence?.(post)} // ✅ Pass Handler
                     onMoveToAsset={
                       post.mediaType === "IMAGE" ||
                       post.mediaType === "CAROUSEL"

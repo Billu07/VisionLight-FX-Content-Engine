@@ -15,6 +15,7 @@ import { EditAssetModal } from "../components/EditAssetModal";
 import { DriftFrameExtractor } from "../components/DriftFrameExtractor";
 import { RenderReserveModal } from "../components/RenderReserveModal";
 import { StockPhotosModal } from "../components/StockPhotosModal";
+import { SequenceEditor, type SequenceItem } from "../components/SequenceEditor";
 
 // Import your logo images
 import picdriftLogo from "../assets/picdrift.png";
@@ -41,7 +42,7 @@ function Dashboard() {
   const [prompt, setPrompt] = useState("");
   const [videoTitle, setVideoTitle] = useState("");
   const [activeLibrarySlot, setActiveLibrarySlot] = useState<
-    "start" | "end" | "generic" | null
+    "start" | "end" | "generic" | "sequencer" | null
   >(null);
 
   // Engine Selection
@@ -130,6 +131,11 @@ function Dashboard() {
     type: "image" | "video" | "carousel";
     url: string | string[];
   } | null>(null);
+
+  // === SEQUENCER STATE ===
+  const [viewMode, setViewMode] = useState<"create" | "sequencer">("create");
+  const [sequence, setSequence] = useState<SequenceItem[]>([]);
+
   const [previewCarouselIndex, setPreviewCarouselIndex] = useState(0);
 
   // State for Magic Edit Asset
@@ -355,6 +361,17 @@ function Dashboard() {
     } else if (activeLibrarySlot === "end") {
       setPicDriftFrames((prev) => ({ ...prev, end: file }));
       setPicDriftUrls((prev) => ({ ...prev, end: url }));
+    } else if (activeLibrarySlot === "sequencer") {
+      // ✅ Add to Sequence
+      const isVideo = file.type.startsWith("video");
+      const newItem: SequenceItem = {
+          id: crypto.randomUUID(),
+          url,
+          type: isVideo ? "VIDEO" : "IMAGE",
+          title: file.name,
+          duration: isVideo ? undefined : 3000
+      };
+      setSequence(prev => [...prev, newItem]);
     } else {
       if (activeEngine === "studio" && studioMode === "carousel") {
         setReferenceImages((prev) => [...prev, file]);
@@ -435,6 +452,30 @@ function Dashboard() {
     setReferenceImages((prev) => [...prev, ...newFiles]);
     const newUrls = newFiles.map((file) => URL.createObjectURL(file));
     setReferenceImageUrls((prev) => [...prev, ...newUrls]);
+  };
+
+  // ✅ NEW: Add to Sequence Logic
+  const handleAddToSequence = (post: any) => {
+      // Extract URL
+      let url = post.mediaUrl;
+      // Handle array or JSON weirdness
+      if (url && url.startsWith("[") && url.includes("]")) {
+        try {
+          const parsed = JSON.parse(url);
+          if (Array.isArray(parsed) && parsed.length > 0) url = parsed[0];
+        } catch (e) {}
+      }
+
+      const item: SequenceItem = {
+          id: crypto.randomUUID(),
+          url,
+          type: post.mediaType,
+          title: post.title || "Untitled",
+          duration: post.mediaType === "IMAGE" ? 3000 : undefined
+      };
+
+      setSequence(prev => [...prev, item]);
+      alert("✅ Added to Sequence Merger");
   };
 
   const handleMagicEditUpload = async (
@@ -1019,6 +1060,18 @@ function Dashboard() {
                 <div className="flex gap-3">
                   <button
                     type="button"
+                    onClick={() => setViewMode(viewMode === "create" ? "sequencer" : "create")}
+                    className={`text-xs px-4 py-2 rounded-lg border font-semibold transition-colors flex items-center gap-2 ${
+                        viewMode === "sequencer" 
+                        ? "bg-purple-600 text-white border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]"
+                        : "bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700 hover:text-white"
+                    }`}
+                  >
+                    <span>🎞️</span> {viewMode === "sequencer" ? "Back to Create" : "Sequence Merger"}
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setShowStockModal(true)}
                     className="text-xs px-4 py-2 rounded-lg border border-gray-600 bg-gray-800 text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors"
                   >
@@ -1045,6 +1098,8 @@ function Dashboard() {
               </div>
 
               {/* NAVIGATION BAR */}
+              {viewMode === "create" && (
+              <>
               <div className="mb-6 sm:mb-8">
                 <label className="block text-sm font-semibold text-white mb-3 sm:mb-4">
                   Select Content Type
@@ -2042,7 +2097,19 @@ function Dashboard() {
                   type="error"
                 />
               )}
-            </div>
+            </>
+            )}
+
+          {/* ✅ SEQUENCE EDITOR VIEW */}
+          {viewMode === "sequencer" && (
+             <SequenceEditor 
+                sequence={sequence}
+                setSequence={setSequence}
+                onAddFromLibrary={() => setActiveLibrarySlot("sequencer")}
+                onClear={() => setSequence([])}
+             />
+          )}
+          </div>
           </div>
 
           <div className="lg:w-96">
@@ -2189,6 +2256,7 @@ function Dashboard() {
             onDelete={(id) => {
               if (confirm("Delete this post?")) deletePostMutation.mutate(id);
             }}
+            onAddToSequence={(post) => handleAddToSequence(post)}
           />
         )}
       </div>

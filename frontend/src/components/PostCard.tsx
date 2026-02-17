@@ -16,6 +16,7 @@ interface PostCardProps {
   onMoveToAsset?: () => void;
   onDrift?: () => void;
   onDelete?: () => void;
+  onAddToSequence?: () => void; // ✅ NEW
 
   // ✅ MINIMAL PROP (For Expanded Gallery)
   minimal?: boolean;
@@ -43,6 +44,7 @@ export function PostCard({
   onMoveToAsset,
   onDrift,
   onDelete,
+  onAddToSequence,
   minimal = false,
 }: PostCardProps) {
   const [mediaError, setMediaError] = useState(false);
@@ -534,6 +536,20 @@ export function PostCard({
                     📸
                   </button>
                 )}
+
+              {/* ✅ NEW: Add to Sequence Button */}
+              {onAddToSequence && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddToSequence();
+                  }}
+                  className="w-8 h-8 flex items-center justify-center bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 rounded-lg text-cyan-300 transition-colors"
+                  title="Add to Merger Sequence"
+                >
+                  ➕
+                </button>
+              )}
 
               {onMoveToAsset && (
                 <button

@@ -1,48 +1,26 @@
-/* Brand System - Dynamically Updated */
-:root {
-  --primary-brand: #6366f1;
-  --secondary-brand: #8b5cf6;
-}
-
 .brand-gradient-text {
-  background: linear-gradient(
-    135deg,
-    var(--primary-brand),
-    var(--secondary-brand)
-  );
+  background: linear-gradient(to right, #a855f7, #ec4899, #06b6d4);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-.brand-gradient-bg {
-  background: linear-gradient(
-    135deg,
-    var(--primary-brand),
-    var(--secondary-brand)
-  );
+/* Custom Scrollbar for modern feel */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-.brand-primary-bg {
-  background-color: var(--primary-brand);
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
 }
 
-.brand-secondary-bg {
-  background-color: var(--secondary-brand);
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
 }
 
-.brand-primary-text {
-  color: var(--primary-brand);
-}
-
-.brand-secondary-text {
-  color: var(--secondary-brand);
-}
-
-.brand-primary-border {
-  border-color: var(--primary-brand);
-}
-
-.brand-secondary-border {
-  border-color: var(--secondary-brand);
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
 }
