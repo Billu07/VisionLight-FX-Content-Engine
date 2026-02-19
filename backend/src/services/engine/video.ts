@@ -54,7 +54,22 @@ export const videoLogic = {
       );
 
       // ✅ FIX: Download Image FIRST to detect aspect ratio
-      const rawUrl = getOptimizedUrl(assetUrl);
+      // Custom 1080p optimization logic (prefer 1920w over 1280w default)
+      let rawUrl = assetUrl;
+      if (
+        rawUrl &&
+        typeof rawUrl === "string" &&
+        rawUrl.includes("cloudinary.com") &&
+        rawUrl.includes("/upload/")
+      ) {
+        rawUrl = rawUrl.replace(
+          "/upload/",
+          "/upload/w_1920,c_limit,q_auto,f_jpg/",
+        );
+      } else {
+        rawUrl = getOptimizedUrl(assetUrl);
+      }
+
       const imageResponse = await axios.get(rawUrl, {
         responseType: "arraybuffer",
       });
@@ -72,13 +87,13 @@ export const videoLogic = {
       }
 
       // Now set target dimensions based on the (potentially auto-detected) ratio
-      let targetWidth = 1280;
-      let targetHeight = 720;
+      let targetWidth = 1920;
+      let targetHeight = 1080;
       let targetRatioString = "16:9";
 
       if (userAspectRatio === "9:16" || userAspectRatio === "portrait") {
-        targetWidth = 720;
-        targetHeight = 1280;
+        targetWidth = 1080;
+        targetHeight = 1920;
         targetRatioString = "9:16";
       } else if (userAspectRatio === "1:1" || userAspectRatio === "square") {
         targetWidth = 1024;
@@ -90,9 +105,11 @@ export const videoLogic = {
       const targetAR = targetWidth / targetHeight;
       let finalImageUrl = rawUrl;
 
-      // Outpaint ONLY if Ratio Mismatch > 5%
-      // Since we auto-detected above, this should barely ever trigger for "original" images,
-      // preserving the exact image you uploaded.
+      // Logic:
+      // 1. If Ratio Mismatch > 5% -> Gemini Outpaint (Returns 2K image) -> Upload
+      // 2. If Ratio Matches but Size is too small (e.g. 720p source) -> Upscale Strict -> Upload
+      // 3. Else -> Use optimized rawUrl (Already >= 1080p and correct ratio)
+
       if (Math.abs(sourceAR - targetAR) > 0.05) {
         try {
           const outpaintedBuffer = await resizeWithGemini(
@@ -110,6 +127,25 @@ export const videoLogic = {
           );
         } catch (e) {
           console.warn("Outpaint failed, proceeding with original.");
+        }
+      } else if (width < targetWidth * 0.9) {
+        // Upscale if width is less than 90% of target (buffer for small rounding diffs)
+        try {
+          console.log(`🔍 Upscaling Drift Input: ${width} -> ${targetWidth}`);
+          const resizedBuffer = await resizeStrict(
+            originalBuffer,
+            targetWidth,
+            targetHeight,
+          );
+          finalImageUrl = await uploadToCloudinary(
+            resizedBuffer,
+            `drift_upscale_${userId}_${Date.now()}`,
+            userId,
+            "Drift Upscale Frame",
+            "image",
+          );
+        } catch (e) {
+          console.warn("Upscale failed, proceeding with original.");
         }
       }
 
