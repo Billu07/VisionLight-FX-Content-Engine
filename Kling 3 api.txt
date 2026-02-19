@@ -1,7 +1,7 @@
 About
-Generate a video from image using O3 model (standard mode).
+Kling V3 (pro) Text to Video API.
 
-O3 supports extended duration (3-15s), start/end frames, and native audio.
+The Kling V3 model is the latest generation of text-to-video with improved visual quality and motion consistency. This version also supports native audio generation when the generate_audio parameter is enabled.
 
 1. Calling the API
 #
@@ -28,10 +28,8 @@ The client API handles the API submit protocol. It will handle the request statu
 
 import { fal } from "@fal-ai/client";
 
-const result = await fal.subscribe("fal-ai/kling-video/o3/standard/image-to-video", {
-  input: {
-    image_url: "https://v3b.fal.media/files/b/0a8cfd5a/8ABMp4n9rh3kfD2Rq8fHd_start_frame.png"
-  },
+const result = await fal.subscribe("fal-ai/kling-video/v3/pro/text-to-video", {
+  input: {},
   logs: true,
   onQueueUpdate: (update) => {
     if (update.status === "IN_PROGRESS") {
@@ -69,10 +67,8 @@ The client API provides a convenient way to submit requests to the model.
 
 import { fal } from "@fal-ai/client";
 
-const { request_id } = await fal.queue.submit("fal-ai/kling-video/o3/standard/image-to-video", {
-  input: {
-    image_url: "https://v3b.fal.media/files/b/0a8cfd5a/8ABMp4n9rh3kfD2Rq8fHd_start_frame.png"
-  },
+const { request_id } = await fal.queue.submit("fal-ai/kling-video/v3/pro/text-to-video", {
+  input: {},
   webhookUrl: "https://optional.webhook.url/for/results",
 });
 Fetch request status
@@ -82,7 +78,7 @@ You can fetch the status of a request to check if it is completed or still in pr
 
 import { fal } from "@fal-ai/client";
 
-const status = await fal.queue.status("fal-ai/kling-video/o3/standard/image-to-video", {
+const status = await fal.queue.status("fal-ai/kling-video/v3/pro/text-to-video", {
   requestId: "764cabcf-b745-4b3e-ae38-1200304cf45b",
   logs: true,
 });
@@ -93,7 +89,7 @@ Once the request is completed, you can fetch the result. See the Output Schema f
 
 import { fal } from "@fal-ai/client";
 
-const result = await fal.queue.result("fal-ai/kling-video/o3/standard/image-to-video", {
+const result = await fal.queue.result("fal-ai/kling-video/v3/pro/text-to-video", {
   requestId: "764cabcf-b745-4b3e-ae38-1200304cf45b"
 });
 console.log(result.data);
@@ -131,49 +127,59 @@ Input
 prompt string
 Text prompt for video generation. Either prompt or multi_prompt must be provided, but not both.
 
-image_url string
-URL of the start frame image.
-
-end_image_url string
-URL of the end frame image (optional).
-
 duration DurationEnum
-Video duration in seconds (3-15s). Default value: "5"
+The duration of the generated video in seconds Default value: "5"
 
 Possible enum values: 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
 
-generate_audio boolean
-Whether to generate native audio for the video.
-
 multi_prompt list<KlingV3MultiPromptElement>
-List of prompts for multi-shot video generation.
+List of prompts for multi-shot video generation. If provided, overrides the single prompt and divides the video into multiple shots with specified prompts and durations.
+
+generate_audio boolean
+Whether to generate native audio for the video. Supports Chinese and English voice output. Other languages are automatically translated to English. For English speech, use lowercase letters; for acronyms or proper nouns, use uppercase. Default value: true
+
+voice_ids list<string>
+Optional Voice IDs for video generation. Reference voices in your prompt with <<<voice_1>>> and <<<voice_2>>> (maximum 2 voices per task). Get voice IDs from the kling video create-voice endpoint: https://fal.ai/models/fal-ai/kling-video/create-voice
 
 shot_type ShotTypeEnum
-The type of multi-shot video generation. Default value: "customize"
+The type of multi-shot video generation Default value: "customize"
 
-Possible enum values: customize
+Possible enum values: customize, intelligent
+
+aspect_ratio AspectRatioEnum
+The aspect ratio of the generated video frame Default value: "16:9"
+
+Possible enum values: 16:9, 9:16, 1:1
+
+negative_prompt string
+Default value: "blur, distort, and low quality"
+
+cfg_scale float
+The CFG (Classifier Free Guidance) scale is a measure of how close you want the model to stick to your prompt. Default value: 0.5
 
 
 {
-  "prompt": "The character walks forward slowly, with the camera following from behind.",
-  "image_url": "https://v3b.fal.media/files/b/0a8cfd5a/8ABMp4n9rh3kfD2Rq8fHd_start_frame.png",
-  "end_image_url": "https://v3b.fal.media/files/b/0a8d0248/S415GcxackjjLKom6f3jq_VTImWrNO.png",
-  "duration": "10",
+  "prompt": "Close-up of glowing fireflies dancing in a dark forest at twilight. Soft bioluminescent particles float through the air. Shallow depth of field, bokeh lights in background. Magical atmosphere, gentle movement.",
+  "duration": "5",
   "multi_prompt": null,
-  "shot_type": "customize"
+  "generate_audio": true,
+  "shot_type": "customize",
+  "aspect_ratio": "16:9",
+  "negative_prompt": "blur, distort, and low quality",
+  "cfg_scale": 0.5
 }
 Output
 #
 video File
-The generated video.
+The generated video
 
 
 {
   "video": {
-    "file_size": 12037975,
+    "file_size": 8062911,
     "file_name": "output.mp4",
     "content_type": "video/mp4",
-    "url": "https://v3b.fal.media/files/b/0a8d0278/pgIO9yOXTFCTetKBsqDwX_output.mp4"
+    "url": "https://storage.googleapis.com/falserverless/example_outputs/kling-v3/pro-t2v/out.mp4"
   }
 }
 Other types
@@ -241,6 +247,29 @@ Default value: "blur, distort, and low quality"
 cfg_scale float
 The CFG (Classifier Free Guidance) scale is a measure of how close you want the model to stick to your prompt. Default value: 0.5
 
+ProImageToVideoRequest
+#
+prompt string
+image_url string
+duration DurationEnum
+The duration of the generated video in seconds Default value: "5"
+
+Possible enum values: 5, 10
+
+aspect_ratio AspectRatioEnum
+The aspect ratio of the generated video frame Default value: "16:9"
+
+Possible enum values: 16:9, 9:16, 1:1
+
+tail_image_url string
+URL of the image to be used for the end of the video
+
+negative_prompt string
+Default value: "blur, distort, and low quality"
+
+cfg_scale float
+The CFG (Classifier Free Guidance) scale is a measure of how close you want the model to stick to your prompt. Default value: 0.5
+
 TextToVideoV3StandardRequest
 #
 prompt string
@@ -276,48 +305,6 @@ Default value: "blur, distort, and low quality"
 cfg_scale float
 The CFG (Classifier Free Guidance) scale is a measure of how close you want the model to stick to your prompt. Default value: 0.5
 
-ProImageToVideoRequest
-#
-prompt string
-image_url string
-duration DurationEnum
-The duration of the generated video in seconds Default value: "5"
-
-Possible enum values: 5, 10
-
-aspect_ratio AspectRatioEnum
-The aspect ratio of the generated video frame Default value: "16:9"
-
-Possible enum values: 16:9, 9:16, 1:1
-
-tail_image_url string
-URL of the image to be used for the end of the video
-
-negative_prompt string
-Default value: "blur, distort, and low quality"
-
-cfg_scale float
-The CFG (Classifier Free Guidance) scale is a measure of how close you want the model to stick to your prompt. Default value: 0.5
-
-TextToVideoV25ProRequest
-#
-prompt string
-duration DurationEnum
-The duration of the generated video in seconds Default value: "5"
-
-Possible enum values: 5, 10
-
-aspect_ratio AspectRatioEnum
-The aspect ratio of the generated video frame Default value: "16:9"
-
-Possible enum values: 16:9, 9:16, 1:1
-
-negative_prompt string
-Default value: "blur, distort, and low quality"
-
-cfg_scale float
-The CFG (Classifier Free Guidance) scale is a measure of how close you want the model to stick to your prompt. Default value: 0.5
-
 TextToVideoV26ProRequest
 #
 prompt string
@@ -340,7 +327,43 @@ The CFG (Classifier Free Guidance) scale is a measure of how close you want the 
 generate_audio boolean
 Whether to generate native audio for the video. Supports Chinese and English voice output. Other languages are automatically translated to English. For English speech, use lowercase letters; for acronyms or proper nouns, use uppercase. Default value: true
 
+TextToVideoV25ProRequest
+#
+prompt string
+duration DurationEnum
+The duration of the generated video in seconds Default value: "5"
+
+Possible enum values: 5, 10
+
+aspect_ratio AspectRatioEnum
+The aspect ratio of the generated video frame Default value: "16:9"
+
+Possible enum values: 16:9, 9:16, 1:1
+
+negative_prompt string
+Default value: "blur, distort, and low quality"
+
+cfg_scale float
+The CFG (Classifier Free Guidance) scale is a measure of how close you want the model to stick to your prompt. Default value: 0.5
+
 ImageToVideoV21StandardRequest
+#
+prompt string
+image_url string
+URL of the image to be used for the video
+
+duration DurationEnum
+The duration of the generated video in seconds Default value: "5"
+
+Possible enum values: 5, 10
+
+negative_prompt string
+Default value: "blur, distort, and low quality"
+
+cfg_scale float
+The CFG (Classifier Free Guidance) scale is a measure of how close you want the model to stick to your prompt. Default value: 0.5
+
+ImageToVideoV25StandardRequest
 #
 prompt string
 image_url string
@@ -386,25 +409,6 @@ URL of the image for Static Brush Application Area (Mask image created by users 
 dynamic_masks list<DynamicMask>
 List of dynamic masks
 
-TextToVideoRequest
-#
-prompt string
-duration DurationEnum
-The duration of the generated video in seconds Default value: "5"
-
-Possible enum values: 5, 10
-
-aspect_ratio AspectRatioEnum
-The aspect ratio of the generated video frame Default value: "16:9"
-
-Possible enum values: 16:9, 9:16, 1:1
-
-negative_prompt string
-Default value: "blur, distort, and low quality"
-
-cfg_scale float
-The CFG (Classifier Free Guidance) scale is a measure of how close you want the model to stick to your prompt. Default value: 0.5
-
 FaceChoice
 #
 face_id string
@@ -432,16 +436,18 @@ Volume multiplier for the inserted audio. Range: [0, 2], where 1 = original volu
 original_audio_volume float
 Volume multiplier for the video's original audio track. Range: [0, 2]. Has no effect if the source video contains no audio. Default value: 1
 
-ImageToVideoV25StandardRequest
+TextToVideoRequest
 #
 prompt string
-image_url string
-URL of the image to be used for the video
-
 duration DurationEnum
 The duration of the generated video in seconds Default value: "5"
 
 Possible enum values: 5, 10
+
+aspect_ratio AspectRatioEnum
+The aspect ratio of the generated video frame Default value: "16:9"
+
+Possible enum values: 16:9, 9:16, 1:1
 
 negative_prompt string
 Default value: "blur, distort, and low quality"
@@ -490,6 +496,23 @@ The URL of the video to generate the lip sync for. Supports .mp4/.mov, ≤100MB,
 audio_url string
 The URL of the audio to generate the lip sync for. Minimum duration is 2s and maximum duration is 60s. Maximum file size is 5MB.
 
+File
+#
+url string
+The URL where the file can be downloaded from.
+
+content_type string
+The mime type of the file.
+
+file_name string
+The name of the file. It will be auto-generated if not provided.
+
+file_size integer
+The size of the file in bytes.
+
+file_data string
+File data
+
 V1TextToVideoRequest
 #
 prompt string
@@ -516,23 +539,6 @@ Possible enum values: down_back, forward_up, right_turn_forward, left_turn_forwa
 
 advanced_camera_control CameraControl
 Advanced Camera control parameters
-
-File
-#
-url string
-The URL where the file can be downloaded from.
-
-content_type string
-The mime type of the file.
-
-file_name string
-The name of the file. It will be auto-generated if not provided.
-
-file_size integer
-The size of the file in bytes.
-
-file_data string
-File data
 
 ImageToVideoRequest
 #
@@ -631,6 +637,21 @@ The CFG (Classifier Free Guidance) scale is a measure of how close you want the 
 tail_image_url string
 URL of the image to be used for the end of the video
 
+VideoEffectsRequest
+#
+input_image_urls list<string>
+URL of images to be used for hug, kiss or heart_gesture video.
+
+effect_scene EffectSceneEnum
+The effect scene to use for the video generation
+
+Possible enum values: hug, kiss, heart_gesture, squish, expansion, fuzzyfuzzy, bloombloom, dizzydizzy, jelly_press, jelly_slice, jelly_squish, jelly_jiggle, pixelpixel, yearbook, instant_film, anime_figure, rocketrocket, fly_fly, disappear, lightning_power, bullet_time, bullet_time_360, media_interview, day_to_night, let's_ride, jumpdrop, swish_swish, running_man, jazz_jazz, swing_swing, skateskate, building_sweater, pure_white_wings, black_wings, golden_wing, pink_pink_wings, rampage_ape, a_list_look, countdown_teleport, firework_2026, instant_christmas, birthday_star, firework, celebration, tiger_hug_pro, pet_lion_pro, guardian_spirit, squeeze_scream, inner_voice, memory_alive, guess_what, eagle_snatch, hug_from_past, instant_kid, dollar_rain, cry_cry, building_collapse, mushroom, jesus_hug, shark_alert, lie_flat, polar_bear_hug, brown_bear_hug, office_escape_plow, watermelon_bomb, boss_coming, wig_out, car_explosion, tiger_hug, siblings, construction_worker, snatched, felt_felt, plushcut, drunk_dance, drunk_dance_pet, daoma_dance, bouncy_dance, smooth_sailing_dance, new_year_greeting, lion_dance, prosperity, great_success, golden_horse_fortune, red_packet_box, lucky_horse_year, lucky_red_packet, lucky_money_come, lion_dance_pet, dumpling_making_pet, fish_making_pet, pet_red_packet, lantern_glow, expression_challenge, overdrive, heart_gesture_dance, poping, martial_arts, running, nezha, motorcycle_dance, subject_3_dance, ghost_step_dance, phantom_jewel, zoom_out, cheers_2026, kiss_pro, fight_pro, hug_pro, heart_gesture_pro, dollar_rain_pro, pet_bee_pro, santa_random_surprise, magic_match_tree, happy_birthday, thumbs_up_pro, surprise_bouquet, bouquet_drop, 3d_cartoon_1_pro, glamour_photo_shoot, box_of_joy, first_toast_of_the_year, my_santa_pic, santa_gift, steampunk_christmas, snowglobe, christmas_photo_shoot, ornament_crash, santa_express, particle_santa_surround, coronation_of_frost, spark_in_the_snow, scarlet_and_snow, cozy_toon_wrap, bullet_time_lite, magic_cloak, balloon_parade, jumping_ginger_joy, c4d_cartoon_pro, venomous_spider, throne_of_king, luminous_elf, woodland_elf, japanese_anime_1, american_comics, snowboarding, witch_transform, vampire_transform, pumpkin_head_transform, demon_transform, mummy_transform, zombie_transform, cute_pumpkin_transform, cute_ghost_transform, knock_knock_halloween, halloween_escape, baseball, trampoline, trampoline_night, pucker_up, feed_mooncake, flyer, dishwasher, pet_chinese_opera, magic_fireball, gallery_ring, pet_moto_rider, muscle_pet, pet_delivery, mythic_style, steampunk, 3d_cartoon_2, pet_chef, santa_gifts, santa_hug, girlfriend, boyfriend, heart_gesture_1, pet_wizard, smoke_smoke, gun_shot, double_gun, pet_warrior, long_hair, pet_dance, wool_curly, pet_bee, marry_me, piggy_morph, ski_ski, magic_broom, splashsplash, surfsurf, fairy_wing, angel_wing, dark_wing, emoji
+
+duration DurationEnum
+The duration of the generated video in seconds Default value: "5"
+
+Possible enum values: 5, 10
+
 MultiImageToVideoRequest
 #
 prompt string
@@ -650,48 +671,26 @@ Possible enum values: 16:9, 9:16, 1:1
 negative_prompt string
 Default value: "blur, distort, and low quality"
 
-VideoEffectsRequest
+LipsyncT2VRequest
 #
-input_image_urls list<string>
-URL of images to be used for hug, kiss or heart_gesture video.
+video_url string
+The URL of the video to generate the lip sync for. Supports .mp4/.mov, ≤100MB, 2-60s, 720p/1080p only, width/height 720–1920px. If validation fails, an error is returned.
 
-effect_scene EffectSceneEnum
-The effect scene to use for the video generation
+text string
+Text content for lip-sync video generation. Max 120 characters.
 
-Possible enum values: hug, kiss, heart_gesture, squish, expansion, fuzzyfuzzy, bloombloom, dizzydizzy, jelly_press, jelly_slice, jelly_squish, jelly_jiggle, pixelpixel, yearbook, instant_film, anime_figure, rocketrocket, fly_fly, disappear, lightning_power, bullet_time, bullet_time_360, media_interview, day_to_night, let's_ride, jumpdrop, swish_swish, running_man, jazz_jazz, swing_swing, skateskate, building_sweater, pure_white_wings, black_wings, golden_wing, pink_pink_wings, rampage_ape, a_list_look, countdown_teleport, firework_2026, instant_christmas, birthday_star, firework, celebration, tiger_hug_pro, pet_lion_pro, guardian_spirit, squeeze_scream, inner_voice, memory_alive, guess_what, eagle_snatch, hug_from_past, instant_kid, dollar_rain, cry_cry, building_collapse, mushroom, jesus_hug, shark_alert, lie_flat, polar_bear_hug, brown_bear_hug, office_escape_plow, watermelon_bomb, boss_coming, wig_out, car_explosion, tiger_hug, siblings, construction_worker, snatched, felt_felt, plushcut, drunk_dance, drunk_dance_pet, daoma_dance, bouncy_dance, smooth_sailing_dance, new_year_greeting, lion_dance, prosperity, great_success, golden_horse_fortune, red_packet_box, lucky_horse_year, lucky_red_packet, lucky_money_come, lion_dance_pet, dumpling_making_pet, fish_making_pet, pet_red_packet, lantern_glow, expression_challenge, overdrive, heart_gesture_dance, poping, martial_arts, running, nezha, motorcycle_dance, subject_3_dance, ghost_step_dance, phantom_jewel, zoom_out, cheers_2026, kiss_pro, fight_pro, hug_pro, heart_gesture_pro, dollar_rain_pro, pet_bee_pro, santa_random_surprise, magic_match_tree, happy_birthday, thumbs_up_pro, surprise_bouquet, bouquet_drop, 3d_cartoon_1_pro, glamour_photo_shoot, box_of_joy, first_toast_of_the_year, my_santa_pic, santa_gift, steampunk_christmas, snowglobe, christmas_photo_shoot, ornament_crash, santa_express, particle_santa_surround, coronation_of_frost, spark_in_the_snow, scarlet_and_snow, cozy_toon_wrap, bullet_time_lite, magic_cloak, balloon_parade, jumping_ginger_joy, c4d_cartoon_pro, venomous_spider, throne_of_king, luminous_elf, woodland_elf, japanese_anime_1, american_comics, snowboarding, witch_transform, vampire_transform, pumpkin_head_transform, demon_transform, mummy_transform, zombie_transform, cute_pumpkin_transform, cute_ghost_transform, knock_knock_halloween, halloween_escape, baseball, trampoline, trampoline_night, pucker_up, feed_mooncake, flyer, dishwasher, pet_chinese_opera, magic_fireball, gallery_ring, pet_moto_rider, muscle_pet, pet_delivery, mythic_style, steampunk, 3d_cartoon_2, pet_chef, santa_gifts, santa_hug, girlfriend, boyfriend, heart_gesture_1, pet_wizard, smoke_smoke, gun_shot, double_gun, pet_warrior, long_hair, pet_dance, wool_curly, pet_bee, marry_me, piggy_morph, ski_ski, magic_broom, splashsplash, surfsurf, fairy_wing, angel_wing, dark_wing, emoji
+voice_id VoiceIdEnum
+Voice ID to use for speech synthesis
 
-duration DurationEnum
-The duration of the generated video in seconds Default value: "5"
+Possible enum values: genshin_vindi2, zhinen_xuesheng, AOT, ai_shatang, genshin_klee2, genshin_kirara, ai_kaiya, oversea_male1, ai_chenjiahao_712, girlfriend_4_speech02, chat1_female_new-3, chat_0407_5-1, cartoon-boy-07, uk_boy1, cartoon-girl-01, PeppaPig_platform, ai_huangzhong_712, ai_huangyaoshi_712, ai_laoguowang_712, chengshu_jiejie, you_pingjing, calm_story1, uk_man2, laopopo_speech02, heainainai_speech02, reader_en_m-v1, commercial_lady_en_f-v1, tiyuxi_xuedi, tiexin_nanyou, girlfriend_1_speech02, girlfriend_2_speech02, zhuxi_speech02, uk_oldman3, dongbeilaotie_speech02, chongqingxiaohuo_speech02, chuanmeizi_speech02, chaoshandashu_speech02, ai_taiwan_man2_speech02, xianzhanggui_speech02, tianjinjiejie_speech02, diyinnansang_DB_CN_M_04-v2, yizhipiannan-v1, guanxiaofang-v2, tianmeixuemei-v1, daopianyansang-v1, mengwa-v1
 
-Possible enum values: 5, 10
+voice_language VoiceLanguageEnum
+The voice language corresponding to the Voice ID Default value: "en"
 
-V1ImageToVideoRequest
-#
-prompt string
-The prompt for the video
+Possible enum values: zh, en
 
-image_url string
-URL of the image to be used for the video
-
-duration DurationEnum
-The duration of the generated video in seconds Default value: "5"
-
-Possible enum values: 5, 10
-
-negative_prompt string
-Default value: "blur, distort, and low quality"
-
-cfg_scale float
-The CFG (Classifier Free Guidance) scale is a measure of how close you want the model to stick to your prompt. Default value: 0.5
-
-tail_image_url string
-URL of the image to be used for the end of the video
-
-static_mask_url string
-URL of the image for Static Brush Application Area (Mask image created by users using the motion brush)
-
-dynamic_masks list<DynamicMask>
-List of dynamic masks
+voice_speed float
+Speech rate for Text to Video generation Default value: 1
 
 ImageToVideoV26ProRequest
 #
@@ -780,26 +779,33 @@ Default value: "blur, distort, and low quality"
 cfg_scale float
 The CFG (Classifier Free Guidance) scale is a measure of how close you want the model to stick to your prompt. Default value: 0.5
 
-LipsyncT2VRequest
+V1ImageToVideoRequest
 #
-video_url string
-The URL of the video to generate the lip sync for. Supports .mp4/.mov, ≤100MB, 2-60s, 720p/1080p only, width/height 720–1920px. If validation fails, an error is returned.
+prompt string
+The prompt for the video
 
-text string
-Text content for lip-sync video generation. Max 120 characters.
+image_url string
+URL of the image to be used for the video
 
-voice_id VoiceIdEnum
-Voice ID to use for speech synthesis
+duration DurationEnum
+The duration of the generated video in seconds Default value: "5"
 
-Possible enum values: genshin_vindi2, zhinen_xuesheng, AOT, ai_shatang, genshin_klee2, genshin_kirara, ai_kaiya, oversea_male1, ai_chenjiahao_712, girlfriend_4_speech02, chat1_female_new-3, chat_0407_5-1, cartoon-boy-07, uk_boy1, cartoon-girl-01, PeppaPig_platform, ai_huangzhong_712, ai_huangyaoshi_712, ai_laoguowang_712, chengshu_jiejie, you_pingjing, calm_story1, uk_man2, laopopo_speech02, heainainai_speech02, reader_en_m-v1, commercial_lady_en_f-v1, tiyuxi_xuedi, tiexin_nanyou, girlfriend_1_speech02, girlfriend_2_speech02, zhuxi_speech02, uk_oldman3, dongbeilaotie_speech02, chongqingxiaohuo_speech02, chuanmeizi_speech02, chaoshandashu_speech02, ai_taiwan_man2_speech02, xianzhanggui_speech02, tianjinjiejie_speech02, diyinnansang_DB_CN_M_04-v2, yizhipiannan-v1, guanxiaofang-v2, tianmeixuemei-v1, daopianyansang-v1, mengwa-v1
+Possible enum values: 5, 10
 
-voice_language VoiceLanguageEnum
-The voice language corresponding to the Voice ID Default value: "en"
+negative_prompt string
+Default value: "blur, distort, and low quality"
 
-Possible enum values: zh, en
+cfg_scale float
+The CFG (Classifier Free Guidance) scale is a measure of how close you want the model to stick to your prompt. Default value: 0.5
 
-voice_speed float
-Speech rate for Text to Video generation Default value: 1
+tail_image_url string
+URL of the image to be used for the end of the video
+
+static_mask_url string
+URL of the image for Static Brush Application Area (Mask image created by users using the motion brush)
+
+dynamic_masks list<DynamicMask>
+List of dynamic masks
 
 Trajectory
 #
@@ -808,41 +814,6 @@ X coordinate of the motion trajectory
 
 y integer
 Y coordinate of the motion trajectory
-
-TextToVideoV3ProRequest
-#
-prompt string
-Text prompt for video generation. Either prompt or multi_prompt must be provided, but not both.
-
-duration DurationEnum
-The duration of the generated video in seconds Default value: "5"
-
-Possible enum values: 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
-
-multi_prompt list<KlingV3MultiPromptElement>
-List of prompts for multi-shot video generation. If provided, overrides the single prompt and divides the video into multiple shots with specified prompts and durations.
-
-generate_audio boolean
-Whether to generate native audio for the video. Supports Chinese and English voice output. Other languages are automatically translated to English. For English speech, use lowercase letters; for acronyms or proper nouns, use uppercase. Default value: true
-
-voice_ids list<string>
-Optional Voice IDs for video generation. Reference voices in your prompt with <<<voice_1>>> and <<<voice_2>>> (maximum 2 voices per task). Get voice IDs from the kling video create-voice endpoint: https://fal.ai/models/fal-ai/kling-video/create-voice
-
-shot_type ShotTypeEnum
-The type of multi-shot video generation Default value: "customize"
-
-Possible enum values: customize, intelligent
-
-aspect_ratio AspectRatioEnum
-The aspect ratio of the generated video frame Default value: "16:9"
-
-Possible enum values: 16:9, 9:16, 1:1
-
-negative_prompt string
-Default value: "blur, distort, and low quality"
-
-cfg_scale float
-The CFG (Classifier Free Guidance) scale is a measure of how close you want the model to stick to your prompt. Default value: 0.5
 
 ImageToVideoV2MasterRequest
 #
