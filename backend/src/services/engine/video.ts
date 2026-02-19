@@ -420,7 +420,17 @@ export const videoLogic = {
             } catch (e) {}
           }
         } else if (params.imageReference) {
-          klingInputUrl = getOptimizedUrl(params.imageReference);
+          // ✅ FIX: Force 1080p Source if Target is 1080p
+          if (targetWidth >= 1920 || targetHeight >= 1920) {
+             let rawUrl = params.imageReference;
+             if (rawUrl && typeof rawUrl === "string" && rawUrl.includes("cloudinary.com") && rawUrl.includes("/upload/")) {
+                klingInputUrl = rawUrl.replace("/upload/", "/upload/w_1920,c_limit,q_auto,f_jpg/");
+             } else {
+                klingInputUrl = getOptimizedUrl(params.imageReference);
+             }
+          } else {
+             klingInputUrl = getOptimizedUrl(params.imageReference);
+          }
           isImageToVideo = true;
         }
 
@@ -432,13 +442,12 @@ export const videoLogic = {
         };
 
         if (isKling3) {
-          // Kling 3 (PicDrift Plus) - Using Standard Endpoint with High-Res Input
-          // We feed 1080p input (handled above) to force higher quality output.
-          const base = "https://queue.fal.run/fal-ai/kling-video/o3/standard";
+          // Kling 3 (PicDrift Plus) - Using PRO Endpoint for best quality
+          const base = "https://queue.fal.run/fal-ai/kling-video/v3/pro";
           url = `${base}/${isImageToVideo ? "image-to-video" : "text-to-video"}`;
 
           if (isImageToVideo) {
-            payload.image_url = klingInputUrl; // O3 Standard uses image_url
+            payload.start_image_url = klingInputUrl; // V3 Pro uses start_image_url
             if (klingEndUrl) {
               payload.end_image_url = klingEndUrl;
             }
