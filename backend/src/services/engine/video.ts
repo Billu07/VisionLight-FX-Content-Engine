@@ -454,6 +454,9 @@ export const videoLogic = {
             // Audio allowed with end frame in v3
             payload.generate_audio =
               params.generateAudio === "true" || params.generateAudio === true;
+            
+            // ✅ Fix: Explicitly send aspect ratio for V3 Pro Image-to-Video
+            payload.aspect_ratio = targetRatioString;
           } else {
             payload.aspect_ratio = targetRatioString;
             payload.generate_audio = true;
