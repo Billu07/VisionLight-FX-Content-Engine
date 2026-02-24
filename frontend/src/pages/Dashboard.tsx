@@ -903,6 +903,16 @@ function Dashboard() {
                   </button>
                 )}
                 <button
+                  onClick={() => {
+                    localStorage.removeItem("visionlight_active_project");
+                    navigate("/projects");
+                  }}
+                  className="p-2 bg-gray-800/60 border border-blue-400/30 rounded-xl"
+                  title="Projects"
+                >
+                  📁
+                </button>
+                <button
                   onClick={() => setShowBrandModal(true)}
                   className="p-2 bg-gray-800/60 border border-cyan-400/30 rounded-xl"
                 >
@@ -1030,6 +1040,15 @@ function Dashboard() {
                     {isRequesting ? "Sending..." : "Request Credit 🔔"}
                   </button>
                 )}
+                <button
+                  onClick={() => {
+                    localStorage.removeItem("visionlight_active_project");
+                    navigate("/projects");
+                  }}
+                  className="px-4 py-2.5 bg-gray-800/60 border border-blue-400/30 rounded-xl text-blue-400 text-sm hover:bg-blue-400/10"
+                >
+                  Projects
+                </button>
                 <button
                   onClick={() => setShowBrandModal(true)}
                   className="px-4 py-2.5 bg-gray-800/60 border border-cyan-400/30 rounded-xl text-cyan-400 text-sm hover:bg-cyan-400/10"

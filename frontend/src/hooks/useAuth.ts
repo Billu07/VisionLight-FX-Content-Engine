@@ -61,6 +61,7 @@ export const useAuth = create<AuthState>((set) => ({
   logout: async () => {
     await supabase.auth.signOut();
     setAuthToken(null);
+    localStorage.removeItem("visionlight_active_project");
     set({ user: null, token: null });
   },
 }));
