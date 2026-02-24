@@ -10,6 +10,7 @@ interface User {
   name: string;
   creditSystem: "COMMERCIAL" | "INTERNAL";
   creditsPicDrift: number;
+  creditsPicDriftPlus: number;
   creditsImageFX: number;
   creditsVideoFX1: number;
   creditsVideoFX2: number;
@@ -35,7 +36,6 @@ interface GlobalSettings {
   priceVideoFX3_4s: number;
   priceVideoFX3_6s: number;
   priceVideoFX3_8s: number;
-  priceEditor_Standard: number;
   priceEditor_Pro: number;
   priceEditor_Enhance: number;
   priceEditor_Convert: number;
@@ -245,9 +245,9 @@ export default function AdminDashboard() {
 
         {/* REQUESTS (PDF PAGE 3) */}
         {requests.length > 0 && (
-          <div className="mb-8 bg-purple-900/10 border border-purple-500/20 rounded-2xl p-6">
-            <h2 className="text-xs font-bold text-purple-300 mb-4 uppercase tracking-widest">
-              🔔 Render Reserve Request ({requests.length})
+          <div className="mb-8 bg-gray-900 border border-gray-800 rounded-2xl p-6">
+            <h2 className="text-xs font-bold text-gray-300 mb-4 uppercase tracking-widest">
+              Render Reserve Request ({requests.length})
             </h2>
             <div className="grid gap-3">
               {requests.map((req) => (
@@ -296,7 +296,8 @@ export default function AdminDashboard() {
                     <th className="p-6 border-b border-white/5">
                       User Identity
                     </th>
-                    <th className="p-6 border-b border-white/5">PicDrift</th>
+                    <th className="p-6 border-b border-white/5">PD Standard</th>
+                    <th className="p-6 border-b border-white/5">PD Plus</th>
                     <th className="p-6 border-b border-white/5">PicFX</th>
                     <th className="p-6 border-b border-white/5">Video FX 1</th>
                     <th className="p-6 border-b border-white/5">Video FX 2</th>
@@ -309,7 +310,7 @@ export default function AdminDashboard() {
                 <tbody className="divide-y divide-white/5">
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="p-20 text-center">
+                      <td colSpan={8} className="p-20 text-center">
                         <LoadingSpinner size="lg" variant="neon" />
                       </td>
                     </tr>
@@ -334,27 +335,32 @@ export default function AdminDashboard() {
                         </td>
                         <td className="p-6">
                           <div className="text-base font-bold text-pink-500">
-                            {(u.creditsPicDrift || 0).toFixed(2)} pts
+                            {(u.creditsPicDrift || 0).toFixed(0)}
+                          </div>
+                        </td>
+                        <td className="p-6">
+                          <div className="text-base font-bold text-rose-500">
+                            {(u.creditsPicDriftPlus || 0).toFixed(0)}
                           </div>
                         </td>
                         <td className="p-6">
                           <div className="text-base font-bold text-violet-500">
-                            {(u.creditsImageFX || 0).toFixed(2)} pts
+                            {(u.creditsImageFX || 0).toFixed(0)}
                           </div>
                         </td>
                         <td className="p-6">
                           <div className="text-base font-bold text-blue-500">
-                            {(u.creditsVideoFX1 || 0).toFixed(2)} pts
+                            {(u.creditsVideoFX1 || 0).toFixed(0)}
                           </div>
                         </td>
                         <td className="p-6">
                           <div className="text-base font-bold text-cyan-500">
-                            {(u.creditsVideoFX2 || 0).toFixed(2)} pts
+                            {(u.creditsVideoFX2 || 0).toFixed(0)}
                           </div>
                         </td>
                         <td className="p-6">
                           <div className="text-base font-bold text-teal-500">
-                            {(u.creditsVideoFX3 || 0).toFixed(2)} pts
+                            {(u.creditsVideoFX3 || 0).toFixed(0)}
                           </div>
                         </td>
                         <td className="p-6 text-right">
@@ -367,9 +373,9 @@ export default function AdminDashboard() {
                             </button>
                             <button
                               onClick={() => handleDeleteUser(u)}
-                              className="p-2 bg-red-900/10 hover:bg-red-600 rounded-lg text-red-500 hover:text-white transition-all"
+                              className="p-2 bg-red-900/10 hover:bg-red-600 rounded-lg text-red-500 hover:text-white transition-all text-xs font-bold uppercase"
                             >
-                              🗑️
+                              Del
                             </button>
                           </div>
                         </td>
@@ -633,20 +639,6 @@ export default function AdminDashboard() {
                   </h3>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-400">Standard</span>
-                      <input
-                        step="0.01"
-                        type="number"
-                        className="w-20 bg-gray-950 border border-gray-800 rounded p-2 text-center text-xs font-bold"
-                        value={settings.priceEditor_Standard}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceEditor_Standard: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
                       <span className="text-xs text-gray-400">Pro Edit</span>
                       <input
                         step="0.01"
@@ -784,7 +776,8 @@ export default function AdminDashboard() {
                         value={targetCreditPool}
                         onChange={(e) => setTargetCreditPool(e.target.value)}
                       >
-                        <option value="creditsPicDrift">PicDrift</option>
+                        <option value="creditsPicDrift">PicDrift Standard</option>
+                        <option value="creditsPicDriftPlus">PicDrift Plus</option>
                         <option value="creditsImageFX">PicFX</option>
                         <option value="creditsVideoFX1">VideoFX 1</option>
                         <option value="creditsVideoFX2">VideoFX 2</option>
@@ -849,7 +842,7 @@ export default function AdminDashboard() {
                       }
                       className={`p-4 rounded-2xl border font-bold text-[10px] uppercase transition-all ${pendingUpdates.creditSystem === "INTERNAL" ? "bg-purple-600 border-purple-500 text-white shadow-lg" : "bg-gray-950 border-gray-800 text-gray-600"}`}
                     >
-                      Internal (pts)
+                      Internal
                     </button>
                   </div>
                 </div>

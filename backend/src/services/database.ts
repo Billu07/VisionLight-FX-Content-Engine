@@ -46,6 +46,7 @@ export const dbService = {
         maxProjects: data.maxProjects || 3,
         creditBalance: 20, // Keep legacy balance
         creditsPicDrift: 10,
+        creditsPicDriftPlus: 10,
         creditsImageFX: 10,
         creditsVideoFX1: 10,
         creditsVideoFX2: 10,
@@ -126,6 +127,7 @@ export const dbService = {
     userId: string,
     pool:
       | "creditsPicDrift"
+      | "creditsPicDriftPlus"
       | "creditsImageFX"
       | "creditsVideoFX1"
       | "creditsVideoFX2"
@@ -142,6 +144,7 @@ export const dbService = {
     userId: string,
     pool:
       | "creditsPicDrift"
+      | "creditsPicDriftPlus"
       | "creditsImageFX"
       | "creditsVideoFX1"
       | "creditsVideoFX2"

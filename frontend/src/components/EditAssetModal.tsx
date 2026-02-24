@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
 import { apiEndpoints } from "../lib/api";
 import { DriftFrameExtractor } from "./DriftFrameExtractor";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { ProgressBar } from "./ProgressBar";
-import { useAuth } from "../hooks/useAuth";
-import picdriftLogo from "../assets/picdrift2.png";
+import drift_icon from "../assets/drift_icon.png";
 
 interface Asset {
   id: string;
@@ -19,9 +20,10 @@ interface EditAssetModalProps {
   asset: Asset;
   onClose: () => void;
   initialVideoUrl?: string;
+  onEditSuccess?: (originalId: string, newAsset: Asset) => void;
 }
 
-type EditorMode = "standard" | "pro" | "drift" | "convert";
+type EditorMode = "pro" | "drift" | "convert";
 
 interface DriftPreset {
   label: string;
@@ -45,17 +47,10 @@ export function EditAssetModal({
   asset: initialAsset,
   onClose,
   initialVideoUrl,
+  onEditSuccess,
 }: EditAssetModalProps) {
   const queryClient = useQueryClient();
   const refFileInput = useRef<HTMLInputElement>(null);
-  // ✅ Fetch pricing and user info
-  const { data: credits } = useQuery({
-    queryKey: ["user-credits"],
-    queryFn: async () => (await apiEndpoints.getUserCredits()).data,
-  });
-  const { user } = useAuth();
-  const isCommercial = user?.creditSystem !== "INTERNAL";
-  const unit = isCommercial ? "$" : "pts";
   const [history, setHistory] = useState<Asset[]>([initialAsset]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentAsset = history[currentIndex];
@@ -67,10 +62,13 @@ export function EditAssetModal({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
+  const [isCropping, setIsCropping] = useState(false);
+  const [crop, setCrop] = useState<Crop>();
+  const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
+  const imgRef = useRef<HTMLImageElement>(null);
 
   // Text Edit State
   const [prompt, setPrompt] = useState("");
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [referenceAsset, setReferenceAsset] = useState<Asset | null>(null);
   const [showRefSelector, setShowRefSelector] = useState(false);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
@@ -291,24 +289,9 @@ export function EditAssetModal({
     setHistory(newHistory);
     setCurrentIndex(newHistory.length - 1);
     if (activeTab !== "drift") setPrompt("");
+    if (onEditSuccess) onEditSuccess(initialAsset.id, newAsset);
     queryClient.invalidateQueries({ queryKey: ["assets"] });
   };
-
-  // Helper Mutations
-  const analyzeMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(currentAsset.url);
-      const blob = await res.blob();
-      const formData = new FormData();
-      formData.append("image", blob, "current.jpg");
-      formData.append("prompt", "Describe subject, lighting, and style.");
-      return apiEndpoints.analyzeImage(formData);
-    },
-    onMutate: () => setIsAnalyzing(true),
-    onSuccess: (res: any) =>
-      setPrompt((prev) => (prev ? prev + "\n" : "") + res.data.result),
-    onSettled: () => setIsAnalyzing(false),
-  });
 
   const uploadRefMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -346,6 +329,57 @@ export function EditAssetModal({
       if (!prompt.trim()) return alert("Please enter a prompt");
       textEditMutation.mutate(convertTargetRatio);
     }
+  };
+
+  const handleCrop = async () => {
+    if (!completedCrop || !imgRef.current) return;
+    const image = imgRef.current;
+    const canvas = document.createElement("canvas");
+    const scaleX = image.naturalWidth / image.width;
+    const scaleY = image.naturalHeight / image.height;
+    
+    canvas.width = Math.floor(completedCrop.width * scaleX);
+    canvas.height = Math.floor(completedCrop.height * scaleY);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.drawImage(
+      image,
+      completedCrop.x * scaleX,
+      completedCrop.y * scaleY,
+      completedCrop.width * scaleX,
+      completedCrop.height * scaleY,
+      0,
+      0,
+      completedCrop.width * scaleX,
+      completedCrop.height * scaleY
+    );
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      const file = new File([blob], "cropped.jpg", { type: "image/jpeg" });
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("raw", "true");
+      
+      const activeProject = localStorage.getItem("visionlight_active_project");
+      if (activeProject) formData.append("projectId", activeProject);
+      
+      setIsProcessing(true);
+      try {
+        const res = await apiEndpoints.uploadAssetSync(formData);
+        if (res.data.success) {
+          handleSuccess(res.data.asset);
+          setIsCropping(false);
+          setCrop(undefined);
+          setCompletedCrop(undefined);
+        }
+      } catch (err: any) {
+        alert("Crop failed: " + err.message);
+      } finally {
+        setIsProcessing(false);
+      }
+    }, "image/jpeg", 0.95);
   };
 
   return (
@@ -434,10 +468,27 @@ export function EditAssetModal({
                 </div>
               )}
 
-              <img
-                src={currentAsset.url}
-                className="max-h-[80vh] object-contain rounded-lg border border-gray-700 shadow-2xl"
-              />
+              {isCropping ? (
+                <ReactCrop
+                  crop={crop}
+                  onChange={(_, percentCrop) => setCrop(percentCrop)}
+                  onComplete={(c) => setCompletedCrop(c)}
+                  className="max-h-[80vh] flex items-center justify-center"
+                >
+                  <img
+                    ref={imgRef}
+                    src={currentAsset.url}
+                    className="max-h-[80vh] object-contain rounded-lg border border-gray-700 shadow-2xl"
+                    crossOrigin="anonymous"
+                  />
+                </ReactCrop>
+              ) : (
+                <img
+                  src={currentAsset.url}
+                  className="max-h-[80vh] object-contain rounded-lg border border-gray-700 shadow-2xl"
+                  crossOrigin="anonymous"
+                />
+              )}
             </>
           )}
         </div>
@@ -447,7 +498,6 @@ export function EditAssetModal({
           <div className="p-4 border-b border-gray-800 bg-gray-950">
             <div className="flex bg-gray-900 p-1 rounded-xl">
               {[
-                { id: "standard", label: "Standard", icon: "⚡" },
                 { id: "pro", label: "Pro", icon: "🧠" },
                 { id: "convert", label: "Convert", icon: "📐" },
                 { id: "drift", label: "Drift", icon: "🌀" },
@@ -468,28 +518,27 @@ export function EditAssetModal({
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {/* ACTIONS: Analyze / Enhance (Only for Std/Pro) */}
+            {/* ACTIONS: Crop / Enhance */}
             {activeTab !== "drift" && activeTab !== "convert" && (
               <div className="flex gap-2">
                 <button
-                  onClick={() => analyzeMutation.mutate()}
-                  disabled={isAnalyzing || isProcessing || isEnhancing}
+                  onClick={() => setIsCropping(true)}
+                  disabled={isProcessing || isEnhancing}
                   className="flex-1 text-xs bg-gray-800 text-cyan-300 px-3 py-2 rounded-lg border border-cyan-500/30 hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
                 >
-                  <span>🔍</span> {isAnalyzing ? "Scanning..." : "Analyze"}
+                  <span>✂️</span> Crop
                 </button>
 
                 <button
                   onClick={() => enhanceMutation.mutate()}
-                  disabled={isAnalyzing || isProcessing || isEnhancing}
+                  disabled={isProcessing || isEnhancing}
                   className="flex-1 text-xs bg-gradient-to-r from-amber-600/20 to-orange-600/20 text-orange-300 px-3 py-2 rounded-lg border border-orange-500/30 hover:bg-orange-900/20 transition-colors flex items-center justify-center gap-2"
                 >
                   {isEnhancing ? (
                     <LoadingSpinner size="sm" variant="light" />
                   ) : (
                     <span>
-                      Enhance ({credits?.prices?.priceEditor_Enhance}
-                      {unit})
+                      Enhance
                     </span>
                   )}
                 </button>
@@ -574,17 +623,15 @@ export function EditAssetModal({
                     </>
                   ) : (
                     <span>
-                      🔄 Convert to {convertTargetRatio} (
-                      {credits?.prices?.priceEditor_Convert}
-                      {unit})
+                      🔄 Convert to {convertTargetRatio}
                     </span>
                   )}
                 </button>
               </div>
             )}
 
-            {/* STANDARD / PRO UI */}
-            {(activeTab === "standard" || activeTab === "pro") && (
+            {/* PRO UI */}
+            {activeTab === "pro" && (
               <>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
@@ -817,7 +864,27 @@ export function EditAssetModal({
 
           {/* FOOTER */}
           <div className="p-6 border-t border-gray-800 bg-gray-900/50 flex flex-col gap-3">
-            {activeTab === "drift" ? (
+            {isCropping ? (
+              <>
+                <button
+                  onClick={handleCrop}
+                  disabled={!completedCrop?.width || !completedCrop?.height || isProcessing}
+                  className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isProcessing ? "Cropping..." : "Confirm Crop"}
+                </button>
+                <button
+                  onClick={() => {
+                    setIsCropping(false);
+                    setCrop(undefined);
+                  }}
+                  disabled={isProcessing}
+                  className="w-full py-2 text-gray-500 hover:text-white text-sm"
+                >
+                  Cancel Crop
+                </button>
+              </>
+            ) : activeTab === "drift" ? (
               <button
                 onClick={() => driftStartMutation.mutate()}
                 disabled={isProcessing || !!driftPostId}
@@ -827,10 +894,9 @@ export function EditAssetModal({
                   "Processing Path..."
                 ) : (
                   <>
-                    <img src={picdriftLogo} alt="Logo" className="h-5 w-auto" />
+                    <img src={drift_icon} alt="Logo" className="h-5 w-auto" />
                     <span>
-                      Generate Path ({credits?.prices?.priceAsset_DriftPath}
-                      {unit})
+                      Generate Path
                     </span>
                   </>
                 )}
@@ -854,11 +920,7 @@ export function EditAssetModal({
                   "Refining..."
                 ) : (
                   <span>
-                    Apply Edit (
-                    {activeTab === "pro"
-                      ? credits?.prices?.priceEditor_Pro
-                      : credits?.prices?.priceEditor_Standard}
-                    {unit})
+                    Apply Edit
                   </span>
                 )}
               </button>

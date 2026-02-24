@@ -62,6 +62,11 @@ export const calculateGranularCost = (
   return 1; // Fallback
 };
 
+export const getCost = (user: any, params: any, settings: any) => {
+  if (user.view === "PICDRIFT") return 1; // Always 1 render per action for Demo View
+  return calculateGranularCost(params, settings);
+}
+
 /**
  * Maps the request to the correct Credit Pool
  */
@@ -70,11 +75,13 @@ export const getTargetPool = (
   model?: string,
 ):
   | "creditsPicDrift"
+  | "creditsPicDriftPlus"
   | "creditsImageFX"
   | "creditsVideoFX1"
   | "creditsVideoFX2"
   | "creditsVideoFX3" => {
-  if (model === "kling-2.5" || model === "kling-3") return "creditsPicDrift";
+  if (model === "kling-3") return "creditsPicDriftPlus";
+  if (model === "kling-2.5") return "creditsPicDrift";
   if (mediaType === "image" || mediaType === "carousel")
     return "creditsImageFX";
   if (model?.includes("kie-sora")) return "creditsVideoFX1";

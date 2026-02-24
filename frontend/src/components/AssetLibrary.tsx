@@ -31,21 +31,18 @@ export function AssetLibrary({
 }: AssetLibraryProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { data: credits } = useQuery({
-    queryKey: ["user-credits"],
-    queryFn: async () => (await apiEndpoints.getUserCredits()).data,
-  });
   const { user } = useAuth();
-  const isCommercial = user?.creditSystem !== "INTERNAL";
-  const unit = isCommercial ? "$" : "pts";
 
   const [activeTab, setActiveTab] = useState<
-    "16:9" | "9:16" | "1:1" | "original" | "custom" | "VIDEO"
-  >("16:9");
+    "16:9" | "9:16" | "1:1" | "original" | "custom" | "VIDEO" | "STORYBOARD"
+  >("original");
 
   // Auto-switch tab based on Dashboard context
   useEffect(() => {
-    if (!initialAspectRatio) return;
+    if (!initialAspectRatio) {
+      setActiveTab("original");
+      return;
+    }
     const ratio = initialAspectRatio.toLowerCase();
 
     if (ratio === "portrait" || ratio === "9:16") setActiveTab("9:16");
@@ -53,6 +50,22 @@ export function AssetLibrary({
     else if (ratio === "square" || ratio === "1:1") setActiveTab("1:1");
     else setActiveTab("original");
   }, [initialAspectRatio]);
+
+  // Storyboard State
+  const activeProject = localStorage.getItem("visionlight_active_project");
+  const storyboardKey = `visionlight_storyboard_${activeProject || 'default'}`;
+  const [storyboardIds, setStoryboardIds] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(storyboardKey);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem(storyboardKey, JSON.stringify(storyboardIds));
+  }, [storyboardIds, storyboardKey]);
 
   // UI States
   const [isUploading, setIsUploading] = useState(false);
@@ -82,13 +95,15 @@ export function AssetLibrary({
       const res = await apiEndpoints.getAssets(activeProject);
       return res.data.assets;
     },
+    enabled: !!user,
     refetchInterval: 3000,
     refetchIntervalInBackground: true,
   });
 
   // ✅ REFINED FILTER LOGIC
-  const filteredAssets = Array.isArray(assets)
+  let filteredAssets = Array.isArray(assets)
     ? assets.filter((a: Asset) => {
+        if (activeTab === "STORYBOARD") return false; // Handled below
         if (activeTab === "VIDEO") return a.type === "VIDEO";
 
         // Originals Tab: STRICTLY raw uploads (no parent)
@@ -120,6 +135,12 @@ export function AssetLibrary({
         return a.type === "IMAGE" && a.aspectRatio === activeTab;
       })
     : [];
+
+  if (activeTab === "STORYBOARD") {
+    filteredAssets = storyboardIds
+      .map(id => assets.find((a: Asset) => a.id === id))
+      .filter(Boolean) as Asset[];
+  }
 
   // Navigation Helpers
   const handleNextAsset = () => {
@@ -361,6 +382,7 @@ export function AssetLibrary({
         <div className="p-6 bg-gray-800/50 flex flex-col md:flex-row gap-4 items-center justify-between border-b border-gray-800">
           <div className="flex bg-gray-950 p-1 rounded-lg border border-gray-700 overflow-x-auto">
             {[
+              { id: "STORYBOARD", label: "🎞️ Storyboard" },
               { id: "16:9", label: "Landscape" },
               { id: "9:16", label: "Portrait" },
               { id: "1:1", label: "Square" },
@@ -383,6 +405,18 @@ export function AssetLibrary({
           </div>
 
           <div className="flex items-center gap-3">
+            {activeTab === "STORYBOARD" && storyboardIds.length > 0 && (
+              <button
+                onClick={() => {
+                  if (window.confirm("Clear all items from your Storyboard sequence?")) {
+                    setStoryboardIds([]);
+                  }
+                }}
+                className="px-4 py-2 text-xs font-bold rounded-lg bg-red-900/50 text-red-400 hover:bg-red-900 hover:text-red-300 border border-red-500/30 transition-colors"
+              >
+                🗑️ Clear Sequence
+              </button>
+            )}
             <input
               type="file"
               multiple
@@ -411,10 +445,6 @@ export function AssetLibrary({
                   <div className="flex items-center gap-2">
                     <span>📤</span> Upload
                   </div>
-                  <span className="text-[9px] text-gray-500 font-bold uppercase tracking-tighter leading-none mt-1">
-                    {credits?.prices?.pricePicFX_Batch}
-                    {unit} Per Img
-                  </span>
                 </>
               )}
             </button>
@@ -422,7 +452,7 @@ export function AssetLibrary({
         </div>
 
         {/* GRID VIEW */}
-        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-black/40">
+        <div className={`flex-1 overflow-y-auto p-8 custom-scrollbar ${activeTab === "STORYBOARD" ? "bg-black relative before:content-[''] before:absolute before:inset-0 before:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iNSIgeT0iNSIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiLz48cmVjdCB4PSI1IiB5PSIyNSIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiLz48L3N2Zz4=')] before:bg-repeat-y before:bg-[length:20px_auto] before:opacity-30 before:pointer-events-none after:content-[''] after:absolute after:inset-y-0 after:right-0 after:w-5 after:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iNSIgeT0iNSIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiLz48cmVjdCB4PSI1IiB5PSIyNSIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiLz48L3N2Zz4=')] after:bg-repeat-y after:bg-[length:20px_auto] after:opacity-30 after:pointer-events-none px-12" : "bg-black/40"}`}>
           {isLoading && !isRefetching ? (
             <div className="flex justify-center items-center h-full">
               <LoadingSpinner size="lg" variant="neon" />
@@ -471,6 +501,38 @@ export function AssetLibrary({
                     }`}
                   >
                     {/* THUMBNAIL LOGIC */}
+                    {activeTab === "STORYBOARD" && (
+                      <div className="absolute top-2 left-2 flex gap-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const idx = storyboardIds.indexOf(asset.id);
+                            if (idx > 0) {
+                              const newIds = [...storyboardIds];
+                              [newIds[idx - 1], newIds[idx]] = [newIds[idx], newIds[idx - 1]];
+                              setStoryboardIds(newIds);
+                            }
+                          }}
+                          className="bg-black/70 hover:bg-white text-white hover:text-black w-7 h-7 rounded-full flex items-center justify-center text-xs shadow-lg backdrop-blur-sm"
+                        >
+                          ◀
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const idx = storyboardIds.indexOf(asset.id);
+                            if (idx < storyboardIds.length - 1) {
+                              const newIds = [...storyboardIds];
+                              [newIds[idx + 1], newIds[idx]] = [newIds[idx], newIds[idx + 1]];
+                              setStoryboardIds(newIds);
+                            }
+                          }}
+                          className="bg-black/70 hover:bg-white text-white hover:text-black w-7 h-7 rounded-full flex items-center justify-center text-xs shadow-lg backdrop-blur-sm"
+                        >
+                          ▶
+                        </button>
+                      </div>
+                    )}
                     {asset.type === "VIDEO" ? (
                       <div className="w-full h-full relative aspect-video">
                         <video
@@ -603,6 +665,23 @@ export function AssetLibrary({
                 </div>
 
                 <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      if (storyboardIds.includes(selectedAsset.id)) {
+                        setStoryboardIds(storyboardIds.filter(id => id !== selectedAsset.id));
+                      } else {
+                        setStoryboardIds([...storyboardIds, selectedAsset.id]);
+                      }
+                    }}
+                    className={`w-full py-3 rounded-xl font-bold transition-all border ${
+                      storyboardIds.includes(selectedAsset.id)
+                        ? "bg-red-900/30 text-red-400 border-red-500/50 hover:bg-red-900/50"
+                        : "bg-indigo-900/30 text-indigo-400 border-indigo-500/50 hover:bg-indigo-900/50"
+                    }`}
+                  >
+                    {storyboardIds.includes(selectedAsset.id) ? "➖ Remove from Storyboard" : "➕ Add to Storyboard"}
+                  </button>
+
                   {onSelect && (
                     <button
                       onClick={() => handleUseImage(selectedAsset)}
@@ -689,6 +768,18 @@ export function AssetLibrary({
         <EditAssetModal
           asset={editingAsset}
           onClose={() => setEditingAsset(null)}
+          onEditSuccess={(originalId, newAsset) => {
+            if (storyboardIds.includes(originalId)) {
+              setStoryboardIds((prev) => {
+                const newIds = [...prev];
+                const idx = newIds.indexOf(originalId);
+                if (idx !== -1) {
+                  newIds[idx] = newAsset.id; // Replace with edited version in storyboard
+                }
+                return newIds;
+              });
+            }
+          }}
         />
       )}
     </div>

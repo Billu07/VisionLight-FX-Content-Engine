@@ -28,13 +28,12 @@ export function RenderReserveModal({
     </div>
   );
 
-  const SectionHeader = ({ icon, title, colorClass }: { icon: string; title: string; colorClass: string }) => (
+  const SectionHeader = ({ title, colorClass }: { title: string; colorClass: string }) => (
     <div className="flex items-center gap-3 mb-4">
-      <span className="text-xl opacity-80">{icon}</span>
       <h3 className={`text-sm font-bold uppercase tracking-[0.2em] ${colorClass}`}>
         {title}
       </h3>
-      <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent ml-2" />
+      <div className="h-px flex-1 bg-white/10 ml-2" />
     </div>
   );
 
@@ -70,7 +69,7 @@ export function RenderReserveModal({
             
             {/* PICDRIFT SERIES */}
             <section>
-              <SectionHeader icon="📸" title="PicDrift Series" colorClass="text-pink-400" />
+              <SectionHeader title="PicDrift Series" colorClass="text-pink-400" />
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <PriceCard label="Standard (5s)" value={prices?.pricePicDrift_5s} sublabel="Pro Performance" />
                 <PriceCard label="Standard (10s)" value={prices?.pricePicDrift_10s} sublabel="Pro Performance" />
@@ -81,7 +80,7 @@ export function RenderReserveModal({
 
             {/* VIDEO FX SERIES */}
             <section>
-              <SectionHeader icon="🎬" title="Video FX Engine" colorClass="text-blue-400" />
+              <SectionHeader title="Video FX Engine" colorClass="text-blue-400" />
               <div className="space-y-6">
                 <div>
                   <div className="text-[10px] text-gray-500 uppercase mb-3 ml-1">Video FX 1 & 2</div>
@@ -105,12 +104,11 @@ export function RenderReserveModal({
 
             {/* CREATIVE TOOLS */}
             <section>
-              <SectionHeader icon="🎨" title="Pic FX & Studio Tools" colorClass="text-violet-400" />
+              <SectionHeader title="Pic FX & Studio Tools" colorClass="text-violet-400" />
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <PriceCard label="Standard Image" value={prices?.pricePicFX_Standard} />
                 <PriceCard label="Carousel (14 images)" value={prices?.pricePicFX_Carousel} />
                 <PriceCard label="Drift Path Tool" value={prices?.priceAsset_DriftPath} />
-                <PriceCard label="Magic Editor" value={prices?.priceEditor_Standard} />
                 <PriceCard label="Pro Editor" value={prices?.priceEditor_Pro} />
                 <PriceCard label="Enhance / Upscale" value={prices?.priceEditor_Enhance} />
                 <PriceCard label="Format Convert" value={prices?.priceEditor_Convert} />

@@ -2,7 +2,7 @@ import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import axios from "axios";
 import dotenv from "dotenv";
-import { calculateGranularCost, getTargetPool } from "./config/pricing";
+import { getCost, getTargetPool } from "./config/pricing";
 import { upload, uploadToCloudinary } from "./utils/fileUpload";
 
 dotenv.config();
@@ -407,6 +407,7 @@ app.get(
       res.json({
         credits: u.creditBalance,
         creditsPicDrift: u.creditsPicDrift,
+        creditsPicDriftPlus: u.creditsPicDriftPlus,
         creditsImageFX: u.creditsImageFX,
         creditsVideoFX1: u.creditsVideoFX1,
         creditsVideoFX2: u.creditsVideoFX2,
@@ -427,6 +428,7 @@ app.post(
     try {
       await airtableService.adminUpdateUser(req.user!.id, {
         creditsPicDrift: 10,
+        creditsPicDriftPlus: 10,
         creditsImageFX: 10,
         creditsVideoFX1: 10,
         creditsVideoFX2: 10,
@@ -482,7 +484,8 @@ app.post(
           airtableService.findUserById(req.user!.id),
         ]);
 
-        const cost = calculateGranularCost(
+        const cost = getCost(
+          user,
           { mediaType: "image", mode: "convert" },
           settings,
         );
@@ -600,7 +603,8 @@ app.post(
         airtableService.findUserById(req.user!.id),
       ]);
 
-      const cost = calculateGranularCost(
+      const cost = getCost(
+        user,
         { mediaType: "image", mode: mode || "pro" },
         settings,
       );
@@ -646,7 +650,8 @@ app.post(
         airtableService.findUserById(req.user!.id),
       ]);
 
-      const cost = calculateGranularCost(
+      const cost = getCost(
+        user,
         { mediaType: "video", mode: "drift-path" },
         settings,
       );
@@ -732,7 +737,8 @@ app.post(
         airtableService.findUserById(req.user!.id),
       ]);
 
-      const cost = calculateGranularCost(
+      const cost = getCost(
+        user,
         { mediaType: "image", mode: "enhance" },
         settings,
       );
@@ -956,7 +962,8 @@ app.post(
 
       // 2. Identify the correct Pool and calculate Cost based on Admin Settings
       const pool = getTargetPool(mediaType, model);
-      const cost = calculateGranularCost(
+      const cost = getCost(
+        user,
         {
           mediaType,
           duration: duration ? parseInt(duration) : undefined,
