@@ -24,7 +24,7 @@ export class AuthService {
   /**
    * ADMIN ONLY: Creates a user in Supabase AND ensures they exist in Database.
    */
-  static async createSystemUser(email: string, password: string, name: string) {
+  static async createSystemUser(email: string, password: string, name: string, view: string = "VISIONLIGHT", maxProjects: number = 3) {
     // 1. Create in Supabase (Auth Provider)
     const { data, error } = await supabase.auth.admin.createUser({
       email,
@@ -41,7 +41,7 @@ export class AuthService {
     const existingUser = await airtableService.findUserByEmail(email);
 
     if (!existingUser) {
-      await airtableService.createUser({ email, name });
+      await airtableService.createUser({ email, name, view, maxProjects });
     }
 
     return data.user;
@@ -118,6 +118,8 @@ export class AuthService {
         name: user.name,
         creditSystem: user.creditSystem,
         role: finalRole, // ✅ Returns 'ADMIN' if either check passes
+        view: (user as any).view || "VISIONLIGHT",
+        maxProjects: (user as any).maxProjects || 3,
       };
     } catch (error) {
       console.error("Auth Validation Error:", error);

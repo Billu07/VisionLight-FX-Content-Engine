@@ -15,6 +15,8 @@ interface User {
   creditsVideoFX2: number;
   creditsVideoFX3: number;
   role: "USER" | "MANAGER" | "ADMIN";
+  view: "VISIONLIGHT" | "PICDRIFT";
+  maxProjects: number;
 }
 
 interface GlobalSettings {
@@ -54,7 +56,7 @@ export default function AdminDashboard() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [pendingUpdates, setPendingUpdates] = useState<Partial<User>>({});
-  const [newUser, setNewUser] = useState({ email: "", password: "", name: "" });
+  const [newUser, setNewUser] = useState({ email: "", password: "", name: "", view: "VISIONLIGHT", maxProjects: 3 });
   const [customCreditAmount, setCustomCreditAmount] = useState<string>("0");
   const [targetCreditPool, setTargetCreditPool] =
     useState<string>("creditsPicDrift");
@@ -84,7 +86,7 @@ export default function AdminDashboard() {
 
   const openEditModal = (user: User) => {
     setEditingUser(user);
-    setPendingUpdates({ creditSystem: user.creditSystem, role: user.role });
+    setPendingUpdates({ creditSystem: user.creditSystem, role: user.role, view: user.view, maxProjects: user.maxProjects });
   };
 
   const handleDeleteUser = async (user: User) => {
@@ -105,7 +107,7 @@ export default function AdminDashboard() {
     try {
       await apiEndpoints.adminCreateUser(newUser);
       setMsg("✅ User created & synced!");
-      setNewUser({ email: "", password: "", name: "" });
+      setNewUser({ email: "", password: "", name: "", view: "VISIONLIGHT", maxProjects: 3 });
       setShowInviteModal(false);
       fetchData();
     } catch (err: any) {
@@ -897,6 +899,33 @@ export default function AdminDashboard() {
                   )}
                 </div>
 
+                {/* 4. VIEW & PROJECTS */}
+                <div>
+                  <label className="text-[9px] font-black text-gray-500 uppercase mb-3 block tracking-widest text-center">
+                    Dashboard View & Projects
+                  </label>
+                  <div className="space-y-3">
+                    <select
+                      className="w-full bg-gray-950 border border-gray-800 rounded-xl p-3 text-xs outline-none focus:border-cyan-500 text-gray-300"
+                      value={pendingUpdates.view || "VISIONLIGHT"}
+                      onChange={(e) => setPendingUpdates({ ...pendingUpdates, view: e.target.value as any })}
+                    >
+                      <option value="VISIONLIGHT">VisionLight FX View (All Unlocked)</option>
+                      <option value="PICDRIFT">PicDrift View (Video FX Locked)</option>
+                    </select>
+                    <div className="flex items-center justify-between p-3 bg-gray-950 border border-gray-800 rounded-xl text-xs">
+                      <span className="text-gray-400">Max Projects</span>
+                      <input
+                        type="number"
+                        min="1"
+                        className="w-20 bg-transparent text-right outline-none font-bold text-white focus:text-cyan-500"
+                        value={pendingUpdates.maxProjects || 3}
+                        onChange={(e) => setPendingUpdates({ ...pendingUpdates, maxProjects: parseInt(e.target.value) || 1 })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="pt-8 border-t border-white/5 space-y-4">
                   <button
                     onClick={handleSaveChanges}
@@ -958,6 +987,25 @@ export default function AdminDashboard() {
                   }
                   required
                 />
+                <select
+                  className="w-full p-4 bg-gray-950 border border-gray-800 rounded-2xl text-sm outline-none focus:border-cyan-500 text-gray-300"
+                  value={newUser.view}
+                  onChange={(e) => setNewUser({ ...newUser, view: e.target.value })}
+                >
+                  <option value="VISIONLIGHT">VisionLight FX View (All Unlocked)</option>
+                  <option value="PICDRIFT">PicDrift View (Video FX Locked)</option>
+                </select>
+                <div className="flex items-center justify-between p-4 bg-gray-950 border border-gray-800 rounded-2xl text-sm">
+                  <span className="text-gray-400">Max Projects</span>
+                  <input
+                    type="number"
+                    min="1"
+                    className="w-20 bg-transparent text-right outline-none focus:text-cyan-500"
+                    value={newUser.maxProjects}
+                    onChange={(e) => setNewUser({ ...newUser, maxProjects: parseInt(e.target.value) || 1 })}
+                    required
+                  />
+                </div>
                 <div className="flex gap-4 pt-6">
                   <button
                     type="button"

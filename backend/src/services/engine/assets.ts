@@ -10,7 +10,7 @@ import {
 export const assetsLogic = {
   // ✅ Upload Raw
   // ✅ Upload Raw (Forced "original" tag)
-  async uploadRawAsset(fileBuffer: Buffer, userId: string) {
+  async uploadRawAsset(fileBuffer: Buffer, userId: string, projectId?: string) {
     try {
       const metadata = await sharp(fileBuffer).metadata();
       const width = metadata.width || 1000;
@@ -32,6 +32,8 @@ export const assetsLogic = {
         url,
         "original",
         "IMAGE",
+        undefined,
+        projectId
       );
     } catch (e: any) {
       console.error("Raw Upload Failed:", e.message);
@@ -45,6 +47,7 @@ export const assetsLogic = {
     userId: string,
     targetAspectRatio: "16:9" | "9:16" | "1:1",
     originalAssetId?: string, // 👈 NEW PARAMETER
+    projectId?: string // 👈 NEW PARAMETER
   ) {
     try {
       let targetWidth = 1280;
@@ -106,6 +109,7 @@ export const assetsLogic = {
         targetAspectRatio,
         "IMAGE",
         originalAssetId, // 👈 Pass it here
+        projectId // 👈 Pass it here
       );
     } catch (e: any) {
       console.error("Asset Processing Failed:", e.message);

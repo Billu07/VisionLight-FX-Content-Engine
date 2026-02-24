@@ -45,10 +45,15 @@ export const apiEndpoints = {
   adminGetSettings: () => api.get("/api/admin/settings"),
   adminUpdateSettings: (data: any) => api.put("/api/admin/settings", data),
 
+  // === Projects ===
+  createProject: (data: { name: string }) => api.post("/api/projects", data),
+  getProjects: () => api.get("/api/projects"),
+  deleteProject: (id: string) => api.delete(`/api/projects/${id}`),
+
   // === Data ===
   getBrandConfig: () => api.get("/api/brand-config"),
   updateBrandConfig: (data: any) => api.put("/api/brand-config", data),
-  getPosts: () => api.get("/api/posts"),
+  getPosts: (projectId?: string) => api.get("/api/posts", { params: { projectId } }),
   getPostById: (id: string) => api.get(`/api/post/${id}`),
   updatePostTitle: (postId: string, title: string) =>
     api.put(`/api/posts/${postId}/title`, { title }),
@@ -69,7 +74,7 @@ export const apiEndpoints = {
     }),
 
   // === Asset Library ===
-  getAssets: () => api.get("/api/assets"),
+  getAssets: (projectId?: string) => api.get("/api/assets", { params: { projectId } }),
 
   deleteAsset: (id: string) => api.delete(`/api/assets/${id}`),
 
@@ -95,6 +100,7 @@ export const apiEndpoints = {
     url: string;
     aspectRatio: string;
     type: "IMAGE" | "VIDEO";
+    projectId?: string;
   }) => api.post("/api/assets/save-url", data),
   // ✅ UPDATED: Edit Asset supports 'mode'
   editAsset: (data: {

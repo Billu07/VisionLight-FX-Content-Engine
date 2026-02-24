@@ -8,6 +8,8 @@ interface User {
   name: string;
   creditSystem?: "COMMERCIAL" | "INTERNAL";
   role?: "ADMIN" | "USER" | "MANAGER";
+  view?: "VISIONLIGHT" | "PICDRIFT";
+  maxProjects?: number;
 }
 
 interface AuthState {

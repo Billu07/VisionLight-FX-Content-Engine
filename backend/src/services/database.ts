@@ -37,10 +37,13 @@ export const dbService = {
   async findUserById(id: string) {
     return prisma.user.findUnique({ where: { id } });
   },
-  async createUser(data: { email: string; name?: string }) {
+  async createUser(data: { email: string; name?: string; view?: string; maxProjects?: number }) {
     return prisma.user.create({
       data: {
-        ...data,
+        email: data.email,
+        name: data.name,
+        view: data.view || "VISIONLIGHT",
+        maxProjects: data.maxProjects || 3,
         creditBalance: 20, // Keep legacy balance
         creditsPicDrift: 10,
         creditsImageFX: 10,
@@ -73,6 +76,32 @@ export const dbService = {
     }
 
     return prisma.user.update({ where: { id }, data: otherData });
+  },
+
+  // === NEW: PROJECT ===
+  async createProject(userId: string, name: string) {
+    return prisma.project.create({
+      data: {
+        userId,
+        name,
+      },
+    });
+  },
+  async getUserProjects(userId: string) {
+    return prisma.project.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
+  },
+  async getProjectById(id: string) {
+    return prisma.project.findUnique({
+      where: { id },
+    });
+  },
+  async deleteProject(id: string) {
+    return prisma.project.delete({
+      where: { id },
+    });
   },
 
   // === CREDITS (Kept Intact for Backward Compatibility) ===
@@ -132,6 +161,7 @@ export const dbService = {
     aspectRatio: string,
     type: string = "IMAGE",
     originalAssetId?: string,
+    projectId?: string
   ) {
     return prisma.asset.create({
       data: {
@@ -140,12 +170,13 @@ export const dbService = {
         aspectRatio,
         type: type as any,
         originalAssetId: originalAssetId || undefined,
+        projectId: projectId || undefined,
       },
     });
   },
-  async getUserAssets(userId: string) {
+  async getUserAssets(userId: string, projectId?: string) {
     return prisma.asset.findMany({
-      where: { userId },
+      where: projectId ? { userId, projectId } : { userId },
       orderBy: { createdAt: "desc" },
       include: {
         variations: true,
@@ -169,6 +200,7 @@ export const dbService = {
     return prisma.post.create({
       data: {
         userId: data.userId,
+        projectId: data.projectId || undefined,
         title: data.title || "",
         prompt: data.prompt,
         mediaType: data.mediaType,
@@ -190,9 +222,13 @@ export const dbService = {
   async getPostById(id: string) {
     return prisma.post.findUnique({ where: { id } });
   },
-  async getUserPosts(userId: string) {
+  async getUserPosts(userId: string, projectId?: string) {
     return prisma.post.findMany({
-      where: {
+      where: projectId ? {
+        userId,
+        projectId,
+        platform: { not: "Internal" },
+      } : {
         userId,
         platform: { not: "Internal" },
       },

@@ -220,7 +220,8 @@ function Dashboard() {
     queryKey: ["posts"],
     queryFn: async () => {
       try {
-        const response = await apiEndpoints.getPosts();
+        const activeProject = localStorage.getItem("visionlight_active_project") || undefined;
+        const response = await apiEndpoints.getPosts(activeProject);
         return Array.isArray(response.data.posts) ? response.data.posts : [];
       } catch (e) {
         return [];
@@ -494,6 +495,9 @@ function Dashboard() {
       const formData = new FormData();
       formData.append("image", file);
       formData.append("raw", "true");
+      const activeProject = localStorage.getItem("visionlight_active_project");
+      if (activeProject) formData.append("projectId", activeProject);
+
       const res = await apiEndpoints.uploadAssetSync(formData);
       if (res.data.success && res.data.asset) {
         setEditingAsset(res.data.asset);
@@ -537,6 +541,11 @@ function Dashboard() {
     const formData = new FormData();
     formData.append("prompt", prompt);
     formData.append("title", videoTitle);
+
+    const activeProject = localStorage.getItem("visionlight_active_project");
+    if (activeProject) {
+      formData.append("projectId", activeProject);
+    }
 
     if (activeEngine === "kie" && videoFxMode === "picdrift") {
       formData.append("mediaType", "video");
@@ -683,6 +692,9 @@ function Dashboard() {
                 const formData = new FormData();
                 formData.append("image", file);
                 formData.append("raw", "true");
+                const activeProject = localStorage.getItem("visionlight_active_project");
+                if (activeProject) formData.append("projectId", activeProject);
+
                 await apiEndpoints.uploadAssetSync(formData);
                 alert("✅ Frame Saved to Asset Library!");
                 queryClient.invalidateQueries({ queryKey: ["assets"] });
@@ -1158,29 +1170,47 @@ function Dashboard() {
                       </button>
 
                       {/* TAB 3: VIDEO FX */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveEngine("kie");
-                          setVideoFxMode("video");
-                        }}
-                        className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
-                          currentVisualTab === "videofx"
-                            ? "border-white/20 bg-gradient-to-br from-blue-700 to-cyan-700 shadow-2xl scale-105"
-                            : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="flex-1">
-                            <div className="font-semibold text-sm text-white">
-                              Video FX
+                      {user?.view === "PICDRIFT" ? (
+                        <a
+                          href="http://picdrift.com/renders"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-cyan-400/50 hover:bg-cyan-900/20 transition-all duration-300 text-left group flex items-center justify-between"
+                        >
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="font-semibold text-sm text-gray-400 group-hover:text-cyan-300 flex items-center gap-2">
+                              <span>🔒</span> Video FX
                             </div>
                           </div>
-                          {currentVisualTab === "videofx" && (
-                            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                          )}
-                        </div>
-                      </button>
+                          <div className="text-xs bg-cyan-600/20 text-cyan-400 px-2 py-1 rounded-md font-bold group-hover:bg-cyan-500 group-hover:text-white transition-colors">
+                            Unlock
+                          </div>
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveEngine("kie");
+                            setVideoFxMode("video");
+                          }}
+                          className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
+                            currentVisualTab === "videofx"
+                              ? "border-white/20 bg-gradient-to-br from-blue-700 to-cyan-700 shadow-2xl scale-105"
+                              : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="flex-1">
+                              <div className="font-semibold text-sm text-white">
+                                Video FX
+                              </div>
+                            </div>
+                            {currentVisualTab === "videofx" && (
+                              <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                            )}
+                          </div>
+                        </button>
+                      )}
                     </div>
                   </div>
 

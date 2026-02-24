@@ -181,7 +181,7 @@ app.post(
   authenticateToken,
   requireAdmin,
   async (req: AuthenticatedRequest, res) => {
-    const { email, password, name } = req.body;
+    const { email, password, name, view, maxProjects } = req.body;
     if (!email || !password)
       return res.status(400).json({ error: "Missing fields" });
 
@@ -190,6 +190,8 @@ app.post(
         email,
         password,
         name || "New User",
+        view || "VISIONLIGHT",
+        maxProjects !== undefined ? Number(maxProjects) : 3
       );
       res.json({ success: true, user: newUser });
     } catch (error: any) {
@@ -219,7 +221,7 @@ app.put(
   async (req: AuthenticatedRequest, res) => {
     const { userId } = req.params;
     // UPDATED: Destructure creditType for pool-specific top-ups
-    const { creditBalance, addCredits, creditType, creditSystem, name, role } =
+    const { creditBalance, addCredits, creditType, creditSystem, name, role, view, maxProjects } =
       req.body;
 
     try {
@@ -242,6 +244,8 @@ app.put(
       if (creditSystem) otherUpdates.creditSystem = creditSystem;
       if (name) otherUpdates.name = name;
       if (role) otherUpdates.role = role;
+      if (view) otherUpdates.view = view;
+      if (maxProjects !== undefined) otherUpdates.maxProjects = Number(maxProjects);
 
       if (Object.keys(otherUpdates).length > 0) {
         await airtableService.adminUpdateUser(userId, otherUpdates);
@@ -287,6 +291,60 @@ app.get(
 );
 
 // ==================== DATA ROUTES ====================
+// --- PROJECTS ---
+app.post(
+  "/api/projects",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { name } = req.body;
+      if (!name) return res.status(400).json({ error: "Project name required" });
+
+      const user = await airtableService.findUserById(req.user!.id);
+      const projects = await airtableService.getUserProjects(req.user!.id);
+
+      if (projects.length >= (user as any).maxProjects) {
+        return res.status(403).json({ error: "Maximum project limit reached" });
+      }
+
+      const project = await airtableService.createProject(req.user!.id, name);
+      res.json({ success: true, project });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+app.get(
+  "/api/projects",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const projects = await airtableService.getUserProjects(req.user!.id);
+      res.json({ success: true, projects });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+app.delete(
+  "/api/projects/:id",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const project = await airtableService.getProjectById(req.params.id);
+      if (!project || project.userId !== req.user!.id) {
+        return res.status(403).json({ error: "Denied" });
+      }
+      await airtableService.deleteProject(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
 app.get(
   "/api/brand-config",
   authenticateToken,
@@ -407,13 +465,14 @@ app.post(
       if (!req.file)
         return res.status(400).json({ error: "No image provided" });
 
-      const { aspectRatio, raw, originalAssetId } = req.body;
+      const { aspectRatio, raw, originalAssetId, projectId } = req.body;
 
       if (raw === "true") {
         // Raw Uploads (v1) remain free/standard upload logic
         const asset = await contentEngine.uploadRawAsset(
           req.file.buffer,
           req.user!.id,
+          projectId
         );
         return res.json({ success: true, asset });
       } else {
@@ -443,6 +502,7 @@ app.post(
           req.user!.id,
           aspectRatio || "16:9",
           originalAssetId, // Keep original reference intact
+          projectId
         );
         res.json({ success: true, asset });
       }
@@ -639,7 +699,7 @@ app.post(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { url, aspectRatio, type } = req.body;
+      const { url, aspectRatio, type, projectId } = req.body;
 
       if (!url) return res.status(400).json({ error: "URL required" });
 
@@ -648,6 +708,8 @@ app.post(
         url,
         aspectRatio || "16:9",
         type || "IMAGE",
+        undefined,
+        projectId
       );
 
       res.json({ success: true, asset });
@@ -727,7 +789,8 @@ app.get(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const assets = await airtableService.getUserAssets(req.user!.id);
+      const projectId = req.query.projectId as string | undefined;
+      const assets = await airtableService.getUserAssets(req.user!.id, projectId);
       res.json({ success: true, assets });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -755,7 +818,8 @@ app.get(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const posts = await airtableService.getUserPosts(req.user!.id);
+      const projectId = req.query.projectId as string | undefined;
+      const posts = await airtableService.getUserPosts(req.user!.id, projectId);
       res.json({ success: true, posts });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch posts" });
@@ -949,6 +1013,7 @@ app.post(
         title: title || "",
         mediaType: mediaType.toUpperCase() as any,
         platform: "INSTAGRAM",
+        projectId: req.body.projectId || undefined,
         generationParams,
         imageReference: primaryRefUrl,
         generationStep: "GENERATION",

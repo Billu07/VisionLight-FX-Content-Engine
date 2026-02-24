@@ -77,7 +77,11 @@ export function AssetLibrary({
     refetch,
   } = useQuery({
     queryKey: ["assets"],
-    queryFn: async () => (await apiEndpoints.getAssets()).data.assets,
+    queryFn: async () => {
+      const activeProject = localStorage.getItem("visionlight_active_project") || undefined;
+      const res = await apiEndpoints.getAssets(activeProject);
+      return res.data.assets;
+    },
     refetchInterval: 3000,
     refetchIntervalInBackground: true,
   });
@@ -185,6 +189,8 @@ export function AssetLibrary({
         formData.append("image", file);
         formData.append("raw", "true");
         formData.append("aspectRatio", "original");
+        const activeProject = localStorage.getItem("visionlight_active_project");
+        if (activeProject) formData.append("projectId", activeProject);
 
         const rawRes = await apiEndpoints.uploadAssetSync(formData);
         const originalAsset = rawRes.data.asset;
@@ -199,6 +205,7 @@ export function AssetLibrary({
           processFormData.append("raw", "false");
           processFormData.append("aspectRatio", activeTab);
           processFormData.append("originalAssetId", originalAsset.id);
+          if (activeProject) processFormData.append("projectId", activeProject);
           await apiEndpoints.uploadAssetSync(processFormData);
         }
         return originalAsset;
@@ -664,6 +671,9 @@ export function AssetLibrary({
                 const formData = new FormData();
                 formData.append("image", file);
                 formData.append("raw", "true");
+                const activeProject = localStorage.getItem("visionlight_active_project");
+                if (activeProject) formData.append("projectId", activeProject);
+                
                 await apiEndpoints.uploadAssetSync(formData);
                 alert("Frame Saved to Library!");
                 setViewingVideoAsset(null);

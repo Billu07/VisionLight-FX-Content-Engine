@@ -198,6 +198,14 @@ export const imageLogic = {
         "image",
       );
 
+      let projectId: string | undefined = undefined;
+      if (originalAssetId) {
+        const original = await airtableService.getUserAssets(userId).then(assets => assets.find(a => a.id === originalAssetId));
+        if (original && original.projectId) {
+          projectId = original.projectId;
+        }
+      }
+
       // ✅ PASSING originalAssetId and using the selected aspectRatio
       // This ensures it moves to Landscape/Portrait/Square OR Edited tab
       return await airtableService.createAsset(
@@ -206,6 +214,7 @@ export const imageLogic = {
         aspectRatio,
         "IMAGE",
         originalAssetId,
+        projectId
       );
     } catch (e: any) {
       throw new Error(`Edit failed: ${e.message}`);
@@ -245,6 +254,14 @@ export const imageLogic = {
         "image",
       );
 
+      let projectId: string | undefined = undefined;
+      if (originalAssetId) {
+        const original = await airtableService.getUserAssets(userId).then(assets => assets.find(a => a.id === originalAssetId));
+        if (original && original.projectId) {
+          projectId = original.projectId;
+        }
+      }
+
       // ✅ PASSING originalAssetId
       return await airtableService.createAsset(
         userId,
@@ -252,6 +269,7 @@ export const imageLogic = {
         "original",
         "IMAGE",
         originalAssetId,
+        projectId
       );
     } catch (e: any) {
       console.error("Enhance Error:", e.message);

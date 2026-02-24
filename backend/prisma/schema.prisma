@@ -24,15 +24,29 @@ model User {
 
   creditSystem  String    @default("COMMERCIAL") // COMMERCIAL ($) or INTERNAL (pts)
   role          String    @default("USER")       // USER, MANAGER, or ADMIN
+  view          String    @default("VISIONLIGHT") // VISIONLIGHT or PICDRIFT
+  maxProjects   Int       @default(3)
   adminNotes    String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   
+  projects      Project[]
   posts         Post[]
   assets        Asset[]
   brandConfig   BrandConfig?
   roiMetrics    ROIMetrics?
   creditRequests CreditRequest[]
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  userId      String
+  name        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts       Post[]
+  assets      Asset[]
 }
 
 // Render Reserve Controls (Pricing)
@@ -98,6 +112,8 @@ model Post {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId        String?
+  project          Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model Asset {
@@ -108,6 +124,8 @@ model Asset {
   type        String   @default("IMAGE") 
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   originalAssetId String?  
   originalAsset   Asset?   @relation("AssetHistory", fields: [originalAssetId], references: [id])

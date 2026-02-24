@@ -12,6 +12,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MarketingSite } from "./pages/MarketingSite";
 import Dashboard from "./pages/Dashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import Projects from "./pages/Projects";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { BrandProvider } from "./contexts/BrandContext";
 import { useAuth } from "./hooks/useAuth";
@@ -49,6 +50,17 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       </div>
     );
   if (!user) return <Navigate to="/" state={{ from: location }} replace />;
+
+  return <>{children}</>;
+};
+
+// --- Project Selected Route ---
+const ProjectRoute = ({ children }: { children: React.ReactNode }) => {
+  const activeProject = localStorage.getItem("visionlight_active_project");
+  
+  if (!activeProject) {
+    return <Navigate to="/projects" replace />;
+  }
 
   return <>{children}</>;
 };
@@ -94,12 +106,23 @@ function App() {
             {/* --------------------------- */}
 
             <Route
+              path="/projects"
+              element={
+                <ProtectedRoute>
+                  <Projects />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
               path="/app"
               element={
                 <ProtectedRoute>
-                  <ErrorBoundary>
-                    <Dashboard />
-                  </ErrorBoundary>
+                  <ProjectRoute>
+                    <ErrorBoundary>
+                      <Dashboard />
+                    </ErrorBoundary>
+                  </ProjectRoute>
                 </ProtectedRoute>
               }
             />
