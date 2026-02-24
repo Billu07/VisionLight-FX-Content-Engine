@@ -222,7 +222,8 @@ function Dashboard() {
     queryKey: ["posts"],
     queryFn: async () => {
       try {
-        const activeProject = localStorage.getItem("visionlight_active_project") || undefined;
+        const activeProject =
+          localStorage.getItem("visionlight_active_project") || undefined;
         const response = await apiEndpoints.getPosts(activeProject);
         return Array.isArray(response.data.posts) ? response.data.posts : [];
       } catch (e) {
@@ -283,7 +284,7 @@ function Dashboard() {
   const creditLink = isCommercial
     ? "http://picdrift.com/fx-Credits"
     : "http://PicDrift.com/fx-request";
-  const creditBtnText = isCommercial ? "Buy Credit" : "Request Credit";
+  const creditBtnText = isCommercial ? "Buy Credit" : "Request Render";
 
   // ✅ 5. BACKGROUND JOB POLLING
   useQuery({
@@ -697,7 +698,9 @@ function Dashboard() {
                 const formData = new FormData();
                 formData.append("image", file);
                 formData.append("raw", "true");
-                const activeProject = localStorage.getItem("visionlight_active_project");
+                const activeProject = localStorage.getItem(
+                  "visionlight_active_project",
+                );
                 if (activeProject) formData.append("projectId", activeProject);
 
                 await apiEndpoints.uploadAssetSync(formData);
@@ -1180,7 +1183,8 @@ function Dashboard() {
                       </button>
 
                       {/* TAB 2: PIC FX */}
-                      {user?.view === "PICDRIFT" && credits.creditsImageFX <= 0 ? (
+                      {user?.view === "PICDRIFT" &&
+                      credits.creditsImageFX <= 0 ? (
                         <a
                           href="http://picdrift.com/renders"
                           target="_blank"
@@ -1220,7 +1224,11 @@ function Dashboard() {
                       )}
 
                       {/* TAB 3: VIDEO FX */}
-                      {user?.view === "PICDRIFT" && (credits.creditsVideoFX1 + credits.creditsVideoFX2 + credits.creditsVideoFX3) <= 0 ? (
+                      {user?.view === "PICDRIFT" &&
+                      credits.creditsVideoFX1 +
+                        credits.creditsVideoFX2 +
+                        credits.creditsVideoFX3 <=
+                        0 ? (
                         <a
                           href="http://picdrift.com/renders"
                           target="_blank"
@@ -2263,9 +2271,6 @@ function Dashboard() {
                             </div>
                           ) : (
                             <div className="flex items-center gap-3 uppercase tracking-widest text-sm">
-                              {currentVisualTab === "picdrift" && (
-                                <img src={drift_icon} alt="" className="h-5 w-auto" />
-                              )}
                               {currentVisualTab === "picdrift"
                                 ? "Generate PicDrift"
                                 : currentVisualTab === "studio"

@@ -53,7 +53,7 @@ export function AssetLibrary({
 
   // Storyboard State
   const activeProject = localStorage.getItem("visionlight_active_project");
-  const storyboardKey = `visionlight_storyboard_${activeProject || 'default'}`;
+  const storyboardKey = `visionlight_storyboard_${activeProject || "default"}`;
   const [storyboardIds, setStoryboardIds] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem(storyboardKey);
@@ -91,7 +91,8 @@ export function AssetLibrary({
   } = useQuery({
     queryKey: ["assets"],
     queryFn: async () => {
-      const activeProject = localStorage.getItem("visionlight_active_project") || undefined;
+      const activeProject =
+        localStorage.getItem("visionlight_active_project") || undefined;
       const res = await apiEndpoints.getAssets(activeProject);
       return res.data.assets;
     },
@@ -138,7 +139,7 @@ export function AssetLibrary({
 
   if (activeTab === "STORYBOARD") {
     filteredAssets = storyboardIds
-      .map(id => assets.find((a: Asset) => a.id === id))
+      .map((id) => assets.find((a: Asset) => a.id === id))
       .filter(Boolean) as Asset[];
   }
 
@@ -210,7 +211,9 @@ export function AssetLibrary({
         formData.append("image", file);
         formData.append("raw", "true");
         formData.append("aspectRatio", "original");
-        const activeProject = localStorage.getItem("visionlight_active_project");
+        const activeProject = localStorage.getItem(
+          "visionlight_active_project",
+        );
         if (activeProject) formData.append("projectId", activeProject);
 
         const rawRes = await apiEndpoints.uploadAssetSync(formData);
@@ -382,13 +385,13 @@ export function AssetLibrary({
         <div className="p-6 bg-gray-800/50 flex flex-col md:flex-row gap-4 items-center justify-between border-b border-gray-800">
           <div className="flex bg-gray-950 p-1 rounded-lg border border-gray-700 overflow-x-auto">
             {[
-              { id: "STORYBOARD", label: "🎞️ Storyboard" },
               { id: "16:9", label: "Landscape" },
               { id: "9:16", label: "Portrait" },
               { id: "1:1", label: "Square" },
               { id: "custom", label: "Edited" },
               { id: "original", label: "Originals" },
-              { id: "VIDEO", label: "Drift Paths" },
+              { id: "STORYBOARD", label: "Storyboard" },
+              { id: "VIDEO", label: "3D-X-Camera-Paths" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -408,7 +411,11 @@ export function AssetLibrary({
             {activeTab === "STORYBOARD" && storyboardIds.length > 0 && (
               <button
                 onClick={() => {
-                  if (window.confirm("Clear all items from your Storyboard sequence?")) {
+                  if (
+                    window.confirm(
+                      "Clear all items from your Storyboard sequence?",
+                    )
+                  ) {
                     setStoryboardIds([]);
                   }
                 }}
@@ -452,7 +459,9 @@ export function AssetLibrary({
         </div>
 
         {/* GRID VIEW */}
-        <div className={`flex-1 overflow-y-auto p-8 custom-scrollbar ${activeTab === "STORYBOARD" ? "bg-black relative before:content-[''] before:absolute before:inset-0 before:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iNSIgeT0iNSIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiLz48cmVjdCB4PSI1IiB5PSIyNSIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiLz48L3N2Zz4=')] before:bg-repeat-y before:bg-[length:20px_auto] before:opacity-30 before:pointer-events-none after:content-[''] after:absolute after:inset-y-0 after:right-0 after:w-5 after:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iNSIgeT0iNSIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiLz48cmVjdCB4PSI1IiB5PSIyNSIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiLz48L3N2Zz4=')] after:bg-repeat-y after:bg-[length:20px_auto] after:opacity-30 after:pointer-events-none px-12" : "bg-black/40"}`}>
+        <div
+          className={`flex-1 overflow-y-auto p-8 custom-scrollbar ${activeTab === "STORYBOARD" ? "bg-black relative before:content-[''] before:absolute before:inset-0 before:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iNSIgeT0iNSIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiLz48cmVjdCB4PSI1IiB5PSIyNSIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiLz48L3N2Zz4=')] before:bg-repeat-y before:bg-[length:20px_auto] before:opacity-30 before:pointer-events-none after:content-[''] after:absolute after:inset-y-0 after:right-0 after:w-5 after:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iNSIgeT0iNSIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiLz48cmVjdCB4PSI1IiB5PSIyNSIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiLz48L3N2Zz4=')] after:bg-repeat-y after:bg-[length:20px_auto] after:opacity-30 after:pointer-events-none px-12" : "bg-black/40"}`}
+        >
           {isLoading && !isRefetching ? (
             <div className="flex justify-center items-center h-full">
               <LoadingSpinner size="lg" variant="neon" />
@@ -509,7 +518,10 @@ export function AssetLibrary({
                             const idx = storyboardIds.indexOf(asset.id);
                             if (idx > 0) {
                               const newIds = [...storyboardIds];
-                              [newIds[idx - 1], newIds[idx]] = [newIds[idx], newIds[idx - 1]];
+                              [newIds[idx - 1], newIds[idx]] = [
+                                newIds[idx],
+                                newIds[idx - 1],
+                              ];
                               setStoryboardIds(newIds);
                             }
                           }}
@@ -523,7 +535,10 @@ export function AssetLibrary({
                             const idx = storyboardIds.indexOf(asset.id);
                             if (idx < storyboardIds.length - 1) {
                               const newIds = [...storyboardIds];
-                              [newIds[idx + 1], newIds[idx]] = [newIds[idx], newIds[idx + 1]];
+                              [newIds[idx + 1], newIds[idx]] = [
+                                newIds[idx],
+                                newIds[idx + 1],
+                              ];
                               setStoryboardIds(newIds);
                             }
                           }}
@@ -668,7 +683,9 @@ export function AssetLibrary({
                   <button
                     onClick={() => {
                       if (storyboardIds.includes(selectedAsset.id)) {
-                        setStoryboardIds(storyboardIds.filter(id => id !== selectedAsset.id));
+                        setStoryboardIds(
+                          storyboardIds.filter((id) => id !== selectedAsset.id),
+                        );
                       } else {
                         setStoryboardIds([...storyboardIds, selectedAsset.id]);
                       }
@@ -679,7 +696,9 @@ export function AssetLibrary({
                         : "bg-indigo-900/30 text-indigo-400 border-indigo-500/50 hover:bg-indigo-900/50"
                     }`}
                   >
-                    {storyboardIds.includes(selectedAsset.id) ? "➖ Remove from Storyboard" : "➕ Add to Storyboard"}
+                    {storyboardIds.includes(selectedAsset.id)
+                      ? "➖ Remove from Storyboard"
+                      : "➕ Add to Storyboard"}
                   </button>
 
                   {onSelect && (
@@ -750,9 +769,11 @@ export function AssetLibrary({
                 const formData = new FormData();
                 formData.append("image", file);
                 formData.append("raw", "true");
-                const activeProject = localStorage.getItem("visionlight_active_project");
+                const activeProject = localStorage.getItem(
+                  "visionlight_active_project",
+                );
                 if (activeProject) formData.append("projectId", activeProject);
-                
+
                 await apiEndpoints.uploadAssetSync(formData);
                 alert("Frame Saved to Library!");
                 setViewingVideoAsset(null);

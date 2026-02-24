@@ -56,7 +56,13 @@ export default function AdminDashboard() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [pendingUpdates, setPendingUpdates] = useState<Partial<User>>({});
-  const [newUser, setNewUser] = useState({ email: "", password: "", name: "", view: "VISIONLIGHT", maxProjects: 3 });
+  const [newUser, setNewUser] = useState({
+    email: "",
+    password: "",
+    name: "",
+    view: "VISIONLIGHT",
+    maxProjects: 3,
+  });
   const [customCreditAmount, setCustomCreditAmount] = useState<string>("0");
   const [targetCreditPool, setTargetCreditPool] =
     useState<string>("creditsPicDrift");
@@ -86,7 +92,12 @@ export default function AdminDashboard() {
 
   const openEditModal = (user: User) => {
     setEditingUser(user);
-    setPendingUpdates({ creditSystem: user.creditSystem, role: user.role, view: user.view, maxProjects: user.maxProjects });
+    setPendingUpdates({
+      creditSystem: user.creditSystem,
+      role: user.role,
+      view: user.view,
+      maxProjects: user.maxProjects,
+    });
   };
 
   const handleDeleteUser = async (user: User) => {
@@ -107,7 +118,13 @@ export default function AdminDashboard() {
     try {
       await apiEndpoints.adminCreateUser(newUser);
       setMsg("✅ User created & synced!");
-      setNewUser({ email: "", password: "", name: "", view: "VISIONLIGHT", maxProjects: 3 });
+      setNewUser({
+        email: "",
+        password: "",
+        name: "",
+        view: "VISIONLIGHT",
+        maxProjects: 3,
+      });
       setShowInviteModal(false);
       fetchData();
     } catch (err: any) {
@@ -211,13 +228,13 @@ export default function AdminDashboard() {
               onClick={() => setActiveTab("users")}
               className={`px-6 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all ${activeTab === "users" ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20" : "text-gray-500 hover:text-white"}`}
             >
-              Directory
+              Users
             </button>
             <button
               onClick={() => setActiveTab("controls")}
               className={`px-6 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${activeTab === "controls" ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20" : "text-gray-500 hover:text-white"}`}
             >
-              Inventory
+              Global Control
             </button>
           </div>
 
@@ -234,7 +251,7 @@ export default function AdminDashboard() {
               onClick={() => setShowInviteModal(true)}
               className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-5 py-2.5 rounded-xl text-[11px] uppercase tracking-widest transition-all whitespace-nowrap shadow-lg shadow-indigo-500/20"
             >
-              + Provision User
+              + Create User
             </button>
           </div>
         </div>
@@ -242,7 +259,12 @@ export default function AdminDashboard() {
         {msg && (
           <div className="mb-10 p-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-400 flex justify-between items-center animate-in fade-in slide-in-from-top-4">
             <span className="text-xs font-medium tracking-wide">✅ {msg}</span>
-            <button onClick={() => setMsg("")} className="text-emerald-500 hover:text-white text-lg">✕</button>
+            <button
+              onClick={() => setMsg("")}
+              className="text-emerald-500 hover:text-white text-lg"
+            >
+              ✕
+            </button>
           </div>
         )}
 
@@ -259,7 +281,9 @@ export default function AdminDashboard() {
                   className="flex items-center justify-between bg-[#16191e] p-5 rounded-2xl border border-white/5"
                 >
                   <div className="flex flex-col gap-1">
-                    <span className="font-bold text-sm text-white tracking-tight">{req.name}</span>
+                    <span className="font-bold text-sm text-white tracking-tight">
+                      {req.name}
+                    </span>
                     <span className="text-[10px] text-gray-500 font-mono tracking-wider">
                       {req.email}
                     </span>
@@ -297,13 +321,27 @@ export default function AdminDashboard() {
                 <thead className="bg-white/[0.02] text-gray-500 text-[9px] uppercase tracking-[0.2em] font-black">
                   <tr>
                     <th className="p-8 border-b border-white/5">Identity</th>
-                    <th className="p-8 border-b border-white/5 text-center text-pink-500/80">PD Standard</th>
-                    <th className="p-8 border-b border-white/5 text-center text-rose-500/80">PD Plus</th>
-                    <th className="p-8 border-b border-white/5 text-center text-violet-500/80">PicFX</th>
-                    <th className="p-8 border-b border-white/5 text-center text-blue-500/80">Video FX 1</th>
-                    <th className="p-8 border-b border-white/5 text-center text-cyan-500/80">Video FX 2</th>
-                    <th className="p-8 border-b border-white/5 text-center text-indigo-500/80">Video FX 3</th>
-                    <th className="p-8 border-b border-white/5 text-right">Operations</th>
+                    <th className="p-8 border-b border-white/5 text-center text-pink-500/80">
+                      PD Standard
+                    </th>
+                    <th className="p-8 border-b border-white/5 text-center text-rose-500/80">
+                      PD Plus
+                    </th>
+                    <th className="p-8 border-b border-white/5 text-center text-violet-500/80">
+                      PicFX
+                    </th>
+                    <th className="p-8 border-b border-white/5 text-center text-blue-500/80">
+                      Video FX 1
+                    </th>
+                    <th className="p-8 border-b border-white/5 text-center text-cyan-500/80">
+                      Video FX 2
+                    </th>
+                    <th className="p-8 border-b border-white/5 text-center text-indigo-500/80">
+                      Video FX 3
+                    </th>
+                    <th className="p-8 border-b border-white/5 text-right">
+                      Operations
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -320,14 +358,18 @@ export default function AdminDashboard() {
                         className="hover:bg-white/[0.02] transition-colors group"
                       >
                         <td className="p-8">
-                          <div className="font-bold text-sm text-white tracking-tight">{u.name}</div>
+                          <div className="font-bold text-sm text-white tracking-tight">
+                            {u.name}
+                          </div>
                           <div className="text-[10px] text-gray-500 mt-1">
                             {u.email}
                           </div>
                           <div
                             className={`mt-2 text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full inline-block ${u.creditSystem === "COMMERCIAL" ? "bg-indigo-500/10 text-indigo-400" : "bg-gray-800 text-gray-500"}`}
                           >
-                            {u.view === "PICDRIFT" ? "Demo Access" : u.creditSystem}
+                            {u.view === "PICDRIFT"
+                              ? "Demo Access"
+                              : u.creditSystem}
                           </div>
                         </td>
                         <td className="p-8 text-center">
@@ -372,7 +414,7 @@ export default function AdminDashboard() {
                               onClick={() => handleDeleteUser(u)}
                               className="px-4 py-2 bg-red-900/10 hover:bg-red-600 rounded-lg text-red-500 hover:text-white transition-all text-[9px] font-bold uppercase tracking-widest"
                             >
-                              Purge
+                              Delete
                             </button>
                           </div>
                         </td>
@@ -399,7 +441,9 @@ export default function AdminDashboard() {
                   </h3>
                   <div className="space-y-6">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Standard 5s</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        Standard 5s
+                      </span>
                       <input
                         step="0.01"
                         type="number"
@@ -413,7 +457,9 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Standard 10s</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        Standard 10s
+                      </span>
                       <input
                         step="0.01"
                         type="number"
@@ -427,7 +473,9 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="flex justify-between items-center pt-6 border-t border-white/5">
-                      <span className="text-[10px] font-bold text-white uppercase tracking-wider">Plus 5s</span>
+                      <span className="text-[10px] font-bold text-white uppercase tracking-wider">
+                        Plus 5s
+                      </span>
                       <input
                         step="0.01"
                         type="number"
@@ -441,7 +489,9 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-white uppercase tracking-wider">Plus 10s</span>
+                      <span className="text-[10px] font-bold text-white uppercase tracking-wider">
+                        Plus 10s
+                      </span>
                       <input
                         step="0.01"
                         type="number"
@@ -462,7 +512,9 @@ export default function AdminDashboard() {
                   </h3>
                   <div className="space-y-6">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Standard Image</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        Standard Image
+                      </span>
                       <input
                         step="0.01"
                         type="number"
@@ -476,7 +528,9 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Carousel Batch</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        Carousel Batch
+                      </span>
                       <input
                         step="0.01"
                         type="number"
@@ -490,7 +544,9 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Mass Processing</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        Mass Processing
+                      </span>
                       <input
                         step="0.01"
                         type="number"
@@ -514,7 +570,9 @@ export default function AdminDashboard() {
                   </h3>
                   <div className="space-y-6">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">FX 1 - 10s</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        FX 1 - 10s
+                      </span>
                       <input
                         step="0.01"
                         type="number"
@@ -528,7 +586,9 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">FX 1 - 15s</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        FX 1 - 15s
+                      </span>
                       <input
                         step="0.01"
                         type="number"
@@ -542,7 +602,9 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="flex justify-between items-center pt-6 border-t border-white/5">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">FX 2 - Base</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        FX 2 - Base
+                      </span>
                       <input
                         step="0.01"
                         type="number"
@@ -556,7 +618,9 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">FX 2 - Max</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        FX 2 - Max
+                      </span>
                       <input
                         step="0.01"
                         type="number"
@@ -577,7 +641,9 @@ export default function AdminDashboard() {
                   </h3>
                   <div className="space-y-6">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">FX 3 - 4s</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        FX 3 - 4s
+                      </span>
                       <input
                         step="0.01"
                         type="number"
@@ -591,7 +657,9 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">FX 3 - 6s</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        FX 3 - 6s
+                      </span>
                       <input
                         step="0.01"
                         type="number"
@@ -605,7 +673,9 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">FX 3 - 8s</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        FX 3 - 8s
+                      </span>
                       <input
                         step="0.01"
                         type="number"
@@ -629,7 +699,9 @@ export default function AdminDashboard() {
                   </h3>
                   <div className="space-y-6">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Pro Editor</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        Pro Editor
+                      </span>
                       <input
                         step="0.01"
                         type="number"
@@ -643,7 +715,9 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Enhance / Upscale</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        Enhance / Upscale
+                      </span>
                       <input
                         step="0.01"
                         type="number"
@@ -657,7 +731,9 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Format Convert</span>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                        Format Convert
+                      </span>
                       <input
                         step="0.01"
                         type="number"
@@ -736,7 +812,9 @@ export default function AdminDashboard() {
               <div className="flex justify-between items-start mb-10 border-b border-white/5 pb-6">
                 <div>
                   <h3 className="text-lg font-bold text-white tracking-tight">
-                    {editingUser.view === "PICDRIFT" ? "Demo Account Control" : "Account Settings"}
+                    {editingUser.view === "PICDRIFT"
+                      ? "Demo Account Control"
+                      : "Account Settings"}
                   </h3>
                   <p className="text-xs text-gray-500 font-mono mt-1">
                     {editingUser.email}
@@ -759,23 +837,59 @@ export default function AdminDashboard() {
                     </label>
                     <div className="grid grid-cols-2 gap-x-8 gap-y-6">
                       {[
-                        { id: "creditsPicDrift", label: "PicDrift Standard", color: "text-pink-400" },
-                        { id: "creditsPicDriftPlus", label: "PicDrift Plus", color: "text-rose-400" },
-                        { id: "creditsImageFX", label: "Pic FX", color: "text-violet-400" },
-                        { id: "creditsVideoFX1", label: "Video FX 1", color: "text-blue-400" },
-                        { id: "creditsVideoFX2", label: "Video FX 2", color: "text-cyan-400" },
-                        { id: "creditsVideoFX3", label: "Video FX 3", color: "text-indigo-400" },
+                        {
+                          id: "creditsPicDrift",
+                          label: "PicDrift Standard",
+                          color: "text-pink-400",
+                        },
+                        {
+                          id: "creditsPicDriftPlus",
+                          label: "PicDrift Plus",
+                          color: "text-rose-400",
+                        },
+                        {
+                          id: "creditsImageFX",
+                          label: "Pic FX",
+                          color: "text-violet-400",
+                        },
+                        {
+                          id: "creditsVideoFX1",
+                          label: "Video FX 1",
+                          color: "text-blue-400",
+                        },
+                        {
+                          id: "creditsVideoFX2",
+                          label: "Video FX 2",
+                          color: "text-cyan-400",
+                        },
+                        {
+                          id: "creditsVideoFX3",
+                          label: "Video FX 3",
+                          color: "text-indigo-400",
+                        },
                       ].map((pool) => (
                         <div key={pool.id} className="flex flex-col gap-2">
-                          <span className={`text-[10px] font-bold uppercase tracking-wider ${pool.color}`}>{pool.label}</span>
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-wider ${pool.color}`}
+                          >
+                            {pool.label}
+                          </span>
                           <input
                             type="number"
                             step="1"
                             className="w-full bg-[#16191e] border border-white/5 rounded-xl px-4 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-500/50 transition-all"
-                            defaultValue={Math.floor((editingUser as any)[pool.id] || 0)}
+                            defaultValue={Math.floor(
+                              (editingUser as any)[pool.id] || 0,
+                            )}
                             onBlur={(e) => {
                               const val = parseInt(e.target.value) || 0;
-                              handleQuickAddCredits(editingUser.id, pool.id, (val - (editingUser as any)[pool.id]).toString());
+                              handleQuickAddCredits(
+                                editingUser.id,
+                                pool.id,
+                                (
+                                  val - (editingUser as any)[pool.id]
+                                ).toString(),
+                              );
                             }}
                           />
                         </div>
@@ -798,8 +912,12 @@ export default function AdminDashboard() {
                           value={targetCreditPool}
                           onChange={(e) => setTargetCreditPool(e.target.value)}
                         >
-                          <option value="creditsPicDrift">PicDrift Standard</option>
-                          <option value="creditsPicDriftPlus">PicDrift Plus</option>
+                          <option value="creditsPicDrift">
+                            PicDrift Standard
+                          </option>
+                          <option value="creditsPicDriftPlus">
+                            PicDrift Plus
+                          </option>
                           <option value="creditsImageFX">PicFX</option>
                           <option value="creditsVideoFX1">Video FX 1</option>
                           <option value="creditsVideoFX2">Video FX 2</option>
@@ -881,7 +999,10 @@ export default function AdminDashboard() {
                         key={r}
                         disabled={adminUser?.role === "MANAGER"}
                         onClick={() =>
-                          setPendingUpdates({ ...pendingUpdates, role: r as any })
+                          setPendingUpdates({
+                            ...pendingUpdates,
+                            role: r as any,
+                          })
                         }
                         className={`p-3 rounded-xl border font-bold text-[9px] uppercase transition-all ${pendingUpdates.role === r ? "bg-white/10 border-white/20 text-white" : "bg-transparent border-white/5 text-gray-700 hover:text-gray-500"}`}
                       >
@@ -900,19 +1021,31 @@ export default function AdminDashboard() {
                     <select
                       className="w-full bg-black/40 border border-white/5 rounded-xl p-3 text-xs outline-none focus:border-indigo-500/50 text-gray-300"
                       value={pendingUpdates.view || "VISIONLIGHT"}
-                      onChange={(e) => setPendingUpdates({ ...pendingUpdates, view: e.target.value as any })}
+                      onChange={(e) =>
+                        setPendingUpdates({
+                          ...pendingUpdates,
+                          view: e.target.value as any,
+                        })
+                      }
                     >
                       <option value="VISIONLIGHT">VisionLight FX (Full)</option>
                       <option value="PICDRIFT">PicDrift (Demo)</option>
                     </select>
                     <div className="flex items-center justify-between p-3 bg-black/40 border border-white/5 rounded-xl text-xs">
-                      <span className="text-gray-500 font-bold uppercase tracking-tighter">Max Projects</span>
+                      <span className="text-gray-500 font-bold uppercase tracking-tighter">
+                        Max Projects
+                      </span>
                       <input
                         type="number"
                         min="1"
                         className="w-20 bg-transparent text-right outline-none font-bold text-white"
                         value={pendingUpdates.maxProjects || 3}
-                        onChange={(e) => setPendingUpdates({ ...pendingUpdates, maxProjects: parseInt(e.target.value) || 1 })}
+                        onChange={(e) =>
+                          setPendingUpdates({
+                            ...pendingUpdates,
+                            maxProjects: parseInt(e.target.value) || 1,
+                          })
+                        }
                       />
                     </div>
                   </div>
@@ -981,19 +1114,28 @@ export default function AdminDashboard() {
                 <select
                   className="w-full p-4 bg-[#16191e] border border-white/5 rounded-2xl text-sm outline-none focus:border-indigo-500/50 transition-all text-gray-300"
                   value={newUser.view}
-                  onChange={(e) => setNewUser({ ...newUser, view: e.target.value })}
+                  onChange={(e) =>
+                    setNewUser({ ...newUser, view: e.target.value })
+                  }
                 >
                   <option value="VISIONLIGHT">VisionLight FX (Standard)</option>
                   <option value="PICDRIFT">PicDrift (Demo/Guest)</option>
                 </select>
                 <div className="flex items-center justify-between p-4 bg-[#16191e] border border-white/5 rounded-2xl text-sm">
-                  <span className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">Project Cap</span>
+                  <span className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">
+                    Project Cap
+                  </span>
                   <input
                     type="number"
                     min="1"
                     className="w-20 bg-transparent text-right outline-none text-white font-bold"
                     value={newUser.maxProjects}
-                    onChange={(e) => setNewUser({ ...newUser, maxProjects: parseInt(e.target.value) || 1 })}
+                    onChange={(e) =>
+                      setNewUser({
+                        ...newUser,
+                        maxProjects: parseInt(e.target.value) || 1,
+                      })
+                    }
                     required
                   />
                 </div>

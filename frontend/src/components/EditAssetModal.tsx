@@ -888,13 +888,13 @@ export function EditAssetModal({
               <button
                 onClick={() => driftStartMutation.mutate()}
                 disabled={isProcessing || !!driftPostId}
-                className="w-full py-4 bg-gradient-to-r from-violet-600 to-violet-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-3"
+                className="w-full py-4 bg-gradient-to-r from-violet-900 to-violet-900 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-3"
               >
                 {isProcessing ? (
                   "Processing Path..."
                 ) : (
                   <>
-                    <img src={drift_icon} alt="Logo" className="h-5 w-auto" />
+                    <img src={drift_icon} alt="Logo" className="h-3 w-auto" />
                     <span>
                       Generate Path
                     </span>
