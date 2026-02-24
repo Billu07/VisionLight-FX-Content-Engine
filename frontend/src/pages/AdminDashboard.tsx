@@ -105,7 +105,8 @@ export default function AdminDashboard() {
     setActionLoading(true);
     try {
       await apiEndpoints.adminDeleteUser(user.id);
-      setMsg("✅ User deleted successfully.");
+      setMsg("User deleted successfully.");
+      setTimeout(() => setMsg(""), 3000);
       fetchData();
     } finally {
       setActionLoading(false);
@@ -117,7 +118,8 @@ export default function AdminDashboard() {
     setActionLoading(true);
     try {
       await apiEndpoints.adminCreateUser(newUser);
-      setMsg("✅ User created & synced!");
+      setMsg("User created successfully.");
+      setTimeout(() => setMsg(""), 3000);
       setNewUser({
         email: "",
         password: "",
@@ -128,7 +130,7 @@ export default function AdminDashboard() {
       setShowInviteModal(false);
       fetchData();
     } catch (err: any) {
-      setMsg("❌ " + err.message);
+      setMsg("Error: " + err.message);
     } finally {
       setActionLoading(false);
     }
@@ -141,7 +143,8 @@ export default function AdminDashboard() {
       const res = await apiEndpoints.adminUpdateSettings(updated);
       if (res.data.success) {
         setSettings(res.data.settings);
-        setMsg("✅ Render Reserve Updated.");
+        setMsg("Controls updated successfully.");
+        setTimeout(() => setMsg(""), 3000);
       }
     } catch (err: any) {
       alert(err.message);
@@ -159,7 +162,8 @@ export default function AdminDashboard() {
         addCredits: parseFloat(amount),
         creditType: type,
       });
-      setMsg(`✅ Render Reserve Updated.`);
+      setMsg(`Render limits updated.`);
+      setTimeout(() => setMsg(""), 3000);
       fetchData();
     } finally {
       setActionLoading(false);
@@ -171,7 +175,8 @@ export default function AdminDashboard() {
     setActionLoading(true);
     try {
       await apiEndpoints.adminUpdateUser(editingUser.id, pendingUpdates);
-      setMsg("✅ User profile updated.");
+      setMsg("User profile updated.");
+      setTimeout(() => setMsg(""), 3000);
       setEditingUser(null);
       fetchData();
     } finally {
@@ -204,97 +209,107 @@ export default function AdminDashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-[#0a0c10] text-gray-300 p-4 sm:p-8 font-sans">
-      <div className="max-w-7xl mx-auto pb-24">
+    <div className="min-h-screen bg-gray-950 text-gray-200 p-6 sm:p-10 font-sans">
+      <div className="max-w-[1400px] mx-auto pb-24">
         {/* HEADER */}
-        <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-8 border-b border-white/5 pb-10">
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end mb-12 gap-8 border-b border-gray-800 pb-8">
           <div className="flex-1">
-            <h1 className="text-3xl font-bold text-white tracking-tight mb-1">
-              Admin <span className="text-indigo-500">Panel</span>
+            <h1 className="text-3xl font-bold text-white tracking-tight mb-2">
+              VISIONLIGHT <span className="text-brand-accent">ADMIN</span>
             </h1>
-            <p className="text-[11px] text-gray-500 uppercase tracking-[0.2em] font-bold">
+            <p className="text-[11px] text-gray-400 uppercase tracking-widest font-semibold">
               Systems Control — Operator: {adminUser?.email}
             </p>
           </div>
 
-          <div className="flex bg-[#16191e] p-1 rounded-xl border border-white/5 shadow-sm backdrop-blur-sm">
-            <button
-              onClick={() => navigate("/app")}
-              className="px-6 py-2 rounded-xl text-[11px] font-bold text-gray-500 hover:text-white transition-all uppercase tracking-wider"
-            >
-              App
-            </button>
-            <button
-              onClick={() => setActiveTab("users")}
-              className={`px-6 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all ${activeTab === "users" ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20" : "text-gray-500 hover:text-white"}`}
-            >
-              Users
-            </button>
-            <button
-              onClick={() => setActiveTab("controls")}
-              className={`px-6 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all ${activeTab === "controls" ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20" : "text-gray-500 hover:text-white"}`}
-            >
-              Global Control
-            </button>
-          </div>
-
-          <div className="flex gap-3 w-full md:w-auto">
-            <div className="relative flex-1 md:w-64">
-              <input
-                placeholder="Filter entities..."
-                className="bg-[#16191e] border border-white/5 rounded-xl px-4 py-2.5 w-full text-xs outline-none focus:border-indigo-500/50 transition-all placeholder-gray-600"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+          <div className="flex flex-col md:flex-row gap-6 w-full xl:w-auto">
+            <div className="flex bg-gray-900 p-1.5 rounded-lg border border-gray-800 shadow-sm w-fit">
+              <button
+                onClick={() => navigate("/app")}
+                className="px-6 py-2.5 rounded-md text-[11px] font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition-colors uppercase tracking-widest"
+              >
+                App
+              </button>
+              <button
+                onClick={() => setActiveTab("users")}
+                className={`px-6 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                  activeTab === "users"
+                    ? "bg-gray-800 text-brand-accent shadow-sm"
+                    : "text-gray-400 hover:text-white hover:bg-gray-800/50"
+                }`}
+              >
+                Users
+              </button>
+              <button
+                onClick={() => setActiveTab("controls")}
+                className={`px-6 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                  activeTab === "controls"
+                    ? "bg-gray-800 text-brand-accent shadow-sm"
+                    : "text-gray-400 hover:text-white hover:bg-gray-800/50"
+                }`}
+              >
+                Global Control
+              </button>
             </div>
-            <button
-              onClick={() => setShowInviteModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-5 py-2.5 rounded-xl text-[11px] uppercase tracking-widest transition-all whitespace-nowrap shadow-lg shadow-indigo-500/20"
-            >
-              + Create User
-            </button>
+
+            <div className="flex gap-4 w-full md:w-auto">
+              <div className="relative flex-1 md:w-72">
+                <input
+                  placeholder="Search entities..."
+                  className="bg-gray-900 border border-gray-800 rounded-lg px-4 py-2 w-full text-sm text-gray-200 outline-none focus:border-brand-accent transition-colors placeholder-gray-500 h-full"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <button
+                onClick={() => setShowInviteModal(true)}
+                className="bg-brand-accent hover:bg-cyan-300 text-gray-950 font-bold px-6 py-2 rounded-lg text-[11px] uppercase tracking-widest transition-colors whitespace-nowrap h-full"
+              >
+                Create User
+              </button>
+            </div>
           </div>
         </div>
 
         {msg && (
-          <div className="mb-10 p-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-400 flex justify-between items-center animate-in fade-in slide-in-from-top-4">
-            <span className="text-xs font-medium tracking-wide">✅ {msg}</span>
+          <div className="mb-8 p-4 rounded-lg border border-brand-accent/20 bg-brand-accent/5 text-brand-accent flex justify-between items-center">
+            <span className="text-sm font-semibold tracking-wide">{msg}</span>
             <button
               onClick={() => setMsg("")}
-              className="text-emerald-500 hover:text-white text-lg"
+              className="text-brand-accent hover:text-cyan-300 text-lg"
             >
-              ✕
+              ×
             </button>
           </div>
         )}
 
         {/* REQUESTS */}
         {requests.length > 0 && (
-          <div className="mb-12 bg-indigo-500/5 border border-indigo-500/10 rounded-3xl p-8">
-            <h2 className="text-[10px] font-black text-indigo-400 mb-6 uppercase tracking-[0.3em]">
+          <div className="mb-12 bg-gray-900 border border-gray-800 rounded-xl p-8">
+            <h2 className="text-[11px] font-bold text-gray-400 mb-6 uppercase tracking-widest">
               Pending Allocations ({requests.length})
             </h2>
             <div className="grid gap-4">
               {requests.map((req) => (
                 <div
                   key={req.id}
-                  className="flex items-center justify-between bg-[#16191e] p-5 rounded-2xl border border-white/5"
+                  className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-gray-950 p-5 rounded-lg border border-gray-800 gap-4"
                 >
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-1.5">
                     <span className="font-bold text-sm text-white tracking-tight">
                       {req.name}
                     </span>
-                    <span className="text-[10px] text-gray-500 font-mono tracking-wider">
+                    <span className="text-xs text-gray-500 font-mono tracking-wider">
                       {req.email}
                     </span>
                   </div>
-                  <div className="flex gap-4">
+                  <div className="flex gap-3 w-full sm:w-auto">
                     <button
                       onClick={() => {
                         setSearchTerm(req.email);
                         setActiveTab("users");
                       }}
-                      className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest hover:text-indigo-300"
+                      className="flex-1 sm:flex-none text-[10px] text-gray-400 font-bold uppercase tracking-widest hover:text-white transition-colors bg-gray-800 px-4 py-2 rounded-md"
                     >
                       Locate
                     </button>
@@ -302,7 +317,7 @@ export default function AdminDashboard() {
                       onClick={() =>
                         apiEndpoints.adminResolveRequest(req.id).then(fetchData)
                       }
-                      className="bg-white/[0.03] hover:bg-white/[0.08] px-5 py-2 rounded-xl text-[10px] uppercase font-bold text-gray-400 hover:text-white transition-all border border-white/5"
+                      className="flex-1 sm:flex-none bg-brand-accent/10 hover:bg-brand-accent/20 px-4 py-2 rounded-md text-[10px] uppercase font-bold text-brand-accent transition-colors border border-brand-accent/20"
                     >
                       Acknowledge
                     </button>
@@ -315,39 +330,25 @@ export default function AdminDashboard() {
 
         {/* TAB CONTENT: USERS */}
         {activeTab === "users" && (
-          <div className="bg-[#0f1115] border border-white/5 rounded-3xl overflow-hidden shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-white/[0.02] text-gray-500 text-[9px] uppercase tracking-[0.2em] font-black">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-sm">
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left border-collapse min-w-[1000px]">
+                <thead className="bg-gray-950/50 text-gray-400 text-[10px] uppercase tracking-widest font-semibold">
                   <tr>
-                    <th className="p-8 border-b border-white/5">Identity</th>
-                    <th className="p-8 border-b border-white/5 text-center text-pink-500/80">
-                      PD Standard
-                    </th>
-                    <th className="p-8 border-b border-white/5 text-center text-rose-500/80">
-                      PD Plus
-                    </th>
-                    <th className="p-8 border-b border-white/5 text-center text-violet-500/80">
-                      PicFX
-                    </th>
-                    <th className="p-8 border-b border-white/5 text-center text-blue-500/80">
-                      Video FX 1
-                    </th>
-                    <th className="p-8 border-b border-white/5 text-center text-cyan-500/80">
-                      Video FX 2
-                    </th>
-                    <th className="p-8 border-b border-white/5 text-center text-indigo-500/80">
-                      Video FX 3
-                    </th>
-                    <th className="p-8 border-b border-white/5 text-right">
-                      Operations
-                    </th>
+                    <th className="p-6 border-b border-gray-800">Identity</th>
+                    <th className="p-6 border-b border-gray-800 text-center">PD Standard</th>
+                    <th className="p-6 border-b border-gray-800 text-center">PD Plus</th>
+                    <th className="p-6 border-b border-gray-800 text-center">PicFX</th>
+                    <th className="p-6 border-b border-gray-800 text-center">Video FX 1</th>
+                    <th className="p-6 border-b border-gray-800 text-center">Video FX 2</th>
+                    <th className="p-6 border-b border-gray-800 text-center">Video FX 3</th>
+                    <th className="p-6 border-b border-gray-800 text-right">Operations</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-gray-800">
                   {loading ? (
                     <tr>
-                      <td colSpan={8} className="p-32 text-center">
+                      <td colSpan={8} className="p-24 text-center">
                         <LoadingSpinner size="lg" variant="neon" />
                       </td>
                     </tr>
@@ -355,64 +356,57 @@ export default function AdminDashboard() {
                     filteredUsers.map((u) => (
                       <tr
                         key={u.id}
-                        className="hover:bg-white/[0.02] transition-colors group"
+                        className="hover:bg-gray-800/50 transition-colors group"
                       >
-                        <td className="p-8">
+                        <td className="p-6">
                           <div className="font-bold text-sm text-white tracking-tight">
                             {u.name}
                           </div>
-                          <div className="text-[10px] text-gray-500 mt-1">
+                          <div className="text-xs text-gray-500 mt-1 font-mono">
                             {u.email}
                           </div>
-                          <div
-                            className={`mt-2 text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full inline-block ${u.creditSystem === "COMMERCIAL" ? "bg-indigo-500/10 text-indigo-400" : "bg-gray-800 text-gray-500"}`}
-                          >
-                            {u.view === "PICDRIFT"
-                              ? "Demo Access"
-                              : u.creditSystem}
+                          <div className="mt-3 flex items-center gap-2">
+                            <span
+                              className={`text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-md ${
+                                u.creditSystem === "COMMERCIAL"
+                                  ? "bg-brand-accent/10 text-brand-accent border border-brand-accent/20"
+                                  : "bg-gray-800 text-gray-400 border border-gray-700"
+                              }`}
+                            >
+                              {u.view === "PICDRIFT"
+                                ? "Demo Access"
+                                : u.creditSystem}
+                            </span>
+                            <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-md bg-gray-800 text-gray-400 border border-gray-700">
+                              {u.role}
+                            </span>
                           </div>
                         </td>
-                        <td className="p-8 text-center">
-                          <div className="text-sm font-bold text-pink-400">
-                            {(u.creditsPicDrift || 0).toFixed(0)}
-                          </div>
-                        </td>
-                        <td className="p-8 text-center">
-                          <div className="text-sm font-bold text-rose-400">
-                            {(u.creditsPicDriftPlus || 0).toFixed(0)}
-                          </div>
-                        </td>
-                        <td className="p-8 text-center">
-                          <div className="text-sm font-bold text-violet-400">
-                            {(u.creditsImageFX || 0).toFixed(0)}
-                          </div>
-                        </td>
-                        <td className="p-8 text-center">
-                          <div className="text-sm font-bold text-blue-400">
-                            {(u.creditsVideoFX1 || 0).toFixed(0)}
-                          </div>
-                        </td>
-                        <td className="p-8 text-center">
-                          <div className="text-sm font-bold text-cyan-400">
-                            {(u.creditsVideoFX2 || 0).toFixed(0)}
-                          </div>
-                        </td>
-                        <td className="p-8 text-center">
-                          <div className="text-sm font-bold text-indigo-400">
-                            {(u.creditsVideoFX3 || 0).toFixed(0)}
-                          </div>
-                        </td>
-                        <td className="p-8 text-right">
+                        {[
+                          u.creditsPicDrift,
+                          u.creditsPicDriftPlus,
+                          u.creditsImageFX,
+                          u.creditsVideoFX1,
+                          u.creditsVideoFX2,
+                          u.creditsVideoFX3,
+                        ].map((credit, idx) => (
+                          <td key={idx} className="p-6 text-center">
+                            <div className="text-sm font-semibold text-gray-300">
+                              {(credit || 0).toFixed(0)}
+                            </div>
+                          </td>
+                        ))}
+                        <td className="p-6 text-right">
                           <div className="flex justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={() => openEditModal(u)}
-                              className="px-4 py-2 bg-gray-800 hover:bg-white text-gray-400 hover:text-black rounded-lg text-[9px] font-bold uppercase tracking-widest transition-all"
+                              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors border border-gray-700"
                             >
                               Manage
                             </button>
                             <button
                               onClick={() => handleDeleteUser(u)}
-                              className="px-4 py-2 bg-red-900/10 hover:bg-red-600 rounded-lg text-red-500 hover:text-white transition-all text-[9px] font-bold uppercase tracking-widest"
+                              className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors border border-red-500/20"
                             >
                               Delete
                             </button>
@@ -429,362 +423,108 @@ export default function AdminDashboard() {
 
         {/* TAB CONTENT: CONTROLS */}
         {activeTab === "controls" && settings && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h2 className="text-[10px] font-black mb-10 flex items-center gap-4 text-gray-500 uppercase tracking-[0.3em]">
+          <div>
+            <h2 className="text-[11px] font-bold mb-8 text-gray-400 uppercase tracking-widest">
               Inventory Resource Controls
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-              <div className="space-y-10">
-                <div className="bg-[#0f1115] p-8 rounded-3xl border border-white/5 shadow-sm">
-                  <h3 className="text-[9px] font-black text-white uppercase tracking-[0.25em] mb-8 pb-4 border-b border-white/5">
-                    PicDrift Engine
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[
+                {
+                  title: "PicDrift Engine",
+                  items: [
+                    { label: "Standard 5s", key: "pricePicDrift_5s" },
+                    { label: "Standard 10s", key: "pricePicDrift_10s" },
+                    { label: "Plus 5s", key: "pricePicDrift_Plus_5s" },
+                    { label: "Plus 10s", key: "pricePicDrift_Plus_10s" },
+                  ],
+                },
+                {
+                  title: "Pic FX & Studio Tools",
+                  items: [
+                    { label: "Standard Image", key: "pricePicFX_Standard" },
+                    { label: "Carousel Batch", key: "pricePicFX_Carousel" },
+                    { label: "Mass Processing", key: "pricePicFX_Batch" },
+                  ],
+                },
+                {
+                  title: "Video FX Engine 1",
+                  items: [
+                    { label: "FX 1 - 10s", key: "priceVideoFX1_10s" },
+                    { label: "FX 1 - 15s", key: "priceVideoFX1_15s" },
+                  ],
+                },
+                {
+                  title: "Video FX Engine 2",
+                  items: [
+                    { label: "FX 2 - Base", key: "priceVideoFX2_4s" },
+                    { label: "FX 2 - Max", key: "priceVideoFX2_12s" },
+                  ],
+                },
+                {
+                  title: "Video FX Engine 3",
+                  items: [
+                    { label: "FX 3 - 4s", key: "priceVideoFX3_4s" },
+                    { label: "FX 3 - 6s", key: "priceVideoFX3_6s" },
+                    { label: "FX 3 - 8s", key: "priceVideoFX3_8s" },
+                  ],
+                },
+                {
+                  title: "PicFX Editor & Path",
+                  items: [
+                    { label: "Pro Editor", key: "priceEditor_Pro" },
+                    { label: "Enhance / Upscale", key: "priceEditor_Enhance" },
+                    { label: "Format Convert", key: "priceEditor_Convert" },
+                    { label: "Generate Path", key: "priceAsset_DriftPath" },
+                  ],
+                },
+              ].map((section, sIdx) => (
+                <div
+                  key={sIdx}
+                  className="bg-gray-900 p-8 rounded-xl border border-gray-800 shadow-sm"
+                >
+                  <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-4 border-b border-gray-800">
+                    {section.title}
                   </h3>
-                  <div className="space-y-6">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        Standard 5s
-                      </span>
-                      <input
-                        step="0.01"
-                        type="number"
-                        className="w-24 bg-[#16191e] border border-white/5 rounded-lg p-2.5 text-center text-xs font-bold text-white outline-none focus:border-indigo-500/30"
-                        value={settings.pricePicDrift_5s}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            pricePicDrift_5s: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        Standard 10s
-                      </span>
-                      <input
-                        step="0.01"
-                        type="number"
-                        className="w-24 bg-[#16191e] border border-white/5 rounded-lg p-2.5 text-center text-xs font-bold text-white outline-none focus:border-indigo-500/30"
-                        value={settings.pricePicDrift_10s}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            pricePicDrift_10s: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center pt-6 border-t border-white/5">
-                      <span className="text-[10px] font-bold text-white uppercase tracking-wider">
-                        Plus 5s
-                      </span>
-                      <input
-                        step="0.01"
-                        type="number"
-                        className="w-24 bg-[#16191e] border border-white/5 rounded-lg p-2.5 text-center text-xs font-bold text-white outline-none focus:border-indigo-500/30"
-                        value={settings.pricePicDrift_Plus_5s}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            pricePicDrift_Plus_5s: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-white uppercase tracking-wider">
-                        Plus 10s
-                      </span>
-                      <input
-                        step="0.01"
-                        type="number"
-                        className="w-24 bg-[#16191e] border border-white/5 rounded-lg p-2.5 text-center text-xs font-bold text-white outline-none focus:border-indigo-500/30"
-                        value={settings.pricePicDrift_Plus_10s}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            pricePicDrift_Plus_10s: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
+                  <div className="space-y-5">
+                    {section.items.map((item, iIdx) => (
+                      <div
+                        key={iIdx}
+                        className="flex justify-between items-center"
+                      >
+                        <span className="text-[11px] font-semibold text-gray-300 uppercase tracking-widest">
+                          {item.label}
+                        </span>
+                        <input
+                          step="0.01"
+                          type="number"
+                          className="w-24 bg-gray-950 border border-gray-700 rounded-md p-2 text-center text-xs font-semibold text-white outline-none focus:border-brand-accent transition-colors"
+                          value={(settings as any)[item.key]}
+                          onChange={(e) =>
+                            handleUpdateGlobalSettings({
+                              [item.key]: parseFloat(e.target.value),
+                            })
+                          }
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <div className="bg-[#0f1115] p-8 rounded-3xl border border-white/5 shadow-sm">
-                  <h3 className="text-[9px] font-black text-white uppercase tracking-[0.25em] mb-8 pb-4 border-b border-white/5">
-                    Pic FX & Studio Tools
-                  </h3>
-                  <div className="space-y-6">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        Standard Image
-                      </span>
-                      <input
-                        step="0.01"
-                        type="number"
-                        className="w-24 bg-[#16191e] border border-white/5 rounded-lg p-2.5 text-center text-xs font-bold text-white outline-none focus:border-indigo-500/30"
-                        value={settings.pricePicFX_Standard}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            pricePicFX_Standard: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        Carousel Batch
-                      </span>
-                      <input
-                        step="0.01"
-                        type="number"
-                        className="w-24 bg-[#16191e] border border-white/5 rounded-lg p-2.5 text-center text-xs font-bold text-white outline-none focus:border-indigo-500/30"
-                        value={settings.pricePicFX_Carousel}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            pricePicFX_Carousel: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        Mass Processing
-                      </span>
-                      <input
-                        step="0.01"
-                        type="number"
-                        className="w-24 bg-[#16191e] border border-white/5 rounded-lg p-2.5 text-center text-xs font-bold text-white outline-none focus:border-indigo-500/30"
-                        value={settings.pricePicFX_Batch}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            pricePicFX_Batch: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-10">
-                <div className="bg-[#0f1115] p-8 rounded-3xl border border-white/5 shadow-sm">
-                  <h3 className="text-[9px] font-black text-white uppercase tracking-[0.25em] mb-8 pb-4 border-b border-white/5">
-                    Video FX Engine 1 & 2
-                  </h3>
-                  <div className="space-y-6">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        FX 1 - 10s
-                      </span>
-                      <input
-                        step="0.01"
-                        type="number"
-                        className="w-24 bg-[#16191e] border border-white/5 rounded-lg p-2.5 text-center text-xs font-bold text-white outline-none focus:border-indigo-500/30"
-                        value={settings.priceVideoFX1_10s}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceVideoFX1_10s: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        FX 1 - 15s
-                      </span>
-                      <input
-                        step="0.01"
-                        type="number"
-                        className="w-24 bg-[#16191e] border border-white/5 rounded-lg p-2.5 text-center text-xs font-bold text-white outline-none focus:border-indigo-500/30"
-                        value={settings.priceVideoFX1_15s}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceVideoFX1_15s: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center pt-6 border-t border-white/5">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        FX 2 - Base
-                      </span>
-                      <input
-                        step="0.01"
-                        type="number"
-                        className="w-24 bg-[#16191e] border border-white/5 rounded-lg p-2.5 text-center text-xs font-bold text-white outline-none focus:border-indigo-500/30"
-                        value={settings.priceVideoFX2_4s}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceVideoFX2_4s: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        FX 2 - Max
-                      </span>
-                      <input
-                        step="0.01"
-                        type="number"
-                        className="w-24 bg-[#16191e] border border-white/5 rounded-lg p-2.5 text-center text-xs font-bold text-white outline-none focus:border-indigo-500/30"
-                        value={settings.priceVideoFX2_12s}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceVideoFX2_12s: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-[#0f1115] p-8 rounded-3xl border border-white/5 shadow-sm">
-                  <h3 className="text-[9px] font-black text-white uppercase tracking-[0.25em] mb-8 pb-4 border-b border-white/5">
-                    Video FX Engine 3
-                  </h3>
-                  <div className="space-y-6">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        FX 3 - 4s
-                      </span>
-                      <input
-                        step="0.01"
-                        type="number"
-                        className="w-24 bg-[#16191e] border border-white/5 rounded-lg p-2.5 text-center text-xs font-bold text-white outline-none focus:border-indigo-500/30"
-                        value={settings.priceVideoFX3_4s}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceVideoFX3_4s: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        FX 3 - 6s
-                      </span>
-                      <input
-                        step="0.01"
-                        type="number"
-                        className="w-24 bg-[#16191e] border border-white/5 rounded-lg p-2.5 text-center text-xs font-bold text-white outline-none focus:border-indigo-500/30"
-                        value={settings.priceVideoFX3_6s}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceVideoFX3_6s: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        FX 3 - 8s
-                      </span>
-                      <input
-                        step="0.01"
-                        type="number"
-                        className="w-24 bg-[#16191e] border border-white/5 rounded-lg p-2.5 text-center text-xs font-bold text-white outline-none focus:border-indigo-500/30"
-                        value={settings.priceVideoFX3_8s}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceVideoFX3_8s: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-10">
-                <div className="bg-[#0f1115] p-8 rounded-3xl border border-white/5 shadow-sm">
-                  <h3 className="text-[9px] font-black text-white uppercase tracking-[0.25em] mb-8 pb-4 border-b border-white/5">
-                    PicFX Editor
-                  </h3>
-                  <div className="space-y-6">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        Pro Editor
-                      </span>
-                      <input
-                        step="0.01"
-                        type="number"
-                        className="w-24 bg-[#16191e] border border-white/5 rounded-lg p-2.5 text-center text-xs font-bold text-white outline-none focus:border-indigo-500/30"
-                        value={settings.priceEditor_Pro}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceEditor_Pro: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        Enhance / Upscale
-                      </span>
-                      <input
-                        step="0.01"
-                        type="number"
-                        className="w-24 bg-[#16191e] border border-white/5 rounded-lg p-2.5 text-center text-xs font-bold text-white outline-none focus:border-indigo-500/30"
-                        value={settings.priceEditor_Enhance}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceEditor_Enhance: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                        Format Convert
-                      </span>
-                      <input
-                        step="0.01"
-                        type="number"
-                        className="w-24 bg-[#16191e] border border-white/5 rounded-lg p-2.5 text-center text-xs font-bold text-white outline-none focus:border-indigo-500/30"
-                        value={settings.priceEditor_Convert}
-                        onChange={(e) =>
-                          handleUpdateGlobalSettings({
-                            priceEditor_Convert: parseFloat(e.target.value),
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-[#0f1115] p-8 rounded-3xl border border-white/5 shadow-sm">
-                  <h3 className="text-[9px] font-black text-white uppercase tracking-[0.25em] mb-8 pb-4 border-b border-white/5">
-                    Drift Path Tool
-                  </h3>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                      Generate Path
-                    </span>
-                    <input
-                      step="0.01"
-                      type="number"
-                      className="w-24 bg-[#16191e] border border-white/5 rounded-lg p-2.5 text-center text-xs font-bold text-white outline-none focus:border-indigo-500/30"
-                      value={settings.priceAsset_DriftPath}
-                      onChange={(e) =>
-                        handleUpdateGlobalSettings({
-                          priceAsset_DriftPath: parseFloat(e.target.value),
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
+              ))}
             </div>
 
             {/* BUDGET CALCULATOR */}
-            <div className="fixed bottom-12 right-12 bg-[#16191e]/90 backdrop-blur-xl border border-white/5 p-8 rounded-[2rem] shadow-2xl max-w-xs animate-in zoom-in-95 duration-300">
-              <div className="flex flex-col gap-5">
-                <div className="flex items-center justify-between border-b border-white/5 pb-4">
-                  <span className="text-[9px] font-black uppercase text-gray-500 tracking-[0.2em]">
+            <div className="fixed bottom-10 right-10 bg-gray-900 border border-gray-800 p-6 rounded-xl shadow-2xl max-w-sm z-50">
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-gray-800 pb-4 gap-8">
+                  <span className="text-[10px] font-bold uppercase text-gray-400 tracking-widest">
                     Yield Valuation
                   </span>
-                  <div className="flex items-center gap-1.5 bg-black/40 px-3 py-1.5 rounded-lg">
-                    <span className="text-[10px] text-gray-600">$</span>
+                  <div className="flex items-center gap-2 bg-gray-950 px-3 py-2 rounded-md border border-gray-800">
+                    <span className="text-xs text-gray-500 font-bold">$</span>
                     <input
                       type="number"
                       step="0.01"
-                      className="w-12 bg-transparent text-[11px] font-black outline-none text-white text-right"
+                      className="w-16 bg-transparent text-xs font-bold outline-none text-white text-right"
                       value={baseBudgetRate}
                       onChange={(e) =>
                         setBaseBudgetRate(parseFloat(e.target.value))
@@ -793,10 +533,10 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-3xl font-bold text-white tracking-tighter">
+                  <span className="text-2xl font-bold text-brand-accent tracking-tight">
                     {totalRenderBudget}
                   </span>
-                  <span className="text-[9px] text-gray-500 uppercase font-black mt-2 tracking-widest">
+                  <span className="text-[10px] text-gray-500 uppercase font-bold mt-1 tracking-widest">
                     Aggregate Resource Value
                   </span>
                 </div>
@@ -807,77 +547,50 @@ export default function AdminDashboard() {
 
         {/* MODAL: MANAGE USER */}
         {editingUser && (
-          <div className="fixed inset-0 bg-black/95 flex items-start justify-center z-[100] overflow-y-auto p-4 py-10 backdrop-blur-sm custom-scrollbar">
-            <div className="bg-[#0f1115] border border-white/5 rounded-[2rem] p-8 sm:p-10 w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
-              <div className="flex justify-between items-start mb-10 border-b border-white/5 pb-6">
-                <div>
-                  <h3 className="text-lg font-bold text-white tracking-tight">
-                    {editingUser.view === "PICDRIFT"
-                      ? "Demo Account Control"
-                      : "Account Settings"}
-                  </h3>
-                  <p className="text-xs text-gray-500 font-mono mt-1">
-                    {editingUser.email}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setEditingUser(null)}
-                  className="text-gray-500 hover:text-white transition-colors"
-                >
-                  ✕
-                </button>
+          <div className="fixed inset-0 bg-gray-950/80 flex items-start justify-center z-[100] overflow-y-auto p-4 py-10 backdrop-blur-sm custom-scrollbar">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 sm:p-10 w-full max-w-2xl shadow-2xl relative">
+              <button
+                onClick={() => setEditingUser(null)}
+                className="absolute top-8 right-8 text-gray-500 hover:text-white transition-colors text-xl font-bold"
+              >
+                ×
+              </button>
+
+              <div className="mb-10 pb-6 border-b border-gray-800">
+                <h3 className="text-xl font-bold text-white tracking-tight mb-2 uppercase tracking-widest">
+                  {editingUser.view === "PICDRIFT"
+                    ? "Demo Account Control"
+                    : "Account Settings"}
+                </h3>
+                <p className="text-sm text-gray-400 font-mono">
+                  {editingUser.email}
+                </p>
               </div>
 
-              <div className="space-y-12">
-                {/* 1. RENDER ALLOCATION (DEMO ONLY) */}
+              <div className="space-y-10">
+                {/* 1. RENDER ALLOCATION */}
                 {editingUser.view === "PICDRIFT" ? (
                   <div className="space-y-6">
-                    <label className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] block mb-6">
+                    <label className="text-[11px] font-bold text-brand-accent uppercase tracking-widest block mb-4">
                       Assigned Renders (Integers)
                     </label>
-                    <div className="grid grid-cols-2 gap-x-8 gap-y-6">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                       {[
-                        {
-                          id: "creditsPicDrift",
-                          label: "PicDrift Standard",
-                          color: "text-pink-400",
-                        },
-                        {
-                          id: "creditsPicDriftPlus",
-                          label: "PicDrift Plus",
-                          color: "text-rose-400",
-                        },
-                        {
-                          id: "creditsImageFX",
-                          label: "Pic FX",
-                          color: "text-violet-400",
-                        },
-                        {
-                          id: "creditsVideoFX1",
-                          label: "Video FX 1",
-                          color: "text-blue-400",
-                        },
-                        {
-                          id: "creditsVideoFX2",
-                          label: "Video FX 2",
-                          color: "text-cyan-400",
-                        },
-                        {
-                          id: "creditsVideoFX3",
-                          label: "Video FX 3",
-                          color: "text-indigo-400",
-                        },
+                        { id: "creditsPicDrift", label: "PD Standard" },
+                        { id: "creditsPicDriftPlus", label: "PD Plus" },
+                        { id: "creditsImageFX", label: "Pic FX" },
+                        { id: "creditsVideoFX1", label: "Video FX 1" },
+                        { id: "creditsVideoFX2", label: "Video FX 2" },
+                        { id: "creditsVideoFX3", label: "Video FX 3" },
                       ].map((pool) => (
-                        <div key={pool.id} className="flex flex-col gap-2">
-                          <span
-                            className={`text-[10px] font-bold uppercase tracking-wider ${pool.color}`}
-                          >
+                        <div key={pool.id} className="flex flex-col gap-3">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
                             {pool.label}
                           </span>
                           <input
                             type="number"
                             step="1"
-                            className="w-full bg-[#16191e] border border-white/5 rounded-xl px-4 py-2.5 text-sm font-bold text-white outline-none focus:border-indigo-500/50 transition-all"
+                            className="w-full bg-gray-950 border border-gray-800 rounded-md px-4 py-2 text-sm font-semibold text-white outline-none focus:border-brand-accent transition-colors"
                             defaultValue={Math.floor(
                               (editingUser as any)[pool.id] || 0,
                             )}
@@ -897,27 +610,22 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 ) : (
-                  /* STANDARD USER CREDIT ADJUSTMENT */
-                  <div className="p-8 bg-indigo-500/5 rounded-[2rem] border border-indigo-500/10">
-                    <label className="text-[10px] font-black text-indigo-400 uppercase mb-6 block tracking-widest text-center">
+                  <div className="p-6 bg-gray-950 rounded-xl border border-gray-800">
+                    <label className="text-[11px] font-bold text-brand-accent uppercase mb-6 block tracking-widest">
                       Wallet Configuration
                     </label>
-                    <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <span className="text-[9px] text-gray-500 uppercase font-black block mb-2 tracking-widest">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold block mb-3 tracking-widest">
                           Target Wallet
                         </span>
                         <select
-                          className="w-full bg-black/40 border border-white/5 rounded-xl p-3 text-xs outline-none focus:border-indigo-500/50 text-gray-300"
+                          className="w-full bg-gray-900 border border-gray-700 rounded-md p-2.5 text-sm outline-none focus:border-brand-accent text-gray-200 transition-colors"
                           value={targetCreditPool}
                           onChange={(e) => setTargetCreditPool(e.target.value)}
                         >
-                          <option value="creditsPicDrift">
-                            PicDrift Standard
-                          </option>
-                          <option value="creditsPicDriftPlus">
-                            PicDrift Plus
-                          </option>
+                          <option value="creditsPicDrift">PicDrift Standard</option>
+                          <option value="creditsPicDriftPlus">PicDrift Plus</option>
                           <option value="creditsImageFX">PicFX</option>
                           <option value="creditsVideoFX1">Video FX 1</option>
                           <option value="creditsVideoFX2">Video FX 2</option>
@@ -925,14 +633,14 @@ export default function AdminDashboard() {
                         </select>
                       </div>
                       <div>
-                        <span className="text-[9px] text-gray-500 uppercase font-black block mb-2 tracking-widest">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold block mb-3 tracking-widest">
                           Allocation Adjustment
                         </span>
-                        <div className="flex gap-2">
+                        <div className="flex gap-3">
                           <input
                             type="number"
                             step="0.01"
-                            className="flex-1 bg-black/40 border border-white/5 rounded-xl p-3 text-sm text-white font-bold outline-none"
+                            className="flex-1 bg-gray-900 border border-gray-700 rounded-md p-2.5 text-sm text-white font-semibold outline-none focus:border-brand-accent transition-colors"
                             value={customCreditAmount}
                             onChange={(e) =>
                               setCustomCreditAmount(e.target.value)
@@ -947,7 +655,7 @@ export default function AdminDashboard() {
                               )
                             }
                             disabled={actionLoading}
-                            className="px-6 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all"
+                            className="px-6 bg-gray-800 hover:bg-gray-700 text-brand-accent border border-gray-700 rounded-md font-bold text-[10px] uppercase tracking-widest transition-colors"
                           >
                             Assign
                           </button>
@@ -957,69 +665,83 @@ export default function AdminDashboard() {
                   </div>
                 )}
 
-                {/* 2. BILLING MODE */}
-                <div>
-                  <label className="text-[9px] font-black text-gray-500 uppercase mb-4 block tracking-widest text-center">
-                    Billing Mode
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() =>
-                        setPendingUpdates({
-                          ...pendingUpdates,
-                          creditSystem: "COMMERCIAL",
-                        })
-                      }
-                      className={`p-4 rounded-2xl border font-bold text-[10px] uppercase transition-all ${pendingUpdates.creditSystem === "COMMERCIAL" ? "bg-indigo-600 border-indigo-500 text-white shadow-lg" : "bg-transparent border-white/5 text-gray-600 hover:text-gray-400"}`}
-                    >
-                      Commercial
-                    </button>
-                    <button
-                      onClick={() =>
-                        setPendingUpdates({
-                          ...pendingUpdates,
-                          creditSystem: "INTERNAL",
-                        })
-                      }
-                      className={`p-4 rounded-2xl border font-bold text-[10px] uppercase transition-all ${pendingUpdates.creditSystem === "INTERNAL" ? "bg-indigo-600 border-indigo-500 text-white shadow-lg" : "bg-transparent border-white/5 text-gray-600 hover:text-gray-400"}`}
-                    >
-                      Internal
-                    </button>
-                  </div>
-                </div>
-
-                {/* 3. PERMISSION LEVEL */}
-                <div>
-                  <label className="text-[9px] font-black text-gray-500 uppercase mb-4 block tracking-widest text-center">
-                    Authorization Tier
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {["USER", "MANAGER", "ADMIN"].map((r) => (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                  {/* 2. BILLING MODE */}
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-400 uppercase mb-4 block tracking-widest">
+                      Billing Mode
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
                       <button
-                        key={r}
-                        disabled={adminUser?.role === "MANAGER"}
                         onClick={() =>
                           setPendingUpdates({
                             ...pendingUpdates,
-                            role: r as any,
+                            creditSystem: "COMMERCIAL",
                           })
                         }
-                        className={`p-3 rounded-xl border font-bold text-[9px] uppercase transition-all ${pendingUpdates.role === r ? "bg-white/10 border-white/20 text-white" : "bg-transparent border-white/5 text-gray-700 hover:text-gray-500"}`}
+                        className={`p-3 rounded-md border font-bold text-[10px] uppercase tracking-widest transition-colors ${
+                          pendingUpdates.creditSystem === "COMMERCIAL"
+                            ? "bg-brand-accent/10 border-brand-accent text-brand-accent"
+                            : "bg-gray-950 border-gray-800 text-gray-500 hover:text-gray-300"
+                        }`}
                       >
-                        {r}
+                        Commercial
                       </button>
-                    ))}
+                      <button
+                        onClick={() =>
+                          setPendingUpdates({
+                            ...pendingUpdates,
+                            creditSystem: "INTERNAL",
+                          })
+                        }
+                        className={`p-3 rounded-md border font-bold text-[10px] uppercase tracking-widest transition-colors ${
+                          pendingUpdates.creditSystem === "INTERNAL"
+                            ? "bg-brand-accent/10 border-brand-accent text-brand-accent"
+                            : "bg-gray-950 border-gray-800 text-gray-500 hover:text-gray-300"
+                        }`}
+                      >
+                        Internal
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 3. PERMISSION LEVEL */}
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-400 uppercase mb-4 block tracking-widest">
+                      Authorization Tier
+                    </label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {["USER", "MANAGER", "ADMIN"].map((r) => (
+                        <button
+                          key={r}
+                          disabled={adminUser?.role === "MANAGER"}
+                          onClick={() =>
+                            setPendingUpdates({
+                              ...pendingUpdates,
+                              role: r as any,
+                            })
+                          }
+                          className={`p-3 rounded-md border font-bold text-[10px] uppercase tracking-widest transition-colors ${
+                            pendingUpdates.role === r
+                              ? "bg-gray-800 border-gray-600 text-white"
+                              : "bg-gray-950 border-gray-800 text-gray-500 hover:text-gray-300"
+                          }`}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
                 {/* 4. VIEW & PROJECTS */}
                 <div>
-                  <label className="text-[9px] font-black text-gray-500 uppercase mb-4 block tracking-widest text-center">
+                  <label className="text-[11px] font-bold text-gray-400 uppercase mb-4 block tracking-widest">
                     Interface & Limits
                   </label>
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <select
-                      className="w-full bg-black/40 border border-white/5 rounded-xl p-3 text-xs outline-none focus:border-indigo-500/50 text-gray-300"
+                      className="w-full bg-gray-950 border border-gray-800 rounded-md p-3 text-sm outline-none focus:border-brand-accent text-gray-300 transition-colors"
                       value={pendingUpdates.view || "VISIONLIGHT"}
                       onChange={(e) =>
                         setPendingUpdates({
@@ -1031,14 +753,14 @@ export default function AdminDashboard() {
                       <option value="VISIONLIGHT">VisionLight FX (Full)</option>
                       <option value="PICDRIFT">PicDrift (Demo)</option>
                     </select>
-                    <div className="flex items-center justify-between p-3 bg-black/40 border border-white/5 rounded-xl text-xs">
-                      <span className="text-gray-500 font-bold uppercase tracking-tighter">
+                    <div className="flex items-center justify-between p-3 bg-gray-950 border border-gray-800 rounded-md text-sm">
+                      <span className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">
                         Max Projects
                       </span>
                       <input
                         type="number"
                         min="1"
-                        className="w-20 bg-transparent text-right outline-none font-bold text-white"
+                        className="w-20 bg-transparent text-right outline-none font-bold text-white focus:text-brand-accent transition-colors"
                         value={pendingUpdates.maxProjects || 3}
                         onChange={(e) =>
                           setPendingUpdates({
@@ -1051,23 +773,23 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="pt-10 border-t border-white/5 space-y-4">
+                <div className="pt-8 mt-8 border-t border-gray-800 flex flex-col-reverse sm:flex-row gap-4 sm:justify-end">
+                  <button
+                    onClick={() => setEditingUser(null)}
+                    className="px-8 py-3 text-[10px] text-gray-400 font-bold uppercase tracking-widest hover:text-white transition-colors bg-gray-950 border border-gray-800 rounded-md"
+                  >
+                    Cancel
+                  </button>
                   <button
                     onClick={handleSaveChanges}
                     disabled={actionLoading}
-                    className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-3xl font-bold uppercase text-[11px] tracking-widest shadow-xl shadow-indigo-500/20 transition-all disabled:opacity-50"
+                    className="flex justify-center items-center px-8 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-md font-bold uppercase text-[11px] tracking-widest transition-colors min-w-[200px]"
                   >
                     {actionLoading ? (
-                      <LoadingSpinner size="sm" variant="light" />
+                      <LoadingSpinner size="sm" color="text-gray-950" />
                     ) : (
-                      "Apply System Changes"
+                      "Apply Changes"
                     )}
-                  </button>
-                  <button
-                    onClick={() => setEditingUser(null)}
-                    className="w-full text-[9px] text-gray-600 font-bold uppercase tracking-[0.2em] hover:text-white transition-all"
-                  >
-                    Dismiss Manager
                   </button>
                 </div>
               </div>
@@ -1077,14 +799,20 @@ export default function AdminDashboard() {
 
         {/* MODAL: INVITE */}
         {showInviteModal && (
-          <div className="fixed inset-0 bg-black/95 flex items-start justify-center z-[100] overflow-y-auto p-4 py-20 backdrop-blur-sm">
-            <div className="bg-[#0f1115] border border-white/5 rounded-[2rem] p-10 w-full max-w-md shadow-2xl animate-in zoom-in-95">
-              <h3 className="text-xl font-bold text-white mb-10 text-center uppercase tracking-widest">
+          <div className="fixed inset-0 bg-gray-950/80 flex items-start justify-center z-[100] overflow-y-auto p-4 py-20 backdrop-blur-sm">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-10 w-full max-w-md shadow-2xl relative">
+              <button
+                onClick={() => setShowInviteModal(false)}
+                className="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors text-xl font-bold"
+              >
+                ×
+              </button>
+              <h3 className="text-lg font-bold text-white mb-8 uppercase tracking-widest">
                 User Provisioning
               </h3>
-              <form onSubmit={handleInviteUser} className="space-y-6">
+              <form onSubmit={handleInviteUser} className="space-y-5">
                 <input
-                  className="w-full p-4 bg-[#16191e] border border-white/5 rounded-2xl text-sm outline-none focus:border-indigo-500/50 transition-all text-white"
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-md text-sm outline-none focus:border-brand-accent transition-colors text-white placeholder-gray-600"
                   placeholder="Registry Email"
                   value={newUser.email}
                   onChange={(e) =>
@@ -1093,7 +821,7 @@ export default function AdminDashboard() {
                   required
                 />
                 <input
-                  className="w-full p-4 bg-[#16191e] border border-white/5 rounded-2xl text-sm outline-none focus:border-indigo-500/50 transition-all text-white"
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-md text-sm outline-none focus:border-brand-accent transition-colors text-white placeholder-gray-600"
                   placeholder="Identification Name"
                   value={newUser.name}
                   onChange={(e) =>
@@ -1103,7 +831,7 @@ export default function AdminDashboard() {
                 />
                 <input
                   type="password"
-                  className="w-full p-4 bg-[#16191e] border border-white/5 rounded-2xl text-sm outline-none focus:border-indigo-500/50 transition-all text-white"
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-md text-sm outline-none focus:border-brand-accent transition-colors text-white placeholder-gray-600"
                   placeholder="Access Key (Password)"
                   value={newUser.password}
                   onChange={(e) =>
@@ -1112,7 +840,7 @@ export default function AdminDashboard() {
                   required
                 />
                 <select
-                  className="w-full p-4 bg-[#16191e] border border-white/5 rounded-2xl text-sm outline-none focus:border-indigo-500/50 transition-all text-gray-300"
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-md text-sm outline-none focus:border-brand-accent transition-colors text-gray-300"
                   value={newUser.view}
                   onChange={(e) =>
                     setNewUser({ ...newUser, view: e.target.value })
@@ -1121,14 +849,14 @@ export default function AdminDashboard() {
                   <option value="VISIONLIGHT">VisionLight FX (Standard)</option>
                   <option value="PICDRIFT">PicDrift (Demo/Guest)</option>
                 </select>
-                <div className="flex items-center justify-between p-4 bg-[#16191e] border border-white/5 rounded-2xl text-sm">
+                <div className="flex items-center justify-between p-3 bg-gray-950 border border-gray-800 rounded-md text-sm">
                   <span className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">
                     Project Cap
                   </span>
                   <input
                     type="number"
                     min="1"
-                    className="w-20 bg-transparent text-right outline-none text-white font-bold"
+                    className="w-20 bg-transparent text-right outline-none text-white font-bold focus:text-brand-accent"
                     value={newUser.maxProjects}
                     onChange={(e) =>
                       setNewUser({
@@ -1139,20 +867,17 @@ export default function AdminDashboard() {
                     required
                   />
                 </div>
-                <div className="flex gap-4 pt-8">
-                  <button
-                    type="button"
-                    onClick={() => setShowInviteModal(false)}
-                    className="flex-1 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest hover:text-white transition-all"
-                  >
-                    Abort
-                  </button>
+                <div className="pt-6">
                   <button
                     type="submit"
                     disabled={actionLoading}
-                    className="flex-1 py-4 bg-white hover:bg-gray-200 text-black rounded-2xl font-bold uppercase text-[10px] tracking-widest shadow-lg transition-all"
+                    className="flex justify-center items-center w-full py-4 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-md font-bold uppercase text-[11px] tracking-widest transition-colors"
                   >
-                    Provision
+                    {actionLoading ? (
+                      <LoadingSpinner size="sm" color="text-gray-950" />
+                    ) : (
+                      "Provision User"
+                    )}
                   </button>
                 </div>
               </form>
