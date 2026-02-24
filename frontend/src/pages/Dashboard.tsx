@@ -24,6 +24,8 @@ import {
 import picdriftLogo from "../assets/picdrift.png";
 import fxLogo from "../assets/fx.png";
 
+import drift_icon from "../assets/drift_icon.png";
+
 type EngineType = "kie" | "studio" | "openai" | "veo";
 type StudioMode = "image" | "carousel" | "edit";
 
@@ -943,7 +945,7 @@ function Dashboard() {
                           {formatBal(credits.creditsPicDrift)}
                         </span>
                         <span className="text-[8px] text-gray-500 uppercase font-black">
-                          {user?.view === "PICDRIFT" ? "PicDrift (Renders)" : "PicDrift"}
+                          PicDrift
                         </span>
                       </div>
                     </div>
@@ -955,7 +957,7 @@ function Dashboard() {
                           {formatBal(credits.creditsPicDriftPlus)}
                         </span>
                         <span className="text-[8px] text-gray-500 uppercase font-black">
-                          {user?.view === "PICDRIFT" ? "PD Plus (Renders)" : "PicDrift Plus"}
+                          PD Plus
                         </span>
                       </div>
                     </div>
@@ -967,7 +969,7 @@ function Dashboard() {
                           {formatBal(credits.creditsImageFX)}
                         </span>
                         <span className="text-[8px] text-gray-500 uppercase font-black">
-                          {user?.view === "PICDRIFT" ? "Pic FX (Renders)" : "Pic FX"}
+                          Pic FX
                         </span>
                       </div>
                     </div>
@@ -979,7 +981,7 @@ function Dashboard() {
                           {formatBal(credits.creditsVideoFX1)}
                         </span>
                         <span className="text-[8px] text-gray-500 uppercase font-black">
-                          {user?.view === "PICDRIFT" ? "Video FX 1 (Renders)" : "Video FX 1"}
+                          Video FX 1
                         </span>
                       </div>
                     </div>
@@ -991,7 +993,7 @@ function Dashboard() {
                           {formatBal(credits.creditsVideoFX2)}
                         </span>
                         <span className="text-[8px] text-gray-500 uppercase font-black">
-                          {user?.view === "PICDRIFT" ? "Video FX 2 (Renders)" : "Video FX 2"}
+                          Video FX 2
                         </span>
                       </div>
                     </div>
@@ -1003,7 +1005,7 @@ function Dashboard() {
                           {formatBal(credits.creditsVideoFX3)}
                         </span>
                         <span className="text-[8px] text-gray-500 uppercase font-black">
-                          {user?.view === "PICDRIFT" ? "Video FX 3 (Renders)" : "Video FX 3"}
+                          Video FX 3
                         </span>
                       </div>
                     </div>
@@ -2239,8 +2241,12 @@ function Dashboard() {
                           }
                           className={`w-full py-4 sm:py-5 px-6 sm:px-8 rounded-2xl transition-all disabled:opacity-50 font-bold text-base sm:text-lg flex flex-col items-center justify-center gap-1 ${
                             activeEngine === "veo"
-                              ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_4px_20px_rgba(79,70,229,0.2)]"
-                              : "gradient-brand text-white hover:shadow-2xl"
+                              ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg"
+                              : currentVisualTab === "picdrift"
+                                ? "bg-rose-600 hover:bg-rose-500 text-white shadow-lg"
+                                : currentVisualTab === "studio"
+                                  ? "bg-violet-600 hover:bg-violet-500 text-white shadow-lg"
+                                  : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg"
                           }`}
                         >
                           {generateMediaMutation.isPending ? (
@@ -2257,6 +2263,9 @@ function Dashboard() {
                             </div>
                           ) : (
                             <div className="flex items-center gap-3 uppercase tracking-widest text-sm">
+                              {currentVisualTab === "picdrift" && (
+                                <img src={drift_icon} alt="" className="h-5 w-auto" />
+                              )}
                               {currentVisualTab === "picdrift"
                                 ? "Generate PicDrift"
                                 : currentVisualTab === "studio"

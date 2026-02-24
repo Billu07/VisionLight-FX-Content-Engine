@@ -72,34 +72,34 @@ export function RenderReserveModal({
             
             {/* PICDRIFT SERIES */}
             <section>
-              <SectionHeader title="PicDrift Engine" colorClass="text-white" />
+              <SectionHeader title="PicDrift Series" colorClass="text-pink-400" />
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <PriceCard label="Standard (5s)" value={prices?.pricePicDrift_5s} sublabel="Performance" />
-                <PriceCard label="Standard (10s)" value={prices?.pricePicDrift_10s} sublabel="Performance" />
-                <PriceCard label="Plus (5s)" value={prices?.pricePicDrift_Plus_5s} sublabel="High Fidelity" />
-                <PriceCard label="Plus (10s)" value={prices?.pricePicDrift_Plus_10s} sublabel="High Fidelity" />
+                <PriceCard label="Standard (5s)" value={prices?.pricePicDrift_5s} sublabel="Pro Performance" />
+                <PriceCard label="Standard (10s)" value={prices?.pricePicDrift_10s} sublabel="Pro Performance" />
+                <PriceCard label="Plus (5s)" value={prices?.pricePicDrift_Plus_5s} sublabel="Ultra Fidelity" />
+                <PriceCard label="Plus (10s)" value={prices?.pricePicDrift_Plus_10s} sublabel="Ultra Fidelity" />
               </div>
             </section>
 
             {/* VIDEO FX SERIES */}
             <section>
-              <SectionHeader title="Motion Systems" colorClass="text-white" />
+              <SectionHeader title="Video FX Engine" colorClass="text-indigo-400" />
               <div className="space-y-8">
                 <div>
-                  <div className="text-[9px] font-black text-gray-600 uppercase mb-4 ml-1 tracking-widest">Generative Layers 1 & 2</div>
+                  <div className="text-[9px] font-black text-gray-600 uppercase mb-4 ml-1 tracking-widest">Video FX 1 & 2</div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <PriceCard label="VFX 1 (10s)" value={prices?.priceVideoFX1_10s} />
-                    <PriceCard label="VFX 1 (15s)" value={prices?.priceVideoFX1_15s} />
-                    <PriceCard label="VFX 2 (Base)" value={prices?.priceVideoFX2_4s} />
-                    <PriceCard label="VFX 2 (Max)" value={prices?.priceVideoFX2_12s} />
+                    <PriceCard label="FX 1 (10s)" value={prices?.priceVideoFX1_10s} />
+                    <PriceCard label="FX 1 (15s)" value={prices?.priceVideoFX1_15s} />
+                    <PriceCard label="FX 2 (Base)" value={prices?.priceVideoFX2_4s} />
+                    <PriceCard label="FX 2 (Max)" value={prices?.priceVideoFX2_12s} />
                   </div>
                 </div>
                 <div>
-                  <div className="text-[9px] font-black text-gray-600 uppercase mb-4 ml-1 tracking-widest">Generative Layer 3</div>
+                  <div className="text-[9px] font-black text-gray-600 uppercase mb-4 ml-1 tracking-widest">Video FX 3</div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <PriceCard label="VFX 3 (4s)" value={prices?.priceVideoFX3_4s} />
-                    <PriceCard label="VFX 3 (6s)" value={prices?.priceVideoFX3_6s} />
-                    <PriceCard label="VFX 3 (8s)" value={prices?.priceVideoFX3_8s} />
+                    <PriceCard label="FX 3 (4s)" value={prices?.priceVideoFX3_4s} />
+                    <PriceCard label="FX 3 (6s)" value={prices?.priceVideoFX3_6s} />
+                    <PriceCard label="FX 3 (8s)" value={prices?.priceVideoFX3_8s} />
                   </div>
                 </div>
               </div>
@@ -107,14 +107,14 @@ export function RenderReserveModal({
 
             {/* CREATIVE TOOLS */}
             <section>
-              <SectionHeader title="Studio Interface" colorClass="text-white" />
+              <SectionHeader title="Pic FX & Studio Tools" colorClass="text-violet-400" />
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <PriceCard label="Standard Image" value={prices?.pricePicFX_Standard} />
                 <PriceCard label="Carousel Batch" value={prices?.pricePicFX_Carousel} />
-                <PriceCard label="Kinematic Drift" value={prices?.priceAsset_DriftPath} />
-                <PriceCard label="Pro Refinement" value={prices?.priceEditor_Pro} />
-                <PriceCard label="Fidelity Upscale" value={prices?.priceEditor_Enhance} />
-                <PriceCard label="Asset Translation" value={prices?.priceEditor_Convert} />
+                <PriceCard label="Drift Path Tool" value={prices?.priceAsset_DriftPath} />
+                <PriceCard label="Pro Editor" value={prices?.priceEditor_Pro} />
+                <PriceCard label="Enhance / Upscale" value={prices?.priceEditor_Enhance} />
+                <PriceCard label="Format Convert" value={prices?.priceEditor_Convert} />
               </div>
             </section>
 
