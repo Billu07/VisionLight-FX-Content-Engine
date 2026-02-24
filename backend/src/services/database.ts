@@ -38,20 +38,22 @@ export const dbService = {
     return prisma.user.findUnique({ where: { id } });
   },
   async createUser(data: { email: string; name?: string; view?: string; maxProjects?: number }) {
+    const isDemo = data.view === "PICDRIFT";
+    
     return prisma.user.create({
       data: {
         email: data.email,
         name: data.name,
         view: data.view || "VISIONLIGHT",
         maxProjects: data.maxProjects || 3,
-        creditBalance: 20, // Keep legacy balance
-        creditsPicDrift: 10,
-        creditsPicDriftPlus: 10,
-        creditsImageFX: 10,
-        creditsVideoFX1: 10,
-        creditsVideoFX2: 10,
-        creditsVideoFX3: 10,
-        creditSystem: "COMMERCIAL",
+        creditBalance: isDemo ? 0 : 20,
+        creditsPicDrift: isDemo ? 5 : 10,
+        creditsPicDriftPlus: isDemo ? 0 : 10,
+        creditsImageFX: isDemo ? 15 : 10,
+        creditsVideoFX1: isDemo ? 0 : 10,
+        creditsVideoFX2: isDemo ? 0 : 10,
+        creditsVideoFX3: isDemo ? 0 : 10,
+        creditSystem: isDemo ? "INTERNAL" : "COMMERCIAL",
         role: "USER",
       },
     });

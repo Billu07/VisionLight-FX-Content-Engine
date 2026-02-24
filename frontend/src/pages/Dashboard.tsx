@@ -874,6 +874,7 @@ function Dashboard() {
         onClose={() => setShowReserveModal(false)}
         prices={(credits as any)?.prices}
         isCommercial={isCommercial}
+        user={user}
       />
 
       {/* Stock Photos Modal */}

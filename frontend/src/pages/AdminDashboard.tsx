@@ -742,11 +742,11 @@ export default function AdminDashboard() {
         {/* MODAL: MANAGE USER (FIXED FLEXIBILITY & CUTTING) */}
         {editingUser && (
           <div className="fixed inset-0 bg-black/95 flex items-start justify-center z-[100] overflow-y-auto p-4 py-10 backdrop-blur-sm custom-scrollbar">
-            <div className="bg-gray-900 border border-white/10 rounded-3xl p-8 sm:p-10 w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
-              <div className="flex justify-between items-start mb-8">
+            <div className="bg-[#0f1115] border border-white/5 rounded-3xl p-8 sm:p-10 w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="flex justify-between items-start mb-10 border-b border-white/5 pb-6">
                 <div>
-                  <h3 className="text-xl font-black uppercase tracking-tighter text-white">
-                    User Identity
+                  <h3 className="text-lg font-bold text-white tracking-tight">
+                    {editingUser.view === "PICDRIFT" ? "Demo User Control" : "User Account Settings"}
                   </h3>
                   <p className="text-xs text-gray-500 font-mono mt-1">
                     {editingUser.email}
@@ -754,67 +754,102 @@ export default function AdminDashboard() {
                 </div>
                 <button
                   onClick={() => setEditingUser(null)}
-                  className="text-gray-500 hover:text-white p-2"
+                  className="text-gray-500 hover:text-white transition-colors"
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="space-y-10">
-                {/* 1. RESERVE ADJUSTMENT */}
-                <div className="p-6 bg-gray-950 rounded-2xl border border-white/5">
-                  <label className="text-[10px] font-black text-cyan-500 uppercase mb-6 block tracking-widest text-center">
-                    User Reserve
-                  </label>
-                  <div className="space-y-5">
-                    <div>
-                      <span className="text-[9px] text-gray-500 uppercase font-black block mb-2">
-                        Select Target Function:
-                      </span>
-                      <select
-                        className="w-full bg-gray-900 border border-gray-800 rounded-xl p-3 text-xs outline-none focus:border-cyan-500"
-                        value={targetCreditPool}
-                        onChange={(e) => setTargetCreditPool(e.target.value)}
-                      >
-                        <option value="creditsPicDrift">PicDrift Standard</option>
-                        <option value="creditsPicDriftPlus">PicDrift Plus</option>
-                        <option value="creditsImageFX">PicFX</option>
-                        <option value="creditsVideoFX1">VideoFX 1</option>
-                        <option value="creditsVideoFX2">VideoFX 2</option>
-                        <option value="creditsVideoFX3">VideoFX 3</option>
-                      </select>
+              <div className="space-y-12">
+                {/* 1. ACCESS CONTROL (CONDITIONAL) */}
+                {editingUser.view === "PICDRIFT" ? (
+                  <div className="space-y-6">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] block mb-6">
+                      Render Allocation (Integers)
+                    </label>
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-6">
+                      {[
+                        { id: "creditsPicDrift", label: "PD Standard" },
+                        { id: "creditsPicDriftPlus", label: "PD Plus" },
+                        { id: "creditsImageFX", label: "Pic FX" },
+                        { id: "creditsVideoFX1", label: "Video FX 1" },
+                        { id: "creditsVideoFX2", label: "Video FX 2" },
+                        { id: "creditsVideoFX3", label: "Video FX 3" },
+                      ].map((pool) => (
+                        <div key={pool.id} className="flex flex-col gap-2">
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{pool.label}</span>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              step="1"
+                              className="w-full bg-[#16191e] border border-white/5 rounded-lg px-3 py-2 text-sm font-bold text-white outline-none focus:border-white/20 transition-all"
+                              defaultValue={(editingUser as any)[pool.id]}
+                              onBlur={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                handleQuickAddCredits(editingUser.id, pool.id, (val - (editingUser as any)[pool.id]).toString());
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div>
-                      <span className="text-[9px] text-gray-500 uppercase font-black block mb-2">
-                        Amount Adjustment:
-                      </span>
-                      <div className="flex gap-2">
-                        <input
-                          type="number"
-                          step="0.01"
-                          className="flex-1 bg-gray-900 border border-gray-800 rounded-xl p-3 text-sm text-white font-bold outline-none"
-                          value={customCreditAmount}
-                          onChange={(e) =>
-                            setCustomCreditAmount(e.target.value)
-                          }
-                        />
-                        <button
-                          onClick={() =>
-                            handleQuickAddCredits(
-                              editingUser.id,
-                              targetCreditPool,
-                              customCreditAmount,
-                            )
-                          }
-                          disabled={actionLoading}
-                          className="px-6 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all"
+                  </div>
+                ) : (
+                  /* STANDARD USER RESERVE */
+                  <div className="p-6 bg-white/[0.02] rounded-2xl border border-white/5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase mb-6 block tracking-widest text-center">
+                      Account Reserve Adjustment
+                    </label>
+                    <div className="space-y-5">
+                      <div>
+                        <span className="text-[9px] text-gray-500 uppercase font-black block mb-2">
+                          Select Wallet:
+                        </span>
+                        <select
+                          className="w-full bg-[#16191e] border border-white/5 rounded-xl p-3 text-xs outline-none focus:border-white/20 text-gray-300"
+                          value={targetCreditPool}
+                          onChange={(e) => setTargetCreditPool(e.target.value)}
                         >
-                          Apply
-                        </button>
+                          <option value="creditsPicDrift">PicDrift Standard</option>
+                          <option value="creditsPicDriftPlus">PicDrift Plus</option>
+                          <option value="creditsImageFX">PicFX</option>
+                          <option value="creditsVideoFX1">VideoFX 1</option>
+                          <option value="creditsVideoFX2">VideoFX 2</option>
+                          <option value="creditsVideoFX3">VideoFX 3</option>
+                        </select>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-gray-500 uppercase font-black block mb-2">
+                          Adjustment Amount:
+                        </span>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="flex-1 bg-[#16191e] border border-white/5 rounded-xl p-3 text-sm text-white font-bold outline-none"
+                            value={customCreditAmount}
+                            onChange={(e) =>
+                              setCustomCreditAmount(e.target.value)
+                            }
+                          />
+                          <button
+                            onClick={() =>
+                              handleQuickAddCredits(
+                                editingUser.id,
+                                targetCreditPool,
+                                customCreditAmount,
+                              )
+                            }
+                            disabled={actionLoading}
+                            className="px-6 bg-white text-black hover:bg-gray-200 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all"
+                          >
+                            Apply
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
 
                 {/* 2. BILLING MODE */}
                 <div>
@@ -829,9 +864,9 @@ export default function AdminDashboard() {
                           creditSystem: "COMMERCIAL",
                         })
                       }
-                      className={`p-4 rounded-2xl border font-bold text-[10px] uppercase transition-all ${pendingUpdates.creditSystem === "COMMERCIAL" ? "bg-green-600 border-green-500 text-white shadow-lg" : "bg-gray-950 border-gray-800 text-gray-600"}`}
+                      className={`p-4 rounded-2xl border font-bold text-[10px] uppercase transition-all ${pendingUpdates.creditSystem === "COMMERCIAL" ? "bg-white text-black border-white shadow-lg" : "bg-transparent border-white/5 text-gray-600 hover:text-gray-400"}`}
                     >
-                      Commercial ($)
+                      Commercial
                     </button>
                     <button
                       onClick={() =>
@@ -840,7 +875,7 @@ export default function AdminDashboard() {
                           creditSystem: "INTERNAL",
                         })
                       }
-                      className={`p-4 rounded-2xl border font-bold text-[10px] uppercase transition-all ${pendingUpdates.creditSystem === "INTERNAL" ? "bg-purple-600 border-purple-500 text-white shadow-lg" : "bg-gray-950 border-gray-800 text-gray-600"}`}
+                      className={`p-4 rounded-2xl border font-bold text-[10px] uppercase transition-all ${pendingUpdates.creditSystem === "INTERNAL" ? "bg-white text-black border-white shadow-lg" : "bg-transparent border-white/5 text-gray-600 hover:text-gray-400"}`}
                     >
                       Internal
                     </button>
@@ -850,7 +885,7 @@ export default function AdminDashboard() {
                 {/* 3. PERMISSION LEVEL (Admin Only) */}
                 <div>
                   <label className="text-[9px] font-black text-gray-500 uppercase mb-3 block tracking-widest text-center">
-                    Permission Level
+                    Account Authorization
                   </label>
                   <div className="grid grid-cols-3 gap-2">
                     <button
@@ -858,7 +893,7 @@ export default function AdminDashboard() {
                       onClick={() =>
                         setPendingUpdates({ ...pendingUpdates, role: "USER" })
                       }
-                      className={`p-3 rounded-xl border font-bold text-[9px] uppercase transition-all ${pendingUpdates.role === "USER" ? "bg-gray-700 border-gray-600 text-white" : "bg-gray-950 border-gray-800 text-gray-700"}`}
+                      className={`p-3 rounded-xl border font-bold text-[9px] uppercase transition-all ${pendingUpdates.role === "USER" ? "bg-white/10 border-white/20 text-white" : "bg-transparent border-white/5 text-gray-700 hover:text-gray-500"}`}
                     >
                       User
                     </button>
@@ -870,7 +905,7 @@ export default function AdminDashboard() {
                           role: "MANAGER",
                         })
                       }
-                      className={`p-3 rounded-xl border font-bold text-[9px] uppercase transition-all ${pendingUpdates.role === "MANAGER" ? "bg-amber-600 border-amber-500 text-white" : "bg-gray-950 border-gray-800 text-gray-700"}`}
+                      className={`p-3 rounded-xl border font-bold text-[9px] uppercase transition-all ${pendingUpdates.role === "MANAGER" ? "bg-amber-600/20 border-amber-500/30 text-amber-500" : "bg-transparent border-white/5 text-gray-700 hover:text-gray-500"}`}
                     >
                       Manager
                     </button>
@@ -879,39 +914,33 @@ export default function AdminDashboard() {
                       onClick={() =>
                         setPendingUpdates({ ...pendingUpdates, role: "ADMIN" })
                       }
-                      className={`p-3 rounded-xl border font-bold text-[9px] uppercase transition-all ${pendingUpdates.role === "ADMIN" ? "bg-red-600 border-red-500 text-white shadow-lg shadow-red-900/40" : "bg-gray-950 border-gray-800 text-gray-700"}`}
+                      className={`p-3 rounded-xl border font-bold text-[9px] uppercase transition-all ${pendingUpdates.role === "ADMIN" ? "bg-red-600/20 border-red-500/30 text-red-500" : "bg-transparent border-white/5 text-gray-700 hover:text-gray-500"}`}
                     >
                       Admin
                     </button>
                   </div>
-                  {adminUser?.role === "MANAGER" && (
-                    <p className="text-[8px] text-center text-red-500 font-bold uppercase mt-3 tracking-tighter">
-                      Permission levels can only be updated by the account
-                      owner.
-                    </p>
-                  )}
                 </div>
 
                 {/* 4. VIEW & PROJECTS */}
                 <div>
                   <label className="text-[9px] font-black text-gray-500 uppercase mb-3 block tracking-widest text-center">
-                    Dashboard View & Projects
+                    Project Configuration
                   </label>
                   <div className="space-y-3">
                     <select
-                      className="w-full bg-gray-950 border border-gray-800 rounded-xl p-3 text-xs outline-none focus:border-cyan-500 text-gray-300"
+                      className="w-full bg-[#16191e] border border-white/5 rounded-xl p-3 text-xs outline-none focus:border-white/20 text-gray-300"
                       value={pendingUpdates.view || "VISIONLIGHT"}
                       onChange={(e) => setPendingUpdates({ ...pendingUpdates, view: e.target.value as any })}
                     >
-                      <option value="VISIONLIGHT">VisionLight FX View (All Unlocked)</option>
-                      <option value="PICDRIFT">PicDrift View (Video FX Locked)</option>
+                      <option value="VISIONLIGHT">VisionLight FX View</option>
+                      <option value="PICDRIFT">PicDrift View (Demo)</option>
                     </select>
-                    <div className="flex items-center justify-between p-3 bg-gray-950 border border-gray-800 rounded-xl text-xs">
-                      <span className="text-gray-400">Max Projects</span>
+                    <div className="flex items-center justify-between p-3 bg-[#16191e] border border-white/5 rounded-xl text-xs">
+                      <span className="text-gray-500 font-bold uppercase tracking-tighter">Max Projects</span>
                       <input
                         type="number"
                         min="1"
-                        className="w-20 bg-transparent text-right outline-none font-bold text-white focus:text-cyan-500"
+                        className="w-20 bg-transparent text-right outline-none font-bold text-white"
                         value={pendingUpdates.maxProjects || 3}
                         onChange={(e) => setPendingUpdates({ ...pendingUpdates, maxProjects: parseInt(e.target.value) || 1 })}
                       />
@@ -919,23 +948,23 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="pt-8 border-t border-white/5 space-y-4">
+                <div className="pt-10 border-t border-white/5 space-y-4">
                   <button
                     onClick={handleSaveChanges}
                     disabled={actionLoading}
-                    className="w-full py-5 bg-cyan-600 hover:bg-cyan-500 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl transition-all disabled:opacity-50"
+                    className="w-full py-4 bg-white hover:bg-gray-200 text-black rounded-2xl font-bold uppercase text-[10px] tracking-widest shadow-xl transition-all disabled:opacity-50"
                   >
                     {actionLoading ? (
-                      <LoadingSpinner size="sm" />
+                      <LoadingSpinner size="sm" variant="default" />
                     ) : (
-                      "Save Profile Changes"
+                      "Apply Account Changes"
                     )}
                   </button>
                   <button
                     onClick={() => setEditingUser(null)}
-                    className="w-full text-[9px] text-gray-600 font-black uppercase tracking-widest hover:text-white transition-all"
+                    className="w-full text-[9px] text-gray-600 font-bold uppercase tracking-[0.2em] hover:text-white transition-all"
                   >
-                    Close manager
+                    Dismiss
                   </button>
                 </div>
               </div>
