@@ -24,8 +24,6 @@ import {
 import picdriftLogo from "../assets/picdrift.png";
 import fxLogo from "../assets/fx.png";
 
-import drift_icon from "../assets/drift_icon.png";
-
 type EngineType = "kie" | "studio" | "openai" | "veo";
 type StudioMode = "image" | "carousel" | "edit";
 
