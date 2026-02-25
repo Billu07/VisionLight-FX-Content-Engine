@@ -37,12 +37,14 @@ model User {
   brandConfig   BrandConfig?
   roiMetrics    ROIMetrics?
   creditRequests CreditRequest[]
+  storyboard    Json?     // Add storyboard persistence
 }
 
 model Project {
   id          String   @id @default(uuid())
   userId      String
   name        String
+  storyboard  Json?     // Add storyboard persistence
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)

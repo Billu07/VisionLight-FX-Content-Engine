@@ -789,6 +789,36 @@ app.post(
   },
 );
 
+// ✅ Get Storyboard
+app.get(
+  "/api/storyboard",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const projectId = req.query.projectId as string | undefined;
+      const storyboard = await airtableService.getStoryboard(req.user!.id, projectId);
+      res.json({ success: true, storyboard });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// ✅ Save Storyboard
+app.post(
+  "/api/storyboard",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { projectId, sequence } = req.body;
+      await airtableService.updateStoryboard(req.user!.id, sequence, projectId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
 // ✅ Get Assets
 app.get(
   "/api/assets",

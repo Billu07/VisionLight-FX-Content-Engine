@@ -276,4 +276,26 @@ export const dbService = {
       data: { status: "RESOLVED" },
     });
   },
+
+  // === STORYBOARD PERSISTENCE ===
+  async getStoryboard(userId: string, projectId?: string) {
+    if (projectId && projectId !== "default") {
+      const project = await prisma.project.findUnique({ where: { id: projectId } });
+      return project?.storyboard || [];
+    }
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    return user?.storyboard || [];
+  },
+  async updateStoryboard(userId: string, sequence: any, projectId?: string) {
+    if (projectId && projectId !== "default") {
+      return prisma.project.update({
+        where: { id: projectId },
+        data: { storyboard: sequence },
+      });
+    }
+    return prisma.user.update({
+      where: { id: userId },
+      data: { storyboard: sequence },
+    });
+  },
 };

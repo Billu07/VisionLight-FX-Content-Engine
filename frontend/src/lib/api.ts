@@ -75,6 +75,8 @@ export const apiEndpoints = {
 
   // === Asset Library ===
   getAssets: (projectId?: string) => api.get("/api/assets", { params: { projectId } }),
+  getStoryboard: (projectId?: string) => api.get("/api/storyboard", { params: { projectId } }),
+  saveStoryboard: (sequence: string[], projectId?: string) => api.post("/api/storyboard", { sequence, projectId }),
 
   deleteAsset: (id: string) => api.delete(`/api/assets/${id}`),
 

@@ -52,20 +52,38 @@ export function AssetLibrary({
   }, [initialAspectRatio]);
 
   // Storyboard State
-  const activeProject = localStorage.getItem("visionlight_active_project");
-  const storyboardKey = `visionlight_storyboard_${activeProject || "default"}`;
-  const [storyboardIds, setStoryboardIds] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem(storyboardKey);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
+  const activeProject = localStorage.getItem("visionlight_active_project") || undefined;
+  const [storyboardIds, setStoryboardIds] = useState<string[]>([]);
+  const [isStoryboardLoaded, setIsStoryboardLoaded] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem(storyboardKey, JSON.stringify(storyboardIds));
-  }, [storyboardIds, storyboardKey]);
+    const fetchStoryboard = async () => {
+      try {
+        const res = await apiEndpoints.getStoryboard(activeProject);
+        if (res.data.success) {
+          setStoryboardIds(res.data.storyboard || []);
+        }
+      } catch (e) {
+        console.error("Failed to load storyboard", e);
+      } finally {
+        setIsStoryboardLoaded(true);
+      }
+    };
+    fetchStoryboard();
+  }, [activeProject]);
+
+  useEffect(() => {
+    if (!isStoryboardLoaded) return;
+    const saveStoryboard = async () => {
+      try {
+        await apiEndpoints.saveStoryboard(storyboardIds, activeProject);
+      } catch (e) {
+        console.error("Failed to save storyboard", e);
+      }
+    };
+    const timer = setTimeout(saveStoryboard, 500);
+    return () => clearTimeout(timer);
+  }, [storyboardIds, isStoryboardLoaded, activeProject]);
 
   // UI States
   const [isUploading, setIsUploading] = useState(false);
