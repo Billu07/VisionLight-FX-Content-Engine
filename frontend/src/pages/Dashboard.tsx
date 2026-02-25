@@ -1085,7 +1085,7 @@ function Dashboard() {
                       disabled={isRequesting}
                       className="px-4 py-2.5 bg-purple-600/20 border border-purple-500/50 rounded-xl text-purple-300 text-sm"
                     >
-                      {isRequesting ? "Sending..." : "Request Credit 🔔"}
+                      {isRequesting ? "Sending..." : "Request Renders 🔔"}
                     </button>
                   )}
                   <button
