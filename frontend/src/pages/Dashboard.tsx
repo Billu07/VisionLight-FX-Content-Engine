@@ -664,7 +664,7 @@ function Dashboard() {
   const { logo: currentLogo, text: currentHeaderText } = getHeaderContent();
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-200 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-purple-950 to-violet-950 text-gray-200 relative overflow-hidden">
       {/* TREDNY STUDIO BACKGROUND EFFECTS */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         {/* Subtle dot matrix grid */}
@@ -2467,6 +2467,7 @@ function Dashboard() {
           />
         )}
       </div>
+    </div>
     </div>
   );
 }

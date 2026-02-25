@@ -1,0 +1,37 @@
+VISUAL UPDATE CHANGELOG - February 25, 2026
+
+This file documents the visual changes made to the Admin Panel and User Dashboard to align with a "Modern Studio" aesthetic. Use this reference if you need to revert specific design elements.
+
+1. ADMIN DASHBOARD (frontend/src/pages/AdminDashboard.tsx)
+---------------------------------------------------------
+PREVIOUS STATE:
+- Background: Mixed lighter grays/blacks.
+- Typography: Low contrast text (text-gray-500) on dark backgrounds.
+- Accents: Multi-colored text tags (pink, rose, violet, blue, cyan, indigo) for different credit types.
+- Layout: Softer, rounded corners (rounded-3xl, rounded-[2rem]).
+- Effects: Heavy use of glowing shadows and gradients.
+
+NEW STATE (Current):
+- Background: Deep "Studio" Gray (bg-gray-950 / #0a0c10).
+- Typography: High-contrast White and Gray-200. Labels are uppercase Gray-400.
+- Accents: Unified "Brand Accent" (Cyan/Teal) for active states and primary actions. Removed the rainbow of text colors.
+- Layout: Professional, sharper edges (rounded-md, rounded-lg).
+- Effects: Minimalist flat design, removed gradients and excessive glows.
+
+2. USER DASHBOARD (frontend/src/pages/Dashboard.tsx)
+---------------------------------------------------
+PREVIOUS STATE:
+- Background Class: `min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900`
+- Style: Vibrant, consumer-focused violet/purple gradient.
+
+NEW STATE (Current):
+- Background Class: `min-h-screen bg-gray-950 text-gray-200 relative overflow-hidden`
+- Added Effects Layer:
+  1. Dot Matrix Grid: `radial-gradient(circle at center, #ffffff 1px, transparent 1px)` with 5% opacity.
+  2. Ambient Orbs:
+     - Top-Left: Cyan-500/10 (pulsing).
+     - Bottom-Right: Purple-600/10 (static).
+     - Blend Mode: `mix-blend-screen`.
+
+TO REVERT DASHBOARD BACKGROUND:
+Search for the main wrapper `div` in Dashboard.tsx (around line 667) and replace the new background div with the original gradient class listed above.
