@@ -688,14 +688,16 @@ function Dashboard() {
           <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-4xl p-6 relative flex flex-col items-center">
             <button
               onClick={() => setExtractingVideoUrl(null)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+              className="absolute top-4 right-4 text-gray-400 hover:text-white z-10"
             >
               ✕
             </button>
-            <h3 className="text-white font-bold mb-4 self-start flex items-center gap-2">
-              <img src="/drift_icon.png" alt="Drift" className="w-5 h-5 object-contain" />
-              3D-X-FRAME-EXTRACTOR
-            </h3>
+            <div className="w-full flex justify-between items-start mb-4 pr-6">
+              <img src="/drift_icon.png" alt="Drift" className="w-10 h-10 object-contain" />
+              <h3 className="text-white font-bold tracking-widest text-sm mt-2">
+                3D-X-FRAME-EXTRACTOR
+              </h3>
+            </div>
             <DriftFrameExtractor
               videoUrl={extractingVideoUrl}
               onExtract={async (blob) => {
