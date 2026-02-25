@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
-import 'react-image-crop/dist/ReactCrop.css';
+import ReactCrop, { type Crop, type PixelCrop } from "react-image-crop";
+import "react-image-crop/dist/ReactCrop.css";
 import { apiEndpoints } from "../lib/api";
 import { DriftFrameExtractor } from "./DriftFrameExtractor";
 import { LoadingSpinner } from "./LoadingSpinner";
@@ -337,7 +337,7 @@ export function EditAssetModal({
     const canvas = document.createElement("canvas");
     const scaleX = image.naturalWidth / image.width;
     const scaleY = image.naturalHeight / image.height;
-    
+
     canvas.width = Math.floor(completedCrop.width * scaleX);
     canvas.height = Math.floor(completedCrop.height * scaleY);
     const ctx = canvas.getContext("2d");
@@ -352,34 +352,40 @@ export function EditAssetModal({
       0,
       0,
       completedCrop.width * scaleX,
-      completedCrop.height * scaleY
+      completedCrop.height * scaleY,
     );
 
-    canvas.toBlob(async (blob) => {
-      if (!blob) return;
-      const file = new File([blob], "cropped.jpg", { type: "image/jpeg" });
-      const formData = new FormData();
-      formData.append("image", file);
-      formData.append("raw", "true");
-      
-      const activeProject = localStorage.getItem("visionlight_active_project");
-      if (activeProject) formData.append("projectId", activeProject);
-      
-      setIsProcessing(true);
-      try {
-        const res = await apiEndpoints.uploadAssetSync(formData);
-        if (res.data.success) {
-          handleSuccess(res.data.asset);
-          setIsCropping(false);
-          setCrop(undefined);
-          setCompletedCrop(undefined);
+    canvas.toBlob(
+      async (blob) => {
+        if (!blob) return;
+        const file = new File([blob], "cropped.jpg", { type: "image/jpeg" });
+        const formData = new FormData();
+        formData.append("image", file);
+        formData.append("raw", "true");
+
+        const activeProject = localStorage.getItem(
+          "visionlight_active_project",
+        );
+        if (activeProject) formData.append("projectId", activeProject);
+
+        setIsProcessing(true);
+        try {
+          const res = await apiEndpoints.uploadAssetSync(formData);
+          if (res.data.success) {
+            handleSuccess(res.data.asset);
+            setIsCropping(false);
+            setCrop(undefined);
+            setCompletedCrop(undefined);
+          }
+        } catch (err: any) {
+          alert("Crop failed: " + err.message);
+        } finally {
+          setIsProcessing(false);
         }
-      } catch (err: any) {
-        alert("Crop failed: " + err.message);
-      } finally {
-        setIsProcessing(false);
-      }
-    }, "image/jpeg", 0.95);
+      },
+      "image/jpeg",
+      0.95,
+    );
   };
 
   return (
@@ -537,9 +543,7 @@ export function EditAssetModal({
                   {isEnhancing ? (
                     <LoadingSpinner size="sm" variant="light" />
                   ) : (
-                    <span>
-                      Enhance
-                    </span>
+                    <span>Enhance</span>
                   )}
                 </button>
               </div>
@@ -622,9 +626,7 @@ export function EditAssetModal({
                       <span>Converting...</span>
                     </>
                   ) : (
-                    <span>
-                      🔄 Convert to {convertTargetRatio}
-                    </span>
+                    <span>🔄 Convert to {convertTargetRatio}</span>
                   )}
                 </button>
               </div>
@@ -868,7 +870,11 @@ export function EditAssetModal({
               <>
                 <button
                   onClick={handleCrop}
-                  disabled={!completedCrop?.width || !completedCrop?.height || isProcessing}
+                  disabled={
+                    !completedCrop?.width ||
+                    !completedCrop?.height ||
+                    isProcessing
+                  }
                   className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isProcessing ? "Cropping..." : "Confirm Crop"}
@@ -894,10 +900,8 @@ export function EditAssetModal({
                   "Processing Path..."
                 ) : (
                   <>
-                    <img src={drift_icon} alt="Logo" className="h-3 w-auto" />
-                    <span>
-                      Generate Path
-                    </span>
+                    <img src={drift_icon} alt="Logo" className="h-2 w-auto" />
+                    <span>Generate Path</span>
                   </>
                 )}
               </button>
@@ -916,13 +920,7 @@ export function EditAssetModal({
                 disabled={!prompt.trim() || isProcessing}
                 className="w-full py-4 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isProcessing ? (
-                  "Refining..."
-                ) : (
-                  <span>
-                    Apply Edit
-                  </span>
-                )}
+                {isProcessing ? "Refining..." : <span>Apply Edit</span>}
               </button>
             )}
 

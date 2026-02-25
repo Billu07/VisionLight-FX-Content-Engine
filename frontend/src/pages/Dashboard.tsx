@@ -674,385 +674,157 @@ function Dashboard() {
 
       <div className="relative z-10">
         {/* ... MODALS ... */}
-      {activeLibrarySlot !== null && (
-        <AssetLibrary
-          onClose={() => setActiveLibrarySlot(null)}
-          onSelect={handleAssetSelect}
-          initialAspectRatio={getCurrentRatioForLibrary()}
-        />
-      )}
+        {activeLibrarySlot !== null && (
+          <AssetLibrary
+            onClose={() => setActiveLibrarySlot(null)}
+            onSelect={handleAssetSelect}
+            initialAspectRatio={getCurrentRatioForLibrary()}
+          />
+        )}
 
-      {/* EXTRACTOR MODAL */}
-      {extractingVideoUrl && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 p-4 animate-in fade-in">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-4xl p-6 relative flex flex-col items-center">
-            <button
-              onClick={() => setExtractingVideoUrl(null)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white z-10"
-            >
-              ✕
-            </button>
-            <div className="w-full flex justify-between items-start mb-4 pr-6">
-              <img src="/drift_icon.png" alt="Drift" className="w-10 h-10 object-contain" />
-              <h3 className="text-white font-bold tracking-widest text-sm mt-2">
-                3D-X-FRAME-EXTRACTOR
-              </h3>
-            </div>
-            <DriftFrameExtractor
-              videoUrl={extractingVideoUrl}
-              onExtract={async (blob) => {
-                const file = new File([blob], "timeline_extract.jpg", {
-                  type: "image/jpeg",
-                });
-                const formData = new FormData();
-                formData.append("image", file);
-                formData.append("raw", "true");
-                const activeProject = localStorage.getItem(
-                  "visionlight_active_project",
-                );
-                if (activeProject) formData.append("projectId", activeProject);
-
-                await apiEndpoints.uploadAssetSync(formData);
-                alert("✅ Frame Saved to Asset Library!");
-                queryClient.invalidateQueries({ queryKey: ["assets"] });
-                setExtractingVideoUrl(null);
-              }}
-              onCancel={() => setExtractingVideoUrl(null)}
-            />
-          </div>
-        </div>
-      )}
-
-      {previewMedia && (
-        <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 animate-in fade-in duration-200"
-          onClick={() => {
-            setPreviewMedia(null);
-            setPreviewCarouselIndex(0);
-          }}
-        >
-          <div
-            className="relative w-full max-w-5xl flex flex-col items-center justify-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {previewMedia.type === "carousel" &&
-            Array.isArray(previewMedia.url) ? (
-              <div className="flex flex-col items-center w-full">
-                <img
-                  src={previewMedia.url[previewCarouselIndex]}
-                  className="max-h-[80vh] w-auto rounded-lg shadow-2xl border border-gray-800"
-                />
-                {previewMedia.url.length > 1 && (
-                  <div className="flex gap-2 mt-4">
-                    {previewMedia.url.map((_, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setPreviewCarouselIndex(idx)}
-                        className={`w-3 h-3 rounded-full transition-all ${
-                          idx === previewCarouselIndex
-                            ? "bg-white scale-125"
-                            : "bg-white/30 hover:bg-white/60"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="w-full flex justify-center">
-                <div className="max-w-full max-h-[85vh]">
-                  <MediaPreview
-                    mediaUrl={previewMedia.url as string}
-                    mediaType={
-                      previewMedia.type === "video" ? "video" : "image"
-                    }
-                  />
-                </div>
-              </div>
-            )}
-            <button
-              onClick={() => {
-                setPreviewMedia(null);
-                setPreviewCarouselIndex(0);
-              }}
-              className="absolute -top-12 right-0 bg-white/10 hover:bg-white/20 text-white p-2 rounded-full transition-colors"
-            >
-              ✕ Close
-            </button>
-          </div>
-        </div>
-      )}
-      {showQueuedModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="bg-gray-900 rounded-2xl border border-cyan-400/40 shadow-2xl max-w-sm w-full p-6">
-            <h3 className="text-lg font-semibold text-white mb-2">
-              Request Received Successfully
-            </h3>
-            <p className="text-sm text-purple-200 mb-4">
-              Our AI model is now generating your result. Check Timeline for
-              updates.
-            </p>
-            <div className="flex justify-end">
+        {/* EXTRACTOR MODAL */}
+        {extractingVideoUrl && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 p-4 animate-in fade-in">
+            <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-4xl p-6 relative flex flex-col items-center">
               <button
-                onClick={() => setShowQueuedModal(false)}
-                className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium"
+                onClick={() => setExtractingVideoUrl(null)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-white z-10"
               >
-                Got it
+                ✕
               </button>
+              <div className="w-full flex justify-between items-start mb-4 pr-6">
+                <img
+                  src="/drift_icon.png"
+                  alt="Drift"
+                  className="w-14 h-12 object-contain"
+                />
+                <h3 className="text-white font-bold tracking-widest text-sm mt-2">
+                  3D-X-FRAME-EXTRACTOR
+                </h3>
+              </div>
+              <DriftFrameExtractor
+                videoUrl={extractingVideoUrl}
+                onExtract={async (blob) => {
+                  const file = new File([blob], "timeline_extract.jpg", {
+                    type: "image/jpeg",
+                  });
+                  const formData = new FormData();
+                  formData.append("image", file);
+                  formData.append("raw", "true");
+                  const activeProject = localStorage.getItem(
+                    "visionlight_active_project",
+                  );
+                  if (activeProject)
+                    formData.append("projectId", activeProject);
+
+                  await apiEndpoints.uploadAssetSync(formData);
+                  alert("✅ Frame Saved to Asset Library!");
+                  queryClient.invalidateQueries({ queryKey: ["assets"] });
+                  setExtractingVideoUrl(null);
+                }}
+                onCancel={() => setExtractingVideoUrl(null)}
+              />
             </div>
           </div>
-        </div>
-      )}
-      {showNoCreditsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
-          <div className="bg-gray-800 rounded-2xl border border-red-500/30 shadow-2xl max-w-sm w-full p-6 text-center">
-            <div className="text-4xl mb-3">💎</div>
-            <h3 className="text-xl font-bold text-white mb-2">
-              Insufficient Credits
-            </h3>
-            <p className="text-sm text-gray-300 mb-6">
-              You need more credits to start this generation.
-            </p>
-            <div className="flex flex-col gap-3">
-              {isCommercial ? (
-                <a
-                  href={creditLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full py-3 bg-green-600 rounded-xl font-bold"
-                >
-                  {creditBtnText}
-                </a>
+        )}
+
+        {previewMedia && (
+          <div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 animate-in fade-in duration-200"
+            onClick={() => {
+              setPreviewMedia(null);
+              setPreviewCarouselIndex(0);
+            }}
+          >
+            <div
+              className="relative w-full max-w-5xl flex flex-col items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {previewMedia.type === "carousel" &&
+              Array.isArray(previewMedia.url) ? (
+                <div className="flex flex-col items-center w-full">
+                  <img
+                    src={previewMedia.url[previewCarouselIndex]}
+                    className="max-h-[80vh] w-auto rounded-lg shadow-2xl border border-gray-800"
+                  />
+                  {previewMedia.url.length > 1 && (
+                    <div className="flex gap-2 mt-4">
+                      {previewMedia.url.map((_, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setPreviewCarouselIndex(idx)}
+                          className={`w-3 h-3 rounded-full transition-all ${
+                            idx === previewCarouselIndex
+                              ? "bg-white scale-125"
+                              : "bg-white/30 hover:bg-white/60"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
               ) : (
-                <button
-                  onClick={handleRequestCredits}
-                  disabled={isRequesting}
-                  className="w-full py-3 bg-purple-600 rounded-xl font-bold"
-                >
-                  {isRequesting ? "Sending..." : "Request Credits"}
-                </button>
+                <div className="w-full flex justify-center">
+                  <div className="max-w-full max-h-[85vh]">
+                    <MediaPreview
+                      mediaUrl={previewMedia.url as string}
+                      mediaType={
+                        previewMedia.type === "video" ? "video" : "image"
+                      }
+                    />
+                  </div>
+                </div>
               )}
               <button
-                onClick={() => setShowNoCreditsModal(false)}
-                className="text-gray-400 text-sm"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {showPromptInfo && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4"
-          onClick={() => setShowPromptInfo(null)}
-        >
-          <div
-            className="bg-gray-800 rounded-2xl border border-gray-600 max-w-md w-full p-6 relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-lg font-bold text-white mb-3">
-              Generation Prompt
-            </h3>
-            <div className="bg-gray-900 p-4 rounded-lg text-gray-300 text-sm mb-4 max-h-60 overflow-y-auto">
-              {showPromptInfo}
-            </div>
-            <div className="flex justify-end gap-2">
-              <button
                 onClick={() => {
-                  navigator.clipboard.writeText(showPromptInfo);
-                  setShowPromptInfo(null);
+                  setPreviewMedia(null);
+                  setPreviewCarouselIndex(0);
                 }}
-                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white text-sm"
+                className="absolute -top-12 right-0 bg-white/10 hover:bg-white/20 text-white p-2 rounded-full transition-colors"
               >
-                Copy
-              </button>
-              <button
-                onClick={() => setShowPromptInfo(null)}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white text-sm"
-              >
-                Close
+                ✕ Close
               </button>
             </div>
           </div>
-        </div>
-      )}
-      {showWelcomeTour && (
-        <WelcomeTour onClose={() => setShowWelcomeTour(false)} />
-      )}
-
-      {/* Render Reserve Modal */}
-
-      <RenderReserveModal
-        isOpen={showReserveModal}
-        onClose={() => setShowReserveModal(false)}
-        prices={(credits as any)?.prices}
-        isCommercial={isCommercial}
-        user={user}
-      />
-
-      {/* Stock Photos Modal */}
-
-      <StockPhotosModal
-        isOpen={showStockModal}
-        onClose={() => setShowStockModal(false)}
-      />
-
-      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
-        {" "}
-        {/* HEADER */}
-        <div className="mb-6 sm:mb-8 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div>
-                <h1 className="text-xl sm:text-3xl md:text-4xl font-bold leading-tight brand-gradient-text">
-                  {companyName}
-                </h1>
+        )}
+        {showQueuedModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+            <div className="bg-gray-900 rounded-2xl border border-cyan-400/40 shadow-2xl max-w-sm w-full p-6">
+              <h3 className="text-lg font-semibold text-white mb-2">
+                Request Received Successfully
+              </h3>
+              <p className="text-sm text-purple-200 mb-4">
+                Our AI model is now generating your result. Check Timeline for
+                updates.
+              </p>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowQueuedModal(false)}
+                  className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium"
+                >
+                  Got it
+                </button>
               </div>
             </div>
-            {isMobile && (
-              <div className="flex gap-2">
-                {isAdmin && (
-                  <button
-                    onClick={() => navigate("/admin")}
-                    className="p-2 bg-red-900/50 border border-red-500/30 rounded-xl text-red-300"
-                  >
-                    ⚙️
-                  </button>
-                )}
-                <button
-                  onClick={() => {
-                    localStorage.removeItem("visionlight_active_project");
-                    navigate("/projects");
-                  }}
-                  className="p-2 bg-gray-800/60 border border-blue-400/30 rounded-xl"
-                  title="Projects"
-                >
-                  📁
-                </button>
-                <button
-                  onClick={() => setShowBrandModal(true)}
-                  className="p-2 bg-gray-800/60 border border-cyan-400/30 rounded-xl"
-                >
-                  🎨
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="p-2 bg-gray-800/60 border border-purple-400/30 rounded-xl"
-                >
-                  🚪
-                </button>
-              </div>
-            )}
           </div>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="bg-gray-800/40 backdrop-blur-xl rounded-2xl px-4 py-2 border border-white/5 w-full sm:w-auto overflow-x-auto">
-              <div className="flex items-center gap-6 min-w-max">
-                {!creditsLoading ? (
-                  <>
-                    {/* PICDRIFT POOL */}
-                    <div className="flex items-center gap-2 border-r border-white/10 pr-4">
-                      <div className="flex flex-col">
-                        <span className="text-pink-400 font-bold text-sm leading-none">
-                          {formatBal(credits.creditsPicDrift)}
-                        </span>
-                        <span className="text-[8px] text-gray-500 uppercase font-black">
-                          PicDrift
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* PICDRIFT PLUS POOL */}
-                    <div className="flex items-center gap-2 border-r border-white/10 pr-4">
-                      <div className="flex flex-col">
-                        <span className="text-rose-400 font-bold text-sm leading-none">
-                          {formatBal(credits.creditsPicDriftPlus)}
-                        </span>
-                        <span className="text-[8px] text-gray-500 uppercase font-black">
-                          PD Plus
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* PIC FX POOL */}
-                    <div className="flex items-center gap-2 border-r border-white/10 pr-4">
-                      <div className="flex flex-col">
-                        <span className="text-violet-400 font-bold text-sm leading-none">
-                          {formatBal(credits.creditsImageFX)}
-                        </span>
-                        <span className="text-[8px] text-gray-500 uppercase font-black">
-                          Pic FX
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* VIDEO FX 1 POOL */}
-                    <div className="flex items-center gap-2 border-r border-white/10 pr-4">
-                      <div className="flex flex-col">
-                        <span className="text-blue-400 font-bold text-sm leading-none">
-                          {formatBal(credits.creditsVideoFX1)}
-                        </span>
-                        <span className="text-[8px] text-gray-500 uppercase font-black">
-                          Video FX 1
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* VIDEO FX 2 POOL */}
-                    <div className="flex items-center gap-2 border-r border-white/10 pr-4">
-                      <div className="flex flex-col">
-                        <span className="text-cyan-400 font-bold text-sm leading-none">
-                          {formatBal(credits.creditsVideoFX2)}
-                        </span>
-                        <span className="text-[8px] text-gray-500 uppercase font-black">
-                          Video FX 2
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* VIDEO FX 3 POOL */}
-                    <div className="flex items-center gap-2">
-                      <div className="flex flex-col">
-                        <span className="text-indigo-400 font-bold text-sm leading-none">
-                          {formatBal(credits.creditsVideoFX3)}
-                        </span>
-                        <span className="text-[8px] text-gray-500 uppercase font-black">
-                          Video FX 3
-                        </span>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <LoadingSpinner size="sm" />
-                )}
-              </div>
-            </div>
-
-            {/* NEW: Render Reserve Button */}
-            <button
-              onClick={() => setShowReserveModal(true)}
-              className="px-4 py-2 bg-gray-800/40 backdrop-blur-xl border border-white/5 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-all flex items-center gap-2 h-full self-stretch sm:self-auto"
-            >
-              <span>💳</span>
-              <span>Render Reserve</span>
-            </button>
-
-            {!isMobile && (
-              <div className="flex gap-2">
-                {isAdmin && (
-                  <button
-                    onClick={() => navigate("/admin")}
-                    className="px-4 py-2.5 bg-red-600/20 border border-red-500/50 rounded-xl text-red-300 text-sm font-bold"
-                  >
-                    Admin Panel
-                  </button>
-                )}
+        )}
+        {showNoCreditsModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
+            <div className="bg-gray-800 rounded-2xl border border-red-500/30 shadow-2xl max-w-sm w-full p-6 text-center">
+              <div className="text-4xl mb-3">💎</div>
+              <h3 className="text-xl font-bold text-white mb-2">
+                Insufficient Credits
+              </h3>
+              <p className="text-sm text-gray-300 mb-6">
+                You need more credits to start this generation.
+              </p>
+              <div className="flex flex-col gap-3">
                 {isCommercial ? (
                   <a
                     href={creditLink}
                     target="_blank"
                     rel="noreferrer"
-                    className="px-4 py-2.5 bg-gray-800/60 border border-green-400/30 rounded-xl text-green-400 text-sm hover:bg-green-400/10 flex items-center gap-2"
+                    className="w-full py-3 bg-green-600 rounded-xl font-bold"
                   >
                     {creditBtnText}
                   </a>
@@ -1060,608 +832,928 @@ function Dashboard() {
                   <button
                     onClick={handleRequestCredits}
                     disabled={isRequesting}
-                    className="px-4 py-2.5 bg-purple-600/20 border border-purple-500/50 rounded-xl text-purple-300 text-sm"
+                    className="w-full py-3 bg-purple-600 rounded-xl font-bold"
                   >
-                    {isRequesting ? "Sending..." : "Request Credit 🔔"}
+                    {isRequesting ? "Sending..." : "Request Credits"}
                   </button>
                 )}
                 <button
-                  onClick={() => {
-                    localStorage.removeItem("visionlight_active_project");
-                    navigate("/projects");
-                  }}
-                  className="px-4 py-2.5 bg-gray-800/60 border border-blue-400/30 rounded-xl text-blue-400 text-sm hover:bg-blue-400/10"
+                  onClick={() => setShowNoCreditsModal(false)}
+                  className="text-gray-400 text-sm"
                 >
-                  Projects
-                </button>
-                <button
-                  onClick={() => setShowBrandModal(true)}
-                  className="px-4 py-2.5 bg-gray-800/60 border border-cyan-400/30 rounded-xl text-cyan-400 text-sm hover:bg-cyan-400/10"
-                >
-                  Edit Dashboard
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="px-4 py-2.5 bg-gray-800/60 border border-purple-400/30 rounded-xl text-purple-300 text-sm hover:bg-purple-400/10"
-                >
-                  Logout
+                  Cancel
                 </button>
               </div>
-            )}
+            </div>
           </div>
-        </div>
-        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
-          <div className="flex-1">
-            <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 lg:p-8 shadow-2xl">
-              {/* ✅ UPDATED HEADER: Logo Left, Library Button Right */}
-              <div className="mb-6 sm:mb-8 flex justify-between items-start">
+        )}
+        {showPromptInfo && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4"
+            onClick={() => setShowPromptInfo(null)}
+          >
+            <div
+              className="bg-gray-800 rounded-2xl border border-gray-600 max-w-md w-full p-6 relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-bold text-white mb-3">
+                Generation Prompt
+              </h3>
+              <div className="bg-gray-900 p-4 rounded-lg text-gray-300 text-sm mb-4 max-h-60 overflow-y-auto">
+                {showPromptInfo}
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(showPromptInfo);
+                    setShowPromptInfo(null);
+                  }}
+                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white text-sm"
+                >
+                  Copy
+                </button>
+                <button
+                  onClick={() => setShowPromptInfo(null)}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showWelcomeTour && (
+          <WelcomeTour onClose={() => setShowWelcomeTour(false)} />
+        )}
+
+        {/* Render Reserve Modal */}
+
+        <RenderReserveModal
+          isOpen={showReserveModal}
+          onClose={() => setShowReserveModal(false)}
+          prices={(credits as any)?.prices}
+          isCommercial={isCommercial}
+          user={user}
+        />
+
+        {/* Stock Photos Modal */}
+
+        <StockPhotosModal
+          isOpen={showStockModal}
+          onClose={() => setShowStockModal(false)}
+        />
+
+        <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
+          {" "}
+          {/* HEADER */}
+          <div className="mb-6 sm:mb-8 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
                 <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="h-12 sm:h-14 flex items-center justify-center">
-                      <img
-                        src={currentLogo}
-                        alt="LOGO"
-                        className="h-full w-auto object-contain"
-                      />
-                    </div>
-                  </div>
-                  <p className="text-purple-300 text-sm ml-1">
-                    {currentHeaderText}
-                  </p>
+                  <h1 className="text-xl sm:text-3xl md:text-4xl font-bold leading-tight brand-gradient-text">
+                    {companyName}
+                  </h1>
                 </div>
-
-                {/* ✅ GLOBAL HEADER BUTTONS */}
-                <div className="flex gap-3">
+              </div>
+              {isMobile && (
+                <div className="flex gap-2">
+                  {isAdmin && (
+                    <button
+                      onClick={() => navigate("/admin")}
+                      className="p-2 bg-red-900/50 border border-red-500/30 rounded-xl text-red-300"
+                    >
+                      ⚙️
+                    </button>
+                  )}
                   <button
-                    type="button"
-                    onClick={() =>
-                      setViewMode(
-                        viewMode === "create" ? "sequencer" : "create",
-                      )
-                    }
-                    className={`text-xs px-4 py-2 rounded-lg border font-semibold transition-colors flex items-center gap-2 ${
-                      viewMode === "sequencer"
-                        ? "bg-purple-600 text-white border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]"
-                        : "bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700 hover:text-white"
-                    }`}
-                  >
-                    <span></span>{" "}
-                    {viewMode === "sequencer"
-                      ? "Back to Create"
-                      : "Sequence Merger"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowStockModal(true)}
-                    className="text-xs px-4 py-2 rounded-lg border border-gray-600 bg-gray-800 text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors"
-                  >
-                    Stock Photos
-                  </button>
-
-                  <button
-                    type="button"
                     onClick={() => {
-                      // For PicDrift, open 'Start Frame' slot. For others, open 'Generic'.
-                      setActiveLibrarySlot(
-                        currentVisualTab === "picdrift" ? "start" : "generic",
-                      );
+                      localStorage.removeItem("visionlight_active_project");
+                      navigate("/projects");
                     }}
-                    className={`text-xs px-4 py-2 rounded-lg border flex items-center gap-2 transition-all font-semibold shadow-lg ${
-                      currentVisualTab === "picdrift"
-                        ? "bg-rose-900/50 text-rose-300 border-rose-700/50 hover:bg-rose-800 hover:border-rose-500"
-                        : "bg-cyan-900/50 text-cyan-300 border-cyan-700/50 hover:bg-cyan-800 hover:border-cyan-500"
-                    }`}
+                    className="p-2 bg-gray-800/60 border border-blue-400/30 rounded-xl"
+                    title="Projects"
                   >
-                    <span></span> Open Library
+                    📁
                   </button>
+                  <button
+                    onClick={() => setShowBrandModal(true)}
+                    className="p-2 bg-gray-800/60 border border-cyan-400/30 rounded-xl"
+                  >
+                    🎨
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="p-2 bg-gray-800/60 border border-purple-400/30 rounded-xl"
+                  >
+                    🚪
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="bg-gray-800/40 backdrop-blur-xl rounded-2xl px-4 py-2 border border-white/5 w-full sm:w-auto overflow-x-auto">
+                <div className="flex items-center gap-6 min-w-max">
+                  {!creditsLoading ? (
+                    <>
+                      {/* PICDRIFT POOL */}
+                      <div className="flex items-center gap-2 border-r border-white/10 pr-4">
+                        <div className="flex flex-col">
+                          <span className="text-pink-400 font-bold text-sm leading-none">
+                            {formatBal(credits.creditsPicDrift)}
+                          </span>
+                          <span className="text-[8px] text-gray-500 uppercase font-black">
+                            PicDrift
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* PICDRIFT PLUS POOL */}
+                      <div className="flex items-center gap-2 border-r border-white/10 pr-4">
+                        <div className="flex flex-col">
+                          <span className="text-rose-400 font-bold text-sm leading-none">
+                            {formatBal(credits.creditsPicDriftPlus)}
+                          </span>
+                          <span className="text-[8px] text-gray-500 uppercase font-black">
+                            PD Plus
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* PIC FX POOL */}
+                      <div className="flex items-center gap-2 border-r border-white/10 pr-4">
+                        <div className="flex flex-col">
+                          <span className="text-violet-400 font-bold text-sm leading-none">
+                            {formatBal(credits.creditsImageFX)}
+                          </span>
+                          <span className="text-[8px] text-gray-500 uppercase font-black">
+                            Pic FX
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* VIDEO FX 1 POOL */}
+                      <div className="flex items-center gap-2 border-r border-white/10 pr-4">
+                        <div className="flex flex-col">
+                          <span className="text-blue-400 font-bold text-sm leading-none">
+                            {formatBal(credits.creditsVideoFX1)}
+                          </span>
+                          <span className="text-[8px] text-gray-500 uppercase font-black">
+                            Video FX 1
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* VIDEO FX 2 POOL */}
+                      <div className="flex items-center gap-2 border-r border-white/10 pr-4">
+                        <div className="flex flex-col">
+                          <span className="text-cyan-400 font-bold text-sm leading-none">
+                            {formatBal(credits.creditsVideoFX2)}
+                          </span>
+                          <span className="text-[8px] text-gray-500 uppercase font-black">
+                            Video FX 2
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* VIDEO FX 3 POOL */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex flex-col">
+                          <span className="text-indigo-400 font-bold text-sm leading-none">
+                            {formatBal(credits.creditsVideoFX3)}
+                          </span>
+                          <span className="text-[8px] text-gray-500 uppercase font-black">
+                            Video FX 3
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <LoadingSpinner size="sm" />
+                  )}
                 </div>
               </div>
 
-              {/* NAVIGATION BAR */}
-              {viewMode === "create" && (
-                <>
-                  <div className="mb-6 sm:mb-8">
-                    <label className="block text-sm font-semibold text-white mb-3 sm:mb-4">
-                      Select Content Type
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-                      {/* TAB 1: PICDRIFT (Default) */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveEngine("kie");
-                          setVideoFxMode("picdrift");
-                        }}
-                        className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
-                          currentVisualTab === "picdrift"
-                            ? "border-white/20 bg-gradient-to-br from-pink-500 to-rose-500 shadow-2xl scale-105"
-                            : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <div className="flex-1">
-                            <div className="font-semibold text-sm text-white">
-                              PicDrift
-                            </div>
-                          </div>
-                          {currentVisualTab === "picdrift" && (
-                            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                          )}
-                        </div>
-                      </button>
+              {/* NEW: Render Reserve Button */}
+              <button
+                onClick={() => setShowReserveModal(true)}
+                className="px-4 py-2 bg-gray-800/40 backdrop-blur-xl border border-white/5 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-all flex items-center gap-2 h-full self-stretch sm:self-auto"
+              >
+                <span>💳</span>
+                <span>Render Reserve</span>
+              </button>
 
-                      {/* TAB 2: PIC FX */}
-                      {user?.view === "PICDRIFT" &&
-                      credits.creditsImageFX <= 0 ? (
-                        <a
-                          href="http://picdrift.com/renders"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-violet-400/50 hover:bg-violet-900/20 transition-all duration-300 text-left group flex items-center justify-between"
-                        >
-                          <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="font-semibold text-sm text-gray-400 group-hover:text-violet-300 flex items-center gap-2">
-                              <span>🔒</span> Pic FX
-                            </div>
-                          </div>
-                          <div className="text-xs bg-violet-600/20 text-violet-400 px-2 py-1 rounded-md font-bold group-hover:bg-violet-500 group-hover:text-white transition-colors">
-                            Unlock
-                          </div>
-                        </a>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setActiveEngine("studio")}
-                          className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
-                            currentVisualTab === "studio"
-                              ? "border-white/20 bg-gradient-to-br from-violet-700 to-purple-700 shadow-2xl scale-105"
-                              : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="flex-1">
-                              <div className="font-semibold text-sm text-white">
-                                Pic FX
-                              </div>
-                            </div>
-                            {currentVisualTab === "studio" && (
-                              <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                            )}
-                          </div>
-                        </button>
-                      )}
-
-                      {/* TAB 3: VIDEO FX */}
-                      {user?.view === "PICDRIFT" &&
-                      credits.creditsVideoFX1 +
-                        credits.creditsVideoFX2 +
-                        credits.creditsVideoFX3 <=
-                        0 ? (
-                        <a
-                          href="http://picdrift.com/renders"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-cyan-400/50 hover:bg-cyan-900/20 transition-all duration-300 text-left group flex items-center justify-between"
-                        >
-                          <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="font-semibold text-sm text-gray-400 group-hover:text-cyan-300 flex items-center gap-2">
-                              <span>🔒</span> Video FX
-                            </div>
-                          </div>
-                          <div className="text-xs bg-cyan-600/20 text-cyan-400 px-2 py-1 rounded-md font-bold group-hover:bg-cyan-500 group-hover:text-white transition-colors">
-                            Unlock
-                          </div>
-                        </a>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveEngine("kie");
-                            setVideoFxMode("video");
-                          }}
-                          className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
-                            currentVisualTab === "videofx"
-                              ? "border-white/20 bg-gradient-to-br from-blue-700 to-cyan-700 shadow-2xl scale-105"
-                              : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="flex-1">
-                              <div className="font-semibold text-sm text-white">
-                                Video FX
-                              </div>
-                            </div>
-                            {currentVisualTab === "videofx" && (
-                              <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                            )}
-                          </div>
-                        </button>
-                      )}
+              {!isMobile && (
+                <div className="flex gap-2">
+                  {isAdmin && (
+                    <button
+                      onClick={() => navigate("/admin")}
+                      className="px-4 py-2.5 bg-red-600/20 border border-red-500/50 rounded-xl text-red-300 text-sm font-bold"
+                    >
+                      Admin Panel
+                    </button>
+                  )}
+                  {isCommercial ? (
+                    <a
+                      href={creditLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-4 py-2.5 bg-gray-800/60 border border-green-400/30 rounded-xl text-green-400 text-sm hover:bg-green-400/10 flex items-center gap-2"
+                    >
+                      {creditBtnText}
+                    </a>
+                  ) : (
+                    <button
+                      onClick={handleRequestCredits}
+                      disabled={isRequesting}
+                      className="px-4 py-2.5 bg-purple-600/20 border border-purple-500/50 rounded-xl text-purple-300 text-sm"
+                    >
+                      {isRequesting ? "Sending..." : "Request Credit 🔔"}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      localStorage.removeItem("visionlight_active_project");
+                      navigate("/projects");
+                    }}
+                    className="px-4 py-2.5 bg-gray-800/60 border border-blue-400/30 rounded-xl text-blue-400 text-sm hover:bg-blue-400/10"
+                  >
+                    Projects
+                  </button>
+                  <button
+                    onClick={() => setShowBrandModal(true)}
+                    className="px-4 py-2.5 bg-gray-800/60 border border-cyan-400/30 rounded-xl text-cyan-400 text-sm hover:bg-cyan-400/10"
+                  >
+                    Edit Dashboard
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="px-4 py-2.5 bg-gray-800/60 border border-purple-400/30 rounded-xl text-purple-300 text-sm hover:bg-purple-400/10"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
+            <div className="flex-1">
+              <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 lg:p-8 shadow-2xl">
+                {/* ✅ UPDATED HEADER: Logo Left, Library Button Right */}
+                <div className="mb-6 sm:mb-8 flex justify-between items-start">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="h-12 sm:h-14 flex items-center justify-center">
+                        <img
+                          src={currentLogo}
+                          alt="LOGO"
+                          className="h-full w-auto object-contain"
+                        />
+                      </div>
                     </div>
+                    <p className="text-purple-300 text-sm ml-1">
+                      {currentHeaderText}
+                    </p>
                   </div>
 
-                  {/* STUDIO SUB-MENU */}
-                  {currentVisualTab === "studio" && (
-                    <div className="mb-6 animate-in fade-in space-y-4">
-                      <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
-                        <button
-                          onClick={() => setStudioMode("image")}
-                          className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
-                            studioMode === "image"
-                              ? "bg-violet-600 text-white shadow-lg"
-                              : "text-gray-400 hover:text-white"
-                          }`}
-                        >
-                          Image FX
-                        </button>
-                        <button
-                          onClick={() => setStudioMode("carousel")}
-                          className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
-                            studioMode === "carousel"
-                              ? "bg-fuchsia-600 text-white shadow-lg"
-                              : "text-gray-400 hover:text-white"
-                          }`}
-                        >
-                          Carousel
-                        </button>
-                        <button
-                          onClick={() => setStudioMode("edit")}
-                          className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
-                            studioMode === "edit"
-                              ? "bg-cyan-600 text-white shadow-lg"
-                              : "text-gray-400 hover:text-white"
-                          }`}
-                        >
-                          PicFX Editor
-                        </button>
-                      </div>
-                      {studioMode !== "edit" && (
-                        <div className="flex justify-center gap-3">
-                          {[
-                            { id: "16:9", label: "Landscape" },
-                            { id: "9:16", label: "Portrait" },
-                            { id: "1:1", label: "Square" },
-                          ].map((a) => (
-                            <button
-                              key={a.id}
-                              onClick={() => setGeminiAspect(a.id as any)}
-                              className={`px-4 py-2 rounded-lg border text-xs font-bold ${
-                                geminiAspect === a.id
-                                  ? "bg-violet-600 border-violet-500 text-white"
-                                  : "bg-gray-800 border-gray-700 text-gray-400"
-                              }`}
-                            >
-                              {a.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {/* ✅ GLOBAL HEADER BUTTONS */}
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setViewMode(
+                          viewMode === "create" ? "sequencer" : "create",
+                        )
+                      }
+                      className={`text-xs px-4 py-2 rounded-lg border font-semibold transition-colors flex items-center gap-2 ${
+                        viewMode === "sequencer"
+                          ? "bg-purple-600 text-white border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]"
+                          : "bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700 hover:text-white"
+                      }`}
+                    >
+                      <span></span>{" "}
+                      {viewMode === "sequencer"
+                        ? "Back to Create"
+                        : "Sequence Merger"}
+                    </button>
 
-                  {/* PICDRIFT SUB-MENU */}
-                  {currentVisualTab === "picdrift" && (
-                    <div className="mb-6 animate-in fade-in space-y-4">
-                      <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
-                        <button
-                          type="button"
-                          onClick={() => setPicDriftMode("standard")}
-                          className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
-                            picDriftMode === "standard"
-                              ? "bg-rose-600 text-white shadow-lg"
-                              : "text-gray-400 hover:text-white"
-                          }`}
-                        >
-                          Standard
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPicDriftMode("plus")}
-                          className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
-                            picDriftMode === "plus"
-                              ? "bg-rose-600 text-white shadow-lg"
-                              : "text-gray-400 hover:text-white"
-                          }`}
-                        >
-                          PicDrift Plus
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => setShowStockModal(true)}
+                      className="text-xs px-4 py-2 rounded-lg border border-gray-600 bg-gray-800 text-gray-300 font-semibold hover:bg-gray-700 hover:text-white transition-colors"
+                    >
+                      Stock Photos
+                    </button>
 
-                  {/* VIDEO FX SUB-MENU */}
-                  {currentVisualTab === "videofx" && (
-                    <div className="mb-6 animate-in fade-in space-y-4">
-                      <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // For PicDrift, open 'Start Frame' slot. For others, open 'Generic'.
+                        setActiveLibrarySlot(
+                          currentVisualTab === "picdrift" ? "start" : "generic",
+                        );
+                      }}
+                      className={`text-xs px-4 py-2 rounded-lg border flex items-center gap-2 transition-all font-semibold shadow-lg ${
+                        currentVisualTab === "picdrift"
+                          ? "bg-rose-900/50 text-rose-300 border-rose-700/50 hover:bg-rose-800 hover:border-rose-500"
+                          : "bg-cyan-900/50 text-cyan-300 border-cyan-700/50 hover:bg-cyan-800 hover:border-cyan-500"
+                      }`}
+                    >
+                      <span></span> Open Library
+                    </button>
+                  </div>
+                </div>
+
+                {/* NAVIGATION BAR */}
+                {viewMode === "create" && (
+                  <>
+                    <div className="mb-6 sm:mb-8">
+                      <label className="block text-sm font-semibold text-white mb-3 sm:mb-4">
+                        Select Content Type
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+                        {/* TAB 1: PICDRIFT (Default) */}
                         <button
                           type="button"
                           onClick={() => {
                             setActiveEngine("kie");
-                            setVideoFxMode("video");
+                            setVideoFxMode("picdrift");
                           }}
-                          className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
-                            activeEngine === "kie"
-                              ? "bg-cyan-600 text-white shadow-lg"
-                              : "text-gray-400 hover:text-white"
+                          className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
+                            currentVisualTab === "picdrift"
+                              ? "border-white/20 bg-gradient-to-br from-pink-500 to-rose-500 shadow-2xl scale-105"
+                              : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
                           }`}
                         >
-                          Video FX 1
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setActiveEngine("openai")}
-                          className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
-                            activeEngine === "openai"
-                              ? "bg-cyan-600 text-white shadow-lg"
-                              : "text-gray-400 hover:text-white"
-                          }`}
-                        >
-                          Video FX 2
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setActiveEngine("veo")}
-                          className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
-                            activeEngine === "veo"
-                              ? "bg-cyan-600 text-white shadow-lg"
-                              : "text-gray-400 hover:text-white"
-                          }`}
-                        >
-                          Video FX 3
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <form
-                    onSubmit={handleSubmit}
-                    className="space-y-4 sm:space-y-6"
-                  >
-                    {/* MAGIC EDIT UI */}
-                    {currentVisualTab === "studio" && studioMode === "edit" ? (
-                      <div className="bg-gray-900/50 border border-cyan-500/30 rounded-2xl p-8 text-center space-y-5 animate-in fade-in">
-                        <div className="w-20 h-20 bg-cyan-900/20 rounded-full flex items-center justify-center mx-auto border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
-                          <span className="text-4xl"></span>
-                        </div>
-                        <div>
-                          <h3 className="text-white font-bold text-xl mb-2">
-                            PicFX Editor
-                          </h3>
-                          <p className="text-gray-400 text-sm max-w-md mx-auto">
-                            Upload an image to start a chat session. Ask PicFX
-                            to change lighting, add objects, or completely
-                            style-transfer your image.
-                          </p>
-                        </div>
-                        <label className="block w-full max-w-sm mx-auto cursor-pointer group">
-                          <div className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl text-white font-bold group-hover:shadow-lg group-hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
-                            <span>📤 Upload to Start</span>
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="flex-1">
+                              <div className="font-semibold text-sm text-white">
+                                PicDrift
+                              </div>
+                            </div>
+                            {currentVisualTab === "picdrift" && (
+                              <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                            )}
                           </div>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleMagicEditUpload}
-                          />
-                        </label>
-                        <p className="text-[20px] text-gray-500">
-                          Or select from{" "}
+                        </button>
+
+                        {/* TAB 2: PIC FX */}
+                        {user?.view === "PICDRIFT" &&
+                        credits.creditsImageFX <= 0 ? (
+                          <a
+                            href="http://picdrift.com/renders"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-violet-400/50 hover:bg-violet-900/20 transition-all duration-300 text-left group flex items-center justify-between"
+                          >
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <div className="font-semibold text-sm text-gray-400 group-hover:text-violet-300 flex items-center gap-2">
+                                <span>🔒</span> Pic FX
+                              </div>
+                            </div>
+                            <div className="text-xs bg-violet-600/20 text-violet-400 px-2 py-1 rounded-md font-bold group-hover:bg-violet-500 group-hover:text-white transition-colors">
+                              Unlock
+                            </div>
+                          </a>
+                        ) : (
                           <button
                             type="button"
-                            onClick={() => setActiveLibrarySlot("generic")}
-                            className="underline text-cyan-400"
+                            onClick={() => setActiveEngine("studio")}
+                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
+                              currentVisualTab === "studio"
+                                ? "border-white/20 bg-gradient-to-br from-violet-700 to-purple-700 shadow-2xl scale-105"
+                                : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
+                            }`}
                           >
-                            Asset Library
-                          </button>
-                        </p>
-                      </div>
-                    ) : (
-                      <>
-                        {/* 1. PICDRIFT FRAMES (Always Top for PicDrift Mode) */}
-                        {currentVisualTab === "picdrift" && (
-                          <div className="grid grid-cols-2 gap-4 mb-4 animate-in fade-in">
-                            {/* Start Frame */}
-                            <div className="flex flex-col gap-2">
-                              <div className="flex justify-between items-center">
-                                <label className="text-xs text-rose-300 font-bold">
-                                  Pic 1 - Start Frame
-                                </label>
-                                {/* Open Library Button for Start Frame */}
-                              </div>
-                              <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
-                                {picDriftUrls.start ? (
-                                  <>
-                                    <img
-                                      src={picDriftUrls.start}
-                                      className="w-full h-full object-cover"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        removePicDriftImage("start")
-                                      }
-                                      className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
-                                    >
-                                      ✕
-                                    </button>
-                                  </>
-                                ) : (
-                                  <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-                                    <label className="flex flex-col items-center justify-center cursor-pointer">
-                                      <span className="text-rose-400 text-2xl">
-                                        +
-                                      </span>
-                                      <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
-                                        Upload File
-                                      </span>
-                                      <input
-                                        type="file"
-                                        className="hidden"
-                                        accept="image/*"
-                                        onChange={(e) =>
-                                          handlePicDriftUpload(e, "start")
-                                        }
-                                      />
-                                    </label>
-                                    <div className="text-gray-600 text-[10px]">
-                                      - OR -
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setActiveLibrarySlot("start")
-                                      }
-                                      className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
-                                    >
-                                      Select from Library
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* End Frame */}
-                            <div
-                              className={`flex flex-col gap-2 ${picDriftAudio && picDriftMode !== "plus" ? "opacity-50 pointer-events-none grayscale" : ""}`}
-                            >
-                              <div className="flex justify-between items-center">
-                                <label className="text-xs text-rose-300 font-bold">
-                                  {picDriftAudio && picDriftMode !== "plus"
-                                    ? "Pic 2 - Disabled (Audio On)"
-                                    : "Pic 2 - End Frame (optional)"}
-                                </label>
-                              </div>
-                              <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
-                                {picDriftUrls.end ? (
-                                  <>
-                                    <img
-                                      src={picDriftUrls.end}
-                                      className="w-full h-full object-cover"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => removePicDriftImage("end")}
-                                      className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
-                                    >
-                                      ✕
-                                    </button>
-                                  </>
-                                ) : (
-                                  <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-                                    <label className="flex flex-col items-center justify-center cursor-pointer">
-                                      <span className="text-rose-400 text-2xl">
-                                        +
-                                      </span>
-                                      <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
-                                        Upload File
-                                      </span>
-                                      <input
-                                        type="file"
-                                        className="hidden"
-                                        accept="image/*"
-                                        onChange={(e) =>
-                                          handlePicDriftUpload(e, "end")
-                                        }
-                                      />
-                                    </label>
-                                    <div className="text-gray-600 text-[10px]">
-                                      - OR -
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setActiveLibrarySlot("end")
-                                      }
-                                      className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
-                                    >
-                                      Select from Library
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 2. PROMPT & TITLE (Moved Up for Non-PicDrift) */}
-                        <div>
-                          <label className="block text-sm font-semibold text-white mb-2">
-                            Your Creative Vision
-                          </label>
-                          <textarea
-                            value={prompt}
-                            onChange={(e) => setPrompt(e.target.value)}
-                            placeholder="Describe your vision with a prompt"
-                            className="w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base leading-relaxed"
-                            rows={3}
-                          />
-                        </div>
-
-                        <div>
-                          {/* ✅ FLEX CONTAINER FOR LABEL + BUTTON */}
-                          <div className="flex justify-between items-center mb-2">
-                            <label className="block text-sm font-semibold text-white">
-                              Title
-                            </label>
-                          </div>
-
-                          <input
-                            type="text"
-                            value={videoTitle}
-                            onChange={(e) => setVideoTitle(e.target.value)}
-                            placeholder="Name your creation..."
-                            className="w-full p-3 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-purple-300/60 backdrop-blur-sm"
-                          />
-                        </div>
-
-                        {/* 3. SETTINGS (Moved below Title) */}
-
-                        {/* VIDEO FX / KIE SETTINGS */}
-                        {currentVisualTab === "videofx" &&
-                          activeEngine === "kie" && (
-                            <div className="space-y-4 sm:space-y-6 animate-in fade-in">
-                              <div className="space-y-2">
-                                <label className="block text-sm font-semibold text-white">
-                                  AI Model
-                                </label>
-                                <div className="grid grid-cols-2 gap-2">
-                                  {[
-                                    { id: "kie-sora-2", label: "Video FX" },
-                                    {
-                                      id: "kie-sora-2-pro",
-                                      label: "Video FX Pro",
-                                    },
-                                  ].map((m) => (
-                                    <button
-                                      key={m.id}
-                                      type="button"
-                                      onClick={() => setKieModel(m.id as any)}
-                                      className={`p-3 rounded-xl border text-left text-sm font-medium ${
-                                        kieModel === m.id
-                                          ? "bg-cyan-600 border-cyan-500 text-white"
-                                          : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
-                                      }`}
-                                    >
-                                      {m.label}
-                                    </button>
-                                  ))}
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <div className="flex-1">
+                                <div className="font-semibold text-sm text-white">
+                                  Pic FX
                                 </div>
                               </div>
+                              {currentVisualTab === "studio" && (
+                                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                              )}
+                            </div>
+                          </button>
+                        )}
+
+                        {/* TAB 3: VIDEO FX */}
+                        {user?.view === "PICDRIFT" &&
+                        credits.creditsVideoFX1 +
+                          credits.creditsVideoFX2 +
+                          credits.creditsVideoFX3 <=
+                          0 ? (
+                          <a
+                            href="http://picdrift.com/renders"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-cyan-400/50 hover:bg-cyan-900/20 transition-all duration-300 text-left group flex items-center justify-between"
+                          >
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <div className="font-semibold text-sm text-gray-400 group-hover:text-cyan-300 flex items-center gap-2">
+                                <span>🔒</span> Video FX
+                              </div>
+                            </div>
+                            <div className="text-xs bg-cyan-600/20 text-cyan-400 px-2 py-1 rounded-md font-bold group-hover:bg-cyan-500 group-hover:text-white transition-colors">
+                              Unlock
+                            </div>
+                          </a>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveEngine("kie");
+                              setVideoFxMode("video");
+                            }}
+                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
+                              currentVisualTab === "videofx"
+                                ? "border-white/20 bg-gradient-to-br from-blue-700 to-cyan-700 shadow-2xl scale-105"
+                                : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <div className="flex-1">
+                                <div className="font-semibold text-sm text-white">
+                                  Video FX
+                                </div>
+                              </div>
+                              {currentVisualTab === "videofx" && (
+                                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                              )}
+                            </div>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* STUDIO SUB-MENU */}
+                    {currentVisualTab === "studio" && (
+                      <div className="mb-6 animate-in fade-in space-y-4">
+                        <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
+                          <button
+                            onClick={() => setStudioMode("image")}
+                            className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
+                              studioMode === "image"
+                                ? "bg-violet-600 text-white shadow-lg"
+                                : "text-gray-400 hover:text-white"
+                            }`}
+                          >
+                            Image FX
+                          </button>
+                          <button
+                            onClick={() => setStudioMode("carousel")}
+                            className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
+                              studioMode === "carousel"
+                                ? "bg-fuchsia-600 text-white shadow-lg"
+                                : "text-gray-400 hover:text-white"
+                            }`}
+                          >
+                            Carousel
+                          </button>
+                          <button
+                            onClick={() => setStudioMode("edit")}
+                            className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
+                              studioMode === "edit"
+                                ? "bg-cyan-600 text-white shadow-lg"
+                                : "text-gray-400 hover:text-white"
+                            }`}
+                          >
+                            PicFX Editor
+                          </button>
+                        </div>
+                        {studioMode !== "edit" && (
+                          <div className="flex justify-center gap-3">
+                            {[
+                              { id: "16:9", label: "Landscape" },
+                              { id: "9:16", label: "Portrait" },
+                              { id: "1:1", label: "Square" },
+                            ].map((a) => (
+                              <button
+                                key={a.id}
+                                onClick={() => setGeminiAspect(a.id as any)}
+                                className={`px-4 py-2 rounded-lg border text-xs font-bold ${
+                                  geminiAspect === a.id
+                                    ? "bg-violet-600 border-violet-500 text-white"
+                                    : "bg-gray-800 border-gray-700 text-gray-400"
+                                }`}
+                              >
+                                {a.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* PICDRIFT SUB-MENU */}
+                    {currentVisualTab === "picdrift" && (
+                      <div className="mb-6 animate-in fade-in space-y-4">
+                        <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
+                          <button
+                            type="button"
+                            onClick={() => setPicDriftMode("standard")}
+                            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                              picDriftMode === "standard"
+                                ? "bg-rose-600 text-white shadow-lg"
+                                : "text-gray-400 hover:text-white"
+                            }`}
+                          >
+                            Standard
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPicDriftMode("plus")}
+                            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                              picDriftMode === "plus"
+                                ? "bg-rose-600 text-white shadow-lg"
+                                : "text-gray-400 hover:text-white"
+                            }`}
+                          >
+                            PicDrift Plus
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* VIDEO FX SUB-MENU */}
+                    {currentVisualTab === "videofx" && (
+                      <div className="mb-6 animate-in fade-in space-y-4">
+                        <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveEngine("kie");
+                              setVideoFxMode("video");
+                            }}
+                            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                              activeEngine === "kie"
+                                ? "bg-cyan-600 text-white shadow-lg"
+                                : "text-gray-400 hover:text-white"
+                            }`}
+                          >
+                            Video FX 1
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActiveEngine("openai")}
+                            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                              activeEngine === "openai"
+                                ? "bg-cyan-600 text-white shadow-lg"
+                                : "text-gray-400 hover:text-white"
+                            }`}
+                          >
+                            Video FX 2
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActiveEngine("veo")}
+                            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                              activeEngine === "veo"
+                                ? "bg-cyan-600 text-white shadow-lg"
+                                : "text-gray-400 hover:text-white"
+                            }`}
+                          >
+                            Video FX 3
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <form
+                      onSubmit={handleSubmit}
+                      className="space-y-4 sm:space-y-6"
+                    >
+                      {/* MAGIC EDIT UI */}
+                      {currentVisualTab === "studio" &&
+                      studioMode === "edit" ? (
+                        <div className="bg-gray-900/50 border border-cyan-500/30 rounded-2xl p-8 text-center space-y-5 animate-in fade-in">
+                          <div className="w-20 h-20 bg-cyan-900/20 rounded-full flex items-center justify-center mx-auto border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+                            <span className="text-4xl"></span>
+                          </div>
+                          <div>
+                            <h3 className="text-white font-bold text-xl mb-2">
+                              PicFX Editor
+                            </h3>
+                            <p className="text-gray-400 text-sm max-w-md mx-auto">
+                              Upload an image to start a chat session. Ask PicFX
+                              to change lighting, add objects, or completely
+                              style-transfer your image.
+                            </p>
+                          </div>
+                          <label className="block w-full max-w-sm mx-auto cursor-pointer group">
+                            <div className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl text-white font-bold group-hover:shadow-lg group-hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
+                              <span>📤 Upload to Start</span>
+                            </div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleMagicEditUpload}
+                            />
+                          </label>
+                          <p className="text-[20px] text-gray-500">
+                            Or select from{" "}
+                            <button
+                              type="button"
+                              onClick={() => setActiveLibrarySlot("generic")}
+                              className="underline text-cyan-400"
+                            >
+                              Asset Library
+                            </button>
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          {/* 1. PICDRIFT FRAMES (Always Top for PicDrift Mode) */}
+                          {currentVisualTab === "picdrift" && (
+                            <div className="grid grid-cols-2 gap-4 mb-4 animate-in fade-in">
+                              {/* Start Frame */}
+                              <div className="flex flex-col gap-2">
+                                <div className="flex justify-between items-center">
+                                  <label className="text-xs text-rose-300 font-bold">
+                                    Pic 1 - Start Frame
+                                  </label>
+                                  {/* Open Library Button for Start Frame */}
+                                </div>
+                                <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
+                                  {picDriftUrls.start ? (
+                                    <>
+                                      <img
+                                        src={picDriftUrls.start}
+                                        className="w-full h-full object-cover"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          removePicDriftImage("start")
+                                        }
+                                        className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
+                                      >
+                                        ✕
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                                      <label className="flex flex-col items-center justify-center cursor-pointer">
+                                        <span className="text-rose-400 text-2xl">
+                                          +
+                                        </span>
+                                        <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
+                                          Upload File
+                                        </span>
+                                        <input
+                                          type="file"
+                                          className="hidden"
+                                          accept="image/*"
+                                          onChange={(e) =>
+                                            handlePicDriftUpload(e, "start")
+                                          }
+                                        />
+                                      </label>
+                                      <div className="text-gray-600 text-[10px]">
+                                        - OR -
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setActiveLibrarySlot("start")
+                                        }
+                                        className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
+                                      >
+                                        Select from Library
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* End Frame */}
+                              <div
+                                className={`flex flex-col gap-2 ${picDriftAudio && picDriftMode !== "plus" ? "opacity-50 pointer-events-none grayscale" : ""}`}
+                              >
+                                <div className="flex justify-between items-center">
+                                  <label className="text-xs text-rose-300 font-bold">
+                                    {picDriftAudio && picDriftMode !== "plus"
+                                      ? "Pic 2 - Disabled (Audio On)"
+                                      : "Pic 2 - End Frame (optional)"}
+                                  </label>
+                                </div>
+                                <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
+                                  {picDriftUrls.end ? (
+                                    <>
+                                      <img
+                                        src={picDriftUrls.end}
+                                        className="w-full h-full object-cover"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          removePicDriftImage("end")
+                                        }
+                                        className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
+                                      >
+                                        ✕
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                                      <label className="flex flex-col items-center justify-center cursor-pointer">
+                                        <span className="text-rose-400 text-2xl">
+                                          +
+                                        </span>
+                                        <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
+                                          Upload File
+                                        </span>
+                                        <input
+                                          type="file"
+                                          className="hidden"
+                                          accept="image/*"
+                                          onChange={(e) =>
+                                            handlePicDriftUpload(e, "end")
+                                          }
+                                        />
+                                      </label>
+                                      <div className="text-gray-600 text-[10px]">
+                                        - OR -
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setActiveLibrarySlot("end")
+                                        }
+                                        className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
+                                      >
+                                        Select from Library
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 2. PROMPT & TITLE (Moved Up for Non-PicDrift) */}
+                          <div>
+                            <label className="block text-sm font-semibold text-white mb-2">
+                              Your Creative Vision
+                            </label>
+                            <textarea
+                              value={prompt}
+                              onChange={(e) => setPrompt(e.target.value)}
+                              placeholder="Describe your vision with a prompt"
+                              className="w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base leading-relaxed"
+                              rows={3}
+                            />
+                          </div>
+
+                          <div>
+                            {/* ✅ FLEX CONTAINER FOR LABEL + BUTTON */}
+                            <div className="flex justify-between items-center mb-2">
+                              <label className="block text-sm font-semibold text-white">
+                                Title
+                              </label>
+                            </div>
+
+                            <input
+                              type="text"
+                              value={videoTitle}
+                              onChange={(e) => setVideoTitle(e.target.value)}
+                              placeholder="Name your creation..."
+                              className="w-full p-3 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-purple-300/60 backdrop-blur-sm"
+                            />
+                          </div>
+
+                          {/* 3. SETTINGS (Moved below Title) */}
+
+                          {/* VIDEO FX / KIE SETTINGS */}
+                          {currentVisualTab === "videofx" &&
+                            activeEngine === "kie" && (
+                              <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+                                <div className="space-y-2">
+                                  <label className="block text-sm font-semibold text-white">
+                                    AI Model
+                                  </label>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                      { id: "kie-sora-2", label: "Video FX" },
+                                      {
+                                        id: "kie-sora-2-pro",
+                                        label: "Video FX Pro",
+                                      },
+                                    ].map((m) => (
+                                      <button
+                                        key={m.id}
+                                        type="button"
+                                        onClick={() => setKieModel(m.id as any)}
+                                        className={`p-3 rounded-xl border text-left text-sm font-medium ${
+                                          kieModel === m.id
+                                            ? "bg-cyan-600 border-cyan-500 text-white"
+                                            : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
+                                        }`}
+                                      >
+                                        {m.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                                  <div>
+                                    <label className="text-sm font-semibold text-white mb-2 block">
+                                      Duration
+                                    </label>
+                                    <div className="flex gap-2">
+                                      {[10, 15].map((d) => (
+                                        <button
+                                          key={d}
+                                          type="button"
+                                          onClick={() =>
+                                            setKieDuration(d as any)
+                                          }
+                                          className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                                            kieDuration === d
+                                              ? "bg-cyan-600 border-cyan-600 text-white"
+                                              : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                          }`}
+                                        >
+                                          {d}s
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="text-sm font-semibold text-white mb-2 block">
+                                      Aspect Ratio
+                                    </label>
+                                    <div className="flex gap-2">
+                                      {/* ✅ ADDED SQUARE HERE TOO FOR CONSISTENCY */}
+                                      {[
+                                        { id: "landscape", label: "Landscape" },
+                                        { id: "portrait", label: "Portrait" },
+                                      ].map((a) => (
+                                        <button
+                                          key={a.id}
+                                          type="button"
+                                          onClick={() =>
+                                            setKieAspect(a.id as any)
+                                          }
+                                          className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                                            kieAspect === a.id
+                                              ? "bg-cyan-600 border-cyan-600 text-white"
+                                              : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                          }`}
+                                        >
+                                          {a.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div className="sm:col-span-2">
+                                    <label className="text-sm font-semibold text-white mb-2 block">
+                                      Resolution
+                                    </label>
+                                    <div className="flex gap-2">
+                                      {[
+                                        { id: "720p", label: "720p (Fast)" },
+                                        { id: "1080p", label: "1080p (HD)" },
+                                      ].map((r) => (
+                                        <button
+                                          key={r.id}
+                                          type="button"
+                                          onClick={() =>
+                                            setKieResolution(r.id as any)
+                                          }
+                                          className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                                            kieResolution === r.id
+                                              ? "bg-cyan-600 border-cyan-600 text-white"
+                                              : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                          }`}
+                                        >
+                                          {r.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                          {/* PICDRIFT SETTINGS */}
+                          {currentVisualTab === "picdrift" && (
+                            <div className="space-y-6 mb-6">
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                                 <div>
                                   <label className="text-sm font-semibold text-white mb-2 block">
                                     Duration
                                   </label>
                                   <div className="flex gap-2">
-                                    {[10, 15].map((d) => (
+                                    {[5, 10].map((d) => (
                                       <button
                                         key={d}
                                         type="button"
                                         onClick={() => setKieDuration(d as any)}
                                         className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
                                           kieDuration === d
-                                            ? "bg-cyan-600 border-cyan-600 text-white"
+                                            ? "bg-rose-600 border-rose-600 text-white"
                                             : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
                                         }`}
                                       >
@@ -1675,10 +1767,11 @@ function Dashboard() {
                                     Aspect Ratio
                                   </label>
                                   <div className="flex gap-2">
-                                    {/* ✅ ADDED SQUARE HERE TOO FOR CONSISTENCY */}
+                                    {/* ✅ ADDED SQUARE OPTION HERE */}
                                     {[
                                       { id: "landscape", label: "Landscape" },
                                       { id: "portrait", label: "Portrait" },
+                                      { id: "square", label: "Square" },
                                     ].map((a) => (
                                       <button
                                         key={a.id}
@@ -1688,7 +1781,7 @@ function Dashboard() {
                                         }
                                         className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
                                           kieAspect === a.id
-                                            ? "bg-cyan-600 border-cyan-600 text-white"
+                                            ? "bg-rose-600 border-rose-600 text-white"
                                             : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
                                         }`}
                                       >
@@ -1697,347 +1790,187 @@ function Dashboard() {
                                     ))}
                                   </div>
                                 </div>
+
+                                {/* Audio Toggle */}
                                 <div className="sm:col-span-2">
-                                  <label className="text-sm font-semibold text-white mb-2 block">
-                                    Resolution
-                                  </label>
-                                  <div className="flex gap-2">
-                                    {[
-                                      { id: "720p", label: "720p (Fast)" },
-                                      { id: "1080p", label: "1080p (HD)" },
-                                    ].map((r) => (
-                                      <button
-                                        key={r.id}
-                                        type="button"
-                                        onClick={() =>
-                                          setKieResolution(r.id as any)
+                                  <label className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-gray-800/50 cursor-pointer hover:bg-gray-800 transition-colors">
+                                    <input
+                                      type="checkbox"
+                                      checked={picDriftAudio}
+                                      onChange={(e) => {
+                                        setPicDriftAudio(e.target.checked);
+                                        // If audio enabled, clear end frame ONLY if standard mode
+                                        if (
+                                          e.target.checked &&
+                                          picDriftMode !== "plus"
+                                        ) {
+                                          setPicDriftFrames((prev) => ({
+                                            ...prev,
+                                            end: null,
+                                          }));
+                                          setPicDriftUrls((prev) => ({
+                                            ...prev,
+                                            end: null,
+                                          }));
                                         }
-                                        className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                          kieResolution === r.id
-                                            ? "bg-cyan-600 border-cyan-600 text-white"
-                                            : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                        }`}
-                                      >
-                                        {r.label}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                        {/* PICDRIFT SETTINGS */}
-                        {currentVisualTab === "picdrift" && (
-                          <div className="space-y-6 mb-6">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                              <div>
-                                <label className="text-sm font-semibold text-white mb-2 block">
-                                  Duration
-                                </label>
-                                <div className="flex gap-2">
-                                  {[5, 10].map((d) => (
-                                    <button
-                                      key={d}
-                                      type="button"
-                                      onClick={() => setKieDuration(d as any)}
-                                      className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                        kieDuration === d
-                                          ? "bg-rose-600 border-rose-600 text-white"
-                                          : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                      }`}
-                                    >
-                                      {d}s
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                              <div>
-                                <label className="text-sm font-semibold text-white mb-2 block">
-                                  Aspect Ratio
-                                </label>
-                                <div className="flex gap-2">
-                                  {/* ✅ ADDED SQUARE OPTION HERE */}
-                                  {[
-                                    { id: "landscape", label: "Landscape" },
-                                    { id: "portrait", label: "Portrait" },
-                                    { id: "square", label: "Square" },
-                                  ].map((a) => (
-                                    <button
-                                      key={a.id}
-                                      type="button"
-                                      onClick={() => setKieAspect(a.id as any)}
-                                      className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                        kieAspect === a.id
-                                          ? "bg-rose-600 border-rose-600 text-white"
-                                          : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                      }`}
-                                    >
-                                      {a.label}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-
-                              {/* Audio Toggle */}
-                              <div className="sm:col-span-2">
-                                <label className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-gray-800/50 cursor-pointer hover:bg-gray-800 transition-colors">
-                                  <input
-                                    type="checkbox"
-                                    checked={picDriftAudio}
-                                    onChange={(e) => {
-                                      setPicDriftAudio(e.target.checked);
-                                      // If audio enabled, clear end frame ONLY if standard mode
-                                      if (
-                                        e.target.checked &&
-                                        picDriftMode !== "plus"
-                                      ) {
-                                        setPicDriftFrames((prev) => ({
-                                          ...prev,
-                                          end: null,
-                                        }));
-                                        setPicDriftUrls((prev) => ({
-                                          ...prev,
-                                          end: null,
-                                        }));
-                                      }
-                                    }}
-                                    className="w-5 h-5 rounded border-gray-600 text-rose-600 focus:ring-rose-500 bg-gray-700"
-                                  />
-                                  <div>
-                                    <div className="font-semibold text-white text-sm">
-                                      Generate Audio
-                                    </div>
-                                    <div className="text-xs text-gray-400">
-                                      AI generated sound effects{" "}
-                                      {picDriftMode === "plus"
-                                        ? "(Supported with End Frame)"
-                                        : "(Disables End Frame)"}
-                                    </div>
-                                  </div>
-                                </label>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* OPENAI SETTINGS (Video FX 2) */}
-                        {currentVisualTab === "videofx" &&
-                          activeEngine === "openai" && (
-                            <div className="space-y-4 sm:space-y-6 animate-in fade-in">
-                              <div className="space-y-2">
-                                <label className="block text-sm font-semibold text-white">
-                                  AI Model
-                                </label>
-                                <div className="grid grid-cols-2 gap-2">
-                                  {[
-                                    { id: "sora-2", label: "Video FX 2" },
-                                    {
-                                      id: "sora-2-pro",
-                                      label: "Video FX 2 Pro",
-                                    },
-                                  ].map((model) => (
-                                    <button
-                                      key={model.id}
-                                      type="button"
-                                      onClick={() =>
-                                        setVideoModel(model.id as any)
-                                      }
-                                      className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${
-                                        videoModel === model.id
-                                          ? "border-cyan-400 bg-cyan-500/20"
-                                          : "border-white/10 bg-gray-800/50"
-                                      }`}
-                                    >
-                                      <div className="font-semibold text-white text-sm">
-                                        {model.label}
-                                      </div>
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <label className="block text-sm font-semibold text-white">
-                                  Aspect Ratio
-                                </label>
-                                <div className="grid grid-cols-2 gap-2">
-                                  {[
-                                    { ratio: "16:9", label: "Landscape" },
-                                    { ratio: "9:16", label: "Portrait" },
-                                  ].map(({ ratio, label }) => (
-                                    <button
-                                      key={ratio}
-                                      type="button"
-                                      onClick={() => {
-                                        setAspectRatio(ratio as any);
-                                        setVideoSize(
-                                          ratio === "16:9"
-                                            ? "1792x1024"
-                                            : "1024x1792",
-                                        );
                                       }}
-                                      className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${
-                                        aspectRatio === ratio
-                                          ? "border-purple-400 bg-purple-500/20"
-                                          : "border-white/10 bg-gray-800/50"
-                                      }`}
-                                    >
+                                      className="w-5 h-5 rounded border-gray-600 text-rose-600 focus:ring-rose-500 bg-gray-700"
+                                    />
+                                    <div>
                                       <div className="font-semibold text-white text-sm">
-                                        {label}
+                                        Generate Audio
                                       </div>
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <label className="block text-sm font-semibold text-white">
-                                  Video Size
-                                </label>
-                                <div className="grid grid-cols-2 gap-2">
-                                  {(aspectRatio === "16:9"
-                                    ? [
-                                        { size: "1280x720", label: "720p HD" },
-                                        ...(videoModel === "sora-2-pro"
-                                          ? [
-                                              {
-                                                size: "1792x1024",
-                                                label: "1080p",
-                                              },
-                                            ]
-                                          : []),
-                                      ]
-                                    : [
-                                        { size: "720x1280", label: "720p HD" },
-                                        ...(videoModel === "sora-2-pro"
-                                          ? [
-                                              {
-                                                size: "1024x1792",
-                                                label: "1080p",
-                                              },
-                                            ]
-                                          : []),
-                                      ]
-                                  ).map(({ size, label }) => (
-                                    <button
-                                      key={size}
-                                      type="button"
-                                      onClick={() => setVideoSize(size as any)}
-                                      className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${
-                                        videoSize === size
-                                          ? "border-green-400 bg-green-500/20"
-                                          : "border-white/10 bg-gray-800/50"
-                                      }`}
-                                    >
-                                      <div className="font-semibold text-white text-sm">
-                                        {label}
+                                      <div className="text-xs text-gray-400">
+                                        AI generated sound effects{" "}
+                                        {picDriftMode === "plus"
+                                          ? "(Supported with End Frame)"
+                                          : "(Disables End Frame)"}
                                       </div>
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <label className="block text-sm font-semibold text-white">
-                                  Duration
-                                </label>
-                                <div className="flex gap-2">
-                                  {[4, 8, 12].map((sec) => (
-                                    <button
-                                      key={sec}
-                                      type="button"
-                                      onClick={() =>
-                                        setVideoDuration(sec as any)
-                                      }
-                                      className={`px-3 py-2 rounded-xl border text-sm flex-1 ${
-                                        videoDuration === sec
-                                          ? "bg-cyan-500 border-cyan-500 text-white"
-                                          : "bg-gray-800/50 border-white/10 text-purple-200"
-                                      }`}
-                                    >
-                                      {sec}s
-                                    </button>
-                                  ))}
+                                    </div>
+                                  </label>
                                 </div>
                               </div>
                             </div>
                           )}
 
-                        {/* VEO 3 SETTINGS (Video FX 3) */}
-                        {currentVisualTab === "videofx" &&
-                          activeEngine === "veo" && (
-                            <div className="space-y-6 animate-in fade-in duration-500">
-                              <div className="space-y-3">
-                                <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
-                                  Canvas Ratio
-                                </label>
-                                <div className="grid grid-cols-2 gap-3">
-                                  {[
-                                    {
-                                      ratio: "16:9",
-                                      label: "Cinematic Landscape",
-                                    },
-                                    { ratio: "9:16", label: "Social Portrait" },
-                                  ].map(({ ratio, label }) => (
-                                    <button
-                                      key={ratio}
-                                      type="button"
-                                      onClick={() =>
-                                        setAspectRatio(ratio as any)
-                                      }
-                                      className={`py-4 px-4 rounded-xl border transition-all text-center ${
-                                        aspectRatio === ratio
-                                          ? "border-indigo-500 bg-indigo-500/10 text-indigo-100 shadow-[0_0_20px_rgba(99,102,241,0.1)]"
-                                          : "border-slate-800 bg-slate-900/40 text-slate-500 hover:border-slate-700"
-                                      }`}
-                                    >
-                                      <div className="text-xs font-medium tracking-tight">
-                                        {label}
-                                      </div>
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-2 gap-6">
-                                <div className="space-y-3">
-                                  <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
-                                    Resolution
+                          {/* OPENAI SETTINGS (Video FX 2) */}
+                          {currentVisualTab === "videofx" &&
+                            activeEngine === "openai" && (
+                              <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+                                <div className="space-y-2">
+                                  <label className="block text-sm font-semibold text-white">
+                                    AI Model
                                   </label>
-                                  <div className="flex bg-slate-900/60 p-1 rounded-xl border border-slate-800">
-                                    {["720p", "1080p", "4k"].map((res) => (
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                      { id: "sora-2", label: "Video FX 2" },
+                                      {
+                                        id: "sora-2-pro",
+                                        label: "Video FX 2 Pro",
+                                      },
+                                    ].map((model) => (
                                       <button
-                                        key={res}
+                                        key={model.id}
                                         type="button"
                                         onClick={() =>
-                                          setVeoResolution(res as any)
+                                          setVideoModel(model.id as any)
                                         }
-                                        className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${
-                                          veoResolution === res
-                                            ? "bg-indigo-500 text-white"
-                                            : "text-slate-500 hover:text-slate-300"
+                                        className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${
+                                          videoModel === model.id
+                                            ? "border-cyan-400 bg-cyan-500/20"
+                                            : "border-white/10 bg-gray-800/50"
                                         }`}
                                       >
-                                        {res.toUpperCase()}
+                                        <div className="font-semibold text-white text-sm">
+                                          {model.label}
+                                        </div>
                                       </button>
                                     ))}
                                   </div>
                                 </div>
-
-                                <div className="space-y-3">
-                                  <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
+                                <div className="space-y-2">
+                                  <label className="block text-sm font-semibold text-white">
+                                    Aspect Ratio
+                                  </label>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                      { ratio: "16:9", label: "Landscape" },
+                                      { ratio: "9:16", label: "Portrait" },
+                                    ].map(({ ratio, label }) => (
+                                      <button
+                                        key={ratio}
+                                        type="button"
+                                        onClick={() => {
+                                          setAspectRatio(ratio as any);
+                                          setVideoSize(
+                                            ratio === "16:9"
+                                              ? "1792x1024"
+                                              : "1024x1792",
+                                          );
+                                        }}
+                                        className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${
+                                          aspectRatio === ratio
+                                            ? "border-purple-400 bg-purple-500/20"
+                                            : "border-white/10 bg-gray-800/50"
+                                        }`}
+                                      >
+                                        <div className="font-semibold text-white text-sm">
+                                          {label}
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="block text-sm font-semibold text-white">
+                                    Video Size
+                                  </label>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {(aspectRatio === "16:9"
+                                      ? [
+                                          {
+                                            size: "1280x720",
+                                            label: "720p HD",
+                                          },
+                                          ...(videoModel === "sora-2-pro"
+                                            ? [
+                                                {
+                                                  size: "1792x1024",
+                                                  label: "1080p",
+                                                },
+                                              ]
+                                            : []),
+                                        ]
+                                      : [
+                                          {
+                                            size: "720x1280",
+                                            label: "720p HD",
+                                          },
+                                          ...(videoModel === "sora-2-pro"
+                                            ? [
+                                                {
+                                                  size: "1024x1792",
+                                                  label: "1080p",
+                                                },
+                                              ]
+                                            : []),
+                                        ]
+                                    ).map(({ size, label }) => (
+                                      <button
+                                        key={size}
+                                        type="button"
+                                        onClick={() =>
+                                          setVideoSize(size as any)
+                                        }
+                                        className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${
+                                          videoSize === size
+                                            ? "border-green-400 bg-green-500/20"
+                                            : "border-white/10 bg-gray-800/50"
+                                        }`}
+                                      >
+                                        <div className="font-semibold text-white text-sm">
+                                          {label}
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="block text-sm font-semibold text-white">
                                     Duration
                                   </label>
-                                  <div className="flex bg-slate-900/60 p-1 rounded-xl border border-slate-800">
-                                    {[4, 6, 8].map((sec) => (
+                                  <div className="flex gap-2">
+                                    {[4, 8, 12].map((sec) => (
                                       <button
                                         key={sec}
                                         type="button"
                                         onClick={() =>
-                                          setVeoDuration(sec as any)
+                                          setVideoDuration(sec as any)
                                         }
-                                        className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${
-                                          veoDuration === sec
-                                            ? "bg-indigo-500 text-white"
-                                            : "text-slate-500 hover:text-slate-300"
+                                        className={`px-3 py-2 rounded-xl border text-sm flex-1 ${
+                                          videoDuration === sec
+                                            ? "bg-cyan-500 border-cyan-500 text-white"
+                                            : "bg-gray-800/50 border-white/10 text-purple-200"
                                         }`}
                                       >
                                         {sec}s
@@ -2046,102 +1979,242 @@ function Dashboard() {
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
+                            )}
 
-                        {/* 4. REFERENCE IMAGES */}
-                        {activeEngine !== "kie" ||
-                        videoFxMode !== "picdrift" ? (
-                          <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                              <label
-                                className={`block text-sm font-semibold ${activeEngine === "veo" ? "text-indigo-200" : "text-white"}`}
-                              >
-                                {activeEngine === "veo"
-                                  ? "Composition Assets"
-                                  : "Reference Images"}
-                              </label>
-                              {activeEngine === "veo" && (
-                                <span className="text-[9px] text-slate-500 uppercase tracking-widest font-medium">
-                                  Input Sequential Logic
-                                </span>
-                              )}
-                            </div>
-
-                            {activeEngine === "veo" ? (
-                              /* VEO 3 SINGLE SOURCE ASSET (SIMPLIFIED) */
-                              <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-700">
-                                <div className="flex justify-between items-center">
-                                  <label className="block text-sm font-semibold text-indigo-200">
-                                    Source Asset
+                          {/* VEO 3 SETTINGS (Video FX 3) */}
+                          {currentVisualTab === "videofx" &&
+                            activeEngine === "veo" && (
+                              <div className="space-y-6 animate-in fade-in duration-500">
+                                <div className="space-y-3">
+                                  <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
+                                    Canvas Ratio
                                   </label>
-                                  <span className="text-[9px] text-indigo-400/60 uppercase tracking-widest font-medium">
-                                    Image to Video / Extend Video
-                                  </span>
+                                  <div className="grid grid-cols-2 gap-3">
+                                    {[
+                                      {
+                                        ratio: "16:9",
+                                        label: "Cinematic Landscape",
+                                      },
+                                      {
+                                        ratio: "9:16",
+                                        label: "Social Portrait",
+                                      },
+                                    ].map(({ ratio, label }) => (
+                                      <button
+                                        key={ratio}
+                                        type="button"
+                                        onClick={() =>
+                                          setAspectRatio(ratio as any)
+                                        }
+                                        className={`py-4 px-4 rounded-xl border transition-all text-center ${
+                                          aspectRatio === ratio
+                                            ? "border-indigo-500 bg-indigo-500/10 text-indigo-100 shadow-[0_0_20px_rgba(99,102,241,0.1)]"
+                                            : "border-slate-800 bg-slate-900/40 text-slate-500 hover:border-slate-700"
+                                        }`}
+                                      >
+                                        <div className="text-xs font-medium tracking-tight">
+                                          {label}
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
                                 </div>
 
-                                <div className="w-full h-32 border-2 border-dashed border-indigo-500/30 rounded-xl hover:border-indigo-400 hover:bg-indigo-900/10 transition-all group relative flex items-center justify-center overflow-hidden">
-                                  {referenceImageUrls[0] ? (
-                                    <>
-                                      {referenceImageUrls[0].includes(
-                                        "video",
-                                      ) ||
-                                      referenceImageUrls[0].endsWith(".mp4") ? (
-                                        <video
-                                          src={referenceImageUrls[0]}
-                                          className="w-full h-full object-contain"
-                                          muted
-                                          autoPlay
-                                          loop
-                                        />
-                                      ) : (
-                                        <img
-                                          src={referenceImageUrls[0]}
-                                          className="w-full h-full object-contain"
-                                        />
-                                      )}
-                                      <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                <div className="grid grid-cols-2 gap-6">
+                                  <div className="space-y-3">
+                                    <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
+                                      Resolution
+                                    </label>
+                                    <div className="flex bg-slate-900/60 p-1 rounded-xl border border-slate-800">
+                                      {["720p", "1080p", "4k"].map((res) => (
                                         <button
+                                          key={res}
                                           type="button"
-                                          onClick={() => removeGenericImage(0)}
-                                          className="px-3 py-1.5 bg-red-500/80 hover:bg-red-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg backdrop-blur-md transition-colors"
+                                          onClick={() =>
+                                            setVeoResolution(res as any)
+                                          }
+                                          className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${
+                                            veoResolution === res
+                                              ? "bg-indigo-500 text-white"
+                                              : "text-slate-500 hover:text-slate-300"
+                                          }`}
                                         >
-                                          Remove
+                                          {res.toUpperCase()}
                                         </button>
-                                      </div>
-                                      <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-md rounded-md text-[9px] font-bold text-white uppercase tracking-wider border border-white/10">
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <div className="space-y-3">
+                                    <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
+                                      Duration
+                                    </label>
+                                    <div className="flex bg-slate-900/60 p-1 rounded-xl border border-slate-800">
+                                      {[4, 6, 8].map((sec) => (
+                                        <button
+                                          key={sec}
+                                          type="button"
+                                          onClick={() =>
+                                            setVeoDuration(sec as any)
+                                          }
+                                          className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${
+                                            veoDuration === sec
+                                              ? "bg-indigo-500 text-white"
+                                              : "text-slate-500 hover:text-slate-300"
+                                          }`}
+                                        >
+                                          {sec}s
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                          {/* 4. REFERENCE IMAGES */}
+                          {activeEngine !== "kie" ||
+                          videoFxMode !== "picdrift" ? (
+                            <div className="space-y-4">
+                              <div className="flex justify-between items-center">
+                                <label
+                                  className={`block text-sm font-semibold ${activeEngine === "veo" ? "text-indigo-200" : "text-white"}`}
+                                >
+                                  {activeEngine === "veo"
+                                    ? "Composition Assets"
+                                    : "Reference Images"}
+                                </label>
+                                {activeEngine === "veo" && (
+                                  <span className="text-[9px] text-slate-500 uppercase tracking-widest font-medium">
+                                    Input Sequential Logic
+                                  </span>
+                                )}
+                              </div>
+
+                              {activeEngine === "veo" ? (
+                                /* VEO 3 SINGLE SOURCE ASSET (SIMPLIFIED) */
+                                <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                                  <div className="flex justify-between items-center">
+                                    <label className="block text-sm font-semibold text-indigo-200">
+                                      Source Asset
+                                    </label>
+                                    <span className="text-[9px] text-indigo-400/60 uppercase tracking-widest font-medium">
+                                      Image to Video / Extend Video
+                                    </span>
+                                  </div>
+
+                                  <div className="w-full h-32 border-2 border-dashed border-indigo-500/30 rounded-xl hover:border-indigo-400 hover:bg-indigo-900/10 transition-all group relative flex items-center justify-center overflow-hidden">
+                                    {referenceImageUrls[0] ? (
+                                      <>
                                         {referenceImageUrls[0].includes(
                                           "video",
                                         ) ||
-                                        referenceImageUrls[0].endsWith(".mp4")
-                                          ? "Extend Video Mode"
-                                          : "Image-to-Video Mode"}
+                                        referenceImageUrls[0].endsWith(
+                                          ".mp4",
+                                        ) ? (
+                                          <video
+                                            src={referenceImageUrls[0]}
+                                            className="w-full h-full object-contain"
+                                            muted
+                                            autoPlay
+                                            loop
+                                          />
+                                        ) : (
+                                          <img
+                                            src={referenceImageUrls[0]}
+                                            className="w-full h-full object-contain"
+                                          />
+                                        )}
+                                        <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              removeGenericImage(0)
+                                            }
+                                            className="px-3 py-1.5 bg-red-500/80 hover:bg-red-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg backdrop-blur-md transition-colors"
+                                          >
+                                            Remove
+                                          </button>
+                                        </div>
+                                        <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-md rounded-md text-[9px] font-bold text-white uppercase tracking-wider border border-white/10">
+                                          {referenceImageUrls[0].includes(
+                                            "video",
+                                          ) ||
+                                          referenceImageUrls[0].endsWith(".mp4")
+                                            ? "Extend Video Mode"
+                                            : "Image-to-Video Mode"}
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <div className="flex items-center gap-8">
+                                        <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
+                                          <span className="text-2xl mb-1">
+                                            📂
+                                          </span>
+                                          <span className="text-xs text-indigo-300 font-bold group-hover:text-white">
+                                            Upload File
+                                          </span>
+                                          <input
+                                            type="file"
+                                            className="hidden"
+                                            accept="image/*,video/*"
+                                            onChange={(e) => {
+                                              const file = e.target.files?.[0];
+                                              if (!file) return;
+                                              setReferenceImages([file]);
+                                              setReferenceImageUrls([
+                                                URL.createObjectURL(file),
+                                              ]);
+                                            }}
+                                          />
+                                        </label>
+                                        <div className="h-8 w-px bg-indigo-500/30"></div>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setActiveLibrarySlot("generic")
+                                          }
+                                          className="flex flex-col items-center group-hover:scale-105 transition-transform"
+                                        >
+                                          <span className="text-2xl mb-1">
+                                            📚
+                                          </span>
+                                          <span className="text-xs text-indigo-300 font-bold group-hover:text-white">
+                                            From Library
+                                          </span>
+                                        </button>
                                       </div>
-                                    </>
-                                  ) : (
-                                    <div className="flex items-center gap-8">
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-slate-500 text-center">
+                                    Upload an <b>Image</b> to animate it, or a{" "}
+                                    <b>Video</b> to extend it.
+                                  </p>
+                                </div>
+                              ) : (
+                                /* GENERIC UPLOAD BOX (Pic FX, Video FX 1&2) */
+                                <div className="space-y-3">
+                                  <div className="w-full h-24 border-2 border-dashed border-gray-600 rounded-xl hover:border-cyan-500 hover:bg-gray-800/50 transition-all group relative flex items-center justify-center">
+                                    <div className="flex items-center gap-6">
                                       <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
                                         <span className="text-2xl mb-1">
                                           📂
                                         </span>
-                                        <span className="text-xs text-indigo-300 font-bold group-hover:text-white">
+                                        <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
                                           Upload File
                                         </span>
                                         <input
                                           type="file"
                                           className="hidden"
+                                          multiple={
+                                            activeEngine === "studio" &&
+                                            studioMode === "carousel"
+                                          }
                                           accept="image/*,video/*"
-                                          onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (!file) return;
-                                            setReferenceImages([file]);
-                                            setReferenceImageUrls([
-                                              URL.createObjectURL(file),
-                                            ]);
-                                          }}
+                                          onChange={handleGenericUpload}
                                         />
                                       </label>
-                                      <div className="h-8 w-px bg-indigo-500/30"></div>
+                                      <div className="h-8 w-px bg-gray-600"></div>
                                       <button
                                         type="button"
                                         onClick={() =>
@@ -2152,320 +2225,281 @@ function Dashboard() {
                                         <span className="text-2xl mb-1">
                                           📚
                                         </span>
-                                        <span className="text-xs text-indigo-300 font-bold group-hover:text-white">
+                                        <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
                                           From Library
                                         </span>
                                       </button>
                                     </div>
+                                    <p className="absolute bottom-2 text-[10px] text-gray-600">
+                                      {activeEngine === "studio" &&
+                                      studioMode === "carousel"
+                                        ? "Up to 14 images"
+                                        : "Single frame (PNG/JPG/MP4)"}
+                                    </p>
+                                  </div>
+                                  {referenceImageUrls.length > 0 && (
+                                    <div className="grid grid-cols-5 gap-2 animate-in fade-in">
+                                      {referenceImageUrls.map((url, index) => (
+                                        <div
+                                          key={index}
+                                          className="relative aspect-square group"
+                                        >
+                                          {url.includes("video") ||
+                                          url.endsWith(".mp4") ? (
+                                            <video
+                                              src={url}
+                                              className="w-full h-full object-cover rounded-lg border border-white/20"
+                                              muted
+                                              onMouseEnter={(e) =>
+                                                e.currentTarget.play()
+                                              }
+                                              onMouseLeave={(e) =>
+                                                e.currentTarget.pause()
+                                              }
+                                            />
+                                          ) : (
+                                            <img
+                                              src={url}
+                                              className="w-full h-full object-cover rounded-lg border border-white/20"
+                                            />
+                                          )}
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              removeGenericImage(index)
+                                            }
+                                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs"
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
                                   )}
                                 </div>
-                                <p className="text-[10px] text-slate-500 text-center">
-                                  Upload an <b>Image</b> to animate it, or a{" "}
-                                  <b>Video</b> to extend it.
-                                </p>
+                              )}
+                            </div>
+                          ) : null}
+
+                          {/* ✅ UPDATED GENERATE BUTTON */}
+                          <button
+                            type="submit"
+                            disabled={
+                              generateMediaMutation.isPending || !prompt.trim()
+                            }
+                            className={`w-full py-4 sm:py-5 px-6 sm:px-8 rounded-2xl transition-all disabled:opacity-50 font-bold text-base sm:text-lg flex flex-col items-center justify-center gap-1 ${
+                              activeEngine === "veo"
+                                ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg"
+                                : currentVisualTab === "picdrift"
+                                  ? "bg-rose-600 hover:bg-rose-500 text-white shadow-lg"
+                                  : currentVisualTab === "studio"
+                                    ? "bg-violet-600 hover:bg-violet-500 text-white shadow-lg"
+                                    : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg"
+                            }`}
+                          >
+                            {generateMediaMutation.isPending ? (
+                              <div className="flex items-center gap-3">
+                                <LoadingSpinner size="sm" variant="light" />
+                                <span>
+                                  {currentVisualTab === "picdrift"
+                                    ? "Generating Drift"
+                                    : currentVisualTab === "studio"
+                                      ? "Painting Your Image"
+                                      : "Creating Your Video"}
+                                  ...
+                                </span>
                               </div>
                             ) : (
-                              /* GENERIC UPLOAD BOX (Pic FX, Video FX 1&2) */
-                              <div className="space-y-3">
-                                <div className="w-full h-24 border-2 border-dashed border-gray-600 rounded-xl hover:border-cyan-500 hover:bg-gray-800/50 transition-all group relative flex items-center justify-center">
-                                  <div className="flex items-center gap-6">
-                                    <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
-                                      <span className="text-2xl mb-1">📂</span>
-                                      <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
-                                        Upload File
-                                      </span>
-                                      <input
-                                        type="file"
-                                        className="hidden"
-                                        multiple={
-                                          activeEngine === "studio" &&
-                                          studioMode === "carousel"
-                                        }
-                                        accept="image/*,video/*"
-                                        onChange={handleGenericUpload}
-                                      />
-                                    </label>
-                                    <div className="h-8 w-px bg-gray-600"></div>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setActiveLibrarySlot("generic")
-                                      }
-                                      className="flex flex-col items-center group-hover:scale-105 transition-transform"
-                                    >
-                                      <span className="text-2xl mb-1">📚</span>
-                                      <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
-                                        From Library
-                                      </span>
-                                    </button>
-                                  </div>
-                                  <p className="absolute bottom-2 text-[10px] text-gray-600">
-                                    {activeEngine === "studio" &&
-                                    studioMode === "carousel"
-                                      ? "Up to 14 images"
-                                      : "Single frame (PNG/JPG/MP4)"}
-                                  </p>
-                                </div>
-                                {referenceImageUrls.length > 0 && (
-                                  <div className="grid grid-cols-5 gap-2 animate-in fade-in">
-                                    {referenceImageUrls.map((url, index) => (
-                                      <div
-                                        key={index}
-                                        className="relative aspect-square group"
-                                      >
-                                        {url.includes("video") ||
-                                        url.endsWith(".mp4") ? (
-                                          <video
-                                            src={url}
-                                            className="w-full h-full object-cover rounded-lg border border-white/20"
-                                            muted
-                                            onMouseEnter={(e) =>
-                                              e.currentTarget.play()
-                                            }
-                                            onMouseLeave={(e) =>
-                                              e.currentTarget.pause()
-                                            }
-                                          />
-                                        ) : (
-                                          <img
-                                            src={url}
-                                            className="w-full h-full object-cover rounded-lg border border-white/20"
-                                          />
-                                        )}
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            removeGenericImage(index)
-                                          }
-                                          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs"
-                                        >
-                                          ✕
-                                        </button>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
+                              <div className="flex items-center gap-3 uppercase tracking-widest text-sm">
+                                {currentVisualTab === "picdrift"
+                                  ? "Generate PicDrift"
+                                  : currentVisualTab === "studio"
+                                    ? "Generate Image"
+                                    : "Generate Video"}
                               </div>
                             )}
-                          </div>
-                        ) : null}
+                          </button>
+                        </>
+                      )}
+                    </form>
 
-                        {/* ✅ UPDATED GENERATE BUTTON */}
-                        <button
-                          type="submit"
-                          disabled={
-                            generateMediaMutation.isPending || !prompt.trim()
-                          }
-                          className={`w-full py-4 sm:py-5 px-6 sm:px-8 rounded-2xl transition-all disabled:opacity-50 font-bold text-base sm:text-lg flex flex-col items-center justify-center gap-1 ${
-                            activeEngine === "veo"
-                              ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg"
-                              : currentVisualTab === "picdrift"
-                                ? "bg-rose-600 hover:bg-rose-500 text-white shadow-lg"
-                                : currentVisualTab === "studio"
-                                  ? "bg-violet-600 hover:bg-violet-500 text-white shadow-lg"
-                                  : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg"
-                          }`}
-                        >
-                          {generateMediaMutation.isPending ? (
-                            <div className="flex items-center gap-3">
-                              <LoadingSpinner size="sm" variant="light" />
-                              <span>
-                                {currentVisualTab === "picdrift"
-                                  ? "Generating Drift"
-                                  : currentVisualTab === "studio"
-                                    ? "Painting Your Image"
-                                    : "Creating Your Video"}
-                                ...
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-3 uppercase tracking-widest text-sm">
-                              {currentVisualTab === "picdrift"
-                                ? "Generate PicDrift"
-                                : currentVisualTab === "studio"
-                                  ? "Generate Image"
-                                  : "Generate Video"}
-                            </div>
-                          )}
-                        </button>
-                      </>
+                    {generationState.status === "error" && (
+                      <ErrorAlert
+                        message={generationState.error || "Generation failed"}
+                        onRetry={() => {
+                          if (!prompt.trim()) return;
+                          generateMediaMutation.mutate(buildFormData());
+                        }}
+                        type="error"
+                      />
                     )}
-                  </form>
+                  </>
+                )}
 
-                  {generationState.status === "error" && (
+                {/* ✅ SEQUENCE EDITOR VIEW */}
+                {viewMode === "sequencer" && (
+                  <SequenceEditor
+                    sequence={sequence}
+                    setSequence={setSequence}
+                    onAddFromLibrary={() => setActiveLibrarySlot("sequencer")}
+                    onClear={() => setSequence([])}
+                  />
+                )}
+              </div>
+            </div>
+
+            <div className="lg:w-96">
+              <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 shadow-2xl sticky top-4">
+                <div className="flex items-center justify-between mb-4 sm:mb-6">
+                  <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                    <span></span> Timeline
+                  </h2>
+                  {/* EXPAND BUTTON */}
+                  <button
+                    onClick={() => setShowFullTimeline(true)}
+                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-cyan-400 transition-colors border border-transparent hover:border-cyan-500/30"
+                    title="Expand Timeline"
+                  >
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                      />
+                    </svg>
+                  </button>
+                  {postsLoading && <LoadingSpinner size="sm" variant="neon" />}
+                </div>
+                <div className="space-y-3 max-h-[500px] sm:max-h-[600px] overflow-y-auto custom-scrollbar">
+                  {posts && Array.isArray(posts) && posts.length > 0 ? (
+                    posts
+                      .filter((post: any) => post.status !== "CANCELLED")
+                      .sort(
+                        (a: any, b: any) =>
+                          new Date(b.createdAt).getTime() -
+                          new Date(a.createdAt).getTime(),
+                      )
+                      .map((post: any) => (
+                        <PostCard
+                          key={post.id}
+                          post={post}
+                          onPublishPost={() =>
+                            handleShowPromptInfo(post.prompt)
+                          }
+                          userCredits={userCredits}
+                          publishingPost={null}
+                          primaryColor={brandConfig?.primaryColor}
+                          compact={true}
+                          onUseAsStartFrame={handleUseAsStartFrame}
+                          onDrift={() => handleDriftFromPost(post)}
+                          onPreview={() => {
+                            let type = "image";
+                            if (post.mediaType === "VIDEO") type = "video";
+                            if (post.mediaType === "CAROUSEL")
+                              type = "carousel";
+                            let url = post.mediaUrl;
+                            if (type === "carousel") {
+                              try {
+                                url = JSON.parse(post.mediaUrl);
+                              } catch (e) {}
+                            }
+                            setPreviewMedia({ type: type as any, url });
+                          }}
+                          onMoveToAsset={
+                            post.mediaType === "IMAGE" ||
+                            post.mediaType === "CAROUSEL"
+                              ? () => handleMoveToAssets(post.id)
+                              : undefined
+                          }
+                          onDelete={() => {
+                            if (
+                              confirm(
+                                "Are you sure you want to delete this post?",
+                              )
+                            ) {
+                              deletePostMutation.mutate(post.id);
+                            }
+                          }}
+                          onAddToSequence={() => handleAddToSequence(post)}
+                        />
+                      ))
+                  ) : !postsLoading ? (
+                    <div className="text-center py-8">
+                      <div className="text-purple-300 text-sm mb-3">
+                        No content yet
+                      </div>
+                      <div className="text-4xl mb-2"></div>
+                    </div>
+                  ) : null}
+                </div>
+                {postsError && (
+                  <div className="text-center py-6">
                     <ErrorAlert
-                      message={generationState.error || "Generation failed"}
-                      onRetry={() => {
-                        if (!prompt.trim()) return;
-                        generateMediaMutation.mutate(buildFormData());
-                      }}
+                      message="Failed to load your content"
+                      onRetry={() =>
+                        queryClient.invalidateQueries({ queryKey: ["posts"] })
+                      }
                       type="error"
                     />
-                  )}
-                </>
-              )}
-
-              {/* ✅ SEQUENCE EDITOR VIEW */}
-              {viewMode === "sequencer" && (
-                <SequenceEditor
-                  sequence={sequence}
-                  setSequence={setSequence}
-                  onAddFromLibrary={() => setActiveLibrarySlot("sequencer")}
-                  onClear={() => setSequence([])}
-                />
-              )}
-            </div>
-          </div>
-
-          <div className="lg:w-96">
-            <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 shadow-2xl sticky top-4">
-              <div className="flex items-center justify-between mb-4 sm:mb-6">
-                <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
-                  <span></span> Timeline
-                </h2>
-                {/* EXPAND BUTTON */}
-                <button
-                  onClick={() => setShowFullTimeline(true)}
-                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-cyan-400 transition-colors border border-transparent hover:border-cyan-500/30"
-                  title="Expand Timeline"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-                    />
-                  </svg>
-                </button>
-                {postsLoading && <LoadingSpinner size="sm" variant="neon" />}
-              </div>
-              <div className="space-y-3 max-h-[500px] sm:max-h-[600px] overflow-y-auto custom-scrollbar">
-                {posts && Array.isArray(posts) && posts.length > 0 ? (
-                  posts
-                    .filter((post: any) => post.status !== "CANCELLED")
-                    .sort(
-                      (a: any, b: any) =>
-                        new Date(b.createdAt).getTime() -
-                        new Date(a.createdAt).getTime(),
-                    )
-                    .map((post: any) => (
-                      <PostCard
-                        key={post.id}
-                        post={post}
-                        onPublishPost={() => handleShowPromptInfo(post.prompt)}
-                        userCredits={userCredits}
-                        publishingPost={null}
-                        primaryColor={brandConfig?.primaryColor}
-                        compact={true}
-                        onUseAsStartFrame={handleUseAsStartFrame}
-                        onDrift={() => handleDriftFromPost(post)}
-                        onPreview={() => {
-                          let type = "image";
-                          if (post.mediaType === "VIDEO") type = "video";
-                          if (post.mediaType === "CAROUSEL") type = "carousel";
-                          let url = post.mediaUrl;
-                          if (type === "carousel") {
-                            try {
-                              url = JSON.parse(post.mediaUrl);
-                            } catch (e) {}
-                          }
-                          setPreviewMedia({ type: type as any, url });
-                        }}
-                        onMoveToAsset={
-                          post.mediaType === "IMAGE" ||
-                          post.mediaType === "CAROUSEL"
-                            ? () => handleMoveToAssets(post.id)
-                            : undefined
-                        }
-                        onDelete={() => {
-                          if (
-                            confirm(
-                              "Are you sure you want to delete this post?",
-                            )
-                          ) {
-                            deletePostMutation.mutate(post.id);
-                          }
-                        }}
-                        onAddToSequence={() => handleAddToSequence(post)}
-                      />
-                    ))
-                ) : !postsLoading ? (
-                  <div className="text-center py-8">
-                    <div className="text-purple-300 text-sm mb-3">
-                      No content yet
-                    </div>
-                    <div className="text-4xl mb-2"></div>
                   </div>
-                ) : null}
+                )}
               </div>
-              {postsError && (
-                <div className="text-center py-6">
-                  <ErrorAlert
-                    message="Failed to load your content"
-                    onRetry={() =>
-                      queryClient.invalidateQueries({ queryKey: ["posts"] })
-                    }
-                    type="error"
-                  />
-                </div>
-              )}
             </div>
           </div>
+          {showBrandModal && (
+            <BrandConfigModal
+              onClose={() => setShowBrandModal(false)}
+              currentConfig={brandConfig}
+            />
+          )}
+          {editingAsset && (
+            <EditAssetModal
+              asset={editingAsset}
+              initialVideoUrl={editingVideoUrl}
+              onClose={() => {
+                setEditingAsset(null);
+                setEditingVideoUrl(undefined); // Reset
+              }}
+            />
+          )}
+          {/* ✅ ADD THIS BLOCK */}
+          {showFullTimeline && (
+            <TimelineExpander
+              posts={posts}
+              onClose={() => setShowFullTimeline(false)}
+              userCredits={userCredits}
+              brandConfig={brandConfig}
+              onPublishPost={(t) => handleShowPromptInfo(t)}
+              onUseAsStartFrame={handleUseAsStartFrame}
+              onDrift={(p) => handleDriftFromPost(p)}
+              onPreview={(media) => {
+                // Re-use your preview logic
+                let type = "image";
+                if (media.mediaType === "VIDEO") type = "video";
+                if (media.mediaType === "CAROUSEL") type = "carousel";
+                let url = media.mediaUrl;
+                if (type === "carousel") {
+                  try {
+                    url = JSON.parse(media.mediaUrl);
+                  } catch (e) {}
+                }
+                setPreviewMedia({ type: type as any, url });
+              }}
+              onMoveToAsset={(id) => handleMoveToAssets(id)}
+              onDelete={(id) => {
+                if (confirm("Delete this post?")) deletePostMutation.mutate(id);
+              }}
+              onAddToSequence={(post) => handleAddToSequence(post)}
+            />
+          )}
         </div>
-        {showBrandModal && (
-          <BrandConfigModal
-            onClose={() => setShowBrandModal(false)}
-            currentConfig={brandConfig}
-          />
-        )}
-        {editingAsset && (
-          <EditAssetModal
-            asset={editingAsset}
-            initialVideoUrl={editingVideoUrl}
-            onClose={() => {
-              setEditingAsset(null);
-              setEditingVideoUrl(undefined); // Reset
-            }}
-          />
-        )}
-        {/* ✅ ADD THIS BLOCK */}
-        {showFullTimeline && (
-          <TimelineExpander
-            posts={posts}
-            onClose={() => setShowFullTimeline(false)}
-            userCredits={userCredits}
-            brandConfig={brandConfig}
-            onPublishPost={(t) => handleShowPromptInfo(t)}
-            onUseAsStartFrame={handleUseAsStartFrame}
-            onDrift={(p) => handleDriftFromPost(p)}
-            onPreview={(media) => {
-              // Re-use your preview logic
-              let type = "image";
-              if (media.mediaType === "VIDEO") type = "video";
-              if (media.mediaType === "CAROUSEL") type = "carousel";
-              let url = media.mediaUrl;
-              if (type === "carousel") {
-                try {
-                  url = JSON.parse(media.mediaUrl);
-                } catch (e) {}
-              }
-              setPreviewMedia({ type: type as any, url });
-            }}
-            onMoveToAsset={(id) => handleMoveToAssets(id)}
-            onDelete={(id) => {
-              if (confirm("Delete this post?")) deletePostMutation.mutate(id);
-            }}
-            onAddToSequence={(post) => handleAddToSequence(post)}
-          />
-        )}
       </div>
-    </div>
     </div>
   );
 }
