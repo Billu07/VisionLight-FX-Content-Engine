@@ -561,8 +561,9 @@ function Dashboard() {
             >
               ✕
             </button>
-            <h3 className="text-white font-bold mb-4 self-start">
-              ✂️ Extract Frame from Video
+            <h3 className="text-white font-bold mb-4 self-start flex items-center gap-2">
+              <img src="/drift_icon.png" alt="Drift" className="w-5 h-5 object-contain" />
+              3D-X-FRAME-EXTRACTOR
             </h3>
             <DriftFrameExtractor
               videoUrl={extractingVideoUrl}

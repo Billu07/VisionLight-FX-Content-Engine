@@ -498,12 +498,15 @@ export default function AdminDashboard() {
                           step="0.01"
                           type="number"
                           className="w-24 bg-gray-950 border border-gray-700 rounded-md p-2 text-center text-xs font-semibold text-white outline-none focus:border-brand-accent transition-colors"
-                          value={(settings as any)[item.key]}
-                          onChange={(e) =>
-                            handleUpdateGlobalSettings({
-                              [item.key]: parseFloat(e.target.value),
-                            })
-                          }
+                          defaultValue={(settings as any)[item.key]}
+                          onBlur={(e) => {
+                            const val = parseFloat(e.target.value);
+                            if (!isNaN(val)) {
+                              handleUpdateGlobalSettings({
+                                [item.key]: val,
+                              });
+                            }
+                          }}
                         />
                       </div>
                     ))}
@@ -634,7 +637,7 @@ export default function AdminDashboard() {
                       </div>
                       <div>
                         <span className="text-[10px] text-gray-400 uppercase font-bold block mb-3 tracking-widest">
-                          Allocation Adjustment
+                          Allocation Adjustment (Current: {Math.floor((editingUser as any)[targetCreditPool] || 0)})
                         </span>
                         <div className="flex gap-3">
                           <input

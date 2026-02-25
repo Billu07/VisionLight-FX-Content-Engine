@@ -148,6 +148,8 @@ export const assetsLogic = {
       targetUrl,
       dbAspectRatio,
       type,
+      undefined,
+      post.projectId || undefined
     );
   },
 };
