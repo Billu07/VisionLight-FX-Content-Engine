@@ -664,7 +664,7 @@ function Dashboard() {
   const { logo: currentLogo, text: currentHeaderText } = getHeaderContent();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900">
+    <div className="min-h-screen bg-gray-950 text-gray-200">
       {/* ... MODALS ... */}
       {activeLibrarySlot !== null && (
         <AssetLibrary
