@@ -48,6 +48,7 @@ export const apiEndpoints = {
   // === Projects ===
   createProject: (data: { name: string }) => api.post("/api/projects", data),
   getProjects: () => api.get("/api/projects"),
+  updateProject: (id: string, name: string) => api.patch(`/api/projects/${id}`, { name }),
   deleteProject: (id: string) => api.delete(`/api/projects/${id}`),
 
   // === Data ===

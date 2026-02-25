@@ -11,6 +11,8 @@ export default function Projects() {
   const queryClient = useQueryClient();
   const [newProjectName, setNewProjectName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
 
   const { data: projectsData, isLoading } = useQuery({
     queryKey: ["projects"],
@@ -36,6 +38,20 @@ export default function Projects() {
     onError: (err: any) => {
       alert("Failed to create project: " + err.message);
       setIsCreating(false);
+    }
+  });
+
+  const updateProjectMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      return await apiEndpoints.updateProject(id, name);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      setEditingProjectId(null);
+      setEditingName("");
+    },
+    onError: (err: any) => {
+      alert("Failed to rename project: " + err.message);
     }
   });
 
@@ -96,20 +112,61 @@ export default function Projects() {
         {projectsData?.map((project: any) => (
           <div
             key={project.id}
-            onClick={() => handleSelectProject(project.id)}
-            className="bg-gray-800/40 border border-purple-500/30 rounded-2xl p-6 flex flex-col justify-between min-h-[200px] cursor-pointer hover:scale-105 hover:bg-gray-800/60 transition-all shadow-lg"
+            className="bg-gray-800/40 border border-purple-500/30 rounded-2xl p-6 flex flex-col justify-between min-h-[200px] hover:bg-gray-800/60 transition-all shadow-lg relative group"
           >
-            <div>
-              <h3 className="text-2xl font-bold text-white mb-2">{project.name}</h3>
-              <p className="text-gray-400 text-sm">
-                Created: {new Date(project.createdAt).toLocaleDateString()}
-              </p>
-            </div>
-            <div className="flex justify-end">
-              <div className="w-10 h-10 rounded-full bg-purple-600/20 flex items-center justify-center text-purple-300 group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                ➔
+            {editingProjectId === project.id ? (
+              <div className="flex flex-col gap-3">
+                <input
+                  type="text"
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  className="w-full p-2 bg-gray-900 border border-cyan-500 rounded-lg text-white text-lg font-bold"
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => updateProjectMutation.mutate({ id: project.id, name: editingName })}
+                    className="flex-1 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-white font-bold text-xs uppercase"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingProjectId(null)}
+                    className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 font-bold text-xs uppercase"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <>
+                <div onClick={() => handleSelectProject(project.id)} className="cursor-pointer flex-1">
+                  <h3 className="text-2xl font-bold text-white mb-2">{project.name}</h3>
+                  <p className="text-gray-400 text-sm">
+                    Created: {new Date(project.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex justify-between items-end mt-4">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingProjectId(project.id);
+                      setEditingName(project.name);
+                    }}
+                    className="p-2 text-gray-500 hover:text-cyan-400 transition-colors"
+                    title="Rename Project"
+                  >
+                    ✏️
+                  </button>
+                  <div 
+                    onClick={() => handleSelectProject(project.id)}
+                    className="w-10 h-10 rounded-full bg-purple-600/20 flex items-center justify-center text-purple-300 group-hover:bg-purple-600 group-hover:text-white transition-colors cursor-pointer"
+                  >
+                    ➔
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         ))}
       </div>

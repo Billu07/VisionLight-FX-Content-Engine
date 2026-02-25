@@ -53,8 +53,8 @@ function Dashboard() {
   const [studioMode, setStudioMode] = useState<StudioMode>("image");
 
   // Kie AI (Video FX & PicDrift)
-  // ✅ UPDATED DEFAULT: 15s
-  const [kieDuration, setKieDuration] = useState<5 | 10 | 15>(15);
+  // ✅ UPDATED DEFAULT: 10s (Matches PicDrift Standard)
+  const [kieDuration, setKieDuration] = useState<5 | 10 | 15>(10);
   // ✅ UPDATED DEFAULT: 1080p
   const [kieResolution, setKieResolution] = useState<"720p" | "1080p">("1080p");
 
@@ -141,7 +141,7 @@ function Dashboard() {
 
   // === SEQUENCER STATE ===
   const [viewMode, setViewMode] = useState<"create" | "sequencer">("create");
-  
+
   const sequenceKey = `visionlight_sequence_${
     localStorage.getItem("visionlight_active_project") || "default"
   }`;
@@ -572,7 +572,10 @@ function Dashboard() {
         "model",
         picDriftMode === "plus" ? "kling-3" : "kling-2.5",
       );
-      formData.append("generateAudio", user?.view === "PICDRIFT" ? "false" : picDriftAudio.toString());
+      formData.append(
+        "generateAudio",
+        user?.view === "PICDRIFT" ? "false" : picDriftAudio.toString(),
+      );
       if (picDriftFrames.start)
         formData.append("referenceImages", picDriftFrames.start);
       if (picDriftFrames.end && (!picDriftAudio || picDriftMode === "plus"))
@@ -849,7 +852,7 @@ function Dashboard() {
                     disabled={isRequesting}
                     className="w-full py-3 bg-purple-600 rounded-xl font-bold"
                   >
-                    {isRequesting ? "Sending..." : "Request Credits"}
+                    {isRequesting ? "Sending..." : "Request Renders"}
                   </button>
                 )}
                 <button
@@ -1192,6 +1195,8 @@ function Dashboard() {
                           onClick={() => {
                             setActiveEngine("kie");
                             setVideoFxMode("picdrift");
+                            if (picDriftMode === "standard") setKieDuration(10);
+                            else setKieDuration(5);
                           }}
                           className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
                             currentVisualTab === "picdrift"
@@ -1279,6 +1284,7 @@ function Dashboard() {
                             onClick={() => {
                               setActiveEngine("kie");
                               setVideoFxMode("video");
+                              setKieDuration(15);
                             }}
                             className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
                               currentVisualTab === "videofx"
@@ -1366,7 +1372,10 @@ function Dashboard() {
                         <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
                           <button
                             type="button"
-                            onClick={() => setPicDriftMode("standard")}
+                            onClick={() => {
+                              setPicDriftMode("standard");
+                              setKieDuration(10);
+                            }}
                             className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
                               picDriftMode === "standard"
                                 ? "bg-rose-600 text-white shadow-lg"
@@ -1377,7 +1386,10 @@ function Dashboard() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => setPicDriftMode("plus")}
+                            onClick={() => {
+                              setPicDriftMode("plus");
+                              setKieDuration(5);
+                            }}
                             className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
                               picDriftMode === "plus"
                                 ? "bg-rose-600 text-white shadow-lg"
@@ -1399,6 +1411,7 @@ function Dashboard() {
                             onClick={() => {
                               setActiveEngine("kie");
                               setVideoFxMode("video");
+                              setKieDuration(15);
                             }}
                             className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
                               activeEngine === "kie"
@@ -1808,43 +1821,43 @@ function Dashboard() {
 
                                 {/* Audio Toggle */}
                                 {user?.view !== "PICDRIFT" && (
-                                <div className="sm:col-span-2">
-                                  <label className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-gray-800/50 cursor-pointer hover:bg-gray-800 transition-colors">
-                                    <input
-                                      type="checkbox"
-                                      checked={picDriftAudio}
-                                      onChange={(e) => {
-                                        setPicDriftAudio(e.target.checked);
-                                        // If audio enabled, clear end frame ONLY if standard mode
-                                        if (
-                                          e.target.checked &&
-                                          picDriftMode !== "plus"
-                                        ) {
-                                          setPicDriftFrames((prev) => ({
-                                            ...prev,
-                                            end: null,
-                                          }));
-                                          setPicDriftUrls((prev) => ({
-                                            ...prev,
-                                            end: null,
-                                          }));
-                                        }
-                                      }}
-                                      className="w-5 h-5 rounded border-gray-600 text-rose-600 focus:ring-rose-500 bg-gray-700"
-                                    />
-                                    <div>
-                                      <div className="font-semibold text-white text-sm">
-                                        Generate Audio
+                                  <div className="sm:col-span-2">
+                                    <label className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-gray-800/50 cursor-pointer hover:bg-gray-800 transition-colors">
+                                      <input
+                                        type="checkbox"
+                                        checked={picDriftAudio}
+                                        onChange={(e) => {
+                                          setPicDriftAudio(e.target.checked);
+                                          // If audio enabled, clear end frame ONLY if standard mode
+                                          if (
+                                            e.target.checked &&
+                                            picDriftMode !== "plus"
+                                          ) {
+                                            setPicDriftFrames((prev) => ({
+                                              ...prev,
+                                              end: null,
+                                            }));
+                                            setPicDriftUrls((prev) => ({
+                                              ...prev,
+                                              end: null,
+                                            }));
+                                          }
+                                        }}
+                                        className="w-5 h-5 rounded border-gray-600 text-rose-600 focus:ring-rose-500 bg-gray-700"
+                                      />
+                                      <div>
+                                        <div className="font-semibold text-white text-sm">
+                                          Generate Audio
+                                        </div>
+                                        <div className="text-xs text-gray-400">
+                                          AI generated sound effects{" "}
+                                          {picDriftMode === "plus"
+                                            ? "(Supported with End Frame)"
+                                            : "(Disables End Frame)"}
+                                        </div>
                                       </div>
-                                      <div className="text-xs text-gray-400">
-                                        AI generated sound effects{" "}
-                                        {picDriftMode === "plus"
-                                          ? "(Supported with End Frame)"
-                                          : "(Disables End Frame)"}
-                                      </div>
-                                    </div>
-                                  </label>
-                                </div>
+                                    </label>
+                                  </div>
                                 )}
                               </div>
                             </div>

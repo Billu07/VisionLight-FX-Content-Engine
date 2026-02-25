@@ -101,6 +101,12 @@ export const dbService = {
       where: { id },
     });
   },
+  async updateProject(id: string, name: string) {
+    return prisma.project.update({
+      where: { id },
+      data: { name },
+    });
+  },
   async deleteProject(id: string) {
     return prisma.project.delete({
       where: { id },

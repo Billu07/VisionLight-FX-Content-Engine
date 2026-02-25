@@ -328,6 +328,24 @@ app.get(
   }
 );
 
+app.patch(
+  "/api/projects/:id",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { name } = req.body;
+      const project = await airtableService.getProjectById(req.params.id);
+      if (!project || project.userId !== req.user!.id) {
+        return res.status(403).json({ error: "Denied" });
+      }
+      const updated = await airtableService.updateProject(req.params.id, name);
+      res.json({ success: true, project: updated });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
 app.delete(
   "/api/projects/:id",
   authenticateToken,
