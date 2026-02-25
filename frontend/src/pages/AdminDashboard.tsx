@@ -164,6 +164,7 @@ export default function AdminDashboard() {
       });
       setMsg(`Render limits updated.`);
       setTimeout(() => setMsg(""), 3000);
+      setSearchTerm(""); // Reset search filter
       fetchData();
     } finally {
       setActionLoading(false);
@@ -178,6 +179,7 @@ export default function AdminDashboard() {
       setMsg("User profile updated.");
       setTimeout(() => setMsg(""), 3000);
       setEditingUser(null);
+      setSearchTerm(""); // Reset search filter
       fetchData();
     } finally {
       setActionLoading(false);
@@ -256,10 +258,18 @@ export default function AdminDashboard() {
               <div className="relative flex-1 md:w-72">
                 <input
                   placeholder="Search entities..."
-                  className="bg-gray-900 border border-gray-800 rounded-lg px-4 py-2 w-full text-sm text-gray-200 outline-none focus:border-brand-accent transition-colors placeholder-gray-500 h-full"
+                  className="bg-gray-900 border border-gray-800 rounded-lg px-4 py-2 w-full text-sm text-gray-200 outline-none focus:border-brand-accent transition-colors placeholder-gray-500 h-full pr-10"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
               <button
                 onClick={() => setShowInviteModal(true)}
@@ -374,7 +384,7 @@ export default function AdminDashboard() {
                               }`}
                             >
                               {u.view === "PICDRIFT"
-                                ? "Demo Access"
+                                ? "PicDrift View"
                                 : u.creditSystem}
                             </span>
                             <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-md bg-gray-800 text-gray-400 border border-gray-700">
@@ -562,7 +572,7 @@ export default function AdminDashboard() {
               <div className="mb-10 pb-6 border-b border-gray-800">
                 <h3 className="text-xl font-bold text-white tracking-tight mb-2 uppercase tracking-widest">
                   {editingUser.view === "PICDRIFT"
-                    ? "Demo Account Control"
+                    ? "PicDrift View Control"
                     : "Account Settings"}
                 </h3>
                 <p className="text-sm text-gray-400 font-mono">
@@ -753,8 +763,8 @@ export default function AdminDashboard() {
                         })
                       }
                     >
-                      <option value="VISIONLIGHT">VisionLight FX (Full)</option>
-                      <option value="PICDRIFT">PicDrift (Demo)</option>
+                      <option value="VISIONLIGHT">VisualFx View</option>
+                      <option value="PICDRIFT">PicDrift View</option>
                     </select>
                     <div className="flex items-center justify-between p-3 bg-gray-950 border border-gray-800 rounded-md text-sm">
                       <span className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">
@@ -849,8 +859,8 @@ export default function AdminDashboard() {
                     setNewUser({ ...newUser, view: e.target.value })
                   }
                 >
-                  <option value="VISIONLIGHT">VisionLight FX (Standard)</option>
-                  <option value="PICDRIFT">PicDrift (Demo/Guest)</option>
+                  <option value="VISIONLIGHT">VisualFx View</option>
+                  <option value="PICDRIFT">PicDrift View</option>
                 </select>
                 <div className="flex items-center justify-between p-3 bg-gray-950 border border-gray-800 rounded-md text-sm">
                   <span className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">

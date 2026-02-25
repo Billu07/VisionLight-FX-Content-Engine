@@ -572,7 +572,7 @@ function Dashboard() {
         "model",
         picDriftMode === "plus" ? "kling-3" : "kling-2.5",
       );
-      formData.append("generateAudio", picDriftAudio.toString());
+      formData.append("generateAudio", user?.view === "PICDRIFT" ? "false" : picDriftAudio.toString());
       if (picDriftFrames.start)
         formData.append("referenceImages", picDriftFrames.start);
       if (picDriftFrames.end && (!picDriftAudio || picDriftMode === "plus"))
@@ -1807,6 +1807,7 @@ function Dashboard() {
                                 </div>
 
                                 {/* Audio Toggle */}
+                                {user?.view !== "PICDRIFT" && (
                                 <div className="sm:col-span-2">
                                   <label className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-gray-800/50 cursor-pointer hover:bg-gray-800 transition-colors">
                                     <input
@@ -1844,6 +1845,7 @@ function Dashboard() {
                                     </div>
                                   </label>
                                 </div>
+                                )}
                               </div>
                             </div>
                           )}
