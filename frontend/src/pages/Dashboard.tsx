@@ -141,7 +141,22 @@ function Dashboard() {
 
   // === SEQUENCER STATE ===
   const [viewMode, setViewMode] = useState<"create" | "sequencer">("create");
-  const [sequence, setSequence] = useState<SequenceItem[]>([]);
+  
+  const sequenceKey = `visionlight_sequence_${
+    localStorage.getItem("visionlight_active_project") || "default"
+  }`;
+  const [sequence, setSequence] = useState<SequenceItem[]>(() => {
+    try {
+      const stored = localStorage.getItem(sequenceKey);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem(sequenceKey, JSON.stringify(sequence));
+  }, [sequence, sequenceKey]);
 
   const [previewCarouselIndex, setPreviewCarouselIndex] = useState(0);
 
