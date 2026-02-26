@@ -1170,7 +1170,7 @@ function Dashboard() {
                       <label className="block text-sm font-semibold text-white mb-3 sm:mb-4">
                         Select Content Type
                       </label>
-                      <div className="flex sm:grid sm:grid-cols-3 gap-2 sm:gap-3 overflow-x-auto pb-2 sm:pb-0 custom-scrollbar">
+                      <div className={`grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 ${isMobile ? 'flex overflow-x-auto pb-2 custom-scrollbar' : ''}`}>
                         {/* TAB 1: PICDRIFT (Default) */}
                         <button
                           type="button"
@@ -1180,7 +1180,7 @@ function Dashboard() {
                             if (picDriftMode === "standard") setKieDuration(10);
                             else setKieDuration(5);
                           }}
-                          className={`flex-shrink-0 sm:flex-shrink p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group min-w-[120px] sm:min-w-0 ${
+                          className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${isMobile ? 'flex-shrink-0 min-w-[120px]' : ''} ${
                             currentVisualTab === "picdrift"
                               ? "border-white/20 bg-gradient-to-br from-pink-500 to-rose-500 shadow-2xl scale-105"
                               : "border-white/5 bg-gray-800/50 hover:border-white/10"
@@ -1198,7 +1198,7 @@ function Dashboard() {
                             href="http://picdrift.com/renders"
                             target="_blank"
                             rel="noreferrer"
-                            className="flex-shrink-0 sm:flex-shrink p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-violet-400/50 hover:bg-violet-900/20 transition-all duration-300 text-left group min-w-[120px] sm:min-w-0 flex items-center justify-between"
+                            className={`p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-violet-400/50 hover:bg-violet-900/20 transition-all duration-300 text-left group flex items-center justify-between ${isMobile ? 'flex-shrink-0 min-w-[120px]' : ''}`}
                           >
                             <div className="font-semibold text-xs sm:text-sm text-gray-400 group-hover:text-violet-300 flex items-center gap-1 sm:gap-2">
                               <span>🔒</span> Pic FX
@@ -1208,7 +1208,7 @@ function Dashboard() {
                           <button
                             type="button"
                             onClick={() => setActiveEngine("studio")}
-                            className={`flex-shrink-0 sm:flex-shrink p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group min-w-[120px] sm:min-w-0 ${
+                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${isMobile ? 'flex-shrink-0 min-w-[120px]' : ''} ${
                               currentVisualTab === "studio"
                                 ? "border-white/20 bg-gradient-to-br from-violet-700 to-purple-700 shadow-2xl scale-105"
                                 : "border-white/5 bg-gray-800/50 hover:border-white/10"
@@ -1230,7 +1230,7 @@ function Dashboard() {
                             href="http://picdrift.com/renders"
                             target="_blank"
                             rel="noreferrer"
-                            className="flex-shrink-0 sm:flex-shrink p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-cyan-400/50 hover:bg-cyan-900/20 transition-all duration-300 text-left group min-w-[120px] sm:min-w-0 flex items-center justify-between"
+                            className={`p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-cyan-400/50 hover:bg-cyan-900/20 transition-all duration-300 text-left group flex items-center justify-between ${isMobile ? 'flex-shrink-0 min-w-[120px]' : ''}`}
                           >
                             <div className="font-semibold text-xs sm:text-sm text-gray-400 group-hover:text-cyan-300 flex items-center gap-1 sm:gap-2">
                               <span>🔒</span> Video FX
@@ -1244,7 +1244,7 @@ function Dashboard() {
                               setVideoFxMode("video");
                               setKieDuration(15);
                             }}
-                            className={`flex-shrink-0 sm:flex-shrink p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group min-w-[120px] sm:min-w-0 ${
+                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${isMobile ? 'flex-shrink-0 min-w-[120px]' : ''} ${
                               currentVisualTab === "videofx"
                                 ? "border-white/20 bg-gradient-to-br from-blue-700 to-cyan-700 shadow-2xl scale-105"
                                 : "border-white/5 bg-gray-800/50 hover:border-white/10"
