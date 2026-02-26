@@ -267,7 +267,7 @@ export function FullscreenVideoEditor({
         )}
 
         {/* PREVIEW VIEWPORT */}
-        <div className="flex-1 bg-black relative flex flex-col items-center justify-center p-8">
+        <div className="flex-1 bg-black relative flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
             <button 
                 onClick={() => setSidebarOpen(!sidebarOpen)}
                 className="absolute top-4 left-4 z-10 w-8 h-8 bg-white/5 hover:bg-white/10 rounded-lg flex items-center justify-center border border-white/10 text-gray-400 transition-colors"
@@ -275,7 +275,7 @@ export function FullscreenVideoEditor({
                 {sidebarOpen ? "◀" : "▶"}
             </button>
 
-            <div className="relative w-full h-full max-w-4xl flex flex-col">
+            <div className="relative w-full h-full flex flex-col max-w-7xl mx-auto">
                 <div className="flex-1 relative bg-[#050505] rounded-2xl overflow-hidden border border-white/5 shadow-[0_0_50px_rgba(0,0,0,0.5)] flex items-center justify-center group">
                     {currentItem ? (
                         <>
@@ -334,7 +334,7 @@ export function FullscreenVideoEditor({
       </div>
 
       {/* TIMELINE AREA */}
-      <div className="h-64 bg-[#141414] border-t border-white/10 flex flex-col shrink-0">
+      <div className="h-48 sm:h-56 bg-[#141414] border-t border-white/10 flex flex-col shrink-0">
         <div className="h-10 border-b border-white/5 flex items-center px-4 justify-between bg-[#1a1a1a]">
             <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">

@@ -379,7 +379,7 @@ export function AssetLibrary({
   }, [selectedAsset, filteredAssets]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black sm:bg-black/95 sm:p-4 backdrop-blur-md">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black sm:bg-black/95 sm:p-4 backdrop-blur-md">
       <div className="bg-gray-900 w-full h-full sm:max-w-6xl sm:h-[85vh] sm:rounded-2xl border-0 sm:border border-gray-700 flex flex-col shadow-2xl overflow-hidden">
         {/* HEADER */}
         <div className="p-4 sm:p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900 z-10">
@@ -602,7 +602,7 @@ export function AssetLibrary({
 
       {/* --- IMAGE DETAILS MODAL --- */}
       {selectedAsset && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/95 p-4 animate-in fade-in duration-200">
           <div
             className="absolute inset-0"
             onClick={() => setSelectedAsset(null)}
@@ -767,7 +767,7 @@ export function AssetLibrary({
       )}
 
       {viewingVideoAsset && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 p-4">
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/95 p-4">
           <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-4xl p-6 relative flex flex-col items-center">
             <button
               onClick={() => setViewingVideoAsset(null)}
