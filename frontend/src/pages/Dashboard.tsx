@@ -698,6 +698,17 @@ function Dashboard() {
             initialAspectRatio={getCurrentRatioForLibrary()}
           />
         )}
+
+        {/* ✅ FULLSCREEN SEQUENCE EDITOR */}
+        {viewMode === "sequencer" && (
+          <FullscreenVideoEditor
+            sequence={sequence}
+            setSequence={setSequence}
+            onAddFromLibrary={() => setActiveLibrarySlot("sequencer")}
+            onClear={() => setSequence([])}
+            onClose={() => setViewMode("create")}
+          />
+        )}
         
         {/* MOBILE NAVBAR */}
         <MobileNavbar 
@@ -2315,17 +2326,6 @@ function Dashboard() {
                       />
                     )}
                   </>
-                )}
-
-                {/* ✅ FULLSCREEN SEQUENCE EDITOR */}
-                {viewMode === "sequencer" && (
-                  <FullscreenVideoEditor
-                    sequence={sequence}
-                    setSequence={setSequence}
-                    onAddFromLibrary={() => setActiveLibrarySlot("sequencer")}
-                    onClear={() => setSequence([])}
-                    onClose={() => setViewMode("create")}
-                  />
                 )}
               </div>
             </div>
