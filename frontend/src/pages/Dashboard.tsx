@@ -15,10 +15,9 @@ import { EditAssetModal } from "../components/EditAssetModal";
 import { DriftFrameExtractor } from "../components/DriftFrameExtractor";
 import { RenderReserveModal } from "../components/RenderReserveModal";
 import { StockPhotosModal } from "../components/StockPhotosModal";
-import {
-  SequenceEditor,
-  type SequenceItem,
-} from "../components/SequenceEditor";
+import { type SequenceItem } from "../components/SequenceEditor";
+import { FullscreenVideoEditor } from "../components/FullscreenVideoEditor";
+import { MobileNavbar } from "../components/MobileNavbar";
 
 // Import your logo images
 import picdriftLogo from "../assets/picdrift.png";
@@ -140,7 +139,7 @@ function Dashboard() {
   } | null>(null);
 
   // === SEQUENCER STATE ===
-  const [viewMode, setViewMode] = useState<"create" | "sequencer">("create");
+  const [viewMode, setViewMode] = useState<"create" | "sequencer" | "history">("create");
 
   const sequenceKey = `visionlight_sequence_${
     localStorage.getItem("visionlight_active_project") || "default"
@@ -682,7 +681,7 @@ function Dashboard() {
   const { logo: currentLogo, text: currentHeaderText } = getHeaderContent();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-purple-950 to-violet-950 text-gray-200 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-purple-950 to-violet-950 text-gray-200 relative overflow-hidden pb-24 lg:pb-0">
       {/* TREDNY STUDIO BACKGROUND EFFECTS */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         {/* Ambient colored glows */}
@@ -699,6 +698,25 @@ function Dashboard() {
             initialAspectRatio={getCurrentRatioForLibrary()}
           />
         )}
+        
+        {/* MOBILE NAVBAR */}
+        <MobileNavbar 
+          activeTab={viewMode}
+          onTabChange={(tab) => {
+             if (tab === "library") setActiveLibrarySlot("generic");
+             else if (tab === "projects") {
+                localStorage.removeItem("visionlight_active_project");
+                navigate("/projects");
+             } else {
+                setViewMode(tab);
+             }
+          }}
+          onOpenLibrary={() => setActiveLibrarySlot("generic")}
+          onOpenProjects={() => {
+              localStorage.removeItem("visionlight_active_project");
+              navigate("/projects");
+          }}
+        />
 
         {/* EXTRACTOR MODAL */}
         {extractingVideoUrl && (
@@ -748,32 +766,32 @@ function Dashboard() {
 
         {previewMedia && (
           <div
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 animate-in fade-in duration-200"
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 backdrop-blur-xl animate-in fade-in duration-200"
             onClick={() => {
               setPreviewMedia(null);
               setPreviewCarouselIndex(0);
             }}
           >
             <div
-              className="relative w-full max-w-5xl flex flex-col items-center justify-center"
+              className="relative w-full h-full flex flex-col items-center justify-center"
               onClick={(e) => e.stopPropagation()}
             >
               {previewMedia.type === "carousel" &&
               Array.isArray(previewMedia.url) ? (
-                <div className="flex flex-col items-center w-full">
+                <div className="flex flex-col items-center w-full h-full justify-center p-4">
                   <img
                     src={previewMedia.url[previewCarouselIndex]}
-                    className="max-h-[80vh] w-auto rounded-lg shadow-2xl border border-gray-800"
+                    className="max-h-full max-w-full object-contain rounded-lg shadow-2xl"
                   />
                   {previewMedia.url.length > 1 && (
-                    <div className="flex gap-2 mt-4">
+                    <div className="flex gap-2 mt-6 absolute bottom-12">
                       {previewMedia.url.map((_, idx) => (
                         <button
                           key={idx}
                           onClick={() => setPreviewCarouselIndex(idx)}
-                          className={`w-3 h-3 rounded-full transition-all ${
+                          className={`w-2.5 h-2.5 rounded-full transition-all ${
                             idx === previewCarouselIndex
-                              ? "bg-white scale-125"
+                              ? "bg-white scale-125 shadow-[0_0_10px_rgba(255,255,255,0.8)]"
                               : "bg-white/30 hover:bg-white/60"
                           }`}
                         />
@@ -782,15 +800,13 @@ function Dashboard() {
                   )}
                 </div>
               ) : (
-                <div className="w-full flex justify-center">
-                  <div className="max-w-full max-h-[85vh]">
-                    <MediaPreview
-                      mediaUrl={previewMedia.url as string}
-                      mediaType={
-                        previewMedia.type === "video" ? "video" : "image"
-                      }
-                    />
-                  </div>
+                <div className="w-full h-full flex justify-center items-center">
+                  <MediaPreview
+                    mediaUrl={previewMedia.url as string}
+                    mediaType={
+                      previewMedia.type === "video" ? "video" : "image"
+                    }
+                  />
                 </div>
               )}
               <button
@@ -798,9 +814,9 @@ function Dashboard() {
                   setPreviewMedia(null);
                   setPreviewCarouselIndex(0);
                 }}
-                className="absolute -top-12 right-0 bg-white/10 hover:bg-white/20 text-white p-2 rounded-full transition-colors"
+                className="absolute top-6 right-6 bg-white/10 hover:bg-white/20 text-white w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md border border-white/10 transition-colors z-[80]"
               >
-                ✕ Close
+                ✕
               </button>
             </div>
           </div>
@@ -933,43 +949,9 @@ function Dashboard() {
                   </h1>
                 </div>
               </div>
-              {isMobile && (
-                <div className="flex gap-2">
-                  {isAdmin && (
-                    <button
-                      onClick={() => navigate("/admin")}
-                      className="p-2 bg-red-900/50 border border-red-500/30 rounded-xl text-red-300"
-                    >
-                      ⚙️
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      localStorage.removeItem("visionlight_active_project");
-                      navigate("/projects");
-                    }}
-                    className="p-2 bg-gray-800/60 border border-blue-400/30 rounded-xl"
-                    title="Projects"
-                  >
-                    📁
-                  </button>
-                  <button
-                    onClick={() => setShowBrandModal(true)}
-                    className="p-2 bg-gray-800/60 border border-cyan-400/30 rounded-xl"
-                  >
-                    🎨
-                  </button>
-                  <button
-                    onClick={handleLogout}
-                    className="p-2 bg-gray-800/60 border border-purple-400/30 rounded-xl"
-                  >
-                    🚪
-                  </button>
-                </div>
-              )}
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div className="bg-gray-800/40 backdrop-blur-xl rounded-2xl px-4 py-2 border border-white/5 w-full sm:w-auto overflow-x-auto">
+              <div className="bg-gray-800/40 backdrop-blur-xl rounded-2xl px-4 py-2 border border-white/5 w-full sm:w-auto overflow-x-auto custom-scrollbar">
                 <div className="flex items-center gap-6 min-w-max">
                   {!creditsLoading ? (
                     <>
@@ -1114,11 +1096,11 @@ function Dashboard() {
             </div>
           </div>
           <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
-            <div className="flex-1">
+            <div className={`flex-1 ${(viewMode !== "create" && isMobile) ? 'hidden' : 'block'}`}>
               <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 lg:p-8 shadow-2xl">
                 {/* ✅ UPDATED HEADER: Logo Left, Library Button Right */}
                 <div className="mb-6 sm:mb-8 flex justify-between items-start">
-                  <div>
+                  <div className="hidden sm:block">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="h-12 sm:h-14 flex items-center justify-center">
                         <img
@@ -1133,8 +1115,8 @@ function Dashboard() {
                     </p>
                   </div>
 
-                  {/* ✅ GLOBAL HEADER BUTTONS */}
-                  <div className="flex gap-3">
+                  {/* ✅ GLOBAL HEADER BUTTONS (HIDDEN ON MOBILE) */}
+                  <div className="hidden sm:flex gap-3 ml-auto">
                     <button
                       type="button"
                       onClick={() =>
@@ -1188,7 +1170,7 @@ function Dashboard() {
                       <label className="block text-sm font-semibold text-white mb-3 sm:mb-4">
                         Select Content Type
                       </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+                      <div className="flex sm:grid sm:grid-cols-3 gap-2 sm:gap-3 overflow-x-auto pb-2 sm:pb-0 custom-scrollbar">
                         {/* TAB 1: PICDRIFT (Default) */}
                         <button
                           type="button"
@@ -1198,21 +1180,14 @@ function Dashboard() {
                             if (picDriftMode === "standard") setKieDuration(10);
                             else setKieDuration(5);
                           }}
-                          className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
+                          className={`flex-shrink-0 sm:flex-shrink p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group min-w-[120px] sm:min-w-0 ${
                             currentVisualTab === "picdrift"
                               ? "border-white/20 bg-gradient-to-br from-pink-500 to-rose-500 shadow-2xl scale-105"
-                              : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
+                              : "border-white/5 bg-gray-800/50 hover:border-white/10"
                           }`}
                         >
-                          <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="flex-1">
-                              <div className="font-semibold text-sm text-white">
-                                PicDrift
-                              </div>
-                            </div>
-                            {currentVisualTab === "picdrift" && (
-                              <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                            )}
+                          <div className="font-semibold text-xs sm:text-sm text-white">
+                            PicDrift
                           </div>
                         </button>
 
@@ -1223,36 +1198,24 @@ function Dashboard() {
                             href="http://picdrift.com/renders"
                             target="_blank"
                             rel="noreferrer"
-                            className="p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-violet-400/50 hover:bg-violet-900/20 transition-all duration-300 text-left group flex items-center justify-between"
+                            className="flex-shrink-0 sm:flex-shrink p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-violet-400/50 hover:bg-violet-900/20 transition-all duration-300 text-left group min-w-[120px] sm:min-w-0 flex items-center justify-between"
                           >
-                            <div className="flex items-center gap-2 sm:gap-3">
-                              <div className="font-semibold text-sm text-gray-400 group-hover:text-violet-300 flex items-center gap-2">
-                                <span>🔒</span> Pic FX
-                              </div>
-                            </div>
-                            <div className="text-xs bg-violet-600/20 text-violet-400 px-2 py-1 rounded-md font-bold group-hover:bg-violet-500 group-hover:text-white transition-colors">
-                              Unlock
+                            <div className="font-semibold text-xs sm:text-sm text-gray-400 group-hover:text-violet-300 flex items-center gap-1 sm:gap-2">
+                              <span>🔒</span> Pic FX
                             </div>
                           </a>
                         ) : (
                           <button
                             type="button"
                             onClick={() => setActiveEngine("studio")}
-                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
+                            className={`flex-shrink-0 sm:flex-shrink p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group min-w-[120px] sm:min-w-0 ${
                               currentVisualTab === "studio"
                                 ? "border-white/20 bg-gradient-to-br from-violet-700 to-purple-700 shadow-2xl scale-105"
-                                : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
+                                : "border-white/5 bg-gray-800/50 hover:border-white/10"
                             }`}
                           >
-                            <div className="flex items-center gap-2 sm:gap-3">
-                              <div className="flex-1">
-                                <div className="font-semibold text-sm text-white">
-                                  Pic FX
-                                </div>
-                              </div>
-                              {currentVisualTab === "studio" && (
-                                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                              )}
+                            <div className="font-semibold text-xs sm:text-sm text-white">
+                              Pic FX
                             </div>
                           </button>
                         )}
@@ -1267,15 +1230,10 @@ function Dashboard() {
                             href="http://picdrift.com/renders"
                             target="_blank"
                             rel="noreferrer"
-                            className="p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-cyan-400/50 hover:bg-cyan-900/20 transition-all duration-300 text-left group flex items-center justify-between"
+                            className="flex-shrink-0 sm:flex-shrink p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-cyan-400/50 hover:bg-cyan-900/20 transition-all duration-300 text-left group min-w-[120px] sm:min-w-0 flex items-center justify-between"
                           >
-                            <div className="flex items-center gap-2 sm:gap-3">
-                              <div className="font-semibold text-sm text-gray-400 group-hover:text-cyan-300 flex items-center gap-2">
-                                <span>🔒</span> Video FX
-                              </div>
-                            </div>
-                            <div className="text-xs bg-cyan-600/20 text-cyan-400 px-2 py-1 rounded-md font-bold group-hover:bg-cyan-500 group-hover:text-white transition-colors">
-                              Unlock
+                            <div className="font-semibold text-xs sm:text-sm text-gray-400 group-hover:text-cyan-300 flex items-center gap-1 sm:gap-2">
+                              <span>🔒</span> Video FX
                             </div>
                           </a>
                         ) : (
@@ -1286,21 +1244,14 @@ function Dashboard() {
                               setVideoFxMode("video");
                               setKieDuration(15);
                             }}
-                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${
+                            className={`flex-shrink-0 sm:flex-shrink p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group min-w-[120px] sm:min-w-0 ${
                               currentVisualTab === "videofx"
                                 ? "border-white/20 bg-gradient-to-br from-blue-700 to-cyan-700 shadow-2xl scale-105"
-                                : "border-white/5 bg-gray-800/50 hover:border-white/10 hover:scale-102"
+                                : "border-white/5 bg-gray-800/50 hover:border-white/10"
                             }`}
                           >
-                            <div className="flex items-center gap-2 sm:gap-3">
-                              <div className="flex-1">
-                                <div className="font-semibold text-sm text-white">
-                                  Video FX
-                                </div>
-                              </div>
-                              {currentVisualTab === "videofx" && (
-                                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                              )}
+                            <div className="font-semibold text-xs sm:text-sm text-white">
+                              Video FX
                             </div>
                           </button>
                         )}
@@ -2366,19 +2317,20 @@ function Dashboard() {
                   </>
                 )}
 
-                {/* ✅ SEQUENCE EDITOR VIEW */}
+                {/* ✅ FULLSCREEN SEQUENCE EDITOR */}
                 {viewMode === "sequencer" && (
-                  <SequenceEditor
+                  <FullscreenVideoEditor
                     sequence={sequence}
                     setSequence={setSequence}
                     onAddFromLibrary={() => setActiveLibrarySlot("sequencer")}
                     onClear={() => setSequence([])}
+                    onClose={() => setViewMode("create")}
                   />
                 )}
               </div>
             </div>
 
-            <div className="lg:w-96">
+            <div className={`lg:w-96 ${(viewMode !== "history" && isMobile) ? 'hidden' : 'block'}`}>
               <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 shadow-2xl sticky top-4">
                 <div className="flex items-center justify-between mb-4 sm:mb-6">
                   <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">

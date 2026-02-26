@@ -379,21 +379,21 @@ export function AssetLibrary({
   }, [selectedAsset, filteredAssets]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 backdrop-blur-md">
-      <div className="bg-gray-900 w-full max-w-6xl h-[85vh] rounded-2xl border border-gray-700 flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black sm:bg-black/95 sm:p-4 backdrop-blur-md">
+      <div className="bg-gray-900 w-full h-full sm:max-w-6xl sm:h-[85vh] sm:rounded-2xl border-0 sm:border border-gray-700 flex flex-col shadow-2xl overflow-hidden">
         {/* HEADER */}
-        <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900 z-10">
+        <div className="p-4 sm:p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900 z-10">
           <div>
-            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
               📚 Asset Library
             </h2>
-            <p className="text-sm text-gray-400">
-              Manage your generated and uploaded assets
+            <p className="text-[10px] sm:text-sm text-gray-400">
+              Manage your assets
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl"
+            className="text-gray-400 hover:text-white text-xl p-2"
           >
             ✕
           </button>
@@ -607,9 +607,9 @@ export function AssetLibrary({
             className="absolute inset-0"
             onClick={() => setSelectedAsset(null)}
           ></div>
-          <div className="relative bg-gray-900 border border-gray-700 rounded-2xl max-w-6xl w-full h-[85vh] flex overflow-hidden shadow-2xl z-10">
+          <div className="relative bg-gray-900 border-0 sm:border border-gray-700 sm:rounded-2xl max-w-6xl w-full h-full sm:h-[85vh] flex flex-col sm:flex-row overflow-hidden shadow-2xl z-10">
             {/* LEFT: IMAGE PREVIEW */}
-            <div className="flex-1 bg-black flex items-center justify-center p-8 border-r border-gray-800 relative group">
+            <div className="flex-1 bg-black flex items-center justify-center p-4 sm:p-8 border-b sm:border-b-0 sm:border-r border-gray-800 relative group min-h-[40vh]">
               {/* UNIFIED OVERLAY CONTROLS */}
               <div className="absolute top-4 right-4 z-20 flex gap-2">
                 <button
@@ -624,7 +624,7 @@ export function AssetLibrary({
                 >
                   ↩️
                 </button>
-                <span className="bg-black/50 text-white px-3 py-1.5 rounded-full text-xs font-mono backdrop-blur-md flex items-center border border-white/10 select-none">
+                <span className="bg-black/50 text-white px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-mono backdrop-blur-md flex items-center border border-white/10 select-none">
                   {selectedAsset.originalAssetId ? "v2" : "v1"}
                 </span>
                 <button
@@ -650,13 +650,13 @@ export function AssetLibrary({
                 className="max-w-full max-h-full object-contain rounded shadow-lg"
               />
 
-              {/* Navigation Arrows */}
+              {/* Navigation Arrows (HIDDEN ON MOBILE for better touch experience) */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   handlePrevAsset();
                 }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-white/20 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all z-10"
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-white/20 text-white rounded-full opacity-0 sm:group-hover:opacity-100 transition-all z-10 hidden sm:block"
               >
                 ◀
               </button>
@@ -665,7 +665,7 @@ export function AssetLibrary({
                   e.stopPropagation();
                   handleNextAsset();
                 }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-white/20 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all z-10"
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-white/20 text-white rounded-full opacity-0 sm:group-hover:opacity-100 transition-all z-10 hidden sm:block"
               >
                 ▶
               </button>
@@ -678,15 +678,15 @@ export function AssetLibrary({
             </div>
 
             {/* RIGHT: DETAILS */}
-            <div className="w-80 p-8 flex flex-col justify-between bg-gray-900">
+            <div className="w-full sm:w-80 p-6 sm:p-8 flex flex-col justify-between bg-gray-900 overflow-y-auto">
               <div>
-                <h3 className="text-2xl font-bold text-white mb-2">
+                <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">
                   Asset Details
                 </h3>
 
                 <div className="mb-6 space-y-4">
                   <div className="bg-gray-800/50 p-3 rounded-lg border border-gray-700">
-                    <span className="text-xs text-gray-500 uppercase font-bold block mb-1">
+                    <span className="text-[10px] text-gray-500 uppercase font-bold block mb-1">
                       Type
                     </span>
                     <p className="text-gray-300 text-sm font-medium">
@@ -708,21 +708,21 @@ export function AssetLibrary({
                         setStoryboardIds([...storyboardIds, selectedAsset.id]);
                       }
                     }}
-                    className={`w-full py-3 rounded-xl font-bold transition-all border ${
+                    className={`w-full py-3 rounded-xl font-bold transition-all border text-sm ${
                       storyboardIds.includes(selectedAsset.id)
                         ? "bg-red-900/30 text-red-400 border-red-500/50 hover:bg-red-900/50"
                         : "bg-indigo-900/30 text-indigo-400 border-indigo-500/50 hover:bg-indigo-900/50"
                     }`}
                   >
                     {storyboardIds.includes(selectedAsset.id)
-                      ? "➖ Remove from Storyboard"
+                      ? "➖ Remove"
                       : "➕ Add to Storyboard"}
                   </button>
 
                   {onSelect && (
                     <button
                       onClick={() => handleUseImage(selectedAsset)}
-                      className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-lg"
+                      className="w-full py-3 sm:py-4 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-lg text-sm"
                     >
                       Use this Asset
                     </button>
@@ -732,7 +732,7 @@ export function AssetLibrary({
                       setEditingAsset(selectedAsset);
                       setSelectedAsset(null);
                     }}
-                    className={`w-full py-3 border rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${activeDriftIds.has(selectedAsset.id) ? "bg-rose-600 text-white border-rose-500" : "bg-purple-600/20 text-purple-300 border-purple-500/50"}`}
+                    className={`w-full py-2 sm:py-3 border rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${activeDriftIds.has(selectedAsset.id) ? "bg-rose-600 text-white border-rose-500" : "bg-purple-600/20 text-purple-300 border-purple-500/50"}`}
                   >
                     <span>
                       {activeDriftIds.has(selectedAsset.id)
@@ -742,11 +742,11 @@ export function AssetLibrary({
                   </button>
                 </div>
               </div>
-              <div className="space-y-3 pt-6 border-t border-gray-800">
+              <div className="flex sm:flex-col gap-3 pt-6 border-t border-gray-800 mt-6 sm:mt-0">
                 <button
                   onClick={() => handleDownloadAsset(selectedAsset)}
                   disabled={isDownloading}
-                  className="w-full py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm"
+                  className="flex-1 sm:w-full py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs sm:text-sm"
                 >
                   {isDownloading ? <LoadingSpinner size="sm" /> : "Download"}
                 </button>
@@ -756,7 +756,7 @@ export function AssetLibrary({
                     if (window.confirm("Delete this asset?"))
                       deleteMutation.mutate(selectedAsset.id);
                   }}
-                  className="w-full py-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg text-sm"
+                  className="flex-1 sm:w-full py-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg text-xs sm:text-sm"
                 >
                   Delete
                 </button>

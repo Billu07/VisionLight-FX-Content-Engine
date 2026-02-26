@@ -14,11 +14,11 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
 
   if (mediaType === "video") {
     return (
-      <div className="w-full max-w-md mx-auto">
+      <div className="w-full h-full flex items-center justify-center">
         <video
           controls
-          className="w-full rounded-lg shadow-lg"
-          poster={mediaUrl.replace("/upload/", "/upload/w_400,h_400,c_fill/")}
+          autoPlay
+          className="max-w-full max-h-full object-contain shadow-2xl"
         >
           <source src={mediaUrl} type="video/mp4" />
           Your browser does not support the video tag.
@@ -28,11 +28,11 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
   }
 
   return (
-    <div className="w-full max-w-md mx-auto">
+    <div className="w-full h-full flex items-center justify-center">
       <img
         src={mediaUrl}
         alt="Generated content"
-        className="w-full rounded-lg shadow-lg"
+        className="max-w-full max-h-full object-contain shadow-2xl"
         loading="lazy"
       />
     </div>
