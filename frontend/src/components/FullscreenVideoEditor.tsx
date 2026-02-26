@@ -6,6 +6,8 @@ export interface SequenceItem {
   type: "IMAGE" | "VIDEO" | "CAROUSEL";
   title?: string;
   duration?: number; // In milliseconds
+  thumbnail?: string;
+  trimStart?: number; // Offset in ms for playback
 }
 
 interface FullscreenVideoEditorProps {
@@ -27,6 +29,7 @@ export function FullscreenVideoEditor({
   const [currentTime, setCurrentTime] = useState(0); // Global time in ms
   const [zoom, setZoom] = useState(1);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -67,7 +70,8 @@ export function FullscreenVideoEditor({
   useEffect(() => {
     if (currentItem?.type === "VIDEO" && videoRef.current) {
         // Only update if drift is significant to avoid stutter
-        const videoTime = localTime / 1000;
+        const trimOffset = currentItem.trimStart || 0;
+        const videoTime = (localTime + trimOffset) / 1000;
         if (Math.abs(videoRef.current.currentTime - videoTime) > 0.1) {
             videoRef.current.currentTime = videoTime;
         }
@@ -111,6 +115,43 @@ export function FullscreenVideoEditor({
   const handleSeek = (time: number) => {
     setCurrentTime(Math.max(0, Math.min(time, totalDuration)));
   };
+
+  const handleSplit = () => {
+    if (!currentItem || itemStartIndex === -1 || localTime <= 0 || localTime >= (currentItem.duration || 3000)) return;
+
+    const newSeq = [...sequence];
+    const itemToSplit = newSeq[itemStartIndex];
+    
+    // First half
+    const firstHalf: SequenceItem = {
+      ...itemToSplit,
+      id: crypto.randomUUID(),
+      duration: localTime,
+    };
+
+    // Second half
+    const secondHalf: SequenceItem = {
+      ...itemToSplit,
+      id: crypto.randomUUID(),
+      duration: (itemToSplit.duration || 3000) - localTime,
+      trimStart: (itemToSplit.trimStart || 0) + localTime,
+    };
+
+    newSeq.splice(itemStartIndex, 1, firstHalf, secondHalf);
+    setSequence(newSeq);
+    setSelectedItemId(secondHalf.id); // Select the new right half
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedItemId) {
+      setSequence(prev => prev.filter(item => item.id !== selectedItemId));
+      setSelectedItemId(null);
+    } else if (currentItem) {
+      // If nothing explicitly selected, delete the one under playhead
+      setSequence(prev => prev.filter(item => item.id !== currentItem.id));
+    }
+  };
+
 
   const handleTimelineMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     const handleMouseMove = (moveEvent: MouseEvent) => {
@@ -356,8 +397,8 @@ export function FullscreenVideoEditor({
             </div>
 
             <div className="flex gap-2">
-                <button className="text-[10px] font-bold text-gray-500 hover:text-white transition-colors uppercase tracking-widest px-3 py-1">✂ Split</button>
-                <button className="text-[10px] font-bold text-gray-500 hover:text-white transition-colors uppercase tracking-widest px-3 py-1">🗑 Delete</button>
+                <button onClick={handleSplit} className="text-[10px] font-bold text-gray-500 hover:text-white transition-colors uppercase tracking-widest px-3 py-1">✂ Split</button>
+                <button onClick={handleDeleteSelected} className="text-[10px] font-bold text-gray-500 hover:text-white transition-colors uppercase tracking-widest px-3 py-1">🗑 Delete</button>
             </div>
         </div>
 
@@ -383,7 +424,9 @@ export function FullscreenVideoEditor({
                     {sequence.map((item, idx) => (
                         <div 
                             key={item.id}
-                            className={`h-20 border-r border-black/50 overflow-hidden relative group/clip transition-all ${
+                            onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
+                            className={`h-20 border-r border-black/50 overflow-hidden relative group/clip transition-all cursor-pointer hover:opacity-80 ${
+                                selectedItemId === item.id ? 'ring-2 ring-purple-500 ring-inset z-10' : 
                                 itemStartIndex === idx ? 'ring-2 ring-cyan-500 ring-inset' : ''
                             }`}
                             style={{ width: `${((item.duration || 3000) / totalDuration) * 100}%` }}
