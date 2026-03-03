@@ -34,7 +34,8 @@ export const FalService = {
 
       const input: any = {
         prompt: params.prompt,
-        enable_web_search: true, // Always use web search for highest quality
+        // Disable web search for edits to drastically improve speed, keep true for fresh 4K generations
+        enable_web_search: isEdit ? false : true,
         safety_tolerance: "6", // Maximum creativity (least strict)
         output_format: "jpeg", // Force JPEG to compress 4K under Cloudinary's 10MB limit
       };
@@ -43,8 +44,8 @@ export const FalService = {
         input.aspect_ratio = params.aspectRatio;
       }
 
-      // Always use the highest resolution
-      input.resolution = "4K";
+      // 4K for initial generation, drop to 2K for edits to make the Editor UX much faster
+      input.resolution = isEdit ? "2K" : "4K";
 
       if (isEdit && params.referenceImages) {
         input.image_urls = params.referenceImages.map(
