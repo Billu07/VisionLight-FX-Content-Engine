@@ -44,8 +44,8 @@ export const FalService = {
         input.aspect_ratio = params.aspectRatio;
       }
 
-      // 4K for initial generation, drop to 2K for edits to make the Editor UX much faster
-      input.resolution = isEdit ? "2K" : "4K";
+      // Default to 1K resolution for both PicFX (generation) and Editor for maximum speed
+      input.resolution = "1K";
 
       if (isEdit && params.referenceImages) {
         input.image_urls = params.referenceImages.map(
