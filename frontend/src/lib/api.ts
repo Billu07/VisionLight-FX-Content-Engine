@@ -7,7 +7,7 @@ console.log("🔧 API Base URL:", API_BASE_URL);
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 60000,
+  timeout: 180000,
 });
 
 export const setAuthToken = (token: string | null) => {
