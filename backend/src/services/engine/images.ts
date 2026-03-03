@@ -15,7 +15,7 @@ export const imageLogic = {
   // === GENERATION ===
   async startImageGeneration(postId: string, finalPrompt: string, params: any) {
     console.log(
-      `🎨 Gemini 3 Pro Gen for Post ${postId} | AR: ${params.aspectRatio}`,
+      `🎨 FAL Nano Banana Gen for Post ${postId} | AR: ${params.aspectRatio}`,
     );
     try {
       const refUrls =
@@ -29,7 +29,7 @@ export const imageLogic = {
       else if (ar === "9:16" || ar === "portrait") targetRatio = "9:16";
       else if (ar === "16:9" || ar === "landscape") targetRatio = "16:9";
 
-      const buf = await GeminiService.generateOrEditImage({
+      const buf = await FalService.generateOrEditImage({
         prompt: finalPrompt,
         aspectRatio: targetRatio,
         referenceImages: refBuffers,
@@ -41,12 +41,12 @@ export const imageLogic = {
         buf,
         postId,
         params.userId,
-        "Gemini 3 Pro Image",
+        "FAL Nano Banana Image",
         "image",
       );
       await airtableService.updatePost(postId, {
         mediaUrl: cloudUrl,
-        mediaProvider: "gemini-3-pro",
+        mediaProvider: "fal-nano-banana",
         status: "READY",
         progress: 100,
         generationStep: "COMPLETED",
@@ -69,7 +69,7 @@ export const imageLogic = {
     finalPrompt: string,
     params: any,
   ) {
-    console.log(`🎠 Gemini 3 Pro Carousel for Post ${postId}`);
+    console.log(`🎠 FAL Nano Banana Carousel for Post ${postId}`);
     try {
       const imageUrls: string[] = [];
       const userRefBuffers = await downloadAndOptimizeImages(
@@ -94,7 +94,7 @@ export const imageLogic = {
         }/3. THEME: ${finalPrompt}. FOCUS: ${
           steps[i]
         }. CONSTRAINT: Maintain visual consistency.`;
-        const buf = await GeminiService.generateOrEditImage({
+        const buf = await FalService.generateOrEditImage({
           prompt: stepPrompt,
           aspectRatio: targetRatio,
           referenceImages: carouselHistory,
@@ -112,7 +112,7 @@ export const imageLogic = {
       }
       await airtableService.updatePost(postId, {
         mediaUrl: JSON.stringify(imageUrls),
-        mediaProvider: "gemini-3-carousel",
+        mediaProvider: "fal-nano-banana-carousel",
         status: "READY",
         progress: 100,
         generationStep: "COMPLETED",
@@ -181,7 +181,7 @@ export const imageLogic = {
           finalPrompt = `TASK: ${prompt} \nINPUT 2 is style reference. Maintain ID of INPUT 1.`;
       }
 
-      const editedBuffer = await GeminiService.generateOrEditImage({
+      const editedBuffer = await FalService.generateOrEditImage({
         prompt: finalPrompt,
         aspectRatio: targetConfigRatio,
         referenceImages: inputBuffers,

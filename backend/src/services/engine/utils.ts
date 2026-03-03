@@ -2,6 +2,7 @@ import sharp from "sharp";
 import axios from "axios";
 import { cloudinaryClient } from "./config";
 import { GeminiService } from "../gemini";
+import { FalService } from "../fal";
 
 // Helper: Fix Cloudinary URLs
 export const getOptimizedUrl = (url: string) => {
@@ -104,9 +105,9 @@ export const resizeWithGemini = async (
     High fidelity, photorealistic style.
     `;
 
-    // 2. Call Gemini (Passing original buffer directly)
-    // Your gemini.ts handles the actual aspect_ratio param in the config
-    return await GeminiService.generateOrEditImage({
+    // 2. Call FAL (Passing original buffer directly)
+    // Your fal.ts handles the actual aspect_ratio param in the config
+    return await FalService.generateOrEditImage({
       prompt: fullPrompt,
       aspectRatio: targetRatioString,
       referenceImages: [originalBuffer], // Passing the raw image, no black bars
@@ -114,7 +115,7 @@ export const resizeWithGemini = async (
       imageSize: "2K", // Request high res for the expansion
     });
   } catch (error: any) {
-    console.error("❌ Gemini Direct Error:", error.message);
+    console.error("❌ FAL Direct Error:", error.message);
     throw error;
   }
 };
