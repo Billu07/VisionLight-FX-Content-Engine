@@ -141,9 +141,8 @@ function Dashboard() {
   // === SEQUENCER STATE ===
   const [viewMode, setViewMode] = useState<"create" | "sequencer" | "history">("create");
 
-  const sequenceKey = `visionlight_sequence_${
-    localStorage.getItem("visionlight_active_project") || "default"
-  }`;
+  const sequenceKey = `visionlight_sequence_${localStorage.getItem("visionlight_active_project") || "default"
+    }`;
   const [sequence, setSequence] = useState<SequenceItem[]>(() => {
     try {
       const stored = localStorage.getItem(sequenceKey);
@@ -489,7 +488,7 @@ function Dashboard() {
       try {
         const parsed = JSON.parse(url);
         if (Array.isArray(parsed) && parsed.length > 0) url = parsed[0];
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const item: SequenceItem = {
@@ -709,23 +708,23 @@ function Dashboard() {
             onClose={() => setViewMode("create")}
           />
         )}
-        
+
         {/* MOBILE NAVBAR */}
-        <MobileNavbar 
+        <MobileNavbar
           activeTab={viewMode}
           onTabChange={(tab) => {
-             if (tab === "library") setActiveLibrarySlot("generic");
-             else if (tab === "projects") {
-                localStorage.removeItem("visionlight_active_project");
-                navigate("/projects");
-             } else {
-                setViewMode(tab);
-             }
+            if (tab === "library") setActiveLibrarySlot("generic");
+            else if (tab === "projects") {
+              localStorage.removeItem("visionlight_active_project");
+              navigate("/projects");
+            } else {
+              setViewMode(tab);
+            }
           }}
           onOpenLibrary={() => setActiveLibrarySlot("generic")}
           onOpenProjects={() => {
-              localStorage.removeItem("visionlight_active_project");
-              navigate("/projects");
+            localStorage.removeItem("visionlight_active_project");
+            navigate("/projects");
           }}
         />
 
@@ -746,7 +745,7 @@ function Dashboard() {
                   className="w-14 h-12 object-contain"
                 />
                 <h3 className="text-white font-bold tracking-widest text-sm mt-2">
-                  3D-X-FRAME-EXTRACTOR
+                  3DX FRAME EXTRACTOR
                 </h3>
               </div>
               <DriftFrameExtractor
@@ -788,7 +787,7 @@ function Dashboard() {
               onClick={(e) => e.stopPropagation()}
             >
               {previewMedia.type === "carousel" &&
-              Array.isArray(previewMedia.url) ? (
+                Array.isArray(previewMedia.url) ? (
                 <div className="flex flex-col items-center w-full h-full justify-center p-4">
                   <img
                     src={previewMedia.url[previewCarouselIndex]}
@@ -800,11 +799,10 @@ function Dashboard() {
                         <button
                           key={idx}
                           onClick={() => setPreviewCarouselIndex(idx)}
-                          className={`w-2.5 h-2.5 rounded-full transition-all ${
-                            idx === previewCarouselIndex
+                          className={`w-2.5 h-2.5 rounded-full transition-all ${idx === previewCarouselIndex
                               ? "bg-white scale-125 shadow-[0_0_10px_rgba(255,255,255,0.8)]"
                               : "bg-white/30 hover:bg-white/60"
-                          }`}
+                            }`}
                         />
                       ))}
                     </div>
@@ -1137,11 +1135,10 @@ function Dashboard() {
                           viewMode === "create" ? "sequencer" : "create",
                         )
                       }
-                      className={`text-xs px-4 py-2 rounded-lg border font-semibold transition-colors flex items-center gap-2 ${
-                        viewMode === "sequencer"
+                      className={`text-xs px-4 py-2 rounded-lg border font-semibold transition-colors flex items-center gap-2 ${viewMode === "sequencer"
                           ? "bg-purple-600 text-white border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]"
                           : "bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700 hover:text-white"
-                      }`}
+                        }`}
                     >
                       <span></span>{" "}
                       {viewMode === "sequencer"
@@ -1165,11 +1162,10 @@ function Dashboard() {
                           currentVisualTab === "picdrift" ? "start" : "generic",
                         );
                       }}
-                      className={`text-xs px-4 py-2 rounded-lg border flex items-center gap-2 transition-all font-semibold shadow-lg ${
-                        currentVisualTab === "picdrift"
+                      className={`text-xs px-4 py-2 rounded-lg border flex items-center gap-2 transition-all font-semibold shadow-lg ${currentVisualTab === "picdrift"
                           ? "bg-rose-900/50 text-rose-300 border-rose-700/50 hover:bg-rose-800 hover:border-rose-500"
                           : "bg-cyan-900/50 text-cyan-300 border-cyan-700/50 hover:bg-cyan-800 hover:border-cyan-500"
-                      }`}
+                        }`}
                     >
                       <span></span> Open Library
                     </button>
@@ -1193,11 +1189,10 @@ function Dashboard() {
                             if (picDriftMode === "standard") setKieDuration(10);
                             else setKieDuration(5);
                           }}
-                          className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group flex flex-col items-center justify-center text-center sm:text-left sm:block sm:items-start ${
-                            currentVisualTab === "picdrift"
+                          className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group flex flex-col items-center justify-center text-center sm:text-left sm:block sm:items-start ${currentVisualTab === "picdrift"
                               ? "border-white/20 bg-gradient-to-br from-pink-500 to-rose-500 shadow-2xl scale-105"
                               : "border-white/5 bg-gray-800/50 hover:border-white/10"
-                          }`}
+                            }`}
                         >
                           <div className="font-semibold text-xs sm:text-sm text-white">
                             PicDrift
@@ -1206,7 +1201,7 @@ function Dashboard() {
 
                         {/* TAB 2: PIC FX */}
                         {user?.view === "PICDRIFT" &&
-                        credits.creditsImageFX <= 0 ? (
+                          credits.creditsImageFX <= 0 ? (
                           <a
                             href="http://picdrift.com/renders"
                             target="_blank"
@@ -1221,11 +1216,10 @@ function Dashboard() {
                           <button
                             type="button"
                             onClick={() => setActiveEngine("studio")}
-                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${
-                              currentVisualTab === "studio"
+                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${currentVisualTab === "studio"
                                 ? "border-white/20 bg-gradient-to-br from-violet-700 to-purple-700 shadow-2xl scale-105"
                                 : "border-white/5 bg-gray-800/50 hover:border-white/10"
-                            }`}
+                              }`}
                           >
                             <div className="font-semibold text-xs sm:text-sm text-white">
                               Pic FX
@@ -1235,7 +1229,7 @@ function Dashboard() {
 
                         {/* TAB 3: VIDEO FX */}
                         {user?.view === "PICDRIFT" &&
-                        credits.creditsVideoFX1 +
+                          credits.creditsVideoFX1 +
                           credits.creditsVideoFX2 +
                           credits.creditsVideoFX3 <=
                           0 ? (
@@ -1257,11 +1251,10 @@ function Dashboard() {
                               setVideoFxMode("video");
                               setKieDuration(15);
                             }}
-                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${
-                              currentVisualTab === "videofx"
+                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${currentVisualTab === "videofx"
                                 ? "border-white/20 bg-gradient-to-br from-blue-700 to-cyan-700 shadow-2xl scale-105"
                                 : "border-white/5 bg-gray-800/50 hover:border-white/10"
-                            }`}
+                              }`}
                           >
                             <div className="font-semibold text-xs sm:text-sm text-white">
                               Video FX
@@ -1277,31 +1270,28 @@ function Dashboard() {
                         <div className="flex bg-gray-900/50 p-1 rounded-xl w-full sm:max-w-sm mx-auto border border-white/5">
                           <button
                             onClick={() => setStudioMode("image")}
-                            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
-                              studioMode === "image"
+                            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${studioMode === "image"
                                 ? "bg-violet-600 text-white shadow-lg"
                                 : "text-gray-400 hover:text-white"
-                            }`}
+                              }`}
                           >
                             Image FX
                           </button>
                           <button
                             onClick={() => setStudioMode("carousel")}
-                            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
-                              studioMode === "carousel"
+                            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${studioMode === "carousel"
                                 ? "bg-fuchsia-600 text-white shadow-lg"
                                 : "text-gray-400 hover:text-white"
-                            }`}
+                              }`}
                           >
                             Carousel
                           </button>
                           <button
                             onClick={() => setStudioMode("edit")}
-                            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
-                              studioMode === "edit"
+                            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${studioMode === "edit"
                                 ? "bg-cyan-600 text-white shadow-lg"
                                 : "text-gray-400 hover:text-white"
-                            }`}
+                              }`}
                           >
                             PicFX Editor
                           </button>
@@ -1316,11 +1306,10 @@ function Dashboard() {
                               <button
                                 key={a.id}
                                 onClick={() => setGeminiAspect(a.id as any)}
-                                className={`px-3 py-2 sm:px-4 rounded-lg border text-xs font-bold transition-all ${
-                                  geminiAspect === a.id
+                                className={`px-3 py-2 sm:px-4 rounded-lg border text-xs font-bold transition-all ${geminiAspect === a.id
                                     ? "bg-violet-600 border-violet-500 text-white"
                                     : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
-                                }`}
+                                  }`}
                               >
                                 {a.label}
                               </button>
@@ -1340,11 +1329,10 @@ function Dashboard() {
                               setPicDriftMode("standard");
                               setKieDuration(10);
                             }}
-                            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
-                              picDriftMode === "standard"
+                            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${picDriftMode === "standard"
                                 ? "bg-rose-600 text-white shadow-lg"
                                 : "text-gray-400 hover:text-white"
-                            }`}
+                              }`}
                           >
                             Standard
                           </button>
@@ -1354,11 +1342,10 @@ function Dashboard() {
                               setPicDriftMode("plus");
                               setKieDuration(5);
                             }}
-                            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
-                              picDriftMode === "plus"
+                            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${picDriftMode === "plus"
                                 ? "bg-rose-600 text-white shadow-lg"
                                 : "text-gray-400 hover:text-white"
-                            }`}
+                              }`}
                           >
                             PicDrift Plus
                           </button>
@@ -1377,33 +1364,30 @@ function Dashboard() {
                               setVideoFxMode("video");
                               setKieDuration(15);
                             }}
-                            className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${
-                              activeEngine === "kie"
+                            className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeEngine === "kie"
                                 ? "bg-cyan-600 text-white shadow-lg"
                                 : "text-gray-400 hover:text-white"
-                            }`}
+                              }`}
                           >
                             Video FX 1
                           </button>
                           <button
                             type="button"
                             onClick={() => setActiveEngine("openai")}
-                            className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${
-                              activeEngine === "openai"
+                            className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeEngine === "openai"
                                 ? "bg-cyan-600 text-white shadow-lg"
                                 : "text-gray-400 hover:text-white"
-                            }`}
+                              }`}
                           >
                             Video FX 2
                           </button>
                           <button
                             type="button"
                             onClick={() => setActiveEngine("veo")}
-                            className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${
-                              activeEngine === "veo"
+                            className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeEngine === "veo"
                                 ? "bg-cyan-600 text-white shadow-lg"
                                 : "text-gray-400 hover:text-white"
-                            }`}
+                              }`}
                           >
                             Video FX 3
                           </button>
@@ -1417,7 +1401,7 @@ function Dashboard() {
                     >
                       {/* MAGIC EDIT UI */}
                       {currentVisualTab === "studio" &&
-                      studioMode === "edit" ? (
+                        studioMode === "edit" ? (
                         <div className="bg-gray-900/50 border border-cyan-500/30 rounded-2xl p-8 text-center space-y-5 animate-in fade-in">
                           <div className="w-20 h-20 bg-cyan-900/20 rounded-full flex items-center justify-center mx-auto border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
                             <span className="text-4xl"></span>
@@ -1637,11 +1621,10 @@ function Dashboard() {
                                         key={m.id}
                                         type="button"
                                         onClick={() => setKieModel(m.id as any)}
-                                        className={`p-3 rounded-xl border text-left text-sm font-medium ${
-                                          kieModel === m.id
+                                        className={`p-3 rounded-xl border text-left text-sm font-medium ${kieModel === m.id
                                             ? "bg-cyan-600 border-cyan-500 text-white"
                                             : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
-                                        }`}
+                                          }`}
                                       >
                                         {m.label}
                                       </button>
@@ -1661,11 +1644,10 @@ function Dashboard() {
                                           onClick={() =>
                                             setKieDuration(d as any)
                                           }
-                                          className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                            kieDuration === d
+                                          className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieDuration === d
                                               ? "bg-cyan-600 border-cyan-600 text-white"
                                               : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                          }`}
+                                            }`}
                                         >
                                           {d}s
                                         </button>
@@ -1688,11 +1670,10 @@ function Dashboard() {
                                           onClick={() =>
                                             setKieAspect(a.id as any)
                                           }
-                                          className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                            kieAspect === a.id
+                                          className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieAspect === a.id
                                               ? "bg-cyan-600 border-cyan-600 text-white"
                                               : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                          }`}
+                                            }`}
                                         >
                                           {a.label}
                                         </button>
@@ -1714,11 +1695,10 @@ function Dashboard() {
                                           onClick={() =>
                                             setKieResolution(r.id as any)
                                           }
-                                          className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                            kieResolution === r.id
+                                          className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieResolution === r.id
                                               ? "bg-cyan-600 border-cyan-600 text-white"
                                               : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                          }`}
+                                            }`}
                                         >
                                           {r.label}
                                         </button>
@@ -1743,11 +1723,10 @@ function Dashboard() {
                                         key={d}
                                         type="button"
                                         onClick={() => setKieDuration(d as any)}
-                                        className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                          kieDuration === d
+                                        className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieDuration === d
                                             ? "bg-rose-600 border-rose-600 text-white"
                                             : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                        }`}
+                                          }`}
                                       >
                                         {d}s
                                       </button>
@@ -1771,11 +1750,10 @@ function Dashboard() {
                                         onClick={() =>
                                           setKieAspect(a.id as any)
                                         }
-                                        className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                          kieAspect === a.id
+                                        className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieAspect === a.id
                                             ? "bg-rose-600 border-rose-600 text-white"
                                             : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                        }`}
+                                          }`}
                                       >
                                         {a.label}
                                       </button>
@@ -1849,11 +1827,10 @@ function Dashboard() {
                                         onClick={() =>
                                           setVideoModel(model.id as any)
                                         }
-                                        className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${
-                                          videoModel === model.id
+                                        className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${videoModel === model.id
                                             ? "border-cyan-400 bg-cyan-500/20"
                                             : "border-white/10 bg-gray-800/50"
-                                        }`}
+                                          }`}
                                       >
                                         <div className="font-semibold text-white text-sm">
                                           {model.label}
@@ -1882,11 +1859,10 @@ function Dashboard() {
                                               : "1024x1792",
                                           );
                                         }}
-                                        className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${
-                                          aspectRatio === ratio
+                                        className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${aspectRatio === ratio
                                             ? "border-purple-400 bg-purple-500/20"
                                             : "border-white/10 bg-gray-800/50"
-                                        }`}
+                                          }`}
                                       >
                                         <div className="font-semibold text-white text-sm">
                                           {label}
@@ -1902,33 +1878,33 @@ function Dashboard() {
                                   <div className="grid grid-cols-2 gap-2">
                                     {(aspectRatio === "16:9"
                                       ? [
-                                          {
-                                            size: "1280x720",
-                                            label: "720p HD",
-                                          },
-                                          ...(videoModel === "sora-2-pro"
-                                            ? [
-                                                {
-                                                  size: "1792x1024",
-                                                  label: "1080p",
-                                                },
-                                              ]
-                                            : []),
-                                        ]
+                                        {
+                                          size: "1280x720",
+                                          label: "720p HD",
+                                        },
+                                        ...(videoModel === "sora-2-pro"
+                                          ? [
+                                            {
+                                              size: "1792x1024",
+                                              label: "1080p",
+                                            },
+                                          ]
+                                          : []),
+                                      ]
                                       : [
-                                          {
-                                            size: "720x1280",
-                                            label: "720p HD",
-                                          },
-                                          ...(videoModel === "sora-2-pro"
-                                            ? [
-                                                {
-                                                  size: "1024x1792",
-                                                  label: "1080p",
-                                                },
-                                              ]
-                                            : []),
-                                        ]
+                                        {
+                                          size: "720x1280",
+                                          label: "720p HD",
+                                        },
+                                        ...(videoModel === "sora-2-pro"
+                                          ? [
+                                            {
+                                              size: "1024x1792",
+                                              label: "1080p",
+                                            },
+                                          ]
+                                          : []),
+                                      ]
                                     ).map(({ size, label }) => (
                                       <button
                                         key={size}
@@ -1936,11 +1912,10 @@ function Dashboard() {
                                         onClick={() =>
                                           setVideoSize(size as any)
                                         }
-                                        className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${
-                                          videoSize === size
+                                        className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${videoSize === size
                                             ? "border-green-400 bg-green-500/20"
                                             : "border-white/10 bg-gray-800/50"
-                                        }`}
+                                          }`}
                                       >
                                         <div className="font-semibold text-white text-sm">
                                           {label}
@@ -1961,11 +1936,10 @@ function Dashboard() {
                                         onClick={() =>
                                           setVideoDuration(sec as any)
                                         }
-                                        className={`px-3 py-2 rounded-xl border text-sm flex-1 ${
-                                          videoDuration === sec
+                                        className={`px-3 py-2 rounded-xl border text-sm flex-1 ${videoDuration === sec
                                             ? "bg-cyan-500 border-cyan-500 text-white"
                                             : "bg-gray-800/50 border-white/10 text-purple-200"
-                                        }`}
+                                          }`}
                                       >
                                         {sec}s
                                       </button>
@@ -2000,11 +1974,10 @@ function Dashboard() {
                                         onClick={() =>
                                           setAspectRatio(ratio as any)
                                         }
-                                        className={`py-4 px-4 rounded-xl border transition-all text-center ${
-                                          aspectRatio === ratio
+                                        className={`py-4 px-4 rounded-xl border transition-all text-center ${aspectRatio === ratio
                                             ? "border-indigo-500 bg-indigo-500/10 text-indigo-100 shadow-[0_0_20px_rgba(99,102,241,0.1)]"
                                             : "border-slate-800 bg-slate-900/40 text-slate-500 hover:border-slate-700"
-                                        }`}
+                                          }`}
                                       >
                                         <div className="text-xs font-medium tracking-tight">
                                           {label}
@@ -2027,11 +2000,10 @@ function Dashboard() {
                                           onClick={() =>
                                             setVeoResolution(res as any)
                                           }
-                                          className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${
-                                            veoResolution === res
+                                          className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${veoResolution === res
                                               ? "bg-indigo-500 text-white"
                                               : "text-slate-500 hover:text-slate-300"
-                                          }`}
+                                            }`}
                                         >
                                           {res.toUpperCase()}
                                         </button>
@@ -2051,11 +2023,10 @@ function Dashboard() {
                                           onClick={() =>
                                             setVeoDuration(sec as any)
                                           }
-                                          className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${
-                                            veoDuration === sec
+                                          className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${veoDuration === sec
                                               ? "bg-indigo-500 text-white"
                                               : "text-slate-500 hover:text-slate-300"
-                                          }`}
+                                            }`}
                                         >
                                           {sec}s
                                         </button>
@@ -2068,7 +2039,7 @@ function Dashboard() {
 
                           {/* 4. REFERENCE IMAGES */}
                           {activeEngine !== "kie" ||
-                          videoFxMode !== "picdrift" ? (
+                            videoFxMode !== "picdrift" ? (
                             <div className="space-y-4">
                               <div className="flex justify-between items-center">
                                 <label
@@ -2103,9 +2074,9 @@ function Dashboard() {
                                         {referenceImageUrls[0].includes(
                                           "video",
                                         ) ||
-                                        referenceImageUrls[0].endsWith(
-                                          ".mp4",
-                                        ) ? (
+                                          referenceImageUrls[0].endsWith(
+                                            ".mp4",
+                                          ) ? (
                                           <video
                                             src={referenceImageUrls[0]}
                                             className="w-full h-full object-contain"
@@ -2134,7 +2105,7 @@ function Dashboard() {
                                           {referenceImageUrls[0].includes(
                                             "video",
                                           ) ||
-                                          referenceImageUrls[0].endsWith(".mp4")
+                                            referenceImageUrls[0].endsWith(".mp4")
                                             ? "Extend Video Mode"
                                             : "Image-to-Video Mode"}
                                         </div>
@@ -2226,7 +2197,7 @@ function Dashboard() {
                                     </div>
                                     <p className="absolute bottom-2 text-[10px] text-gray-600">
                                       {activeEngine === "studio" &&
-                                      studioMode === "carousel"
+                                        studioMode === "carousel"
                                         ? "Up to 14 images"
                                         : "Single frame (PNG/JPG/MP4)"}
                                     </p>
@@ -2239,7 +2210,7 @@ function Dashboard() {
                                           className="relative aspect-square group"
                                         >
                                           {url.includes("video") ||
-                                          url.endsWith(".mp4") ? (
+                                            url.endsWith(".mp4") ? (
                                             <video
                                               src={url}
                                               className="w-full h-full object-cover rounded-lg border border-white/20"
@@ -2281,15 +2252,14 @@ function Dashboard() {
                             disabled={
                               generateMediaMutation.isPending || !prompt.trim()
                             }
-                            className={`w-full py-4 sm:py-5 px-6 sm:px-8 rounded-2xl transition-all disabled:opacity-50 font-bold text-base sm:text-lg flex flex-col items-center justify-center gap-1 ${
-                              activeEngine === "veo"
+                            className={`w-full py-4 sm:py-5 px-6 sm:px-8 rounded-2xl transition-all disabled:opacity-50 font-bold text-base sm:text-lg flex flex-col items-center justify-center gap-1 ${activeEngine === "veo"
                                 ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg"
                                 : currentVisualTab === "picdrift"
                                   ? "bg-rose-600 hover:bg-rose-500 text-white shadow-lg"
                                   : currentVisualTab === "studio"
                                     ? "bg-violet-600 hover:bg-violet-500 text-white shadow-lg"
                                     : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg"
-                            }`}
+                              }`}
                           >
                             {generateMediaMutation.isPending ? (
                               <div className="flex items-center gap-3">
@@ -2391,13 +2361,13 @@ function Dashboard() {
                             if (type === "carousel") {
                               try {
                                 url = JSON.parse(post.mediaUrl);
-                              } catch (e) {}
+                              } catch (e) { }
                             }
                             setPreviewMedia({ type: type as any, url });
                           }}
                           onMoveToAsset={
                             post.mediaType === "IMAGE" ||
-                            post.mediaType === "CAROUSEL"
+                              post.mediaType === "CAROUSEL"
                               ? () => handleMoveToAssets(post.id)
                               : undefined
                           }
@@ -2471,7 +2441,7 @@ function Dashboard() {
                 if (type === "carousel") {
                   try {
                     url = JSON.parse(media.mediaUrl);
-                  } catch (e) {}
+                  } catch (e) { }
                 }
                 setPreviewMedia({ type: type as any, url });
               }}

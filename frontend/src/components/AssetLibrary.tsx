@@ -122,37 +122,37 @@ export function AssetLibrary({
   // ✅ REFINED FILTER LOGIC
   let filteredAssets = Array.isArray(assets)
     ? assets.filter((a: Asset) => {
-        if (activeTab === "STORYBOARD") return false; // Handled below
-        if (activeTab === "VIDEO") return a.type === "VIDEO";
+      if (activeTab === "STORYBOARD") return false; // Handled below
+      if (activeTab === "VIDEO") return a.type === "VIDEO";
 
-        // Originals Tab: STRICTLY raw uploads (no parent)
-        if (activeTab === "original") {
-          return (
-            a.type === "IMAGE" &&
-            a.aspectRatio === "original" &&
-            !a.originalAssetId // Must be a root asset
-          );
-        }
+      // Originals Tab: STRICTLY raw uploads (no parent)
+      if (activeTab === "original") {
+        return (
+          a.type === "IMAGE" &&
+          a.aspectRatio === "original" &&
+          !a.originalAssetId // Must be a root asset
+        );
+      }
 
-        // Edited/Custom Tab:
-        // 1. Explicit 'custom' ratio
-        // 2. 'original' ratio BUT has a parent (meaning it was edited but size kept)
-        // 3. Weird ratios that aren't the standard 3
-        if (activeTab === "custom") {
-          return (
-            a.type === "IMAGE" &&
-            (a.aspectRatio === "custom" ||
-              (a.aspectRatio === "original" && a.originalAssetId) ||
-              (a.aspectRatio !== "16:9" &&
-                a.aspectRatio !== "9:16" &&
-                a.aspectRatio !== "1:1" &&
-                a.aspectRatio !== "original"))
-          );
-        }
+      // Edited/Custom Tab:
+      // 1. Explicit 'custom' ratio
+      // 2. 'original' ratio BUT has a parent (meaning it was edited but size kept)
+      // 3. Weird ratios that aren't the standard 3
+      if (activeTab === "custom") {
+        return (
+          a.type === "IMAGE" &&
+          (a.aspectRatio === "custom" ||
+            (a.aspectRatio === "original" && a.originalAssetId) ||
+            (a.aspectRatio !== "16:9" &&
+              a.aspectRatio !== "9:16" &&
+              a.aspectRatio !== "1:1" &&
+              a.aspectRatio !== "original"))
+        );
+      }
 
-        // Standard Ratios (16:9, 9:16, 1:1)
-        return a.type === "IMAGE" && a.aspectRatio === activeTab;
-      })
+      // Standard Ratios (16:9, 9:16, 1:1)
+      return a.type === "IMAGE" && a.aspectRatio === activeTab;
+    })
     : [];
 
   if (activeTab === "STORYBOARD") {
@@ -409,16 +409,15 @@ export function AssetLibrary({
               { id: "custom", label: "Edited" },
               { id: "original", label: "Originals" },
               { id: "STORYBOARD", label: "Storyboard" },
-              { id: "VIDEO", label: "3D-X-Paths" },
+              { id: "VIDEO", label: "3DX Paths" },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-md text-[10px] sm:text-xs md:text-sm font-bold whitespace-nowrap transition-all flex-1 sm:flex-none text-center ${
-                  activeTab === tab.id
-                    ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg"
-                    : "text-gray-400 hover:text-white hover:bg-gray-800"
-                }`}
+                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-md text-[10px] sm:text-xs md:text-sm font-bold whitespace-nowrap transition-all flex-1 sm:flex-none text-center ${activeTab === tab.id
+                  ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg"
+                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+                  }`}
               >
                 {tab.label}
               </button>
@@ -497,8 +496,8 @@ export function AssetLibrary({
                     <span className="text-cyan-400 text-xs font-bold mt-3 tracking-wide">
                       Generating{" "}
                       {activeTab !== "original" &&
-                      activeTab !== "VIDEO" &&
-                      activeTab !== "custom"
+                        activeTab !== "VIDEO" &&
+                        activeTab !== "custom"
                         ? activeTab
                         : "Asset"}
                       ...
@@ -521,11 +520,10 @@ export function AssetLibrary({
                       if (asset.type === "VIDEO") setViewingVideoAsset(asset);
                       else setSelectedAsset(asset);
                     }}
-                    className={`relative group border rounded-xl overflow-hidden bg-black cursor-pointer transition-all hover:shadow-2xl hover:shadow-cyan-900/20 ${
-                      activeDriftIds.has(asset.id)
-                        ? "border-rose-500 ring-2 ring-rose-500/50"
-                        : "border-gray-800 hover:border-cyan-500/50"
-                    }`}
+                    className={`relative group border rounded-xl overflow-hidden bg-black cursor-pointer transition-all hover:shadow-2xl hover:shadow-cyan-900/20 ${activeDriftIds.has(asset.id)
+                      ? "border-rose-500 ring-2 ring-rose-500/50"
+                      : "border-gray-800 hover:border-cyan-500/50"
+                      }`}
                   >
                     {/* THUMBNAIL LOGIC */}
                     {activeTab === "STORYBOARD" && (
@@ -575,7 +573,7 @@ export function AssetLibrary({
                         />
                         <div className="absolute inset-0 flex items-center justify-center">
                           <div className="w-12 h-12 bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-full flex items-center justify-center transition-all shadow-lg text-white">
-                            <svg className="w-6 h-6 ml-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                            <svg className="w-6 h-6 ml-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3" /></svg>
                           </div>
                         </div>
                       </div>
@@ -615,11 +613,10 @@ export function AssetLibrary({
                 <button
                   onClick={handleGoToOriginal}
                   disabled={!selectedAsset.originalAssetId}
-                  className={`p-2 rounded-full text-white backdrop-blur-md transition-all border border-white/10 ${
-                    selectedAsset.originalAssetId
-                      ? "bg-gray-800/80 hover:bg-gray-700 hover:border-white/30"
-                      : "bg-gray-800/30 opacity-30 cursor-not-allowed"
-                  }`}
+                  className={`p-2 rounded-full text-white backdrop-blur-md transition-all border border-white/10 ${selectedAsset.originalAssetId
+                    ? "bg-gray-800/80 hover:bg-gray-700 hover:border-white/30"
+                    : "bg-gray-800/30 opacity-30 cursor-not-allowed"
+                    }`}
                   title="Go to Original (v1)"
                 >
                   ↩️
@@ -633,12 +630,11 @@ export function AssetLibrary({
                     !selectedAsset.variations ||
                     selectedAsset.variations.length === 0
                   }
-                  className={`p-2 rounded-full text-white backdrop-blur-md transition-all border border-white/10 ${
-                    selectedAsset.variations &&
+                  className={`p-2 rounded-full text-white backdrop-blur-md transition-all border border-white/10 ${selectedAsset.variations &&
                     selectedAsset.variations.length > 0
-                      ? "bg-gray-800/80 hover:bg-gray-700 hover:border-white/30"
-                      : "bg-gray-800/30 opacity-30 cursor-not-allowed"
-                  }`}
+                    ? "bg-gray-800/80 hover:bg-gray-700 hover:border-white/30"
+                    : "bg-gray-800/30 opacity-30 cursor-not-allowed"
+                    }`}
                   title="Go to Processed (v2)"
                 >
                   ↪️
@@ -708,11 +704,10 @@ export function AssetLibrary({
                         setStoryboardIds([...storyboardIds, selectedAsset.id]);
                       }
                     }}
-                    className={`w-full py-3 rounded-xl font-bold transition-all border text-sm ${
-                      storyboardIds.includes(selectedAsset.id)
-                        ? "bg-red-900/30 text-red-400 border-red-500/50 hover:bg-red-900/50"
-                        : "bg-indigo-900/30 text-indigo-400 border-indigo-500/50 hover:bg-indigo-900/50"
-                    }`}
+                    className={`w-full py-3 rounded-xl font-bold transition-all border text-sm ${storyboardIds.includes(selectedAsset.id)
+                      ? "bg-red-900/30 text-red-400 border-red-500/50 hover:bg-red-900/50"
+                      : "bg-indigo-900/30 text-indigo-400 border-indigo-500/50 hover:bg-indigo-900/50"
+                      }`}
                   >
                     {storyboardIds.includes(selectedAsset.id)
                       ? "➖ Remove"
@@ -778,7 +773,7 @@ export function AssetLibrary({
             <div className="w-full flex justify-between items-start mb-4 pr-6">
               <img src="/drift_icon.png" alt="Drift" className="w-10 h-10 object-contain" />
               <h3 className="text-white font-bold tracking-widest text-sm mt-2">
-                3D-X-FRAME-EXTRACTOR
+                3DX FRAME EXTRACTOR
               </h3>
             </div>
             <DriftFrameExtractor
