@@ -10,7 +10,7 @@ async function main() {
   // Find stuck jobs
   const stuckPosts = await prisma.post.findMany({
     where: {
-      status: "PROCESSING",
+      status: { in: ["PROCESSING", "NEW"] },
       createdAt: {
         lt: cutoffDate,
       },
