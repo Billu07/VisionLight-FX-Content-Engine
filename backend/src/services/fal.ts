@@ -36,6 +36,7 @@ export const FalService = {
         prompt: params.prompt,
         enable_web_search: true, // Always use web search for highest quality
         safety_tolerance: "6", // Maximum creativity (least strict)
+        output_format: "jpeg", // Force JPEG to compress 4K under Cloudinary's 10MB limit
       };
 
       if (params.aspectRatio && params.aspectRatio !== "original") {
