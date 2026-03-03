@@ -567,10 +567,10 @@ export function AssetLibrary({
                       </div>
                     )}
                     {asset.type === "VIDEO" ? (
-                      <div className="w-full h-full relative aspect-video">
+                      <div className="w-full h-full relative aspect-square bg-black/20">
                         <video
                           src={asset.url}
-                          className="w-full h-full object-cover opacity-80"
+                          className="w-full h-full object-contain opacity-80"
                           muted
                         />
                         <div className="absolute inset-0 flex items-center justify-center">
