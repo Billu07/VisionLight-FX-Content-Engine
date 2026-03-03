@@ -908,14 +908,7 @@ export function EditAssetModal({
                 )}
               </button>
             ) : activeTab === "convert" ? (
-              // Convert button handled in Convert UI block
-              <button
-                onClick={onClose}
-                disabled={isProcessing}
-                className="w-full py-2 text-gray-500 hover:text-white text-sm"
-              >
-                Cancel
-              </button>
+              null // Convert button is in the UI block above
             ) : (
               <button
                 onClick={() => textEditMutation.mutate(undefined)}
@@ -926,15 +919,13 @@ export function EditAssetModal({
               </button>
             )}
 
-            {activeTab !== "convert" && (
-              <button
-                onClick={onClose}
-                disabled={isProcessing}
-                className="w-full py-2 text-gray-500 hover:text-white text-sm"
-              >
-                Save & Close
-              </button>
-            )}
+            <button
+              onClick={onClose}
+              disabled={isProcessing}
+              className="w-full py-2 text-gray-500 hover:text-white text-sm"
+            >
+              Save & Close
+            </button>
           </div>
         </div>
       </div>
