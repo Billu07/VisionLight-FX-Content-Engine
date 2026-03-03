@@ -400,8 +400,8 @@ export function AssetLibrary({
         </div>
 
         {/* CONTROLS */}
-        <div className="p-6 bg-gray-800/50 flex flex-col md:flex-row gap-4 items-center justify-between border-b border-gray-800">
-          <div className="flex bg-gray-950 p-1 rounded-lg border border-gray-700 overflow-x-auto">
+        <div className="p-4 sm:p-6 bg-gray-800/50 flex flex-col md:flex-row gap-4 items-center justify-between border-b border-gray-800">
+          <div className="flex flex-wrap sm:flex-nowrap bg-gray-950 p-1 rounded-lg border border-gray-700 sm:overflow-x-auto justify-center sm:justify-start gap-1 w-full md:w-auto">
             {[
               { id: "16:9", label: "Landscape" },
               { id: "9:16", label: "Portrait" },
@@ -409,15 +409,15 @@ export function AssetLibrary({
               { id: "custom", label: "Edited" },
               { id: "original", label: "Originals" },
               { id: "STORYBOARD", label: "Storyboard" },
-              { id: "VIDEO", label: "3D-X-Camera-Paths" },
+              { id: "VIDEO", label: "3D-X-Paths" },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`px-4 py-2 rounded-md text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
+                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-md text-[10px] sm:text-xs md:text-sm font-bold whitespace-nowrap transition-all flex-1 sm:flex-none text-center ${
                   activeTab === tab.id
                     ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg"
-                    : "text-gray-400 hover:text-white"
+                    : "text-gray-400 hover:text-white hover:bg-gray-800"
                 }`}
               >
                 {tab.label}
@@ -425,7 +425,7 @@ export function AssetLibrary({
             ))}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto justify-between md:justify-end">
             {activeTab === "STORYBOARD" && storyboardIds.length > 0 && (
               <button
                 onClick={() => {

@@ -236,6 +236,7 @@ export function EditAssetModal({
   // === MUTATION 4: DRIFT START ===
   const driftStartMutation = useMutation({
     mutationFn: async () => {
+      const activeProject = localStorage.getItem("visionlight_active_project") || undefined;
       return apiEndpoints.startDriftVideo({
         assetUrl: currentAsset.url,
         prompt: prompt,
@@ -243,6 +244,7 @@ export function EditAssetModal({
         vertical: driftParams.vertical,
         zoom: driftParams.zoom,
         aspectRatio: currentAsset.aspectRatio,
+        projectId: activeProject,
       });
     },
     onMutate: () => {

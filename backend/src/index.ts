@@ -660,7 +660,7 @@ app.post(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { assetUrl, prompt, horizontal, vertical, zoom, aspectRatio, generateAudio } =
+      const { assetUrl, prompt, horizontal, vertical, zoom, aspectRatio, generateAudio, projectId } =
         req.body;
 
       const [settings, user] = await Promise.all([
@@ -693,6 +693,7 @@ app.post(
         Number(zoom),
         aspectRatio,
         generateAudio === "true" || generateAudio === true,
+        projectId
       );
       res.json(result);
     } catch (error: any) {

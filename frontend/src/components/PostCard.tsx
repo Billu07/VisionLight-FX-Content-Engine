@@ -355,10 +355,10 @@ export function PostCard({
           </video>
 
           {!minimal && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
-              <span className="text-white text-3xl drop-shadow-lg opacity-80 group-hover:opacity-100 transition-opacity">
-                ▶
-              </span>
+            <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/30 transition-all duration-300">
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center scale-90 group-hover:scale-100 transition-transform shadow-xl border border-white/30 text-white">
+                <svg className="w-5 h-5 ml-1 drop-shadow-md" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              </div>
             </div>
           )}
         </div>

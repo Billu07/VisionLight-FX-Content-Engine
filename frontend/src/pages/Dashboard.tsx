@@ -962,65 +962,65 @@ function Dashboard() {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div className="bg-gray-800/40 backdrop-blur-xl rounded-2xl px-4 py-2 border border-white/5 w-full sm:w-auto overflow-x-auto custom-scrollbar">
-                <div className="flex items-center gap-6 min-w-max">
+              <div className="bg-gray-800/40 backdrop-blur-xl rounded-2xl p-4 sm:px-4 sm:py-2 border border-white/5 w-full sm:w-auto">
+                <div className="grid grid-cols-3 gap-y-4 gap-x-2 sm:flex sm:items-center sm:gap-6">
                   {!creditsLoading ? (
                     <>
                       {/* PICDRIFT POOL */}
-                      <div className="flex items-center gap-2 border-r border-white/10 pr-4">
+                      <div className="flex items-center gap-2 sm:border-r border-white/10 sm:pr-4">
                         <div className="flex flex-col">
-                          <span className="text-pink-400 font-bold text-sm leading-none">
+                          <span className="text-pink-400 font-bold text-base sm:text-sm leading-none">
                             {formatBal(credits.creditsPicDrift)}
                           </span>
-                          <span className="text-[8px] text-gray-500 uppercase font-black">
+                          <span className="text-[9px] sm:text-[8px] text-gray-500 uppercase font-black mt-0.5">
                             PicDrift
                           </span>
                         </div>
                       </div>
 
                       {/* PICDRIFT PLUS POOL */}
-                      <div className="flex items-center gap-2 border-r border-white/10 pr-4">
+                      <div className="flex items-center gap-2 sm:border-r border-white/10 sm:pr-4">
                         <div className="flex flex-col">
-                          <span className="text-rose-400 font-bold text-sm leading-none">
+                          <span className="text-rose-400 font-bold text-base sm:text-sm leading-none">
                             {formatBal(credits.creditsPicDriftPlus)}
                           </span>
-                          <span className="text-[8px] text-gray-500 uppercase font-black">
+                          <span className="text-[9px] sm:text-[8px] text-gray-500 uppercase font-black mt-0.5">
                             PD Plus
                           </span>
                         </div>
                       </div>
 
                       {/* PIC FX POOL */}
-                      <div className="flex items-center gap-2 border-r border-white/10 pr-4">
+                      <div className="flex items-center gap-2 sm:border-r border-white/10 sm:pr-4">
                         <div className="flex flex-col">
-                          <span className="text-violet-400 font-bold text-sm leading-none">
+                          <span className="text-violet-400 font-bold text-base sm:text-sm leading-none">
                             {formatBal(credits.creditsImageFX)}
                           </span>
-                          <span className="text-[8px] text-gray-500 uppercase font-black">
+                          <span className="text-[9px] sm:text-[8px] text-gray-500 uppercase font-black mt-0.5">
                             Pic FX
                           </span>
                         </div>
                       </div>
 
                       {/* VIDEO FX 1 POOL */}
-                      <div className="flex items-center gap-2 border-r border-white/10 pr-4">
+                      <div className="flex items-center gap-2 sm:border-r border-white/10 sm:pr-4">
                         <div className="flex flex-col">
-                          <span className="text-blue-400 font-bold text-sm leading-none">
+                          <span className="text-blue-400 font-bold text-base sm:text-sm leading-none">
                             {formatBal(credits.creditsVideoFX1)}
                           </span>
-                          <span className="text-[8px] text-gray-500 uppercase font-black">
+                          <span className="text-[9px] sm:text-[8px] text-gray-500 uppercase font-black mt-0.5">
                             Video FX 1
                           </span>
                         </div>
                       </div>
 
                       {/* VIDEO FX 2 POOL */}
-                      <div className="flex items-center gap-2 border-r border-white/10 pr-4">
+                      <div className="flex items-center gap-2 sm:border-r border-white/10 sm:pr-4">
                         <div className="flex flex-col">
-                          <span className="text-cyan-400 font-bold text-sm leading-none">
+                          <span className="text-cyan-400 font-bold text-base sm:text-sm leading-none">
                             {formatBal(credits.creditsVideoFX2)}
                           </span>
-                          <span className="text-[8px] text-gray-500 uppercase font-black">
+                          <span className="text-[9px] sm:text-[8px] text-gray-500 uppercase font-black mt-0.5">
                             Video FX 2
                           </span>
                         </div>
@@ -1029,17 +1029,19 @@ function Dashboard() {
                       {/* VIDEO FX 3 POOL */}
                       <div className="flex items-center gap-2">
                         <div className="flex flex-col">
-                          <span className="text-indigo-400 font-bold text-sm leading-none">
+                          <span className="text-indigo-400 font-bold text-base sm:text-sm leading-none">
                             {formatBal(credits.creditsVideoFX3)}
                           </span>
-                          <span className="text-[8px] text-gray-500 uppercase font-black">
+                          <span className="text-[9px] sm:text-[8px] text-gray-500 uppercase font-black mt-0.5">
                             Video FX 3
                           </span>
                         </div>
                       </div>
                     </>
                   ) : (
-                    <LoadingSpinner size="sm" />
+                    <div className="col-span-3 sm:col-span-1 flex justify-center">
+                      <LoadingSpinner size="sm" />
+                    </div>
                   )}
                 </div>
               </div>
@@ -1181,7 +1183,7 @@ function Dashboard() {
                       <label className="block text-sm font-semibold text-white mb-3 sm:mb-4">
                         Select Content Type
                       </label>
-                      <div className={`grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 ${isMobile ? 'flex overflow-x-auto pb-2 custom-scrollbar' : ''}`}>
+                      <div className="grid grid-cols-3 gap-2 sm:gap-3">
                         {/* TAB 1: PICDRIFT (Default) */}
                         <button
                           type="button"
@@ -1191,7 +1193,7 @@ function Dashboard() {
                             if (picDriftMode === "standard") setKieDuration(10);
                             else setKieDuration(5);
                           }}
-                          className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${isMobile ? 'flex-shrink-0 min-w-[120px]' : ''} ${
+                          className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group flex flex-col items-center justify-center text-center sm:text-left sm:block sm:items-start ${
                             currentVisualTab === "picdrift"
                               ? "border-white/20 bg-gradient-to-br from-pink-500 to-rose-500 shadow-2xl scale-105"
                               : "border-white/5 bg-gray-800/50 hover:border-white/10"
@@ -1209,7 +1211,7 @@ function Dashboard() {
                             href="http://picdrift.com/renders"
                             target="_blank"
                             rel="noreferrer"
-                            className={`p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-violet-400/50 hover:bg-violet-900/20 transition-all duration-300 text-left group flex items-center justify-between ${isMobile ? 'flex-shrink-0 min-w-[120px]' : ''}`}
+                            className={`p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-violet-400/50 hover:bg-violet-900/20 transition-all duration-300 text-center sm:text-left group flex flex-col sm:flex-row items-center justify-center sm:justify-between`}
                           >
                             <div className="font-semibold text-xs sm:text-sm text-gray-400 group-hover:text-violet-300 flex items-center gap-1 sm:gap-2">
                               <span>🔒</span> Pic FX
@@ -1219,7 +1221,7 @@ function Dashboard() {
                           <button
                             type="button"
                             onClick={() => setActiveEngine("studio")}
-                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${isMobile ? 'flex-shrink-0 min-w-[120px]' : ''} ${
+                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${
                               currentVisualTab === "studio"
                                 ? "border-white/20 bg-gradient-to-br from-violet-700 to-purple-700 shadow-2xl scale-105"
                                 : "border-white/5 bg-gray-800/50 hover:border-white/10"
@@ -1241,7 +1243,7 @@ function Dashboard() {
                             href="http://picdrift.com/renders"
                             target="_blank"
                             rel="noreferrer"
-                            className={`p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-cyan-400/50 hover:bg-cyan-900/20 transition-all duration-300 text-left group flex items-center justify-between ${isMobile ? 'flex-shrink-0 min-w-[120px]' : ''}`}
+                            className={`p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-cyan-400/50 hover:bg-cyan-900/20 transition-all duration-300 text-center sm:text-left group flex flex-col sm:flex-row items-center justify-center sm:justify-between`}
                           >
                             <div className="font-semibold text-xs sm:text-sm text-gray-400 group-hover:text-cyan-300 flex items-center gap-1 sm:gap-2">
                               <span>🔒</span> Video FX
@@ -1255,7 +1257,7 @@ function Dashboard() {
                               setVideoFxMode("video");
                               setKieDuration(15);
                             }}
-                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group ${isMobile ? 'flex-shrink-0 min-w-[120px]' : ''} ${
+                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${
                               currentVisualTab === "videofx"
                                 ? "border-white/20 bg-gradient-to-br from-blue-700 to-cyan-700 shadow-2xl scale-105"
                                 : "border-white/5 bg-gray-800/50 hover:border-white/10"
@@ -1272,10 +1274,10 @@ function Dashboard() {
                     {/* STUDIO SUB-MENU */}
                     {currentVisualTab === "studio" && (
                       <div className="mb-6 animate-in fade-in space-y-4">
-                        <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
+                        <div className="flex bg-gray-900/50 p-1 rounded-xl w-full sm:max-w-sm mx-auto border border-white/5">
                           <button
                             onClick={() => setStudioMode("image")}
-                            className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
+                            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
                               studioMode === "image"
                                 ? "bg-violet-600 text-white shadow-lg"
                                 : "text-gray-400 hover:text-white"
@@ -1285,7 +1287,7 @@ function Dashboard() {
                           </button>
                           <button
                             onClick={() => setStudioMode("carousel")}
-                            className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
+                            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
                               studioMode === "carousel"
                                 ? "bg-fuchsia-600 text-white shadow-lg"
                                 : "text-gray-400 hover:text-white"
@@ -1295,7 +1297,7 @@ function Dashboard() {
                           </button>
                           <button
                             onClick={() => setStudioMode("edit")}
-                            className={`flex-1 py-2 text-[10px] sm:text-xs font-semibold rounded-lg transition-all ${
+                            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
                               studioMode === "edit"
                                 ? "bg-cyan-600 text-white shadow-lg"
                                 : "text-gray-400 hover:text-white"
@@ -1305,7 +1307,7 @@ function Dashboard() {
                           </button>
                         </div>
                         {studioMode !== "edit" && (
-                          <div className="flex justify-center gap-3">
+                          <div className="flex justify-center gap-2 sm:gap-3">
                             {[
                               { id: "16:9", label: "Landscape" },
                               { id: "9:16", label: "Portrait" },
@@ -1314,10 +1316,10 @@ function Dashboard() {
                               <button
                                 key={a.id}
                                 onClick={() => setGeminiAspect(a.id as any)}
-                                className={`px-4 py-2 rounded-lg border text-xs font-bold ${
+                                className={`px-3 py-2 sm:px-4 rounded-lg border text-xs font-bold transition-all ${
                                   geminiAspect === a.id
                                     ? "bg-violet-600 border-violet-500 text-white"
-                                    : "bg-gray-800 border-gray-700 text-gray-400"
+                                    : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
                                 }`}
                               >
                                 {a.label}
@@ -1331,7 +1333,7 @@ function Dashboard() {
                     {/* PICDRIFT SUB-MENU */}
                     {currentVisualTab === "picdrift" && (
                       <div className="mb-6 animate-in fade-in space-y-4">
-                        <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
+                        <div className="flex bg-gray-900/50 p-1 rounded-xl w-full sm:max-w-sm mx-auto border border-white/5">
                           <button
                             type="button"
                             onClick={() => {
@@ -1367,7 +1369,7 @@ function Dashboard() {
                     {/* VIDEO FX SUB-MENU */}
                     {currentVisualTab === "videofx" && (
                       <div className="mb-6 animate-in fade-in space-y-4">
-                        <div className="flex bg-gray-900/50 p-1 rounded-xl max-w-xs mx-auto border border-white/5">
+                        <div className="flex bg-gray-900/50 p-1 rounded-xl w-full sm:max-w-sm mx-auto border border-white/5">
                           <button
                             type="button"
                             onClick={() => {
@@ -1375,7 +1377,7 @@ function Dashboard() {
                               setVideoFxMode("video");
                               setKieDuration(15);
                             }}
-                            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                            className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${
                               activeEngine === "kie"
                                 ? "bg-cyan-600 text-white shadow-lg"
                                 : "text-gray-400 hover:text-white"
@@ -1386,7 +1388,7 @@ function Dashboard() {
                           <button
                             type="button"
                             onClick={() => setActiveEngine("openai")}
-                            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                            className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${
                               activeEngine === "openai"
                                 ? "bg-cyan-600 text-white shadow-lg"
                                 : "text-gray-400 hover:text-white"
@@ -1397,7 +1399,7 @@ function Dashboard() {
                           <button
                             type="button"
                             onClick={() => setActiveEngine("veo")}
-                            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${
+                            className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${
                               activeEngine === "veo"
                                 ? "bg-cyan-600 text-white shadow-lg"
                                 : "text-gray-400 hover:text-white"

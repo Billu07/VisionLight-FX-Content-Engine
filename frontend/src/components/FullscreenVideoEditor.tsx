@@ -313,7 +313,11 @@ export function FullscreenVideoEditor({
                 onClick={() => setSidebarOpen(!sidebarOpen)}
                 className="absolute top-4 left-4 z-10 w-8 h-8 bg-white/5 hover:bg-white/10 rounded-lg flex items-center justify-center border border-white/10 text-gray-400 transition-colors"
             >
-                {sidebarOpen ? "◀" : "▶"}
+                {sidebarOpen ? (
+                    <svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                ) : (
+                    <svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                )}
             </button>
 
             <div className="relative w-full h-full flex flex-col max-w-7xl mx-auto">
@@ -346,10 +350,10 @@ export function FullscreenVideoEditor({
                     {!isPlaying && currentItem && (
                         <button 
                             onClick={handleTogglePlay}
-                            className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/10 transition-all group-hover:bg-black/40"
+                            className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/30 transition-all duration-300 group-hover:bg-black/40"
                         >
-                            <div className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center scale-90 group-hover:scale-100 transition-transform shadow-2xl">
-                                <span className="text-4xl text-white ml-2">▶</span>
+                            <div className="w-24 h-24 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center scale-90 group-hover:scale-100 transition-transform shadow-2xl text-white">
+                                <svg className="w-10 h-10 ml-2 drop-shadow-lg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                             </div>
                         </button>
                     )}
@@ -358,16 +362,20 @@ export function FullscreenVideoEditor({
                 {/* Player Controls */}
                 <div className="h-16 flex items-center justify-center gap-8 mt-4">
                     <button className="text-gray-500 hover:text-white transition-colors" onClick={() => handleSeek(currentTime - 5000)}>
-                        <span className="text-xl">⏪</span>
+                        <svg className="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 19 2 12 11 5 11 19"></polygon><polygon points="22 19 13 12 22 5 22 19"></polygon></svg>
                     </button>
                     <button 
                         onClick={handleTogglePlay}
-                        className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center hover:scale-110 transition-transform shadow-xl shadow-white/10"
+                        className="w-14 h-14 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 transition-transform shadow-xl shadow-white/10"
                     >
-                        <span className="text-2xl">{isPlaying ? "⏸" : "▶"}</span>
+                        {isPlaying ? (
+                            <svg className="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                        ) : (
+                            <svg className="w-6 h-6 ml-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        )}
                     </button>
                     <button className="text-gray-500 hover:text-white transition-colors" onClick={() => handleSeek(currentTime + 5000)}>
-                        <span className="text-xl">⏩</span>
+                        <svg className="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 19 22 12 13 5 13 19"></polygon><polygon points="2 19 11 12 2 5 2 19"></polygon></svg>
                     </button>
                 </div>
             </div>

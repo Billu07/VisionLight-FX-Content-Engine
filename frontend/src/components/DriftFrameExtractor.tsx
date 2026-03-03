@@ -93,16 +93,22 @@ export function DriftFrameExtractor({
 
       // Convert to Blob
       canvas.toBlob(
-        (blob) => {
-          setIsExtracting(false);
+        async (blob) => {
           if (blob) {
-            onExtract(blob);
+            try {
+              await onExtract(blob);
+            } catch (err) {
+              console.error("onExtract Error:", err);
+            } finally {
+              setIsExtracting(false);
+            }
           } else {
+            setIsExtracting(false);
             throw new Error("Canvas extraction failed (Empty Blob).");
           }
         },
         "image/jpeg",
-        0.95
+        0.95,
       );
     } catch (e: any) {
       setIsExtracting(false);

@@ -46,11 +46,12 @@ export const videoLogic = {
     vertical: number,
     zoom: number,
     userAspectRatio?: string,
-    generateAudio: boolean = false, // ✅ ADDED
+    generateAudio: boolean = false,
+    projectId?: string,
   ) {
     try {
       console.log(
-        `🎬 Kling 2.6 Drift Request: H${horizontal} V${vertical} Z${zoom} | AR: ${userAspectRatio} | Audio: ${generateAudio}`,
+        `🎬 Kling 2.6 Drift Request: H${horizontal} V${vertical} Z${zoom} | AR: ${userAspectRatio} | Audio: ${generateAudio} | Project: ${projectId}`,
       );
 
       // ✅ FIX: Download Image FIRST to detect aspect ratio
@@ -175,6 +176,7 @@ export const videoLogic = {
 
       const post = await airtableService.createPost({
         userId,
+        projectId,
         title: "Drift Shot (2.6)",
         prompt: finalPrompt,
         mediaType: "VIDEO",
@@ -689,6 +691,8 @@ export const videoLogic = {
             url,
             params.aspectRatio || "16:9",
             "VIDEO",
+            undefined,
+            post.projectId || undefined
           );
         } catch (e) {
           console.warn("Asset Save Failed");
