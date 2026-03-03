@@ -34,19 +34,16 @@ export const FalService = {
 
       const input: any = {
         prompt: params.prompt,
-        enable_web_search: params.useGrounding ?? false,
+        enable_web_search: true, // Always use web search for highest quality
+        safety_tolerance: "6", // Maximum creativity (least strict)
       };
 
       if (params.aspectRatio && params.aspectRatio !== "original") {
         input.aspect_ratio = params.aspectRatio;
       }
 
-      if (params.imageSize) {
-        input.resolution = params.imageSize;
-      } else {
-        // Default to 2K for "quality", 1K for "speed"
-        input.resolution = params.modelType === "quality" ? "2K" : "1K";
-      }
+      // Always use the highest resolution
+      input.resolution = "4K";
 
       if (isEdit && params.referenceImages) {
         input.image_urls = params.referenceImages.map(
