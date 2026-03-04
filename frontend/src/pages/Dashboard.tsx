@@ -811,8 +811,8 @@ function Dashboard() {
                           key={idx}
                           onClick={() => setPreviewCarouselIndex(idx)}
                           className={`w-2.5 h-2.5 rounded-full transition-all ${idx === previewCarouselIndex
-                              ? "bg-white scale-125 shadow-[0_0_10px_rgba(255,255,255,0.8)]"
-                              : "bg-white/30 hover:bg-white/60"
+                            ? "bg-white scale-125 shadow-[0_0_10px_rgba(255,255,255,0.8)]"
+                            : "bg-white/30 hover:bg-white/60"
                             }`}
                         />
                       ))}
@@ -981,20 +981,8 @@ function Dashboard() {
                           <span className="text-pink-400 font-bold text-base sm:text-sm leading-none">
                             {formatBal(credits.creditsPicDrift)}
                           </span>
-                          <span className="text-[9px] sm:text-[8px] text-gray-500 uppercase font-black mt-0.5">
+                          <span className="text-[9px] sm:text-[8px] text-white-500 uppercase font-black mt-0.5">
                             PicDrift
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* PICDRIFT PLUS POOL */}
-                      <div className="flex items-center gap-2 sm:border-r border-white/10 sm:pr-4">
-                        <div className="flex flex-col">
-                          <span className="text-rose-400 font-bold text-base sm:text-sm leading-none">
-                            {formatBal(credits.creditsPicDriftPlus)}
-                          </span>
-                          <span className="text-[9px] sm:text-[8px] text-gray-500 uppercase font-black mt-0.5">
-                            PD Plus
                           </span>
                         </div>
                       </div>
@@ -1005,11 +993,25 @@ function Dashboard() {
                           <span className="text-violet-400 font-bold text-base sm:text-sm leading-none">
                             {formatBal(credits.creditsImageFX)}
                           </span>
-                          <span className="text-[9px] sm:text-[8px] text-gray-500 uppercase font-black mt-0.5">
+                          <span className="text-[9px] sm:text-[8px] text-white-500 uppercase font-black mt-0.5">
                             Pic FX
                           </span>
                         </div>
                       </div>
+
+                      {/* PICDRIFT PLUS POOL */}
+                      <div className="flex items-center gap-2 sm:border-r border-white/10 sm:pr-4">
+                        <div className="flex flex-col">
+                          <span className="text-rose-400 font-bold text-base sm:text-sm leading-none">
+                            {formatBal(credits.creditsPicDriftPlus)}
+                          </span>
+                          <span className="text-[9px] sm:text-[8px] text-White-600 uppercase font-black mt-0.5">
+                            PicDrift<sup>+</sup>
+                          </span>
+                        </div>
+                      </div>
+
+
 
                       {/* VIDEO FX 1 POOL */}
                       <div className="flex items-center gap-2 sm:border-r border-white/10 sm:pr-4">
@@ -1017,8 +1019,8 @@ function Dashboard() {
                           <span className="text-blue-400 font-bold text-base sm:text-sm leading-none">
                             {formatBal(credits.creditsVideoFX1)}
                           </span>
-                          <span className="text-[9px] sm:text-[8px] text-gray-500 uppercase font-black mt-0.5">
-                            Video FX 1
+                          <span className="text-[9px] sm:text-[8px] text-white-500 uppercase font-black mt-0.5">
+                            VidFX 1
                           </span>
                         </div>
                       </div>
@@ -1029,8 +1031,8 @@ function Dashboard() {
                           <span className="text-cyan-400 font-bold text-base sm:text-sm leading-none">
                             {formatBal(credits.creditsVideoFX2)}
                           </span>
-                          <span className="text-[9px] sm:text-[8px] text-gray-500 uppercase font-black mt-0.5">
-                            Video FX 2
+                          <span className="text-[9px] sm:text-[8px] text-white-500 uppercase font-black mt-0.5">
+                            VidFX 2
                           </span>
                         </div>
                       </div>
@@ -1041,8 +1043,8 @@ function Dashboard() {
                           <span className="text-indigo-400 font-bold text-base sm:text-sm leading-none">
                             {formatBal(credits.creditsVideoFX3)}
                           </span>
-                          <span className="text-[9px] sm:text-[8px] text-gray-500 uppercase font-black mt-0.5">
-                            Video FX 3
+                          <span className="text-[9px] sm:text-[8px] text-white-500 uppercase font-black mt-0.5">
+                            VidFX 3
                           </span>
                         </div>
                       </div>
@@ -1147,8 +1149,8 @@ function Dashboard() {
                         )
                       }
                       className={`text-xs px-4 py-2 rounded-lg border font-semibold transition-colors flex items-center gap-2 ${viewMode === "sequencer"
-                          ? "bg-purple-600 text-white border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]"
-                          : "bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700 hover:text-white"
+                        ? "bg-purple-600 text-white border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]"
+                        : "bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700 hover:text-white"
                         }`}
                     >
                       <span></span>{" "}
@@ -1175,8 +1177,8 @@ function Dashboard() {
                         );
                       }}
                       className={`text-xs px-4 py-2 rounded-lg border flex items-center gap-2 transition-all font-semibold shadow-lg ${currentVisualTab === "picdrift"
-                          ? "bg-rose-900/50 text-rose-300 border-rose-700/50 hover:bg-rose-800 hover:border-rose-500"
-                          : "bg-cyan-900/50 text-cyan-300 border-cyan-700/50 hover:bg-cyan-800 hover:border-cyan-500"
+                        ? "bg-rose-900/50 text-rose-300 border-rose-700/50 hover:bg-rose-800 hover:border-rose-500"
+                        : "bg-cyan-900/50 text-cyan-300 border-cyan-700/50 hover:bg-cyan-800 hover:border-cyan-500"
                         }`}
                     >
                       <span></span> Open Library
@@ -1202,8 +1204,8 @@ function Dashboard() {
                             else setKieDuration(5);
                           }}
                           className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group flex flex-col items-center justify-center text-center sm:text-left sm:block sm:items-start ${currentVisualTab === "picdrift"
-                              ? "border-white/20 bg-gradient-to-br from-pink-500 to-rose-500 shadow-2xl scale-105"
-                              : "border-white/5 bg-gray-800/50 hover:border-white/10"
+                            ? "border-white/20 bg-gradient-to-br from-pink-500 to-rose-500 shadow-2xl scale-105"
+                            : "border-white/5 bg-gray-800/50 hover:border-white/10"
                             }`}
                         >
                           <div className="font-semibold text-xs sm:text-sm text-white">
@@ -1229,8 +1231,8 @@ function Dashboard() {
                             type="button"
                             onClick={() => setActiveEngine("studio")}
                             className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${currentVisualTab === "studio"
-                                ? "border-white/20 bg-gradient-to-br from-violet-700 to-purple-700 shadow-2xl scale-105"
-                                : "border-white/5 bg-gray-800/50 hover:border-white/10"
+                              ? "border-white/20 bg-gradient-to-br from-violet-700 to-purple-700 shadow-2xl scale-105"
+                              : "border-white/5 bg-gray-800/50 hover:border-white/10"
                               }`}
                           >
                             <div className="font-semibold text-xs sm:text-sm text-white">
@@ -1264,8 +1266,8 @@ function Dashboard() {
                               setKieDuration(15);
                             }}
                             className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${currentVisualTab === "videofx"
-                                ? "border-white/20 bg-gradient-to-br from-blue-700 to-cyan-700 shadow-2xl scale-105"
-                                : "border-white/5 bg-gray-800/50 hover:border-white/10"
+                              ? "border-white/20 bg-gradient-to-br from-blue-700 to-cyan-700 shadow-2xl scale-105"
+                              : "border-white/5 bg-gray-800/50 hover:border-white/10"
                               }`}
                           >
                             <div className="font-semibold text-xs sm:text-sm text-white">
@@ -1283,8 +1285,8 @@ function Dashboard() {
                           <button
                             onClick={() => setStudioMode("image")}
                             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${studioMode === "image"
-                                ? "bg-violet-600 text-white shadow-lg"
-                                : "text-gray-400 hover:text-white"
+                              ? "bg-violet-600 text-white shadow-lg"
+                              : "text-gray-400 hover:text-white"
                               }`}
                           >
                             Image FX
@@ -1292,8 +1294,8 @@ function Dashboard() {
                           <button
                             onClick={() => setStudioMode("carousel")}
                             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${studioMode === "carousel"
-                                ? "bg-fuchsia-600 text-white shadow-lg"
-                                : "text-gray-400 hover:text-white"
+                              ? "bg-fuchsia-600 text-white shadow-lg"
+                              : "text-gray-400 hover:text-white"
                               }`}
                           >
                             Carousel
@@ -1301,8 +1303,8 @@ function Dashboard() {
                           <button
                             onClick={() => setStudioMode("edit")}
                             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${studioMode === "edit"
-                                ? "bg-cyan-600 text-white shadow-lg"
-                                : "text-gray-400 hover:text-white"
+                              ? "bg-cyan-600 text-white shadow-lg"
+                              : "text-gray-400 hover:text-white"
                               }`}
                           >
                             PicFX Editor
@@ -1319,8 +1321,8 @@ function Dashboard() {
                                 key={a.id}
                                 onClick={() => setGeminiAspect(a.id as any)}
                                 className={`px-3 py-2 sm:px-4 rounded-lg border text-xs font-bold transition-all ${geminiAspect === a.id
-                                    ? "bg-violet-600 border-violet-500 text-white"
-                                    : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
+                                  ? "bg-violet-600 border-violet-500 text-white"
+                                  : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
                                   }`}
                               >
                                 {a.label}
@@ -1342,8 +1344,8 @@ function Dashboard() {
                               setKieDuration(10);
                             }}
                             className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${picDriftMode === "standard"
-                                ? "bg-rose-600 text-white shadow-lg"
-                                : "text-gray-400 hover:text-white"
+                              ? "bg-rose-600 text-white shadow-lg"
+                              : "text-gray-400 hover:text-white"
                               }`}
                           >
                             Standard
@@ -1355,8 +1357,8 @@ function Dashboard() {
                               setKieDuration(5);
                             }}
                             className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${picDriftMode === "plus"
-                                ? "bg-rose-600 text-white shadow-lg"
-                                : "text-gray-400 hover:text-white"
+                              ? "bg-rose-600 text-white shadow-lg"
+                              : "text-gray-400 hover:text-white"
                               }`}
                           >
                             PicDrift Plus
@@ -1377,8 +1379,8 @@ function Dashboard() {
                               setKieDuration(15);
                             }}
                             className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeEngine === "kie"
-                                ? "bg-cyan-600 text-white shadow-lg"
-                                : "text-gray-400 hover:text-white"
+                              ? "bg-cyan-600 text-white shadow-lg"
+                              : "text-gray-400 hover:text-white"
                               }`}
                           >
                             Video FX 1
@@ -1387,8 +1389,8 @@ function Dashboard() {
                             type="button"
                             onClick={() => setActiveEngine("openai")}
                             className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeEngine === "openai"
-                                ? "bg-cyan-600 text-white shadow-lg"
-                                : "text-gray-400 hover:text-white"
+                              ? "bg-cyan-600 text-white shadow-lg"
+                              : "text-gray-400 hover:text-white"
                               }`}
                           >
                             Video FX 2
@@ -1397,8 +1399,8 @@ function Dashboard() {
                             type="button"
                             onClick={() => setActiveEngine("veo")}
                             className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeEngine === "veo"
-                                ? "bg-cyan-600 text-white shadow-lg"
-                                : "text-gray-400 hover:text-white"
+                              ? "bg-cyan-600 text-white shadow-lg"
+                              : "text-gray-400 hover:text-white"
                               }`}
                           >
                             Video FX 3
@@ -1639,8 +1641,8 @@ function Dashboard() {
                                         type="button"
                                         onClick={() => setKieModel(m.id as any)}
                                         className={`p-3 rounded-xl border text-left text-sm font-medium ${kieModel === m.id
-                                            ? "bg-cyan-600 border-cyan-500 text-white"
-                                            : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
+                                          ? "bg-cyan-600 border-cyan-500 text-white"
+                                          : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
                                           }`}
                                       >
                                         {m.label}
@@ -1662,8 +1664,8 @@ function Dashboard() {
                                             setKieDuration(d as any)
                                           }
                                           className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieDuration === d
-                                              ? "bg-cyan-600 border-cyan-600 text-white"
-                                              : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                            ? "bg-cyan-600 border-cyan-600 text-white"
+                                            : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
                                             }`}
                                         >
                                           {d}s
@@ -1688,8 +1690,8 @@ function Dashboard() {
                                             setKieAspect(a.id as any)
                                           }
                                           className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieAspect === a.id
-                                              ? "bg-cyan-600 border-cyan-600 text-white"
-                                              : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                            ? "bg-cyan-600 border-cyan-600 text-white"
+                                            : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
                                             }`}
                                         >
                                           {a.label}
@@ -1713,8 +1715,8 @@ function Dashboard() {
                                             setKieResolution(r.id as any)
                                           }
                                           className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieResolution === r.id
-                                              ? "bg-cyan-600 border-cyan-600 text-white"
-                                              : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                            ? "bg-cyan-600 border-cyan-600 text-white"
+                                            : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
                                             }`}
                                         >
                                           {r.label}
@@ -1741,8 +1743,8 @@ function Dashboard() {
                                         type="button"
                                         onClick={() => setKieDuration(d as any)}
                                         className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieDuration === d
-                                            ? "bg-rose-600 border-rose-600 text-white"
-                                            : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                          ? "bg-rose-600 border-rose-600 text-white"
+                                          : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
                                           }`}
                                       >
                                         {d}s
@@ -1768,8 +1770,8 @@ function Dashboard() {
                                           setKieAspect(a.id as any)
                                         }
                                         className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieAspect === a.id
-                                            ? "bg-rose-600 border-rose-600 text-white"
-                                            : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                          ? "bg-rose-600 border-rose-600 text-white"
+                                          : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
                                           }`}
                                       >
                                         {a.label}
@@ -1845,8 +1847,8 @@ function Dashboard() {
                                           setVideoModel(model.id as any)
                                         }
                                         className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${videoModel === model.id
-                                            ? "border-cyan-400 bg-cyan-500/20"
-                                            : "border-white/10 bg-gray-800/50"
+                                          ? "border-cyan-400 bg-cyan-500/20"
+                                          : "border-white/10 bg-gray-800/50"
                                           }`}
                                       >
                                         <div className="font-semibold text-white text-sm">
@@ -1877,8 +1879,8 @@ function Dashboard() {
                                           );
                                         }}
                                         className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${aspectRatio === ratio
-                                            ? "border-purple-400 bg-purple-500/20"
-                                            : "border-white/10 bg-gray-800/50"
+                                          ? "border-purple-400 bg-purple-500/20"
+                                          : "border-white/10 bg-gray-800/50"
                                           }`}
                                       >
                                         <div className="font-semibold text-white text-sm">
@@ -1930,8 +1932,8 @@ function Dashboard() {
                                           setVideoSize(size as any)
                                         }
                                         className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${videoSize === size
-                                            ? "border-green-400 bg-green-500/20"
-                                            : "border-white/10 bg-gray-800/50"
+                                          ? "border-green-400 bg-green-500/20"
+                                          : "border-white/10 bg-gray-800/50"
                                           }`}
                                       >
                                         <div className="font-semibold text-white text-sm">
@@ -1954,8 +1956,8 @@ function Dashboard() {
                                           setVideoDuration(sec as any)
                                         }
                                         className={`px-3 py-2 rounded-xl border text-sm flex-1 ${videoDuration === sec
-                                            ? "bg-cyan-500 border-cyan-500 text-white"
-                                            : "bg-gray-800/50 border-white/10 text-purple-200"
+                                          ? "bg-cyan-500 border-cyan-500 text-white"
+                                          : "bg-gray-800/50 border-white/10 text-purple-200"
                                           }`}
                                       >
                                         {sec}s
@@ -1992,8 +1994,8 @@ function Dashboard() {
                                           setAspectRatio(ratio as any)
                                         }
                                         className={`py-4 px-4 rounded-xl border transition-all text-center ${aspectRatio === ratio
-                                            ? "border-indigo-500 bg-indigo-500/10 text-indigo-100 shadow-[0_0_20px_rgba(99,102,241,0.1)]"
-                                            : "border-slate-800 bg-slate-900/40 text-slate-500 hover:border-slate-700"
+                                          ? "border-indigo-500 bg-indigo-500/10 text-indigo-100 shadow-[0_0_20px_rgba(99,102,241,0.1)]"
+                                          : "border-slate-800 bg-slate-900/40 text-slate-500 hover:border-slate-700"
                                           }`}
                                       >
                                         <div className="text-xs font-medium tracking-tight">
@@ -2018,8 +2020,8 @@ function Dashboard() {
                                             setVeoResolution(res as any)
                                           }
                                           className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${veoResolution === res
-                                              ? "bg-indigo-500 text-white"
-                                              : "text-slate-500 hover:text-slate-300"
+                                            ? "bg-indigo-500 text-white"
+                                            : "text-slate-500 hover:text-slate-300"
                                             }`}
                                         >
                                           {res.toUpperCase()}
@@ -2041,8 +2043,8 @@ function Dashboard() {
                                             setVeoDuration(sec as any)
                                           }
                                           className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${veoDuration === sec
-                                              ? "bg-indigo-500 text-white"
-                                              : "text-slate-500 hover:text-slate-300"
+                                            ? "bg-indigo-500 text-white"
+                                            : "text-slate-500 hover:text-slate-300"
                                             }`}
                                         >
                                           {sec}s
@@ -2272,12 +2274,12 @@ function Dashboard() {
                               generateMediaMutation.isPending || !prompt.trim()
                             }
                             className={`w-full py-4 sm:py-5 px-6 sm:px-8 rounded-2xl transition-all disabled:opacity-50 font-bold text-base sm:text-lg flex flex-col items-center justify-center gap-1 ${activeEngine === "veo"
-                                ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg"
-                                : currentVisualTab === "picdrift"
-                                  ? "bg-rose-600 hover:bg-rose-500 text-white shadow-lg"
-                                  : currentVisualTab === "studio"
-                                    ? "bg-violet-600 hover:bg-violet-500 text-white shadow-lg"
-                                    : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg"
+                              ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg"
+                              : currentVisualTab === "picdrift"
+                                ? "bg-rose-600 hover:bg-rose-500 text-white shadow-lg"
+                                : currentVisualTab === "studio"
+                                  ? "bg-violet-600 hover:bg-violet-500 text-white shadow-lg"
+                                  : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg"
                               }`}
                           >
                             {generateMediaMutation.isPending ? (
