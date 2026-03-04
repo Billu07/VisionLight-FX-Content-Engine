@@ -334,7 +334,7 @@ export default function AdminDashboard() {
                     : "text-gray-400 hover:text-white hover:bg-gray-800/50"
                 }`}
               >
-                Global Control
+                {adminUser?.role === "SUPERADMIN" ? "Global Control" : "Org Settings"}
               </button>
               <button
                 onClick={() => setActiveTab("keys")}
@@ -768,8 +768,11 @@ export default function AdminDashboard() {
                     <th className="p-6 border-b border-gray-800 text-center">
                       UUID
                     </th>
-                    <th className="p-6 border-b border-gray-800 text-right">
+                    <th className="p-6 border-b border-gray-800 text-center">
                       Created
+                    </th>
+                    <th className="p-6 border-b border-gray-800 text-right">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -796,8 +799,24 @@ export default function AdminDashboard() {
                       <td className="p-6 text-center text-gray-500 text-xs font-mono">
                         {org.id}
                       </td>
-                      <td className="p-6 text-right text-gray-500 text-xs font-mono">
+                      <td className="p-6 text-center text-gray-500 text-xs font-mono">
                         {new Date(org.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="p-6 text-right">
+                        <button
+                          onClick={async () => {
+                            // Fetch this specific org's settings and switch to controls tab
+                            const res = await apiEndpoints.adminGetSettingsByOrgId(org.id);
+                            if (res.data.success) {
+                              setSettings(res.data.settings);
+                              setActiveTab("controls");
+                              setMsg(`Now editing settings for: ${org.name}`);
+                            }
+                          }}
+                          className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors border border-gray-700"
+                        >
+                          Edit Settings
+                        </button>
                       </td>
                     </tr>
                   ))}

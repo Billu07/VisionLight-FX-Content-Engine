@@ -36,6 +36,16 @@ async function getTenantApiKeys(userId: string) {
   };
 }
 
+// Helper to get pricing settings
+async function getTenantSettings(userId: string) {
+  const user = await airtableService.findUserById(userId);
+  if (user?.organizationId) {
+    const org = await airtableService.getOrganization(user.organizationId);
+    if (org) return org;
+  }
+  return await airtableService.getGlobalSettings();
+}
+
 const PORT = process.env.PORT || 4000;
 
 // === ADMIN CONFIGURATION ===
@@ -223,8 +233,20 @@ app.get(
   requireAdmin,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const settings = await airtableService.getGlobalSettings();
-      res.json({ success: true, settings });
+      const user = await airtableService.findUserById(req.user!.id);
+      
+      // If user is SUPERADMIN and they didn't specify an org, show Global Template
+      if (req.user.role === "SUPERADMIN" && !req.query.orgId) {
+        const settings = await getTenantSettings(req.user!.id);
+        return res.json({ success: true, settings });
+      }
+
+      // Otherwise, show Organization-specific settings
+      const orgId = (req.user.role === "SUPERADMIN" ? req.query.orgId : user?.organizationId) as string;
+      if (!orgId) return res.status(400).json({ error: "Organization ID required" });
+
+      const org = await airtableService.getOrganization(orgId);
+      res.json({ success: true, settings: org });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -237,7 +259,19 @@ app.put(
   requireAdmin,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const settings = await airtableService.updateGlobalSettings(req.body);
+      const user = await airtableService.findUserById(req.user!.id);
+
+      // If SUPERADMIN is editing without orgId, update Global Template
+      if (req.user.role === "SUPERADMIN" && !req.query.orgId) {
+        const settings = await airtableService.updateGlobalSettings(req.body);
+        return res.json({ success: true, settings });
+      }
+
+      // Otherwise, update Organization-specific settings
+      const orgId = (req.user.role === "SUPERADMIN" ? req.query.orgId : user?.organizationId) as string;
+      if (!orgId) return res.status(400).json({ error: "Organization ID required" });
+
+      const settings = await airtableService.updateOrganization(orgId, req.body);
       res.json({ success: true, settings });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -303,6 +337,11 @@ app.post(
     if (!email || !password)
       return res.status(400).json({ error: "Missing fields" });
 
+    // SECURITY: Tenant Admins cannot choose Organization or promote to SuperAdmin
+    const isSuperAdmin = req.user.role === "SUPERADMIN";
+    const finalOrgId = isSuperAdmin ? organizationId : req.user.organizationId;
+    const finalRole = (role === "SUPERADMIN" && !isSuperAdmin) ? "USER" : role;
+
     try {
       const newUser = await AuthService.createSystemUser(
         email,
@@ -310,8 +349,8 @@ app.post(
         name || "New User",
         view || "VISIONLIGHT",
         maxProjects !== undefined ? Number(maxProjects) : 3,
-        organizationId,
-        role
+        finalOrgId,
+        finalRole
       );
       res.json({ success: true, user: newUser });
     } catch (error: any) {
@@ -326,7 +365,19 @@ app.get(
   requireAdmin,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const users = await airtableService.getAllUsers();
+      const isSuperAdmin = req.user.role === "SUPERADMIN";
+      let users;
+      
+      if (isSuperAdmin) {
+        users = await airtableService.getAllUsers();
+      } else {
+        // Tenant Admin: Only fetch users from their own organization
+        users = await prisma.user.findMany({
+          where: { organizationId: req.user.organizationId },
+          orderBy: { createdAt: "desc" },
+        });
+      }
+      
       res.json({ success: true, users });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -536,7 +587,7 @@ app.get(
     try {
       const [user, settings] = await Promise.all([
         airtableService.findUserById(req.user!.id),
-        airtableService.getGlobalSettings(),
+        getTenantSettings(req.user!.id),
       ]);
 
       if (!user) return res.json({ credits: 0 });
@@ -619,7 +670,7 @@ app.post(
       } else {
         // Process Mode (Ratio Conversion)
         const [settings, user] = await Promise.all([
-          airtableService.getGlobalSettings(),
+          getTenantSettings(req.user!.id),
           airtableService.findUserById(req.user!.id),
         ]);
 
@@ -668,7 +719,7 @@ app.post(
         return res.status(400).json({ error: "No images provided" });
 
       const [settings, user] = await Promise.all([
-        airtableService.getGlobalSettings(),
+        getTenantSettings(req.user!.id),
         airtableService.findUserById(req.user!.id),
       ]);
 
@@ -738,7 +789,7 @@ app.post(
       }
 
       const [settings, user] = await Promise.all([
-        airtableService.getGlobalSettings(),
+        getTenantSettings(req.user!.id),
         airtableService.findUserById(req.user!.id),
       ]);
 
@@ -788,7 +839,7 @@ app.post(
         req.body;
 
       const [settings, user] = await Promise.all([
-        airtableService.getGlobalSettings(),
+        getTenantSettings(req.user!.id),
         airtableService.findUserById(req.user!.id),
       ]);
 
@@ -879,7 +930,7 @@ app.post(
       const { assetUrl, originalAssetId } = req.body;
 
       const [settings, user] = await Promise.all([
-        airtableService.getGlobalSettings(),
+        getTenantSettings(req.user!.id),
         airtableService.findUserById(req.user!.id),
       ]);
 
@@ -1131,9 +1182,9 @@ app.post(
         generateAudio,
       } = req.body;
 
-      // 1. Fetch Global Pricing & User (Keeps original data fetch intact)
+      // 1. Fetch Tenant Pricing & User
       const [settings, user] = await Promise.all([
-        airtableService.getGlobalSettings(),
+        getTenantSettings(req.user!.id),
         airtableService.findUserById(req.user!.id),
       ]);
 

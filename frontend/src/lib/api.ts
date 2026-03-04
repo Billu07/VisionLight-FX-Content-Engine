@@ -49,6 +49,7 @@ export const apiEndpoints = {
 
   // === Admin Settings (Pricing Control) ===
   adminGetSettings: () => api.get("/api/admin/settings"),
+  adminGetSettingsByOrgId: (orgId: string) => api.get(`/api/admin/settings?orgId=${orgId}`),
   adminUpdateSettings: (data: any) => api.put("/api/admin/settings", data),
 
   // === Projects ===
