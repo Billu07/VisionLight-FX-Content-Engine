@@ -3,6 +3,20 @@ import axios from "axios";
 import { cloudinaryClient } from "./config";
 import { GeminiService } from "../gemini";
 import { FalService } from "../fal";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import crypto from "crypto";
+
+// Configure AWS S3 Client for Cloudflare R2
+const r2Client = new S3Client({
+  region: "auto",
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
+  },
+});
+
+export { cloudinaryClient };
 
 // Helper: Fix Cloudinary URLs
 export const getOptimizedUrl = (url: string) => {
@@ -128,28 +142,52 @@ export const uploadToCloudinary = async (
   t: string,
   r: string,
 ): Promise<string> => {
-  return new Promise<string>((resolve, reject) => {
-    const options = {
-      resource_type: r as "auto" | "image" | "video" | "raw",
-      folder: `visionlight/user_${u}/${r}s`,
-      public_id: p,
-      overwrite: true,
-      context: { caption: t, alt: t },
-    };
+  try {
+    const bucketName = process.env.R2_BUCKET_NAME || "";
+    const publicUrl = process.env.R2_PUBLIC_URL || "";
+    
+    // We are generating unique keys for R2. We ignore 'p' (which was cloudinary public_id)
+    // and instead use UUIDs to guarantee no collisions.
+    const uniqueId = crypto.randomUUID();
+    let extension = r === "video" ? "mp4" : "jpg";
+    let contentType = r === "video" ? "video/mp4" : "image/jpeg";
+    
+    const fileKey = `visionlight/user_${u}/${r}s/${uniqueId}.${extension}`;
+
+    let bufferToUpload: Buffer;
+
     if (Buffer.isBuffer(f)) {
-      cloudinaryClient.uploader
-        .upload_stream(options, (err, res) =>
-          err ? reject(err) : resolve(res!.secure_url),
-        )
-        .end(f);
+      bufferToUpload = f;
+    } else if (typeof f === 'string' && f.startsWith('http')) {
+      // If a URL was passed, download it first then upload to R2
+      const response = await axios.get(f, { responseType: 'arraybuffer' });
+      bufferToUpload = Buffer.from(response.data);
+      
+      // Try to guess mime type from response if available
+      if (response.headers['content-type']) {
+        contentType = response.headers['content-type'];
+        extension = contentType.split('/').pop() || extension;
+      }
     } else {
-      cloudinaryClient.uploader.upload(
-        f,
-        { ...options, timeout: 120000 },
-        (err, res) => (err ? reject(err) : resolve(res!.secure_url)),
-      );
+      throw new Error("Unsupported file format for R2 upload. Must be Buffer or URL.");
     }
-  });
+
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: fileKey,
+      Body: bufferToUpload,
+      ContentType: contentType,
+    });
+
+    await r2Client.send(command);
+    
+    const finalUrl = `${publicUrl}/${fileKey}`;
+    console.log(`✅ Uploaded ${r} to R2:`, finalUrl);
+    return finalUrl;
+  } catch (error) {
+    console.error("Error uploading to R2:", error);
+    throw error;
+  }
 };
 
 // Helper: Download

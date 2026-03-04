@@ -1,12 +1,16 @@
-import cloudinary from "cloudinary";
 import multer from "multer";
 import { Request } from "express";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import crypto from "crypto";
 
-// Configure Cloudinary
-cloudinary.v2.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+// Configure AWS S3 Client for Cloudflare R2
+const r2Client = new S3Client({
+  region: "auto",
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
+  },
 });
 
 // Configure multer for file uploads
@@ -16,10 +20,10 @@ export const upload = multer({
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
   fileFilter: (req: Request, file: Express.Multer.File, cb: any) => {
-    if (file.mimetype.startsWith("image/")) {
+    if (file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/")) {
       cb(null, true);
     } else {
-      cb(new Error("Only image files are allowed"), false);
+      cb(new Error("Only image and video files are allowed"), false);
     }
   },
 });
@@ -28,34 +32,28 @@ export const uploadToCloudinary = async (
   file: Express.Multer.File
 ): Promise<string> => {
   try {
-    return new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.v2.uploader.upload_stream(
-        {
-          resource_type: "image",
-          folder: "visionlight-reference-images",
-          transformation: [
-            { width: 1024, height: 1024, crop: "limit" },
-            { quality: "auto" },
-            { format: "webp" },
-          ],
-        },
-        (error, result) => {
-          if (error) {
-            console.error("Cloudinary upload error:", error);
-            reject(error);
-          } else if (result) {
-            console.log("✅ Image uploaded to Cloudinary:", result.secure_url);
-            resolve(result.secure_url);
-          } else {
-            reject(new Error("Upload failed - no result"));
-          }
-        }
-      );
+    const bucketName = process.env.R2_BUCKET_NAME || "";
+    const publicUrl = process.env.R2_PUBLIC_URL || "";
+    
+    // Generate a unique file name
+    const fileExtension = file.originalname.split('.').pop();
+    const uniqueId = crypto.randomUUID();
+    const fileKey = `visionlight-reference-images/${uniqueId}.${fileExtension}`;
 
-      uploadStream.end(file.buffer);
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: fileKey,
+      Body: file.buffer,
+      ContentType: file.mimetype,
     });
+
+    await r2Client.send(command);
+    
+    const finalUrl = `${publicUrl}/${fileKey}`;
+    console.log("✅ File uploaded to R2:", finalUrl);
+    return finalUrl;
   } catch (error) {
-    console.error("Error uploading to Cloudinary:", error);
+    console.error("Error uploading to R2:", error);
     throw error;
   }
 };
