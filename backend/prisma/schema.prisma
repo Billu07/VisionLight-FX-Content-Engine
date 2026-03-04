@@ -15,7 +15,7 @@ model Organization {
   // Custom API Keys
   falApiKey    String?
   openaiApiKey String?
-  klingApiKey  String?
+  kieApiKey    String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

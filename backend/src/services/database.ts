@@ -35,7 +35,10 @@ export const dbService = {
     return prisma.user.findUnique({ where: { email } });
   },
   async findUserById(id: string) {
-    return prisma.user.findUnique({ where: { id } });
+    return prisma.user.findUnique({
+      where: { id },
+      include: { organization: true },
+    });
   },
   async createUser(data: { email: string; name?: string; view?: string; maxProjects?: number }) {
     const isDemo = data.view === "PICDRIFT";

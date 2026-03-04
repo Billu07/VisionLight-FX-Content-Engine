@@ -4,12 +4,17 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Configure FAL
-fal.config({
-  credentials: process.env.FAL_KEY,
-});
-
 export const FalService = {
+  /**
+   * Helper to configure FAL with a tenant's custom key, or fallback to the master key.
+   */
+  _configureClient(tenantKey?: string) {
+    const credentials = tenantKey || process.env.FAL_KEY;
+    if (!credentials) throw new Error("FAL API Key is not configured.");
+
+    fal.config({ credentials });
+  },
+
   /**
    * CORE GENERATION & EDITING
    * Uses fal-ai/nano-banana-2 or fal-ai/nano-banana-2/edit based on reference images.
@@ -20,8 +25,10 @@ export const FalService = {
     referenceImages?: Buffer[];
     modelType?: "speed" | "quality";
     useGrounding?: boolean;
-    imageSize?: "1K" | "2K" | "4K";
+    imageSize?: string;
+    apiKey?: string; // <--- NEW
   }): Promise<Buffer> {
+    this._configureClient(params.apiKey);
     try {
       const isEdit = params.referenceImages && params.referenceImages.length > 0;
       const endpoint = isEdit ? "fal-ai/nano-banana-2/edit" : "fal-ai/nano-banana-2";
@@ -75,7 +82,8 @@ export const FalService = {
 
   /**
    */
-  async upscaleImage(params: { imageUrl: string }): Promise<Buffer> {
+  async upscaleImage(params: { imageUrl: string, apiKey?: string }): Promise<Buffer> {
+    this._configureClient(params.apiKey);
     try {
       console.log(`✨ FAL Topaz Upscale: ${params.imageUrl}`);
 

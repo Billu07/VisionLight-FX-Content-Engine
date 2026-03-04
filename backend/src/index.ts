@@ -20,8 +20,20 @@ import { ROIService } from "./services/roi";
 import { AuthService } from "./services/auth";
 import { dbService as airtableService } from "./services/database";
 import { contentEngine } from "./services/engine";
+import { encryptionUtils } from "./utils/encryption";
 
 const app = express();
+
+// Helper to extract keys
+async function getTenantApiKeys(userId: string) {
+  const user = await airtableService.findUserById(userId);
+  return {
+    falApiKey: encryptionUtils.decrypt(user?.organization?.falApiKey) || undefined,
+    kieApiKey: encryptionUtils.decrypt(user?.organization?.kieApiKey) || undefined,
+    openaiApiKey: encryptionUtils.decrypt(user?.organization?.openaiApiKey) || undefined,
+  };
+}
+
 const PORT = process.env.PORT || 4000;
 
 // === ADMIN CONFIGURATION ===
@@ -638,6 +650,8 @@ app.post(
         cost,
       );
 
+      const apiKeys = await getTenantApiKeys(req.user!.id);
+
       const newAsset = await contentEngine.editAsset(
         assetUrl,
         prompt,
@@ -646,6 +660,7 @@ app.post(
         referenceUrl,
         mode || "pro",
         originalAssetId,
+        apiKeys
       );
 
       res.json({ success: true, asset: newAsset });
@@ -685,6 +700,7 @@ app.post(
         cost,
       );
 
+      const apiKeys = await getTenantApiKeys(req.user!.id);
       const result = await contentEngine.processKlingDrift(
         req.user!.id,
         assetUrl,
@@ -694,7 +710,8 @@ app.post(
         Number(zoom),
         aspectRatio,
         generateAudio === "true" || generateAudio === true,
-        projectId
+        projectId,
+        apiKeys
       );
       res.json(result);
     } catch (error: any) {
@@ -710,7 +727,8 @@ app.post(
   async (req: AuthenticatedRequest, res) => {
     try {
       const { statusUrl } = req.body;
-      const status = await contentEngine.checkToolStatus(statusUrl);
+      const apiKeys = await getTenantApiKeys(req.user!.id);
+      const status = await contentEngine.checkToolStatus(statusUrl, apiKeys);
       res.json({ success: true, status });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -772,10 +790,13 @@ app.post(
         cost,
       );
 
+      const apiKeys = await getTenantApiKeys(req.user!.id);
+
       const asset = await contentEngine.enhanceAsset(
         req.user!.id,
         assetUrl,
         originalAssetId,
+        apiKeys
       );
       res.json({ success: true, asset });
     } catch (error: any) {
@@ -1084,22 +1105,28 @@ app.post(
       (async () => {
         try {
           if (mediaType === "carousel") {
+            const apiKeys = await getTenantApiKeys(req.user!.id);
             await contentEngine.startCarouselGeneration(
               post.id,
               prompt,
               generationParams,
+              apiKeys
             );
           } else if (mediaType === "image") {
+            const apiKeys = await getTenantApiKeys(req.user!.id);
             await contentEngine.startImageGeneration(
               post.id,
               prompt,
               generationParams,
+              apiKeys
             );
           } else {
+            const apiKeys = await getTenantApiKeys(req.user!.id);
             contentEngine.startVideoGeneration(
               post.id,
               prompt,
               generationParams,
+              apiKeys
             );
           }
         } catch (err: any) {
@@ -1130,7 +1157,8 @@ app.get(
         return res.status(403).json({ error: "Denied" });
 
       if (post.status === "PROCESSING") {
-        await contentEngine.checkPostStatus(post);
+        const apiKeys = await getTenantApiKeys(req.user!.id);
+        await contentEngine.checkPostStatus(post, apiKeys);
         post = await airtableService.getPostById(req.params.postId);
       }
 
@@ -1165,7 +1193,8 @@ app.get(
       const updates = activePosts.map(async (simplePost: any) => {
         const fullPost = await airtableService.getPostById(simplePost.id);
         if (fullPost && fullPost.status === "PROCESSING") {
-          await contentEngine.checkPostStatus(fullPost);
+          const apiKeys = await getTenantApiKeys(req.user!.id);
+          await contentEngine.checkPostStatus(fullPost, apiKeys);
         }
       });
 

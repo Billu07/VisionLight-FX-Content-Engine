@@ -11,9 +11,11 @@ import {
   getClosestAspectRatio,
 } from "./utils";
 
+import { TenantApiKeys } from "./video";
+
 export const imageLogic = {
   // === GENERATION ===
-  async startImageGeneration(postId: string, finalPrompt: string, params: any) {
+  async startImageGeneration(postId: string, finalPrompt: string, params: any, apiKeys?: TenantApiKeys) {
     console.log(
       `🎨 FAL Nano Banana Gen for Post ${postId} | AR: ${params.aspectRatio}`,
     );
@@ -35,6 +37,7 @@ export const imageLogic = {
         referenceImages: refBuffers,
         modelType: "quality",
         useGrounding: true,
+        apiKey: apiKeys?.falApiKey,
       });
 
       const cloudUrl = await uploadToCloudinary(
@@ -68,6 +71,7 @@ export const imageLogic = {
     postId: string,
     finalPrompt: string,
     params: any,
+    apiKeys?: TenantApiKeys
   ) {
     console.log(`🎠 FAL Nano Banana Carousel for Post ${postId}`);
     try {
@@ -99,6 +103,7 @@ export const imageLogic = {
           aspectRatio: targetRatio,
           referenceImages: carouselHistory,
           modelType: "quality",
+          apiKey: apiKeys?.falApiKey,
         });
         carouselHistory.push(buf);
         const url = await uploadToCloudinary(
@@ -138,6 +143,7 @@ export const imageLogic = {
     referenceUrl?: string,
     mode: "standard" | "pro" = "pro",
     originalAssetId?: string, // 👈 ADDED PARAMETER
+    apiKeys?: TenantApiKeys
   ): Promise<Asset> {
     try {
       console.log(`🎨 Editing asset for ${userId} [${mode}]: "${prompt}"`);
@@ -188,6 +194,7 @@ export const imageLogic = {
         modelType: modelType,
         useGrounding: mode === "pro",
         imageSize: targetSize,
+        apiKey: apiKeys?.falApiKey,
       });
 
       const newUrl = await uploadToCloudinary(
@@ -226,12 +233,13 @@ export const imageLogic = {
     userId: string,
     assetUrl: string,
     originalAssetId?: string, // 👈 ADDED PARAMETER
+    apiKeys?: TenantApiKeys
   ): Promise<Asset> {
     try {
       console.log(`✨ Enhancing Asset for ${userId}...`);
 
       const rawUrl = assetUrl;
-      const bigBuffer = await FalService.upscaleImage({ imageUrl: rawUrl });
+      const bigBuffer = await FalService.upscaleImage({ imageUrl: rawUrl, apiKey: apiKeys?.falApiKey });
 
       // FIX: Compress before Cloudinary upload (Mozjpeg 95)
       const optimizedBuffer = await sharp(bigBuffer)

@@ -18,6 +18,12 @@ import {
   VIDEO_UPLOAD_TIMEOUT,
 } from "./config";
 
+export interface TenantApiKeys {
+  falApiKey?: string;
+  kieApiKey?: string;
+  openaiApiKey?: string;
+}
+
 // Convert Sliders to Prompt
 const getKlingCameraPrompt = (h: number, v: number, z: number) => {
   const parts: string[] = [];
@@ -48,6 +54,7 @@ export const videoLogic = {
     userAspectRatio?: string,
     generateAudio: boolean = false,
     projectId?: string,
+    apiKeys?: TenantApiKeys
   ) {
     try {
       console.log(
@@ -158,6 +165,9 @@ export const videoLogic = {
       const subject = prompt?.trim() || "The scene";
       const finalPrompt = `${subject}. Action: ${cameraMove}. Style: High fidelity, smooth motion, cinematic 3D depth, professional lighting.`;
 
+      const credentials = apiKeys?.falApiKey || FAL_KEY;
+      if (!credentials) throw new Error("FAL API Key is missing.");
+
       // ✅ 2.6 Payload
       const payload: any = {
         prompt: finalPrompt,
@@ -169,7 +179,7 @@ export const videoLogic = {
       const url = `${FAL_BASE_PATH}/image-to-video`;
       const submitRes = await axios.post(url, payload, {
         headers: {
-          Authorization: `Key ${FAL_KEY}`,
+          Authorization: `Key ${credentials}`,
           "Content-Type": "application/json",
         },
       });
@@ -204,15 +214,18 @@ export const videoLogic = {
     }
   },
 
-  async checkToolStatus(statusUrl: string) {
+  async checkToolStatus(statusUrl: string, apiKeys?: TenantApiKeys) {
+    const credentials = apiKeys?.falApiKey || FAL_KEY;
+    if (!credentials) throw new Error("FAL API Key is missing.");
+
     const res = await axios.get(statusUrl, {
-      headers: { Authorization: `Key ${FAL_KEY}` },
+      headers: { Authorization: `Key ${credentials}` },
     });
     return res.data;
   },
 
   // === TIMELINE VIDEO GEN ===
-  async startVideoGeneration(postId: string, finalPrompt: string, params: any) {
+  async startVideoGeneration(postId: string, finalPrompt: string, params: any, apiKeys?: TenantApiKeys) {
     console.log(
       `🎬 Video Gen for ${postId} | Model: ${params.model} | AR: ${params.aspectRatio}`,
     );
@@ -373,10 +386,11 @@ export const videoLogic = {
 
         console.log(`🚀 Veo Request: ${endpoint}`, JSON.stringify(payload, null, 2));
 
+        const falKey = apiKeys?.falApiKey || FAL_KEY;
         const url = `https://queue.fal.run/${endpoint}`;
         const submitRes = await axios.post(url, payload, {
           headers: {
-            Authorization: `Key ${FAL_KEY}`,
+            Authorization: `Key ${falKey}`,
             "Content-Type": "application/json",
           },
         });
@@ -482,9 +496,10 @@ export const videoLogic = {
           }
         }
 
+        const falKey = apiKeys?.falApiKey || FAL_KEY;
         const submitRes = await axios.post(url, payload, {
           headers: {
-            Authorization: `Key ${FAL_KEY}`,
+            Authorization: `Key ${falKey}`,
             "Content-Type": "application/json",
           },
         });
@@ -520,10 +535,11 @@ export const videoLogic = {
         };
         if (isImageToVideo) kiePayload.input.image_urls = [kieInputUrl];
 
+        const kieKey = apiKeys?.kieApiKey || KIE_API_KEY;
         const kieRes = await axios.post(
           `${KIE_BASE_URL}/jobs/createTask`,
           kiePayload,
-          { headers: { Authorization: `Bearer ${KIE_API_KEY}` } },
+          { headers: { Authorization: `Bearer ${kieKey}` } },
         );
         if (kieRes.data.code !== 200) throw new Error("Kie Error");
         externalId = kieRes.data.data.taskId;
@@ -543,13 +559,14 @@ export const videoLogic = {
             contentType: "image/jpeg",
           });
         }
+        const openAIKey = apiKeys?.openaiApiKey || process.env.OPENAI_API_KEY;
         const genResponse = await axios.post(
           "https://api.openai.com/v1/videos",
           form,
           {
             headers: {
               ...form.getHeaders(),
-              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+              Authorization: `Bearer ${openAIKey}`,
             },
             timeout: VIDEO_UPLOAD_TIMEOUT,
           },
@@ -572,7 +589,7 @@ export const videoLogic = {
     }
   },
 
-  async checkPostStatus(post: Post) {
+  async checkPostStatus(post: Post, apiKeys?: TenantApiKeys) {
     const params = post.generationParams as any;
     if (post.status !== "PROCESSING" || !params?.externalId) return;
     const externalId = params.externalId;
@@ -587,9 +604,10 @@ export const videoLogic = {
       let errorMessage = "";
 
       if (provider.includes("kie")) {
+        const kieKey = apiKeys?.kieApiKey || KIE_API_KEY;
         const checkRes = await axios.get(
           `${KIE_BASE_URL}/jobs/recordInfo?taskId=${externalId}`,
-          { headers: { Authorization: `Bearer ${KIE_API_KEY}` } },
+          { headers: { Authorization: `Bearer ${kieKey}` } },
         );
         if (checkRes.data.data.state === "success") {
           finalUrl = JSON.parse(checkRes.data.data.resultJson).resultUrls?.[0];
@@ -599,18 +617,19 @@ export const videoLogic = {
           errorMessage = checkRes.data.data.failMsg;
         } else progress = Math.min(95, progress + 5);
       } else if (provider.includes("kling")) {
+        const falKey = apiKeys?.falApiKey || FAL_KEY;
         const checkUrl =
           params.statusUrl || `${FAL_BASE_PATH}/requests/${externalId}/status`;
 
         try {
           const statusRes = await axios.get(checkUrl, {
-            headers: { Authorization: `Key ${FAL_KEY}` },
+            headers: { Authorization: `Key ${falKey}` },
           });
           const data = statusRes.data;
 
           if (data.status === "COMPLETED") {
             const resultRes = await axios.get(data.response_url, {
-              headers: { Authorization: `Key ${FAL_KEY}` },
+              headers: { Authorization: `Key ${falKey}` },
             });
             // Robust parsing for different Fal models
             finalUrl = resultRes.data.video?.url || resultRes.data.url || resultRes.data.file_url;
