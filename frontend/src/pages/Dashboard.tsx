@@ -1056,15 +1056,6 @@ function Dashboard() {
                 </div>
               </div>
 
-              {/* NEW: Render Reserve Button */}
-              <button
-                onClick={() => setShowReserveModal(true)}
-                className="px-4 py-2 bg-gray-800/40 backdrop-blur-xl border border-white/5 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-all flex items-center gap-2 h-full self-stretch sm:self-auto"
-              >
-                <span>💳</span>
-                <span>Render Reserve</span>
-              </button>
-
               {!isMobile && (
                 <div className="relative">
                   <button
@@ -1087,6 +1078,17 @@ function Dashboard() {
                       <div className="px-4 py-2 border-b border-gray-800/80 mb-2">
                         <div className="text-xs text-gray-400 uppercase tracking-widest font-bold">Options</div>
                       </div>
+
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          setShowReserveModal(true);
+                        }}
+                        className="w-full text-left px-4 py-2 text-yellow-400 hover:bg-yellow-500/10 text-sm font-medium transition-colors flex items-center gap-2"
+                      >
+                        <span>💳</span>
+                        <span>Render Reserve</span>
+                      </button>
 
                       {isAdmin && (
                         <button
