@@ -8,14 +8,41 @@ datasource db {
 }
 
 model Organization {
-  id       String  @id @default(uuid())
-  name     String
-  isActive Boolean @default(true)
+  id           String  @id @default(uuid())
+  name         String
+  isActive     Boolean @default(true)
 
   // Custom API Keys
   falApiKey    String?
   openaiApiKey String?
   kieApiKey    String?
+
+  // Pricing Settings (Tenant specific)
+  pricePicDrift_5s       Float @default(1)
+  pricePicDrift_10s      Float @default(2)
+  pricePicDrift_Plus_5s  Float @default(2)
+  pricePicDrift_Plus_10s Float @default(3)
+
+  pricePicFX_Standard Float @default(1)
+  pricePicFX_Carousel Float @default(3)
+  pricePicFX_Batch    Float @default(1)
+
+  priceEditor_Pro     Float @default(4)
+  priceEditor_Enhance Float @default(1)
+  priceEditor_Convert Float @default(1)
+
+  priceVideoFX1_10s Float @default(4)
+  priceVideoFX1_15s Float @default(3)
+
+  priceVideoFX2_4s   Float @default(6)
+  priceVideoFX2_8s   Float @default(4)
+  priceVideoFX2_12s  Float @default(6)
+
+  priceVideoFX3_4s   Float @default(4)
+  priceVideoFX3_6s   Float @default(5)
+  priceVideoFX3_8s   Float @default(6)
+
+  priceAsset_DriftPath Float @default(2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
