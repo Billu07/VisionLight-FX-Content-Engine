@@ -607,24 +607,25 @@ export function AssetLibrary({
             className="absolute inset-0"
             onClick={() => setSelectedAsset(null)}
           ></div>
-          <div className="relative bg-gray-900 border-0 sm:border border-gray-700 sm:rounded-2xl max-w-6xl w-full h-full sm:h-[85vh] flex flex-col overflow-hidden shadow-2xl z-10">
-            {/* TITLE BLOCK (TOP BAR) */}
-            <div className="w-full bg-black border-b border-gray-800 p-3 sm:p-4 flex justify-center items-center z-30 shadow-md">
-              <div className="text-white px-6 py-1.5 rounded-full font-bold tracking-widest text-xs sm:text-sm border border-white/10 bg-gray-800/80 shadow-inner">
-                {activeTab === "STORYBOARD" ? "Storyboard FX" :
-                  activeTab === "9:16" ? "Portrait FX" :
-                    activeTab === "16:9" ? "Landscape FX" :
-                      activeTab === "1:1" ? "Square FX" :
-                        activeTab === "3DX_FRAME" ? "3DX Drift Frames" :
-                          activeTab === "VIDEO" ? "3DX Paths" :
-                            activeTab === "custom" ? "Edited Assets" :
-                              "Original Assets"}
+          <div className="relative bg-gray-900 border-0 sm:border border-gray-700 sm:rounded-2xl max-w-6xl w-full h-full sm:h-[85vh] flex flex-col sm:flex-row overflow-hidden shadow-2xl z-10">
+            {/* LEFT: IMAGE PREVIEW */}
+            <div className="flex-1 bg-black flex flex-col border-b sm:border-b-0 sm:border-r border-gray-800 relative group min-h-[40vh] overflow-hidden">
+              {/* TITLE BLOCK (TOP BAR) */}
+              <div className="w-full bg-black border-b border-gray-800 p-3 sm:p-4 flex justify-center items-center z-30 shadow-md shrink-0">
+                <div className="text-white px-6 py-1.5 rounded-full font-bold tracking-widest text-xs sm:text-sm border border-white/10 bg-gray-800/80 shadow-inner">
+                  {activeTab === "STORYBOARD" ? "Storyboard FX" :
+                    activeTab === "9:16" ? "Portrait FX" :
+                      activeTab === "16:9" ? "Landscape FX" :
+                        activeTab === "1:1" ? "Square FX" :
+                          activeTab === "3DX_FRAME" ? "3DX Drift Frames" :
+                            activeTab === "VIDEO" ? "3DX Paths" :
+                              activeTab === "custom" ? "Edited Assets" :
+                                "Original Assets"}
+                </div>
               </div>
-            </div>
 
-            <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
-              {/* LEFT: IMAGE PREVIEW */}
-              <div className="flex-1 bg-black flex items-center justify-center p-4 sm:p-8 border-b sm:border-b-0 sm:border-r border-gray-800 relative group min-h-[40vh]">
+              {/* IMAGE WRAPPER */}
+              <div className="flex-1 relative flex items-center justify-center p-4 sm:p-8 overflow-hidden">
                 {/* UNIFIED OVERLAY CONTROLS */}
               <div className="absolute top-4 right-4 z-20 flex gap-2">
                 <button
