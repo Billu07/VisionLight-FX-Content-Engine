@@ -46,6 +46,7 @@ function Dashboard() {
   const [activeLibrarySlot, setActiveLibrarySlot] = useState<
     "start" | "end" | "generic" | "sequencer" | null
   >(null);
+  const [librarySource, setLibrarySource] = useState<"top" | "field">("top");
 
   // Engine Selection
   const [activeEngine, setActiveEngine] = useState<EngineType>("kie");
@@ -694,7 +695,9 @@ function Dashboard() {
           <AssetLibrary
             onClose={() => setActiveLibrarySlot(null)}
             onSelect={handleAssetSelect}
-            initialAspectRatio={getCurrentRatioForLibrary()}
+            initialAspectRatio={
+              librarySource === "top" ? "original" : getCurrentRatioForLibrary()
+            }
           />
         )}
 
@@ -703,7 +706,10 @@ function Dashboard() {
           <FullscreenVideoEditor
             sequence={sequence}
             setSequence={setSequence}
-            onAddFromLibrary={() => setActiveLibrarySlot("sequencer")}
+            onAddFromLibrary={() => {
+              setLibrarySource("field");
+              setActiveLibrarySlot("sequencer");
+            }}
             onClear={() => setSequence([])}
             onClose={() => setViewMode("create")}
           />
@@ -713,15 +719,20 @@ function Dashboard() {
         <MobileNavbar
           activeTab={viewMode}
           onTabChange={(tab) => {
-            if (tab === "library") setActiveLibrarySlot("generic");
-            else if (tab === "projects") {
+            if (tab === "library") {
+              setLibrarySource("top");
+              setActiveLibrarySlot("generic");
+            } else if (tab === "projects") {
               localStorage.removeItem("visionlight_active_project");
               navigate("/projects");
             } else {
               setViewMode(tab);
             }
           }}
-          onOpenLibrary={() => setActiveLibrarySlot("generic")}
+          onOpenLibrary={() => {
+            setLibrarySource("top");
+            setActiveLibrarySlot("generic");
+          }}
           onOpenProjects={() => {
             localStorage.removeItem("visionlight_active_project");
             navigate("/projects");
@@ -1157,6 +1168,7 @@ function Dashboard() {
                     <button
                       type="button"
                       onClick={() => {
+                        setLibrarySource("top");
                         // For PicDrift, open 'Start Frame' slot. For others, open 'Generic'.
                         setActiveLibrarySlot(
                           currentVisualTab === "picdrift" ? "start" : "generic",
@@ -1431,7 +1443,10 @@ function Dashboard() {
                             Or select from{" "}
                             <button
                               type="button"
-                              onClick={() => setActiveLibrarySlot("generic")}
+                              onClick={() => {
+                                setLibrarySource("field");
+                                setActiveLibrarySlot("generic");
+                              }}
                               className="underline text-cyan-400"
                             >
                               Asset Library
@@ -1491,9 +1506,10 @@ function Dashboard() {
                                       </div>
                                       <button
                                         type="button"
-                                        onClick={() =>
-                                          setActiveLibrarySlot("start")
-                                        }
+                                        onClick={() => {
+                                          setLibrarySource("field");
+                                          setActiveLibrarySlot("start");
+                                        }}
                                         className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
                                       >
                                         Select from Library
@@ -1554,9 +1570,10 @@ function Dashboard() {
                                       </div>
                                       <button
                                         type="button"
-                                        onClick={() =>
-                                          setActiveLibrarySlot("end")
-                                        }
+                                        onClick={() => {
+                                          setLibrarySource("field");
+                                          setActiveLibrarySlot("end");
+                                        }}
                                         className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
                                       >
                                         Select from Library
@@ -2136,9 +2153,10 @@ function Dashboard() {
                                         <div className="h-8 w-px bg-indigo-500/30"></div>
                                         <button
                                           type="button"
-                                          onClick={() =>
-                                            setActiveLibrarySlot("generic")
-                                          }
+                                          onClick={() => {
+                                            setLibrarySource("field");
+                                            setActiveLibrarySlot("generic");
+                                          }}
                                           className="flex flex-col items-center group-hover:scale-105 transition-transform"
                                         >
                                           <span className="text-2xl mb-1">
@@ -2182,9 +2200,10 @@ function Dashboard() {
                                       <div className="h-8 w-px bg-gray-600"></div>
                                       <button
                                         type="button"
-                                        onClick={() =>
-                                          setActiveLibrarySlot("generic")
-                                        }
+                                        onClick={() => {
+                                          setLibrarySource("field");
+                                          setActiveLibrarySlot("generic");
+                                        }}
                                         className="flex flex-col items-center group-hover:scale-105 transition-transform"
                                       >
                                         <span className="text-2xl mb-1">

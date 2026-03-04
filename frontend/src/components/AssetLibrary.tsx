@@ -399,14 +399,14 @@ export function AssetLibrary({
         <div className="p-4 sm:p-6 bg-gray-800/50 flex flex-col md:flex-row gap-4 items-center justify-between border-b border-gray-800">
           <div className="flex flex-wrap sm:flex-nowrap bg-gray-950 p-1 rounded-lg border border-gray-700 sm:overflow-x-auto justify-center sm:justify-start gap-1 w-full md:w-auto">
             {[
+              { id: "original", label: "Originals" },
               { id: "16:9", label: "Landscape" },
               { id: "9:16", label: "Portrait" },
               { id: "1:1", label: "Square" },
-              { id: "custom", label: "Edited" },
-              { id: "original", label: "Originals" },
               { id: "STORYBOARD", label: "Storyboard" },
-              { id: "3DX_FRAME", label: "3DX Drift Frames" },
-              { id: "VIDEO", label: "3DX Paths" },
+              { id: "custom", label: "Edited" },
+              { id: "VIDEO", label: "3DX Camera Paths" },
+              { id: "3DX_FRAME", label: "3DX Camera Frames" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -607,22 +607,25 @@ export function AssetLibrary({
             className="absolute inset-0"
             onClick={() => setSelectedAsset(null)}
           ></div>
-          <div className="relative bg-gray-900 border-0 sm:border border-gray-700 sm:rounded-2xl max-w-6xl w-full h-full sm:h-[85vh] flex flex-col sm:flex-row overflow-hidden shadow-2xl z-10">
-            {/* LEFT: IMAGE PREVIEW */}
-            <div className="flex-1 bg-black flex items-center justify-center p-4 sm:p-8 border-b sm:border-b-0 sm:border-r border-gray-800 relative group min-h-[40vh]">
-              {/* TITLE BLOCK */}
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-black/60 text-white px-6 py-2 rounded-full font-bold tracking-widest text-xs border border-white/20 backdrop-blur-md whitespace-nowrap">
+          <div className="relative bg-gray-900 border-0 sm:border border-gray-700 sm:rounded-2xl max-w-6xl w-full h-full sm:h-[85vh] flex flex-col overflow-hidden shadow-2xl z-10">
+            {/* TITLE BLOCK (TOP BAR) */}
+            <div className="w-full bg-black border-b border-gray-800 p-3 sm:p-4 flex justify-center items-center z-30 shadow-md">
+              <div className="text-white px-6 py-1.5 rounded-full font-bold tracking-widest text-xs sm:text-sm border border-white/10 bg-gray-800/80 shadow-inner">
                 {activeTab === "STORYBOARD" ? "Storyboard FX" :
-                 activeTab === "9:16" ? "Portrait FX" :
-                 activeTab === "16:9" ? "Landscape FX" :
-                 activeTab === "1:1" ? "Square FX" :
-                 activeTab === "3DX_FRAME" ? "3DX Drift Frames" :
-                 activeTab === "VIDEO" ? "3DX Paths" :
-                 activeTab === "custom" ? "Edited Assets" :
-                 "Original Assets"}
+                  activeTab === "9:16" ? "Portrait FX" :
+                    activeTab === "16:9" ? "Landscape FX" :
+                      activeTab === "1:1" ? "Square FX" :
+                        activeTab === "3DX_FRAME" ? "3DX Drift Frames" :
+                          activeTab === "VIDEO" ? "3DX Paths" :
+                            activeTab === "custom" ? "Edited Assets" :
+                              "Original Assets"}
               </div>
+            </div>
 
-              {/* UNIFIED OVERLAY CONTROLS */}
+            <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
+              {/* LEFT: IMAGE PREVIEW */}
+              <div className="flex-1 bg-black flex items-center justify-center p-4 sm:p-8 border-b sm:border-b-0 sm:border-r border-gray-800 relative group min-h-[40vh]">
+                {/* UNIFIED OVERLAY CONTROLS */}
               <div className="absolute top-4 right-4 z-20 flex gap-2">
                 <button
                   onClick={handleGoToOriginal}
@@ -770,6 +773,7 @@ export function AssetLibrary({
                   Delete
                 </button>
               </div>
+            </div>
             </div>
           </div>
         </div>
