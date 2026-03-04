@@ -110,11 +110,11 @@ const requireAdmin = (
   next: NextFunction,
 ) => {
   // ✅ Check Database Role OR Super Admin Email List
-  const isDbAdmin = req.user?.role === "ADMIN";
-  const isSuperAdmin =
+  const isDbAdmin = req.user?.role === "ADMIN" || req.user?.role === "SUPERADMIN";
+  const isSuperAdminEmail =
     req.user?.email && ADMIN_EMAILS.includes(req.user.email.toLowerCase());
 
-  if (isDbAdmin || isSuperAdmin) {
+  if (isDbAdmin || isSuperAdminEmail) {
     next();
   } else {
     return res.status(403).json({ error: "Access Denied: Admins only." });

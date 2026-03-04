@@ -22,9 +22,6 @@ import { LoadingSpinner } from "./components/LoadingSpinner";
 import { Terms } from "./pages/Terms";
 import { Privacy } from "./pages/Privacy";
 
-// Define your Admin Email here
-const ADMIN_EMAILS = ["snowfix07@gmail.com", "keith@picdrift.com"];
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -83,8 +80,9 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   // 1. Must be logged in
   if (!user) return <Navigate to="/" replace />;
 
-  // 2. Must be in the Allowed List
-  if (!ADMIN_EMAILS.includes(user.email)) {
+  // 2. Must be an Admin or SuperAdmin
+  const isAdmin = user.role === "ADMIN" || user.role === "SUPERADMIN";
+  if (!isAdmin) {
     return <Navigate to="/app" replace />;
   }
 
