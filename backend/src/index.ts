@@ -109,6 +109,110 @@ const requireAdmin = (
   }
 };
 
+const requireSuperAdmin = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  const isSuperAdmin = req.user?.role === "SUPERADMIN" || 
+    (req.user?.email && ADMIN_EMAILS.includes(req.user.email.toLowerCase()));
+
+  if (isSuperAdmin) {
+    next();
+  } else {
+    return res.status(403).json({ error: "Access Denied: Super Admins only." });
+  }
+};
+
+// ==================== ORGANIZATION ROUTES ====================
+
+app.get(
+  "/api/admin/organization",
+  authenticateToken,
+  requireAdmin,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = await airtableService.findUserById(req.user!.id);
+      if (!user?.organizationId) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+      const org = await airtableService.getOrganization(user.organizationId);
+      
+      // Decrypt keys for display (masked for security usually, but for config they need to see them or at least know they exist)
+      // We'll return them decrypted so they can edit them easily.
+      res.json({
+        success: true,
+        organization: {
+          ...org,
+          falApiKey: encryptionUtils.decrypt(org?.falApiKey),
+          kieApiKey: encryptionUtils.decrypt(org?.kieApiKey),
+          openaiApiKey: encryptionUtils.decrypt(org?.openaiApiKey),
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+app.put(
+  "/api/admin/organization",
+  authenticateToken,
+  requireAdmin,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { falApiKey, kieApiKey, openaiApiKey, name } = req.body;
+      const user = await airtableService.findUserById(req.user!.id);
+      
+      if (!user?.organizationId) {
+        return res.status(404).json({ error: "Organization not found" });
+      }
+
+      const updated = await airtableService.updateOrganization(user.organizationId, {
+        name,
+        falApiKey: encryptionUtils.encrypt(falApiKey),
+        kieApiKey: encryptionUtils.encrypt(kieApiKey),
+        openaiApiKey: encryptionUtils.encrypt(openaiApiKey),
+      });
+
+      res.json({ success: true, organization: updated });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+app.post(
+  "/api/admin/organizations",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { name } = req.body;
+      const org = await prisma.organization.create({
+        data: { name },
+      });
+      res.json({ success: true, organization: org });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+app.get(
+  "/api/admin/organizations",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const orgs = await prisma.organization.findMany();
+      res.json({ success: true, organizations: orgs });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
 // ==================== GLOBAL PRICING SETTINGS ====================
 
 app.get(
@@ -193,7 +297,7 @@ app.post(
   authenticateToken,
   requireAdmin,
   async (req: AuthenticatedRequest, res) => {
-    const { email, password, name, view, maxProjects } = req.body;
+    const { email, password, name, view, maxProjects, organizationId, role } = req.body;
     if (!email || !password)
       return res.status(400).json({ error: "Missing fields" });
 
@@ -203,7 +307,9 @@ app.post(
         password,
         name || "New User",
         view || "VISIONLIGHT",
-        maxProjects !== undefined ? Number(maxProjects) : 3
+        maxProjects !== undefined ? Number(maxProjects) : 3,
+        organizationId,
+        role
       );
       res.json({ success: true, user: newUser });
     } catch (error: any) {

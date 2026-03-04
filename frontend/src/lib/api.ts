@@ -41,6 +41,12 @@ export const apiEndpoints = {
     api.put(`/api/admin/users/${userId}`, data),
   adminDeleteUser: (userId: string) => api.delete(`/api/admin/users/${userId}`),
 
+  // === Admin Organization (Tenant Control) ===
+  adminGetOrganization: () => api.get("/api/admin/organization"),
+  adminUpdateOrganization: (data: any) => api.put("/api/admin/organization", data),
+  adminGetOrganizations: () => api.get("/api/admin/organizations"),
+  adminCreateOrganization: (data: any) => api.post("/api/admin/organizations", data),
+
   // === Admin Settings (Pricing Control) ===
   adminGetSettings: () => api.get("/api/admin/settings"),
   adminUpdateSettings: (data: any) => api.put("/api/admin/settings", data),

@@ -15,9 +15,10 @@ interface User {
   creditsVideoFX1: number;
   creditsVideoFX2: number;
   creditsVideoFX3: number;
-  role: "USER" | "MANAGER" | "ADMIN";
+  role: "USER" | "MANAGER" | "ADMIN" | "SUPERADMIN";
   view: "VISIONLIGHT" | "PICDRIFT";
   maxProjects: number;
+  organizationId?: string | null;
 }
 
 interface GlobalSettings {
@@ -46,14 +47,25 @@ export default function AdminDashboard() {
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<"users" | "controls">("users");
+  const [activeTab, setActiveTab] = useState<"users" | "controls" | "keys" | "orgs">("users");
   const [users, setUsers] = useState<User[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [settings, setSettings] = useState<GlobalSettings | null>(null);
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [organization, setOrganization] = useState<any>(null);
+  const [orgKeys, setOrgKeys] = useState({
+    falApiKey: "",
+    kieApiKey: "",
+    openaiApiKey: "",
+    name: "",
+  });
+
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showOrgModal, setShowOrgModal] = useState(false);
+  const [newOrgName, setNewOrgName] = useState("");
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [pendingUpdates, setPendingUpdates] = useState<Partial<User>>({});
   const [newUser, setNewUser] = useState({
@@ -62,6 +74,8 @@ export default function AdminDashboard() {
     name: "",
     view: "VISIONLIGHT",
     maxProjects: 3,
+    organizationId: "",
+    role: "USER",
   });
   const [customCreditAmount, setCustomCreditAmount] = useState<string>("0");
   const [targetCreditPool, setTargetCreditPool] =
@@ -73,6 +87,42 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const fetchOrgData = async () => {
+    try {
+      const res = await apiEndpoints.adminGetOrganization();
+      if (res.data.success) {
+        setOrganization(res.data.organization);
+        setOrgKeys({
+          falApiKey: res.data.organization.falApiKey || "",
+          kieApiKey: res.data.organization.kieApiKey || "",
+          openaiApiKey: res.data.organization.openaiApiKey || "",
+          name: res.data.organization.name || "",
+        });
+      }
+    } catch (err: any) {
+      console.error("Failed to fetch org keys", err);
+    }
+  };
+
+  const fetchOrganizations = async () => {
+    try {
+      const res = await apiEndpoints.adminGetOrganizations();
+      if (res.data.success) {
+        setOrganizations(res.data.organizations);
+      }
+    } catch (err: any) {
+      console.error("Failed to fetch organizations", err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "keys") {
+      fetchOrgData();
+    } else if (activeTab === "orgs") {
+      fetchOrganizations();
+    }
+  }, [activeTab]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -126,6 +176,8 @@ export default function AdminDashboard() {
         name: "",
         view: "VISIONLIGHT",
         maxProjects: 3,
+        organizationId: "",
+        role: "USER",
       });
       setShowInviteModal(false);
       fetchData();
@@ -181,6 +233,38 @@ export default function AdminDashboard() {
       setEditingUser(null);
       setSearchTerm(""); // Reset search filter
       fetchData();
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUpdateOrgKeys = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActionLoading(true);
+    try {
+      await apiEndpoints.adminUpdateOrganization(orgKeys);
+      setMsg("API Keys updated successfully.");
+      setTimeout(() => setMsg(""), 3000);
+      fetchOrgData();
+    } catch (err: any) {
+      setMsg("Error: " + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCreateOrganization = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActionLoading(true);
+    try {
+      await apiEndpoints.adminCreateOrganization({ name: newOrgName });
+      setMsg("Organization created successfully.");
+      setTimeout(() => setMsg(""), 3000);
+      setNewOrgName("");
+      setShowOrgModal(false);
+      fetchOrganizations();
+    } catch (err: any) {
+      setMsg("Error: " + err.message);
     } finally {
       setActionLoading(false);
     }
@@ -252,6 +336,28 @@ export default function AdminDashboard() {
               >
                 Global Control
               </button>
+              <button
+                onClick={() => setActiveTab("keys")}
+                className={`px-6 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                  activeTab === "keys"
+                    ? "bg-gray-800 text-brand-accent shadow-sm"
+                    : "text-gray-400 hover:text-white hover:bg-gray-800/50"
+                }`}
+              >
+                API Keys
+              </button>
+              {adminUser?.role === "SUPERADMIN" && (
+                <button
+                  onClick={() => setActiveTab("orgs")}
+                  className={`px-6 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                    activeTab === "orgs"
+                      ? "bg-gray-800 text-brand-accent shadow-sm"
+                      : "text-gray-400 hover:text-white hover:bg-gray-800/50"
+                  }`}
+                >
+                  Organizations
+                </button>
+              )}
             </div>
 
             <div className="flex gap-4 w-full md:w-auto">
@@ -558,6 +664,149 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* TAB CONTENT: API KEYS */}
+        {activeTab === "keys" && (
+          <div className="max-w-2xl mx-auto bg-gray-900 border border-gray-800 rounded-xl p-8 sm:p-10 shadow-sm animate-in fade-in slide-in-from-bottom-4">
+            <h2 className="text-xl font-bold text-white mb-2 uppercase tracking-widest">
+              API Configuration
+            </h2>
+            <p className="text-xs text-gray-500 mb-8 font-mono">
+              Configure isolated engine credentials for your organization:{" "}
+              <span className="text-brand-accent">
+                {organization?.name || "Loading..."}
+              </span>
+            </p>
+
+            <form onSubmit={handleUpdateOrgKeys} className="space-y-8">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  Fal AI Key (Mandatory)
+                </label>
+                <input
+                  type="password"
+                  className="w-full p-4 bg-gray-950 border border-gray-800 rounded-xl text-sm outline-none focus:border-brand-accent transition-colors text-white placeholder-gray-700 font-mono"
+                  placeholder="fal_xxxxxxxxxxxxxxxx"
+                  value={orgKeys.falApiKey}
+                  onChange={(e) =>
+                    setOrgKeys({ ...orgKeys, falApiKey: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  KIE API Key (For VideoFX 1)
+                </label>
+                <input
+                  type="password"
+                  className="w-full p-4 bg-gray-950 border border-gray-800 rounded-xl text-sm outline-none focus:border-brand-accent transition-colors text-white placeholder-gray-700 font-mono"
+                  placeholder="kie_xxxxxxxxxxxxxxxx"
+                  value={orgKeys.kieApiKey}
+                  onChange={(e) =>
+                    setOrgKeys({ ...orgKeys, kieApiKey: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  OpenAI Key (For VideoFX 2)
+                </label>
+                <input
+                  type="password"
+                  className="w-full p-4 bg-gray-950 border border-gray-800 rounded-xl text-sm outline-none focus:border-brand-accent transition-colors text-white placeholder-gray-700 font-mono"
+                  placeholder="sk-xxxxxxxxxxxxxxxx"
+                  value={orgKeys.openaiApiKey}
+                  onChange={(e) =>
+                    setOrgKeys({ ...orgKeys, openaiApiKey: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="pt-4">
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="w-full py-4 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-xl font-bold uppercase text-xs tracking-widest transition-all shadow-lg active:scale-[0.98]"
+                >
+                  {actionLoading ? (
+                    <LoadingSpinner size="sm" color="text-gray-950" />
+                  ) : (
+                    "Save Configuration"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* TAB CONTENT: ORGANIZATIONS (SUPERADMIN ONLY) */}
+        {activeTab === "orgs" && adminUser?.role === "SUPERADMIN" && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
+                Active Tenants
+              </h2>
+              <button
+                onClick={() => setShowOrgModal(true)}
+                className="bg-brand-accent hover:bg-cyan-300 text-gray-950 font-bold px-6 py-2 rounded-lg text-[11px] uppercase tracking-widest transition-colors h-full"
+              >
+                New Organization
+              </button>
+            </div>
+
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-sm">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-gray-950/50 text-gray-400 text-[10px] uppercase tracking-widest font-semibold">
+                  <tr>
+                    <th className="p-6 border-b border-gray-800">
+                      Organization Name
+                    </th>
+                    <th className="p-6 border-b border-gray-800 text-center">
+                      Status
+                    </th>
+                    <th className="p-6 border-b border-gray-800 text-center">
+                      UUID
+                    </th>
+                    <th className="p-6 border-b border-gray-800 text-right">
+                      Created
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                  {organizations.map((org) => (
+                    <tr
+                      key={org.id}
+                      className="hover:bg-gray-800/50 transition-colors"
+                    >
+                      <td className="p-6 font-bold text-white tracking-tight">
+                        {org.name}
+                      </td>
+                      <td className="p-6 text-center">
+                        <span
+                          className={`px-2 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest ${
+                            org.isActive
+                              ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                              : "bg-red-500/10 text-red-400 border border-red-500/20"
+                          }`}
+                        >
+                          {org.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="p-6 text-center text-gray-500 text-xs font-mono">
+                        {org.id}
+                      </td>
+                      <td className="p-6 text-right text-gray-500 text-xs font-mono">
+                        {new Date(org.createdAt).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* MODAL: MANAGE USER */}
         {editingUser && (
           <div className="fixed inset-0 bg-gray-950/80 flex items-start justify-center z-[100] overflow-y-auto p-4 py-10 backdrop-blur-sm custom-scrollbar">
@@ -786,6 +1035,48 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                {/* 5. SUPERADMIN ONLY: ORG & ROLE */}
+                {adminUser?.role === "SUPERADMIN" && (
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-400 uppercase mb-4 block tracking-widest">
+                      Tenant & Global Permissions
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <select
+                        className="w-full bg-gray-950 border border-gray-800 rounded-md p-3 text-sm outline-none focus:border-brand-accent text-gray-300 transition-colors"
+                        value={pendingUpdates.organizationId || ""}
+                        onChange={(e) =>
+                          setPendingUpdates({
+                            ...pendingUpdates,
+                            organizationId: e.target.value || null,
+                          })
+                        }
+                      >
+                        <option value="">No Organization</option>
+                        {organizations.map((org) => (
+                          <option key={org.id} value={org.id}>
+                            {org.name}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        className="w-full bg-gray-950 border border-gray-800 rounded-md p-3 text-sm outline-none focus:border-brand-accent text-gray-300 transition-colors"
+                        value={pendingUpdates.role || "USER"}
+                        onChange={(e) =>
+                          setPendingUpdates({
+                            ...pendingUpdates,
+                            role: e.target.value as any,
+                          })
+                        }
+                      >
+                        <option value="USER">USER</option>
+                        <option value="ADMIN">ADMIN (Tenant)</option>
+                        <option value="SUPERADMIN">SUPERADMIN (Global)</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
                 <div className="pt-8 mt-8 border-t border-gray-800 flex flex-col-reverse sm:flex-row gap-4 sm:justify-end">
                   <button
                     onClick={() => setEditingUser(null)}
@@ -862,6 +1153,37 @@ export default function AdminDashboard() {
                   <option value="VISIONLIGHT">VisualFx View</option>
                   <option value="PICDRIFT">PicDrift View</option>
                 </select>
+
+                {adminUser?.role === "SUPERADMIN" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <select
+                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-md text-sm outline-none focus:border-brand-accent transition-colors text-gray-300"
+                      value={newUser.organizationId}
+                      onChange={(e) =>
+                        setNewUser({ ...newUser, organizationId: e.target.value })
+                      }
+                    >
+                      <option value="">No Organization</option>
+                      {organizations.map((org) => (
+                        <option key={org.id} value={org.id}>
+                          {org.name}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-md text-sm outline-none focus:border-brand-accent transition-colors text-gray-300"
+                      value={newUser.role}
+                      onChange={(e) =>
+                        setNewUser({ ...newUser, role: e.target.value })
+                      }
+                    >
+                      <option value="USER">Standard User</option>
+                      <option value="ADMIN">Tenant Admin</option>
+                      <option value="SUPERADMIN">Super Admin</option>
+                    </select>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between p-3 bg-gray-950 border border-gray-800 rounded-md text-sm">
                   <span className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">
                     Project Cap
@@ -890,6 +1212,45 @@ export default function AdminDashboard() {
                       <LoadingSpinner size="sm" color="text-gray-950" />
                     ) : (
                       "Provision User"
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: NEW ORGANIZATION */}
+        {showOrgModal && (
+          <div className="fixed inset-0 bg-gray-950/80 flex items-start justify-center z-[100] overflow-y-auto p-4 py-20 backdrop-blur-sm">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-10 w-full max-w-md shadow-2xl relative">
+              <button
+                onClick={() => setShowOrgModal(false)}
+                className="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors text-xl font-bold"
+              >
+                ×
+              </button>
+              <h3 className="text-lg font-bold text-white mb-8 uppercase tracking-widest">
+                Register New Tenant
+              </h3>
+              <form onSubmit={handleCreateOrganization} className="space-y-5">
+                <input
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-md text-sm outline-none focus:border-brand-accent transition-colors text-white placeholder-gray-600"
+                  placeholder="Organization Name (e.g. Acme Agency)"
+                  value={newOrgName}
+                  onChange={(e) => setNewOrgName(e.target.value)}
+                  required
+                />
+                <div className="pt-6">
+                  <button
+                    type="submit"
+                    disabled={actionLoading}
+                    className="flex justify-center items-center w-full py-4 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-md font-bold uppercase text-[11px] tracking-widest transition-colors"
+                  >
+                    {actionLoading ? (
+                      <LoadingSpinner size="sm" color="text-gray-950" />
+                    ) : (
+                      "Create Organization"
                     )}
                   </button>
                 </div>

@@ -7,7 +7,8 @@ interface User {
   email: string;
   name: string;
   creditSystem?: "COMMERCIAL" | "INTERNAL";
-  role?: "ADMIN" | "USER" | "MANAGER";
+  role?: "ADMIN" | "USER" | "MANAGER" | "SUPERADMIN";
+  organizationId?: string | null;
   view?: "VISIONLIGHT" | "PICDRIFT";
   maxProjects?: number;
 }

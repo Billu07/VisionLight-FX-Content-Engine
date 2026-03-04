@@ -24,7 +24,15 @@ export class AuthService {
   /**
    * ADMIN ONLY: Creates a user in Supabase AND ensures they exist in Database.
    */
-  static async createSystemUser(email: string, password: string, name: string, view: string = "VISIONLIGHT", maxProjects: number = 3) {
+  static async createSystemUser(
+    email: string,
+    password: string,
+    name: string,
+    view: string = "VISIONLIGHT",
+    maxProjects: number = 3,
+    organizationId?: string,
+    role?: string,
+  ) {
     // 1. Create in Supabase (Auth Provider)
     const { data, error } = await supabase.auth.admin.createUser({
       email,
@@ -41,7 +49,14 @@ export class AuthService {
     const existingUser = await airtableService.findUserByEmail(email);
 
     if (!existingUser) {
-      await airtableService.createUser({ email, name, view, maxProjects });
+      await airtableService.createUser({
+        email,
+        name,
+        view,
+        maxProjects,
+        organizationId,
+        role,
+      });
     }
 
     return data.user;
@@ -103,21 +118,26 @@ export class AuthService {
       }
 
       // 1. Check .env (Super Admin Safety Net)
-      const isSuperAdmin = ADMIN_EMAILS.includes(user.email.toLowerCase());
+      const isSuperAdminEnv = ADMIN_EMAILS.includes(user.email.toLowerCase());
 
       // 2. Check Database (Dynamic Role)
-      // Note: user.role comes from Prisma. If column doesn't exist yet, this is undefined (falsy).
-      const isDbAdmin = (user as any).role === "ADMIN";
+      const dbRole = (user as any).role;
 
       // 3. Determine Final Role
-      const finalRole = isSuperAdmin || isDbAdmin ? "ADMIN" : "USER";
+      let finalRole = "USER";
+      if (isSuperAdminEnv || dbRole === "SUPERADMIN") {
+        finalRole = "SUPERADMIN";
+      } else if (dbRole === "ADMIN") {
+        finalRole = "ADMIN";
+      }
 
       return {
         id: user.id,
         email: user.email,
         name: user.name,
         creditSystem: user.creditSystem,
-        role: finalRole, // ✅ Returns 'ADMIN' if either check passes
+        role: finalRole,
+        organizationId: user.organizationId,
         view: (user as any).view || "VISIONLIGHT",
         maxProjects: (user as any).maxProjects || 3,
       };

@@ -30,6 +30,20 @@ export const dbService = {
     });
   },
 
+  // === ORGANIZATION ===
+  async getOrganization(orgId: string) {
+    return prisma.organization.findUnique({
+      where: { id: orgId },
+    });
+  },
+
+  async updateOrganization(orgId: string, data: any) {
+    return prisma.organization.update({
+      where: { id: orgId },
+      data,
+    });
+  },
+
   // === USER ===
   async findUserByEmail(email: string) {
     return prisma.user.findUnique({ where: { email } });
@@ -40,15 +54,23 @@ export const dbService = {
       include: { organization: true },
     });
   },
-  async createUser(data: { email: string; name?: string; view?: string; maxProjects?: number }) {
+  async createUser(data: {
+    email: string;
+    name?: string;
+    view?: string;
+    maxProjects?: number;
+    organizationId?: string;
+    role?: string;
+  }) {
     const isDemo = data.view === "PICDRIFT";
-    
+
     return prisma.user.create({
       data: {
         email: data.email,
         name: data.name,
         view: data.view || "VISIONLIGHT",
         maxProjects: data.maxProjects || 3,
+        organizationId: data.organizationId,
         creditBalance: isDemo ? 0 : 20,
         creditsPicDrift: isDemo ? 5 : 10,
         creditsPicDriftPlus: isDemo ? 0 : 10,
@@ -57,11 +79,10 @@ export const dbService = {
         creditsVideoFX2: isDemo ? 0 : 10,
         creditsVideoFX3: isDemo ? 0 : 10,
         creditSystem: isDemo ? "INTERNAL" : "COMMERCIAL",
-        role: "USER",
+        role: data.role || "USER",
       },
     });
-  },
-  async deleteUser(id: string) {
+  },  async deleteUser(id: string) {
     return prisma.user.delete({ where: { id } });
   },
   async getAllUsers() {
