@@ -7,115 +7,138 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  name          String?
-  
-  // 1. Granular Credit Balances (Changed to Float for .01 support)
-  creditsPicDrift  Float    @default(10)
-  creditsPicDriftPlus Float @default(10)
-  creditsImageFX   Float    @default(10)
-  creditsVideoFX1  Float    @default(10)
-  creditsVideoFX2  Float    @default(10)
-  creditsVideoFX3  Float    @default(10)
+model Organization {
+  id       String  @id @default(uuid())
+  name     String
+  isActive Boolean @default(true)
 
-  // Keep legacy field as Float for safety
-  creditBalance Float       @default(20)
+  // Custom API Keys
+  falApiKey    String?
+  openaiApiKey String?
+  klingApiKey  String?
 
-  creditSystem  String    @default("COMMERCIAL") // COMMERCIAL ($) or INTERNAL (pts)
-  role          String    @default("USER")       // USER, MANAGER, or ADMIN
-  view          String    @default("VISIONLIGHT") // VISIONLIGHT or PICDRIFT
-  maxProjects   Int       @default(3)
-  adminNotes    String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  projects      Project[]
-  posts         Post[]
-  assets        Asset[]
-  brandConfig   BrandConfig?
-  roiMetrics    ROIMetrics?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users          User[]
+  projects       Project[]
+  posts          Post[]
+  assets         Asset[]
+  brandConfigs   BrandConfig[]
+  roiMetrics     ROIMetrics[]
   creditRequests CreditRequest[]
-  storyboard    Json?     // Add storyboard persistence
+}
+
+model User {
+  id    String  @id @default(uuid())
+  email String  @unique
+  name  String?
+
+  creditsPicDrift     Float @default(10)
+  creditsPicDriftPlus Float @default(10)
+  creditsImageFX      Float @default(10)
+  creditsVideoFX1     Float @default(10)
+  creditsVideoFX2     Float @default(10)
+  creditsVideoFX3     Float @default(10)
+
+  creditBalance Float @default(20)
+
+  creditSystem String   @default("COMMERCIAL")
+  role         String   @default("USER") // SUPERADMIN, ADMIN, USER
+  view         String   @default("VISIONLIGHT")
+  maxProjects  Int      @default(3)
+  adminNotes   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  projects       Project[]
+  posts          Post[]
+  assets         Asset[]
+  brandConfig    BrandConfig?
+  roiMetrics     ROIMetrics?
+  creditRequests CreditRequest[]
+  storyboard     Json?
 }
 
 model Project {
-  id          String   @id @default(uuid())
-  userId      String
-  name        String
-  storyboard  Json?     // Add storyboard persistence
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  posts       Post[]
-  assets      Asset[]
+  id         String   @id @default(uuid())
+  userId     String
+  name       String
+  storyboard Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts  Post[]
+  assets Asset[]
 }
 
-// Render Reserve Controls (Pricing)
 model GlobalSettings {
-  id             String @id @default("singleton")
+  id String @id @default("singleton")
 
-  // --- PICDRIFT (Changed to Float for .01 support) ---
-  pricePicDrift_5s   Float @default(1)
-  pricePicDrift_10s  Float @default(2)
-  pricePicDrift_Plus_5s Float @default(2)
+  pricePicDrift_5s       Float @default(1)
+  pricePicDrift_10s      Float @default(2)
+  pricePicDrift_Plus_5s  Float @default(2)
   pricePicDrift_Plus_10s Float @default(3)
 
-  // --- PIC FX (Changed to Float for .01 support) ---
   pricePicFX_Standard Float @default(1)
-  pricePicFX_Carousel Float @default(3) 
-  pricePicFX_Batch    Float @default(1) 
+  pricePicFX_Carousel Float @default(3)
+  pricePicFX_Batch    Float @default(1)
 
-  // --- PICFX EDITOR (Changed to Float for .01 support) ---
-  priceEditor_Pro      Float @default(4)
-  priceEditor_Enhance  Float @default(1)
-  priceEditor_Convert  Float @default(1)
+  priceEditor_Pro     Float @default(4)
+  priceEditor_Enhance Float @default(1)
+  priceEditor_Convert Float @default(1)
 
-  // --- VIDEO FX 1 ---
-  priceVideoFX1_10s   Float @default(4)
-  priceVideoFX1_15s   Float @default(3)
+  priceVideoFX1_10s Float @default(4)
+  priceVideoFX1_15s Float @default(3)
 
-  // --- VIDEO FX 2 ---
-  priceVideoFX2_4s    Float @default(6)
-  priceVideoFX2_8s    Float @default(4)
-  priceVideoFX2_12s   Float @default(6)
+  priceVideoFX2_4s  Float @default(6)
+  priceVideoFX2_8s  Float @default(4)
+  priceVideoFX2_12s Float @default(6)
 
-  // --- VIDEO FX 3 (VEO) ---
-  priceVideoFX3_4s    Float @default(4)
-  priceVideoFX3_6s    Float @default(5)
-  priceVideoFX3_8s    Float @default(6)
+  priceVideoFX3_4s Float @default(4)
+  priceVideoFX3_6s Float @default(5)
+  priceVideoFX3_8s Float @default(6)
 
-  // --- PATH TOOLS ---
   priceAsset_DriftPath Float @default(2)
 
-  updatedAt      DateTime @updatedAt
+  updatedAt DateTime @updatedAt
 }
 
 model Post {
-  id               String   @id @default(uuid())
-  userId           String
-  title            String?
-  prompt           String
-  enhancedPrompt   String?
-  imageReference   String?
-  mediaType        String?
-  mediaUrl         String?
-  mediaProvider    String?
+  id                String   @id @default(uuid())
+  userId            String
+  title             String?
+  prompt            String
+  enhancedPrompt    String?
+  imageReference    String?
+  mediaType         String?
+  mediaUrl          String?
+  mediaProvider     String?
   generatedEndFrame String?
-  status           String   @default("NEW")
-  platform         String?
-  script           Json?
-  generationParams Json?
-  progress         Int      @default(0)
-  error            String?
-  generationStep   String?
-  requiresApproval Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  projectId        String?
-  project          Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  status            String   @default("NEW")
+  platform          String?
+  script            Json?
+  generationParams  Json?
+  progress          Int      @default(0)
+  error             String?
+  generationStep    String?
+  requiresApproval  Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model Asset {
@@ -123,15 +146,19 @@ model Asset {
   userId      String
   url         String
   aspectRatio String
-  type        String   @default("IMAGE") 
+  type        String   @default("IMAGE")
   createdAt   DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  projectId   String?
-  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  originalAssetId String?  
-  originalAsset   Asset?   @relation("AssetHistory", fields: [originalAssetId], references: [id])
-  variations      Asset[]  @relation("AssetHistory")
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  originalAssetId String?
+  originalAsset   Asset?  @relation("AssetHistory", fields: [originalAssetId], references: [id])
+  variations      Asset[] @relation("AssetHistory")
 }
 
 model BrandConfig {
@@ -142,7 +169,11 @@ model BrandConfig {
   secondaryColor String?
   logoUrl        String?
   updatedAt      DateTime @updatedAt
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ROIMetrics {
@@ -152,7 +183,11 @@ model ROIMetrics {
   timeSaved      Int      @default(0)
   mediaGenerated Int      @default(0)
   updatedAt      DateTime @updatedAt
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model CreditRequest {
@@ -162,5 +197,9 @@ model CreditRequest {
   name      String?
   status    String   @default("PENDING")
   createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
