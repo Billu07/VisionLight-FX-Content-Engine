@@ -971,79 +971,77 @@ function Dashboard() {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div className="bg-gray-800/40 backdrop-blur-xl rounded-2xl p-4 sm:px-4 sm:py-2 border border-white/5 w-full sm:w-auto">
-                <div className="grid grid-cols-3 gap-y-4 gap-x-2 sm:flex sm:items-center sm:gap-6">
+              <div className="bg-gradient-to-r from-gray-900/80 to-gray-800/80 backdrop-blur-xl rounded-xl p-4 sm:px-6 sm:py-3 border border-gray-700/50 shadow-xl w-full sm:w-auto">
+                <div className="grid grid-cols-3 gap-y-5 gap-x-4 sm:flex sm:items-center sm:gap-8">
                   {!creditsLoading ? (
                     <>
                       {/* PICDRIFT POOL */}
-                      <div className="flex items-center gap-2 sm:border-r border-white/10 sm:pr-4">
+                      <div className="flex items-center sm:border-r border-gray-700/50 sm:pr-6">
                         <div className="flex flex-col">
-                          <span className="text-pink-400 font-bold text-base sm:text-sm leading-none">
+                          <span className="text-pink-400 font-medium text-lg sm:text-base leading-none tracking-wide">
                             {formatBal(credits.creditsPicDrift)}
                           </span>
-                          <span className="text-[9px] sm:text-[8px] text-white-500 uppercase font-black mt-0.5">
+                          <span className="text-[10px] sm:text-[9px] text-gray-400 uppercase font-medium tracking-widest mt-1">
                             PicDrift
                           </span>
                         </div>
                       </div>
 
                       {/* PIC FX POOL */}
-                      <div className="flex items-center gap-2 sm:border-r border-white/10 sm:pr-4">
+                      <div className="flex items-center sm:border-r border-gray-700/50 sm:pr-6">
                         <div className="flex flex-col">
-                          <span className="text-violet-400 font-bold text-base sm:text-sm leading-none">
+                          <span className="text-violet-400 font-medium text-lg sm:text-base leading-none tracking-wide">
                             {formatBal(credits.creditsImageFX)}
                           </span>
-                          <span className="text-[9px] sm:text-[8px] text-white-500 uppercase font-black mt-0.5">
+                          <span className="text-[10px] sm:text-[9px] text-gray-400 uppercase font-medium tracking-widest mt-1">
                             Pic FX
                           </span>
                         </div>
                       </div>
 
                       {/* PICDRIFT PLUS POOL */}
-                      <div className="flex items-center gap-2 sm:border-r border-white/10 sm:pr-4">
+                      <div className="flex items-center sm:border-r border-gray-700/50 sm:pr-6">
                         <div className="flex flex-col">
-                          <span className="text-rose-400 font-bold text-base sm:text-sm leading-none">
+                          <span className="text-rose-400 font-medium text-lg sm:text-base leading-none tracking-wide flex items-start">
                             {formatBal(credits.creditsPicDriftPlus)}
                           </span>
-                          <span className="text-[9px] sm:text-[8px] text-White-600 uppercase font-black mt-0.5">
-                            PicDrift<sup>+</sup>
+                          <span className="text-[10px] sm:text-[9px] text-gray-400 uppercase font-medium tracking-widest mt-1 flex items-center">
+                            PicDrift<sup className="text-[11px] font-bold text-rose-500 ml-0.5">+</sup>
                           </span>
                         </div>
                       </div>
 
-
-
                       {/* VIDEO FX 1 POOL */}
-                      <div className="flex items-center gap-2 sm:border-r border-white/10 sm:pr-4">
+                      <div className="flex items-center sm:border-r border-gray-700/50 sm:pr-6">
                         <div className="flex flex-col">
-                          <span className="text-blue-400 font-bold text-base sm:text-sm leading-none">
+                          <span className="text-blue-400 font-medium text-lg sm:text-base leading-none tracking-wide">
                             {formatBal(credits.creditsVideoFX1)}
                           </span>
-                          <span className="text-[9px] sm:text-[8px] text-white-500 uppercase font-black mt-0.5">
+                          <span className="text-[10px] sm:text-[9px] text-gray-400 uppercase font-medium tracking-widest mt-1">
                             VidFX 1
                           </span>
                         </div>
                       </div>
 
                       {/* VIDEO FX 2 POOL */}
-                      <div className="flex items-center gap-2 sm:border-r border-white/10 sm:pr-4">
+                      <div className="flex items-center sm:border-r border-gray-700/50 sm:pr-6">
                         <div className="flex flex-col">
-                          <span className="text-cyan-400 font-bold text-base sm:text-sm leading-none">
+                          <span className="text-cyan-400 font-medium text-lg sm:text-base leading-none tracking-wide">
                             {formatBal(credits.creditsVideoFX2)}
                           </span>
-                          <span className="text-[9px] sm:text-[8px] text-white-500 uppercase font-black mt-0.5">
+                          <span className="text-[10px] sm:text-[9px] text-gray-400 uppercase font-medium tracking-widest mt-1">
                             VidFX 2
                           </span>
                         </div>
                       </div>
 
                       {/* VIDEO FX 3 POOL */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center">
                         <div className="flex flex-col">
-                          <span className="text-indigo-400 font-bold text-base sm:text-sm leading-none">
+                          <span className="text-indigo-400 font-medium text-lg sm:text-base leading-none tracking-wide">
                             {formatBal(credits.creditsVideoFX3)}
                           </span>
-                          <span className="text-[9px] sm:text-[8px] text-white-500 uppercase font-black mt-0.5">
+                          <span className="text-[10px] sm:text-[9px] text-gray-400 uppercase font-medium tracking-widest mt-1">
                             VidFX 3
                           </span>
                         </div>
