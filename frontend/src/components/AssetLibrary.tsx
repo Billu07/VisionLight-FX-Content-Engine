@@ -690,6 +690,7 @@ export function AssetLibrary({
                 ✕
               </button>
             </div>
+            </div>
 
             {/* RIGHT: DETAILS */}
             <div className="w-full sm:w-80 p-6 sm:p-8 flex flex-col justify-between bg-gray-900 overflow-y-auto">
@@ -774,7 +775,6 @@ export function AssetLibrary({
                   Delete
                 </button>
               </div>
-            </div>
             </div>
           </div>
         </div>
