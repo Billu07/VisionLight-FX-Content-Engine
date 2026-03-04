@@ -11,7 +11,7 @@ import drift_icon from "../assets/drift_icon.png";
 interface Asset {
   id: string;
   url: string;
-  aspectRatio: "16:9" | "9:16" | "original" | "1:1" | "custom";
+  aspectRatio: "16:9" | "9:16" | "original" | "1:1" | "custom" | "3DX_FRAME";
   type?: "IMAGE" | "VIDEO";
   originalAssetId?: string | null;
 }
@@ -77,7 +77,7 @@ export function EditAssetModal({
   const [convertTargetRatio, setConvertTargetRatio] = useState<
     "16:9" | "9:16" | "1:1"
   >("16:9");
-  const [convertMode, setConvertMode] = useState<"auto" | "custom">("auto");
+  const [convertMode, setConvertMode] = useState<"auto" | "custom">("custom");
 
   // Drift State
   const [driftParams, setDriftParams] = useState({
@@ -216,6 +216,11 @@ export function EditAssetModal({
         formData.append("originalAssetId", currentAsset.id);
       }
 
+      const activeProject = localStorage.getItem("visionlight_active_project");
+      if (activeProject) {
+        formData.append("projectId", activeProject);
+      }
+
       return apiEndpoints.uploadAssetSync(formData);
     },
     onMutate: () => {
@@ -269,6 +274,12 @@ export function EditAssetModal({
     const formData = new FormData();
     formData.append("image", file);
     formData.append("raw", "true");
+    formData.append("aspectRatio", "3DX_FRAME");
+
+    const activeProject = localStorage.getItem("visionlight_active_project");
+    if (activeProject) {
+      formData.append("projectId", activeProject);
+    }
 
     try {
       setIsProcessing(true);
@@ -506,9 +517,9 @@ export function EditAssetModal({
           <div className="p-4 border-b border-gray-800 bg-gray-950">
             <div className="flex bg-gray-900 p-1 rounded-xl">
               {[
-                { id: "pro", label: "Pro", icon: "🧠" },
-                { id: "convert", label: "Convert", icon: "📐" },
-                { id: "drift", label: "Drift", icon: "🌀" },
+                { id: "pro", label: "Pro" },
+                { id: "convert", label: "Convert" },
+                { id: "drift", label: <div className="flex items-center gap-2"><img src={drift_icon} alt="3DX" className="h-3 w-auto" /> 3DX Camera</div> },
               ].map((mode) => (
                 <button
                   key={mode.id}
@@ -586,21 +597,21 @@ export function EditAssetModal({
                     onClick={() => setConvertMode("auto")}
                     className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${
                       convertMode === "auto"
-                        ? "bg-gray-700 text-white shadow-sm"
+                        ? "bg-pink-600 text-white shadow-sm"
                         : "text-gray-400 hover:text-white"
                     }`}
                   >
-                    ⚡ Auto Convert
+                    Auto Convert
                   </button>
                   <button
                     onClick={() => setConvertMode("custom")}
                     className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${
                       convertMode === "custom"
-                        ? "bg-gray-700 text-white shadow-sm"
+                        ? "bg-pink-600 text-white shadow-sm"
                         : "text-gray-400 hover:text-white"
                     }`}
                   >
-                    ✏️ Custom Prompt
+                    Custom Prompt
                   </button>
                 </div>
 
@@ -728,7 +739,7 @@ export function EditAssetModal({
 
             {/* DRIFT UI */}
             {activeTab === "drift" && (
-              <div className="space-y-6 animate-in fade-in">
+              <div className="space-y-6 animate-in fade-in h-full flex flex-col">
                 <div className="grid grid-cols-3 gap-2">
                   {DRIFT_PRESETS.map((preset) => (
                     <button
@@ -750,106 +761,15 @@ export function EditAssetModal({
                   ))}
                 </div>
 
-                <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
-                  <h4 className="text-sm font-bold text-white mb-4">
-                    Camera Rig
-                  </h4>
-
-                  {/* Horizontal */}
-                  <div className="space-y-2 mb-4">
-                    <div className="flex justify-between text-xs text-gray-400">
-                      <span>Orbit (H)</span>
-                      <span className="text-cyan-400">
-                        {driftParams.horizontal}
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="-10"
-                      max="10"
-                      step="1"
-                      value={driftParams.horizontal}
-                      onChange={(e) =>
-                        setDriftParams((p) => ({
-                          ...p,
-                          horizontal: parseFloat(e.target.value),
-                        }))
-                      }
-                      className="w-full accent-cyan-500 cursor-pointer"
-                    />
-                    <div className="flex justify-between text-[8px] text-gray-600">
-                      <span>Left</span>
-                      <span>Center</span>
-                      <span>Right</span>
-                    </div>
-                  </div>
-
-                  {/* Vertical */}
-                  <div className="space-y-2 mb-4">
-                    <div className="flex justify-between text-xs text-gray-400">
-                      <span>Elevation (V)</span>
-                      <span className="text-purple-400">
-                        {driftParams.vertical}
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="-10"
-                      max="10"
-                      step="1"
-                      value={driftParams.vertical}
-                      onChange={(e) =>
-                        setDriftParams((p) => ({
-                          ...p,
-                          vertical: parseFloat(e.target.value),
-                        }))
-                      }
-                      className="w-full accent-purple-500 cursor-pointer"
-                    />
-                    <div className="flex justify-between text-[8px] text-gray-600">
-                      <span>Down</span>
-                      <span>Center</span>
-                      <span>Up</span>
-                    </div>
-                  </div>
-
-                  {/* Zoom */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs text-gray-400">
-                      <span>Zoom (Z)</span>
-                      <span className="text-green-400">{driftParams.zoom}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="-10"
-                      max="10"
-                      step="0.5"
-                      value={driftParams.zoom}
-                      onChange={(e) =>
-                        setDriftParams((p) => ({
-                          ...p,
-                          zoom: parseFloat(e.target.value),
-                        }))
-                      }
-                      className="w-full accent-green-500 cursor-pointer"
-                    />
-                    <div className="flex justify-between text-[8px] text-gray-600">
-                      <span>Out</span>
-                      <span>Neutral</span>
-                      <span>In</span>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Prompt Box */}
-                <div className="space-y-3">
+                <div className="space-y-3 flex-1 flex flex-col min-h-[250px]">
                   <div className="flex justify-between items-end">
                     <label className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
-                      Subject Description (Optional)
+                      Subject Description
                     </label>
                   </div>
                   <textarea
-                    className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none leading-relaxed placeholder-gray-500"
+                    className="w-full flex-1 bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none leading-relaxed placeholder-gray-500"
                     placeholder="e.g. 'A silver robot' (Helps maintain identity)"
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}

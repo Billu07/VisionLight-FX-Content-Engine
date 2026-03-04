@@ -492,7 +492,8 @@ app.post(
         const asset = await contentEngine.uploadRawAsset(
           req.file.buffer,
           req.user!.id,
-          projectId
+          projectId,
+          aspectRatio
         );
         return res.json({ success: true, asset });
       } else {

@@ -11,7 +11,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB Limit
 interface Asset {
   id: string;
   url: string;
-  aspectRatio: "16:9" | "9:16" | "1:1" | "original" | "custom";
+  aspectRatio: "16:9" | "9:16" | "1:1" | "original" | "custom" | "3DX_FRAME";
   type: "IMAGE" | "VIDEO";
   createdAt: string;
   originalAssetId?: string | null;
@@ -34,7 +34,7 @@ export function AssetLibrary({
   const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<
-    "16:9" | "9:16" | "1:1" | "original" | "custom" | "VIDEO" | "STORYBOARD"
+    "16:9" | "9:16" | "1:1" | "original" | "custom" | "VIDEO" | "STORYBOARD" | "3DX_FRAME"
   >("original");
 
   // Auto-switch tab based on Dashboard context
@@ -135,19 +135,15 @@ export function AssetLibrary({
       }
 
       // Edited/Custom Tab:
-      // 1. Explicit 'custom' ratio
-      // 2. 'original' ratio BUT has a parent (meaning it was edited but size kept)
-      // 3. Weird ratios that aren't the standard 3
       if (activeTab === "custom") {
         return (
           a.type === "IMAGE" &&
-          (a.aspectRatio === "custom" ||
-            (a.aspectRatio === "original" && a.originalAssetId) ||
-            (a.aspectRatio !== "16:9" &&
-              a.aspectRatio !== "9:16" &&
-              a.aspectRatio !== "1:1" &&
-              a.aspectRatio !== "original"))
+          (a.aspectRatio === "custom" || !!a.originalAssetId)
         );
+      }
+
+      if (activeTab === "3DX_FRAME") {
+        return a.type === "IMAGE" && a.aspectRatio === "3DX_FRAME";
       }
 
       // Standard Ratios (16:9, 9:16, 1:1)
@@ -409,6 +405,7 @@ export function AssetLibrary({
               { id: "custom", label: "Edited" },
               { id: "original", label: "Originals" },
               { id: "STORYBOARD", label: "Storyboard" },
+              { id: "3DX_FRAME", label: "3DX Drift Frames" },
               { id: "VIDEO", label: "3DX Paths" },
             ].map((tab) => (
               <button
@@ -513,7 +510,7 @@ export function AssetLibrary({
                   <p>No {activeTab === "VIDEO" ? "videos" : "images"} found.</p>
                 </div>
               ) : (
-                filteredAssets.map((asset: Asset) => (
+                filteredAssets.map((asset: Asset, index: number) => (
                   <div
                     key={asset.id}
                     onClick={() => {
@@ -526,6 +523,11 @@ export function AssetLibrary({
                       }`}
                   >
                     {/* THUMBNAIL LOGIC */}
+                    {activeTab === "STORYBOARD" && (
+                      <div className="absolute top-2 right-2 bg-indigo-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-lg z-20 pointer-events-none">
+                        {index + 1}
+                      </div>
+                    )}
                     {activeTab === "STORYBOARD" && (
                       <div className="absolute top-2 left-2 flex gap-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
@@ -608,6 +610,18 @@ export function AssetLibrary({
           <div className="relative bg-gray-900 border-0 sm:border border-gray-700 sm:rounded-2xl max-w-6xl w-full h-full sm:h-[85vh] flex flex-col sm:flex-row overflow-hidden shadow-2xl z-10">
             {/* LEFT: IMAGE PREVIEW */}
             <div className="flex-1 bg-black flex items-center justify-center p-4 sm:p-8 border-b sm:border-b-0 sm:border-r border-gray-800 relative group min-h-[40vh]">
+              {/* TITLE BLOCK */}
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-black/60 text-white px-6 py-2 rounded-full font-bold tracking-widest text-xs border border-white/20 backdrop-blur-md whitespace-nowrap">
+                {activeTab === "STORYBOARD" ? "Storyboard FX" :
+                 activeTab === "9:16" ? "Portrait FX" :
+                 activeTab === "16:9" ? "Landscape FX" :
+                 activeTab === "1:1" ? "Square FX" :
+                 activeTab === "3DX_FRAME" ? "3DX Drift Frames" :
+                 activeTab === "VIDEO" ? "3DX Paths" :
+                 activeTab === "custom" ? "Edited Assets" :
+                 "Original Assets"}
+              </div>
+
               {/* UNIFIED OVERLAY CONTROLS */}
               <div className="absolute top-4 right-4 z-20 flex gap-2">
                 <button
@@ -710,7 +724,7 @@ export function AssetLibrary({
                       }`}
                   >
                     {storyboardIds.includes(selectedAsset.id)
-                      ? "➖ Remove"
+                      ? "➖ Remove From Storyboard"
                       : "➕ Add to Storyboard"}
                   </button>
 
@@ -785,6 +799,7 @@ export function AssetLibrary({
                 const formData = new FormData();
                 formData.append("image", file);
                 formData.append("raw", "true");
+                formData.append("aspectRatio", "3DX_FRAME");
                 const activeProject = localStorage.getItem(
                   "visionlight_active_project",
                 );
