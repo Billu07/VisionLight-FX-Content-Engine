@@ -324,7 +324,7 @@ export default function AdminDashboard() {
                     : "text-gray-400 hover:text-white hover:bg-gray-800/50"
                 }`}
               >
-                Users
+                {adminUser?.role === "SUPERADMIN" ? "Platform Users" : "My Team"}
               </button>
               <button
                 onClick={() => setActiveTab("controls")}
@@ -334,7 +334,7 @@ export default function AdminDashboard() {
                     : "text-gray-400 hover:text-white hover:bg-gray-800/50"
                 }`}
               >
-                {adminUser?.role === "SUPERADMIN" ? "Global Control" : "Org Settings"}
+                {adminUser?.role === "SUPERADMIN" ? "Pricing Template" : "Credit Prices"}
               </button>
               <button
                 onClick={() => setActiveTab("keys")}
@@ -344,7 +344,7 @@ export default function AdminDashboard() {
                     : "text-gray-400 hover:text-white hover:bg-gray-800/50"
                 }`}
               >
-                API Keys
+                API Credentials
               </button>
               {adminUser?.role === "SUPERADMIN" && (
                 <button
@@ -355,7 +355,7 @@ export default function AdminDashboard() {
                       : "text-gray-400 hover:text-white hover:bg-gray-800/50"
                   }`}
                 >
-                  Organizations
+                  Tenants
                 </button>
               )}
             </div>
