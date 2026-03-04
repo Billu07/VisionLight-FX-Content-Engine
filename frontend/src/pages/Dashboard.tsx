@@ -278,7 +278,7 @@ function Dashboard() {
 
   // ✅ 2. CORE LOGIC & PERMISSIONS
   const isCommercial = user?.creditSystem !== "INTERNAL";
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
 
   // ✅ 3. VIRTUAL SUM (Fixes Timeline Build Errors)
   const userCredits =
