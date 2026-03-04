@@ -21,7 +21,9 @@ import { AuthService } from "./services/auth";
 import { dbService as airtableService } from "./services/database";
 import { contentEngine } from "./services/engine";
 import { encryptionUtils } from "./utils/encryption";
+import { PrismaClient } from "@prisma/client";
 
+const prisma = new PrismaClient();
 const app = express();
 
 // Helper to extract keys
