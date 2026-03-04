@@ -125,6 +125,7 @@ function Dashboard() {
   // Modals & UI Flags
   const [showBrandModal, setShowBrandModal] = useState(false);
   const [showWelcomeTour, setShowWelcomeTour] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const [showQueuedModal, setShowQueuedModal] = useState(false);
   const [showNoCreditsModal, setShowNoCreditsModal] = useState(false);
   const [showReserveModal, setShowReserveModal] = useState(false);
@@ -1065,54 +1066,97 @@ function Dashboard() {
               </button>
 
               {!isMobile && (
-                <div className="flex gap-2">
-                  {isAdmin && (
-                    <button
-                      onClick={() => navigate("/admin")}
-                      className="px-4 py-2.5 bg-red-600/20 border border-red-500/50 rounded-xl text-red-300 text-sm font-bold"
+                <div className="relative">
+                  <button
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-gray-800/40 backdrop-blur-xl border border-white/10 rounded-2xl text-sm font-bold text-gray-300 hover:text-white hover:bg-white/10 transition-all h-full"
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      Admin Panel
-                    </button>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                    Menu
+                  </button>
+
+                  {showUserMenu && (
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-gray-900 border border-gray-700/80 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                      <div className="px-4 py-2 border-b border-gray-800/80 mb-2">
+                        <div className="text-xs text-gray-400 uppercase tracking-widest font-bold">Options</div>
+                      </div>
+
+                      {isAdmin && (
+                        <button
+                          onClick={() => {
+                            setShowUserMenu(false);
+                            navigate("/admin");
+                          }}
+                          className="w-full text-left px-4 py-2 text-red-400 hover:bg-red-500/10 text-sm font-medium transition-colors"
+                        >
+                          Admin Panel
+                        </button>
+                      )}
+
+                      {isCommercial ? (
+                        <a
+                          href={creditLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={() => setShowUserMenu(false)}
+                          className="w-full text-left px-4 py-2 text-green-400 hover:bg-green-500/10 text-sm font-medium transition-colors block"
+                        >
+                          {creditBtnText}
+                        </a>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setShowUserMenu(false);
+                            handleRequestCredits();
+                          }}
+                          disabled={isRequesting}
+                          className="w-full text-left px-4 py-2 text-purple-400 hover:bg-purple-500/10 text-sm font-medium transition-colors"
+                        >
+                          {isRequesting ? "Sending..." : "Request Renders 🔔"}
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          localStorage.removeItem("visionlight_active_project");
+                          navigate("/projects");
+                        }}
+                        className="w-full text-left px-4 py-2 text-blue-400 hover:bg-blue-500/10 text-sm font-medium transition-colors"
+                      >
+                        Projects
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          setShowBrandModal(true);
+                        }}
+                        className="w-full text-left px-4 py-2 text-cyan-400 hover:bg-cyan-500/10 text-sm font-medium transition-colors"
+                      >
+                        Edit Dashboard
+                      </button>
+
+                      <div className="my-1 border-t border-gray-800/80"></div>
+
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          handleLogout();
+                        }}
+                        className="w-full text-left px-4 py-2 text-gray-400 hover:bg-white/5 hover:text-white text-sm font-medium transition-colors"
+                      >
+                        Logout
+                      </button>
+                    </div>
                   )}
-                  {isCommercial ? (
-                    <a
-                      href={creditLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-4 py-2.5 bg-gray-800/60 border border-green-400/30 rounded-xl text-green-400 text-sm hover:bg-green-400/10 flex items-center gap-2"
-                    >
-                      {creditBtnText}
-                    </a>
-                  ) : (
-                    <button
-                      onClick={handleRequestCredits}
-                      disabled={isRequesting}
-                      className="px-4 py-2.5 bg-purple-600/20 border border-purple-500/50 rounded-xl text-purple-300 text-sm"
-                    >
-                      {isRequesting ? "Sending..." : "Request Renders 🔔"}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      localStorage.removeItem("visionlight_active_project");
-                      navigate("/projects");
-                    }}
-                    className="px-4 py-2.5 bg-gray-800/60 border border-blue-400/30 rounded-xl text-blue-400 text-sm hover:bg-blue-400/10"
-                  >
-                    Projects
-                  </button>
-                  <button
-                    onClick={() => setShowBrandModal(true)}
-                    className="px-4 py-2.5 bg-gray-800/60 border border-cyan-400/30 rounded-xl text-cyan-400 text-sm hover:bg-cyan-400/10"
-                  >
-                    Edit Dashboard
-                  </button>
-                  <button
-                    onClick={handleLogout}
-                    className="px-4 py-2.5 bg-gray-800/60 border border-purple-400/30 rounded-xl text-purple-300 text-sm hover:bg-purple-400/10"
-                  >
-                    Logout
-                  </button>
                 </div>
               )}
             </div>
