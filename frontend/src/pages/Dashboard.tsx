@@ -941,6 +941,44 @@ function Dashboard() {
           <WelcomeTour onClose={() => setShowWelcomeTour(false)} />
         )}
 
+        {/* 🚨 ACTIVATION OVERLAY (FOR INACTIVE TENANTS) */}
+        {user?.needsActivation && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-gray-950/90 backdrop-blur-xl p-4">
+            <div className="bg-gray-900 border border-white/10 rounded-[2.5rem] p-8 sm:p-12 max-w-xl w-full shadow-[0_0_50px_rgba(0,0,0,0.5)] text-center animate-in zoom-in-95 duration-300">
+              <div className="w-24 h-24 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-8 border border-rose-500/20">
+                <span className="text-5xl animate-pulse">⚡</span>
+              </div>
+              <h2 className="text-3xl font-black text-white mb-4 uppercase tracking-[0.2em]">
+                Platform Inactive
+              </h2>
+              <p className="text-gray-400 mb-10 leading-relaxed text-sm sm:text-base">
+                Your agency environment for <span className="text-white font-bold">{user.organizationName}</span> is not yet active.
+                <br /><br />
+                {user.role === 'ADMIN' || user.role === 'SUPERADMIN'
+                  ? "Connect your Fal AI credentials in the Admin Panel to unlock all generation tools."
+                  : "Please contact your system administrator to configure the required API credentials."
+                }
+              </p>
+              <div className="space-y-4">
+                {(user.role === 'ADMIN' || user.role === 'SUPERADMIN') && (
+                  <button
+                    onClick={() => navigate('/admin')}
+                    className="w-full py-5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-2xl font-black uppercase text-xs tracking-[0.15em] transition-all shadow-xl hover:shadow-cyan-500/20 active:scale-[0.98]"
+                  >
+                    Go to API Configuration
+                  </button>
+                )}
+                <button
+                  onClick={logout}
+                  className="w-full py-4 text-gray-500 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors"
+                >
+                  Switch Account / Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Render Reserve Modal */}
 
         <RenderReserveModal

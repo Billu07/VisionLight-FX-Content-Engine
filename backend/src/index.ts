@@ -475,7 +475,36 @@ app.get(
   "/api/auth/me",
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
-    res.json({ success: true, user: req.user });
+    try {
+      const user = await airtableService.findUserById(req.user!.id);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const org = user.organization;
+      const isDefaultOrg = org?.name?.toLowerCase().includes("default visualfx organization");
+      
+      let isOrgActive = true;
+      let needsActivation = false;
+
+      if (org && !isDefaultOrg) {
+        const hasKeys = !!(org.falApiKey || org.kieApiKey || org.openaiApiKey);
+        if (!hasKeys) {
+          isOrgActive = false;
+          needsActivation = true;
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        user: { 
+          ...req.user, 
+          isOrgActive, 
+          needsActivation,
+          organizationName: org?.name
+        } 
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   },
 );
 

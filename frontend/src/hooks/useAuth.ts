@@ -9,6 +9,9 @@ interface User {
   creditSystem?: "COMMERCIAL" | "INTERNAL";
   role?: "ADMIN" | "USER" | "MANAGER" | "SUPERADMIN";
   organizationId?: string | null;
+  organizationName?: string | null;
+  isOrgActive?: boolean;
+  needsActivation?: boolean;
   view?: "VISIONLIGHT" | "PICDRIFT";
   maxProjects?: number;
 }
