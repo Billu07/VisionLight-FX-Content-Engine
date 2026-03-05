@@ -29,10 +29,28 @@ const app = express();
 // Helper to extract keys
 async function getTenantApiKeys(userId: string) {
   const user = await airtableService.findUserById(userId);
+  if (!user) throw new Error("User not found");
+
+  const org = user.organization;
+  const isDefaultOrg = org?.name?.toLowerCase().includes("default visualfx organization");
+  const noOrg = !org;
+
+  // Decrypt tenant keys
+  const falKey = encryptionUtils.decrypt(org?.falApiKey);
+  const kieKey = encryptionUtils.decrypt(org?.kieApiKey);
+  const openAIKey = encryptionUtils.decrypt(org?.openaiApiKey);
+
+  // If it's a regular Tenant Org and keys are missing, throw error to prompt activation
+  if (!isDefaultOrg && !noOrg) {
+    if (!falKey && !kieKey && !openAIKey) {
+      throw new Error("Your platform is not active. Please configure your API keys in the Admin Panel.");
+    }
+  }
+
   return {
-    falApiKey: encryptionUtils.decrypt(user?.organization?.falApiKey) || undefined,
-    kieApiKey: encryptionUtils.decrypt(user?.organization?.kieApiKey) || undefined,
-    openaiApiKey: encryptionUtils.decrypt(user?.organization?.openaiApiKey) || undefined,
+    falApiKey: falKey || (isDefaultOrg || noOrg ? process.env.FAL_KEY : undefined),
+    kieApiKey: kieKey || (isDefaultOrg || noOrg ? process.env.KIE_AI_API_KEY : undefined),
+    openaiApiKey: openAIKey || (isDefaultOrg || noOrg ? process.env.OPENAI_API_KEY : undefined),
   };
 }
 

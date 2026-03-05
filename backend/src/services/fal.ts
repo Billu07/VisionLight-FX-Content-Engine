@@ -6,15 +6,13 @@ dotenv.config();
 
 export const FalService = {
   /**
-   * Helper to configure FAL with a tenant's custom key, or fallback to the master key.
+   * Helper to configure FAL with a tenant's custom key.
    */
   _configureClient(tenantKey?: string) {
-    const credentials = tenantKey || process.env.FAL_KEY;
-    if (!credentials) throw new Error("FAL API Key is not configured.");
+    if (!tenantKey) throw new Error("API Key is missing. Please configure your Fal AI key in the Admin Panel.");
 
-    fal.config({ credentials });
+    fal.config({ credentials: tenantKey });
   },
-
   /**
    * CORE GENERATION & EDITING
    * Uses fal-ai/nano-banana-2 or fal-ai/nano-banana-2/edit based on reference images.

@@ -165,8 +165,8 @@ export const videoLogic = {
       const subject = prompt?.trim() || "The scene";
       const finalPrompt = `${subject}. Action: ${cameraMove}. Style: High fidelity, smooth motion, cinematic 3D depth, professional lighting.`;
 
-      const credentials = apiKeys?.falApiKey || FAL_KEY;
-      if (!credentials) throw new Error("FAL API Key is missing.");
+      const credentials = apiKeys?.falApiKey;
+      if (!credentials) throw new Error("API Key is missing. Please configure your Fal AI key in the Admin Panel.");
 
       // ✅ 2.6 Payload
       const payload: any = {
@@ -215,8 +215,8 @@ export const videoLogic = {
   },
 
   async checkToolStatus(statusUrl: string, apiKeys?: TenantApiKeys) {
-    const credentials = apiKeys?.falApiKey || FAL_KEY;
-    if (!credentials) throw new Error("FAL API Key is missing.");
+    const credentials = apiKeys?.falApiKey;
+    if (!credentials) throw new Error("API Key is missing. Please configure your Fal AI key in the Admin Panel.");
 
     const res = await axios.get(statusUrl, {
       headers: { Authorization: `Key ${credentials}` },
@@ -386,7 +386,9 @@ export const videoLogic = {
 
         console.log(`🚀 Veo Request: ${endpoint}`, JSON.stringify(payload, null, 2));
 
-        const falKey = apiKeys?.falApiKey || FAL_KEY;
+        const falKey = apiKeys?.falApiKey;
+        if (!falKey) throw new Error("API Key is missing. Please configure your Fal AI key in the Admin Panel.");
+
         const url = `https://queue.fal.run/${endpoint}`;
         const submitRes = await axios.post(url, payload, {
           headers: {
@@ -496,7 +498,9 @@ export const videoLogic = {
           }
         }
 
-        const falKey = apiKeys?.falApiKey || FAL_KEY;
+        const falKey = apiKeys?.falApiKey;
+        if (!falKey) throw new Error("API Key is missing. Please configure your Fal AI key in the Admin Panel.");
+
         const submitRes = await axios.post(url, payload, {
           headers: {
             Authorization: `Key ${falKey}`,
@@ -535,7 +539,9 @@ export const videoLogic = {
         };
         if (isImageToVideo) kiePayload.input.image_urls = [kieInputUrl];
 
-        const kieKey = apiKeys?.kieApiKey || KIE_API_KEY;
+        const kieKey = apiKeys?.kieApiKey;
+        if (!kieKey) throw new Error("API Key is missing. Please configure your KIE API key in the Admin Panel.");
+
         const kieRes = await axios.post(
           `${KIE_BASE_URL}/jobs/createTask`,
           kiePayload,
@@ -559,7 +565,9 @@ export const videoLogic = {
             contentType: "image/jpeg",
           });
         }
-        const openAIKey = apiKeys?.openaiApiKey || process.env.OPENAI_API_KEY;
+        const openAIKey = apiKeys?.openaiApiKey;
+        if (!openAIKey) throw new Error("API Key is missing. Please configure your OpenAI API key in the Admin Panel.");
+
         const genResponse = await axios.post(
           "https://api.openai.com/v1/videos",
           form,

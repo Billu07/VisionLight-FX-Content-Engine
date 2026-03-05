@@ -63,6 +63,9 @@ export const dbService = {
     role?: string;
   }) {
     const isDemo = data.view === "PICDRIFT";
+    // Users in a Tenant Organization start with 0 credits. 
+    // Only "Default" (no org) or explicit Demo users get starting points.
+    const hasOrg = !!data.organizationId;
 
     return prisma.user.create({
       data: {
@@ -71,13 +74,13 @@ export const dbService = {
         view: data.view || "VISIONLIGHT",
         maxProjects: data.maxProjects || 3,
         organizationId: data.organizationId,
-        creditBalance: isDemo ? 0 : 20,
-        creditsPicDrift: isDemo ? 5 : 10,
-        creditsPicDriftPlus: isDemo ? 0 : 10,
-        creditsImageFX: isDemo ? 15 : 10,
-        creditsVideoFX1: isDemo ? 0 : 10,
-        creditsVideoFX2: isDemo ? 0 : 10,
-        creditsVideoFX3: isDemo ? 0 : 10,
+        creditBalance: (isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 20),
+        creditsPicDrift: (isDemo && !hasOrg) ? 5 : (hasOrg ? 0 : 10),
+        creditsPicDriftPlus: (isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 10),
+        creditsImageFX: (isDemo && !hasOrg) ? 15 : (hasOrg ? 0 : 10),
+        creditsVideoFX1: (isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 10),
+        creditsVideoFX2: (isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 10),
+        creditsVideoFX3: (isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 10),
         creditSystem: isDemo ? "INTERNAL" : "COMMERCIAL",
         role: data.role || "USER",
       },
