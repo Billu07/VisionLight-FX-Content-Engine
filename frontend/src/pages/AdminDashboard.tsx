@@ -47,8 +47,25 @@ export default function AdminDashboard() {
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<"users" | "controls" | "keys" | "orgs">("users");
+  const [activeTab, setActiveTab] = useState<"my-team" | "subscribers" | "controls" | "keys" | "orgs">("my-team");
   const [users, setUsers] = useState<User[]>([]);
+
+  // Memoized filters for SuperAdmin
+  const myTeamUsers = useMemo(() => {
+    return users.filter(u => u.organizationId === adminUser?.organizationId);
+  }, [users, adminUser]);
+
+  const subscriberUsers = useMemo(() => {
+    return users.filter(u => u.organizationId !== adminUser?.organizationId && u.role === "ADMIN");
+  }, [users, adminUser]);
+
+  // For Tenant Admins, we just show all users (which the backend already filters to their org)
+  const displayUsers = useMemo(() => {
+    if (adminUser?.role === "SUPERADMIN") {
+      return activeTab === "my-team" ? myTeamUsers : subscriberUsers;
+    }
+    return users;
+  }, [adminUser, activeTab, myTeamUsers, subscriberUsers, users]);
   const [requests, setRequests] = useState<any[]>([]);
   const [settings, setSettings] = useState<GlobalSettings | null>(null);
   const [organizations, setOrganizations] = useState<any[]>([]);
@@ -288,11 +305,13 @@ export default function AdminDashboard() {
     });
   }, [users, baseBudgetRate]);
 
-  const filteredUsers = users.filter(
-    (u) =>
-      u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.name?.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const filteredUsers = useMemo(() => {
+    return displayUsers.filter(
+      (u) =>
+        u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.name?.toLowerCase().includes(searchTerm.toLowerCase()),
+    );
+  }, [displayUsers, searchTerm]);
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-200 p-6 sm:p-10 font-sans">
@@ -317,15 +336,27 @@ export default function AdminDashboard() {
                 App
               </button>
               <button
-                onClick={() => setActiveTab("users")}
+                onClick={() => setActiveTab("my-team")}
                 className={`px-6 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                  activeTab === "users"
+                  activeTab === "my-team"
                     ? "bg-gray-800 text-brand-accent shadow-sm"
                     : "text-gray-400 hover:text-white hover:bg-gray-800/50"
                 }`}
               >
-                {adminUser?.role === "SUPERADMIN" ? "Platform Users" : "My Team"}
+                {adminUser?.role === "SUPERADMIN" ? "My Organization" : "My Team"}
               </button>
+              {adminUser?.role === "SUPERADMIN" && (
+                <button
+                  onClick={() => setActiveTab("subscribers")}
+                  className={`px-6 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                    activeTab === "subscribers"
+                      ? "bg-gray-800 text-brand-accent shadow-sm"
+                      : "text-gray-400 hover:text-white hover:bg-gray-800/50"
+                  }`}
+                >
+                  Subscribers
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab("controls")}
                 className={`px-6 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-widest transition-colors ${
@@ -423,7 +454,7 @@ export default function AdminDashboard() {
                     <button
                       onClick={() => {
                         setSearchTerm(req.email);
-                        setActiveTab("users");
+                        setActiveTab(adminUser?.role === "SUPERADMIN" ? "my-team" : "my-team");
                       }}
                       className="flex-1 sm:flex-none text-[10px] text-gray-400 font-bold uppercase tracking-widest hover:text-white transition-colors bg-gray-800 px-4 py-2 rounded-md"
                     >
@@ -445,7 +476,7 @@ export default function AdminDashboard() {
         )}
 
         {/* TAB CONTENT: USERS */}
-        {activeTab === "users" && (
+        {(activeTab === "my-team" || activeTab === "subscribers") && (
           <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto custom-scrollbar">
               <table className="w-full text-left border-collapse min-w-[1000px]">
