@@ -327,17 +327,17 @@ export default function AdminDashboard() {
             </p>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-6 w-full xl:w-auto">
-            <div className="flex bg-gray-900 p-1.5 rounded-lg border border-gray-800 shadow-sm w-fit">
+          <div className="flex flex-col lg:flex-row gap-6 w-full xl:w-auto items-start lg:items-center">
+            <div className="flex flex-wrap bg-gray-900 p-1.5 rounded-lg border border-gray-800 shadow-sm w-full lg:w-fit gap-1">
               <button
                 onClick={() => navigate("/app")}
-                className="px-6 py-2.5 rounded-md text-[11px] font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition-colors uppercase tracking-widest"
+                className="px-4 sm:px-6 py-2.5 rounded-md text-[10px] sm:text-[11px] font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition-colors uppercase tracking-widest"
               >
                 App
               </button>
               <button
                 onClick={() => setActiveTab("my-team")}
-                className={`px-6 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                className={`px-4 sm:px-6 py-2.5 rounded-md text-[10px] sm:text-[11px] font-bold uppercase tracking-widest transition-colors ${
                   activeTab === "my-team"
                     ? "bg-gray-800 text-brand-accent shadow-sm"
                     : "text-gray-400 hover:text-white hover:bg-gray-800/50"
@@ -348,7 +348,7 @@ export default function AdminDashboard() {
               {adminUser?.role === "SUPERADMIN" && (
                 <button
                   onClick={() => setActiveTab("subscribers")}
-                  className={`px-6 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                  className={`px-4 sm:px-6 py-2.5 rounded-md text-[10px] sm:text-[11px] font-bold uppercase tracking-widest transition-colors ${
                     activeTab === "subscribers"
                       ? "bg-gray-800 text-brand-accent shadow-sm"
                       : "text-gray-400 hover:text-white hover:bg-gray-800/50"
@@ -359,7 +359,7 @@ export default function AdminDashboard() {
               )}
               <button
                 onClick={() => setActiveTab("controls")}
-                className={`px-6 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                className={`px-4 sm:px-6 py-2.5 rounded-md text-[10px] sm:text-[11px] font-bold uppercase tracking-widest transition-colors ${
                   activeTab === "controls"
                     ? "bg-gray-800 text-brand-accent shadow-sm"
                     : "text-gray-400 hover:text-white hover:bg-gray-800/50"
@@ -369,7 +369,7 @@ export default function AdminDashboard() {
               </button>
               <button
                 onClick={() => setActiveTab("keys")}
-                className={`px-6 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                className={`px-4 sm:px-6 py-2.5 rounded-md text-[10px] sm:text-[11px] font-bold uppercase tracking-widest transition-colors ${
                   activeTab === "keys"
                     ? "bg-gray-800 text-brand-accent shadow-sm"
                     : "text-gray-400 hover:text-white hover:bg-gray-800/50"
@@ -380,22 +380,22 @@ export default function AdminDashboard() {
               {adminUser?.role === "SUPERADMIN" && (
                 <button
                   onClick={() => setActiveTab("orgs")}
-                  className={`px-6 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                  className={`px-4 sm:px-6 py-2.5 rounded-md text-[10px] sm:text-[11px] font-bold uppercase tracking-widest transition-colors ${
                     activeTab === "orgs"
                       ? "bg-gray-800 text-brand-accent shadow-sm"
                       : "text-gray-400 hover:text-white hover:bg-gray-800/50"
                   }`}
                 >
-                  Tenants
+                  Organizations
                 </button>
               )}
             </div>
 
-            <div className="flex gap-4 w-full md:w-auto">
-              <div className="relative flex-1 md:w-72">
+            <div className="flex gap-4 w-full lg:w-auto">
+              <div className="relative flex-1 lg:w-64">
                 <input
-                  placeholder="Search entities..."
-                  className="bg-gray-900 border border-gray-800 rounded-lg px-4 py-2 w-full text-sm text-gray-200 outline-none focus:border-brand-accent transition-colors placeholder-gray-500 h-full pr-10"
+                  placeholder="Search..."
+                  className="bg-gray-900 border border-gray-800 rounded-lg px-4 py-2.5 w-full text-sm text-gray-200 outline-none focus:border-brand-accent transition-colors placeholder-gray-500 h-full pr-10"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -410,7 +410,7 @@ export default function AdminDashboard() {
               </div>
               <button
                 onClick={() => setShowInviteModal(true)}
-                className="bg-brand-accent hover:bg-cyan-300 text-gray-950 font-bold px-6 py-2 rounded-lg text-[11px] uppercase tracking-widest transition-colors whitespace-nowrap h-full"
+                className="bg-brand-accent hover:bg-cyan-300 text-gray-950 font-bold px-6 py-2.5 rounded-lg text-[10px] sm:text-[11px] uppercase tracking-widest transition-colors whitespace-nowrap h-full shadow-lg active:scale-95"
               >
                 Create User
               </button>
