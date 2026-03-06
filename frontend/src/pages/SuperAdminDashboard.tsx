@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
@@ -26,7 +25,6 @@ interface User {
 
 export default function SuperAdminDashboard() {
   const { user: adminUser } = useAuth();
-  const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<"tenants" | "my-agency" | "demo-leads" | "global-settings">("tenants");
   const [tenants, setTenants] = useState<Tenant[]>([]);

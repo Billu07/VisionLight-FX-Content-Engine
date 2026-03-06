@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
@@ -23,7 +22,6 @@ interface Config {
 
 export default function TenantDashboard() {
   const { user: adminUser } = useAuth();
-  const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<"team" | "integrations">("team");
   const [users, setUsers] = useState<User[]>([]);

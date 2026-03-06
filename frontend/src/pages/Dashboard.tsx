@@ -1333,16 +1333,6 @@ function Dashboard() {
                           </button>
                         )}
                       </div>
-                              ? "border-white/20 bg-gradient-to-br from-blue-700 to-cyan-700 shadow-2xl scale-105"
-                              : "border-white/5 bg-gray-800/50 hover:border-white/10"
-                              }`}
-                          >
-                            <div className="font-semibold text-xs sm:text-sm text-white">
-                              Video FX
-                            </div>
-                          </button>
-                        )}
-                      </div>
                     </div>
 
                     {/* STUDIO SUB-MENU */}

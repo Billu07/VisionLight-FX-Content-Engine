@@ -11,7 +11,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // --- EXISTING IMPORTS ---
 import { MarketingSite } from "./pages/MarketingSite";
 import Dashboard from "./pages/Dashboard";
-import AdminDashboard from "./pages/AdminDashboard";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import TenantDashboard from "./pages/TenantDashboard";
 import Projects from "./pages/Projects";
