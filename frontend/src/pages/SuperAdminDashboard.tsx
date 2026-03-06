@@ -72,7 +72,7 @@ export default function SuperAdminDashboard() {
       const [tenantsRes, settingsRes, usersRes] = await Promise.all([
         apiEndpoints.superadminGetOrganizations(),
         apiEndpoints.superadminGetGlobalSettings(),
-        apiEndpoints.adminGetUsers() 
+        apiEndpoints.superadminGetUsers() 
       ]);
       
       if (tenantsRes.data.success) setTenants(tenantsRes.data.organizations);

@@ -85,6 +85,16 @@ router.put("/organizations/:id/limits", async (req: AuthenticatedRequest, res) =
 
 // === USER PROVISIONING ===
 
+// Get all users (SuperAdmin sees everyone)
+router.get("/users", async (req: AuthenticatedRequest, res) => {
+  try {
+    const users = await dbService.getAllUsers();
+    res.json({ success: true, users });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Create a Demo User (locked to Picdrift view and Default Org)
 router.post("/users/demo", async (req: AuthenticatedRequest, res) => {
   const { email, password, name } = req.body;

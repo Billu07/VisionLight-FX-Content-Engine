@@ -46,6 +46,7 @@ export const apiEndpoints = {
   superadminCreateTenant: (data: any) => api.post("/api/superadmin/organizations/tenant", data),
   superadminUpdateOrgStatus: (id: string, isActive: boolean) => api.put(`/api/superadmin/organizations/${id}/status`, { isActive }),
   superadminUpdateOrgLimits: (id: string, data: any) => api.put(`/api/superadmin/organizations/${id}/limits`, data),
+  superadminGetUsers: () => api.get("/api/superadmin/users"),
   superadminCreateDemoUser: (data: any) => api.post("/api/superadmin/users/demo", data),
   superadminCreateSuperAdmin: (data: any) => api.post("/api/superadmin/users/superadmin", data),
   superadminGetGlobalSettings: () => api.get("/api/superadmin/settings/global"),
