@@ -1295,33 +1295,19 @@ function Dashboard() {
                           </div>
                         </button>
 
-                        {/* TAB 2: PIC FX (Restricted from Demo Users) */}
-                        {user?.view !== "PICDRIFT" ? (
-                          <button
-                            type="button"
-                            onClick={() => setActiveEngine("studio")}
-                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${currentVisualTab === "studio"
-                              ? "border-white/20 bg-gradient-to-br from-violet-700 to-purple-700 shadow-2xl scale-105"
-                              : "border-white/5 bg-gray-800/50 hover:border-white/10"
-                              }`}
-                          >
-                            <div className="font-semibold text-xs sm:text-sm text-white uppercase tracking-wider">
-                              Pic FX
-                            </div>
-                          </button>
-                        ) : (
-                          /* Locked Pic FX for Demo Users */
-                          <a
-                            href="http://picdrift.com/renders"
-                            target="_blank"
-                            rel="noreferrer"
-                            className={`p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-violet-400/50 hover:bg-violet-900/20 transition-all duration-300 text-center sm:text-left group flex flex-col sm:flex-row items-center justify-center sm:justify-between`}
-                          >
-                            <div className="font-semibold text-xs sm:text-sm text-gray-400 group-hover:text-violet-300 flex items-center gap-1 sm:gap-2">
-                              <span>🔒</span> Pic FX
-                            </div>
-                          </a>
-                        )}
+                        {/* TAB 2: PIC FX (Unlocked for Demo Users) */}
+                        <button
+                          type="button"
+                          onClick={() => setActiveEngine("studio")}
+                          className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${currentVisualTab === "studio"
+                            ? "border-white/20 bg-gradient-to-br from-violet-700 to-purple-700 shadow-2xl scale-105"
+                            : "border-white/5 bg-gray-800/50 hover:border-white/10"
+                            }`}
+                        >
+                          <div className="font-semibold text-xs sm:text-sm text-white uppercase tracking-wider">
+                            Pic FX
+                          </div>
+                        </button>
 
                         {/* TAB 3: VIDEO FX (Restricted from Demo Users) */}
                         {user?.view !== "PICDRIFT" ? (
