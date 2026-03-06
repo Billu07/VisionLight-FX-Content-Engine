@@ -8,9 +8,12 @@ datasource db {
 }
 
 model Organization {
-  id           String  @id @default(uuid())
-  name         String
-  isActive     Boolean @default(true)
+  id               String  @id @default(uuid())
+  name             String
+  isActive         Boolean @default(true)
+  isDefault        Boolean @default(false)
+  maxUsers         Int     @default(5)
+  maxProjectsTotal Int     @default(20)
 
   // Custom API Keys
   falApiKey    String?

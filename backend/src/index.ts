@@ -4,6 +4,16 @@ import axios from "axios";
 import dotenv from "dotenv";
 import { getCost, getTargetPool } from "./config/pricing";
 import { upload, uploadToCloudinary } from "./utils/fileUpload";
+import { ROIService } from "./services/roi";
+import { AuthService } from "./services/auth";
+import { dbService as airtableService, prisma } from "./services/database";
+import { contentEngine } from "./services/engine";
+import { encryptionUtils } from "./utils/encryption";
+import { authenticateToken, AuthenticatedRequest } from "./middleware/auth";
+
+// Import Routers
+import superadminRouter from "./routes/superadmin";
+import tenantRouter from "./routes/tenant";
 
 dotenv.config();
 
@@ -16,14 +26,6 @@ console.log("🔧 Environment Check:", {
   supabase: process.env.SUPABASE_URL ? "✅ Loaded" : "❌ Missing",
 });
 
-import { ROIService } from "./services/roi";
-import { AuthService } from "./services/auth";
-import { dbService as airtableService } from "./services/database";
-import { contentEngine } from "./services/engine";
-import { encryptionUtils } from "./utils/encryption";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
 const app = express();
 
 // Helper to extract keys
@@ -32,7 +34,7 @@ async function getTenantApiKeys(userId: string) {
   if (!user) throw new Error("User not found");
 
   const org = user.organization;
-  const isDefaultOrg = org?.name?.toLowerCase().includes("default visualfx organization");
+  const isDefaultOrg = org?.isDefault;
   const noOrg = !org;
 
   // Decrypt tenant keys
@@ -66,15 +68,6 @@ async function getTenantSettings(userId: string) {
 
 const PORT = process.env.PORT || 4000;
 
-// === ADMIN CONFIGURATION ===
-const ADMIN_EMAILS_RAW = process.env.ADMIN_EMAILS || "snowfix07@gmail.com";
-const ADMIN_EMAILS = ADMIN_EMAILS_RAW.split(",").map((email) =>
-  email.trim().toLowerCase(),
-);
-
-const allowedOrigins = ["https://picdrift.studio", "http://localhost:5173"];
-if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL);
-
 app.use(
   cors({
     origin: true, // Allow any domain (safer for PWA/Mobile)
@@ -88,96 +81,52 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 app.get("/", (req, res) => {
   res.json({
-    message: "PicDrift Studio FX Backend - Stable",
-    version: "4.7.0", // Bumped version for Role Support
+    message: "PicDrift Studio FX Backend - Multi-Tenant",
+    version: "5.0.0", // Significant architectural update
     status: "Healthy",
   });
 });
 
-// ==================== AUTHENTICATION MIDDLEWARE ====================
-interface AuthenticatedRequest extends Request {
-  user?: any;
-  token?: string;
-}
+// ==================== ROUTE MOUNTING ====================
 
-const authenticateToken = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction,
-) => {
-  const token = req.headers.authorization?.replace("Bearer ", "");
-  if (!token) return res.status(401).json({ error: "Authentication required" });
+// High-level Platform Control (SuperAdmins)
+app.use("/api/superadmin", superadminRouter);
 
-  try {
-    const user = await AuthService.validateSession(token);
-    if (!user)
-      return res.status(401).json({ error: "Invalid or expired token" });
+// Organization/Team Control (Tenant Admins)
+app.use("/api/tenant", tenantRouter);
 
-    req.user = user;
-    req.token = token;
-    next();
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-};
 
-// ==================== ADMIN MIDDLEWARE (UPDATED) ====================
-const requireAdmin = (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction,
-) => {
-  // ✅ Check Database Role OR Super Admin Email List
-  const isDbAdmin = req.user?.role === "ADMIN" || req.user?.role === "SUPERADMIN";
-  const isSuperAdminEmail =
-    req.user?.email && ADMIN_EMAILS.includes(req.user.email.toLowerCase());
-
-  if (isDbAdmin || isSuperAdminEmail) {
-    next();
-  } else {
-    return res.status(403).json({ error: "Access Denied: Admins only." });
-  }
-};
-
-const requireSuperAdmin = (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction,
-) => {
-  const isSuperAdmin = req.user?.role === "SUPERADMIN" || 
-    (req.user?.email && ADMIN_EMAILS.includes(req.user.email.toLowerCase()));
-
-  if (isSuperAdmin) {
-    next();
-  } else {
-    return res.status(403).json({ error: "Access Denied: Super Admins only." });
-  }
-};
-
-// ==================== ORGANIZATION ROUTES ====================
-
+// ==================== AUTH ROUTES ====================
 app.get(
-  "/api/admin/organization",
+  "/api/auth/me",
   authenticateToken,
-  requireAdmin,
   async (req: AuthenticatedRequest, res) => {
     try {
       const user = await airtableService.findUserById(req.user!.id);
-      if (!user?.organizationId) {
-        return res.status(404).json({ error: "Organization not found" });
-      }
-      const org = await airtableService.getOrganization(user.organizationId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const org = user.organization;
+      const isDefaultOrg = org?.isDefault;
       
-      // Decrypt keys for display (masked for security usually, but for config they need to see them or at least know they exist)
-      // We'll return them decrypted so they can edit them easily.
-      res.json({
-        success: true,
-        organization: {
-          ...org,
-          falApiKey: encryptionUtils.decrypt(org?.falApiKey),
-          kieApiKey: encryptionUtils.decrypt(org?.kieApiKey),
-          openaiApiKey: encryptionUtils.decrypt(org?.openaiApiKey),
-        },
+      let isOrgActive = true;
+      let needsActivation = false;
+
+      if (org && !isDefaultOrg) {
+        const hasKeys = !!(org.falApiKey || org.kieApiKey || org.openaiApiKey);
+        if (!hasKeys) {
+          isOrgActive = false;
+          needsActivation = true;
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        user: { 
+          ...req.user, 
+          isOrgActive, 
+          needsActivation,
+          organizationName: org?.name
+        } 
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -185,86 +134,86 @@ app.get(
   },
 );
 
-app.put(
-  "/api/admin/organization",
-  authenticateToken,
-  requireAdmin,
-  async (req: AuthenticatedRequest, res) => {
-    try {
-      const { falApiKey, kieApiKey, openaiApiKey, name } = req.body;
-      const user = await airtableService.findUserById(req.user!.id);
-      
-      if (!user?.organizationId) {
-        return res.status(404).json({ error: "Organization not found" });
-      }
-
-      const updated = await airtableService.updateOrganization(user.organizationId, {
-        name,
-        falApiKey: encryptionUtils.encrypt(falApiKey),
-        kieApiKey: encryptionUtils.encrypt(kieApiKey),
-        openaiApiKey: encryptionUtils.encrypt(openaiApiKey),
-      });
-
-      res.json({ success: true, organization: updated });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  },
-);
-
+// ==================== DATA ROUTES ====================
+// --- PROJECTS ---
 app.post(
-  "/api/admin/organizations",
+  "/api/projects",
   authenticateToken,
-  requireSuperAdmin,
   async (req: AuthenticatedRequest, res) => {
     try {
       const { name } = req.body;
-      const org = await prisma.organization.create({
-        data: { name },
-      });
-      res.json({ success: true, organization: org });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  },
-);
+      if (!name) return res.status(400).json({ error: "Project name required" });
 
-app.get(
-  "/api/admin/organizations",
-  authenticateToken,
-  requireSuperAdmin,
-  async (req: AuthenticatedRequest, res) => {
-    try {
-      const orgs = await prisma.organization.findMany();
-      res.json({ success: true, organizations: orgs });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  },
-);
-
-// ==================== GLOBAL PRICING SETTINGS ====================
-
-app.get(
-  "/api/admin/settings",
-  authenticateToken,
-  requireAdmin,
-  async (req: AuthenticatedRequest, res) => {
-    try {
       const user = await airtableService.findUserById(req.user!.id);
-      
-      // If user is SUPERADMIN and they didn't specify an org, show Global Template
-      if (req.user.role === "SUPERADMIN" && !req.query.orgId) {
-        const settings = await getTenantSettings(req.user!.id);
-        return res.json({ success: true, settings });
+      const projects = await airtableService.getUserProjects(req.user!.id);
+
+      if (projects.length >= (user as any).maxProjects) {
+        return res.status(403).json({ error: "Maximum project limit reached" });
       }
 
-      // Otherwise, show Organization-specific settings
-      const orgId = (req.user.role === "SUPERADMIN" ? req.query.orgId : user?.organizationId) as string;
-      if (!orgId) return res.status(400).json({ error: "Organization ID required" });
+      const project = await airtableService.createProject(req.user!.id, name);
+      res.json({ success: true, project });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
 
-      const org = await airtableService.getOrganization(orgId);
-      res.json({ success: true, settings: org });
+app.get(
+  "/api/projects",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const projects = await airtableService.getUserProjects(req.user!.id);
+      res.json({ success: true, projects });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+app.patch(
+  "/api/projects/:id",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { name } = req.body;
+      const project = await airtableService.getProjectById(req.params.id);
+      if (!project || project.userId !== req.user!.id) {
+        return res.status(403).json({ error: "Denied" });
+      }
+      const updated = await airtableService.updateProject(req.params.id, name);
+      res.json({ success: true, project: updated });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+app.delete(
+  "/api/projects/:id",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const project = await airtableService.getProjectById(req.params.id);
+      if (!project || project.userId !== req.user!.id) {
+        return res.status(403).json({ error: "Denied" });
+      }
+      await airtableService.deleteProject(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+app.get(
+  "/api/brand-config",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const config = await airtableService.getBrandConfig(req.user!.id);
+      res.json({ success: true, config });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -272,71 +221,470 @@ app.get(
 );
 
 app.put(
-  "/api/admin/settings",
+  "/api/brand-config",
   authenticateToken,
-  requireAdmin,
   async (req: AuthenticatedRequest, res) => {
+    const { companyName, primaryColor, secondaryColor, logoUrl } = req.body;
     try {
-      const user = await airtableService.findUserById(req.user!.id);
-
-      // If SUPERADMIN is editing without orgId, update Global Template
-      if (req.user.role === "SUPERADMIN" && !req.query.orgId) {
-        const settings = await airtableService.updateGlobalSettings(req.body);
-        return res.json({ success: true, settings });
-      }
-
-      // Otherwise, update Organization-specific settings
-      const orgId = (req.user.role === "SUPERADMIN" ? req.query.orgId : user?.organizationId) as string;
-      if (!orgId) return res.status(400).json({ error: "Organization ID required" });
-
-      const settings = await airtableService.updateOrganization(orgId, req.body);
-      res.json({ success: true, settings });
+      const config = await airtableService.upsertBrandConfig({
+        userId: req.user!.id,
+        companyName,
+        primaryColor,
+        secondaryColor,
+        logoUrl,
+      });
+      res.json({ success: true, config });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   },
 );
 
-// ==================== NOTIFICATION ROUTES ====================
+app.get(
+  "/api/roi-metrics",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const metrics = await ROIService.getMetrics(req.user!.id);
+      res.json({ success: true, metrics });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+app.get(
+  "/api/user-credits",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const [user, settings] = await Promise.all([
+        airtableService.findUserById(req.user!.id),
+        getTenantSettings(req.user!.id),
+      ]);
+
+      if (!user) return res.json({ credits: 0 });
+
+      const u = user as any;
+      res.json({
+        credits: u.creditBalance,
+        creditsPicDrift: u.creditsPicDrift,
+        creditsPicDriftPlus: u.creditsPicDriftPlus,
+        creditsImageFX: u.creditsImageFX,
+        creditsVideoFX1: u.creditsVideoFX1,
+        creditsVideoFX2: u.creditsVideoFX2,
+        creditsVideoFX3: u.creditsVideoFX3,
+        // ✅ Add settings so the user knows the prices
+        prices: settings,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch credits" });
+    }
+  },
+);
 
 app.post(
-  "/api/request-credits",
+  "/api/reset-demo-credits",
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      await airtableService.createCreditRequest(
-        req.user.id,
-        req.user.email,
-        req.user.name,
+      await airtableService.adminUpdateUser(req.user!.id, {
+        creditsPicDrift: 10,
+        creditsPicDriftPlus: 10,
+        creditsImageFX: 10,
+        creditsVideoFX1: 10,
+        creditsVideoFX2: 10,
+        creditsVideoFX3: 10,
+      });
+      res.json({ success: true, message: "Demo credits reset to all pools" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// ==================== ASSET MANAGEMENT ====================
+
+// ✅ Move Post Media to Asset (Timeline -> Library)
+app.post(
+  "/api/posts/:postId/to-asset",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      await contentEngine.copyPostMediaToAsset(req.params.postId, req.user!.id);
+      res.json({ success: true, message: "Saved to Asset Library" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// ✅ Sync Upload (Magic Edit & Direct Reference)
+app.post(
+  "/api/assets/upload-sync",
+  authenticateToken,
+  upload.single("image"),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.file)
+        return res.status(400).json({ error: "No image provided" });
+
+      const { aspectRatio, raw, originalAssetId, projectId } = req.body;
+
+      if (raw === "true") {
+        // Raw Uploads (v1) remain free/standard upload logic
+        const asset = await contentEngine.uploadRawAsset(
+          req.file.buffer,
+          req.user!.id,
+          projectId,
+          aspectRatio
+        );
+        return res.json({ success: true, asset });
+      } else {
+        // Process Mode (Ratio Conversion)
+        const [settings, user] = await Promise.all([
+          getTenantSettings(req.user!.id),
+          airtableService.findUserById(req.user!.id),
+        ]);
+
+        const cost = getCost(
+          user,
+          { mediaType: "image", mode: "convert" },
+          settings,
+        );
+        if (user!.creditsImageFX < cost)
+          return res
+            .status(403)
+            .json({ error: "Insufficient Image FX credits" });
+
+        await airtableService.deductGranularCredits(
+          req.user!.id,
+          "creditsImageFX",
+          cost,
+        );
+
+        const asset = await contentEngine.processAndSaveAsset(
+          req.file.buffer,
+          req.user!.id,
+          aspectRatio || "16:9",
+          originalAssetId, // Keep original reference intact
+          projectId
+        );
+        res.json({ success: true, asset });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// ✅ Batch Upload
+app.post(
+  "/api/assets/batch",
+  authenticateToken,
+  upload.array("images", 20),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const files = (req.files as Express.Multer.File[]) || [];
+      const { aspectRatio } = req.body;
+
+      if (files.length === 0)
+        return res.status(400).json({ error: "No images provided" });
+
+      const [settings, user] = await Promise.all([
+        getTenantSettings(req.user!.id),
+        airtableService.findUserById(req.user!.id),
+      ]);
+
+      const costPerImg = settings.pricePicFX_Batch;
+      const totalCost = files.length * costPerImg;
+
+      if (user!.creditsImageFX < totalCost) {
+        return res.status(403).json({
+          error: `Need ${totalCost} Image FX credits for this batch.`,
+        });
+      }
+
+      // Deduct total upfront
+      await airtableService.deductGranularCredits(
+        req.user!.id,
+        "creditsImageFX",
+        totalCost,
       );
-      res.json({ success: true, message: "Request sent to admin." });
+
+      res.json({
+        success: true,
+        message: `Processing batch of ${files.length}. Cost: ${totalCost} credits.`,
+      });
+
+      // Background Processing (Original logic intact)
+      (async () => {
+        for (const file of files) {
+          try {
+            await contentEngine.processAndSaveAsset(
+              file.buffer,
+              req.user!.id,
+              aspectRatio || "16:9",
+            );
+          } catch (e) {
+            console.error("Failed batch item", e);
+            // Optional: refund individual failures
+            await airtableService.refundGranularCredits(
+              req.user!.id,
+              "creditsImageFX",
+              costPerImg,
+            );
+          }
+        }
+      })();
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   },
 );
 
+// ✅ Edit Asset (Standard/Pro)
+app.post(
+  "/api/assets/edit",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const {
+        prompt,
+        assetUrl,
+        aspectRatio,
+        referenceUrl,
+        mode,
+        originalAssetId,
+      } = req.body;
+      if (!assetUrl || !prompt) {
+        return res.status(400).json({ error: "Missing asset or prompt" });
+      }
+
+      const [settings, user] = await Promise.all([
+        getTenantSettings(req.user!.id),
+        airtableService.findUserById(req.user!.id),
+      ]);
+
+      const cost = getCost(
+        user,
+        { mediaType: "image", mode: mode || "pro" },
+        settings,
+      );
+
+      // Editor always uses ImageFX pool
+      if (user!.creditsImageFX < cost)
+        return res.status(403).json({ error: "Insufficient Image FX credits" });
+
+      await airtableService.deductGranularCredits(
+        req.user!.id,
+        "creditsImageFX",
+        cost,
+      );
+
+      const apiKeys = await getTenantApiKeys(req.user!.id);
+
+      const newAsset = await contentEngine.editAsset(
+        assetUrl,
+        prompt,
+        req.user!.id,
+        aspectRatio || "16:9",
+        referenceUrl,
+        mode || "pro",
+        originalAssetId,
+        apiKeys
+      );
+
+      res.json({ success: true, asset: newAsset });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// ✅ Start Drift Video Path (Kling)
+app.post(
+  "/api/assets/drift-video",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { assetUrl, prompt, horizontal, vertical, zoom, aspectRatio, generateAudio, projectId } =
+        req.body;
+
+      const [settings, user] = await Promise.all([
+        getTenantSettings(req.user!.id),
+        airtableService.findUserById(req.user!.id),
+      ]);
+
+      const cost = getCost(
+        user,
+        { mediaType: "video", mode: "drift-path" },
+        settings,
+      );
+
+      // Drift Path uses PicDrift pool
+      if (user!.creditsPicDrift < cost)
+        return res.status(403).json({ error: "Insufficient PicDrift credits" });
+
+      await airtableService.deductGranularCredits(
+        req.user!.id,
+        "creditsPicDrift",
+        cost,
+      );
+
+      const apiKeys = await getTenantApiKeys(req.user!.id);
+      const result = await contentEngine.processKlingDrift(
+        req.user!.id,
+        assetUrl,
+        prompt,
+        Number(horizontal),
+        Number(vertical),
+        Number(zoom),
+        aspectRatio,
+        generateAudio === "true" || generateAudio === true,
+        projectId,
+        apiKeys
+      );
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// ✅ Check Tool Status (For Drift Polling)
+app.post(
+  "/api/tools/status",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { statusUrl } = req.body;
+      const apiKeys = await getTenantApiKeys(req.user!.id);
+      const status = await contentEngine.checkToolStatus(statusUrl, apiKeys);
+      res.json({ success: true, status });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// ✅ Save Extracted Frame / Video URL
+app.post(
+  "/api/assets/save-url",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { url, aspectRatio, type, projectId } = req.body;
+
+      if (!url) return res.status(400).json({ error: "URL required" });
+
+      const asset = await airtableService.createAsset(
+        req.user!.id,
+        url,
+        aspectRatio || "16:9",
+        type || "IMAGE",
+        undefined,
+        projectId
+      );
+
+      res.json({ success: true, asset });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// ✅ NEW: Enhance Asset
+app.post(
+  "/api/assets/enhance",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { assetUrl, originalAssetId } = req.body;
+
+      const [settings, user] = await Promise.all([
+        getTenantSettings(req.user!.id),
+        airtableService.findUserById(req.user!.id),
+      ]);
+
+      const cost = getCost(
+        user,
+        { mediaType: "image", mode: "enhance" },
+        settings,
+      );
+
+      if (user!.creditsImageFX < cost)
+        return res.status(403).json({ error: "Insufficient Image FX credits" });
+
+      await airtableService.deductGranularCredits(
+        req.user!.id,
+        "creditsImageFX",
+        cost,
+      );
+
+      const apiKeys = await getTenantApiKeys(req.user!.id);
+
+      const asset = await contentEngine.enhanceAsset(
+        req.user!.id,
+        assetUrl,
+        originalAssetId,
+        apiKeys
+      );
+      res.json({ success: true, asset });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// ✅ Vision Analysis
+app.post(
+  "/api/analyze-image",
+  authenticateToken,
+  upload.single("image"),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.file)
+        return res.status(400).json({ error: "No image uploaded" });
+
+      const { prompt } = req.body;
+      const { GeminiService } = require("./services/gemini");
+
+      const text = await GeminiService.analyzeImageText({
+        prompt: prompt || "Describe this image in detail.",
+        imageBuffer: req.file.buffer,
+      });
+
+      res.json({ success: true, result: text });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// ✅ Get Storyboard
 app.get(
-  "/api/admin/requests",
+  "/api/storyboard",
   authenticateToken,
-  requireAdmin,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const requests = await airtableService.getPendingCreditRequests();
-      res.json({ success: true, requests });
+      const projectId = req.query.projectId as string | undefined;
+      const storyboard = await airtableService.getStoryboard(req.user!.id, projectId);
+      res.json({ success: true, storyboard });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   },
 );
 
-app.put(
-  "/api/admin/requests/:id/resolve",
+// ✅ Save Storyboard
+app.post(
+  "/api/storyboard",
   authenticateToken,
-  requireAdmin,
   async (req: AuthenticatedRequest, res) => {
     try {
-      await airtableService.resolveCreditRequest(req.params.id);
+      const { projectId, sequence } = req.body;
+      await airtableService.updateStoryboard(req.user!.id, sequence, projectId);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -344,131 +692,379 @@ app.put(
   },
 );
 
-// ==================== ADMIN MANAGEMENT ROUTES ====================
-
-app.post(
-  "/api/admin/create-user",
+// ✅ Get Assets
+app.get(
+  "/api/assets",
   authenticateToken,
-  requireAdmin,
   async (req: AuthenticatedRequest, res) => {
-    const { email, password, name, view, maxProjects, organizationId, role } = req.body;
-    if (!email || !password)
-      return res.status(400).json({ error: "Missing fields" });
-
-    // SECURITY: Tenant Admins cannot choose Organization or promote to SuperAdmin
-    const isSuperAdmin = req.user.role === "SUPERADMIN";
-    const finalOrgId = isSuperAdmin ? organizationId : req.user.organizationId;
-    const finalRole = (role === "SUPERADMIN" && !isSuperAdmin) ? "USER" : role;
-
     try {
-      const newUser = await AuthService.createSystemUser(
-        email,
-        password,
-        name || "New User",
-        view || "VISIONLIGHT",
-        maxProjects !== undefined ? Number(maxProjects) : 3,
-        finalOrgId,
-        finalRole
-      );
-      res.json({ success: true, user: newUser });
+      const projectId = req.query.projectId as string | undefined;
+      const assets = await airtableService.getUserAssets(req.user!.id, projectId);
+      res.json({ success: true, assets });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   },
 );
 
-app.get(
-  "/api/admin/users",
+// ✅ Delete Asset
+app.delete(
+  "/api/assets/:id",
   authenticateToken,
-  requireAdmin,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const isSuperAdmin = req.user.role === "SUPERADMIN";
-      let users;
-      
-      if (isSuperAdmin) {
-        users = await airtableService.getAllUsers();
-      } else {
-        // Tenant Admin: Only fetch users from their own organization
-        users = await prisma.user.findMany({
-          where: { organizationId: req.user.organizationId },
-          orderBy: { createdAt: "desc" },
-        });
-      }
-      
-      res.json({ success: true, users });
+      await airtableService.deleteAsset(req.params.id);
+      res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// ==================== CONTENT ROUTES (TIMELINE) ====================
+app.get(
+  "/api/posts",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const projectId = req.query.projectId as string | undefined;
+      const posts = await airtableService.getUserPosts(req.user!.id, projectId);
+      res.json({ success: true, posts });
+    } catch (error: any) {
+      res.status(500).json({ error: "Failed to fetch posts" });
     }
   },
 );
 
 app.put(
-  "/api/admin/users/:userId",
+  "/api/posts/:postId/title",
   authenticateToken,
-  requireAdmin,
   async (req: AuthenticatedRequest, res) => {
-    const { userId } = req.params;
-    // UPDATED: Destructure creditType for pool-specific top-ups
-    const { creditBalance, addCredits, creditType, creditSystem, name, role, view, maxProjects } =
-      req.body;
-
     try {
-      // 1. Handle Credits
-      if (addCredits && creditType) {
-        // New Granular Top-up
-        await airtableService.adminUpdateUser(userId, {
-          addCredits,
-          creditType,
-        });
-      } else if (addCredits) {
-        // Fallback for legacy balance top-up
-        await airtableService.addCredits(userId, parseInt(addCredits));
-      } else if (creditBalance !== undefined) {
-        await airtableService.adminUpdateUser(userId, { creditBalance });
-      }
+      const { postId } = req.params;
+      const { title } = req.body;
+      const post = await airtableService.getPostById(postId);
+      if (!post || post.userId !== req.user!.id)
+        return res.status(403).json({ error: "Access denied" });
 
-      // 2. Handle Other Profile Updates
-      const otherUpdates: any = {};
-      if (creditSystem) otherUpdates.creditSystem = creditSystem;
-      if (name) otherUpdates.name = name;
-      if (role) otherUpdates.role = role;
-      if (view) otherUpdates.view = view;
-      if (maxProjects !== undefined) otherUpdates.maxProjects = Number(maxProjects);
-
-      if (Object.keys(otherUpdates).length > 0) {
-        await airtableService.adminUpdateUser(userId, otherUpdates);
-      }
-
-      res.json({ success: true, message: "User updated successfully" });
+      await airtableService.updatePost(postId, { title });
+      res.json({ success: true, message: "Title updated" });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   },
 );
 
+// ✅ FIXED: Dynamic Download Extension
+app.get(
+  "/api/posts/:postId/download",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { postId } = req.params;
+      const post = await airtableService.getPostById(postId);
+
+      if (!post || post.userId !== req.user!.id)
+        return res.status(403).json({ error: "Access denied" });
+      if (!post.mediaUrl)
+        return res.status(404).json({ error: "Media not available" });
+
+      let cleanTitle = `visionlight-${postId}`;
+      if (post.title && post.title.trim().length > 0) {
+        cleanTitle = post.title.replace(/[\\/:*?"<>|]/g, "_").trim();
+      }
+
+      // Check Media Type for extension
+      let extension = "mp4";
+      const type = post.mediaType ? post.mediaType.toUpperCase() : "VIDEO";
+
+      if (type === "IMAGE") extension = "jpg";
+      if (type === "CAROUSEL") extension = "jpg";
+
+      const filename = `${cleanTitle}.${extension}`;
+
+      // Handle Carousel Arrays
+      let targetUrl = post.mediaUrl;
+      try {
+        const parsed = JSON.parse(post.mediaUrl);
+        if (Array.isArray(parsed) && parsed.length > 0) targetUrl = parsed[0];
+      } catch (e) {}
+
+      const response = await axios({
+        url: targetUrl,
+        method: "GET",
+        responseType: "stream",
+      });
+
+      res.setHeader("Content-Type", response.headers["content-type"]);
+      if (response.headers["content-length"])
+        res.setHeader("Content-Length", response.headers["content-length"]);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${filename}"`,
+      );
+      response.data.pipe(res);
+    } catch (error: any) {
+      console.error("Download error:", error);
+      if (!res.headersSent)
+        res.status(500).json({ error: "Failed to download media" });
+    }
+  },
+);
+
+// ✅ Delete Post (Timeline)
 app.delete(
-  "/api/admin/users/:userId",
+  "/api/posts/:postId",
   authenticateToken,
-  requireAdmin,
   async (req: AuthenticatedRequest, res) => {
-    const { userId } = req.params;
-
     try {
-      const userToDelete = await airtableService.findUserById(userId);
-      if (!userToDelete)
-        return res.status(404).json({ error: "User not found" });
+      const { postId } = req.params;
+      const post = await airtableService.getPostById(postId);
 
-      await AuthService.deleteSupabaseUserByEmail(userToDelete.email);
-      await airtableService.deleteUser(userId);
+      if (!post || post.userId !== req.user!.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
 
-      res.json({ success: true, message: "User deleted successfully" });
+      await airtableService.deletePost(postId);
+      res.json({ success: true, message: "Post deleted successfully" });
     } catch (error: any) {
-      console.error("Delete Error:", error);
       res.status(500).json({ error: error.message });
     }
   },
 );
+
+// ==================== GENERATION WORKFLOW (UNIFIED) ====================
+app.post(
+  "/api/generate-media",
+  authenticateToken,
+  upload.array("referenceImages", 5),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      console.log("🎬 /api/generate-media hit");
+      const {
+        prompt,
+        mediaType, // "video", "image", "carousel"
+        duration,
+        model,
+        aspectRatio,
+        resolution,
+        size,
+        width,
+        height,
+        title,
+        generateAudio,
+      } = req.body;
+
+      // 1. Fetch Tenant Pricing & User
+      const [settings, user] = await Promise.all([
+        getTenantSettings(req.user!.id),
+        airtableService.findUserById(req.user!.id),
+      ]);
+
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      // 2. Identify the correct Pool and calculate Cost based on Admin Settings
+      const pool = getTargetPool(mediaType, model);
+      const cost = getCost(
+        user,
+        {
+          mediaType,
+          duration: duration ? parseInt(duration) : undefined,
+          model,
+        },
+        settings,
+      );
+
+      // 3. Granular Balance Check (Casted to any to fix TS7053)
+      const userAny = user as any;
+      if (userAny[pool] < cost) {
+        return res.status(403).json({
+          error: `Insufficient credits in your ${pool.replace("credits", "")} wallet. Required: ${cost}, Current: ${userAny[pool]}`,
+        });
+      }
+
+      // Handle Uploads (Your original setup intact)
+      const referenceFiles = (req.files as Express.Multer.File[]) || [];
+      const uploadedUrls: string[] = [];
+      if (referenceFiles.length > 0) {
+        try {
+          for (const file of referenceFiles) {
+            const url = await uploadToCloudinary(file);
+            uploadedUrls.push(url);
+          }
+        } catch (err) {
+          return res.status(500).json({ error: "Image upload failed" });
+        }
+      }
+      const primaryRefUrl = uploadedUrls.length > 0 ? uploadedUrls[0] : "";
+
+      const generationParams = {
+        mediaType,
+        duration: duration ? parseInt(duration) : undefined,
+        model,
+        aspectRatio,
+        generateAudio,
+        imageReference: primaryRefUrl,
+        imageReferences: uploadedUrls,
+        hasReferenceImage: uploadedUrls.length > 0,
+        timestamp: new Date().toISOString(),
+        title: title || "",
+        userId: req.user!.id,
+        cost: cost, // Stores the cost used at time of generation
+      };
+
+      // 4. Deduct from the specific Granular Pool
+      await airtableService.deductGranularCredits(req.user!.id, pool, cost);
+
+      // 5. CREATE POST (Your original setup intact)
+      const post = await airtableService.createPost({
+        userId: req.user!.id,
+        prompt,
+        title: title || "",
+        mediaType: mediaType.toUpperCase() as any,
+        platform: "INSTAGRAM",
+        projectId: req.body.projectId || undefined,
+        generationParams,
+        imageReference: primaryRefUrl,
+        generationStep: "GENERATION",
+        requiresApproval: false,
+      });
+
+      // 3. RESPOND
+      res.json({ success: true, postId: post.id });
+
+      // 4. TRIGGER PROCESS (Your original setup intact)
+      (async () => {
+        try {
+          if (mediaType === "carousel") {
+            const apiKeys = await getTenantApiKeys(req.user!.id);
+            await contentEngine.startCarouselGeneration(
+              post.id,
+              prompt,
+              generationParams,
+              apiKeys
+            );
+          } else if (mediaType === "image") {
+            const apiKeys = await getTenantApiKeys(req.user!.id);
+            await contentEngine.startImageGeneration(
+              post.id,
+              prompt,
+              generationParams,
+              apiKeys
+            );
+          } else {
+            const apiKeys = await getTenantApiKeys(req.user!.id);
+            contentEngine.startVideoGeneration(
+              post.id,
+              prompt,
+              generationParams,
+              apiKeys
+            );
+          }
+        } catch (err: any) {
+          console.error("Background Error:", err);
+          await airtableService.updatePost(post.id, {
+            status: "FAILED",
+            error: "Processing failed",
+          });
+          // REFUND to the correct Granular Pool
+          await airtableService.refundGranularCredits(req.user!.id, pool, cost);
+        }
+      })();
+    } catch (error: any) {
+      console.error("API Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// ✅ POST STATUS (Active Polling)
+app.get(
+  "/api/post/:postId/status",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      let post = await airtableService.getPostById(req.params.postId);
+      if (!post || post.userId !== req.user!.id)
+        return res.status(403).json({ error: "Denied" });
+
+      if (post.status === "PROCESSING") {
+        const apiKeys = await getTenantApiKeys(req.user!.id);
+        await contentEngine.checkPostStatus(post, apiKeys);
+        post = await airtableService.getPostById(req.params.postId);
+      }
+
+      res.json({
+        success: true,
+        status: post?.status,
+        progress: post?.progress || 0,
+        mediaUrl: post?.mediaUrl,
+        error: post?.error,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// 2. JOB CHECK (Active Jobs List)
+app.get(
+  "/api/jobs/check-active",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const allPosts = await airtableService.getUserPosts(req.user!.id);
+      const activePosts = allPosts.filter(
+        (p: any) => p.status === "PROCESSING",
+      );
+
+      if (activePosts.length === 0) {
+        return res.json({ success: true, active: 0 });
+      }
+
+      const updates = activePosts.map(async (simplePost: any) => {
+        const fullPost = await airtableService.getPostById(simplePost.id);
+        if (fullPost && fullPost.status === "PROCESSING") {
+          const apiKeys = await getTenantApiKeys(req.user!.id);
+          await contentEngine.checkPostStatus(fullPost, apiKeys);
+        }
+      });
+
+      await Promise.all(updates);
+      res.json({ success: true, checked: activePosts.length });
+    } catch (error: any) {
+      res.json({ success: false, error: error.message });
+    }
+  },
+);
+
+app.get(
+  "/api/post/:postId",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const post = await airtableService.getPostById(req.params.postId);
+      if (!post || post.userId !== req.user!.id)
+        return res.status(403).json({ error: "Denied" });
+      res.json({ success: true, post });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+app.use((req, res) => res.status(404).json({ error: "Route not found" }));
+app.use((error: any, req: Request, res: Response, next: NextFunction) => {
+  console.error("Global Error:", error);
+  res.status(500).json({ error: "Internal Server Error" });
+});
+
+if (process.env.NODE_ENV !== "production" || process.env.VERCEL !== "1") {
+  app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+}
+
+export default app;
+
 
 // ==================== AUTH ROUTES ====================
 app.get(

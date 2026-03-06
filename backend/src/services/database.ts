@@ -31,9 +31,26 @@ export const dbService = {
   },
 
   // === ORGANIZATION ===
+  async createOrganization(data: { name: string; maxUsers: number; maxProjectsTotal: number; isDefault?: boolean }) {
+    return prisma.organization.create({
+      data: {
+        name: data.name,
+        maxUsers: data.maxUsers,
+        maxProjectsTotal: data.maxProjectsTotal,
+        isDefault: data.isDefault || false,
+      },
+    });
+  },
+
   async getOrganization(orgId: string) {
     return prisma.organization.findUnique({
       where: { id: orgId },
+    });
+  },
+
+  async getDefaultOrganization() {
+    return prisma.organization.findFirst({
+      where: { isDefault: true },
     });
   },
 
@@ -41,6 +58,13 @@ export const dbService = {
     return prisma.organization.update({
       where: { id: orgId },
       data,
+    });
+  },
+
+  async updateOrganizationStatus(orgId: string, isActive: boolean) {
+    return prisma.organization.update({
+      where: { id: orgId },
+      data: { isActive },
     });
   },
 
@@ -61,10 +85,17 @@ export const dbService = {
     maxProjects?: number;
     organizationId?: string;
     role?: string;
+    // Allow explicit override of credits during creation
+    creditsPicDrift?: number;
+    creditsPicDriftPlus?: number;
+    creditsImageFX?: number;
+    creditsVideoFX1?: number;
+    creditsVideoFX2?: number;
+    creditsVideoFX3?: number;
+    creditBalance?: number;
   }) {
     const isDemo = data.view === "PICDRIFT";
-    // Users in a Tenant Organization start with 0 credits. 
-    // Only "Default" (no org) or explicit Demo users get starting points.
+    // Users in a Tenant Organization start with 0 credits unless specified.
     const hasOrg = !!data.organizationId;
 
     return prisma.user.create({
@@ -74,18 +105,19 @@ export const dbService = {
         view: data.view || "VISIONLIGHT",
         maxProjects: data.maxProjects || 3,
         organizationId: data.organizationId,
-        creditBalance: (isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 20),
-        creditsPicDrift: (isDemo && !hasOrg) ? 5 : (hasOrg ? 0 : 10),
-        creditsPicDriftPlus: (isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 10),
-        creditsImageFX: (isDemo && !hasOrg) ? 15 : (hasOrg ? 0 : 10),
-        creditsVideoFX1: (isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 10),
-        creditsVideoFX2: (isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 10),
-        creditsVideoFX3: (isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 10),
+        creditBalance: data.creditBalance !== undefined ? data.creditBalance : ((isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 20)),
+        creditsPicDrift: data.creditsPicDrift !== undefined ? data.creditsPicDrift : ((isDemo && !hasOrg) ? 5 : (hasOrg ? 0 : 10)),
+        creditsPicDriftPlus: data.creditsPicDriftPlus !== undefined ? data.creditsPicDriftPlus : ((isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 10)),
+        creditsImageFX: data.creditsImageFX !== undefined ? data.creditsImageFX : ((isDemo && !hasOrg) ? 15 : (hasOrg ? 0 : 10)),
+        creditsVideoFX1: data.creditsVideoFX1 !== undefined ? data.creditsVideoFX1 : ((isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 10)),
+        creditsVideoFX2: data.creditsVideoFX2 !== undefined ? data.creditsVideoFX2 : ((isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 10)),
+        creditsVideoFX3: data.creditsVideoFX3 !== undefined ? data.creditsVideoFX3 : ((isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 10)),
         creditSystem: isDemo ? "INTERNAL" : "COMMERCIAL",
         role: data.role || "USER",
       },
     });
-  },  async deleteUser(id: string) {
+  },
+  async deleteUser(id: string) {
     return prisma.user.delete({ where: { id } });
   },
   async getAllUsers() {

@@ -41,7 +41,25 @@ export const apiEndpoints = {
     api.put(`/api/admin/users/${userId}`, data),
   adminDeleteUser: (userId: string) => api.delete(`/api/admin/users/${userId}`),
 
-  // === Admin Organization (Tenant Control) ===
+  // === SuperAdmin (Platform Control) ===
+  superadminGetOrganizations: () => api.get("/api/superadmin/organizations"),
+  superadminCreateTenant: (data: any) => api.post("/api/superadmin/organizations/tenant", data),
+  superadminUpdateOrgStatus: (id: string, isActive: boolean) => api.put(`/api/superadmin/organizations/${id}/status`, { isActive }),
+  superadminUpdateOrgLimits: (id: string, data: any) => api.put(`/api/superadmin/organizations/${id}/limits`, data),
+  superadminCreateDemoUser: (data: any) => api.post("/api/superadmin/users/demo", data),
+  superadminCreateSuperAdmin: (data: any) => api.post("/api/superadmin/users/superadmin", data),
+  superadminGetGlobalSettings: () => api.get("/api/superadmin/settings/global"),
+  superadminUpdateGlobalSettings: (data: any) => api.put("/api/superadmin/settings/global", data),
+
+  // === Tenant (Team Management) ===
+  tenantGetTeam: () => api.get("/api/tenant/team"),
+  tenantAddUser: (data: any) => api.post("/api/tenant/team/user", data),
+  tenantUpdateUser: (userId: string, data: any) => api.put(`/api/tenant/team/user/${userId}`, data),
+  tenantDeleteUser: (userId: string) => api.delete(`/api/tenant/team/user/${userId}`),
+  tenantGetConfig: () => api.get("/api/tenant/config"),
+  tenantUpdateConfig: (data: any) => api.put("/api/tenant/config", data),
+
+  // === Admin Organization (Tenant Control - Legacy) ===
   adminGetOrganization: () => api.get("/api/admin/organization"),
   adminUpdateOrganization: (data: any) => api.put("/api/admin/organization", data),
   adminGetOrganizations: () => api.get("/api/admin/organizations"),

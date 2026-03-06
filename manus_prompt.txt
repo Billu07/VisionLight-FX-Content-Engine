@@ -1,0 +1,18 @@
+You are Manus 1.6 Pro. Your task is to create a master plan to refactor a SaaS platform's organization and admin handling.
+
+USER'S VISION:
+"My target is to give demo users 'Picdrift Credit' and 'PicFX Credit', that's why we have the picdrift view. Once they like the demo and want to subscribe, we then give them a complete platform like ours, a new organization. In their organization they will have their own admin panel, can add users, can set prices, use their own API credentials to activate their own dashboard. But NO access to the super admin panel. There will be no view options (visualfx/picdrift) for them while creating a user. It's just the default view. They will have their own white label SaaS. Super admin can anytime revoke or pause their platform. Basically super admin takes monthly fees for the platform. A super admin can also be an admin of his own organization. So managing other orgs and managing his own org should be handled through different interfaces. Many of these features are already integrated, but very messed up. I need a proper plan and execution on that part."
+
+CURRENT SETUP CONTEXT:
+- Organizations: Function as tenants, storing their own API keys and pricing overrides.
+- Roles: SUPERADMIN (global access), ADMIN (tenant-level access), and USER.
+- Credits: A complex mix of a legacy creditBalance and granular pools (e.g., creditsPicDrift). Deductions are driven by 'view' type and pricing settings.
+- Settings: Duplicated structure between GlobalSettings (system-wide) and Organization (tenant-specific).
+- Messed up areas:
+  - Pricing logic in backend/src/config/pricing.ts is hardcoded to specific model fields, making it difficult to extend.
+  - Admin routes in backend/src/index.ts often conflate ADMIN and SUPERADMIN permissions, leading to potential leak of global config to tenant admins.
+  - The 'view' property (PICDRIFT vs VISIONLIGHT) heavily influences credit logic in a way that is hard-coded into createUser and getCost.
+  - The 'AdminDashboard' in the frontend (frontend/src/pages/AdminDashboard.tsx) is a monolithic component that uses complex conditional logic to separate Super Admin and Admin views, which should be split into distinct panels.
+
+YOUR TASK:
+Provide a detailed, step-by-step master plan to cleanly separate the Super Admin panel (for managing SaaS tenants/orgs, pausing platforms, billing) from the Tenant Admin panel (for a tenant managing their own users, prices, API credentials, with a default view). Include architectural changes, database schema updates, backend route splitting, and frontend component refactoring. Ensure the plan accounts for the Super Admin being able to manage their own organization via the Tenant Admin panel, completely separate from the Super Admin platform management interface.

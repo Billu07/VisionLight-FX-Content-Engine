@@ -12,6 +12,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MarketingSite } from "./pages/MarketingSite";
 import Dashboard from "./pages/Dashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import SuperAdminDashboard from "./pages/SuperAdminDashboard";
+import TenantDashboard from "./pages/TenantDashboard";
 import Projects from "./pages/Projects";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { BrandProvider } from "./contexts/BrandContext";
@@ -30,6 +32,13 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// --- Admin Dashboard Switcher ---
+const AdminDashboardSwitcher = () => {
+  const { user } = useAuth();
+  if (user?.role === "SUPERADMIN") return <SuperAdminDashboard />;
+  return <TenantDashboard />;
+};
 
 // --- Standard Protected Route ---
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -131,7 +140,7 @@ function App() {
               element={
                 <AdminRoute>
                   <ErrorBoundary>
-                    <AdminDashboard />
+                    <AdminDashboardSwitcher />
                   </ErrorBoundary>
                 </AdminRoute>
               }

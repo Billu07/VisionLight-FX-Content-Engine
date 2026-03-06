@@ -1275,40 +1275,30 @@ function Dashboard() {
                       <label className="block text-sm font-semibold text-white mb-3 sm:mb-4">
                         Select Content Type
                       </label>
-                      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                        {/* TAB 1: PICDRIFT (Default) */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveEngine("kie");
-                            setVideoFxMode("picdrift");
-                            if (picDriftMode === "standard") setKieDuration(10);
-                            else setKieDuration(5);
-                          }}
-                          className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group flex flex-col items-center justify-center text-center sm:text-left sm:block sm:items-start ${currentVisualTab === "picdrift"
-                            ? "border-white/20 bg-gradient-to-br from-pink-500 to-rose-500 shadow-2xl scale-105"
-                            : "border-white/5 bg-gray-800/50 hover:border-white/10"
-                            }`}
-                        >
-                          <div className="font-semibold text-xs sm:text-sm text-white">
-                            PicDrift
-                          </div>
-                        </button>
-
-                        {/* TAB 2: PIC FX */}
-                        {user?.view === "PICDRIFT" &&
-                          credits.creditsImageFX <= 0 ? (
-                          <a
-                            href="http://picdrift.com/renders"
-                            target="_blank"
-                            rel="noreferrer"
-                            className={`p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-violet-400/50 hover:bg-violet-900/20 transition-all duration-300 text-center sm:text-left group flex flex-col sm:flex-row items-center justify-center sm:justify-between`}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+                        {/* TAB 1: PICDRIFT (Demo Only) */}
+                        {user?.view === "PICDRIFT" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveEngine("kie");
+                              setVideoFxMode("picdrift");
+                              if (picDriftMode === "standard") setKieDuration(10);
+                              else setKieDuration(5);
+                            }}
+                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group flex flex-col items-center justify-center text-center sm:text-left sm:block sm:items-start ${currentVisualTab === "picdrift"
+                              ? "border-white/20 bg-gradient-to-br from-pink-500 to-rose-500 shadow-2xl scale-105"
+                              : "border-white/5 bg-gray-800/50 hover:border-white/10"
+                              }`}
                           >
-                            <div className="font-semibold text-xs sm:text-sm text-gray-400 group-hover:text-violet-300 flex items-center gap-1 sm:gap-2">
-                              <span>🔒</span> Pic FX
+                            <div className="font-semibold text-xs sm:text-sm text-white uppercase tracking-wider">
+                              PicDrift
                             </div>
-                          </a>
-                        ) : (
+                          </button>
+                        )}
+
+                        {/* TAB 2: PIC FX (Subscribers Only) */}
+                        {user?.view !== "PICDRIFT" && (
                           <button
                             type="button"
                             onClick={() => setActiveEngine("studio")}
@@ -1317,29 +1307,14 @@ function Dashboard() {
                               : "border-white/5 bg-gray-800/50 hover:border-white/10"
                               }`}
                           >
-                            <div className="font-semibold text-xs sm:text-sm text-white">
-                              Pic FX
+                            <div className="font-semibold text-xs sm:text-sm text-white uppercase tracking-wider">
+                              Studio (Pic FX)
                             </div>
                           </button>
                         )}
 
-                        {/* TAB 3: VIDEO FX */}
-                        {user?.view === "PICDRIFT" &&
-                          credits.creditsVideoFX1 +
-                          credits.creditsVideoFX2 +
-                          credits.creditsVideoFX3 <=
-                          0 ? (
-                          <a
-                            href="http://picdrift.com/renders"
-                            target="_blank"
-                            rel="noreferrer"
-                            className={`p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-cyan-400/50 hover:bg-cyan-900/20 transition-all duration-300 text-center sm:text-left group flex flex-col sm:flex-row items-center justify-center sm:justify-between`}
-                          >
-                            <div className="font-semibold text-xs sm:text-sm text-gray-400 group-hover:text-cyan-300 flex items-center gap-1 sm:gap-2">
-                              <span>🔒</span> Video FX
-                            </div>
-                          </a>
-                        ) : (
+                        {/* TAB 3: VIDEO FX (Subscribers Only) */}
+                        {user?.view !== "PICDRIFT" && (
                           <button
                             type="button"
                             onClick={() => {
@@ -1348,6 +1323,16 @@ function Dashboard() {
                               setKieDuration(15);
                             }}
                             className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${currentVisualTab === "videofx"
+                              ? "border-white/20 bg-gradient-to-br from-cyan-600 to-blue-600 shadow-2xl scale-105"
+                              : "border-white/5 bg-gray-800/50 hover:border-white/10"
+                              }`}
+                          >
+                            <div className="font-semibold text-xs sm:text-sm text-white uppercase tracking-wider">
+                              Video FX
+                            </div>
+                          </button>
+                        )}
+                      </div>
                               ? "border-white/20 bg-gradient-to-br from-blue-700 to-cyan-700 shadow-2xl scale-105"
                               : "border-white/5 bg-gray-800/50 hover:border-white/10"
                               }`}
