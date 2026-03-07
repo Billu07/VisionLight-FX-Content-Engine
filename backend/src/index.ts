@@ -363,12 +363,15 @@ app.post(
           cost,
         );
 
+        const apiKeys = await getTenantApiKeys(req.user!.id);
+
         const asset = await contentEngine.processAndSaveAsset(
           req.file.buffer,
           req.user!.id,
           aspectRatio || "16:9",
           originalAssetId, // Keep original reference intact
-          projectId
+          projectId,
+          apiKeys
         );
         res.json({ success: true, asset });
       }
@@ -412,6 +415,8 @@ app.post(
         totalCost,
       );
 
+      const apiKeys = await getTenantApiKeys(req.user!.id);
+
       res.json({
         success: true,
         message: `Processing batch of ${files.length}. Cost: ${totalCost} credits.`,
@@ -425,6 +430,9 @@ app.post(
               file.buffer,
               req.user!.id,
               aspectRatio || "16:9",
+              undefined,
+              undefined,
+              apiKeys
             );
           } catch (e) {
             console.error("Failed batch item", e);

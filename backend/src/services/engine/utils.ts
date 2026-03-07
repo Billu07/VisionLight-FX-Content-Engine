@@ -59,6 +59,7 @@ export const resizeWithBlurFill = async (
         fit: "contain",
         background: { r: 0, g: 0, b: 0, alpha: 0 },
       })
+      .png() // 👈 CRITICAL: Must be PNG to preserve alpha for the composite step
       .toBuffer();
 
     return await sharp(background)
@@ -77,6 +78,7 @@ export const resizeWithGemini = async (
   targetWidth: number, // (Unused but kept for signature compatibility)
   targetHeight: number, // (Unused but kept for signature compatibility)
   targetRatioString: string = "16:9",
+  apiKeys?: any,
 ): Promise<Buffer> => {
   try {
     console.log(`✨ Gemini Direct Outpaint: Target ${targetRatioString}`);
@@ -128,6 +130,7 @@ export const resizeWithGemini = async (
       referenceImages: [originalBuffer], // Passing the raw image, no black bars
       modelType: "quality",
       imageSize: "2K", // Request high res for the expansion
+      apiKey: apiKeys?.falApiKey,
     });
   } catch (error: any) {
     console.error("❌ FAL Direct Error:", error.message);

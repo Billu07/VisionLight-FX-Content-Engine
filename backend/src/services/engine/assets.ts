@@ -47,7 +47,8 @@ export const assetsLogic = {
     userId: string,
     targetAspectRatio: "16:9" | "9:16" | "1:1",
     originalAssetId?: string, // 👈 NEW PARAMETER
-    projectId?: string // 👈 NEW PARAMETER
+    projectId?: string, // 👈 NEW PARAMETER
+    apiKeys?: any // 👈 NEW PARAMETER
   ) {
     try {
       let targetWidth = 1280;
@@ -69,14 +70,18 @@ export const assetsLogic = {
       // 5% Tolerance
       const isMatch = Math.abs(sourceAR - targetRatioNum) < 0.05;
 
+      console.log(`🖼️ Asset Processing: Source AR: ${sourceAR.toFixed(2)} | Target AR: ${targetRatioNum.toFixed(2)} | Match: ${isMatch}`);
+
       let processedBuffer: Buffer;
       if (isMatch) {
+        console.log("📏 Ratios match (within tolerance). Performing strict resize.");
         processedBuffer = await resizeStrict(
           fileBuffer,
           targetWidth,
           targetHeight,
         );
       } else {
+        console.log(`✨ Ratios differ. Triggering AI Outpainting for ${targetAspectRatio}...`);
         try {
           // Pass the target ratio string to Gemini logic
           processedBuffer = await resizeWithGemini(
@@ -84,8 +89,10 @@ export const assetsLogic = {
             targetWidth,
             targetHeight,
             targetAspectRatio,
+            apiKeys,
           );
-        } catch (e) {
+        } catch (e: any) {
+          console.error("⚠️ resizeWithGemini failed, falling back to blur fill:", e.message);
           processedBuffer = await resizeWithBlurFill(
             fileBuffer,
             targetWidth,

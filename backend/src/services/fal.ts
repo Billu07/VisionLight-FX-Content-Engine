@@ -50,13 +50,15 @@ export const FalService = {
       }
 
       // Default to 1K resolution for both PicFX (generation) and Editor for maximum speed
-      input.resolution = "1K";
+      input.resolution = params.imageSize || "1K";
 
       if (isEdit && params.referenceImages) {
         input.image_urls = params.referenceImages.map(
           (buf) => `data:image/jpeg;base64,${buf.toString("base64")}`
         );
       }
+
+      console.log("📤 FAL Request Input (Keys Omitted):", { ...input, image_urls: input.image_urls ? `[${input.image_urls.length} images]` : undefined });
 
       const result: any = await fal.subscribe(endpoint, {
         input,
