@@ -1239,7 +1239,7 @@ function Dashboard() {
                       <span></span>{" "}
                       {viewMode === "sequencer"
                         ? "Back to Create"
-                        : "Sequence Merger"}
+                        : "Video Editor"}
                     </button>
 
                     <button

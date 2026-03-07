@@ -44,7 +44,7 @@ export default function SuperAdminDashboard() {
   const [showTenantModal, setShowTenantModal] = useState(false);
   const [showDemoModal, setShowDemoModal] = useState(false);
   const [showAddTeamModal, setShowAddTeamModal] = useState(false);
-  
+
   // Edit Tenant Modal
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
   const [tenantUpdates, setTenantUpdates] = useState({
@@ -59,7 +59,7 @@ export default function SuperAdminDashboard() {
     view: "VISIONLIGHT",
     role: "USER"
   });
-  
+
   // Forms
   const [newTenant, setNewTenant] = useState({
     orgName: "",
@@ -93,9 +93,9 @@ export default function SuperAdminDashboard() {
       const [tenantsRes, settingsRes, usersRes] = await Promise.all([
         apiEndpoints.superadminGetOrganizations(),
         apiEndpoints.superadminGetGlobalSettings(),
-        apiEndpoints.superadminGetUsers() 
+        apiEndpoints.superadminGetUsers()
       ]);
-      
+
       if (tenantsRes.data.success) setTenants(tenantsRes.data.organizations);
       if (settingsRes.data.success) setGlobalSettings(settingsRes.data.settings);
       if (usersRes.data.success) setUsers(usersRes.data.users);
@@ -122,7 +122,7 @@ export default function SuperAdminDashboard() {
   };
 
   const handleDeleteTenant = async (id: string) => {
-    if(!confirm("Are you sure? This will delete the organization and ALL its users forever.")) return;
+    if (!confirm("Are you sure? This will delete the organization and ALL its users forever.")) return;
     setActionLoading(true);
     try {
       await apiEndpoints.superadminDeleteOrganization(id);
@@ -136,33 +136,33 @@ export default function SuperAdminDashboard() {
   };
 
   const handleUpdateTenant = async () => {
-    if(!editingTenant) return;
+    if (!editingTenant) return;
     setActionLoading(true);
     try {
-        await apiEndpoints.superadminUpdateOrgLimits(editingTenant.id, {
-            maxUsers: tenantUpdates.maxUsers,
-            maxProjectsTotal: tenantUpdates.maxProjectsTotal
-        });
-        if(editingTenant.isActive !== tenantUpdates.isActive) {
-            await apiEndpoints.superadminUpdateOrgStatus(editingTenant.id, tenantUpdates.isActive);
-        }
-        setMsg("Tenant updated.");
-        setEditingTenant(null);
-        fetchInitialData();
-    } catch(err: any) {
-        setMsg("Error: " + err.message);
+      await apiEndpoints.superadminUpdateOrgLimits(editingTenant.id, {
+        maxUsers: tenantUpdates.maxUsers,
+        maxProjectsTotal: tenantUpdates.maxProjectsTotal
+      });
+      if (editingTenant.isActive !== tenantUpdates.isActive) {
+        await apiEndpoints.superadminUpdateOrgStatus(editingTenant.id, tenantUpdates.isActive);
+      }
+      setMsg("Tenant updated.");
+      setEditingTenant(null);
+      fetchInitialData();
+    } catch (err: any) {
+      setMsg("Error: " + err.message);
     } finally {
-        setActionLoading(false);
+      setActionLoading(false);
     }
   };
 
   const openEditTenant = (t: Tenant) => {
-      setEditingTenant(t);
-      setTenantUpdates({
-          maxUsers: t.maxUsers,
-          maxProjectsTotal: t.maxProjectsTotal,
-          isActive: t.isActive
-      });
+    setEditingTenant(t);
+    setTenantUpdates({
+      maxUsers: t.maxUsers,
+      maxProjectsTotal: t.maxProjectsTotal,
+      isActive: t.isActive
+    });
   };
 
   const handleCreateDemo = async (e: React.FormEvent) => {
@@ -205,14 +205,14 @@ export default function SuperAdminDashboard() {
   };
 
   const handleUpdateUserBasic = async () => {
-    if(!editingUser) return;
+    if (!editingUser) return;
     try {
-        await apiEndpoints.adminUpdateUser(editingUser.id, userUpdates);
-        setMsg("User updated.");
-        setEditingUser(null);
-        fetchInitialData();
-    } catch(err: any) {
-        alert(err.message);
+      await apiEndpoints.adminUpdateUser(editingUser.id, userUpdates);
+      setMsg("User updated.");
+      setEditingUser(null);
+      fetchInitialData();
+    } catch (err: any) {
+      alert(err.message);
     }
   }
 
@@ -237,7 +237,7 @@ export default function SuperAdminDashboard() {
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end mb-12 gap-8 border-b border-gray-800 pb-8">
           <div>
             <h1 className="text-3xl font-bold text-white tracking-tight uppercase mb-2">
-                Platform <span className="text-brand-accent">Control</span>
+              Platform <span className="text-brand-accent">Control</span>
             </h1>
             <p className="text-[11px] text-gray-400 uppercase tracking-widest font-semibold">
               Super Admin Interface — {adminUser?.email}
@@ -245,19 +245,18 @@ export default function SuperAdminDashboard() {
           </div>
 
           <div className="flex flex-wrap items-center bg-gray-900 p-1.5 rounded-lg border border-gray-800 gap-1">
-            <button 
-                onClick={() => navigate("/dashboard")}
-                className="px-6 py-2.5 rounded-md text-[11px] font-black uppercase tracking-widest text-brand-accent hover:bg-brand-accent/10 transition-all border border-brand-accent/20 mr-2"
+            <button
+              onClick={() => navigate("/app")}
+              className="px-6 py-2.5 rounded-md text-[11px] font-black uppercase tracking-widest text-brand-accent hover:bg-brand-accent/10 transition-all border border-brand-accent/20 mr-2"
             >
-                Back to App
+              Back to App
             </button>
             {["tenants", "my-agency", "demo-leads", "global-settings"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
-                className={`px-6 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                  activeTab === tab ? "bg-gray-800 text-brand-accent" : "text-gray-400 hover:text-white"
-                }`}
+                className={`px-6 py-2.5 rounded-md text-[11px] font-bold uppercase tracking-widest transition-colors ${activeTab === tab ? "bg-gray-800 text-brand-accent" : "text-gray-400 hover:text-white"
+                  }`}
               >
                 {tab.replace("-", " ")}
               </button>
@@ -304,11 +303,10 @@ export default function SuperAdminDashboard() {
                       </td>
                       <td className="p-6 text-center">
                         <span
-                          className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${
-                            t.isActive 
-                              ? "bg-green-500/10 text-green-400 border-green-500/20" 
+                          className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${t.isActive
+                              ? "bg-green-500/10 text-green-400 border-green-500/20"
                               : "bg-red-500/10 text-red-400 border-red-500/20"
-                          }`}
+                            }`}
                         >
                           {t.isActive ? "Active" : "Deactivated"}
                         </span>
@@ -320,18 +318,18 @@ export default function SuperAdminDashboard() {
                       </td>
                       <td className="p-6 text-right">
                         <div className="flex gap-2 justify-end">
-                            <button 
+                          <button
                             className="text-gray-400 hover:text-white text-[10px] font-bold uppercase tracking-widest px-4 py-2 bg-gray-800 rounded-md border border-gray-700 hover:bg-gray-700 transition-colors"
                             onClick={() => openEditTenant(t)}
-                            >
+                          >
                             Configure
-                            </button>
-                            <button 
+                          </button>
+                          <button
                             className="text-red-500/50 hover:text-red-400 text-[10px] font-bold uppercase tracking-widest px-4 py-2 hover:bg-red-500/10 transition-colors rounded-md"
                             onClick={() => handleDeleteTenant(t.id)}
-                            >
+                          >
                             Delete
-                            </button>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -347,7 +345,7 @@ export default function SuperAdminDashboard() {
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
             <div className="flex justify-between items-center">
               <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">Default Agency Team</h2>
-              <button 
+              <button
                 onClick={() => setShowAddTeamModal(true)}
                 className="bg-brand-accent hover:bg-cyan-300 text-gray-950 px-6 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest"
               >
@@ -374,42 +372,42 @@ export default function SuperAdminDashboard() {
                         <div className="text-[10px] text-gray-500 font-mono">{u.email}</div>
                       </td>
                       <td className="p-6 text-center">
-                         <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${u.view === 'PICDRIFT' ? 'bg-pink-500/10 text-pink-400 border-pink-500/20' : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'}`}>
-                            {u.view}
-                         </span>
+                        <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${u.view === 'PICDRIFT' ? 'bg-pink-500/10 text-pink-400 border-pink-500/20' : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'}`}>
+                          {u.view}
+                        </span>
                       </td>
                       <td className="p-6 text-center">
-                         <div className="flex flex-col gap-1">
-                            <div className="flex items-center justify-center gap-2">
-                                <span className="text-[10px] text-gray-500">Std:</span>
-                                <input type="number" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDrift} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsPicDrift, creditType: "creditsPicDrift" })}/>
-                            </div>
-                            <div className="flex items-center justify-center gap-2">
-                                <span className="text-[10px] text-gray-500">Plus:</span>
-                                <input type="number" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsPicDriftPlus, creditType: "creditsPicDriftPlus" })}/>
-                            </div>
-                         </div>
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center justify-center gap-2">
+                            <span className="text-[10px] text-gray-500">Std:</span>
+                            <input type="number" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDrift} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsPicDrift, creditType: "creditsPicDrift" })} />
+                          </div>
+                          <div className="flex items-center justify-center gap-2">
+                            <span className="text-[10px] text-gray-500">Plus:</span>
+                            <input type="number" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsPicDriftPlus, creditType: "creditsPicDriftPlus" })} />
+                          </div>
+                        </div>
                       </td>
                       <td className="p-6 text-center">
-                         <input type="number" className="w-16 bg-gray-950 border border-gray-800 rounded p-1 text-center text-xs text-white" defaultValue={u.creditsImageFX} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsImageFX, creditType: "creditsImageFX" })}/>
+                        <input type="number" className="w-16 bg-gray-950 border border-gray-800 rounded p-1 text-center text-xs text-white" defaultValue={u.creditsImageFX} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsImageFX, creditType: "creditsImageFX" })} />
                       </td>
                       <td className="p-6 text-center">
-                         <div className="flex gap-2 justify-center">
-                            <input type="number" title="VidFX 1" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsVideoFX1, creditType: "creditsVideoFX1" })}/>
-                            <input type="number" title="VidFX 2" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsVideoFX2, creditType: "creditsVideoFX2" })}/>
-                            <input type="number" title="VidFX 3" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsVideoFX3, creditType: "creditsVideoFX3" })}/>
-                         </div>
+                        <div className="flex gap-2 justify-center">
+                          <input type="number" title="VidFX 1" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsVideoFX1, creditType: "creditsVideoFX1" })} />
+                          <input type="number" title="VidFX 2" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsVideoFX2, creditType: "creditsVideoFX2" })} />
+                          <input type="number" title="VidFX 3" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsVideoFX3, creditType: "creditsVideoFX3" })} />
+                        </div>
                       </td>
                       <td className="p-6 text-right">
-                         <div className="flex gap-2 justify-end">
-                            <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className="text-cyan-400 hover:text-cyan-300 text-[10px] font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded">Manage</button>
-                            <button 
-                                className="text-red-500/50 hover:text-red-400 text-[10px] font-bold uppercase tracking-widest"
-                                onClick={() => { if(window.confirm("Remove user?")) apiEndpoints.tenantDeleteUser(u.id).then(fetchInitialData); }}
-                            >
-                                Remove
-                            </button>
-                         </div>
+                        <div className="flex gap-2 justify-end">
+                          <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className="text-cyan-400 hover:text-cyan-300 text-[10px] font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded">Manage</button>
+                          <button
+                            className="text-red-500/50 hover:text-red-400 text-[10px] font-bold uppercase tracking-widest"
+                            onClick={() => { if (window.confirm("Remove user?")) apiEndpoints.tenantDeleteUser(u.id).then(fetchInitialData); }}
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -441,10 +439,10 @@ export default function SuperAdminDashboard() {
                       <div className="text-xs text-gray-500 font-mono">{u.email}</div>
                     </div>
                     <div className="flex flex-col gap-1 items-end">
-                        <span className="bg-cyan-500/10 text-cyan-400 text-[9px] font-bold px-2 py-1 rounded uppercase tracking-widest border border-cyan-500/20">
-                            {u.view}
-                        </span>
-                        <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className="text-[8px] text-gray-500 hover:text-white uppercase font-bold tracking-tighter">Edit View</button>
+                      <span className="bg-cyan-500/10 text-cyan-400 text-[9px] font-bold px-2 py-1 rounded uppercase tracking-widest border border-cyan-500/20">
+                        {u.view}
+                      </span>
+                      <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className="text-[8px] text-gray-500 hover:text-white uppercase font-bold tracking-tighter">Edit View</button>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4 border-t border-gray-800 pt-4 mt-4">
@@ -470,61 +468,61 @@ export default function SuperAdminDashboard() {
               <h3 className="text-brand-accent font-bold uppercase text-xs tracking-widest mb-2">Global Pricing Template</h3>
               <p className="text-xs text-gray-400 italic">These prices are used as defaults for all new organizations unless overridden.</p>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-               <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">PicDrift Engine</h4>
-                  <div className="space-y-4">
-                    {["pricePicDrift_5s", "pricePicDrift_10s", "pricePicDrift_Plus_5s", "pricePicDrift_Plus_10s"].map(key => (
-                      <div key={key} className="flex justify-between items-center">
-                        <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
-                        <input 
-                          type="number" 
-                          step="0.1"
-                          className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
-                          defaultValue={globalSettings[key]}
-                          onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: parseFloat(e.target.value) })}
-                        />
-                      </div>
-                    ))}
-                  </div>
-               </div>
-               
-               <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Studio & Editor</h4>
-                  <div className="space-y-4">
-                    {["pricePicFX_Standard", "pricePicFX_Carousel", "pricePicFX_Batch", "priceEditor_Pro", "priceEditor_Enhance", "priceEditor_Convert", "priceAsset_DriftPath"].map(key => (
-                      <div key={key} className="flex justify-between items-center">
-                        <span className="text-[10px] text-gray-400 uppercase font-bold truncate max-w-[100px]" title={key}>{key.replace('price', '').replace(/_/g, ' ')}</span>
-                        <input 
-                          type="number" 
-                          step="0.1"
-                          className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
-                          defaultValue={globalSettings[key]}
-                          onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: parseFloat(e.target.value) })}
-                        />
-                      </div>
-                    ))}
-                  </div>
-               </div>
-               
-               <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Video FX Engines</h4>
-                  <div className="space-y-4">
-                    {["priceVideoFX1_10s", "priceVideoFX1_15s", "priceVideoFX2_4s", "priceVideoFX2_8s", "priceVideoFX2_12s", "priceVideoFX3_4s", "priceVideoFX3_6s", "priceVideoFX3_8s"].map(key => (
-                      <div key={key} className="flex justify-between items-center">
-                        <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
-                        <input 
-                          type="number" 
-                          step="0.1"
-                          className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
-                          defaultValue={globalSettings[key]}
-                          onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: parseFloat(e.target.value) })}
-                        />
-                      </div>
-                    ))}
-                  </div>
-               </div>
+              <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">PicDrift Engine</h4>
+                <div className="space-y-4">
+                  {["pricePicDrift_5s", "pricePicDrift_10s", "pricePicDrift_Plus_5s", "pricePicDrift_Plus_10s"].map(key => (
+                    <div key={key} className="flex justify-between items-center">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
+                      <input
+                        type="number"
+                        step="0.1"
+                        className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
+                        defaultValue={globalSettings[key]}
+                        onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: parseFloat(e.target.value) })}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Studio & Editor</h4>
+                <div className="space-y-4">
+                  {["pricePicFX_Standard", "pricePicFX_Carousel", "pricePicFX_Batch", "priceEditor_Pro", "priceEditor_Enhance", "priceEditor_Convert", "priceAsset_DriftPath"].map(key => (
+                    <div key={key} className="flex justify-between items-center">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold truncate max-w-[100px]" title={key}>{key.replace('price', '').replace(/_/g, ' ')}</span>
+                      <input
+                        type="number"
+                        step="0.1"
+                        className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
+                        defaultValue={globalSettings[key]}
+                        onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: parseFloat(e.target.value) })}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Video FX Engines</h4>
+                <div className="space-y-4">
+                  {["priceVideoFX1_10s", "priceVideoFX1_15s", "priceVideoFX2_4s", "priceVideoFX2_8s", "priceVideoFX2_12s", "priceVideoFX3_4s", "priceVideoFX3_6s", "priceVideoFX3_8s"].map(key => (
+                    <div key={key} className="flex justify-between items-center">
+                      <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
+                      <input
+                        type="number"
+                        step="0.1"
+                        className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
+                        defaultValue={globalSettings[key]}
+                        onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: parseFloat(e.target.value) })}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -546,18 +544,18 @@ export default function SuperAdminDashboard() {
                     className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm outline-none focus:border-brand-accent text-white"
                     placeholder="e.g. Paramount Visuals"
                     required
-                    onChange={e => setNewTenant({...newTenant, orgName: e.target.value})}
+                    onChange={e => setNewTenant({ ...newTenant, orgName: e.target.value })}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">User Limit</label>
-                      <input type="number" className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white" defaultValue={5} onChange={e => setNewTenant({...newTenant, maxUsers: parseInt(e.target.value)})}/>
-                   </div>
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Project Limit</label>
-                      <input type="number" className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white" defaultValue={20} onChange={e => setNewTenant({...newTenant, maxProjectsTotal: parseInt(e.target.value)})}/>
-                   </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">User Limit</label>
+                    <input type="number" className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white" defaultValue={5} onChange={e => setNewTenant({ ...newTenant, maxUsers: parseInt(e.target.value) })} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Project Limit</label>
+                    <input type="number" className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white" defaultValue={20} onChange={e => setNewTenant({ ...newTenant, maxProjectsTotal: parseInt(e.target.value) })} />
+                  </div>
                 </div>
                 <div className="border-t border-gray-800 pt-6 space-y-4">
                   <h4 className="text-[10px] font-bold text-brand-accent uppercase tracking-widest">Tenant Admin Account</h4>
@@ -566,14 +564,14 @@ export default function SuperAdminDashboard() {
                     placeholder="Admin Email"
                     type="email"
                     required
-                    onChange={e => setNewTenant({...newTenant, adminEmail: e.target.value})}
+                    onChange={e => setNewTenant({ ...newTenant, adminEmail: e.target.value })}
                   />
                   <input
                     className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
                     placeholder="Initial Password"
                     type="password"
                     required
-                    onChange={e => setNewTenant({...newTenant, adminPassword: e.target.value})}
+                    onChange={e => setNewTenant({ ...newTenant, adminPassword: e.target.value })}
                   />
                 </div>
               </div>
@@ -600,59 +598,57 @@ export default function SuperAdminDashboard() {
               <button onClick={() => setEditingTenant(null)} className="text-gray-500 hover:text-white font-bold text-xl">×</button>
             </div>
             <div className="p-8 space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Max Users</label>
-                      <input 
-                         type="number" 
-                         className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent" 
-                         value={tenantUpdates.maxUsers} 
-                         onChange={e => setTenantUpdates({...tenantUpdates, maxUsers: parseInt(e.target.value)})}
-                      />
-                   </div>
-                   <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Max Projects</label>
-                      <input 
-                         type="number" 
-                         className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent" 
-                         value={tenantUpdates.maxProjectsTotal} 
-                         onChange={e => setTenantUpdates({...tenantUpdates, maxProjectsTotal: parseInt(e.target.value)})}
-                      />
-                   </div>
-                </div>
-
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Subscription Status</label>
-                   <div className="flex gap-4">
-                      <button 
-                        onClick={() => setTenantUpdates({...tenantUpdates, isActive: true})}
-                        className={`flex-1 py-3 rounded-lg border text-xs font-bold uppercase tracking-widest transition-colors ${
-                            tenantUpdates.isActive 
-                            ? "bg-green-500/10 border-green-500/50 text-green-400" 
-                            : "bg-gray-950 border-gray-800 text-gray-500 hover:text-white"
-                        }`}
-                      >
-                        Active
-                      </button>
-                      <button 
-                        onClick={() => setTenantUpdates({...tenantUpdates, isActive: false})}
-                        className={`flex-1 py-3 rounded-lg border text-xs font-bold uppercase tracking-widest transition-colors ${
-                            !tenantUpdates.isActive 
-                            ? "bg-red-500/10 border-red-500/50 text-red-400" 
-                            : "bg-gray-950 border-gray-800 text-gray-500 hover:text-white"
-                        }`}
-                      >
-                        Deactivated
-                      </button>
-                   </div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Max Users</label>
+                  <input
+                    type="number"
+                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                    value={tenantUpdates.maxUsers}
+                    onChange={e => setTenantUpdates({ ...tenantUpdates, maxUsers: parseInt(e.target.value) })}
+                  />
                 </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Max Projects</label>
+                  <input
+                    type="number"
+                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                    value={tenantUpdates.maxProjectsTotal}
+                    onChange={e => setTenantUpdates({ ...tenantUpdates, maxProjectsTotal: parseInt(e.target.value) })}
+                  />
+                </div>
+              </div>
 
-                <div className="flex gap-4 pt-4">
-                  <button type="button" onClick={() => setEditingTenant(null)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
-                  <button onClick={handleUpdateTenant} disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
-                    {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : "Save Changes"}
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Subscription Status</label>
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => setTenantUpdates({ ...tenantUpdates, isActive: true })}
+                    className={`flex-1 py-3 rounded-lg border text-xs font-bold uppercase tracking-widest transition-colors ${tenantUpdates.isActive
+                        ? "bg-green-500/10 border-green-500/50 text-green-400"
+                        : "bg-gray-950 border-gray-800 text-gray-500 hover:text-white"
+                      }`}
+                  >
+                    Active
+                  </button>
+                  <button
+                    onClick={() => setTenantUpdates({ ...tenantUpdates, isActive: false })}
+                    className={`flex-1 py-3 rounded-lg border text-xs font-bold uppercase tracking-widest transition-colors ${!tenantUpdates.isActive
+                        ? "bg-red-500/10 border-red-500/50 text-red-400"
+                        : "bg-gray-950 border-gray-800 text-gray-500 hover:text-white"
+                      }`}
+                  >
+                    Deactivated
                   </button>
                 </div>
+              </div>
+
+              <div className="flex gap-4 pt-4">
+                <button type="button" onClick={() => setEditingTenant(null)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
+                <button onClick={handleUpdateTenant} disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
+                  {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : "Save Changes"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -667,38 +663,38 @@ export default function SuperAdminDashboard() {
               <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">{editingUser.email}</p>
             </div>
             <div className="p-8 space-y-6">
-                <div className="space-y-2">
-                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform View</label>
-                   <select 
-                        className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
-                        value={userUpdates.view}
-                        onChange={e => setUserUpdates({...userUpdates, view: e.target.value})}
-                   >
-                       <option value="PICDRIFT">PICDRIFT (Demo Mode)</option>
-                       <option value="VISIONLIGHT">VISIONLIGHT (Full Mode)</option>
-                   </select>
-                </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform View</label>
+                <select
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                  value={userUpdates.view}
+                  onChange={e => setUserUpdates({ ...userUpdates, view: e.target.value })}
+                >
+                  <option value="PICDRIFT">PICDRIFT (Demo Mode)</option>
+                  <option value="VISIONLIGHT">VISIONLIGHT (Full Mode)</option>
+                </select>
+              </div>
 
-                <div className="space-y-2">
-                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Role</label>
-                   <select 
-                        className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
-                        value={userUpdates.role}
-                        onChange={e => setUserUpdates({...userUpdates, role: e.target.value})}
-                   >
-                       <option value="USER">Standard User</option>
-                       <option value="MANAGER">Agency Manager</option>
-                       <option value="ADMIN">Organization Admin</option>
-                       <option value="SUPERADMIN">System SuperAdmin</option>
-                   </select>
-                </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Role</label>
+                <select
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                  value={userUpdates.role}
+                  onChange={e => setUserUpdates({ ...userUpdates, role: e.target.value })}
+                >
+                  <option value="USER">Standard User</option>
+                  <option value="MANAGER">Agency Manager</option>
+                  <option value="ADMIN">Organization Admin</option>
+                  <option value="SUPERADMIN">System SuperAdmin</option>
+                </select>
+              </div>
 
-                <div className="flex gap-4 pt-4">
-                  <button type="button" onClick={() => setEditingUser(null)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
-                  <button onClick={handleUpdateUserBasic} disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
-                    Update User
-                  </button>
-                </div>
+              <div className="flex gap-4 pt-4">
+                <button type="button" onClick={() => setEditingUser(null)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
+                <button onClick={handleUpdateUserBasic} disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
+                  Update User
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -713,26 +709,26 @@ export default function SuperAdminDashboard() {
               <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Locked to PicDrift View</p>
             </div>
             <form onSubmit={handleCreateDemo} className="p-8 space-y-6">
-               <input
-                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
-                  placeholder="Demo Lead Email"
-                  type="email"
-                  required
-                  onChange={e => setNewDemo({...newDemo, email: e.target.value})}
-                />
-                <input
-                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
-                  placeholder="Demo Lead Name"
-                  required
-                  onChange={e => setNewDemo({...newDemo, name: e.target.value})}
-                />
-                <input
-                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
-                  placeholder="Initial Password"
-                  type="password"
-                  required
-                  onChange={e => setNewDemo({...newDemo, password: e.target.value})}
-                />
+              <input
+                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                placeholder="Demo Lead Email"
+                type="email"
+                required
+                onChange={e => setNewDemo({ ...newDemo, email: e.target.value })}
+              />
+              <input
+                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                placeholder="Demo Lead Name"
+                required
+                onChange={e => setNewDemo({ ...newDemo, name: e.target.value })}
+              />
+              <input
+                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                placeholder="Initial Password"
+                type="password"
+                required
+                onChange={e => setNewDemo({ ...newDemo, password: e.target.value })}
+              />
               <div className="flex gap-4 pt-4">
                 <button type="button" onClick={() => setShowDemoModal(false)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
                 <button type="submit" disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
@@ -752,34 +748,34 @@ export default function SuperAdminDashboard() {
               <h3 className="text-xl font-bold text-white uppercase tracking-tight">New Agency Member</h3>
             </div>
             <form onSubmit={handleAddTeamMember} className="p-8 space-y-6">
-                <input
-                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
-                  placeholder="Email Address"
-                  type="email"
-                  required
-                  onChange={e => setNewTeamMember({...newTeamMember, email: e.target.value})}
-                />
-                <input
-                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
-                  placeholder="Full Name"
-                  required
-                  onChange={e => setNewTeamMember({...newTeamMember, name: e.target.value})}
-                />
-                <input
-                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
-                  placeholder="Password"
-                  type="password"
-                  required
-                  onChange={e => setNewTeamMember({...newTeamMember, password: e.target.value})}
-                />
-                <select 
-                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-gray-300"
-                  onChange={e => setNewTeamMember({...newTeamMember, role: e.target.value})}
-                >
-                  <option value="USER">Standard User</option>
-                  <option value="MANAGER">Team Manager</option>
-                  <option value="SUPERADMIN">System Admin</option>
-                </select>
+              <input
+                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
+                placeholder="Email Address"
+                type="email"
+                required
+                onChange={e => setNewTeamMember({ ...newTeamMember, email: e.target.value })}
+              />
+              <input
+                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
+                placeholder="Full Name"
+                required
+                onChange={e => setNewTeamMember({ ...newTeamMember, name: e.target.value })}
+              />
+              <input
+                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
+                placeholder="Password"
+                type="password"
+                required
+                onChange={e => setNewTeamMember({ ...newTeamMember, password: e.target.value })}
+              />
+              <select
+                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-gray-300"
+                onChange={e => setNewTeamMember({ ...newTeamMember, role: e.target.value })}
+              >
+                <option value="USER">Standard User</option>
+                <option value="MANAGER">Team Manager</option>
+                <option value="SUPERADMIN">System Admin</option>
+              </select>
               <div className="flex gap-4 pt-4">
                 <button type="button" onClick={() => setShowAddTeamModal(false)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
                 <button type="submit" disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
