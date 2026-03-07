@@ -511,7 +511,7 @@ export default function SuperAdminDashboard() {
                <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
                   <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Video FX Engines</h4>
                   <div className="space-y-4">
-                    {["priceVideoFX1_10s", "priceVideoFX1_15s", "priceVideoFX2_12s", "priceVideoFX3_4s", "priceVideoFX3_6s", "priceVideoFX3_8s"].map(key => (
+                    {["priceVideoFX1_10s", "priceVideoFX1_15s", "priceVideoFX2_4s", "priceVideoFX2_8s", "priceVideoFX2_12s", "priceVideoFX3_4s", "priceVideoFX3_6s", "priceVideoFX3_8s"].map(key => (
                       <div key={key} className="flex justify-between items-center">
                         <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
                         <input 
