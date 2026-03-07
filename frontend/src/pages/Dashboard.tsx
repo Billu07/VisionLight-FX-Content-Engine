@@ -43,6 +43,25 @@ function Dashboard() {
   // Core
   const [prompt, setPrompt] = useState("");
   const [videoTitle, setVideoTitle] = useState("");
+  
+  // PromptFX State
+  const promptFxKey = "visionlight_prompt_fx";
+  const [promptFxList, setPromptFxList] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(promptFxKey);
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return [
+      "Cinematic lighting, 8k resolution, highly detailed, photorealistic",
+      "Cyberpunk aesthetic, neon colors, volumetric lighting, tracking shot",
+      "Macro photography, shallow depth of field, dramatic shadows"
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem(promptFxKey, JSON.stringify(promptFxList));
+  }, [promptFxList]);
+
   const [activeLibrarySlot, setActiveLibrarySlot] = useState<
     "start" | "end" | "generic" | "sequencer" | null
   >(null);
@@ -1310,42 +1329,46 @@ function Dashboard() {
                           </div>
                         </button>
 
-                        {/* TAB 3: VIDEO FX (Restricted from Demo Users) */}
-                        {user?.view !== "PICDRIFT" ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveEngine("kie");
-                              setVideoFxMode("video");
-                              setKieDuration(15);
-                            }}
-                            className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${currentVisualTab === "videofx"
-                              ? "border-white/20 bg-gradient-to-br from-cyan-600 to-blue-600 shadow-2xl scale-105"
-                              : "border-white/5 bg-gray-800/50 hover:border-white/10"
-                              }`}
-                          >
-                            <div className="font-semibold text-xs sm:text-sm text-white uppercase tracking-wider">
-                              Video FX
-                            </div>
-                          </button>
-                        ) : (
-                          /* Locked Video FX for Demo Users */
+                        {/* TAB 3: VIDEO FX (Visible but Locked for Demo Users) */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveEngine("kie");
+                            setVideoFxMode("video");
+                            setKieDuration(15);
+                          }}
+                          className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${currentVisualTab === "videofx"
+                            ? "border-white/20 bg-gradient-to-br from-cyan-600 to-blue-600 shadow-2xl scale-105"
+                            : "border-white/5 bg-gray-800/50 hover:border-white/10"
+                            }`}
+                        >
+                          <div className={`font-semibold text-xs sm:text-sm uppercase tracking-wider flex items-center gap-1 sm:gap-2 ${user?.view === "PICDRIFT" && currentVisualTab !== "videofx" ? "text-gray-400 group-hover:text-cyan-300" : "text-white"}`}>
+                            {user?.view === "PICDRIFT" && <span>🔒</span>} Video FX
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* --- Content Wrapper for Blur Effect --- */}
+                    <div className="relative mt-4">
+                      {user?.view === "PICDRIFT" && currentVisualTab === "videofx" && (
+                        <div className="absolute inset-0 z-50 flex items-center justify-center rounded-2xl">
                           <a
                             href="http://picdrift.com/renders"
                             target="_blank"
                             rel="noreferrer"
-                            className={`p-3 sm:p-4 rounded-2xl border-2 border-white/5 bg-gray-800/50 hover:border-cyan-400/50 hover:bg-cyan-900/20 transition-all duration-300 text-center sm:text-left group flex flex-col sm:flex-row items-center justify-center sm:justify-between`}
+                            className="flex flex-col items-center bg-gray-900/80 backdrop-blur-md border border-cyan-500/50 p-8 rounded-3xl shadow-[0_0_30px_rgba(6,182,212,0.2)] hover:border-cyan-400 hover:shadow-[0_0_40px_rgba(6,182,212,0.4)] hover:scale-105 transition-all duration-300 cursor-pointer"
                           >
-                            <div className="font-semibold text-xs sm:text-sm text-gray-400 group-hover:text-cyan-300 flex items-center gap-1 sm:gap-2">
-                              <span>🔒</span> Video FX
-                            </div>
+                            <span className="text-5xl mb-4">🔒</span>
+                            <h3 className="text-2xl font-bold text-white mb-2">Video FX is Locked</h3>
+                            <p className="text-cyan-300 font-medium">Click here to upgrade & unlock</p>
                           </a>
-                        )}
-                      </div>
-                    </div>
+                        </div>
+                      )}
 
-                    {/* STUDIO SUB-MENU */}
-                    {currentVisualTab === "studio" && (
+                      <div className={user?.view === "PICDRIFT" && currentVisualTab === "videofx" ? "blur-[5px] pointer-events-none opacity-50 select-none transition-all duration-500" : "transition-all duration-500"}>
+                        {/* STUDIO SUB-MENU */}
+                        {currentVisualTab === "studio" && (
                       <div className="mb-6 animate-in fade-in space-y-4">
                         <div className="flex bg-gray-900/50 p-1 rounded-xl w-full sm:max-w-sm mx-auto border border-white/5">
                           <button
@@ -1655,9 +1678,53 @@ function Dashboard() {
 
                           {/* 2. PROMPT & TITLE (Moved Up for Non-PicDrift) */}
                           <div>
-                            <label className="block text-sm font-semibold text-white mb-2">
-                              Your Creative Vision
-                            </label>
+                            <div className="flex items-center justify-between mb-2">
+                              <label className="block text-sm font-semibold text-white">
+                                Your Creative Vision
+                              </label>
+                            </div>
+                            
+                            {/* PromptFX Bar */}
+                            <div className="flex items-center gap-2 mb-3 overflow-x-auto custom-scrollbar pb-2">
+                              <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest whitespace-nowrap bg-cyan-900/30 px-2 py-1 rounded-md border border-cyan-500/20">
+                                PromptFX
+                              </span>
+                              {promptFxList.map((pfText, idx) => (
+                                <div key={idx} className="relative group flex-shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => setPrompt(pfText)}
+                                    className="px-3 py-1.5 bg-gray-800/50 border border-white/10 hover:border-cyan-500/50 hover:bg-cyan-900/20 rounded-full text-xs text-gray-300 transition-all max-w-[200px] truncate"
+                                    title={pfText}
+                                  >
+                                    {pfText}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPromptFxList(prev => prev.filter((_, i) => i !== idx));
+                                    }}
+                                    className="absolute -top-1 -right-1 bg-red-500 hover:bg-red-400 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newPrompt = window.prompt("Enter your new PromptFX shortcut:");
+                                  if (newPrompt && newPrompt.trim()) {
+                                    setPromptFxList(prev => [...prev, newPrompt.trim()]);
+                                  }
+                                }}
+                                className="flex-shrink-0 px-3 py-1.5 bg-gray-800/80 border border-dashed border-gray-500 hover:border-cyan-400 text-gray-400 hover:text-cyan-300 rounded-full text-xs transition-all flex items-center gap-1"
+                              >
+                                <span>+</span> Add
+                              </button>
+                            </div>
+
                             <textarea
                               value={prompt}
                               onChange={(e) => setPrompt(e.target.value)}
@@ -2373,6 +2440,8 @@ function Dashboard() {
                         </>
                       )}
                     </form>
+                      </div>
+                    </div>
 
                     {generationState.status === "error" && (
                       <ErrorAlert
