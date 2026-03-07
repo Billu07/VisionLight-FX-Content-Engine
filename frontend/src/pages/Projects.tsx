@@ -43,7 +43,7 @@ export default function Projects() {
 
   const updateProjectMutation = useMutation({
     mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      return await apiEndpoints.updateProject(id, name);
+      return await apiEndpoints.updateProject(id, { name });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });

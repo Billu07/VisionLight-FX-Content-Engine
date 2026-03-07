@@ -644,7 +644,7 @@ export function FullscreenVideoEditor({
 
                 {/* Audio Track Container */}
                 <div className="relative h-12 bg-white/5 mx-2 mt-2 rounded-xl flex items-center group/track border border-dashed border-white/10">
-                    {audioTracks?.map((audio, idx) => (
+                    {audioTracks?.map((audio) => (
                         <div 
                             key={audio.id}
                             className="absolute h-10 top-1 bg-emerald-600/30 border border-emerald-500/50 rounded-md overflow-hidden flex items-center px-2"
