@@ -6,6 +6,12 @@ import { encryptionUtils } from "../utils/encryption";
 
 const router = express.Router();
 
+// Debug Logger
+router.use((req, res, next) => {
+  console.log(`📡 SuperAdmin Router Hit: ${req.method} ${req.url}`);
+  next();
+});
+
 // Apply middleware to all routes in this router
 router.use(authenticateToken);
 router.use(requireSuperAdmin);
@@ -41,18 +47,63 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
       isDefault: false
     });
 
-    // 2. Create Admin User for this Org
-    const adminUser = await AuthService.createSystemUser(
-      adminEmail,
-      adminPassword,
-      adminName || `${orgName} Admin`,
-      "VISIONLIGHT",
-      3, // Initial individual project limit for the admin
-      org.id,
-      "ADMIN"
-    );
+    // 2. Check if User already exists
+    const existingUser = await dbService.findUserByEmail(adminEmail);
+    let adminUser;
+
+    if (existingUser) {
+      // Security check: Don't move other SuperAdmins
+      if (existingUser.role === "SUPERADMIN") {
+        throw new Error("Cannot move a System SuperAdmin to a Tenant organization.");
+      }
+
+      // 3a. Update Existing User (Migrate to new Org)
+      adminUser = await dbService.adminUpdateUser(existingUser.id, {
+        organizationId: org.id,
+        role: "ADMIN",
+        view: "VISIONLIGHT",
+        name: adminName || existingUser.name
+      });
+      console.log(`✅ Migrated existing user ${adminEmail} to new Tenant Org: ${orgName}`);
+    } else {
+      // 3b. Create Brand New Admin User
+      adminUser = await AuthService.createSystemUser(
+        adminEmail,
+        adminPassword,
+        adminName || `${orgName} Admin`,
+        "VISIONLIGHT",
+        3,
+        org.id,
+        "ADMIN"
+      );
+    }
 
     res.json({ success: true, organization: org, adminUser });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Test route to verify mounting
+router.get("/test", (req, res) => res.json({ success: true, message: "SuperAdmin Router Active" }));
+
+// Delete Organization
+router.delete("/organizations/:id", async (req: AuthenticatedRequest, res) => {
+  try {
+    console.log(`🗑️ DELETE Request for Organization: ${req.params.id}`);
+    // 1. Check if it's the default org (cannot delete)
+    const org = await dbService.getOrganization(req.params.id);
+    if (org?.isDefault) {
+      return res.status(400).json({ error: "Cannot delete the default system organization." });
+    }
+
+    // 2. Delete all users associated with this org
+    await prisma.user.deleteMany({ where: { organizationId: req.params.id } });
+
+    // 3. Delete the org
+    await prisma.organization.delete({ where: { id: req.params.id } });
+
+    res.json({ success: true, message: "Organization and all associated users deleted." });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -90,6 +141,25 @@ router.get("/users", async (req: AuthenticatedRequest, res) => {
   try {
     const users = await dbService.getAllUsers();
     res.json({ success: true, users });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update User (Basic Info / Role / View)
+router.put("/users/:userId", async (req: AuthenticatedRequest, res) => {
+  const { userId } = req.params;
+  const { name, role, view, maxProjects } = req.body;
+
+  try {
+    const updates: any = {};
+    if (name) updates.name = name;
+    if (role) updates.role = role;
+    if (view) updates.view = view;
+    if (maxProjects !== undefined) updates.maxProjects = Number(maxProjects);
+
+    const updatedUser = await dbService.adminUpdateUser(userId, updates);
+    res.json({ success: true, user: updatedUser });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

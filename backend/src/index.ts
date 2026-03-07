@@ -1068,7 +1068,11 @@ app.use((error: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 if (process.env.NODE_ENV !== "production" || process.env.VERCEL !== "1") {
-  app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🕒 Start Time: ${new Date().toISOString()}`);
+    console.log(`📡 SuperAdmin DELETE Org Route: ACTIVE`);
+  });
 }
 
 export default app;

@@ -150,8 +150,21 @@ router.get("/config", async (req: AuthenticatedRequest, res) => {
         pricing: {
           pricePicDrift_5s: org.pricePicDrift_5s,
           pricePicDrift_10s: org.pricePicDrift_10s,
+          pricePicDrift_Plus_5s: org.pricePicDrift_Plus_5s,
+          pricePicDrift_Plus_10s: org.pricePicDrift_Plus_10s,
           pricePicFX_Standard: org.pricePicFX_Standard,
-          // ... include other pricing fields if needed in the UI
+          pricePicFX_Carousel: org.pricePicFX_Carousel,
+          pricePicFX_Batch: org.pricePicFX_Batch,
+          priceEditor_Pro: org.priceEditor_Pro,
+          priceEditor_Enhance: org.priceEditor_Enhance,
+          priceEditor_Convert: org.priceEditor_Convert,
+          priceAsset_DriftPath: org.priceAsset_DriftPath,
+          priceVideoFX1_10s: org.priceVideoFX1_10s,
+          priceVideoFX1_15s: org.priceVideoFX1_15s,
+          priceVideoFX2_12s: org.priceVideoFX2_12s,
+          priceVideoFX3_4s: org.priceVideoFX3_4s,
+          priceVideoFX3_6s: org.priceVideoFX3_6s,
+          priceVideoFX3_8s: org.priceVideoFX3_8s,
         }
       }
     });
@@ -160,18 +173,29 @@ router.get("/config", async (req: AuthenticatedRequest, res) => {
   }
 });
 
-// Update Organization Config (API Keys)
+// Update Organization Config (API Keys & Pricing Overrides)
 router.put("/config", async (req: AuthenticatedRequest, res) => {
-  const { falApiKey, kieApiKey, openaiApiKey, name } = req.body;
+  const { falApiKey, kieApiKey, openaiApiKey, name, pricing } = req.body;
   try {
     const orgId = req.user!.organizationId!;
     
-    const updated = await dbService.updateOrganization(orgId, {
+    const updates: any = {
       name: name || undefined,
       falApiKey: falApiKey ? encryptionUtils.encrypt(falApiKey) : undefined,
       kieApiKey: kieApiKey ? encryptionUtils.encrypt(kieApiKey) : undefined,
       openaiApiKey: openaiApiKey ? encryptionUtils.encrypt(openaiApiKey) : undefined,
-    });
+    };
+
+    // Apply pricing overrides if provided
+    if (pricing) {
+       Object.keys(pricing).forEach(key => {
+         if (key.startsWith('price')) {
+            updates[key] = Number(pricing[key]);
+         }
+       });
+    }
+
+    await dbService.updateOrganization(orgId, updates);
 
     res.json({ success: true, message: "Configuration updated." });
   } catch (error: any) {
