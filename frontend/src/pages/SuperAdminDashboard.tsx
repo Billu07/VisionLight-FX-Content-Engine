@@ -236,23 +236,21 @@ export default function SuperAdminDashboard() {
         {/* HEADER */}
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end mb-12 gap-8 border-b border-gray-800 pb-8">
           <div>
-            <div className="flex items-center gap-4 mb-2">
-                <h1 className="text-3xl font-bold text-white tracking-tight uppercase">
+            <h1 className="text-3xl font-bold text-white tracking-tight uppercase mb-2">
                 Platform <span className="text-brand-accent">Control</span>
-                </h1>
-                <button 
-                    onClick={() => navigate("/dashboard")}
-                    className="px-4 py-1.5 border border-gray-700 hover:border-brand-accent rounded-full text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-brand-accent transition-all"
-                >
-                    ← Exit Admin
-                </button>
-            </div>
+            </h1>
             <p className="text-[11px] text-gray-400 uppercase tracking-widest font-semibold">
               Super Admin Interface — {adminUser?.email}
             </p>
           </div>
 
-          <div className="flex flex-wrap bg-gray-900 p-1.5 rounded-lg border border-gray-800 gap-1">
+          <div className="flex flex-wrap items-center bg-gray-900 p-1.5 rounded-lg border border-gray-800 gap-1">
+            <button 
+                onClick={() => navigate("/dashboard")}
+                className="px-6 py-2.5 rounded-md text-[11px] font-black uppercase tracking-widest text-brand-accent hover:bg-brand-accent/10 transition-all border border-brand-accent/20 mr-2"
+            >
+                Back to App
+            </button>
             {["tenants", "my-agency", "demo-leads", "global-settings"].map((tab) => (
               <button
                 key={tab}
@@ -329,7 +327,7 @@ export default function SuperAdminDashboard() {
                             Configure
                             </button>
                             <button 
-                            className="text-red-500/50 hover:text-red-400 text-[10px] font-bold uppercase tracking-widest px-4 py-2 hover:bg-red-500/10 transition-colors"
+                            className="text-red-500/50 hover:text-red-400 text-[10px] font-bold uppercase tracking-widest px-4 py-2 hover:bg-red-500/10 transition-colors rounded-md"
                             onClick={() => handleDeleteTenant(t.id)}
                             >
                             Delete
