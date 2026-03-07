@@ -65,9 +65,11 @@ export class AuthService {
 
     // 2. Sync with Database
     const existingDbUser = await airtableService.findUserByEmail(email);
+    let dbUser;
 
     if (!existingDbUser) {
-      await airtableService.createUser({
+      dbUser = await airtableService.createUser({
+        id: supabaseUser.id, // 👈 Pass the Supabase UUID
         email,
         name,
         view,
@@ -77,7 +79,7 @@ export class AuthService {
       });
     } else {
       // If they exist in DB, update them to the new Org/Role
-      await airtableService.adminUpdateUser(existingDbUser.id, {
+      dbUser = await airtableService.adminUpdateUser(existingDbUser.id, {
         organizationId,
         role,
         view,
@@ -85,7 +87,7 @@ export class AuthService {
       });
     }
 
-    return supabaseUser;
+    return dbUser; // 👈 Return the DB record for the router to use
   }
 
   /**

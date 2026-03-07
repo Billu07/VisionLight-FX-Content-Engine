@@ -77,7 +77,7 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
       });
       console.log(`✅ Fully Migrated and Synced user ${adminEmail} to new Tenant Org: ${orgName}`);
     } else {
-      // 3c. Create Brand New Admin User
+      // 3c. Create Brand New Admin User (Starts with 0 credits automatically now)
       adminUser = await AuthService.createSystemUser(
         adminEmail,
         adminPassword,
@@ -87,16 +87,6 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
         org.id,
         "ADMIN"
       );
-      
-      // Ensure new user also starts at 0 credits for internal pools
-      await dbService.adminUpdateUser(adminUser.id, {
-        creditsPicDrift: 0,
-        creditsPicDriftPlus: 0,
-        creditsImageFX: 0,
-        creditsVideoFX1: 0,
-        creditsVideoFX2: 0,
-        creditsVideoFX3: 0
-      });
     }
 
     res.json({ success: true, organization: org, adminUser });

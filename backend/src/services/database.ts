@@ -82,6 +82,7 @@ export const dbService = {
     });
   },
   async createUser(data: {
+    id?: string; // 👈 Allow passing Supabase UUID
     email: string;
     name?: string;
     view?: string;
@@ -103,6 +104,7 @@ export const dbService = {
 
     return prisma.user.create({
       data: {
+        id: data.id, // 👈 Map Supabase ID here
         email: data.email,
         name: data.name,
         view: data.view || "VISIONLIGHT",
