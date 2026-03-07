@@ -581,7 +581,7 @@ export function AssetLibrary({
                       </div>
                     ) : (
                       <img
-                        src={asset.url}
+                        src={`${asset.url}${asset.url.includes('?') ? '&' : '?'}v=${asset.createdAt}`}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         loading="lazy"
                         crossOrigin="anonymous"
@@ -661,7 +661,7 @@ export function AssetLibrary({
               </div>
 
               <img
-                src={selectedAsset.url}
+                src={`${selectedAsset.url}${selectedAsset.url.includes('?') ? '&' : '?'}v=${selectedAsset.createdAt}`}
                 className="max-w-full max-h-full object-contain rounded shadow-lg"
                 crossOrigin="anonymous"
               />
