@@ -37,7 +37,7 @@ router.get("/team", async (req: AuthenticatedRequest, res) => {
 
 // Add a team member
 router.post("/team/user", async (req: AuthenticatedRequest, res) => {
-  const { email, password, name, role, maxProjects } = req.body;
+  const { email, password, name, role, maxProjects, view } = req.body;
   
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password required" });
@@ -60,7 +60,7 @@ router.post("/team/user", async (req: AuthenticatedRequest, res) => {
       email,
       password,
       name || "Team Member",
-      "VISIONLIGHT", // Tenants only use VisualFX view
+      view || "VISIONLIGHT", // Allow view selection, default to VISIONLIGHT
       maxProjects !== undefined ? Number(maxProjects) : 3,
       org.id,
       finalRole

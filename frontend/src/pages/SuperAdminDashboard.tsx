@@ -39,6 +39,14 @@ export default function SuperAdminDashboard() {
   const [showDemoModal, setShowDemoModal] = useState(false);
   const [showAddTeamModal, setShowAddTeamModal] = useState(false);
   
+  // Edit Tenant Modal
+  const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
+  const [tenantUpdates, setTenantUpdates] = useState({
+    maxUsers: 0,
+    maxProjectsTotal: 0,
+    isActive: true
+  });
+  
   // Forms
   const [newTenant, setNewTenant] = useState({
     orgName: "",
@@ -98,6 +106,38 @@ export default function SuperAdminDashboard() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handleUpdateTenant = async () => {
+    if(!editingTenant) return;
+    setActionLoading(true);
+    try {
+        // Update Limits
+        await apiEndpoints.superadminUpdateOrgLimits(editingTenant.id, {
+            maxUsers: tenantUpdates.maxUsers,
+            maxProjectsTotal: tenantUpdates.maxProjectsTotal
+        });
+        // Update Status
+        if(editingTenant.isActive !== tenantUpdates.isActive) {
+            await apiEndpoints.superadminUpdateOrgStatus(editingTenant.id, tenantUpdates.isActive);
+        }
+        setMsg("Tenant updated.");
+        setEditingTenant(null);
+        fetchInitialData();
+    } catch(err: any) {
+        setMsg("Error: " + err.message);
+    } finally {
+        setActionLoading(false);
+    }
+  };
+
+  const openEditTenant = (t: Tenant) => {
+      setEditingTenant(t);
+      setTenantUpdates({
+          maxUsers: t.maxUsers,
+          maxProjectsTotal: t.maxProjectsTotal,
+          isActive: t.isActive
+      });
   };
 
   const handleCreateDemo = async (e: React.FormEvent) => {
@@ -229,8 +269,7 @@ export default function SuperAdminDashboard() {
                         <div className="text-xs text-gray-500 font-mono mt-1">{t.id}</div>
                       </td>
                       <td className="p-6 text-center">
-                        <button
-                          onClick={() => toggleTenantStatus(t.id, t.isActive)}
+                        <span
                           className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${
                             t.isActive 
                               ? "bg-green-500/10 text-green-400 border-green-500/20" 
@@ -238,7 +277,7 @@ export default function SuperAdminDashboard() {
                           }`}
                         >
                           {t.isActive ? "Active" : "Deactivated"}
-                        </button>
+                        </span>
                       </td>
                       <td className="p-6 text-center">
                         <div className="text-xs text-gray-300 font-semibold">
@@ -247,8 +286,8 @@ export default function SuperAdminDashboard() {
                       </td>
                       <td className="p-6 text-right">
                         <button 
-                          className="text-gray-400 hover:text-white text-[10px] font-bold uppercase tracking-widest px-4 py-2 bg-gray-800 rounded-md"
-                          onClick={() => setMsg(`Limits for ${t.name} managed via database for now.`)}
+                          className="text-gray-400 hover:text-white text-[10px] font-bold uppercase tracking-widest px-4 py-2 bg-gray-800 rounded-md border border-gray-700 hover:bg-gray-700 transition-colors"
+                          onClick={() => openEditTenant(t)}
                         >
                           Configure
                         </button>
@@ -376,7 +415,7 @@ export default function SuperAdminDashboard() {
         {/* TAB CONTENT: GLOBAL SETTINGS */}
         {activeTab === "global-settings" && globalSettings && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-            <div className="bg-brand-accent/5 border border-brand-accent/20 p-6 rounded-xl">
+            <div className="bg-brand-accent/10 border border-brand-accent/20 p-6 rounded-xl">
               <h3 className="text-brand-accent font-bold uppercase text-xs tracking-widest mb-2">Global Pricing Template</h3>
               <p className="text-xs text-gray-400 italic">These prices are used as defaults for all new organizations unless overridden.</p>
             </div>
@@ -390,6 +429,7 @@ export default function SuperAdminDashboard() {
                         <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
                         <input 
                           type="number" 
+                          step="0.1"
                           className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
                           defaultValue={globalSettings[key]}
                           onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: parseFloat(e.target.value) })}
@@ -398,14 +438,16 @@ export default function SuperAdminDashboard() {
                     ))}
                   </div>
                </div>
+               
                <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Studio (Pic FX)</h4>
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Studio & Editor</h4>
                   <div className="space-y-4">
-                    {["pricePicFX_Standard", "pricePicFX_Carousel", "pricePicFX_Batch"].map(key => (
+                    {["pricePicFX_Standard", "pricePicFX_Carousel", "pricePicFX_Batch", "priceEditor_Pro", "priceEditor_Enhance", "priceEditor_Convert", "priceAsset_DriftPath"].map(key => (
                       <div key={key} className="flex justify-between items-center">
-                        <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
+                        <span className="text-[10px] text-gray-400 uppercase font-bold truncate max-w-[100px]" title={key}>{key.replace('price', '').replace(/_/g, ' ')}</span>
                         <input 
                           type="number" 
+                          step="0.1"
                           className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
                           defaultValue={globalSettings[key]}
                           onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: parseFloat(e.target.value) })}
@@ -414,14 +456,34 @@ export default function SuperAdminDashboard() {
                     ))}
                   </div>
                </div>
+               
                <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Video FX</h4>
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Video FX Engine 1 & 3</h4>
                   <div className="space-y-4">
-                    {["priceVideoFX1_10s", "priceVideoFX2_4s", "priceVideoFX3_4s"].map(key => (
+                    {["priceVideoFX1_10s", "priceVideoFX1_15s", "priceVideoFX3_4s", "priceVideoFX3_6s", "priceVideoFX3_8s"].map(key => (
                       <div key={key} className="flex justify-between items-center">
                         <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
                         <input 
                           type="number" 
+                          step="0.1"
+                          className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
+                          defaultValue={globalSettings[key]}
+                          onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: parseFloat(e.target.value) })}
+                        />
+                      </div>
+                    ))}
+                  </div>
+               </div>
+
+               <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Video FX Engine 2</h4>
+                  <div className="space-y-4">
+                    {["priceVideoFX2_4s", "priceVideoFX2_8s", "priceVideoFX2_12s"].map(key => (
+                      <div key={key} className="flex justify-between items-center">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
+                        <input 
+                          type="number" 
+                          step="0.1"
                           className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
                           defaultValue={globalSettings[key]}
                           onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: parseFloat(e.target.value) })}
@@ -489,6 +551,76 @@ export default function SuperAdminDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT TENANT */}
+      {editingTenant && (
+        <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+            <div className="p-8 border-b border-gray-800 flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-bold text-white uppercase tracking-tight">Configure Tenant</h3>
+                <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">{editingTenant.name}</p>
+              </div>
+              <button onClick={() => setEditingTenant(null)} className="text-gray-500 hover:text-white font-bold text-xl">×</button>
+            </div>
+            <div className="p-8 space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Max Users</label>
+                      <input 
+                         type="number" 
+                         className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent" 
+                         value={tenantUpdates.maxUsers} 
+                         onChange={e => setTenantUpdates({...tenantUpdates, maxUsers: parseInt(e.target.value)})}
+                      />
+                   </div>
+                   <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Max Projects</label>
+                      <input 
+                         type="number" 
+                         className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent" 
+                         value={tenantUpdates.maxProjectsTotal} 
+                         onChange={e => setTenantUpdates({...tenantUpdates, maxProjectsTotal: parseInt(e.target.value)})}
+                      />
+                   </div>
+                </div>
+
+                <div className="space-y-2">
+                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Subscription Status</label>
+                   <div className="flex gap-4">
+                      <button 
+                        onClick={() => setTenantUpdates({...tenantUpdates, isActive: true})}
+                        className={`flex-1 py-3 rounded-lg border text-xs font-bold uppercase tracking-widest transition-colors ${
+                            tenantUpdates.isActive 
+                            ? "bg-green-500/10 border-green-500/50 text-green-400" 
+                            : "bg-gray-950 border-gray-800 text-gray-500 hover:text-white"
+                        }`}
+                      >
+                        Active
+                      </button>
+                      <button 
+                        onClick={() => setTenantUpdates({...tenantUpdates, isActive: false})}
+                        className={`flex-1 py-3 rounded-lg border text-xs font-bold uppercase tracking-widest transition-colors ${
+                            !tenantUpdates.isActive 
+                            ? "bg-red-500/10 border-red-500/50 text-red-400" 
+                            : "bg-gray-950 border-gray-800 text-gray-500 hover:text-white"
+                        }`}
+                      >
+                        Deactivated
+                      </button>
+                   </div>
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button type="button" onClick={() => setEditingTenant(null)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
+                  <button onClick={handleUpdateTenant} disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
+                    {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : "Save Changes"}
+                  </button>
+                </div>
+            </div>
           </div>
         </div>
       )}
