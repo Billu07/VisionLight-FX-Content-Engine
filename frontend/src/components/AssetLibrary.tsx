@@ -661,7 +661,7 @@ export function AssetLibrary({
               </div>
 
               <img
-                src={`${selectedAsset.url}${selectedAsset.url.includes('?') ? '&' : '?'}v=${selectedAsset.createdAt}`}
+                src={`${getCORSProxyUrl(selectedAsset.url)}${selectedAsset.url.includes('?') ? '&' : '?'}v=${selectedAsset.createdAt}`}
                 className="max-w-full max-h-full object-contain rounded shadow-lg"
                 crossOrigin="anonymous"
               />
