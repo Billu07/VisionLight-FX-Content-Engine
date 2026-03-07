@@ -156,7 +156,7 @@ export class AuthService {
         return null;
       }
 
-      let user = await airtableService.findUserById(supabaseUser.email);
+      let user = await airtableService.findUserByEmail(supabaseUser.email);
 
       if (!user) {
         console.log(
@@ -169,6 +169,8 @@ export class AuthService {
             supabaseUser.email.split("@")[0],
         });
       }
+
+      if (!user) return null;
 
       // 1. Check .env (Super Admin Safety Net)
       const isSuperAdminEnv = ADMIN_EMAILS.includes(user.email.toLowerCase());

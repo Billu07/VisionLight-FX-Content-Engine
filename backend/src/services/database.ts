@@ -70,7 +70,10 @@ export const dbService = {
 
   // === USER ===
   async findUserByEmail(email: string) {
-    return prisma.user.findUnique({ where: { email } });
+    return prisma.user.findUnique({
+      where: { email },
+      include: { organization: true },
+    });
   },
   async findUserById(id: string) {
     return prisma.user.findUnique({
@@ -115,6 +118,7 @@ export const dbService = {
         creditSystem: isDemo ? "INTERNAL" : "COMMERCIAL",
         role: data.role || "USER",
       },
+      include: { organization: true },
     });
   },
   async deleteUser(id: string) {
