@@ -166,10 +166,10 @@ export const dbService = {
       where: { id },
     });
   },
-  async updateProject(id: string, name: string) {
+  async updateProject(id: string, data: { name?: string, editorState?: any }) {
     return prisma.project.update({
       where: { id },
-      data: { name },
+      data,
     });
   },
   async deleteProject(id: string) {

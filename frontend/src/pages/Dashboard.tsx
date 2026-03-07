@@ -191,10 +191,25 @@ function Dashboard() {
       return [];
     }
   });
+  
+  // Track audio for NLE
+  const audioTracksKey = `visionlight_audio_${localStorage.getItem("visionlight_active_project") || "default"}`;
+  const [audioTracks, setAudioTracks] = useState<any[]>(() => {
+    try {
+        const stored = localStorage.getItem(audioTracksKey);
+        return stored ? JSON.parse(stored) : [];
+    } catch {
+        return [];
+    }
+  });
 
   useEffect(() => {
     localStorage.setItem(sequenceKey, JSON.stringify(sequence));
   }, [sequence, sequenceKey]);
+
+  useEffect(() => {
+    localStorage.setItem(audioTracksKey, JSON.stringify(audioTracks));
+  }, [audioTracks, audioTracksKey]);
 
   const [previewCarouselIndex, setPreviewCarouselIndex] = useState(0);
 
@@ -744,8 +759,11 @@ function Dashboard() {
         {/* ✅ FULLSCREEN SEQUENCE EDITOR */}
         {viewMode === "sequencer" && (
           <FullscreenVideoEditor
+            projectId={localStorage.getItem("visionlight_active_project") || undefined}
             sequence={sequence}
             setSequence={setSequence}
+            audioTracks={audioTracks}
+            setAudioTracks={setAudioTracks}
             onAddFromLibrary={() => {
               setLibrarySource("field");
               setActiveLibrarySlot("sequencer");

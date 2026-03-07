@@ -1,4 +1,15 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
+import { apiEndpoints } from "../lib/api";
+
+export interface AudioItem {
+  id: string;
+  url: string;
+  title: string;
+  startTime: number; // When it starts on the timeline (ms)
+  duration: number; // How long it plays (ms)
+  trimStart?: number; // Internal trim
+  volume?: number;
+}
 
 export interface SequenceItem {
   id: string;
@@ -11,16 +22,22 @@ export interface SequenceItem {
 }
 
 interface FullscreenVideoEditorProps {
+  projectId?: string; // Optional: To sync with backend project storage
   sequence: SequenceItem[];
   setSequence: React.Dispatch<React.SetStateAction<SequenceItem[]>>;
+  audioTracks?: AudioItem[];
+  setAudioTracks?: React.Dispatch<React.SetStateAction<AudioItem[]>>;
   onClose: () => void;
   onAddFromLibrary: () => void;
   onClear: () => void;
 }
 
 export function FullscreenVideoEditor({
+  projectId,
   sequence,
   setSequence,
+  audioTracks,
+  setAudioTracks,
   onClose,
   onAddFromLibrary,
   onClear,
@@ -245,6 +262,24 @@ export function FullscreenVideoEditor({
     }
   };
 
+  const handleSaveProject = async () => {
+    if (!projectId) {
+        alert("Cannot save: No active project detected.");
+        return;
+    }
+    try {
+        const editorState = {
+            sequence,
+            audioTracks: audioTracks || []
+        };
+        await apiEndpoints.updateProject(projectId, { editorState });
+        alert("Project saved successfully!");
+    } catch (error) {
+        console.error("Failed to save project", error);
+        alert("Failed to save project.");
+    }
+  };
+
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
@@ -287,10 +322,16 @@ export function FullscreenVideoEditor({
 
         <div className="flex items-center gap-3">
           <button 
+            onClick={handleSaveProject}
+            className="px-4 py-1.5 rounded-lg text-xs font-bold text-gray-400 hover:text-white hover:bg-white/10 transition-all border border-transparent"
+          >
+            Save Project
+          </button>
+          <button 
             onClick={onClear}
             className="px-4 py-1.5 rounded-lg text-xs font-bold text-gray-400 hover:text-red-400 hover:bg-red-400/10 transition-all border border-transparent hover:border-red-400/20"
           >
-            Clear Project
+            Clear
           </button>
           <button 
             className="px-6 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-2"
@@ -308,13 +349,41 @@ export function FullscreenVideoEditor({
           <div className="w-72 bg-[#141414] border-r border-white/5 flex flex-col shrink-0 animate-in slide-in-from-left duration-300">
             <div className="p-4 border-b border-white/5 flex items-center justify-between">
               <h2 className="text-xs font-black uppercase tracking-widest text-gray-500">Media Pool</h2>
-              <button 
-                onClick={onAddFromLibrary}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500 hover:text-white transition-all"
-                title="Add Media"
-              >
-                +
-              </button>
+              <div className="flex gap-2">
+                  <button 
+                    onClick={() => {
+                        const fileInput = document.createElement('input');
+                        fileInput.type = 'file';
+                        fileInput.accept = 'audio/*';
+                        fileInput.onchange = (e: any) => {
+                            const file = e.target.files?.[0];
+                            if (file && setAudioTracks) {
+                                const url = URL.createObjectURL(file);
+                                const newAudio: AudioItem = {
+                                    id: crypto.randomUUID(),
+                                    url,
+                                    title: file.name,
+                                    startTime: currentTime,
+                                    duration: 10000 // default 10s until we can read metadata
+                                };
+                                setAudioTracks(prev => [...(prev || []), newAudio]);
+                            }
+                        };
+                        fileInput.click();
+                    }}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-white transition-all text-xs"
+                    title="Add Audio"
+                  >
+                    🎵
+                  </button>
+                  <button 
+                    onClick={onAddFromLibrary}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500 hover:text-white transition-all"
+                    title="Add Visual Media"
+                  >
+                    +
+                  </button>
+              </div>
             </div>
             
             <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
@@ -569,6 +638,28 @@ export function FullscreenVideoEditor({
                     {sequence.length === 0 && (
                         <div className="absolute inset-0 flex items-center justify-center text-gray-700 text-[10px] font-black uppercase tracking-[0.2em]">
                             Drop media here to start editing
+                        </div>
+                    )}
+                </div>
+
+                {/* Audio Track Container */}
+                <div className="relative h-12 bg-white/5 mx-2 mt-2 rounded-xl flex items-center group/track border border-dashed border-white/10">
+                    {audioTracks?.map((audio, idx) => (
+                        <div 
+                            key={audio.id}
+                            className="absolute h-10 top-1 bg-emerald-600/30 border border-emerald-500/50 rounded-md overflow-hidden flex items-center px-2"
+                            style={{ 
+                                left: `${(audio.startTime / totalDuration) * 100}%`,
+                                width: `${(audio.duration / totalDuration) * 100}%` 
+                            }}
+                        >
+                            <span className="text-[9px] font-bold text-emerald-300 truncate">🎵 {audio.title}</span>
+                        </div>
+                    ))}
+                    
+                    {(!audioTracks || audioTracks.length === 0) && (
+                         <div className="absolute inset-0 flex items-center justify-center text-gray-700 text-[9px] font-black uppercase tracking-[0.2em] pointer-events-none">
+                            Drop audio here
                         </div>
                     )}
                 </div>

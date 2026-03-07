@@ -201,12 +201,12 @@ app.patch(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { name } = req.body;
+      const { name, editorState } = req.body;
       const project = await airtableService.getProjectById(req.params.id);
       if (!project || project.userId !== req.user!.id) {
-        return res.status(403).json({ error: "Denied" });
+        return res.status(403).json({ error: "Unauthorized" });
       }
-      const updated = await airtableService.updateProject(req.params.id, name);
+      const updated = await airtableService.updateProject(req.params.id, { name, editorState });
       res.json({ success: true, project: updated });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
