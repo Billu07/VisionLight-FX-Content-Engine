@@ -168,3 +168,14 @@ export const apiEndpoints = {
   adminResolveRequest: (id: string) =>
     api.put(`/api/admin/requests/${id}/resolve`),
 };
+
+/**
+ * Helper to bypass CORS issues by proxying R2 images through a dedicated proxy route.
+ * This ensures images load with correct headers for Canvas/Editor use.
+ */
+export const getCORSProxyUrl = (url: string) => {
+  if (!url || !url.includes("r2.dev")) return url;
+  
+  // Use our backend as a proxy to bypass R2 CORS restrictions
+  return `${API_BASE_URL}/api/proxy-image?url=${encodeURIComponent(url)}`;
+};
