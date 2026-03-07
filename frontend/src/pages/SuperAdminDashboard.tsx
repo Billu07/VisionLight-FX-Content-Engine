@@ -179,15 +179,6 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const toggleTenantStatus = async (id: string, currentStatus: boolean) => {
-    try {
-      await apiEndpoints.superadminUpdateOrgStatus(id, !currentStatus);
-      fetchInitialData();
-    } catch (err: any) {
-      alert(err.message);
-    }
-  };
-
   const myAgencyUsers = useMemo(() => {
     return users.filter(u => u.organizationId === adminUser?.organizationId);
   }, [users, adminUser]);

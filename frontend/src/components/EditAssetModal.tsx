@@ -453,6 +453,7 @@ export function EditAssetModal({
                       <img
                         src={referenceAsset.url}
                         className="w-full h-full object-cover opacity-90"
+                        crossOrigin="anonymous"
                       />
                       <button
                         onClick={() => setReferenceAsset(null)}
@@ -702,6 +703,7 @@ export function EditAssetModal({
                               key={a.id}
                               src={a.url}
                               className="w-full h-12 object-cover rounded cursor-pointer border border-transparent hover:border-purple-500"
+                              crossOrigin="anonymous"
                               onClick={() => {
                                 setReferenceAsset(a);
                                 setShowRefSelector(false);
