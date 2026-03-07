@@ -20,7 +20,11 @@ interface User {
   view: string;
   organizationId: string;
   creditsPicDrift: number;
+  creditsPicDriftPlus: number;
   creditsImageFX: number;
+  creditsVideoFX1: number;
+  creditsVideoFX2: number;
+  creditsVideoFX3: number;
 }
 
 export default function SuperAdminDashboard() {
@@ -45,6 +49,13 @@ export default function SuperAdminDashboard() {
     maxUsers: 0,
     maxProjectsTotal: 0,
     isActive: true
+  });
+
+  // Edit User Modal
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [userUpdates, setUserUpdates] = useState({
+    view: "VISIONLIGHT",
+    role: "USER"
   });
   
   // Forms
@@ -179,6 +190,18 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  const handleUpdateUserBasic = async () => {
+    if(!editingUser) return;
+    try {
+        await apiEndpoints.adminUpdateUser(editingUser.id, userUpdates);
+        setMsg("User updated.");
+        setEditingUser(null);
+        fetchInitialData();
+    } catch(err: any) {
+        alert(err.message);
+    }
+  }
+
   const myAgencyUsers = useMemo(() => {
     return users.filter(u => u.organizationId === adminUser?.organizationId);
   }, [users, adminUser]);
@@ -303,14 +326,15 @@ export default function SuperAdminDashboard() {
                 Add Team Member
               </button>
             </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-              <table className="w-full text-left">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
+              <table className="w-full text-left min-w-[1000px]">
                 <thead className="bg-gray-950 text-[10px] uppercase tracking-widest text-gray-500 font-bold">
                   <tr>
                     <th className="p-6">User</th>
-                    <th className="p-6 text-center">Role</th>
-                    <th className="p-6 text-center">PD Credits</th>
-                    <th className="p-6 text-center">PicFX Credits</th>
+                    <th className="p-6 text-center">View</th>
+                    <th className="p-6 text-center">PicDrift / +</th>
+                    <th className="p-6 text-center">PicFX</th>
+                    <th className="p-6 text-center">VidFX 1 / 2 / 3</th>
                     <th className="p-6 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -322,37 +346,42 @@ export default function SuperAdminDashboard() {
                         <div className="text-[10px] text-gray-500 font-mono">{u.email}</div>
                       </td>
                       <td className="p-6 text-center">
-                        <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
-                          {u.role}
-                        </span>
+                         <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${u.view === 'PICDRIFT' ? 'bg-pink-500/10 text-pink-400 border-pink-500/20' : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'}`}>
+                            {u.view}
+                         </span>
                       </td>
                       <td className="p-6 text-center">
-                         <input 
-                            type="number" 
-                            className="w-16 bg-gray-950 border border-gray-800 rounded p-1 text-center text-xs text-white"
-                            defaultValue={u.creditsPicDrift}
-                            onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsPicDrift, creditType: "creditsPicDrift" })}
-                         />
+                         <div className="flex flex-col gap-1">
+                            <div className="flex items-center justify-center gap-2">
+                                <span className="text-[10px] text-gray-500">Std:</span>
+                                <input type="number" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDrift} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsPicDrift, creditType: "creditsPicDrift" })}/>
+                            </div>
+                            <div className="flex items-center justify-center gap-2">
+                                <span className="text-[10px] text-gray-500">Plus:</span>
+                                <input type="number" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsPicDriftPlus, creditType: "creditsPicDriftPlus" })}/>
+                            </div>
+                         </div>
                       </td>
                       <td className="p-6 text-center">
-                         <input 
-                            type="number" 
-                            className="w-16 bg-gray-950 border border-gray-800 rounded p-1 text-center text-xs text-white"
-                            defaultValue={u.creditsImageFX}
-                            onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsImageFX, creditType: "creditsImageFX" })}
-                         />
+                         <input type="number" className="w-16 bg-gray-950 border border-gray-800 rounded p-1 text-center text-xs text-white" defaultValue={u.creditsImageFX} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsImageFX, creditType: "creditsImageFX" })}/>
+                      </td>
+                      <td className="p-6 text-center">
+                         <div className="flex gap-2 justify-center">
+                            <input type="number" title="VidFX 1" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsVideoFX1, creditType: "creditsVideoFX1" })}/>
+                            <input type="number" title="VidFX 2" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsVideoFX2, creditType: "creditsVideoFX2" })}/>
+                            <input type="number" title="VidFX 3" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsVideoFX3, creditType: "creditsVideoFX3" })}/>
+                         </div>
                       </td>
                       <td className="p-6 text-right">
-                         <button 
-                          className="text-red-500/50 hover:text-red-400 text-[10px] font-bold uppercase tracking-widest"
-                          onClick={() => {
-                            if(window.confirm("Remove user from team?")) {
-                              apiEndpoints.tenantDeleteUser(u.id).then(fetchInitialData);
-                            }
-                          }}
-                         >
-                          Remove
-                         </button>
+                         <div className="flex gap-2 justify-end">
+                            <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className="text-cyan-400 hover:text-cyan-300 text-[10px] font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded">Manage</button>
+                            <button 
+                                className="text-red-500/50 hover:text-red-400 text-[10px] font-bold uppercase tracking-widest"
+                                onClick={() => { if(window.confirm("Remove user?")) apiEndpoints.tenantDeleteUser(u.id).then(fetchInitialData); }}
+                            >
+                                Remove
+                            </button>
+                         </div>
                       </td>
                     </tr>
                   ))}
@@ -383,16 +412,19 @@ export default function SuperAdminDashboard() {
                       <div className="font-bold text-white">{u.name}</div>
                       <div className="text-xs text-gray-500 font-mono">{u.email}</div>
                     </div>
-                    <span className="bg-cyan-500/10 text-cyan-400 text-[9px] font-bold px-2 py-1 rounded uppercase tracking-widest border border-cyan-500/20">
-                      Demo
-                    </span>
+                    <div className="flex flex-col gap-1 items-end">
+                        <span className="bg-cyan-500/10 text-cyan-400 text-[9px] font-bold px-2 py-1 rounded uppercase tracking-widest border border-cyan-500/20">
+                            {u.view}
+                        </span>
+                        <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className="text-[8px] text-gray-500 hover:text-white uppercase font-bold tracking-tighter">Edit View</button>
+                    </div>
                   </div>
-                  <div className="flex gap-4 border-t border-gray-800 pt-4 mt-4">
-                    <div className="flex-1">
+                  <div className="grid grid-cols-2 gap-4 border-t border-gray-800 pt-4 mt-4">
+                    <div>
                       <div className="text-[9px] uppercase text-gray-500 font-bold mb-1">PicDrift</div>
                       <div className="text-sm font-bold text-white">{u.creditsPicDrift}</div>
                     </div>
-                    <div className="flex-1 border-l border-gray-800 pl-4">
+                    <div className="border-l border-gray-800 pl-4">
                       <div className="text-[9px] uppercase text-gray-500 font-bold mb-1">PicFX</div>
                       <div className="text-sm font-bold text-white">{u.creditsImageFX}</div>
                     </div>
@@ -452,24 +484,6 @@ export default function SuperAdminDashboard() {
                   <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Video FX Engine 1 & 3</h4>
                   <div className="space-y-4">
                     {["priceVideoFX1_10s", "priceVideoFX1_15s", "priceVideoFX3_4s", "priceVideoFX3_6s", "priceVideoFX3_8s"].map(key => (
-                      <div key={key} className="flex justify-between items-center">
-                        <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
-                        <input 
-                          type="number" 
-                          step="0.1"
-                          className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
-                          defaultValue={globalSettings[key]}
-                          onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: parseFloat(e.target.value) })}
-                        />
-                      </div>
-                    ))}
-                  </div>
-               </div>
-
-               <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Video FX Engine 2</h4>
-                  <div className="space-y-4">
-                    {["priceVideoFX2_4s", "priceVideoFX2_8s", "priceVideoFX2_12s"].map(key => (
                       <div key={key} className="flex justify-between items-center">
                         <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
                         <input 
@@ -609,6 +623,52 @@ export default function SuperAdminDashboard() {
                   <button type="button" onClick={() => setEditingTenant(null)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
                   <button onClick={handleUpdateTenant} disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
                     {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : "Save Changes"}
+                  </button>
+                </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT USER (Manage View/Role) */}
+      {editingUser && (
+        <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div className="p-8 border-b border-gray-800">
+              <h3 className="text-xl font-bold text-white uppercase tracking-tight">Manage User</h3>
+              <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">{editingUser.email}</p>
+            </div>
+            <div className="p-8 space-y-6">
+                <div className="space-y-2">
+                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform View</label>
+                   <select 
+                        className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                        value={userUpdates.view}
+                        onChange={e => setUserUpdates({...userUpdates, view: e.target.value})}
+                   >
+                       <option value="PICDRIFT">PICDRIFT (Demo Mode)</option>
+                       <option value="VISIONLIGHT">VISIONLIGHT (Full Mode)</option>
+                   </select>
+                </div>
+
+                <div className="space-y-2">
+                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Role</label>
+                   <select 
+                        className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                        value={userUpdates.role}
+                        onChange={e => setUserUpdates({...userUpdates, role: e.target.value})}
+                   >
+                       <option value="USER">Standard User</option>
+                       <option value="MANAGER">Agency Manager</option>
+                       <option value="ADMIN">Organization Admin</option>
+                       <option value="SUPERADMIN">System SuperAdmin</option>
+                   </select>
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button type="button" onClick={() => setEditingUser(null)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
+                  <button onClick={handleUpdateUserBasic} disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
+                    Update User
                   </button>
                 </div>
             </div>
