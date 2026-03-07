@@ -1,5 +1,5 @@
 import express from "express";
-import { dbService } from "../services/database";
+import { dbService, prisma } from "../services/database";
 import { AuthService } from "../services/auth";
 import { authenticateToken, requireSuperAdmin, AuthenticatedRequest } from "../middleware/auth";
 import { encryptionUtils } from "../utils/encryption";
@@ -15,7 +15,7 @@ router.use(requireSuperAdmin);
 // Get all organizations
 router.get("/organizations", async (req: AuthenticatedRequest, res) => {
   try {
-    const orgs = await dbService.prisma.organization.findMany({
+    const orgs = await prisma.organization.findMany({
       orderBy: { createdAt: "desc" },
     });
     res.json({ success: true, organizations: orgs });
