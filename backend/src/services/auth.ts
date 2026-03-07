@@ -33,7 +33,8 @@ export class AuthService {
     organizationId?: string,
     role?: string,
   ) {
-    // 1. Create in Supabase (Auth Provider)
+    // 1. Attempt to create in Supabase
+    let supabaseUser;
     const { data, error } = await supabase.auth.admin.createUser({
       email,
       password,
@@ -42,13 +43,30 @@ export class AuthService {
     });
 
     if (error) {
-      throw new Error(`Supabase Create Failed: ${error.message}`);
+      if (error.message.includes("already registered") || error.message.includes("already exists")) {
+        console.log(`ℹ️ User ${email} already in Supabase. Syncing identity...`);
+        // Find existing user to get ID
+        const { data: list } = await supabase.auth.admin.listUsers();
+        const existingAuth = list.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+        
+        if (existingAuth) {
+          // Update password to match the new form
+          await supabase.auth.admin.updateUserById(existingAuth.id, { password });
+          supabaseUser = existingAuth;
+        } else {
+          throw new Error("Conflict: Supabase says user exists but cannot find them.");
+        }
+      } else {
+        throw new Error(`Supabase Create Failed: ${error.message}`);
+      }
+    } else {
+      supabaseUser = data.user;
     }
 
     // 2. Sync with Database
-    const existingUser = await airtableService.findUserByEmail(email);
+    const existingDbUser = await airtableService.findUserByEmail(email);
 
-    if (!existingUser) {
+    if (!existingDbUser) {
       await airtableService.createUser({
         email,
         name,
@@ -57,9 +75,17 @@ export class AuthService {
         organizationId,
         role,
       });
+    } else {
+      // If they exist in DB, update them to the new Org/Role
+      await airtableService.adminUpdateUser(existingDbUser.id, {
+        organizationId,
+        role,
+        view,
+        name
+      });
     }
 
-    return data.user;
+    return supabaseUser;
   }
 
   /**
@@ -74,7 +100,7 @@ export class AuthService {
 
     if (listError) throw listError;
 
-    const userToDelete = users.find((u) => u.email === email);
+    const userToDelete = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
 
     // 2. If found, delete by ID
     if (userToDelete) {
@@ -86,6 +112,33 @@ export class AuthService {
     }
 
     return false;
+  }
+
+  /**
+   * ADMIN ONLY: Force update a user's password in Supabase.
+   */
+  static async updateSupabaseUserPassword(email: string, newPassword: string) {
+    // 1. Find the Supabase User
+    const {
+      data: { users },
+      error: listError,
+    } = await supabase.auth.admin.listUsers();
+
+    if (listError) throw listError;
+
+    const userToUpdate = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+
+    // 2. If found, update by ID
+    if (userToUpdate) {
+      const { error: updateError } = await supabase.auth.admin.updateUserById(
+        userToUpdate.id,
+        { password: newPassword }
+      );
+      if (updateError) throw updateError;
+      return true;
+    }
+
+    throw new Error(`User ${email} not found in Supabase Auth.`);
   }
 
   /**
@@ -103,7 +156,7 @@ export class AuthService {
         return null;
       }
 
-      let user = await airtableService.findUserByEmail(supabaseUser.email);
+      let user = await airtableService.findUserById(supabaseUser.email);
 
       if (!user) {
         console.log(

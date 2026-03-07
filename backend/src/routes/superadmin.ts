@@ -57,16 +57,27 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
         throw new Error("Cannot move a System SuperAdmin to a Tenant organization.");
       }
 
-      // 3a. Update Existing User (Migrate to new Org)
+      // 3a. Update Password in Supabase (Identity Sync)
+      await AuthService.updateSupabaseUserPassword(adminEmail, adminPassword);
+
+      // 3b. Update Existing User (Migrate to new Org & Reset Credits)
       adminUser = await dbService.adminUpdateUser(existingUser.id, {
         organizationId: org.id,
         role: "ADMIN",
         view: "VISIONLIGHT",
-        name: adminName || existingUser.name
+        name: adminName || existingUser.name,
+        // Reset credits to 0 - Tenant must add credits or configure keys
+        creditsPicDrift: 0,
+        creditsPicDriftPlus: 0,
+        creditsImageFX: 0,
+        creditsVideoFX1: 0,
+        creditsVideoFX2: 0,
+        creditsVideoFX3: 0,
+        creditSystem: "INTERNAL"
       });
-      console.log(`✅ Migrated existing user ${adminEmail} to new Tenant Org: ${orgName}`);
+      console.log(`✅ Fully Migrated and Synced user ${adminEmail} to new Tenant Org: ${orgName}`);
     } else {
-      // 3b. Create Brand New Admin User
+      // 3c. Create Brand New Admin User
       adminUser = await AuthService.createSystemUser(
         adminEmail,
         adminPassword,
@@ -76,6 +87,16 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
         org.id,
         "ADMIN"
       );
+      
+      // Ensure new user also starts at 0 credits for internal pools
+      await dbService.adminUpdateUser(adminUser.id, {
+        creditsPicDrift: 0,
+        creditsPicDriftPlus: 0,
+        creditsImageFX: 0,
+        creditsVideoFX1: 0,
+        creditsVideoFX2: 0,
+        creditsVideoFX3: 0
+      });
     }
 
     res.json({ success: true, organization: org, adminUser });
@@ -90,20 +111,31 @@ router.get("/test", (req, res) => res.json({ success: true, message: "SuperAdmin
 // Delete Organization
 router.delete("/organizations/:id", async (req: AuthenticatedRequest, res) => {
   try {
-    console.log(`🗑️ DELETE Request for Organization: ${req.params.id}`);
+    console.log(`🗑️ DEEP DELETE Request for Organization: ${req.params.id}`);
+    
     // 1. Check if it's the default org (cannot delete)
     const org = await dbService.getOrganization(req.params.id);
     if (org?.isDefault) {
       return res.status(400).json({ error: "Cannot delete the default system organization." });
     }
 
-    // 2. Delete all users associated with this org
-    await prisma.user.deleteMany({ where: { organizationId: req.params.id } });
+    // 2. Fetch all users in this org to wipe them from Supabase
+    const usersInOrg = await prisma.user.findMany({ where: { organizationId: req.params.id } });
+    
+    for (const u of usersInOrg) {
+      try {
+        await AuthService.deleteSupabaseUserByEmail(u.email);
+        console.log(`🧹 Wiped ${u.email} from Supabase Auth`);
+      } catch (e) {
+        console.error(`⚠️ Failed to wipe ${u.email} from Supabase:`, e);
+      }
+    }
 
-    // 3. Delete the org
+    // 3. Delete all local records
+    await prisma.user.deleteMany({ where: { organizationId: req.params.id } });
     await prisma.organization.delete({ where: { id: req.params.id } });
 
-    res.json({ success: true, message: "Organization and all associated users deleted." });
+    res.json({ success: true, message: "Organization and all associated users fully purged." });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

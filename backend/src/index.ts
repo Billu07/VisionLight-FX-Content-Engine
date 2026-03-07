@@ -87,6 +87,30 @@ app.get("/", (req, res) => {
   });
 });
 
+// ✅ Image Proxy to bypass R2 CORS
+app.get("/api/proxy-image", async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ error: "URL required" });
+
+  try {
+    const response = await axios({
+      url: url as string,
+      method: "GET",
+      responseType: "stream",
+      timeout: 15000,
+    });
+
+    res.setHeader("Content-Type", response.headers["content-type"] || "image/jpeg");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24h
+    
+    response.data.pipe(res);
+  } catch (error: any) {
+    console.error("Proxy Error:", error.message);
+    res.status(500).json({ error: "Failed to proxy image" });
+  }
+});
+
 // ==================== ROUTE MOUNTING ====================
 
 // High-level Platform Control (SuperAdmins)
