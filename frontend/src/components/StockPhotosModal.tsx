@@ -53,7 +53,7 @@ export function StockPhotosModal({ isOpen, onClose }: StockPhotosModalProps) {
                 className="w-full h-full border-0"
                 title="Pexels Stock Photos"
                 allow="clipboard-write"
-                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads"
               />
               {/* Overlay hint if Pexels blocks framing (Browser behavior varies) */}
               <div className="absolute inset-0 pointer-events-none hidden">
