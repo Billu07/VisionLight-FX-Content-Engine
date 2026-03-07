@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import ReactCrop, { type Crop, type PixelCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
-import { apiEndpoints } from "../lib/api";
+import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
 import { DriftFrameExtractor } from "./DriftFrameExtractor";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { ProgressBar } from "./ProgressBar";
@@ -65,6 +65,7 @@ export function EditAssetModal({
   const [isCropping, setIsCropping] = useState(false);
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
+  const [cropAspect, setCropAspect] = useState<number | undefined>(undefined);
   const imgRef = useRef<HTMLImageElement>(null);
 
   // Text Edit State
@@ -389,6 +390,7 @@ export function EditAssetModal({
             setIsCropping(false);
             setCrop(undefined);
             setCompletedCrop(undefined);
+            setCropAspect(undefined);
           }
         } catch (err: any) {
           alert("Crop failed: " + err.message);
@@ -493,18 +495,19 @@ export function EditAssetModal({
                   crop={crop}
                   onChange={(_, percentCrop) => setCrop(percentCrop)}
                   onComplete={(c) => setCompletedCrop(c)}
+                  aspect={cropAspect}
                   className="max-h-[80vh] flex items-center justify-center"
                 >
                   <img
                     ref={imgRef}
-                    src={currentAsset.url}
+                    src={getCORSProxyUrl(currentAsset.url)}
                     className="max-h-[80vh] object-contain rounded-lg border border-gray-700 shadow-2xl"
                     crossOrigin="anonymous"
                   />
                 </ReactCrop>
               ) : (
                 <img
-                  src={currentAsset.url}
+                  src={getCORSProxyUrl(currentAsset.url)}
                   className="max-h-[80vh] object-contain rounded-lg border border-gray-700 shadow-2xl"
                   crossOrigin="anonymous"
                 />
@@ -792,6 +795,28 @@ export function EditAssetModal({
           <div className="p-6 border-t border-gray-800 bg-gray-900/50 flex flex-col gap-3">
             {isCropping ? (
               <>
+                <div className="flex gap-2 mb-2 bg-gray-950 p-1 rounded-lg border border-gray-700 overflow-x-auto custom-scrollbar">
+                  {[
+                    { label: "Free", value: undefined },
+                    { label: "1:1", value: 1 },
+                    { label: "16:9", value: 16 / 9 },
+                    { label: "9:16", value: 9 / 16 },
+                    { label: "4:3", value: 4 / 3 },
+                    { label: "3:4", value: 3 / 4 },
+                  ].map((ratio) => (
+                    <button
+                      key={ratio.label}
+                      onClick={() => setCropAspect(ratio.value)}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-md whitespace-nowrap transition-all flex-1 ${
+                        cropAspect === ratio.value
+                          ? "bg-cyan-600 text-white shadow-lg"
+                          : "text-gray-400 hover:text-white hover:bg-gray-800"
+                      }`}
+                    >
+                      {ratio.label}
+                    </button>
+                  ))}
+                </div>
                 <button
                   onClick={handleCrop}
                   disabled={
@@ -807,6 +832,7 @@ export function EditAssetModal({
                   onClick={() => {
                     setIsCropping(false);
                     setCrop(undefined);
+                    setCropAspect(undefined);
                   }}
                   disabled={isProcessing}
                   className="w-full py-2 text-gray-500 hover:text-white text-sm"

@@ -30,6 +30,9 @@ export function FullscreenVideoEditor({
   const [zoom, setZoom] = useState(1);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [viewportRatio, setViewportRatio] = useState<"16:9" | "9:16" | "1:1">("16:9");
+
+  const [draggingEdge, setDraggingEdge] = useState<{ id: string, edge: 'left' | 'right', initialX: number, initialDuration: number, initialTrim: number } | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -143,15 +146,78 @@ export function FullscreenVideoEditor({
   };
 
   const handleDeleteSelected = () => {
-    if (selectedItemId) {
-      setSequence(prev => prev.filter(item => item.id !== selectedItemId));
-      setSelectedItemId(null);
-    } else if (currentItem) {
-      // If nothing explicitly selected, delete the one under playhead
-      setSequence(prev => prev.filter(item => item.id !== currentItem.id));
+    if (window.confirm("Are you sure you want to remove this clip from the timeline?")) {
+      if (selectedItemId) {
+        setSequence(prev => prev.filter(item => item.id !== selectedItemId));
+        setSelectedItemId(null);
+      } else if (currentItem) {
+        // If nothing explicitly selected, delete the one under playhead
+        setSequence(prev => prev.filter(item => item.id !== currentItem.id));
+      }
     }
   };
 
+
+  const handleEdgeDrag = (e: React.MouseEvent, id: string, edge: 'left' | 'right') => {
+    e.stopPropagation();
+    const item = sequence.find(i => i.id === id);
+    if (!item) return;
+
+    setDraggingEdge({
+      id,
+      edge,
+      initialX: e.clientX,
+      initialDuration: item.duration || 3000,
+      initialTrim: item.trimStart || 0
+    });
+  };
+
+  useEffect(() => {
+    if (!draggingEdge) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!timelineRef.current) return;
+      
+      const deltaX = e.clientX - draggingEdge.initialX;
+      const timelineRect = timelineRef.current.getBoundingClientRect();
+      
+      // Calculate time delta based on current zoom and timeline width
+      const msPerPixel = totalDuration / timelineRect.width;
+      const deltaTimeMs = deltaX * msPerPixel;
+
+      setSequence(prev => prev.map(item => {
+        if (item.id !== draggingEdge.id) return item;
+
+        let newDuration = draggingEdge.initialDuration;
+        let newTrim = draggingEdge.initialTrim;
+
+        if (draggingEdge.edge === 'right') {
+          // Dragging right edge changes duration
+          newDuration = Math.max(500, draggingEdge.initialDuration + deltaTimeMs);
+        } else if (draggingEdge.edge === 'left') {
+          // Dragging left edge changes trimStart AND duration
+          const maxTrim = draggingEdge.initialTrim + draggingEdge.initialDuration - 500;
+          newTrim = Math.max(0, Math.min(draggingEdge.initialTrim + deltaTimeMs, maxTrim));
+          
+          const changeInTrim = newTrim - draggingEdge.initialTrim;
+          newDuration = Math.max(500, draggingEdge.initialDuration - changeInTrim);
+        }
+
+        return { ...item, duration: newDuration, trimStart: newTrim };
+      }));
+    };
+
+    const handleMouseUp = () => {
+      setDraggingEdge(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [draggingEdge, totalDuration]);
 
   const handleTimelineMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     const handleMouseMove = (moveEvent: MouseEvent) => {
@@ -320,8 +386,38 @@ export function FullscreenVideoEditor({
                 )}
             </button>
 
-            <div className="relative w-full h-full flex flex-col max-w-7xl mx-auto">
-                <div className="flex-1 relative bg-[#050505] rounded-2xl overflow-hidden border border-white/5 shadow-[0_0_50px_rgba(0,0,0,0.5)] flex items-center justify-center group">
+            {/* Viewport Ratio Switcher */}
+            <div className="absolute top-4 right-4 z-10 flex gap-1 bg-black/50 backdrop-blur-md p-1 rounded-lg border border-white/10">
+                {[
+                    { id: "16:9", icon: "▭", label: "Landscape" },
+                    { id: "9:16", icon: "▯", label: "Portrait" },
+                    { id: "1:1", icon: "□", label: "Square" },
+                ].map((ratio) => (
+                    <button
+                        key={ratio.id}
+                        onClick={() => setViewportRatio(ratio.id as any)}
+                        className={`px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-1 ${
+                            viewportRatio === ratio.id ? "bg-cyan-600 text-white" : "text-gray-400 hover:text-white hover:bg-white/10"
+                        }`}
+                        title={ratio.label}
+                    >
+                        <span>{ratio.icon}</span>
+                        <span className="hidden sm:inline">{ratio.id}</span>
+                    </button>
+                ))}
+            </div>
+
+            <div className="relative w-full h-full flex flex-col items-center justify-center pt-8">
+                <div 
+                    className="relative bg-[#050505] rounded-lg overflow-hidden border border-white/5 shadow-[0_0_50px_rgba(0,0,0,0.5)] flex items-center justify-center group transition-all duration-500"
+                    style={{
+                        width: viewportRatio === "16:9" ? "100%" : viewportRatio === "9:16" ? "auto" : "auto",
+                        height: viewportRatio === "16:9" ? "auto" : "100%",
+                        aspectRatio: viewportRatio === "16:9" ? "16/9" : viewportRatio === "9:16" ? "9/16" : "1/1",
+                        maxHeight: "100%",
+                        maxWidth: "100%"
+                    }}
+                >
                     {currentItem ? (
                         <>
                             {currentItem.type === "VIDEO" ? (
@@ -449,6 +545,24 @@ export function FullscreenVideoEditor({
                                 <span className="text-[9px] font-bold text-white/80 truncate drop-shadow-md">{item.title || "Clip"}</span>
                                 <span className="text-[8px] text-white/40 font-mono">{Math.round((item.duration || 3000) / 1000)}s</span>
                             </div>
+
+                            {/* Drag Handles (Visible when selected) */}
+                            {selectedItemId === item.id && (
+                                <>
+                                    <div 
+                                        className="absolute left-0 top-0 bottom-0 w-2 bg-purple-500 cursor-ew-resize hover:w-3 transition-all z-20 flex items-center justify-center opacity-80 hover:opacity-100"
+                                        onMouseDown={(e) => handleEdgeDrag(e, item.id, 'left')}
+                                    >
+                                        <div className="w-[1px] h-4 bg-white/50"></div>
+                                    </div>
+                                    <div 
+                                        className="absolute right-0 top-0 bottom-0 w-2 bg-purple-500 cursor-ew-resize hover:w-3 transition-all z-20 flex items-center justify-center opacity-80 hover:opacity-100"
+                                        onMouseDown={(e) => handleEdgeDrag(e, item.id, 'right')}
+                                    >
+                                        <div className="w-[1px] h-4 bg-white/50"></div>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     ))}
                     
