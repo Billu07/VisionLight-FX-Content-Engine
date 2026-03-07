@@ -584,6 +584,7 @@ export function AssetLibrary({
                         src={asset.url}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         loading="lazy"
+                        crossOrigin="anonymous"
                       />
                     )}
 
@@ -662,6 +663,7 @@ export function AssetLibrary({
               <img
                 src={selectedAsset.url}
                 className="max-w-full max-h-full object-contain rounded shadow-lg"
+                crossOrigin="anonymous"
               />
 
               {/* Navigation Arrows (HIDDEN ON MOBILE for better touch experience) */}
