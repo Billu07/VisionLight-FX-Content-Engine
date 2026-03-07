@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiEndpoints } from "../lib/api";
+import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
 import { EditAssetModal } from "./EditAssetModal";
@@ -581,7 +581,7 @@ export function AssetLibrary({
                       </div>
                     ) : (
                       <img
-                        src={`${asset.url}${asset.url.includes('?') ? '&' : '?'}v=${asset.createdAt}`}
+                        src={`${getCORSProxyUrl(asset.url)}${asset.url.includes('?') ? '&' : '?'}v=${asset.createdAt}`}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         loading="lazy"
                         crossOrigin="anonymous"
