@@ -261,6 +261,7 @@ function Dashboard() {
   const {
     data: credits = {
       creditsPicDrift: 0,
+      creditsPicDriftPlus: 0,
       creditsImageFX: 0,
       creditsVideoFX1: 0,
       creditsVideoFX2: 0,

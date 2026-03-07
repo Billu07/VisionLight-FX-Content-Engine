@@ -44,6 +44,7 @@ export const apiEndpoints = {
   // === SuperAdmin (Platform Control) ===
   superadminGetOrganizations: () => api.get("/api/superadmin/organizations"),
   superadminCreateTenant: (data: any) => api.post("/api/superadmin/organizations/tenant", data),
+  superadminDeleteOrganization: (id: string) => api.delete(`/api/superadmin/organizations/${id}`),
   superadminUpdateOrgStatus: (id: string, isActive: boolean) => api.put(`/api/superadmin/organizations/${id}/status`, { isActive }),
   superadminUpdateOrgLimits: (id: string, data: any) => api.put(`/api/superadmin/organizations/${id}/limits`, data),
   superadminGetUsers: () => api.get("/api/superadmin/users"),

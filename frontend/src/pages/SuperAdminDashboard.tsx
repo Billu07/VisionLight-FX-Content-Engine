@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
@@ -29,6 +30,7 @@ interface User {
 
 export default function SuperAdminDashboard() {
   const { user: adminUser } = useAuth();
+  const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<"tenants" | "my-agency" | "demo-leads" | "global-settings">("tenants");
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -119,16 +121,28 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  const handleDeleteTenant = async (id: string) => {
+    if(!confirm("Are you sure? This will delete the organization and ALL its users forever.")) return;
+    setActionLoading(true);
+    try {
+      await apiEndpoints.superadminDeleteOrganization(id);
+      setMsg("Organization deleted.");
+      fetchInitialData();
+    } catch (err: any) {
+      setMsg("Error: " + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleUpdateTenant = async () => {
     if(!editingTenant) return;
     setActionLoading(true);
     try {
-        // Update Limits
         await apiEndpoints.superadminUpdateOrgLimits(editingTenant.id, {
             maxUsers: tenantUpdates.maxUsers,
             maxProjectsTotal: tenantUpdates.maxProjectsTotal
         });
-        // Update Status
         if(editingTenant.isActive !== tenantUpdates.isActive) {
             await apiEndpoints.superadminUpdateOrgStatus(editingTenant.id, tenantUpdates.isActive);
         }
@@ -156,7 +170,7 @@ export default function SuperAdminDashboard() {
     setActionLoading(true);
     try {
       await apiEndpoints.superadminCreateDemoUser(newDemo);
-      setMsg("Demo user created (5 Picdrift, 15 PicFX).");
+      setMsg("Demo user created.");
       setShowDemoModal(false);
       fetchInitialData();
     } catch (err: any) {
@@ -222,9 +236,17 @@ export default function SuperAdminDashboard() {
         {/* HEADER */}
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end mb-12 gap-8 border-b border-gray-800 pb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight mb-2 uppercase">
-              Platform <span className="text-brand-accent">Control</span>
-            </h1>
+            <div className="flex items-center gap-4 mb-2">
+                <h1 className="text-3xl font-bold text-white tracking-tight uppercase">
+                Platform <span className="text-brand-accent">Control</span>
+                </h1>
+                <button 
+                    onClick={() => navigate("/dashboard")}
+                    className="px-4 py-1.5 border border-gray-700 hover:border-brand-accent rounded-full text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-brand-accent transition-all"
+                >
+                    ← Exit Admin
+                </button>
+            </div>
             <p className="text-[11px] text-gray-400 uppercase tracking-widest font-semibold">
               Super Admin Interface — {adminUser?.email}
             </p>
@@ -299,12 +321,20 @@ export default function SuperAdminDashboard() {
                         </div>
                       </td>
                       <td className="p-6 text-right">
-                        <button 
-                          className="text-gray-400 hover:text-white text-[10px] font-bold uppercase tracking-widest px-4 py-2 bg-gray-800 rounded-md border border-gray-700 hover:bg-gray-700 transition-colors"
-                          onClick={() => openEditTenant(t)}
-                        >
-                          Configure
-                        </button>
+                        <div className="flex gap-2 justify-end">
+                            <button 
+                            className="text-gray-400 hover:text-white text-[10px] font-bold uppercase tracking-widest px-4 py-2 bg-gray-800 rounded-md border border-gray-700 hover:bg-gray-700 transition-colors"
+                            onClick={() => openEditTenant(t)}
+                            >
+                            Configure
+                            </button>
+                            <button 
+                            className="text-red-500/50 hover:text-red-400 text-[10px] font-bold uppercase tracking-widest px-4 py-2 hover:bg-red-500/10 transition-colors"
+                            onClick={() => handleDeleteTenant(t.id)}
+                            >
+                            Delete
+                            </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -481,9 +511,9 @@ export default function SuperAdminDashboard() {
                </div>
                
                <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Video FX Engine 1 & 3</h4>
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Video FX Engines</h4>
                   <div className="space-y-4">
-                    {["priceVideoFX1_10s", "priceVideoFX1_15s", "priceVideoFX3_4s", "priceVideoFX3_6s", "priceVideoFX3_8s"].map(key => (
+                    {["priceVideoFX1_10s", "priceVideoFX1_15s", "priceVideoFX2_12s", "priceVideoFX3_4s", "priceVideoFX3_6s", "priceVideoFX3_8s"].map(key => (
                       <div key={key} className="flex justify-between items-center">
                         <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
                         <input 

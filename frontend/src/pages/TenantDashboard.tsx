@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
@@ -22,12 +23,14 @@ interface Config {
   falApiKey: string;
   kieApiKey: string;
   openaiApiKey: string;
+  pricing: any;
 }
 
 export default function TenantDashboard() {
   const { user: adminUser } = useAuth();
+  const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<"team" | "integrations">("team");
+  const [activeTab, setActiveTab] = useState<"team" | "pricing" | "integrations">("team");
   const [users, setUsers] = useState<User[]>([]);
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
@@ -82,8 +85,8 @@ export default function TenantDashboard() {
     }
   };
 
-  const handleUpdateConfig = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleUpdateConfig = async (e?: React.FormEvent) => {
+    if(e) e.preventDefault();
     setActionLoading(true);
     try {
       await apiEndpoints.tenantUpdateConfig(config);
@@ -119,43 +122,47 @@ export default function TenantDashboard() {
         {/* HEADER */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-8 border-b border-gray-800 pb-8">
           <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight mb-2 uppercase">
-              Agency <span className="text-brand-accent">Management</span>
-            </h1>
+            <div className="flex items-center gap-4 mb-2">
+                <h1 className="text-2xl font-bold text-white tracking-tight uppercase">
+                Agency <span className="text-brand-accent">Management</span>
+                </h1>
+                <button 
+                    onClick={() => navigate("/dashboard")}
+                    className="px-4 py-1.5 border border-gray-700 hover:border-brand-accent rounded-full text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-brand-accent transition-all"
+                >
+                    ← Exit Admin
+                </button>
+            </div>
             <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">
               {adminUser?.organizationName || "Your Organization"} — Admin Panel
             </p>
           </div>
 
-          <div className="flex bg-gray-900 p-1 rounded-lg border border-gray-800">
-            <button
-              onClick={() => setActiveTab("team")}
-              className={`px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors ${
-                activeTab === "team" ? "bg-gray-800 text-brand-accent" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              My Team
-            </button>
-            <button
-              onClick={() => setActiveTab("integrations")}
-              className={`px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors ${
-                activeTab === "integrations" ? "bg-gray-800 text-brand-accent" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              Integrations
-            </button>
+          <div className="flex bg-gray-900 p-1 rounded-lg border border-gray-800 gap-1">
+            {["team", "pricing", "integrations"].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab as any)}
+                className={`px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                  activeTab === tab ? "bg-gray-800 text-brand-accent" : "text-gray-400 hover:text-white"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
         </div>
 
         {msg && (
-          <div className="mb-8 p-4 rounded-lg bg-brand-accent/5 border border-brand-accent/20 text-brand-accent text-xs font-semibold">
+          <div className="mb-8 p-4 rounded-lg bg-brand-accent/5 border border-brand-accent/20 text-brand-accent text-[10px] font-bold uppercase tracking-widest flex justify-between items-center">
             {msg}
+            <button onClick={() => setMsg("")} className="text-lg">×</button>
           </div>
         )}
 
         {/* TEAM TAB */}
         {activeTab === "team" && (
-          <div className="space-y-6">
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
             <div className="flex justify-between items-center">
               <h2 className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Team Members</h2>
               <button
@@ -231,38 +238,121 @@ export default function TenantDashboard() {
           </div>
         )}
 
+        {/* PRICING TAB */}
+        {activeTab === "pricing" && config && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
+            <div className="bg-brand-accent/5 border border-brand-accent/20 p-6 rounded-xl">
+              <h3 className="text-brand-accent font-bold uppercase text-[10px] tracking-[0.2em] mb-2">Cost Configuration</h3>
+              <p className="text-xs text-gray-500 italic">Set how many credits each generation type deducts from your users' balance.</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+               <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">PicDrift Credits</h4>
+                  <div className="space-y-4">
+                    {["pricePicDrift_5s", "pricePicDrift_10s", "pricePicDrift_Plus_5s", "pricePicDrift_Plus_10s"].map(key => (
+                      <div key={key} className="flex justify-between items-center">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
+                        <input 
+                          type="number" 
+                          step="0.1"
+                          className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
+                          value={config.pricing[key]}
+                          onChange={(e) => setConfig({ ...config, pricing: { ...config.pricing, [key]: parseFloat(e.target.value) }})}
+                          onBlur={() => handleUpdateConfig()}
+                        />
+                      </div>
+                    ))}
+                  </div>
+               </div>
+               
+               <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Pic FX & Editor</h4>
+                  <div className="space-y-4">
+                    {["pricePicFX_Standard", "pricePicFX_Carousel", "pricePicFX_Batch", "priceEditor_Pro", "priceEditor_Enhance", "priceEditor_Convert", "priceAsset_DriftPath"].map(key => (
+                      <div key={key} className="flex justify-between items-center">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold truncate max-w-[100px]" title={key}>{key.replace('price', '').replace(/_/g, ' ')}</span>
+                        <input 
+                          type="number" 
+                          step="0.1"
+                          className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
+                          value={config.pricing[key]}
+                          onChange={(e) => setConfig({ ...config, pricing: { ...config.pricing, [key]: parseFloat(e.target.value) }})}
+                          onBlur={() => handleUpdateConfig()}
+                        />
+                      </div>
+                    ))}
+                  </div>
+               </div>
+               
+               <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Video FX</h4>
+                  <div className="space-y-4">
+                    {["priceVideoFX1_10s", "priceVideoFX1_15s", "priceVideoFX2_12s", "priceVideoFX3_4s", "priceVideoFX3_6s", "priceVideoFX3_8s"].map(key => (
+                      <div key={key} className="flex justify-between items-center">
+                        <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
+                        <input 
+                          type="number" 
+                          step="0.1"
+                          className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
+                          value={config.pricing[key]}
+                          onChange={(e) => setConfig({ ...config, pricing: { ...config.pricing, [key]: parseFloat(e.target.value) }})}
+                          onBlur={() => handleUpdateConfig()}
+                        />
+                      </div>
+                    ))}
+                  </div>
+               </div>
+            </div>
+          </div>
+        )}
+
         {/* INTEGRATIONS TAB */}
         {activeTab === "integrations" && config && (
           <div className="max-w-xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4">
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 shadow-xl">
-              <h2 className="text-lg font-bold text-white mb-6 uppercase tracking-tight">API Credentials</h2>
+              <h2 className="text-lg font-bold text-white mb-6 uppercase tracking-tight">Organization Profile</h2>
               <form onSubmit={handleUpdateConfig} className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fal AI Key</label>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Agency Name</label>
                   <input
-                    type="password"
-                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white focus:border-brand-accent outline-none font-mono"
-                    value={config.falApiKey}
-                    onChange={e => setConfig({...config, falApiKey: e.target.value})}
+                    type="text"
+                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white focus:border-brand-accent outline-none"
+                    value={config.name}
+                    onChange={e => setConfig({...config, name: e.target.value})}
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Kling/KIE AI Key</label>
-                  <input
-                    type="password"
-                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white focus:border-brand-accent outline-none font-mono"
-                    value={config.kieApiKey}
-                    onChange={e => setConfig({...config, kieApiKey: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">OpenAI Key</label>
-                  <input
-                    type="password"
-                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white focus:border-brand-accent outline-none font-mono"
-                    value={config.openaiApiKey}
-                    onChange={e => setConfig({...config, openaiApiKey: e.target.value})}
-                  />
+                <div className="border-t border-gray-800 pt-6 mt-6">
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">API Credentials</h3>
+                    <div className="space-y-6">
+                        <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fal AI Key</label>
+                        <input
+                            type="password"
+                            className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white focus:border-brand-accent outline-none font-mono"
+                            value={config.falApiKey}
+                            onChange={e => setConfig({...config, falApiKey: e.target.value})}
+                        />
+                        </div>
+                        <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Kling/KIE AI Key</label>
+                        <input
+                            type="password"
+                            className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white focus:border-brand-accent outline-none font-mono"
+                            value={config.kieApiKey}
+                            onChange={e => setConfig({...config, kieApiKey: e.target.value})}
+                        />
+                        </div>
+                        <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">OpenAI Key</label>
+                        <input
+                            type="password"
+                            className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white focus:border-brand-accent outline-none font-mono"
+                            value={config.openaiApiKey}
+                            onChange={e => setConfig({...config, openaiApiKey: e.target.value})}
+                        />
+                        </div>
+                    </div>
                 </div>
                 <button
                   type="submit"
