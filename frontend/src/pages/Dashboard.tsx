@@ -45,22 +45,41 @@ function Dashboard() {
   const [videoTitle, setVideoTitle] = useState("");
   
   // PromptFX State
-  const promptFxKey = "visionlight_prompt_fx";
-  const [promptFxList, setPromptFxList] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem(promptFxKey);
-      if (stored) return JSON.parse(stored);
-    } catch {}
-    return [
-      "Cinematic lighting, 8k resolution, highly detailed, photorealistic",
-      "Cyberpunk aesthetic, neon colors, volumetric lighting, tracking shot",
-      "Macro photography, shallow depth of field, dramatic shadows"
-    ];
+  const [showPromptFxMenu, setShowPromptFxMenu] = useState(false);
+  const [newPromptFxName, setNewPromptFxName] = useState("");
+  const [newPromptFxText, setNewPromptFxText] = useState("");
+  const [isAddingPromptFx, setIsAddingPromptFx] = useState(false);
+
+  const { data: promptFxList = [] } = useQuery({
+    queryKey: ["prompt-fx"],
+    queryFn: async () => {
+      const res = await apiEndpoints.getPromptFx();
+      return res.data.promptFx || [];
+    },
   });
 
-  useEffect(() => {
-    localStorage.setItem(promptFxKey, JSON.stringify(promptFxList));
-  }, [promptFxList]);
+  const savePromptFxMutation = useMutation({
+    mutationFn: (newPromptFx: { name: string; prompt: string }[]) =>
+      apiEndpoints.savePromptFx(newPromptFx),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["prompt-fx"] });
+      setNewPromptFxName("");
+      setNewPromptFxText("");
+      setIsAddingPromptFx(false);
+    },
+  });
+
+  const handleAddPromptFx = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPromptFxName.trim() || !newPromptFxText.trim()) return;
+    const newList = [...promptFxList, { name: newPromptFxName.trim(), prompt: newPromptFxText.trim() }];
+    savePromptFxMutation.mutate(newList);
+  };
+
+  const handleRemovePromptFx = (indexToRemove: number) => {
+    const newList = promptFxList.filter((_: any, idx: number) => idx !== indexToRemove);
+    savePromptFxMutation.mutate(newList);
+  };
 
   const [activeLibrarySlot, setActiveLibrarySlot] = useState<
     "start" | "end" | "generic" | "sequencer" | null
@@ -1678,51 +1697,102 @@ function Dashboard() {
 
                           {/* 2. PROMPT & TITLE (Moved Up for Non-PicDrift) */}
                           <div>
-                            <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center justify-between mb-2 relative">
                               <label className="block text-sm font-semibold text-white">
                                 Your Creative Vision
                               </label>
-                            </div>
-                            
-                            {/* PromptFX Bar */}
-                            <div className="flex items-center gap-2 mb-3 overflow-x-auto custom-scrollbar pb-2">
-                              <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest whitespace-nowrap bg-cyan-900/30 px-2 py-1 rounded-md border border-cyan-500/20">
-                                PromptFX
-                              </span>
-                              {promptFxList.map((pfText, idx) => (
-                                <div key={idx} className="relative group flex-shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={() => setPrompt(pfText)}
-                                    className="px-3 py-1.5 bg-gray-800/50 border border-white/10 hover:border-cyan-500/50 hover:bg-cyan-900/20 rounded-full text-xs text-gray-300 transition-all max-w-[200px] truncate"
-                                    title={pfText}
-                                  >
-                                    {pfText}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setPromptFxList(prev => prev.filter((_, i) => i !== idx));
-                                    }}
-                                    className="absolute -top-1 -right-1 bg-red-500 hover:bg-red-400 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
-                                  >
-                                    ✕
-                                  </button>
-                                </div>
-                              ))}
+
+                              {/* PromptFX Popover Trigger */}
                               <button
                                 type="button"
-                                onClick={() => {
-                                  const newPrompt = window.prompt("Enter your new PromptFX shortcut:");
-                                  if (newPrompt && newPrompt.trim()) {
-                                    setPromptFxList(prev => [...prev, newPrompt.trim()]);
-                                  }
-                                }}
-                                className="flex-shrink-0 px-3 py-1.5 bg-gray-800/80 border border-dashed border-gray-500 hover:border-cyan-400 text-gray-400 hover:text-cyan-300 rounded-full text-xs transition-all flex items-center gap-1"
+                                onClick={() => setShowPromptFxMenu(!showPromptFxMenu)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all shadow-sm ${
+                                  currentVisualTab === "picdrift"
+                                    ? "bg-rose-900/40 border-rose-500/50 text-rose-300 hover:bg-rose-800/60"
+                                    : currentVisualTab === "studio"
+                                      ? "bg-violet-900/40 border-violet-500/50 text-violet-300 hover:bg-violet-800/60"
+                                      : "bg-cyan-900/40 border-cyan-500/50 text-cyan-300 hover:bg-cyan-800/60"
+                                }`}
                               >
-                                <span>+</span> Add
+                                ✨ PromptFX
                               </button>
+
+                              {/* PromptFX Popover Menu */}
+                              {showPromptFxMenu && (
+                                <div className="absolute top-full right-0 mt-2 w-72 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                                  <div className="p-3 border-b border-gray-800 flex justify-between items-center bg-gray-800/30">
+                                    <h4 className="text-xs font-bold text-gray-300 uppercase tracking-widest">Saved Prompts</h4>
+                                    <button 
+                                      type="button" 
+                                      onClick={() => setIsAddingPromptFx(!isAddingPromptFx)}
+                                      className="text-[10px] bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-white transition-colors"
+                                    >
+                                      {isAddingPromptFx ? "Cancel" : "+ Add New"}
+                                    </button>
+                                  </div>
+
+                                  {isAddingPromptFx && (
+                                    <div className="p-3 bg-gray-800/50 border-b border-gray-800 space-y-2">
+                                      <input 
+                                        type="text" 
+                                        placeholder="Name (e.g., Cinematic Lighting)" 
+                                        value={newPromptFxName}
+                                        onChange={(e) => setNewPromptFxName(e.target.value)}
+                                        className="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-xs text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none"
+                                      />
+                                      <textarea 
+                                        placeholder="The prompt text..." 
+                                        value={newPromptFxText}
+                                        onChange={(e) => setNewPromptFxText(e.target.value)}
+                                        className="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-xs text-white placeholder-gray-500 resize-none h-16 focus:border-cyan-500 focus:outline-none"
+                                      />
+                                      <button 
+                                        type="button"
+                                        onClick={handleAddPromptFx}
+                                        disabled={savePromptFxMutation.isPending || !newPromptFxName.trim() || !newPromptFxText.trim()}
+                                        className="w-full py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-bold rounded transition-colors"
+                                      >
+                                        Save Prompt
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                                    {promptFxList.length === 0 ? (
+                                      <div className="p-4 text-center text-xs text-gray-500">
+                                        No saved prompts yet.
+                                      </div>
+                                    ) : (
+                                      promptFxList.map((pf: any, idx: number) => (
+                                        <div key={idx} className="group relative border-b border-gray-800/50 last:border-0 hover:bg-gray-800/40 transition-colors">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setPrompt(pf.prompt);
+                                              setShowPromptFxMenu(false);
+                                            }}
+                                            className="w-full text-left p-3 pr-10 flex flex-col gap-1"
+                                          >
+                                            <span className="text-sm font-bold text-gray-200">{pf.name}</span>
+                                            <span className="text-xs text-gray-500 truncate">{pf.prompt}</span>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleRemovePromptFx(idx);
+                                            }}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-all"
+                                            title="Delete"
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                             </div>
 
                             <textarea

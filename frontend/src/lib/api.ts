@@ -163,6 +163,10 @@ export const apiEndpoints = {
   getUserCredits: () => api.get("/api/user-credits"),
   requestCredits: () => api.post("/api/request-credits"),
 
+  // === Prompt FX ===
+  getPromptFx: () => api.get("/api/user-prompt-fx"),
+  savePromptFx: (promptFx: { name: string, prompt: string }[]) => api.put("/api/user-prompt-fx", { promptFx }),
+
   // === Admin Notifications ===
   adminGetRequests: () => api.get("/api/admin/requests"),
   adminResolveRequest: (id: string) =>

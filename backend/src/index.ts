@@ -307,6 +307,43 @@ app.get(
   },
 );
 
+// ==================== PROMPT FX ROUTES ====================
+app.get(
+  "/api/user-prompt-fx",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: req.user!.id },
+        select: { promptFx: true }
+      });
+      res.json({ success: true, promptFx: user?.promptFx || [] });
+    } catch (error: any) {
+      console.error("PromptFX Get Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+app.put(
+  "/api/user-prompt-fx",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { promptFx } = req.body;
+      const updatedUser = await prisma.user.update({
+        where: { id: req.user!.id },
+        data: { promptFx },
+        select: { promptFx: true }
+      });
+      res.json({ success: true, promptFx: updatedUser.promptFx });
+    } catch (error: any) {
+      console.error("PromptFX Update Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
 app.post(
   "/api/reset-demo-credits",
   authenticateToken,

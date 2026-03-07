@@ -78,6 +78,7 @@ model User {
   view         String   @default("VISIONLIGHT")
   maxProjects  Int      @default(3)
   adminNotes   String?
+  promptFx     Json?    // Stores the user's custom PromptFX setups [{ name: string, prompt: string }]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
