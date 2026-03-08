@@ -391,6 +391,28 @@ app.post(
         return res.status(400).json({ error: "No image provided" });
 
       const { aspectRatio, raw, originalAssetId, projectId } = req.body;
+      const fileSizeBytes = req.file.size;
+
+      // --- NEW: Project Storage Quota Check ---
+      if (projectId && req.user!.organizationId) {
+          const org = await prisma.organization.findUnique({
+              where: { id: req.user!.organizationId }
+          });
+          if (org) {
+              const projectAssets = await prisma.asset.findMany({
+                  where: { projectId },
+                  select: { sizeBytes: true }
+              });
+              const currentTotalBytes = projectAssets.reduce((acc, a) => acc + (a.sizeBytes || 0), 0);
+              const maxBytes = org.maxStorageMb * 1024 * 1024;
+              
+              if (currentTotalBytes + fileSizeBytes > maxBytes) {
+                  return res.status(400).json({ 
+                      error: `Storage Limit Exceeded. Your organization is limited to ${org.maxStorageMb}MB per project.` 
+                  });
+              }
+          }
+      }
 
       if (raw === "true") {
         // Raw Uploads (v1) remain free/standard upload logic
@@ -398,7 +420,8 @@ app.post(
           req.file.buffer,
           req.user!.id,
           projectId,
-          aspectRatio
+          aspectRatio,
+          fileSizeBytes
         );
         return res.json({ success: true, asset });
       } else {

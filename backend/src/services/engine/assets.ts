@@ -10,7 +10,7 @@ import {
 export const assetsLogic = {
   // ✅ Upload Raw
   // ✅ Upload Raw (Forced "original" tag)
-  async uploadRawAsset(fileBuffer: Buffer, userId: string, projectId?: string, requestedRatio?: string) {
+  async uploadRawAsset(fileBuffer: Buffer, userId: string, projectId?: string, requestedRatio?: string, fileSizeBytes?: number) {
     try {
       const metadata = await sharp(fileBuffer).metadata();
       const width = metadata.width || 1000;
@@ -30,10 +30,11 @@ export const assetsLogic = {
       return await airtableService.createAsset(
         userId,
         url,
-        requestedRatio || "original",
+        "original", // We force original so it lands in Media Pool specifically
         "IMAGE",
         undefined,
-        projectId
+        projectId,
+        fileSizeBytes
       );
     } catch (e: any) {
       console.error("Raw Upload Failed:", e.message);

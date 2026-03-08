@@ -31,12 +31,13 @@ export const dbService = {
   },
 
   // === ORGANIZATION ===
-  async createOrganization(data: { name: string; maxUsers: number; maxProjectsTotal: number; isDefault?: boolean }) {
+  async createOrganization(data: { name: string; maxUsers: number; maxProjectsTotal: number; maxStorageMb?: number; isDefault?: boolean }) {
     return prisma.organization.create({
       data: {
         name: data.name,
         maxUsers: data.maxUsers,
         maxProjectsTotal: data.maxProjectsTotal,
+        maxStorageMb: data.maxStorageMb || 500,
         isDefault: data.isDefault || false,
       },
     });
@@ -237,8 +238,10 @@ export const dbService = {
     aspectRatio: string,
     type: string = "IMAGE",
     originalAssetId?: string,
-    projectId?: string
+    projectId?: string,
+    sizeBytes?: number
   ) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
     return prisma.asset.create({
       data: {
         userId,
@@ -247,6 +250,8 @@ export const dbService = {
         type: type as any,
         originalAssetId: originalAssetId || undefined,
         projectId: projectId || undefined,
+        sizeBytes: sizeBytes || null,
+        organizationId: user?.organizationId,
       },
     });
   },

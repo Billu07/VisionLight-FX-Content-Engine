@@ -32,8 +32,8 @@ router.get("/organizations", async (req: AuthenticatedRequest, res) => {
 
 // Create a new Tenant (Organization + Admin User)
 router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
-  const { orgName, adminEmail, adminPassword, adminName, maxUsers, maxProjectsTotal } = req.body;
-  
+  const { orgName, adminEmail, adminPassword, adminName, maxUsers, maxProjectsTotal, maxStorageMb } = req.body;
+
   if (!orgName || !adminEmail || !adminPassword) {
     return res.status(400).json({ error: "Missing required fields" });
   }
@@ -44,9 +44,9 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
       name: orgName,
       maxUsers: Number(maxUsers) || 5,
       maxProjectsTotal: Number(maxProjectsTotal) || 20,
+      maxStorageMb: Number(maxStorageMb) || 500,
       isDefault: false
     });
-
     // 2. Check if User already exists
     const existingUser = await dbService.findUserByEmail(adminEmail);
     let adminUser;
@@ -144,11 +144,12 @@ router.put("/organizations/:id/status", async (req: AuthenticatedRequest, res) =
 
 // Update Organization Limits
 router.put("/organizations/:id/limits", async (req: AuthenticatedRequest, res) => {
-  const { maxUsers, maxProjectsTotal } = req.body;
+  const { maxUsers, maxProjectsTotal, maxStorageMb } = req.body;
   try {
     const org = await dbService.updateOrganization(req.params.id, {
       maxUsers: maxUsers !== undefined ? Number(maxUsers) : undefined,
       maxProjectsTotal: maxProjectsTotal !== undefined ? Number(maxProjectsTotal) : undefined,
+      maxStorageMb: maxStorageMb !== undefined ? Number(maxStorageMb) : undefined,
     });
     res.json({ success: true, organization: org });
   } catch (error: any) {

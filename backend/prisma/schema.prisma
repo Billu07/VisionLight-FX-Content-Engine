@@ -14,6 +14,7 @@ model Organization {
   isDefault        Boolean @default(false)
   maxUsers         Int     @default(5)
   maxProjectsTotal Int     @default(20)
+  maxStorageMb     Int     @default(500) // SuperAdmin defined storage limit in MB for the entire tenant
 
   // Custom API Keys
   falApiKey    String?

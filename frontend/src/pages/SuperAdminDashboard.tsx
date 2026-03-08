@@ -10,6 +10,7 @@ interface Tenant {
   isActive: boolean;
   maxUsers: number;
   maxProjectsTotal: number;
+  maxStorageMb: number;
   createdAt: string;
 }
 
@@ -50,6 +51,7 @@ export default function SuperAdminDashboard() {
   const [tenantUpdates, setTenantUpdates] = useState({
     maxUsers: 0,
     maxProjectsTotal: 0,
+    maxStorageMb: 500,
     isActive: true
   });
 
@@ -556,6 +558,10 @@ export default function SuperAdminDashboard() {
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Project Limit</label>
                     <input type="number" className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white" defaultValue={20} onChange={e => setNewTenant({ ...newTenant, maxProjectsTotal: parseInt(e.target.value) })} />
                   </div>
+                </div>
+                <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Storage Limit (MB)</label>
+                    <input type="number" className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white" defaultValue={500} onChange={e => setNewTenant({ ...newTenant, maxStorageMb: parseInt(e.target.value) } as any)} />
                 </div>
                 <div className="border-t border-gray-800 pt-6 space-y-4">
                   <h4 className="text-[10px] font-bold text-brand-accent uppercase tracking-widest">Tenant Admin Account</h4>
