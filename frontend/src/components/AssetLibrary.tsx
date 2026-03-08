@@ -22,12 +22,14 @@ interface AssetLibraryProps {
   onSelect?: (file: File, url: string, aspectRatio?: string) => void;
   onClose: () => void;
   initialAspectRatio?: string;
+  isSequencerMode?: boolean;
 }
 
 export function AssetLibrary({
   onSelect,
   onClose,
   initialAspectRatio,
+  isSequencerMode,
 }: AssetLibraryProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -523,7 +525,7 @@ export function AssetLibrary({
                   <div
                     key={asset.id}
                     onClick={() => {
-                      if (onSelect) {
+                      if (onSelect && isSequencerMode) {
                           // If in picker mode, immediately use it!
                           handleUseImage(asset);
                       } else if (asset.type === "VIDEO") {

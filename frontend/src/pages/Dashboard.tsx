@@ -763,6 +763,7 @@ function Dashboard() {
           <AssetLibrary
             onClose={() => setActiveLibrarySlot(null)}
             onSelect={handleAssetSelect}
+            isSequencerMode={activeLibrarySlot === "sequencer"}
             initialAspectRatio={
               librarySource === "top" ? "original" : getCurrentRatioForLibrary()
             }
