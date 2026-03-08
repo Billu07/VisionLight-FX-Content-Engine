@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { apiEndpoints } from "../lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
+import { LoadingSpinner } from "./LoadingSpinner";
 
 export interface AudioItem {
   id: string;
@@ -19,6 +21,7 @@ export interface SequenceItem {
   duration?: number; // In milliseconds
   thumbnail?: string;
   trimStart?: number; // Offset in ms for playback
+  speed?: number; // Playback speed multiplier (0.5, 1, 2, etc.)
 }
 
 interface FullscreenVideoEditorProps {
@@ -48,6 +51,17 @@ export function FullscreenVideoEditor({
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [viewportRatio, setViewportRatio] = useState<"16:9" | "9:16" | "1:1">("16:9");
+  const [sidebarTab, setSidebarTab] = useState<"project" | "timeline">("project");
+
+  const { data: projectAssets = [], isLoading: isLoadingAssets } = useQuery({
+    queryKey: ["assets", projectId],
+    queryFn: async () => {
+      if (!projectId) return [];
+      const res = await apiEndpoints.getAssets();
+      return (res.data.assets || []).filter((a: any) => a.projectId === projectId);
+    },
+    enabled: !!projectId,
+  });
 
   const [draggingEdge, setDraggingEdge] = useState<{ id: string, edge: 'left' | 'right', initialX: number, initialDuration: number, initialTrim: number } | null>(null);
 
@@ -92,6 +106,7 @@ export function FullscreenVideoEditor({
         // Only update if drift is significant to avoid stutter
         const trimOffset = currentItem.trimStart || 0;
         const videoTime = (localTime + trimOffset) / 1000;
+        videoRef.current.playbackRate = currentItem.speed || 1;
         if (Math.abs(videoRef.current.currentTime - videoTime) > 0.1) {
             videoRef.current.currentTime = videoTime;
         }
@@ -347,96 +362,150 @@ export function FullscreenVideoEditor({
         {/* ASSET SIDEBAR */}
         {sidebarOpen && (
           <div className="w-72 bg-[#141414] border-r border-white/5 flex flex-col shrink-0 animate-in slide-in-from-left duration-300">
-            <div className="p-4 border-b border-white/5 flex items-center justify-between">
-              <h2 className="text-xs font-black uppercase tracking-widest text-gray-500">Media Pool</h2>
-              <div className="flex gap-2">
-                  <button 
-                    onClick={() => {
-                        const fileInput = document.createElement('input');
-                        fileInput.type = 'file';
-                        fileInput.accept = 'audio/*';
-                        fileInput.onchange = (e: any) => {
-                            const file = e.target.files?.[0];
-                            if (file && setAudioTracks) {
-                                const url = URL.createObjectURL(file);
-                                const newAudio: AudioItem = {
-                                    id: crypto.randomUUID(),
-                                    url,
-                                    title: file.name,
-                                    startTime: currentTime,
-                                    duration: 10000 // default 10s until we can read metadata
-                                };
-                                setAudioTracks(prev => [...(prev || []), newAudio]);
-                            }
-                        };
-                        fileInput.click();
-                    }}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-white transition-all text-xs"
-                    title="Add Audio"
-                  >
-                    🎵
-                  </button>
-                  <button 
-                    onClick={onAddFromLibrary}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500 hover:text-white transition-all"
-                    title="Add Visual Media"
-                  >
-                    +
-                  </button>
+            <div className="p-4 border-b border-white/5 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div className="flex gap-2 bg-gray-900 rounded-lg p-1">
+                    <button 
+                        onClick={() => setSidebarTab("project")}
+                        className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest transition-colors ${sidebarTab === "project" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                    >
+                        Project Media
+                    </button>
+                    <button 
+                        onClick={() => setSidebarTab("timeline")}
+                        className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest transition-colors ${sidebarTab === "timeline" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                    >
+                        Timeline
+                    </button>
+                </div>
+                <div className="flex gap-2">
+                    <button 
+                        onClick={() => {
+                            const fileInput = document.createElement('input');
+                            fileInput.type = 'file';
+                            fileInput.accept = 'audio/*';
+                            fileInput.onchange = (e: any) => {
+                                const file = e.target.files?.[0];
+                                if (file && setAudioTracks) {
+                                    const url = URL.createObjectURL(file);
+                                    const newAudio: AudioItem = {
+                                        id: crypto.randomUUID(),
+                                        url,
+                                        title: file.name,
+                                        startTime: currentTime,
+                                        duration: 10000 // default 10s until we can read metadata
+                                    };
+                                    setAudioTracks(prev => [...(prev || []), newAudio]);
+                                }
+                            };
+                            fileInput.click();
+                        }}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-white transition-all text-xs"
+                        title="Add Audio"
+                    >
+                        🎵
+                    </button>
+                    <button 
+                        onClick={onAddFromLibrary}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500 hover:text-white transition-all"
+                        title="Add Visual Media"
+                    >
+                        +
+                    </button>
+                </div>
               </div>
             </div>
             
             <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
-              {sequence.map((item, idx) => (
-                <div 
-                    key={item.id}
-                    className={`group relative p-2 rounded-xl border transition-all cursor-pointer ${
-                        itemStartIndex === idx ? 'bg-cyan-500/10 border-cyan-500/50' : 'bg-[#1a1a1a] border-white/5 hover:border-white/20'
-                    }`}
-                    onClick={() => {
-                        let offset = 0;
-                        for(let i=0; i<idx; i++) offset += (sequence[i].duration || 3000);
-                        handleSeek(offset);
-                    }}
-                >
-                  <div className="flex gap-3">
-                    <div className="w-16 h-12 rounded-lg bg-black overflow-hidden shrink-0 border border-white/5 relative">
-                        {item.type === "VIDEO" ? (
-                             <video src={item.url} className="w-full h-full object-cover opacity-60" />
-                        ) : (
-                             <img src={item.url} className="w-full h-full object-cover" />
-                        )}
-                        <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors"></div>
-                        <div className="absolute bottom-1 right-1 text-[8px] bg-black/60 px-1 rounded text-gray-400 font-mono">
-                            {Math.round((item.duration || 3000) / 1000)}s
+              {sidebarTab === "timeline" && (
+                  <>
+                      {sequence.map((item, idx) => (
+                        <div 
+                            key={item.id}
+                            className={`group relative p-2 rounded-xl border transition-all cursor-pointer ${
+                                itemStartIndex === idx ? 'bg-cyan-500/10 border-cyan-500/50' : 'bg-[#1a1a1a] border-white/5 hover:border-white/20'
+                            }`}
+                            onClick={() => {
+                                let offset = 0;
+                                for(let i=0; i<idx; i++) offset += (sequence[i].duration || 3000);
+                                handleSeek(offset);
+                            }}
+                        >
+                          <div className="flex gap-3">
+                            <div className="w-16 h-12 rounded-lg bg-black overflow-hidden shrink-0 border border-white/5 relative">
+                                {item.type === "VIDEO" ? (
+                                     <video src={item.url} className="w-full h-full object-cover opacity-60" />
+                                ) : (
+                                     <img src={item.url} className="w-full h-full object-cover" />
+                                )}
+                                <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors"></div>
+                                <div className="absolute bottom-1 right-1 text-[8px] bg-black/60 px-1 rounded text-gray-400 font-mono">
+                                    {Math.round((item.duration || 3000) / 1000)}s
+                                </div>
+                            </div>
+                            <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                <p className="text-[11px] font-bold text-white truncate">{item.title || "Untitled"}</p>
+                                <p className="text-[9px] text-gray-500 uppercase">{item.type}</p>
+                            </div>
+                          </div>
+                          
+                          {/* Item Actions */}
+                          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={(e) => { e.stopPropagation(); moveItem(idx, -1); }} className="p-1 hover:text-white text-gray-500">▲</button>
+                            <button onClick={(e) => { e.stopPropagation(); moveItem(idx, 1); }} className="p-1 hover:text-white text-gray-500">▼</button>
+                            <button onClick={(e) => { e.stopPropagation(); removeItem(item.id); }} className="p-1 hover:text-red-400 text-gray-500 ml-1">✕</button>
+                          </div>
                         </div>
-                    </div>
-                    <div className="flex-1 min-w-0 flex flex-col justify-center">
-                        <p className="text-[11px] font-bold text-white truncate">{item.title || "Untitled"}</p>
-                        <p className="text-[9px] text-gray-500 uppercase">{item.type}</p>
-                    </div>
+                      ))}
+                      
+                      {sequence.length === 0 && (
+                        <div className="h-64 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-white/5 rounded-2xl">
+                            <span className="text-3xl mb-4">📂</span>
+                            <p className="text-xs text-gray-500 font-medium">Timeline empty.</p>
+                            <button 
+                                onClick={onAddFromLibrary}
+                                className="mt-4 text-[10px] text-cyan-400 hover:text-cyan-300 font-black uppercase tracking-widest"
+                            >
+                                Import Clips
+                            </button>
+                        </div>
+                      )}
+                  </>
+              )}
+
+              {sidebarTab === "project" && (
+                  <div className="grid grid-cols-2 gap-2">
+                      {isLoadingAssets ? (
+                          <div className="col-span-2 flex justify-center py-10"><LoadingSpinner /></div>
+                      ) : projectAssets.length === 0 ? (
+                          <div className="col-span-2 text-center text-gray-500 text-xs py-10">No media saved to this project yet.</div>
+                      ) : (
+                          projectAssets.map((asset: any) => (
+                              <div 
+                                key={asset.id} 
+                                className="relative aspect-square bg-black rounded-lg border border-white/5 overflow-hidden group cursor-pointer hover:border-cyan-500/50 transition-all"
+                                onClick={() => {
+                                    setSequence(prev => [...prev, {
+                                        id: crypto.randomUUID(),
+                                        url: getCORSProxyUrl(asset.url),
+                                        type: asset.type === "VIDEO" ? "VIDEO" : "IMAGE",
+                                        duration: asset.type === "VIDEO" ? 5000 : 3000,
+                                        title: "Project Media"
+                                    }]);
+                                }}
+                              >
+                                  {asset.type === "VIDEO" ? (
+                                      <video src={getCORSProxyUrl(asset.url)} className="w-full h-full object-cover" muted />
+                                  ) : (
+                                      <img src={getCORSProxyUrl(asset.url)} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                  )}
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                      <span className="bg-cyan-500 text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">+ Add</span>
+                                  </div>
+                              </div>
+                          ))
+                      )}
                   </div>
-                  
-                  {/* Item Actions */}
-                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={(e) => { e.stopPropagation(); moveItem(idx, -1); }} className="p-1 hover:text-white text-gray-500">▲</button>
-                    <button onClick={(e) => { e.stopPropagation(); moveItem(idx, 1); }} className="p-1 hover:text-white text-gray-500">▼</button>
-                    <button onClick={(e) => { e.stopPropagation(); removeItem(item.id); }} className="p-1 hover:text-red-400 text-gray-500 ml-1">✕</button>
-                  </div>
-                </div>
-              ))}
-              
-              {sequence.length === 0 && (
-                <div className="h-64 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-white/5 rounded-2xl">
-                    <span className="text-3xl mb-4">📂</span>
-                    <p className="text-xs text-gray-500 font-medium">Your media pool is empty.</p>
-                    <button 
-                        onClick={onAddFromLibrary}
-                        className="mt-4 text-[10px] text-cyan-400 hover:text-cyan-300 font-black uppercase tracking-widest"
-                    >
-                        Import Clips
-                    </button>
-                </div>
               )}
             </div>
           </div>
@@ -569,9 +638,26 @@ export function FullscreenVideoEditor({
                 </div>
             </div>
 
-            <div className="flex gap-2">
-                <button onClick={handleSplit} className="text-[10px] font-bold text-gray-500 hover:text-white transition-colors uppercase tracking-widest px-3 py-1">✂ Split</button>
-                <button onClick={handleDeleteSelected} className="text-[10px] font-bold text-gray-500 hover:text-white transition-colors uppercase tracking-widest px-3 py-1">🗑 Delete</button>
+            <div className="flex items-center gap-2">
+                {sequence.find(i => i.id === selectedItemId)?.type === "VIDEO" && (
+                    <select 
+                        value={sequence.find(i => i.id === selectedItemId)?.speed || 1}
+                        onChange={(e) => {
+                            const speed = parseFloat(e.target.value);
+                            setSequence(prev => prev.map(item => item.id === selectedItemId ? { ...item, speed } : item));
+                        }}
+                        className="bg-gray-900 border border-white/10 text-[10px] text-cyan-400 font-bold uppercase tracking-widest rounded px-2 py-1 outline-none cursor-pointer"
+                        title="Playback Speed"
+                    >
+                        <option value="0.5">0.5x Speed</option>
+                        <option value="1">1.0x Speed</option>
+                        <option value="2">2.0x Speed</option>
+                        <option value="4">4.0x Speed</option>
+                        <option value="8">8.0x Speed</option>
+                    </select>
+                )}
+                <button onClick={handleSplit} className="text-[10px] font-bold text-gray-500 hover:text-white transition-colors uppercase tracking-widest px-3 py-1 bg-white/5 rounded hover:bg-white/10">✂ Split</button>
+                <button onClick={handleDeleteSelected} className="text-[10px] font-bold text-red-500/70 hover:text-red-400 transition-colors uppercase tracking-widest px-3 py-1 bg-red-500/10 rounded hover:bg-red-500/20">🗑 Delete</button>
             </div>
         </div>
 

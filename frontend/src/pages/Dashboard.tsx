@@ -211,6 +211,19 @@ function Dashboard() {
     localStorage.setItem(audioTracksKey, JSON.stringify(audioTracks));
   }, [audioTracks, audioTracksKey]);
 
+  useEffect(() => {
+    const activeProjectId = localStorage.getItem("visionlight_active_project");
+    if (activeProjectId) {
+      apiEndpoints.getProjects().then(res => {
+        const project = res.data.projects?.find((p: any) => p.id === activeProjectId);
+        if (project && project.editorState) {
+           setSequence(project.editorState.sequence || []);
+           setAudioTracks(project.editorState.audioTracks || []);
+        }
+      }).catch(err => console.error("Failed to fetch project editor state", err));
+    }
+  }, []);
+
   const [previewCarouselIndex, setPreviewCarouselIndex] = useState(0);
 
   // State for Magic Edit Asset
