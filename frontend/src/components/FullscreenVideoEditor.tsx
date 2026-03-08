@@ -364,18 +364,20 @@ export function FullscreenVideoEditor({
           <div className="w-72 bg-[#141414] border-r border-white/5 flex flex-col shrink-0 animate-in slide-in-from-left duration-300">
             <div className="p-4 border-b border-white/5 flex flex-col gap-3">
               <div className="flex items-center justify-between">
-                <div className="flex gap-2 bg-gray-900 rounded-lg p-1">
+                <div className="flex gap-1 bg-gray-900 rounded-lg p-1">
                     <button 
                         onClick={() => setSidebarTab("project")}
-                        className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest transition-colors ${sidebarTab === "project" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                        className={`px-3 py-1 rounded text-[10px] font-bold transition-colors flex items-center gap-1 ${sidebarTab === "project" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                        title="View files saved in this project folder"
                     >
-                        Project Media
+                        <span>📁</span> Folder
                     </button>
                     <button 
                         onClick={() => setSidebarTab("timeline")}
-                        className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest transition-colors ${sidebarTab === "timeline" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                        className={`px-3 py-1 rounded text-[10px] font-bold transition-colors flex items-center gap-1 ${sidebarTab === "timeline" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                        title="View clips currently in your sequence"
                     >
-                        Timeline
+                        <span>🎞️</span> Pool
                     </button>
                 </div>
                 <div className="flex gap-2">
