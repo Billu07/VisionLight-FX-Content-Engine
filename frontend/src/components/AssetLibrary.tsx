@@ -297,6 +297,15 @@ export function AssetLibrary({
   const handleUseImage = async (asset: Asset) => {
     if (!onSelect) return;
     try {
+      if (asset.type === "VIDEO") {
+        // For NLE timeline and general video imports, just pass a dummy file and the URL
+        const file = new File(["dummy"], `asset_${asset.id}.mp4`, { type: "video/mp4" });
+        onSelect(file, asset.url, asset.aspectRatio);
+        onClose();
+        return;
+      }
+
+      // Existing logic for images
       const response = await fetch(asset.url);
       const blob = await response.blob();
       const file = new File([blob], `asset_${asset.id}.jpg`, {
@@ -305,7 +314,7 @@ export function AssetLibrary({
       onSelect(file, asset.url, asset.aspectRatio);
       onClose();
     } catch (e) {
-      alert("Could not load image.");
+      alert("Could not load media.");
     }
   };
 
@@ -514,8 +523,14 @@ export function AssetLibrary({
                   <div
                     key={asset.id}
                     onClick={() => {
-                      if (asset.type === "VIDEO") setViewingVideoAsset(asset);
-                      else setSelectedAsset(asset);
+                      if (onSelect) {
+                          // If in picker mode, immediately use it!
+                          handleUseImage(asset);
+                      } else if (asset.type === "VIDEO") {
+                          setViewingVideoAsset(asset);
+                      } else {
+                          setSelectedAsset(asset);
+                      }
                     }}
                     className={`relative group border rounded-xl overflow-hidden bg-black cursor-pointer transition-all hover:shadow-2xl hover:shadow-cyan-900/20 ${activeDriftIds.has(asset.id)
                       ? "border-rose-500 ring-2 ring-rose-500/50"
