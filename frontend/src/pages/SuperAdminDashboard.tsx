@@ -163,6 +163,7 @@ export default function SuperAdminDashboard() {
     setTenantUpdates({
       maxUsers: t.maxUsers,
       maxProjectsTotal: t.maxProjectsTotal,
+      maxStorageMb: t.maxStorageMb || 500,
       isActive: t.isActive
     });
   };
