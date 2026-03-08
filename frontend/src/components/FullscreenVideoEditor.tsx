@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
 import { LoadingSpinner } from "./LoadingSpinner";
 
@@ -51,7 +51,12 @@ export function FullscreenVideoEditor({
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [viewportRatio, setViewportRatio] = useState<"16:9" | "9:16" | "1:1">("16:9");
-  const [sidebarTab, setSidebarTab] = useState<"project" | "timeline">("project");
+  const [sidebarTab, setSidebarTab] = useState<"project" | "timeline" | "exports">("project");
+  
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+
+  const queryClient = useQueryClient();
 
   const { data: projectAssets = [], isLoading: isLoadingAssets } = useQuery({
     queryKey: ["assets", projectId],
@@ -295,6 +300,49 @@ export function FullscreenVideoEditor({
     }
   };
 
+  const handleExportVideo = async () => {
+    if (sequence.length === 0) {
+      alert("Timeline is empty. Add clips to export.");
+      return;
+    }
+    
+    setIsExporting(true);
+    setExportProgress(0);
+
+    // 1. Simulate Rendering Progress
+    for (let i = 0; i <= 100; i += 10) {
+      setExportProgress(i);
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    try {
+      // 2. Mock Export (Since we don't have backend FFmpeg yet)
+      // We will take the first video clip and save it as an "EXPORTED" video in the project
+      const firstClipUrl = sequence.find(s => s.type === "VIDEO")?.url || sequence[0].url;
+      const response = await fetch(firstClipUrl);
+      const blob = await response.blob();
+      const file = new File([blob], `exported_video_${Date.now()}.mp4`, { type: "video/mp4" });
+
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("raw", "true");
+      formData.append("aspectRatio", "EXPORTED_VIDEO"); // Custom tag to filter in the Exports tab
+      if (projectId) formData.append("projectId", projectId);
+
+      await apiEndpoints.uploadAssetSync(formData);
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      
+      setIsExporting(false);
+      setSidebarTab("exports");
+      if (!sidebarOpen) setSidebarOpen(true);
+      
+    } catch (e) {
+      console.error(e);
+      alert("Failed to export video.");
+      setIsExporting(false);
+    }
+  };
+
   const formatTime = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
@@ -349,12 +397,30 @@ export function FullscreenVideoEditor({
             Clear
           </button>
           <button 
-            className="px-6 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-2"
+            onClick={handleExportVideo}
+            disabled={isExporting}
+            className="px-6 py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-2"
           >
-            <span>💾</span> Export Video
+            <span>💾</span> {isExporting ? "Rendering..." : "Export Video"}
           </button>
         </div>
       </div>
+
+      {/* RENDER PROGRESS OVERLAY */}
+      {isExporting && (
+          <div className="absolute inset-0 z-[200] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center">
+              <div className="w-96 p-8 bg-gray-900 border border-gray-700 rounded-2xl flex flex-col items-center">
+                  <h3 className="text-white font-bold text-lg mb-2">Rendering Video</h3>
+                  <p className="text-gray-400 text-xs text-center mb-6">
+                      (Note: True server-side NLE FFmpeg rendering is required for complex sequences. Saving demo clip...)
+                  </p>
+                  <div className="w-full bg-gray-800 rounded-full h-3 mb-2 overflow-hidden">
+                      <div className="bg-cyan-500 h-full transition-all duration-300" style={{ width: `${exportProgress}%` }}></div>
+                  </div>
+                  <span className="text-cyan-400 font-mono text-sm">{exportProgress}%</span>
+              </div>
+          </div>
+      )}
 
       {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex overflow-hidden">
@@ -378,6 +444,13 @@ export function FullscreenVideoEditor({
                         title="View clips currently in your sequence"
                     >
                         <span>🎞️</span> Pool
+                    </button>
+                    <button 
+                        onClick={() => setSidebarTab("exports")}
+                        className={`px-3 py-1 rounded text-[10px] font-bold transition-colors flex items-center gap-1 ${sidebarTab === "exports" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                        title="View rendered exported videos"
+                    >
+                        <span>🎬</span> Exports
                     </button>
                 </div>
                 <div className="flex gap-2">
@@ -479,10 +552,10 @@ export function FullscreenVideoEditor({
                   <div className="grid grid-cols-2 gap-2">
                       {isLoadingAssets ? (
                           <div className="col-span-2 flex justify-center py-10"><LoadingSpinner /></div>
-                      ) : projectAssets.length === 0 ? (
+                      ) : projectAssets.filter((a: any) => a.aspectRatio !== "EXPORTED_VIDEO").length === 0 ? (
                           <div className="col-span-2 text-center text-gray-500 text-xs py-10">No media saved to this project yet.</div>
                       ) : (
-                          projectAssets.map((asset: any) => (
+                          projectAssets.filter((a: any) => a.aspectRatio !== "EXPORTED_VIDEO").map((asset: any) => (
                               <div 
                                 key={asset.id} 
                                 className="relative aspect-square bg-black rounded-lg border border-white/5 overflow-hidden group cursor-pointer hover:border-cyan-500/50 transition-all"
@@ -503,6 +576,40 @@ export function FullscreenVideoEditor({
                                   )}
                                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                       <span className="bg-cyan-500 text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">+ Add</span>
+                                  </div>
+                              </div>
+                          ))
+                      )}
+                  </div>
+              )}
+
+              {sidebarTab === "exports" && (
+                  <div className="flex flex-col gap-3">
+                      {isLoadingAssets ? (
+                          <div className="flex justify-center py-10"><LoadingSpinner /></div>
+                      ) : projectAssets.filter((a: any) => a.aspectRatio === "EXPORTED_VIDEO").length === 0 ? (
+                          <div className="text-center text-gray-500 text-xs py-10 border-2 border-dashed border-white/5 rounded-2xl">
+                              <span className="text-3xl mb-2 block">🎬</span>
+                              No exported videos yet. Click "Export Video" to render your sequence.
+                          </div>
+                      ) : (
+                          projectAssets.filter((a: any) => a.aspectRatio === "EXPORTED_VIDEO").map((asset: any) => (
+                              <div key={asset.id} className="bg-black/40 border border-white/10 rounded-xl overflow-hidden group">
+                                  <div className="aspect-video relative bg-black">
+                                      <video src={getCORSProxyUrl(asset.url)} className="w-full h-full object-contain" controls />
+                                  </div>
+                                  <div className="p-3 flex items-center justify-between">
+                                      <div className="text-[10px] text-gray-400 font-mono">
+                                          {new Date(asset.createdAt).toLocaleDateString()}
+                                      </div>
+                                      <a 
+                                          href={getCORSProxyUrl(asset.url)} 
+                                          download={`Render_${asset.id}.mp4`}
+                                          target="_blank"
+                                          className="text-xs font-bold text-cyan-400 hover:text-cyan-300"
+                                      >
+                                          Download
+                                      </a>
                                   </div>
                               </div>
                           ))
