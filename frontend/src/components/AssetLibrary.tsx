@@ -416,8 +416,8 @@ export function AssetLibrary({
               { id: "1:1", label: "Square" },
               { id: "STORYBOARD", label: "Storyboard" },
               { id: "custom", label: "Edited" },
-              { id: "VIDEO", label: "3DX Camera Paths" },
-              { id: "3DX_FRAME", label: "3DX Camera Frames" },
+              { id: "VIDEO", label: "3DX Paths" },
+              { id: "3DX_FRAME", label: "3DX Frames" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -526,12 +526,12 @@ export function AssetLibrary({
                     key={asset.id}
                     onClick={() => {
                       if (onSelect && isSequencerMode) {
-                          // If in picker mode, immediately use it!
-                          handleUseImage(asset);
+                        // If in picker mode, immediately use it!
+                        handleUseImage(asset);
                       } else if (asset.type === "VIDEO") {
-                          setViewingVideoAsset(asset);
+                        setViewingVideoAsset(asset);
                       } else {
-                          setSelectedAsset(asset);
+                        setSelectedAsset(asset);
                       }
                     }}
                     className={`relative group border rounded-xl overflow-hidden bg-black cursor-pointer transition-all hover:shadow-2xl hover:shadow-cyan-900/20 ${activeDriftIds.has(asset.id)
@@ -645,70 +645,70 @@ export function AssetLibrary({
               {/* IMAGE WRAPPER */}
               <div className="flex-1 relative flex items-center justify-center p-4 sm:p-8 overflow-hidden">
                 {/* UNIFIED OVERLAY CONTROLS */}
-              <div className="absolute top-4 right-4 z-20 flex gap-2">
+                <div className="absolute top-4 right-4 z-20 flex gap-2">
+                  <button
+                    onClick={handleGoToOriginal}
+                    disabled={!selectedAsset.originalAssetId}
+                    className={`p-2 rounded-full text-white backdrop-blur-md transition-all border border-white/10 ${selectedAsset.originalAssetId
+                      ? "bg-gray-800/80 hover:bg-gray-700 hover:border-white/30"
+                      : "bg-gray-800/30 opacity-30 cursor-not-allowed"
+                      }`}
+                    title="Go to Original (v1)"
+                  >
+                    ↩️
+                  </button>
+                  <span className="bg-black/50 text-white px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-mono backdrop-blur-md flex items-center border border-white/10 select-none">
+                    {selectedAsset.originalAssetId ? "v2" : "v1"}
+                  </span>
+                  <button
+                    onClick={handleGoToProcessed}
+                    disabled={
+                      !selectedAsset.variations ||
+                      selectedAsset.variations.length === 0
+                    }
+                    className={`p-2 rounded-full text-white backdrop-blur-md transition-all border border-white/10 ${selectedAsset.variations &&
+                      selectedAsset.variations.length > 0
+                      ? "bg-gray-800/80 hover:bg-gray-700 hover:border-white/30"
+                      : "bg-gray-800/30 opacity-30 cursor-not-allowed"
+                      }`}
+                    title="Go to Processed (v2)"
+                  >
+                    ↪️
+                  </button>
+                </div>
+
+                <img
+                  src={`${getCORSProxyUrl(selectedAsset.url)}${selectedAsset.url.includes('?') ? '&' : '?'}v=${selectedAsset.createdAt}`}
+                  className="max-w-full max-h-full object-contain rounded shadow-lg"
+                  crossOrigin="anonymous"
+                />
+
+                {/* Navigation Arrows (HIDDEN ON MOBILE for better touch experience) */}
                 <button
-                  onClick={handleGoToOriginal}
-                  disabled={!selectedAsset.originalAssetId}
-                  className={`p-2 rounded-full text-white backdrop-blur-md transition-all border border-white/10 ${selectedAsset.originalAssetId
-                    ? "bg-gray-800/80 hover:bg-gray-700 hover:border-white/30"
-                    : "bg-gray-800/30 opacity-30 cursor-not-allowed"
-                    }`}
-                  title="Go to Original (v1)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePrevAsset();
+                  }}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-white/20 text-white rounded-full opacity-0 sm:group-hover:opacity-100 transition-all z-10 hidden sm:block"
                 >
-                  ↩️
+                  ◀
                 </button>
-                <span className="bg-black/50 text-white px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-mono backdrop-blur-md flex items-center border border-white/10 select-none">
-                  {selectedAsset.originalAssetId ? "v2" : "v1"}
-                </span>
                 <button
-                  onClick={handleGoToProcessed}
-                  disabled={
-                    !selectedAsset.variations ||
-                    selectedAsset.variations.length === 0
-                  }
-                  className={`p-2 rounded-full text-white backdrop-blur-md transition-all border border-white/10 ${selectedAsset.variations &&
-                    selectedAsset.variations.length > 0
-                    ? "bg-gray-800/80 hover:bg-gray-700 hover:border-white/30"
-                    : "bg-gray-800/30 opacity-30 cursor-not-allowed"
-                    }`}
-                  title="Go to Processed (v2)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleNextAsset();
+                  }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-white/20 text-white rounded-full opacity-0 sm:group-hover:opacity-100 transition-all z-10 hidden sm:block"
                 >
-                  ↪️
+                  ▶
+                </button>
+                <button
+                  onClick={() => setSelectedAsset(null)}
+                  className="absolute top-4 left-4 bg-black/50 text-white p-2 rounded-full hover:bg-white/20 z-10"
+                >
+                  ✕
                 </button>
               </div>
-
-              <img
-                src={`${getCORSProxyUrl(selectedAsset.url)}${selectedAsset.url.includes('?') ? '&' : '?'}v=${selectedAsset.createdAt}`}
-                className="max-w-full max-h-full object-contain rounded shadow-lg"
-                crossOrigin="anonymous"
-              />
-
-              {/* Navigation Arrows (HIDDEN ON MOBILE for better touch experience) */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePrevAsset();
-                }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-white/20 text-white rounded-full opacity-0 sm:group-hover:opacity-100 transition-all z-10 hidden sm:block"
-              >
-                ◀
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleNextAsset();
-                }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/50 hover:bg-white/20 text-white rounded-full opacity-0 sm:group-hover:opacity-100 transition-all z-10 hidden sm:block"
-              >
-                ▶
-              </button>
-              <button
-                onClick={() => setSelectedAsset(null)}
-                className="absolute top-4 left-4 bg-black/50 text-white p-2 rounded-full hover:bg-white/20 z-10"
-              >
-                ✕
-              </button>
-            </div>
             </div>
 
             {/* RIGHT: DETAILS */}

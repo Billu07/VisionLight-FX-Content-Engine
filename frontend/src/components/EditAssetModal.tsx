@@ -523,16 +523,15 @@ export function EditAssetModal({
               {[
                 { id: "pro", label: "Pro" },
                 { id: "convert", label: "Convert" },
-                { id: "drift", label: <div className="flex items-center gap-2"><img src={drift_icon} alt="3DX" className="h-3 w-auto" /> 3DX Camera</div> },
+                { id: "drift", label: <div className="flex items-center gap-2"><img src={drift_icon} alt="3DX" className="h-3 w-auto" /> Camera</div> },
               ].map((mode) => (
                 <button
                   key={mode.id}
                   onClick={() => setActiveTab(mode.id as any)}
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex flex-col items-center gap-1 ${
-                    activeTab === mode.id
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex flex-col items-center gap-1 ${activeTab === mode.id
                       ? "bg-cyan-600 text-white shadow-lg"
                       : "text-gray-400 hover:text-white hover:bg-gray-800"
-                  }`}
+                    }`}
                 >
                   {mode.label}
                 </button>
@@ -583,11 +582,10 @@ export function EditAssetModal({
                       <button
                         key={ratio.id}
                         onClick={() => setConvertTargetRatio(ratio.id as any)}
-                        className={`py-3 text-xs font-bold rounded-lg border transition-all ${
-                          convertTargetRatio === ratio.id
+                        className={`py-3 text-xs font-bold rounded-lg border transition-all ${convertTargetRatio === ratio.id
                             ? "bg-purple-600 border-purple-500 text-white"
                             : "bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500"
-                        }`}
+                          }`}
                       >
                         {ratio.label}
                       </button>
@@ -599,21 +597,19 @@ export function EditAssetModal({
                 <div className="bg-gray-800/50 p-1 rounded-lg flex border border-gray-700">
                   <button
                     onClick={() => setConvertMode("auto")}
-                    className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${
-                      convertMode === "auto"
+                    className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${convertMode === "auto"
                         ? "bg-pink-600 text-white shadow-sm"
                         : "text-gray-400 hover:text-white"
-                    }`}
+                      }`}
                   >
                     Auto Convert
                   </button>
                   <button
                     onClick={() => setConvertMode("custom")}
-                    className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${
-                      convertMode === "custom"
+                    className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${convertMode === "custom"
                         ? "bg-pink-600 text-white shadow-sm"
                         : "text-gray-400 hover:text-white"
-                    }`}
+                      }`}
                   >
                     Custom Prompt
                   </button>
@@ -661,11 +657,10 @@ export function EditAssetModal({
                   {!showRefSelector ? (
                     <button
                       onClick={() => setShowRefSelector(true)}
-                      className={`w-full border border-dashed rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${
-                        referenceAsset
+                      className={`w-full border border-dashed rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${referenceAsset
                           ? "border-purple-500/50 bg-purple-500/10"
                           : "border-gray-700 hover:border-gray-500"
-                      }`}
+                        }`}
                     >
                       <span className="text-xs text-gray-300">
                         {referenceAsset ? "Change Reference" : "Add Reference"}
@@ -807,11 +802,10 @@ export function EditAssetModal({
                     <button
                       key={ratio.label}
                       onClick={() => setCropAspect(ratio.value)}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-md whitespace-nowrap transition-all flex-1 ${
-                        cropAspect === ratio.value
+                      className={`px-3 py-1.5 text-xs font-bold rounded-md whitespace-nowrap transition-all flex-1 ${cropAspect === ratio.value
                           ? "bg-cyan-600 text-white shadow-lg"
                           : "text-gray-400 hover:text-white hover:bg-gray-800"
-                      }`}
+                        }`}
                     >
                       {ratio.label}
                     </button>
