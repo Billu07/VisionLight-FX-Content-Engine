@@ -801,6 +801,8 @@ function Dashboard() {
 
   // ✅ HELPER: Header Logic
   const getHeaderContent = () => {
+    if (currentVisualTab === "3dx")
+      return { logo: "/drift_icon.png", text: "Drift Path Generation" };
     if (currentVisualTab === "picdrift")
       return { logo: picdriftLogo, text: "Photo to Photo Movement" };
     if (currentVisualTab === "studio")
