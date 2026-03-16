@@ -187,10 +187,10 @@ export const videoLogic = {
       const post = await airtableService.createPost({
         userId,
         projectId,
-        title: "Drift Shot (2.6)",
+        title: "Drift Path 3DX",
         prompt: finalPrompt,
         mediaType: "VIDEO",
-        platform: "Internal",
+        platform: "Visionlight",
         status: "PROCESSING",
         mediaProvider: "kling",
         imageReference: assetUrl,

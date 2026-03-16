@@ -71,6 +71,7 @@ export const getCost = (user: any, params: any, settings: any) => {
  * Maps the request to the correct Credit Pool
  */
 export const getTargetPool = (
+  user: any,
   mediaType: string,
   model?: string,
 ):
@@ -80,6 +81,11 @@ export const getTargetPool = (
   | "creditsVideoFX1"
   | "creditsVideoFX2"
   | "creditsVideoFX3" => {
+  if (user?.view === "PICDRIFT") {
+    if (mediaType === "image" || mediaType === "carousel") return "creditsImageFX";
+    return "creditsPicDrift";
+  }
+
   if (model === "kling-3") return "creditsPicDriftPlus";
   if (model === "kling-2.5") return "creditsPicDrift";
   if (mediaType === "image" || mediaType === "carousel")

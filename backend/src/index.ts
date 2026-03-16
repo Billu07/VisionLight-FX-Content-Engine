@@ -956,7 +956,7 @@ app.post(
       if (!user) return res.status(404).json({ error: "User not found" });
 
       // 2. Identify the correct Pool and calculate Cost based on Admin Settings
-      const pool = getTargetPool(mediaType, model);
+      const pool = getTargetPool(user, mediaType, model);
       const cost = getCost(
         user,
         {
