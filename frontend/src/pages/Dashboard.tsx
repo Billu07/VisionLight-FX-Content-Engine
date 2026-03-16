@@ -23,11 +23,21 @@ import { MobileNavbar } from "../components/MobileNavbar";
 import picdriftLogo from "../assets/picdrift.png";
 import fxLogo from "../assets/fx.png";
 
-type EngineType = "kie" | "studio" | "openai" | "veo";
+type EngineType = "kie" | "studio" | "openai" | "veo" | "3dx";
 type StudioMode = "image" | "carousel" | "edit";
 
 // Visual Tab Type
-type VisualTab = "picdrift" | "studio" | "videofx";
+type VisualTab = "picdrift" | "studio" | "videofx" | "3dx";
+
+const DRIFT_PRESETS = [
+  { label: "Orbit Right", h: 5, v: 0, z: 0, icon: "↪️" },
+  { label: "Orbit Left", h: -5, v: 0, z: 0, icon: "↩️" },
+  { label: "Dolly Right", h: 3, v: 0, z: 0, icon: "➡️" },
+  { label: "Dolly Left", h: -3, v: 0, z: 0, icon: "⬅️" },
+  { label: "Crane Up", h: 0, v: 5, z: 0, icon: "⬆️" },
+  { label: "Crane Down", h: 0, v: -5, z: 0, icon: "⬇️" },
+  { label: "Zoom In", h: 0, v: 0, z: 5, icon: "🔍" },
+];
 
 interface GenerationState {
   status: "idle" | "generating" | "completed" | "error";
@@ -106,6 +116,9 @@ function Dashboard() {
   const [picDriftMode, setPicDriftMode] = useState<"standard" | "plus">(
     "standard",
   );
+
+  // Drift State for 3DX
+  const [driftParams, setDriftParams] = useState({ horizontal: 0, vertical: 0, zoom: 0 });
 
   // ✅ UPDATED DEFAULT: Pro Model
   const [kieModel, setKieModel] = useState<"kie-sora-2" | "kie-sora-2-pro">(
@@ -243,11 +256,13 @@ function Dashboard() {
 
   // Helper to determine the current "Visual Tab"
   const currentVisualTab: VisualTab =
-    activeEngine === "studio"
-      ? "studio"
-      : activeEngine === "kie" && videoFxMode === "picdrift"
-        ? "picdrift"
-        : "videofx";
+    activeEngine === "3dx"
+      ? "3dx"
+      : activeEngine === "studio"
+        ? "studio"
+        : activeEngine === "kie" && videoFxMode === "picdrift"
+          ? "picdrift"
+          : "videofx";
 
   // HANDLER: Open Timeline Video in Drift
   const handleDriftFromPost = (post: any) => {
@@ -388,6 +403,53 @@ function Dashboard() {
   });
 
   // === ACTIONS ===
+
+  const driftStartMutation = useMutation({
+    mutationFn: async () => {
+      let assetUrl = referenceImageUrls[0];
+      const activeProject = localStorage.getItem("visionlight_active_project") || undefined;
+      
+      if (referenceImages[0] && referenceImages[0] instanceof File) {
+         const formData = new FormData();
+         formData.append("image", referenceImages[0]);
+         formData.append("raw", "true");
+         if (activeProject) formData.append("projectId", activeProject);
+         
+         const uploadRes = await apiEndpoints.uploadAssetSync(formData);
+         assetUrl = uploadRes.data.asset.url;
+      }
+      
+      return apiEndpoints.startDriftVideo({
+        assetUrl,
+        prompt: prompt,
+        horizontal: driftParams.horizontal,
+        vertical: driftParams.vertical,
+        zoom: driftParams.zoom,
+        aspectRatio: kieAspect === "landscape" ? "16:9" : kieAspect === "portrait" ? "9:16" : "1:1",
+        projectId: activeProject,
+      });
+    },
+    onSuccess: (res: any) => {
+       queryClient.invalidateQueries({ queryKey: ["posts"] });
+       queryClient.invalidateQueries({ queryKey: ["user-credits"] });
+       setGenerationState({
+          status: "generating",
+          result: { postId: res.data?.postId },
+       });
+       setShowQueuedModal(true);
+       setPrompt("");
+       setReferenceImages([]);
+       setReferenceImageUrls([]);
+       setDriftParams({ horizontal: 0, vertical: 0, zoom: 0 });
+    },
+    onError: (err: any) => {
+      if (err.response?.status === 403) {
+        setShowNoCreditsModal(true);
+      } else {
+        alert("3DX Generation Failed: " + err.message);
+      }
+    }
+  });
 
   const generateMediaMutation = useMutation({
     mutationFn: async (formData: FormData) =>
@@ -693,6 +755,15 @@ function Dashboard() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (currentVisualTab === "3dx") {
+       if (!referenceImageUrls.length) {
+          alert("Please select a reference image for 3DX Path extraction.");
+          return;
+       }
+       driftStartMutation.mutate();
+       return;
+    }
+
     if (!prompt.trim()) return;
 
     // Check correct pool balance based on current visual tab
@@ -1347,56 +1418,109 @@ function Dashboard() {
                         Select Content Type
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
-                        {/* TAB 1: PICDRIFT (Visible to Everyone) */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveEngine("kie");
-                            setVideoFxMode("picdrift");
-                            if (picDriftMode === "standard") setKieDuration(10);
-                            else setKieDuration(5);
-                          }}
-                          className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group flex flex-col items-center justify-center text-center sm:text-left sm:block sm:items-start ${currentVisualTab === "picdrift"
-                            ? "border-white/20 bg-gradient-to-br from-pink-500 to-rose-500 shadow-2xl scale-105"
-                            : "border-white/5 bg-gray-800/50 hover:border-white/10"
-                            }`}
-                        >
-                          <div className="font-semibold text-xs sm:text-sm text-white uppercase tracking-wider">
-                            PicDrift
-                          </div>
-                        </button>
+                        {user?.view === "PICDRIFT" ? (
+                          <>
+                            {/* TAB 1: PIC (Studio) */}
+                            <button
+                              type="button"
+                              onClick={() => setActiveEngine("studio")}
+                              className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${currentVisualTab === "studio"
+                                ? "border-white/20 bg-gradient-to-br from-violet-700 to-purple-700 shadow-2xl scale-105"
+                                : "border-white/5 bg-gray-800/50 hover:border-white/10"
+                                }`}
+                            >
+                              <div className="font-semibold text-xs sm:text-sm text-white uppercase tracking-wider">
+                                Pic
+                              </div>
+                            </button>
 
-                        {/* TAB 2: PIC FX (Unlocked for Demo Users) */}
-                        <button
-                          type="button"
-                          onClick={() => setActiveEngine("studio")}
-                          className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${currentVisualTab === "studio"
-                            ? "border-white/20 bg-gradient-to-br from-violet-700 to-purple-700 shadow-2xl scale-105"
-                            : "border-white/5 bg-gray-800/50 hover:border-white/10"
-                            }`}
-                        >
-                          <div className="font-semibold text-xs sm:text-sm text-white uppercase tracking-wider">
-                            Pic FX
-                          </div>
-                        </button>
+                            {/* TAB 2: DRIFT (PicDrift) */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveEngine("kie");
+                                setVideoFxMode("picdrift");
+                                if (picDriftMode === "standard") setKieDuration(10);
+                                else setKieDuration(5);
+                              }}
+                              className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group flex flex-col items-center justify-center text-center sm:text-left sm:block sm:items-start ${currentVisualTab === "picdrift"
+                                ? "border-white/20 bg-gradient-to-br from-pink-500 to-rose-500 shadow-2xl scale-105"
+                                : "border-white/5 bg-gray-800/50 hover:border-white/10"
+                                }`}
+                            >
+                              <div className="font-semibold text-xs sm:text-sm text-white uppercase tracking-wider">
+                                Drift
+                              </div>
+                            </button>
 
-                        {/* TAB 3: VIDEO FX (Visible but Locked for Demo Users) */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveEngine("kie");
-                            setVideoFxMode("video");
-                            setKieDuration(15);
-                          }}
-                          className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${currentVisualTab === "videofx"
-                            ? "border-white/20 bg-gradient-to-br from-cyan-600 to-blue-600 shadow-2xl scale-105"
-                            : "border-white/5 bg-gray-800/50 hover:border-white/10"
-                            }`}
-                        >
-                          <div className={`font-semibold text-xs sm:text-sm uppercase tracking-wider flex items-center gap-1 sm:gap-2 ${user?.view === "PICDRIFT" && currentVisualTab !== "videofx" ? "text-gray-400 group-hover:text-cyan-300" : "text-white"}`}>
-                            {user?.view === "PICDRIFT" && <span>🔒</span>} Video FX
-                          </div>
-                        </button>
+                            {/* TAB 3: 3DX */}
+                            <button
+                              type="button"
+                              onClick={() => setActiveEngine("3dx")}
+                              className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${currentVisualTab === "3dx"
+                                ? "border-white/20 bg-gradient-to-br from-indigo-600 to-blue-600 shadow-2xl scale-105"
+                                : "border-white/5 bg-gray-800/50 hover:border-white/10"
+                                }`}
+                            >
+                              <div className="font-semibold text-xs sm:text-sm text-white uppercase tracking-wider flex items-center gap-1 sm:gap-2">
+                                <img src="/drift_icon.png" alt="3DX" className="h-4 w-auto brightness-0 invert" /> 3DX
+                              </div>
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            {/* TAB 1: PICDRIFT */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveEngine("kie");
+                                setVideoFxMode("picdrift");
+                                if (picDriftMode === "standard") setKieDuration(10);
+                                else setKieDuration(5);
+                              }}
+                              className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group flex flex-col items-center justify-center text-center sm:text-left sm:block sm:items-start ${currentVisualTab === "picdrift"
+                                ? "border-white/20 bg-gradient-to-br from-pink-500 to-rose-500 shadow-2xl scale-105"
+                                : "border-white/5 bg-gray-800/50 hover:border-white/10"
+                                }`}
+                            >
+                              <div className="font-semibold text-xs sm:text-sm text-white uppercase tracking-wider">
+                                PicDrift
+                              </div>
+                            </button>
+
+                            {/* TAB 2: PIC FX */}
+                            <button
+                              type="button"
+                              onClick={() => setActiveEngine("studio")}
+                              className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${currentVisualTab === "studio"
+                                ? "border-white/20 bg-gradient-to-br from-violet-700 to-purple-700 shadow-2xl scale-105"
+                                : "border-white/5 bg-gray-800/50 hover:border-white/10"
+                                }`}
+                            >
+                              <div className="font-semibold text-xs sm:text-sm text-white uppercase tracking-wider">
+                                Pic FX
+                              </div>
+                            </button>
+
+                            {/* TAB 3: VIDEO FX */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveEngine("kie");
+                                setVideoFxMode("video");
+                                setKieDuration(15);
+                              }}
+                              className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${currentVisualTab === "videofx"
+                                ? "border-white/20 bg-gradient-to-br from-cyan-600 to-blue-600 shadow-2xl scale-105"
+                                : "border-white/5 bg-gray-800/50 hover:border-white/10"
+                                }`}
+                            >
+                              <div className="font-semibold text-xs sm:text-sm uppercase tracking-wider flex items-center gap-1 sm:gap-2 text-white">
+                                Video FX
+                              </div>
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
 
@@ -1963,6 +2087,32 @@ function Dashboard() {
                               </div>
                             )}
 
+                          {/* 3DX SETTINGS */}
+                          {currentVisualTab === "3dx" && (
+                            <div className="space-y-6 mb-6 animate-in fade-in">
+                              <label className="block text-sm font-semibold text-white">
+                                Camera Movement Path
+                              </label>
+                              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                {DRIFT_PRESETS.map((preset) => (
+                                  <button
+                                    key={preset.label}
+                                    type="button"
+                                    onClick={() => setDriftParams({ horizontal: preset.h, vertical: preset.v, zoom: preset.z })}
+                                    className={`p-3 rounded-xl border transition-all flex flex-col items-center gap-2 ${
+                                      driftParams.horizontal === preset.h && driftParams.vertical === preset.v && driftParams.zoom === preset.z
+                                        ? "bg-indigo-600/50 border-indigo-400"
+                                        : "bg-gray-800/50 border-white/5 hover:bg-gray-700"
+                                    }`}
+                                  >
+                                    <span className="text-xl">{preset.icon}</span>
+                                    <span className="text-[10px] font-bold text-gray-300">{preset.label}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
                           {/* PICDRIFT SETTINGS */}
                           {currentVisualTab === "picdrift" && (
                             <div className="space-y-6 mb-6">
@@ -2506,36 +2656,42 @@ function Dashboard() {
                           <button
                             type="submit"
                             disabled={
-                              generateMediaMutation.isPending || !prompt.trim()
+                              (currentVisualTab === "3dx" ? driftStartMutation.isPending : generateMediaMutation.isPending) || !prompt.trim()
                             }
                             className={`w-full py-4 sm:py-5 px-6 sm:px-8 rounded-2xl transition-all disabled:opacity-50 font-bold text-base sm:text-lg flex flex-col items-center justify-center gap-1 ${activeEngine === "veo"
                               ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg"
-                              : currentVisualTab === "picdrift"
-                                ? "bg-rose-600 hover:bg-rose-500 text-white shadow-lg"
-                                : currentVisualTab === "studio"
-                                  ? "bg-violet-600 hover:bg-violet-500 text-white shadow-lg"
-                                  : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg"
+                              : currentVisualTab === "3dx"
+                                ? "bg-blue-600 hover:bg-blue-500 text-white shadow-lg"
+                                : currentVisualTab === "picdrift"
+                                  ? "bg-rose-600 hover:bg-rose-500 text-white shadow-lg"
+                                  : currentVisualTab === "studio"
+                                    ? "bg-violet-600 hover:bg-violet-500 text-white shadow-lg"
+                                    : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg"
                               }`}
                           >
-                            {generateMediaMutation.isPending ? (
+                            {(currentVisualTab === "3dx" ? driftStartMutation.isPending : generateMediaMutation.isPending) ? (
                               <div className="flex items-center gap-3">
                                 <LoadingSpinner size="sm" variant="light" />
                                 <span>
-                                  {currentVisualTab === "picdrift"
-                                    ? "Generating Drift"
-                                    : currentVisualTab === "studio"
-                                      ? "Painting Your Image"
-                                      : "Creating Your Video"}
+                                  {currentVisualTab === "3dx"
+                                    ? "Extracting 3DX Path"
+                                    : currentVisualTab === "picdrift"
+                                      ? "Generating Drift"
+                                      : currentVisualTab === "studio"
+                                        ? "Painting Your Image"
+                                        : "Creating Your Video"}
                                   ...
                                 </span>
                               </div>
                             ) : (
                               <div className="flex items-center gap-3 uppercase tracking-widest text-sm">
-                                {currentVisualTab === "picdrift"
-                                  ? "Generate PicDrift"
-                                  : currentVisualTab === "studio"
-                                    ? "Generate Image"
-                                    : "Generate Video"}
+                                {currentVisualTab === "3dx"
+                                  ? "Generate 3DX Path"
+                                  : currentVisualTab === "picdrift"
+                                    ? "Generate PicDrift"
+                                    : currentVisualTab === "studio"
+                                      ? "Generate Image"
+                                      : "Generate Video"}
                               </div>
                             )}
                           </button>
