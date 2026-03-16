@@ -1462,8 +1462,8 @@ function Dashboard() {
                                 : "border-white/5 bg-gray-800/50 hover:border-white/10"
                                 }`}
                             >
-                              <div className="font-semibold text-xs sm:text-sm text-white uppercase tracking-wider flex items-center gap-1 sm:gap-2">
-                                <img src="/drift_icon.png" alt="3DX" className="h-4 w-auto brightness-0 invert" /> 3DX
+                              <div className="font-semibold text-xs sm:text-sm text-white uppercase tracking-wider flex items-center justify-center sm:justify-start w-full gap-1 sm:gap-2">
+                                <img src="/drift_icon.png" alt="3DX" className="h-6 w-auto brightness-0 invert" />
                               </div>
                             </button>
                           </>
@@ -1954,7 +1954,7 @@ function Dashboard() {
                             <textarea
                               value={prompt}
                               onChange={(e) => setPrompt(e.target.value)}
-                              placeholder="Describe your vision with a prompt"
+                              placeholder={currentVisualTab === "3dx" ? "Describe where you want the camera to move to create a path." : "Describe your vision with a prompt"}
                               className="w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base leading-relaxed"
                               rows={3}
                             />
@@ -2086,32 +2086,6 @@ function Dashboard() {
                                 </div>
                               </div>
                             )}
-
-                          {/* 3DX SETTINGS */}
-                          {currentVisualTab === "3dx" && (
-                            <div className="space-y-6 mb-6 animate-in fade-in">
-                              <label className="block text-sm font-semibold text-white">
-                                Camera Movement Path
-                              </label>
-                              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                                {DRIFT_PRESETS.map((preset) => (
-                                  <button
-                                    key={preset.label}
-                                    type="button"
-                                    onClick={() => setDriftParams({ horizontal: preset.h, vertical: preset.v, zoom: preset.z })}
-                                    className={`p-3 rounded-xl border transition-all flex flex-col items-center gap-2 ${
-                                      driftParams.horizontal === preset.h && driftParams.vertical === preset.v && driftParams.zoom === preset.z
-                                        ? "bg-indigo-600/50 border-indigo-400"
-                                        : "bg-gray-800/50 border-white/5 hover:bg-gray-700"
-                                    }`}
-                                  >
-                                    <span className="text-xl">{preset.icon}</span>
-                                    <span className="text-[10px] font-bold text-gray-300">{preset.label}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
 
                           {/* PICDRIFT SETTINGS */}
                           {currentVisualTab === "picdrift" && (
