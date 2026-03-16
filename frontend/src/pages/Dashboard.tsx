@@ -29,16 +29,6 @@ type StudioMode = "image" | "carousel" | "edit";
 // Visual Tab Type
 type VisualTab = "picdrift" | "studio" | "videofx" | "3dx";
 
-const DRIFT_PRESETS = [
-  { label: "Orbit Right", h: 5, v: 0, z: 0, icon: "↪️" },
-  { label: "Orbit Left", h: -5, v: 0, z: 0, icon: "↩️" },
-  { label: "Dolly Right", h: 3, v: 0, z: 0, icon: "➡️" },
-  { label: "Dolly Left", h: -3, v: 0, z: 0, icon: "⬅️" },
-  { label: "Crane Up", h: 0, v: 5, z: 0, icon: "⬆️" },
-  { label: "Crane Down", h: 0, v: -5, z: 0, icon: "⬇️" },
-  { label: "Zoom In", h: 0, v: 0, z: 5, icon: "🔍" },
-];
-
 interface GenerationState {
   status: "idle" | "generating" | "completed" | "error";
   result?: any;
