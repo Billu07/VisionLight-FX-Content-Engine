@@ -1397,7 +1397,6 @@ function Dashboard() {
                         : "bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700 hover:text-white"
                         }`}
                     >
-                      <span></span>{" "}
                       {viewMode === "sequencer"
                         ? "Back to Create"
                         : "Video Editor"}
@@ -1425,7 +1424,7 @@ function Dashboard() {
                         : "bg-cyan-900/50 text-cyan-300 border-cyan-700/50 hover:bg-cyan-800 hover:border-cyan-500"
                         }`}
                     >
-                      <span></span> Open Library
+                      Open Library
                     </button>
                   </div>
                 </div>
