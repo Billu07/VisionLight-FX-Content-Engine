@@ -809,9 +809,9 @@ export function AssetLibrary({
               ✕
             </button>
             <div className="w-full flex justify-between items-start mb-4 pr-6">
-              <img src="/drift_icon.png" alt="Drift" className="w-14 h-14 object-contain" />
+              <img src="/drift_icon.png" alt="Drift" className="w-16 h-16 object-contain" />
               <h3 className="text-white font-bold tracking-widest text-sm mt-2">
-                3DX FRAME EXTRACTOR
+                3DX FRAME CAPTURE
               </h3>
             </div>
             <DriftFrameExtractor
