@@ -529,7 +529,7 @@ export function EditAssetModal({
                   key={mode.id}
                   onClick={() => setActiveTab(mode.id as any)}
                   className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex flex-col items-center gap-1 ${activeTab === mode.id
-                    ? "bg-cyan-600 text-white shadow-lg"
+                    ? "bg-purple-600 text-white shadow-lg"
                     : "text-gray-400 hover:text-white hover:bg-gray-800"
                     }`}
                 >

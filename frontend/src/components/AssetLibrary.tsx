@@ -475,7 +475,7 @@ export function AssetLibrary({
               ) : (
                 <>
                   <div className="flex items-center gap-2">
-                    <span></span> Upload
+                    Upload
                   </div>
                 </>
               )}
