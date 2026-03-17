@@ -468,7 +468,7 @@ export function AssetLibrary({
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading || pollingUntil > 0}
-              className="px-6 py-2.5 font-bold rounded-lg bg-white text-black hover:bg-gray-200 flex flex-col items-center justify-center transition-colors min-w-[140px]"
+              className="px-6 py-2.5 font-bold rounded-lg bg-purple-600 text-white hover:bg-purple-500 flex flex-col items-center justify-center transition-colors min-w-[140px]"
             >
               {isUploading ? (
                 <LoadingSpinner size="sm" variant="default" />
@@ -809,7 +809,7 @@ export function AssetLibrary({
               ✕
             </button>
             <div className="w-full flex justify-between items-start mb-4 pr-6">
-              <img src="/drift_icon.png" alt="Drift" className="w-10 h-10 object-contain" />
+              <img src="/drift_icon.png" alt="Drift" className="w-14 h-14 object-contain" />
               <h3 className="text-white font-bold tracking-widest text-sm mt-2">
                 3DX FRAME EXTRACTOR
               </h3>

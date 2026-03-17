@@ -43,7 +43,7 @@ function Dashboard() {
   // Core
   const [prompt, setPrompt] = useState("");
   const [videoTitle, setVideoTitle] = useState("");
-  
+
   // PromptFX State
   const [showPromptFxMenu, setShowPromptFxMenu] = useState(false);
   const [newPromptFxName, setNewPromptFxName] = useState("");
@@ -194,15 +194,15 @@ function Dashboard() {
       return [];
     }
   });
-  
+
   // Track audio for NLE
   const audioTracksKey = `visionlight_audio_${localStorage.getItem("visionlight_active_project") || "default"}`;
   const [audioTracks, setAudioTracks] = useState<any[]>(() => {
     try {
-        const stored = localStorage.getItem(audioTracksKey);
-        return stored ? JSON.parse(stored) : [];
+      const stored = localStorage.getItem(audioTracksKey);
+      return stored ? JSON.parse(stored) : [];
     } catch {
-        return [];
+      return [];
     }
   });
 
@@ -220,8 +220,8 @@ function Dashboard() {
       apiEndpoints.getProjects().then(res => {
         const project = res.data.projects?.find((p: any) => p.id === activeProjectId);
         if (project && project.editorState) {
-           setSequence(project.editorState.sequence || []);
-           setAudioTracks(project.editorState.audioTracks || []);
+          setSequence(project.editorState.sequence || []);
+          setAudioTracks(project.editorState.audioTracks || []);
         }
       }).catch(err => console.error("Failed to fetch project editor state", err));
     }
@@ -398,17 +398,17 @@ function Dashboard() {
     mutationFn: async () => {
       let assetUrl = referenceImageUrls[0];
       const activeProject = localStorage.getItem("visionlight_active_project") || undefined;
-      
+
       if (referenceImages[0] && referenceImages[0] instanceof File) {
-         const formData = new FormData();
-         formData.append("image", referenceImages[0]);
-         formData.append("raw", "true");
-         if (activeProject) formData.append("projectId", activeProject);
-         
-         const uploadRes = await apiEndpoints.uploadAssetSync(formData);
-         assetUrl = uploadRes.data.asset.url;
+        const formData = new FormData();
+        formData.append("image", referenceImages[0]);
+        formData.append("raw", "true");
+        if (activeProject) formData.append("projectId", activeProject);
+
+        const uploadRes = await apiEndpoints.uploadAssetSync(formData);
+        assetUrl = uploadRes.data.asset.url;
       }
-      
+
       return apiEndpoints.startDriftVideo({
         assetUrl,
         prompt: prompt,
@@ -420,17 +420,17 @@ function Dashboard() {
       });
     },
     onSuccess: (res: any) => {
-       queryClient.invalidateQueries({ queryKey: ["posts"] });
-       queryClient.invalidateQueries({ queryKey: ["user-credits"] });
-       setGenerationState({
-          status: "generating",
-          result: { postId: res.data?.postId },
-       });
-       setShowQueuedModal(true);
-       setPrompt("");
-       setReferenceImages([]);
-       setReferenceImageUrls([]);
-       setDriftParams({ horizontal: 0, vertical: 0, zoom: 0 });
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      queryClient.invalidateQueries({ queryKey: ["user-credits"] });
+      setGenerationState({
+        status: "generating",
+        result: { postId: res.data?.postId },
+      });
+      setShowQueuedModal(true);
+      setPrompt("");
+      setReferenceImages([]);
+      setReferenceImageUrls([]);
+      setDriftParams({ horizontal: 0, vertical: 0, zoom: 0 });
     },
     onError: (err: any) => {
       if (err.response?.status === 403) {
@@ -746,12 +746,12 @@ function Dashboard() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (currentVisualTab === "3dx") {
-       if (!referenceImageUrls.length) {
-          alert("Please select a reference image for 3DX Path extraction.");
-          return;
-       }
-       driftStartMutation.mutate();
-       return;
+      if (!referenceImageUrls.length) {
+        alert("Please select a reference image for 3DX Path extraction.");
+        return;
+      }
+      driftStartMutation.mutate();
+      return;
     }
 
     if (!prompt.trim()) return;
@@ -891,7 +891,7 @@ function Dashboard() {
                   className="w-14 h-12 object-contain"
                 />
                 <h3 className="text-white font-bold tracking-widest text-sm mt-2">
-                  3DX FRAME EXTRACTOR
+                  3DX FRAME CAPTURE
                 </h3>
               </div>
               <DriftFrameExtractor
@@ -1564,1134 +1564,1133 @@ function Dashboard() {
                       <div className={user?.view === "PICDRIFT" && currentVisualTab === "videofx" ? "blur-[5px] pointer-events-none opacity-50 select-none transition-all duration-500" : "transition-all duration-500"}>
                         {/* STUDIO SUB-MENU */}
                         {currentVisualTab === "studio" && (
-                      <div className="mb-6 animate-in fade-in space-y-4">
-                        <div className="flex bg-gray-900/50 p-1 rounded-xl w-full sm:max-w-sm mx-auto border border-white/5">
-                          <button
-                            onClick={() => setStudioMode("image")}
-                            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${studioMode === "image"
-                              ? "bg-violet-600 text-white shadow-lg"
-                              : "text-gray-400 hover:text-white"
-                              }`}
-                          >
-                            Image FX
-                          </button>
-                          <button
-                            onClick={() => setStudioMode("carousel")}
-                            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${studioMode === "carousel"
-                              ? "bg-fuchsia-600 text-white shadow-lg"
-                              : "text-gray-400 hover:text-white"
-                              }`}
-                          >
-                            Carousel
-                          </button>
-                          <button
-                            onClick={() => setStudioMode("edit")}
-                            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${studioMode === "edit"
-                              ? "bg-cyan-600 text-white shadow-lg"
-                              : "text-gray-400 hover:text-white"
-                              }`}
-                          >
-                            PicFX Editor
-                          </button>
-                        </div>
-                        {studioMode !== "edit" && (
-                          <div className="flex justify-center gap-2 sm:gap-3">
-                            {[
-                              { id: "16:9", label: "Landscape" },
-                              { id: "9:16", label: "Portrait" },
-                              { id: "1:1", label: "Square" },
-                            ].map((a) => (
+                          <div className="mb-6 animate-in fade-in space-y-4">
+                            <div className="flex bg-gray-900/50 p-1 rounded-xl w-full sm:max-w-sm mx-auto border border-white/5">
                               <button
-                                key={a.id}
-                                onClick={() => setGeminiAspect(a.id as any)}
-                                className={`px-3 py-2 sm:px-4 rounded-lg border text-xs font-bold transition-all ${geminiAspect === a.id
-                                  ? "bg-violet-600 border-violet-500 text-white"
-                                  : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
+                                onClick={() => setStudioMode("image")}
+                                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${studioMode === "image"
+                                  ? "bg-violet-600 text-white shadow-lg"
+                                  : "text-gray-400 hover:text-white"
                                   }`}
                               >
-                                {a.label}
+                                Image FX
                               </button>
-                            ))}
+                              <button
+                                onClick={() => setStudioMode("carousel")}
+                                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${studioMode === "carousel"
+                                  ? "bg-fuchsia-600 text-white shadow-lg"
+                                  : "text-gray-400 hover:text-white"
+                                  }`}
+                              >
+                                Carousel
+                              </button>
+                              <button
+                                onClick={() => setStudioMode("edit")}
+                                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${studioMode === "edit"
+                                  ? "bg-cyan-600 text-white shadow-lg"
+                                  : "text-gray-400 hover:text-white"
+                                  }`}
+                              >
+                                PicFX Editor
+                              </button>
+                            </div>
+                            {studioMode !== "edit" && (
+                              <div className="flex justify-center gap-2 sm:gap-3">
+                                {[
+                                  { id: "16:9", label: "Landscape" },
+                                  { id: "9:16", label: "Portrait" },
+                                  { id: "1:1", label: "Square" },
+                                ].map((a) => (
+                                  <button
+                                    key={a.id}
+                                    onClick={() => setGeminiAspect(a.id as any)}
+                                    className={`px-3 py-2 sm:px-4 rounded-lg border text-xs font-bold transition-all ${geminiAspect === a.id
+                                      ? "bg-violet-600 border-violet-500 text-white"
+                                      : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
+                                      }`}
+                                  >
+                                    {a.label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
-                      </div>
-                    )}
 
-                    {/* PICDRIFT SUB-MENU */}
-                    {currentVisualTab === "picdrift" && (
-                      <div className="mb-6 animate-in fade-in space-y-4">
-                        <div className="flex bg-gray-900/50 p-1 rounded-xl w-full sm:max-w-sm mx-auto border border-white/5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPicDriftMode("standard");
-                              setKieDuration(10);
-                            }}
-                            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${picDriftMode === "standard"
-                              ? "bg-rose-600 text-white shadow-lg"
-                              : "text-gray-400 hover:text-white"
-                              }`}
-                          >
-                            Standard
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPicDriftMode("plus");
-                              setKieDuration(5);
-                            }}
-                            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${picDriftMode === "plus"
-                              ? "bg-rose-600 text-white shadow-lg"
-                              : "text-gray-400 hover:text-white"
-                              }`}
-                          >
-                            PicDrift Plus
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* VIDEO FX SUB-MENU */}
-                    {currentVisualTab === "videofx" && (
-                      <div className="mb-6 animate-in fade-in space-y-4">
-                        <div className="flex bg-gray-900/50 p-1 rounded-xl w-full sm:max-w-sm mx-auto border border-white/5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveEngine("kie");
-                              setVideoFxMode("video");
-                              setKieDuration(15);
-                            }}
-                            className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeEngine === "kie"
-                              ? "bg-cyan-600 text-white shadow-lg"
-                              : "text-gray-400 hover:text-white"
-                              }`}
-                          >
-                            Video FX 1
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setActiveEngine("openai")}
-                            className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeEngine === "openai"
-                              ? "bg-cyan-600 text-white shadow-lg"
-                              : "text-gray-400 hover:text-white"
-                              }`}
-                          >
-                            Video FX 2
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setActiveEngine("veo")}
-                            className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeEngine === "veo"
-                              ? "bg-cyan-600 text-white shadow-lg"
-                              : "text-gray-400 hover:text-white"
-                              }`}
-                          >
-                            Video FX 3
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    <form
-                      onSubmit={handleSubmit}
-                      className="space-y-4 sm:space-y-6"
-                    >
-                      {/* MAGIC EDIT UI */}
-                      {currentVisualTab === "studio" &&
-                        studioMode === "edit" ? (
-                        <div className="bg-gray-900/50 border border-cyan-500/30 rounded-2xl p-8 text-center space-y-5 animate-in fade-in">
-                          <div className="w-20 h-20 bg-cyan-900/20 rounded-full flex items-center justify-center mx-auto border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
-                            <span className="text-4xl"></span>
-                          </div>
-                          <div>
-                            <h3 className="text-white font-bold text-xl mb-2">
-                              PicFX Editor
-                            </h3>
-                            <p className="text-gray-400 text-sm max-w-md mx-auto">
-                              Upload an image to start a chat session. Ask PicFX
-                              to change lighting, add objects, or completely
-                              style-transfer your image.
-                            </p>
-                          </div>
-                          <label className="block w-full max-w-sm mx-auto cursor-pointer group">
-                            <div className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl text-white font-bold group-hover:shadow-lg group-hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
-                              <span>📤 Upload to Start</span>
-                            </div>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={handleMagicEditUpload}
-                            />
-                          </label>
-                          <p className="text-[20px] text-gray-500">
-                            Or select from{" "}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setLibrarySource("field");
-                                setActiveLibrarySlot("generic");
-                              }}
-                              className="underline text-cyan-400"
-                            >
-                              Asset Library
-                            </button>
-                          </p>
-                        </div>
-                      ) : (
-                        <>
-                          {/* 1. PICDRIFT FRAMES (Always Top for PicDrift Mode) */}
-                          {currentVisualTab === "picdrift" && (
-                            <div className="grid grid-cols-2 gap-4 mb-4 animate-in fade-in">
-                              {/* Start Frame */}
-                              <div className="flex flex-col gap-2">
-                                <div className="flex justify-between items-center">
-                                  <label className="text-xs text-rose-300 font-bold">
-                                    Pic 1 - Start Frame
-                                  </label>
-                                  {/* Open Library Button for Start Frame */}
-                                </div>
-                                <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
-                                  {picDriftUrls.start ? (
-                                    <>
-                                      <img
-                                        src={picDriftUrls.start}
-                                        className="w-full h-full object-cover"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          removePicDriftImage("start")
-                                        }
-                                        className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
-                                      >
-                                        ✕
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-                                      <label className="flex flex-col items-center justify-center cursor-pointer">
-                                        <span className="text-rose-400 text-2xl">
-                                          +
-                                        </span>
-                                        <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
-                                          Upload File
-                                        </span>
-                                        <input
-                                          type="file"
-                                          className="hidden"
-                                          accept="image/*"
-                                          onChange={(e) =>
-                                            handlePicDriftUpload(e, "start")
-                                          }
-                                        />
-                                      </label>
-                                      <div className="text-gray-600 text-[10px]">
-                                        - OR -
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setLibrarySource("field");
-                                          setActiveLibrarySlot("start");
-                                        }}
-                                        className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
-                                      >
-                                        Select from Library
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* End Frame */}
-                              <div
-                                className={`flex flex-col gap-2 ${picDriftAudio && picDriftMode !== "plus" ? "opacity-50 pointer-events-none grayscale" : ""}`}
-                              >
-                                <div className="flex justify-between items-center">
-                                  <label className="text-xs text-rose-300 font-bold">
-                                    {picDriftAudio && picDriftMode !== "plus"
-                                      ? "Pic 2 - Disabled (Audio On)"
-                                      : "Pic 2 - End Frame (optional)"}
-                                  </label>
-                                </div>
-                                <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
-                                  {picDriftUrls.end ? (
-                                    <>
-                                      <img
-                                        src={picDriftUrls.end}
-                                        className="w-full h-full object-cover"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          removePicDriftImage("end")
-                                        }
-                                        className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
-                                      >
-                                        ✕
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-                                      <label className="flex flex-col items-center justify-center cursor-pointer">
-                                        <span className="text-rose-400 text-2xl">
-                                          +
-                                        </span>
-                                        <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
-                                          Upload File
-                                        </span>
-                                        <input
-                                          type="file"
-                                          className="hidden"
-                                          accept="image/*"
-                                          onChange={(e) =>
-                                            handlePicDriftUpload(e, "end")
-                                          }
-                                        />
-                                      </label>
-                                      <div className="text-gray-600 text-[10px]">
-                                        - OR -
-                                      </div>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setLibrarySource("field");
-                                          setActiveLibrarySlot("end");
-                                        }}
-                                        className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
-                                      >
-                                        Select from Library
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* 2. PROMPT & TITLE (Moved Up for Non-PicDrift) */}
-                          <div>
-                            <div className="flex items-center justify-between mb-2 relative">
-                              <label className="block text-sm font-semibold text-white">
-                                Your Creative Vision
-                              </label>
-
-                              {/* PromptFX Popover Trigger */}
+                        {/* PICDRIFT SUB-MENU */}
+                        {currentVisualTab === "picdrift" && (
+                          <div className="mb-6 animate-in fade-in space-y-4">
+                            <div className="flex bg-gray-900/50 p-1 rounded-xl w-full sm:max-w-sm mx-auto border border-white/5">
                               <button
                                 type="button"
-                                onClick={() => setShowPromptFxMenu(!showPromptFxMenu)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all shadow-sm ${
-                                  currentVisualTab === "picdrift"
-                                    ? "bg-rose-900/40 border-rose-500/50 text-rose-300 hover:bg-rose-800/60"
-                                    : currentVisualTab === "studio"
-                                      ? "bg-violet-900/40 border-violet-500/50 text-violet-300 hover:bg-violet-800/60"
-                                      : "bg-cyan-900/40 border-cyan-500/50 text-cyan-300 hover:bg-cyan-800/60"
-                                }`}
+                                onClick={() => {
+                                  setPicDriftMode("standard");
+                                  setKieDuration(10);
+                                }}
+                                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${picDriftMode === "standard"
+                                  ? "bg-rose-600 text-white shadow-lg"
+                                  : "text-gray-400 hover:text-white"
+                                  }`}
                               >
-                                ✨ PromptFX
+                                Standard
                               </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPicDriftMode("plus");
+                                  setKieDuration(5);
+                                }}
+                                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${picDriftMode === "plus"
+                                  ? "bg-rose-600 text-white shadow-lg"
+                                  : "text-gray-400 hover:text-white"
+                                  }`}
+                              >
+                                PicDrift Plus
+                              </button>
+                            </div>
+                          </div>
+                        )}
 
-                              {/* PromptFX Popover Menu */}
-                              {showPromptFxMenu && (
-                                <div className="absolute top-full right-0 mt-2 w-72 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
-                                  <div className="p-3 border-b border-gray-800 flex justify-between items-center bg-gray-800/30">
-                                    <h4 className="text-xs font-bold text-gray-300 uppercase tracking-widest">Saved Prompts</h4>
-                                    <button 
-                                      type="button" 
-                                      onClick={() => setIsAddingPromptFx(!isAddingPromptFx)}
-                                      className="text-[10px] bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-white transition-colors"
-                                    >
-                                      {isAddingPromptFx ? "Cancel" : "+ Add New"}
-                                    </button>
-                                  </div>
+                        {/* VIDEO FX SUB-MENU */}
+                        {currentVisualTab === "videofx" && (
+                          <div className="mb-6 animate-in fade-in space-y-4">
+                            <div className="flex bg-gray-900/50 p-1 rounded-xl w-full sm:max-w-sm mx-auto border border-white/5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveEngine("kie");
+                                  setVideoFxMode("video");
+                                  setKieDuration(15);
+                                }}
+                                className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeEngine === "kie"
+                                  ? "bg-cyan-600 text-white shadow-lg"
+                                  : "text-gray-400 hover:text-white"
+                                  }`}
+                              >
+                                Video FX 1
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setActiveEngine("openai")}
+                                className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeEngine === "openai"
+                                  ? "bg-cyan-600 text-white shadow-lg"
+                                  : "text-gray-400 hover:text-white"
+                                  }`}
+                              >
+                                Video FX 2
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setActiveEngine("veo")}
+                                className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeEngine === "veo"
+                                  ? "bg-cyan-600 text-white shadow-lg"
+                                  : "text-gray-400 hover:text-white"
+                                  }`}
+                              >
+                                Video FX 3
+                              </button>
+                            </div>
+                          </div>
+                        )}
 
-                                  {isAddingPromptFx && (
-                                    <div className="p-3 bg-gray-800/50 border-b border-gray-800 space-y-2">
-                                      <input 
-                                        type="text" 
-                                        placeholder="Name (e.g., Cinematic Lighting)" 
-                                        value={newPromptFxName}
-                                        onChange={(e) => setNewPromptFxName(e.target.value)}
-                                        className="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-xs text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none"
-                                      />
-                                      <textarea 
-                                        placeholder="The prompt text..." 
-                                        value={newPromptFxText}
-                                        onChange={(e) => setNewPromptFxText(e.target.value)}
-                                        className="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-xs text-white placeholder-gray-500 resize-none h-16 focus:border-cyan-500 focus:outline-none"
-                                      />
-                                      <button 
-                                        type="button"
-                                        onClick={handleAddPromptFx}
-                                        disabled={savePromptFxMutation.isPending || !newPromptFxName.trim() || !newPromptFxText.trim()}
-                                        className="w-full py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-bold rounded transition-colors"
-                                      >
-                                        Save Prompt
-                                      </button>
+                        <form
+                          onSubmit={handleSubmit}
+                          className="space-y-4 sm:space-y-6"
+                        >
+                          {/* MAGIC EDIT UI */}
+                          {currentVisualTab === "studio" &&
+                            studioMode === "edit" ? (
+                            <div className="bg-gray-900/50 border border-cyan-500/30 rounded-2xl p-8 text-center space-y-5 animate-in fade-in">
+                              <div className="w-20 h-20 bg-cyan-900/20 rounded-full flex items-center justify-center mx-auto border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+                                <span className="text-4xl"></span>
+                              </div>
+                              <div>
+                                <h3 className="text-white font-bold text-xl mb-2">
+                                  PicFX Editor
+                                </h3>
+                                <p className="text-gray-400 text-sm max-w-md mx-auto">
+                                  Upload an image to start a chat session. Ask PicFX
+                                  to change lighting, add objects, or completely
+                                  style-transfer your image.
+                                </p>
+                              </div>
+                              <label className="block w-full max-w-sm mx-auto cursor-pointer group">
+                                <div className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl text-white font-bold group-hover:shadow-lg group-hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
+                                  <span>📤 Upload to Start</span>
+                                </div>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={handleMagicEditUpload}
+                                />
+                              </label>
+                              <p className="text-[20px] text-gray-500">
+                                Or select from{" "}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setLibrarySource("field");
+                                    setActiveLibrarySlot("generic");
+                                  }}
+                                  className="underline text-cyan-400"
+                                >
+                                  Asset Library
+                                </button>
+                              </p>
+                            </div>
+                          ) : (
+                            <>
+                              {/* 1. PICDRIFT FRAMES (Always Top for PicDrift Mode) */}
+                              {currentVisualTab === "picdrift" && (
+                                <div className="grid grid-cols-2 gap-4 mb-4 animate-in fade-in">
+                                  {/* Start Frame */}
+                                  <div className="flex flex-col gap-2">
+                                    <div className="flex justify-between items-center">
+                                      <label className="text-xs text-rose-300 font-bold">
+                                        Pic 1 - Start Frame
+                                      </label>
+                                      {/* Open Library Button for Start Frame */}
                                     </div>
-                                  )}
-
-                                  <div className="max-h-60 overflow-y-auto custom-scrollbar">
-                                    {promptFxList.length === 0 ? (
-                                      <div className="p-4 text-center text-xs text-gray-500">
-                                        No saved prompts yet.
-                                      </div>
-                                    ) : (
-                                      promptFxList.map((pf: any, idx: number) => (
-                                        <div key={idx} className="group relative border-b border-gray-800/50 last:border-0 hover:bg-gray-800/40 transition-colors">
+                                    <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
+                                      {picDriftUrls.start ? (
+                                        <>
+                                          <img
+                                            src={picDriftUrls.start}
+                                            className="w-full h-full object-cover"
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              removePicDriftImage("start")
+                                            }
+                                            className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
+                                          >
+                                            ✕
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                                          <label className="flex flex-col items-center justify-center cursor-pointer">
+                                            <span className="text-rose-400 text-2xl">
+                                              +
+                                            </span>
+                                            <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
+                                              Upload File
+                                            </span>
+                                            <input
+                                              type="file"
+                                              className="hidden"
+                                              accept="image/*"
+                                              onChange={(e) =>
+                                                handlePicDriftUpload(e, "start")
+                                              }
+                                            />
+                                          </label>
+                                          <div className="text-gray-600 text-[10px]">
+                                            - OR -
+                                          </div>
                                           <button
                                             type="button"
                                             onClick={() => {
-                                              setPrompt(pf.prompt);
-                                              setShowPromptFxMenu(false);
+                                              setLibrarySource("field");
+                                              setActiveLibrarySlot("start");
                                             }}
-                                            className="w-full text-left p-3 pr-10 flex flex-col gap-1"
+                                            className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
                                           >
-                                            <span className="text-sm font-bold text-gray-200">{pf.name}</span>
-                                            <span className="text-xs text-gray-500 truncate">{pf.prompt}</span>
+                                            Select from Library
                                           </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* End Frame */}
+                                  <div
+                                    className={`flex flex-col gap-2 ${picDriftAudio && picDriftMode !== "plus" ? "opacity-50 pointer-events-none grayscale" : ""}`}
+                                  >
+                                    <div className="flex justify-between items-center">
+                                      <label className="text-xs text-rose-300 font-bold">
+                                        {picDriftAudio && picDriftMode !== "plus"
+                                          ? "Pic 2 - Disabled (Audio On)"
+                                          : "Pic 2 - End Frame (optional)"}
+                                      </label>
+                                    </div>
+                                    <div className="relative aspect-video bg-gray-900 border-2 border-dashed border-rose-500/30 rounded-xl overflow-hidden hover:border-rose-400 transition-colors group">
+                                      {picDriftUrls.end ? (
+                                        <>
+                                          <img
+                                            src={picDriftUrls.end}
+                                            className="w-full h-full object-cover"
+                                          />
                                           <button
                                             type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleRemovePromptFx(idx);
-                                            }}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-all"
-                                            title="Delete"
+                                            onClick={() =>
+                                              removePicDriftImage("end")
+                                            }
+                                            className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
                                           >
                                             ✕
                                           </button>
+                                        </>
+                                      ) : (
+                                        <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                                          <label className="flex flex-col items-center justify-center cursor-pointer">
+                                            <span className="text-rose-400 text-2xl">
+                                              +
+                                            </span>
+                                            <span className="text-xs text-rose-300/70 hover:text-white transition-colors">
+                                              Upload File
+                                            </span>
+                                            <input
+                                              type="file"
+                                              className="hidden"
+                                              accept="image/*"
+                                              onChange={(e) =>
+                                                handlePicDriftUpload(e, "end")
+                                              }
+                                            />
+                                          </label>
+                                          <div className="text-gray-600 text-[10px]">
+                                            - OR -
+                                          </div>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setLibrarySource("field");
+                                              setActiveLibrarySlot("end");
+                                            }}
+                                            className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded hover:bg-rose-900 hover:text-white border border-gray-700 transition-colors"
+                                          >
+                                            Select from Library
+                                          </button>
                                         </div>
-                                      ))
-                                    )}
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               )}
-                            </div>
 
-                            <textarea
-                              value={prompt}
-                              onChange={(e) => setPrompt(e.target.value)}
-                              placeholder={currentVisualTab === "3dx" ? "Describe where you want the camera to move to create a path." : "Describe your vision with a prompt"}
-                              className="w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base leading-relaxed"
-                              rows={3}
-                            />
-                          </div>
-
-                          <div>
-                            {/* ✅ FLEX CONTAINER FOR LABEL + BUTTON */}
-                            <div className="flex justify-between items-center mb-2">
-                              <label className="block text-sm font-semibold text-white">
-                                Title
-                              </label>
-                            </div>
-
-                            <input
-                              type="text"
-                              value={videoTitle}
-                              onChange={(e) => setVideoTitle(e.target.value)}
-                              placeholder="Name your creation..."
-                              className="w-full p-3 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-purple-300/60 backdrop-blur-sm"
-                            />
-                          </div>
-
-                          {/* 3. SETTINGS (Moved below Title) */}
-
-                          {/* VIDEO FX / KIE SETTINGS */}
-                          {currentVisualTab === "videofx" &&
-                            activeEngine === "kie" && (
-                              <div className="space-y-4 sm:space-y-6 animate-in fade-in">
-                                <div className="space-y-2">
+                              {/* 2. PROMPT & TITLE (Moved Up for Non-PicDrift) */}
+                              <div>
+                                <div className="flex items-center justify-between mb-2 relative">
                                   <label className="block text-sm font-semibold text-white">
-                                    AI Model
+                                    Your Creative Vision
                                   </label>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    {[
-                                      { id: "kie-sora-2", label: "Video FX" },
-                                      {
-                                        id: "kie-sora-2-pro",
-                                        label: "Video FX Pro",
-                                      },
-                                    ].map((m) => (
-                                      <button
-                                        key={m.id}
-                                        type="button"
-                                        onClick={() => setKieModel(m.id as any)}
-                                        className={`p-3 rounded-xl border text-left text-sm font-medium ${kieModel === m.id
-                                          ? "bg-cyan-600 border-cyan-500 text-white"
-                                          : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
-                                          }`}
-                                      >
-                                        {m.label}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                                  <div>
-                                    <label className="text-sm font-semibold text-white mb-2 block">
-                                      Duration
-                                    </label>
-                                    <div className="flex gap-2">
-                                      {[10, 15].map((d) => (
-                                        <button
-                                          key={d}
-                                          type="button"
-                                          onClick={() =>
-                                            setKieDuration(d as any)
-                                          }
-                                          className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieDuration === d
-                                            ? "bg-cyan-600 border-cyan-600 text-white"
-                                            : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                            }`}
-                                        >
-                                          {d}s
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                  <div>
-                                    <label className="text-sm font-semibold text-white mb-2 block">
-                                      Aspect Ratio
-                                    </label>
-                                    <div className="flex gap-2">
-                                      {/* ✅ ADDED SQUARE HERE TOO FOR CONSISTENCY */}
-                                      {[
-                                        { id: "landscape", label: "Landscape" },
-                                        { id: "portrait", label: "Portrait" },
-                                      ].map((a) => (
-                                        <button
-                                          key={a.id}
-                                          type="button"
-                                          onClick={() =>
-                                            setKieAspect(a.id as any)
-                                          }
-                                          className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieAspect === a.id
-                                            ? "bg-cyan-600 border-cyan-600 text-white"
-                                            : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                            }`}
-                                        >
-                                          {a.label}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                  <div className="sm:col-span-2">
-                                    <label className="text-sm font-semibold text-white mb-2 block">
-                                      Resolution
-                                    </label>
-                                    <div className="flex gap-2">
-                                      {[
-                                        { id: "720p", label: "720p (Fast)" },
-                                        { id: "1080p", label: "1080p (HD)" },
-                                      ].map((r) => (
-                                        <button
-                                          key={r.id}
-                                          type="button"
-                                          onClick={() =>
-                                            setKieResolution(r.id as any)
-                                          }
-                                          className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieResolution === r.id
-                                            ? "bg-cyan-600 border-cyan-600 text-white"
-                                            : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                            }`}
-                                        >
-                                          {r.label}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
 
-                          {/* PICDRIFT SETTINGS */}
-                          {currentVisualTab === "picdrift" && (
-                            <div className="space-y-6 mb-6">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                                <div>
-                                  <label className="text-sm font-semibold text-white mb-2 block">
-                                    Duration
-                                  </label>
-                                  <div className="flex gap-2">
-                                    {[5, 10].map((d) => (
-                                      <button
-                                        key={d}
-                                        type="button"
-                                        onClick={() => setKieDuration(d as any)}
-                                        className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieDuration === d
-                                          ? "bg-rose-600 border-rose-600 text-white"
-                                          : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                          }`}
-                                      >
-                                        {d}s
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                                <div>
-                                  <label className="text-sm font-semibold text-white mb-2 block">
-                                    Aspect Ratio
-                                  </label>
-                                  <div className="flex gap-2">
-                                    {/* ✅ ADDED SQUARE OPTION HERE */}
-                                    {[
-                                      { id: "landscape", label: "Landscape" },
-                                      { id: "portrait", label: "Portrait" },
-                                      { id: "square", label: "Square" },
-                                    ].map((a) => (
-                                      <button
-                                        key={a.id}
-                                        type="button"
-                                        onClick={() =>
-                                          setKieAspect(a.id as any)
-                                        }
-                                        className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieAspect === a.id
-                                          ? "bg-rose-600 border-rose-600 text-white"
-                                          : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                          }`}
-                                      >
-                                        {a.label}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
+                                  {/* PromptFX Popover Trigger */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowPromptFxMenu(!showPromptFxMenu)}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all shadow-sm ${currentVisualTab === "picdrift"
+                                      ? "bg-rose-900/40 border-rose-500/50 text-rose-300 hover:bg-rose-800/60"
+                                      : currentVisualTab === "studio"
+                                        ? "bg-violet-900/40 border-violet-500/50 text-violet-300 hover:bg-violet-800/60"
+                                        : "bg-cyan-900/40 border-cyan-500/50 text-cyan-300 hover:bg-cyan-800/60"
+                                      }`}
+                                  >
+                                    ✨ PromptFX
+                                  </button>
 
-                                {/* Audio Toggle */}
-                                {user?.view !== "PICDRIFT" && (
-                                  <div className="sm:col-span-2">
-                                    <label className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-gray-800/50 cursor-pointer hover:bg-gray-800 transition-colors">
-                                      <input
-                                        type="checkbox"
-                                        checked={picDriftAudio}
-                                        onChange={(e) => {
-                                          setPicDriftAudio(e.target.checked);
-                                          // If audio enabled, clear end frame ONLY if standard mode
-                                          if (
-                                            e.target.checked &&
-                                            picDriftMode !== "plus"
-                                          ) {
-                                            setPicDriftFrames((prev) => ({
-                                              ...prev,
-                                              end: null,
-                                            }));
-                                            setPicDriftUrls((prev) => ({
-                                              ...prev,
-                                              end: null,
-                                            }));
-                                          }
-                                        }}
-                                        className="w-5 h-5 rounded border-gray-600 text-rose-600 focus:ring-rose-500 bg-gray-700"
-                                      />
-                                      <div>
-                                        <div className="font-semibold text-white text-sm">
-                                          Generate Audio
-                                        </div>
-                                        <div className="text-xs text-gray-400">
-                                          AI generated sound effects{" "}
-                                          {picDriftMode === "plus"
-                                            ? "(Supported with End Frame)"
-                                            : "(Disables End Frame)"}
-                                        </div>
+                                  {/* PromptFX Popover Menu */}
+                                  {showPromptFxMenu && (
+                                    <div className="absolute top-full right-0 mt-2 w-72 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                                      <div className="p-3 border-b border-gray-800 flex justify-between items-center bg-gray-800/30">
+                                        <h4 className="text-xs font-bold text-gray-300 uppercase tracking-widest">Saved Prompts</h4>
+                                        <button
+                                          type="button"
+                                          onClick={() => setIsAddingPromptFx(!isAddingPromptFx)}
+                                          className="text-[10px] bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-white transition-colors"
+                                        >
+                                          {isAddingPromptFx ? "Cancel" : "+ Add New"}
+                                        </button>
                                       </div>
-                                    </label>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
 
-                          {/* OPENAI SETTINGS (Video FX 2) */}
-                          {currentVisualTab === "videofx" &&
-                            activeEngine === "openai" && (
-                              <div className="space-y-4 sm:space-y-6 animate-in fade-in">
-                                <div className="space-y-2">
-                                  <label className="block text-sm font-semibold text-white">
-                                    AI Model
-                                  </label>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    {[
-                                      { id: "sora-2", label: "Video FX 2" },
-                                      {
-                                        id: "sora-2-pro",
-                                        label: "Video FX 2 Pro",
-                                      },
-                                    ].map((model) => (
-                                      <button
-                                        key={model.id}
-                                        type="button"
-                                        onClick={() =>
-                                          setVideoModel(model.id as any)
-                                        }
-                                        className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${videoModel === model.id
-                                          ? "border-cyan-400 bg-cyan-500/20"
-                                          : "border-white/10 bg-gray-800/50"
-                                          }`}
-                                      >
-                                        <div className="font-semibold text-white text-sm">
-                                          {model.label}
-                                        </div>
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                                <div className="space-y-2">
-                                  <label className="block text-sm font-semibold text-white">
-                                    Aspect Ratio
-                                  </label>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    {[
-                                      { ratio: "16:9", label: "Landscape" },
-                                      { ratio: "9:16", label: "Portrait" },
-                                    ].map(({ ratio, label }) => (
-                                      <button
-                                        key={ratio}
-                                        type="button"
-                                        onClick={() => {
-                                          setAspectRatio(ratio as any);
-                                          setVideoSize(
-                                            ratio === "16:9"
-                                              ? "1792x1024"
-                                              : "1024x1792",
-                                          );
-                                        }}
-                                        className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${aspectRatio === ratio
-                                          ? "border-purple-400 bg-purple-500/20"
-                                          : "border-white/10 bg-gray-800/50"
-                                          }`}
-                                      >
-                                        <div className="font-semibold text-white text-sm">
-                                          {label}
-                                        </div>
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                                <div className="space-y-2">
-                                  <label className="block text-sm font-semibold text-white">
-                                    Video Size
-                                  </label>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    {(aspectRatio === "16:9"
-                                      ? [
-                                        {
-                                          size: "1280x720",
-                                          label: "720p HD",
-                                        },
-                                        ...(videoModel === "sora-2-pro"
-                                          ? [
-                                            {
-                                              size: "1792x1024",
-                                              label: "1080p",
-                                            },
-                                          ]
-                                          : []),
-                                      ]
-                                      : [
-                                        {
-                                          size: "720x1280",
-                                          label: "720p HD",
-                                        },
-                                        ...(videoModel === "sora-2-pro"
-                                          ? [
-                                            {
-                                              size: "1024x1792",
-                                              label: "1080p",
-                                            },
-                                          ]
-                                          : []),
-                                      ]
-                                    ).map(({ size, label }) => (
-                                      <button
-                                        key={size}
-                                        type="button"
-                                        onClick={() =>
-                                          setVideoSize(size as any)
-                                        }
-                                        className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${videoSize === size
-                                          ? "border-green-400 bg-green-500/20"
-                                          : "border-white/10 bg-gray-800/50"
-                                          }`}
-                                      >
-                                        <div className="font-semibold text-white text-sm">
-                                          {label}
-                                        </div>
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                                <div className="space-y-2">
-                                  <label className="block text-sm font-semibold text-white">
-                                    Duration
-                                  </label>
-                                  <div className="flex gap-2">
-                                    {[4, 8, 12].map((sec) => (
-                                      <button
-                                        key={sec}
-                                        type="button"
-                                        onClick={() =>
-                                          setVideoDuration(sec as any)
-                                        }
-                                        className={`px-3 py-2 rounded-xl border text-sm flex-1 ${videoDuration === sec
-                                          ? "bg-cyan-500 border-cyan-500 text-white"
-                                          : "bg-gray-800/50 border-white/10 text-purple-200"
-                                          }`}
-                                      >
-                                        {sec}s
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                          {/* VEO 3 SETTINGS (Video FX 3) */}
-                          {currentVisualTab === "videofx" &&
-                            activeEngine === "veo" && (
-                              <div className="space-y-6 animate-in fade-in duration-500">
-                                <div className="space-y-3">
-                                  <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
-                                    Canvas Ratio
-                                  </label>
-                                  <div className="grid grid-cols-2 gap-3">
-                                    {[
-                                      {
-                                        ratio: "16:9",
-                                        label: "Cinematic Landscape",
-                                      },
-                                      {
-                                        ratio: "9:16",
-                                        label: "Social Portrait",
-                                      },
-                                    ].map(({ ratio, label }) => (
-                                      <button
-                                        key={ratio}
-                                        type="button"
-                                        onClick={() =>
-                                          setAspectRatio(ratio as any)
-                                        }
-                                        className={`py-4 px-4 rounded-xl border transition-all text-center ${aspectRatio === ratio
-                                          ? "border-indigo-500 bg-indigo-500/10 text-indigo-100 shadow-[0_0_20px_rgba(99,102,241,0.1)]"
-                                          : "border-slate-800 bg-slate-900/40 text-slate-500 hover:border-slate-700"
-                                          }`}
-                                      >
-                                        <div className="text-xs font-medium tracking-tight">
-                                          {label}
-                                        </div>
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-6">
-                                  <div className="space-y-3">
-                                    <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
-                                      Resolution
-                                    </label>
-                                    <div className="flex bg-slate-900/60 p-1 rounded-xl border border-slate-800">
-                                      {["720p", "1080p", "4k"].map((res) => (
-                                        <button
-                                          key={res}
-                                          type="button"
-                                          onClick={() =>
-                                            setVeoResolution(res as any)
-                                          }
-                                          className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${veoResolution === res
-                                            ? "bg-indigo-500 text-white"
-                                            : "text-slate-500 hover:text-slate-300"
-                                            }`}
-                                        >
-                                          {res.toUpperCase()}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  <div className="space-y-3">
-                                    <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
-                                      Duration
-                                    </label>
-                                    <div className="flex bg-slate-900/60 p-1 rounded-xl border border-slate-800">
-                                      {[4, 6, 8].map((sec) => (
-                                        <button
-                                          key={sec}
-                                          type="button"
-                                          onClick={() =>
-                                            setVeoDuration(sec as any)
-                                          }
-                                          className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${veoDuration === sec
-                                            ? "bg-indigo-500 text-white"
-                                            : "text-slate-500 hover:text-slate-300"
-                                            }`}
-                                        >
-                                          {sec}s
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                          {/* 4. REFERENCE IMAGES */}
-                          {activeEngine !== "kie" ||
-                            videoFxMode !== "picdrift" ? (
-                            <div className="space-y-4">
-                              <div className="flex justify-between items-center">
-                                <label
-                                  className={`block text-sm font-semibold ${activeEngine === "veo" ? "text-indigo-200" : "text-white"}`}
-                                >
-                                  {activeEngine === "veo"
-                                    ? "Composition Assets"
-                                    : "Reference Images"}
-                                </label>
-                                {activeEngine === "veo" && (
-                                  <span className="text-[9px] text-slate-500 uppercase tracking-widest font-medium">
-                                    Input Sequential Logic
-                                  </span>
-                                )}
-                              </div>
-
-                              {activeEngine === "veo" ? (
-                                /* VEO 3 SINGLE SOURCE ASSET (SIMPLIFIED) */
-                                <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-700">
-                                  <div className="flex justify-between items-center">
-                                    <label className="block text-sm font-semibold text-indigo-200">
-                                      Source Asset
-                                    </label>
-                                    <span className="text-[9px] text-indigo-400/60 uppercase tracking-widest font-medium">
-                                      Image to Video / Extend Video
-                                    </span>
-                                  </div>
-
-                                  <div className="w-full h-32 border-2 border-dashed border-indigo-500/30 rounded-xl hover:border-indigo-400 hover:bg-indigo-900/10 transition-all group relative flex items-center justify-center overflow-hidden">
-                                    {referenceImageUrls[0] ? (
-                                      <>
-                                        {referenceImageUrls[0].includes(
-                                          "video",
-                                        ) ||
-                                          referenceImageUrls[0].endsWith(
-                                            ".mp4",
-                                          ) ? (
-                                          <video
-                                            src={referenceImageUrls[0]}
-                                            className="w-full h-full object-contain"
-                                            muted
-                                            autoPlay
-                                            loop
-                                          />
-                                        ) : (
-                                          <img
-                                            src={referenceImageUrls[0]}
-                                            className="w-full h-full object-contain"
-                                          />
-                                        )}
-                                        <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              removeGenericImage(0)
-                                            }
-                                            className="px-3 py-1.5 bg-red-500/80 hover:bg-red-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg backdrop-blur-md transition-colors"
-                                          >
-                                            Remove
-                                          </button>
-                                        </div>
-                                        <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-md rounded-md text-[9px] font-bold text-white uppercase tracking-wider border border-white/10">
-                                          {referenceImageUrls[0].includes(
-                                            "video",
-                                          ) ||
-                                            referenceImageUrls[0].endsWith(".mp4")
-                                            ? "Extend Video Mode"
-                                            : "Image-to-Video Mode"}
-                                        </div>
-                                      </>
-                                    ) : (
-                                      <div className="flex items-center gap-8">
-                                        <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
-                                          <span className="text-2xl mb-1">
-                                            📂
-                                          </span>
-                                          <span className="text-xs text-indigo-300 font-bold group-hover:text-white">
-                                            Upload File
-                                          </span>
+                                      {isAddingPromptFx && (
+                                        <div className="p-3 bg-gray-800/50 border-b border-gray-800 space-y-2">
                                           <input
-                                            type="file"
-                                            className="hidden"
-                                            accept="image/*,video/*"
-                                            onChange={(e) => {
-                                              const file = e.target.files?.[0];
-                                              if (!file) return;
-                                              setReferenceImages([file]);
-                                              setReferenceImageUrls([
-                                                URL.createObjectURL(file),
-                                              ]);
-                                            }}
+                                            type="text"
+                                            placeholder="Name (e.g., Cinematic Lighting)"
+                                            value={newPromptFxName}
+                                            onChange={(e) => setNewPromptFxName(e.target.value)}
+                                            className="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-xs text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none"
                                           />
-                                        </label>
-                                        <div className="h-8 w-px bg-indigo-500/30"></div>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setLibrarySource("field");
-                                            setActiveLibrarySlot("generic");
-                                          }}
-                                          className="flex flex-col items-center group-hover:scale-105 transition-transform"
-                                        >
-                                          <span className="text-2xl mb-1">
-                                            📚
-                                          </span>
-                                          <span className="text-xs text-indigo-300 font-bold group-hover:text-white">
-                                            From Library
-                                          </span>
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                  <p className="text-[10px] text-slate-500 text-center">
-                                    Upload an <b>Image</b> to animate it, or a{" "}
-                                    <b>Video</b> to extend it.
-                                  </p>
-                                </div>
-                              ) : (
-                                /* GENERIC UPLOAD BOX (Pic FX, Video FX 1&2) */
-                                <div className="space-y-3">
-                                  <div className="w-full h-24 border-2 border-dashed border-gray-600 rounded-xl hover:border-cyan-500 hover:bg-gray-800/50 transition-all group relative flex items-center justify-center">
-                                    <div className="flex items-center gap-6">
-                                      <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
-                                        <span className="text-2xl mb-1">
-                                          📂
-                                        </span>
-                                        <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
-                                          Upload File
-                                        </span>
-                                        <input
-                                          type="file"
-                                          className="hidden"
-                                          multiple={
-                                            activeEngine === "studio" &&
-                                            studioMode === "carousel"
-                                          }
-                                          accept="image/*,video/*"
-                                          onChange={handleGenericUpload}
-                                        />
-                                      </label>
-                                      <div className="h-8 w-px bg-gray-600"></div>
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setLibrarySource("field");
-                                          setActiveLibrarySlot("generic");
-                                        }}
-                                        className="flex flex-col items-center group-hover:scale-105 transition-transform"
-                                      >
-                                        <span className="text-2xl mb-1">
-                                          📚
-                                        </span>
-                                        <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
-                                          From Library
-                                        </span>
-                                      </button>
-                                    </div>
-                                    <p className="absolute bottom-2 text-[10px] text-gray-600">
-                                      {activeEngine === "studio" &&
-                                        studioMode === "carousel"
-                                        ? "Up to 14 images"
-                                        : "Single frame (PNG/JPG/MP4)"}
-                                    </p>
-                                  </div>
-                                  {referenceImageUrls.length > 0 && (
-                                    <div className="grid grid-cols-5 gap-2 animate-in fade-in">
-                                      {referenceImageUrls.map((url, index) => (
-                                        <div
-                                          key={index}
-                                          className="relative aspect-square group"
-                                        >
-                                          {url.includes("video") ||
-                                            url.endsWith(".mp4") ? (
-                                            <video
-                                              src={url}
-                                              className="w-full h-full object-cover rounded-lg border border-white/20"
-                                              muted
-                                              onMouseEnter={(e) =>
-                                                e.currentTarget.play()
-                                              }
-                                              onMouseLeave={(e) =>
-                                                e.currentTarget.pause()
-                                              }
-                                            />
-                                          ) : (
-                                            <img
-                                              src={url}
-                                              className="w-full h-full object-cover rounded-lg border border-white/20"
-                                            />
-                                          )}
+                                          <textarea
+                                            placeholder="The prompt text..."
+                                            value={newPromptFxText}
+                                            onChange={(e) => setNewPromptFxText(e.target.value)}
+                                            className="w-full bg-gray-900 border border-gray-700 rounded p-1.5 text-xs text-white placeholder-gray-500 resize-none h-16 focus:border-cyan-500 focus:outline-none"
+                                          />
                                           <button
                                             type="button"
-                                            onClick={() =>
-                                              removeGenericImage(index)
-                                            }
-                                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs"
+                                            onClick={handleAddPromptFx}
+                                            disabled={savePromptFxMutation.isPending || !newPromptFxName.trim() || !newPromptFxText.trim()}
+                                            className="w-full py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-bold rounded transition-colors"
                                           >
-                                            ✕
+                                            Save Prompt
                                           </button>
                                         </div>
-                                      ))}
+                                      )}
+
+                                      <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                                        {promptFxList.length === 0 ? (
+                                          <div className="p-4 text-center text-xs text-gray-500">
+                                            No saved prompts yet.
+                                          </div>
+                                        ) : (
+                                          promptFxList.map((pf: any, idx: number) => (
+                                            <div key={idx} className="group relative border-b border-gray-800/50 last:border-0 hover:bg-gray-800/40 transition-colors">
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setPrompt(pf.prompt);
+                                                  setShowPromptFxMenu(false);
+                                                }}
+                                                className="w-full text-left p-3 pr-10 flex flex-col gap-1"
+                                              >
+                                                <span className="text-sm font-bold text-gray-200">{pf.name}</span>
+                                                <span className="text-xs text-gray-500 truncate">{pf.prompt}</span>
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleRemovePromptFx(idx);
+                                                }}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-all"
+                                                title="Delete"
+                                              >
+                                                ✕
+                                              </button>
+                                            </div>
+                                          ))
+                                        )}
+                                      </div>
                                     </div>
                                   )}
                                 </div>
-                              )}
-                            </div>
-                          ) : null}
 
-                          {/* ✅ UPDATED GENERATE BUTTON */}
-                          <button
-                            type="submit"
-                            disabled={
-                              (currentVisualTab === "3dx" ? driftStartMutation.isPending : generateMediaMutation.isPending) || !prompt.trim()
-                            }
-                            className={`w-full py-4 sm:py-5 px-6 sm:px-8 rounded-2xl transition-all disabled:opacity-50 font-bold text-base sm:text-lg flex flex-col items-center justify-center gap-1 ${activeEngine === "veo"
-                              ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg"
-                              : currentVisualTab === "3dx"
-                                ? "bg-blue-600 hover:bg-blue-500 text-white shadow-lg"
-                                : currentVisualTab === "picdrift"
-                                  ? "bg-rose-600 hover:bg-rose-500 text-white shadow-lg"
-                                  : currentVisualTab === "studio"
-                                    ? "bg-violet-600 hover:bg-violet-500 text-white shadow-lg"
-                                    : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg"
-                              }`}
-                          >
-                            {(currentVisualTab === "3dx" ? driftStartMutation.isPending : generateMediaMutation.isPending) ? (
-                              <div className="flex items-center gap-3">
-                                <LoadingSpinner size="sm" variant="light" />
-                                <span>
-                                  {currentVisualTab === "3dx"
-                                    ? "Extracting 3DX Path"
+                                <textarea
+                                  value={prompt}
+                                  onChange={(e) => setPrompt(e.target.value)}
+                                  placeholder={currentVisualTab === "3dx" ? "Describe where you want the camera to move to create a path." : "Describe your vision with a prompt"}
+                                  className="w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base leading-relaxed"
+                                  rows={3}
+                                />
+                              </div>
+
+                              <div>
+                                {/* ✅ FLEX CONTAINER FOR LABEL + BUTTON */}
+                                <div className="flex justify-between items-center mb-2">
+                                  <label className="block text-sm font-semibold text-white">
+                                    Title
+                                  </label>
+                                </div>
+
+                                <input
+                                  type="text"
+                                  value={videoTitle}
+                                  onChange={(e) => setVideoTitle(e.target.value)}
+                                  placeholder="Name your creation..."
+                                  className="w-full p-3 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-purple-300/60 backdrop-blur-sm"
+                                />
+                              </div>
+
+                              {/* 3. SETTINGS (Moved below Title) */}
+
+                              {/* VIDEO FX / KIE SETTINGS */}
+                              {currentVisualTab === "videofx" &&
+                                activeEngine === "kie" && (
+                                  <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+                                    <div className="space-y-2">
+                                      <label className="block text-sm font-semibold text-white">
+                                        AI Model
+                                      </label>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        {[
+                                          { id: "kie-sora-2", label: "Video FX" },
+                                          {
+                                            id: "kie-sora-2-pro",
+                                            label: "Video FX Pro",
+                                          },
+                                        ].map((m) => (
+                                          <button
+                                            key={m.id}
+                                            type="button"
+                                            onClick={() => setKieModel(m.id as any)}
+                                            className={`p-3 rounded-xl border text-left text-sm font-medium ${kieModel === m.id
+                                              ? "bg-cyan-600 border-cyan-500 text-white"
+                                              : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
+                                              }`}
+                                          >
+                                            {m.label}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                                      <div>
+                                        <label className="text-sm font-semibold text-white mb-2 block">
+                                          Duration
+                                        </label>
+                                        <div className="flex gap-2">
+                                          {[10, 15].map((d) => (
+                                            <button
+                                              key={d}
+                                              type="button"
+                                              onClick={() =>
+                                                setKieDuration(d as any)
+                                              }
+                                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieDuration === d
+                                                ? "bg-cyan-600 border-cyan-600 text-white"
+                                                : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                                }`}
+                                            >
+                                              {d}s
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <label className="text-sm font-semibold text-white mb-2 block">
+                                          Aspect Ratio
+                                        </label>
+                                        <div className="flex gap-2">
+                                          {/* ✅ ADDED SQUARE HERE TOO FOR CONSISTENCY */}
+                                          {[
+                                            { id: "landscape", label: "Landscape" },
+                                            { id: "portrait", label: "Portrait" },
+                                          ].map((a) => (
+                                            <button
+                                              key={a.id}
+                                              type="button"
+                                              onClick={() =>
+                                                setKieAspect(a.id as any)
+                                              }
+                                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieAspect === a.id
+                                                ? "bg-cyan-600 border-cyan-600 text-white"
+                                                : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                                }`}
+                                            >
+                                              {a.label}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                      <div className="sm:col-span-2">
+                                        <label className="text-sm font-semibold text-white mb-2 block">
+                                          Resolution
+                                        </label>
+                                        <div className="flex gap-2">
+                                          {[
+                                            { id: "720p", label: "720p (Fast)" },
+                                            { id: "1080p", label: "1080p (HD)" },
+                                          ].map((r) => (
+                                            <button
+                                              key={r.id}
+                                              type="button"
+                                              onClick={() =>
+                                                setKieResolution(r.id as any)
+                                              }
+                                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieResolution === r.id
+                                                ? "bg-cyan-600 border-cyan-600 text-white"
+                                                : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                                }`}
+                                            >
+                                              {r.label}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                              {/* PICDRIFT SETTINGS */}
+                              {currentVisualTab === "picdrift" && (
+                                <div className="space-y-6 mb-6">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                                    <div>
+                                      <label className="text-sm font-semibold text-white mb-2 block">
+                                        Duration
+                                      </label>
+                                      <div className="flex gap-2">
+                                        {[5, 10].map((d) => (
+                                          <button
+                                            key={d}
+                                            type="button"
+                                            onClick={() => setKieDuration(d as any)}
+                                            className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieDuration === d
+                                              ? "bg-rose-600 border-rose-600 text-white"
+                                              : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                              }`}
+                                          >
+                                            {d}s
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <label className="text-sm font-semibold text-white mb-2 block">
+                                        Aspect Ratio
+                                      </label>
+                                      <div className="flex gap-2">
+                                        {/* ✅ ADDED SQUARE OPTION HERE */}
+                                        {[
+                                          { id: "landscape", label: "Landscape" },
+                                          { id: "portrait", label: "Portrait" },
+                                          { id: "square", label: "Square" },
+                                        ].map((a) => (
+                                          <button
+                                            key={a.id}
+                                            type="button"
+                                            onClick={() =>
+                                              setKieAspect(a.id as any)
+                                            }
+                                            className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieAspect === a.id
+                                              ? "bg-rose-600 border-rose-600 text-white"
+                                              : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                              }`}
+                                          >
+                                            {a.label}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    {/* Audio Toggle */}
+                                    {user?.view !== "PICDRIFT" && (
+                                      <div className="sm:col-span-2">
+                                        <label className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-gray-800/50 cursor-pointer hover:bg-gray-800 transition-colors">
+                                          <input
+                                            type="checkbox"
+                                            checked={picDriftAudio}
+                                            onChange={(e) => {
+                                              setPicDriftAudio(e.target.checked);
+                                              // If audio enabled, clear end frame ONLY if standard mode
+                                              if (
+                                                e.target.checked &&
+                                                picDriftMode !== "plus"
+                                              ) {
+                                                setPicDriftFrames((prev) => ({
+                                                  ...prev,
+                                                  end: null,
+                                                }));
+                                                setPicDriftUrls((prev) => ({
+                                                  ...prev,
+                                                  end: null,
+                                                }));
+                                              }
+                                            }}
+                                            className="w-5 h-5 rounded border-gray-600 text-rose-600 focus:ring-rose-500 bg-gray-700"
+                                          />
+                                          <div>
+                                            <div className="font-semibold text-white text-sm">
+                                              Generate Audio
+                                            </div>
+                                            <div className="text-xs text-gray-400">
+                                              AI generated sound effects{" "}
+                                              {picDriftMode === "plus"
+                                                ? "(Supported with End Frame)"
+                                                : "(Disables End Frame)"}
+                                            </div>
+                                          </div>
+                                        </label>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* OPENAI SETTINGS (Video FX 2) */}
+                              {currentVisualTab === "videofx" &&
+                                activeEngine === "openai" && (
+                                  <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+                                    <div className="space-y-2">
+                                      <label className="block text-sm font-semibold text-white">
+                                        AI Model
+                                      </label>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        {[
+                                          { id: "sora-2", label: "Video FX 2" },
+                                          {
+                                            id: "sora-2-pro",
+                                            label: "Video FX 2 Pro",
+                                          },
+                                        ].map((model) => (
+                                          <button
+                                            key={model.id}
+                                            type="button"
+                                            onClick={() =>
+                                              setVideoModel(model.id as any)
+                                            }
+                                            className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${videoModel === model.id
+                                              ? "border-cyan-400 bg-cyan-500/20"
+                                              : "border-white/10 bg-gray-800/50"
+                                              }`}
+                                          >
+                                            <div className="font-semibold text-white text-sm">
+                                              {model.label}
+                                            </div>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <label className="block text-sm font-semibold text-white">
+                                        Aspect Ratio
+                                      </label>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        {[
+                                          { ratio: "16:9", label: "Landscape" },
+                                          { ratio: "9:16", label: "Portrait" },
+                                        ].map(({ ratio, label }) => (
+                                          <button
+                                            key={ratio}
+                                            type="button"
+                                            onClick={() => {
+                                              setAspectRatio(ratio as any);
+                                              setVideoSize(
+                                                ratio === "16:9"
+                                                  ? "1792x1024"
+                                                  : "1024x1792",
+                                              );
+                                            }}
+                                            className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${aspectRatio === ratio
+                                              ? "border-purple-400 bg-purple-500/20"
+                                              : "border-white/10 bg-gray-800/50"
+                                              }`}
+                                          >
+                                            <div className="font-semibold text-white text-sm">
+                                              {label}
+                                            </div>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <label className="block text-sm font-semibold text-white">
+                                        Video Size
+                                      </label>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        {(aspectRatio === "16:9"
+                                          ? [
+                                            {
+                                              size: "1280x720",
+                                              label: "720p HD",
+                                            },
+                                            ...(videoModel === "sora-2-pro"
+                                              ? [
+                                                {
+                                                  size: "1792x1024",
+                                                  label: "1080p",
+                                                },
+                                              ]
+                                              : []),
+                                          ]
+                                          : [
+                                            {
+                                              size: "720x1280",
+                                              label: "720p HD",
+                                            },
+                                            ...(videoModel === "sora-2-pro"
+                                              ? [
+                                                {
+                                                  size: "1024x1792",
+                                                  label: "1080p",
+                                                },
+                                              ]
+                                              : []),
+                                          ]
+                                        ).map(({ size, label }) => (
+                                          <button
+                                            key={size}
+                                            type="button"
+                                            onClick={() =>
+                                              setVideoSize(size as any)
+                                            }
+                                            className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${videoSize === size
+                                              ? "border-green-400 bg-green-500/20"
+                                              : "border-white/10 bg-gray-800/50"
+                                              }`}
+                                          >
+                                            <div className="font-semibold text-white text-sm">
+                                              {label}
+                                            </div>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <label className="block text-sm font-semibold text-white">
+                                        Duration
+                                      </label>
+                                      <div className="flex gap-2">
+                                        {[4, 8, 12].map((sec) => (
+                                          <button
+                                            key={sec}
+                                            type="button"
+                                            onClick={() =>
+                                              setVideoDuration(sec as any)
+                                            }
+                                            className={`px-3 py-2 rounded-xl border text-sm flex-1 ${videoDuration === sec
+                                              ? "bg-cyan-500 border-cyan-500 text-white"
+                                              : "bg-gray-800/50 border-white/10 text-purple-200"
+                                              }`}
+                                          >
+                                            {sec}s
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                              {/* VEO 3 SETTINGS (Video FX 3) */}
+                              {currentVisualTab === "videofx" &&
+                                activeEngine === "veo" && (
+                                  <div className="space-y-6 animate-in fade-in duration-500">
+                                    <div className="space-y-3">
+                                      <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
+                                        Canvas Ratio
+                                      </label>
+                                      <div className="grid grid-cols-2 gap-3">
+                                        {[
+                                          {
+                                            ratio: "16:9",
+                                            label: "Cinematic Landscape",
+                                          },
+                                          {
+                                            ratio: "9:16",
+                                            label: "Social Portrait",
+                                          },
+                                        ].map(({ ratio, label }) => (
+                                          <button
+                                            key={ratio}
+                                            type="button"
+                                            onClick={() =>
+                                              setAspectRatio(ratio as any)
+                                            }
+                                            className={`py-4 px-4 rounded-xl border transition-all text-center ${aspectRatio === ratio
+                                              ? "border-indigo-500 bg-indigo-500/10 text-indigo-100 shadow-[0_0_20px_rgba(99,102,241,0.1)]"
+                                              : "border-slate-800 bg-slate-900/40 text-slate-500 hover:border-slate-700"
+                                              }`}
+                                          >
+                                            <div className="text-xs font-medium tracking-tight">
+                                              {label}
+                                            </div>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-6">
+                                      <div className="space-y-3">
+                                        <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
+                                          Resolution
+                                        </label>
+                                        <div className="flex bg-slate-900/60 p-1 rounded-xl border border-slate-800">
+                                          {["720p", "1080p", "4k"].map((res) => (
+                                            <button
+                                              key={res}
+                                              type="button"
+                                              onClick={() =>
+                                                setVeoResolution(res as any)
+                                              }
+                                              className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${veoResolution === res
+                                                ? "bg-indigo-500 text-white"
+                                                : "text-slate-500 hover:text-slate-300"
+                                                }`}
+                                            >
+                                              {res.toUpperCase()}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+
+                                      <div className="space-y-3">
+                                        <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
+                                          Duration
+                                        </label>
+                                        <div className="flex bg-slate-900/60 p-1 rounded-xl border border-slate-800">
+                                          {[4, 6, 8].map((sec) => (
+                                            <button
+                                              key={sec}
+                                              type="button"
+                                              onClick={() =>
+                                                setVeoDuration(sec as any)
+                                              }
+                                              className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${veoDuration === sec
+                                                ? "bg-indigo-500 text-white"
+                                                : "text-slate-500 hover:text-slate-300"
+                                                }`}
+                                            >
+                                              {sec}s
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                              {/* 4. REFERENCE IMAGES */}
+                              {activeEngine !== "kie" ||
+                                videoFxMode !== "picdrift" ? (
+                                <div className="space-y-4">
+                                  <div className="flex justify-between items-center">
+                                    <label
+                                      className={`block text-sm font-semibold ${activeEngine === "veo" ? "text-indigo-200" : "text-white"}`}
+                                    >
+                                      {activeEngine === "veo"
+                                        ? "Composition Assets"
+                                        : "Reference Images"}
+                                    </label>
+                                    {activeEngine === "veo" && (
+                                      <span className="text-[9px] text-slate-500 uppercase tracking-widest font-medium">
+                                        Input Sequential Logic
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {activeEngine === "veo" ? (
+                                    /* VEO 3 SINGLE SOURCE ASSET (SIMPLIFIED) */
+                                    <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                                      <div className="flex justify-between items-center">
+                                        <label className="block text-sm font-semibold text-indigo-200">
+                                          Source Asset
+                                        </label>
+                                        <span className="text-[9px] text-indigo-400/60 uppercase tracking-widest font-medium">
+                                          Image to Video / Extend Video
+                                        </span>
+                                      </div>
+
+                                      <div className="w-full h-32 border-2 border-dashed border-indigo-500/30 rounded-xl hover:border-indigo-400 hover:bg-indigo-900/10 transition-all group relative flex items-center justify-center overflow-hidden">
+                                        {referenceImageUrls[0] ? (
+                                          <>
+                                            {referenceImageUrls[0].includes(
+                                              "video",
+                                            ) ||
+                                              referenceImageUrls[0].endsWith(
+                                                ".mp4",
+                                              ) ? (
+                                              <video
+                                                src={referenceImageUrls[0]}
+                                                className="w-full h-full object-contain"
+                                                muted
+                                                autoPlay
+                                                loop
+                                              />
+                                            ) : (
+                                              <img
+                                                src={referenceImageUrls[0]}
+                                                className="w-full h-full object-contain"
+                                              />
+                                            )}
+                                            <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  removeGenericImage(0)
+                                                }
+                                                className="px-3 py-1.5 bg-red-500/80 hover:bg-red-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg backdrop-blur-md transition-colors"
+                                              >
+                                                Remove
+                                              </button>
+                                            </div>
+                                            <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-md rounded-md text-[9px] font-bold text-white uppercase tracking-wider border border-white/10">
+                                              {referenceImageUrls[0].includes(
+                                                "video",
+                                              ) ||
+                                                referenceImageUrls[0].endsWith(".mp4")
+                                                ? "Extend Video Mode"
+                                                : "Image-to-Video Mode"}
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <div className="flex items-center gap-8">
+                                            <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
+                                              <span className="text-2xl mb-1">
+                                                📂
+                                              </span>
+                                              <span className="text-xs text-indigo-300 font-bold group-hover:text-white">
+                                                Upload File
+                                              </span>
+                                              <input
+                                                type="file"
+                                                className="hidden"
+                                                accept="image/*,video/*"
+                                                onChange={(e) => {
+                                                  const file = e.target.files?.[0];
+                                                  if (!file) return;
+                                                  setReferenceImages([file]);
+                                                  setReferenceImageUrls([
+                                                    URL.createObjectURL(file),
+                                                  ]);
+                                                }}
+                                              />
+                                            </label>
+                                            <div className="h-8 w-px bg-indigo-500/30"></div>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setLibrarySource("field");
+                                                setActiveLibrarySlot("generic");
+                                              }}
+                                              className="flex flex-col items-center group-hover:scale-105 transition-transform"
+                                            >
+                                              <span className="text-2xl mb-1">
+                                                📚
+                                              </span>
+                                              <span className="text-xs text-indigo-300 font-bold group-hover:text-white">
+                                                From Library
+                                              </span>
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                      <p className="text-[10px] text-slate-500 text-center">
+                                        Upload an <b>Image</b> to animate it, or a{" "}
+                                        <b>Video</b> to extend it.
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    /* GENERIC UPLOAD BOX (Pic FX, Video FX 1&2) */
+                                    <div className="space-y-3">
+                                      <div className="w-full h-24 border-2 border-dashed border-gray-600 rounded-xl hover:border-cyan-500 hover:bg-gray-800/50 transition-all group relative flex items-center justify-center">
+                                        <div className="flex items-center gap-6">
+                                          <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
+                                            <span className="text-2xl mb-1">
+                                              📂
+                                            </span>
+                                            <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
+                                              Upload File
+                                            </span>
+                                            <input
+                                              type="file"
+                                              className="hidden"
+                                              multiple={
+                                                activeEngine === "studio" &&
+                                                studioMode === "carousel"
+                                              }
+                                              accept="image/*,video/*"
+                                              onChange={handleGenericUpload}
+                                            />
+                                          </label>
+                                          <div className="h-8 w-px bg-gray-600"></div>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setLibrarySource("field");
+                                              setActiveLibrarySlot("generic");
+                                            }}
+                                            className="flex flex-col items-center group-hover:scale-105 transition-transform"
+                                          >
+                                            <span className="text-2xl mb-1">
+                                              📚
+                                            </span>
+                                            <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
+                                              From Library
+                                            </span>
+                                          </button>
+                                        </div>
+                                        <p className="absolute bottom-2 text-[10px] text-gray-600">
+                                          {activeEngine === "studio" &&
+                                            studioMode === "carousel"
+                                            ? "Up to 14 images"
+                                            : "Single frame (PNG/JPG/MP4)"}
+                                        </p>
+                                      </div>
+                                      {referenceImageUrls.length > 0 && (
+                                        <div className="grid grid-cols-5 gap-2 animate-in fade-in">
+                                          {referenceImageUrls.map((url, index) => (
+                                            <div
+                                              key={index}
+                                              className="relative aspect-square group"
+                                            >
+                                              {url.includes("video") ||
+                                                url.endsWith(".mp4") ? (
+                                                <video
+                                                  src={url}
+                                                  className="w-full h-full object-cover rounded-lg border border-white/20"
+                                                  muted
+                                                  onMouseEnter={(e) =>
+                                                    e.currentTarget.play()
+                                                  }
+                                                  onMouseLeave={(e) =>
+                                                    e.currentTarget.pause()
+                                                  }
+                                                />
+                                              ) : (
+                                                <img
+                                                  src={url}
+                                                  className="w-full h-full object-cover rounded-lg border border-white/20"
+                                                />
+                                              )}
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  removeGenericImage(index)
+                                                }
+                                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs"
+                                              >
+                                                ✕
+                                              </button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : null}
+
+                              {/* ✅ UPDATED GENERATE BUTTON */}
+                              <button
+                                type="submit"
+                                disabled={
+                                  (currentVisualTab === "3dx" ? driftStartMutation.isPending : generateMediaMutation.isPending) || !prompt.trim()
+                                }
+                                className={`w-full py-4 sm:py-5 px-6 sm:px-8 rounded-2xl transition-all disabled:opacity-50 font-bold text-base sm:text-lg flex flex-col items-center justify-center gap-1 ${activeEngine === "veo"
+                                  ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg"
+                                  : currentVisualTab === "3dx"
+                                    ? "bg-blue-600 hover:bg-blue-500 text-white shadow-lg"
                                     : currentVisualTab === "picdrift"
-                                      ? "Generating Drift"
+                                      ? "bg-rose-600 hover:bg-rose-500 text-white shadow-lg"
                                       : currentVisualTab === "studio"
-                                        ? "Painting Your Image"
-                                        : "Creating Your Video"}
-                                  ...
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-3 uppercase tracking-widest text-sm">
-                                {currentVisualTab === "3dx"
-                                  ? "Generate 3DX Path"
-                                  : currentVisualTab === "picdrift"
-                                    ? "Generate PicDrift"
-                                    : currentVisualTab === "studio"
-                                      ? "Generate Image"
-                                      : "Generate Video"}
-                              </div>
-                            )}
-                          </button>
-                        </>
-                      )}
-                    </form>
+                                        ? "bg-violet-600 hover:bg-violet-500 text-white shadow-lg"
+                                        : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg"
+                                  }`}
+                              >
+                                {(currentVisualTab === "3dx" ? driftStartMutation.isPending : generateMediaMutation.isPending) ? (
+                                  <div className="flex items-center gap-3">
+                                    <LoadingSpinner size="sm" variant="light" />
+                                    <span>
+                                      {currentVisualTab === "3dx"
+                                        ? "Extracting 3DX Path"
+                                        : currentVisualTab === "picdrift"
+                                          ? "Generating Drift"
+                                          : currentVisualTab === "studio"
+                                            ? "Painting Your Image"
+                                            : "Creating Your Video"}
+                                      ...
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-3 uppercase tracking-widest text-sm">
+                                    {currentVisualTab === "3dx"
+                                      ? "Generate 3DX Path"
+                                      : currentVisualTab === "picdrift"
+                                        ? "Generate PicDrift"
+                                        : currentVisualTab === "studio"
+                                          ? "Generate Image"
+                                          : "Generate Video"}
+                                  </div>
+                                )}
+                              </button>
+                            </>
+                          )}
+                        </form>
                       </div>
                     </div>
 
