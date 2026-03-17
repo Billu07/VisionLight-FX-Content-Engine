@@ -541,12 +541,12 @@ export function AssetLibrary({
                   >
                     {/* THUMBNAIL LOGIC */}
                     {activeTab === "STORYBOARD" && (
-                      <div className="absolute top-2 right-2 bg-indigo-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-lg z-20 pointer-events-none">
+                      <div className="absolute top-2 left-2 bg-indigo-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-lg z-20 pointer-events-none">
                         {index + 1}
                       </div>
                     )}
                     {activeTab === "STORYBOARD" && (
-                      <div className="absolute top-2 left-2 flex gap-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="absolute top-2 right-2 flex gap-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();

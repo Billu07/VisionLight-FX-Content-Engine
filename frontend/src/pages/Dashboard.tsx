@@ -22,6 +22,7 @@ import { MobileNavbar } from "../components/MobileNavbar";
 // Import your logo images
 import picdriftLogo from "../assets/picdrift.png";
 import fxLogo from "../assets/fx.png";
+import driftLogo from "../assets/drift_icon.png";
 
 type EngineType = "kie" | "studio" | "openai" | "veo" | "3dx";
 type StudioMode = "image" | "carousel" | "edit";
@@ -1477,12 +1478,12 @@ function Dashboard() {
                               type="button"
                               onClick={() => setActiveEngine("3dx")}
                               className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${currentVisualTab === "3dx"
-                                ? "border-white/20 bg-gradient-to-br from-indigo-600 to-blue-600 shadow-2xl scale-105"
+                                ? "border-white/20 bg-gradient-to-br from-purple-600 to-indigo-600 shadow-2xl scale-105"
                                 : "border-white/5 bg-gray-800/50 hover:border-white/10"
                                 }`}
                             >
                               <div className="font-semibold text-xs sm:text-sm text-white uppercase tracking-wider flex items-center justify-center sm:justify-start w-full gap-1 sm:gap-2">
-                                <img src="/drift_icon.png" alt="3DX" className="h-6 w-auto brightness-0 invert" />
+                                <img src={driftLogo} alt="3DX" className="h-5 w-auto" />
                               </div>
                             </button>
                           </>
