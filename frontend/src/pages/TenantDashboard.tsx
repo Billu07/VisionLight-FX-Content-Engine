@@ -334,24 +334,28 @@ export default function TenantDashboard() {
                         onChange={e => setConfig({ ...config, falApiKey: e.target.value })}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Kling/KIE AI Key</label>
-                      <input
-                        type="password"
-                        className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white focus:border-brand-accent outline-none font-mono"
-                        value={config.kieApiKey}
-                        onChange={e => setConfig({ ...config, kieApiKey: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">OpenAI Key</label>
-                      <input
-                        type="password"
-                        className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white focus:border-brand-accent outline-none font-mono"
-                        value={config.openaiApiKey}
-                        onChange={e => setConfig({ ...config, openaiApiKey: e.target.value })}
-                      />
-                    </div>
+                    {adminUser?.view !== "PICDRIFT" && (
+                      <>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Kling/KIE AI Key</label>
+                          <input
+                            type="password"
+                            className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white focus:border-brand-accent outline-none font-mono"
+                            value={config.kieApiKey}
+                            onChange={e => setConfig({ ...config, kieApiKey: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">OpenAI Key</label>
+                          <input
+                            type="password"
+                            className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white focus:border-brand-accent outline-none font-mono"
+                            value={config.openaiApiKey}
+                            onChange={e => setConfig({ ...config, openaiApiKey: e.target.value })}
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
                 <button

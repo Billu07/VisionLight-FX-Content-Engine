@@ -69,7 +69,8 @@ export default function SuperAdminDashboard() {
     adminPassword: "",
     adminName: "",
     maxUsers: 5,
-    maxProjectsTotal: 20
+    maxProjectsTotal: 20,
+    view: "VISIONLIGHT"
   });
 
   const [newDemo, setNewDemo] = useState({
@@ -563,6 +564,17 @@ export default function SuperAdminDashboard() {
                 <div className="space-y-2">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Storage Limit (MB)</label>
                     <input type="number" className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white" defaultValue={500} onChange={e => setNewTenant({ ...newTenant, maxStorageMb: parseInt(e.target.value) } as any)} />
+                </div>
+                <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform View</label>
+                    <select
+                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                      value={newTenant.view}
+                      onChange={e => setNewTenant({ ...newTenant, view: e.target.value })}
+                    >
+                      <option value="VISIONLIGHT">VisionLight View (Full)</option>
+                      <option value="PICDRIFT">PicDrift View (Limited)</option>
+                    </select>
                 </div>
                 <div className="border-t border-gray-800 pt-6 space-y-4">
                   <h4 className="text-[10px] font-bold text-brand-accent uppercase tracking-widest">Tenant Admin Account</h4>

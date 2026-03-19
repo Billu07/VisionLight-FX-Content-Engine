@@ -32,11 +32,13 @@ router.get("/organizations", async (req: AuthenticatedRequest, res) => {
 
 // Create a new Tenant (Organization + Admin User)
 router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
-  const { orgName, adminEmail, adminPassword, adminName, maxUsers, maxProjectsTotal, maxStorageMb } = req.body;
+  const { orgName, adminEmail, adminPassword, adminName, maxUsers, maxProjectsTotal, maxStorageMb, view } = req.body;
 
   if (!orgName || !adminEmail || !adminPassword) {
     return res.status(400).json({ error: "Missing required fields" });
   }
+
+  const userView = view === "PICDRIFT" ? "PICDRIFT" : "VISIONLIGHT";
 
   try {
     // 1. Create Organization
@@ -64,7 +66,7 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
       adminUser = await dbService.adminUpdateUser(existingUser.id, {
         organizationId: org.id,
         role: "ADMIN",
-        view: "VISIONLIGHT",
+        view: userView,
         name: adminName || existingUser.name,
         // Reset credits to 0 - Tenant must add credits or configure keys
         creditsPicDrift: 0,
@@ -75,14 +77,53 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
         creditsVideoFX3: 0,
         creditSystem: "INTERNAL"
       });
+
+      // 3c. Migrate Data to New Organization
+      // Move any existing projects to the new organization
+      await prisma.project.updateMany({
+        where: { userId: existingUser.id },
+        data: { organizationId: org.id }
+      });
+
+      // Find assets that belong to the user but are not explicitly assigned to a project (or are in the default org)
+      // Actually, let's create a default project to hold migrated demo assets
+      const migratedProject = await prisma.project.create({
+        data: {
+          name: "Migrated Demo Assets",
+          userId: existingUser.id,
+          organizationId: org.id,
+        }
+      });
+
+      // Update all assets belonging to the user to point to the new org, and assign them to the migrated project if they have none
+      await prisma.asset.updateMany({
+        where: { userId: existingUser.id, projectId: null },
+        data: { organizationId: org.id, projectId: migratedProject.id }
+      });
+      // Also update org ID for assets that ALREADY have a project (since we migrated the projects too)
+      await prisma.asset.updateMany({
+        where: { userId: existingUser.id, projectId: { not: null } },
+        data: { organizationId: org.id }
+      });
+
+      // Do the same for posts
+      await prisma.post.updateMany({
+        where: { userId: existingUser.id, projectId: null },
+        data: { organizationId: org.id, projectId: migratedProject.id }
+      });
+      await prisma.post.updateMany({
+        where: { userId: existingUser.id, projectId: { not: null } },
+        data: { organizationId: org.id }
+      });
+
       console.log(`✅ Fully Migrated and Synced user ${adminEmail} to new Tenant Org: ${orgName}`);
     } else {
-      // 3c. Create Brand New Admin User (Starts with 0 credits automatically now)
+      // 3d. Create Brand New Admin User (Starts with 0 credits automatically now)
       adminUser = await AuthService.createSystemUser(
         adminEmail,
         adminPassword,
         adminName || `${orgName} Admin`,
-        "VISIONLIGHT",
+        userView,
         3,
         org.id,
         "ADMIN"

@@ -63,6 +63,7 @@ export function EditAssetModal({
   const [newPromptFxName, setNewPromptFxName] = useState("");
   const [newPromptFxText, setNewPromptFxText] = useState("");
   const [isAddingPromptFx, setIsAddingPromptFx] = useState(false);
+  const [isUploadingInitial, setIsUploadingInitial] = useState(false);
 
   const { data: promptFxList = [] } = useQuery({
     queryKey: ["prompt-fx"],
@@ -471,16 +472,17 @@ export function EditAssetModal({
                   <p className="text-gray-400 max-w-sm">To use the 3DX Editor, you need a starting image. Upload one or select from your library.</p>
                 </div>
                 <div className="flex gap-4">
-                  <label className="cursor-pointer px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all">
-                    Upload Image
+                  <label className={`cursor-pointer px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${isUploadingInitial ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    {isUploadingInitial ? <LoadingSpinner size="sm" variant="light" /> : "Upload Image"}
                     <input
                       type="file"
                       className="hidden"
                       accept="image/*"
+                      disabled={isUploadingInitial}
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
-                        setIsProcessing(true);
+                        setIsUploadingInitial(true);
                         try {
                           const formData = new FormData();
                           formData.append("image", file);
@@ -497,7 +499,7 @@ export function EditAssetModal({
                         } catch (err: any) {
                           alert("Upload failed: " + err.message);
                         } finally {
-                          setIsProcessing(false);
+                          setIsUploadingInitial(false);
                         }
                       }}
                     />
