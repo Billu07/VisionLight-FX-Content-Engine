@@ -905,6 +905,7 @@ function Dashboard() {
                   const formData = new FormData();
                   formData.append("image", file);
                   formData.append("raw", "true");
+                  formData.append("aspectRatio", "3DX_FRAME");
                   const activeProject = localStorage.getItem(
                     "visionlight_active_project",
                   );
