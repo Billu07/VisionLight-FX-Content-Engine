@@ -175,7 +175,7 @@ export function EditAssetModal({
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [driftPostId, currentAsset.id, queryClient]);
+  }, [driftPostId, currentAsset?.id, queryClient]);
 
   // === MUTATION 1: TEXT EDIT ===
   const textEditMutation = useMutation({
