@@ -445,7 +445,6 @@ export function EditAssetModal({
               {activeTab === "convert" && "Convert FX"}
               {activeTab === "drift" && (
                 <div className="flex items-center gap-2">
-                  <span>3DX</span>
                   <img src={drift_icon} alt="Drift" className="h-4 w-auto" />
                   <span>Camera FX</span>
                 </div>
@@ -488,7 +487,7 @@ export function EditAssetModal({
                           formData.append("raw", "true");
                           const activeProject = localStorage.getItem("visionlight_active_project");
                           if (activeProject) formData.append("projectId", activeProject);
-                          
+
                           const res = await apiEndpoints.uploadAssetSync(formData);
                           if (res.data.success && res.data.asset) {
                             setHistory([res.data.asset]);
