@@ -415,105 +415,122 @@ export function EditAssetModal({
         </button>
 
         {/* LEFT: CANVAS */}
-        <div className="flex-1 bg-black flex flex-col items-center justify-center p-4 relative border-r border-gray-800 group">
-          {driftVideoUrl ? (
-            <div className="w-full h-full flex flex-col items-center justify-center">
-              <DriftFrameExtractor
-                videoUrl={driftVideoUrl}
-                onExtract={handleFrameExtraction}
-                onCancel={() => setDriftVideoUrl(null)}
-              />
+        <div className="flex-1 bg-black flex flex-col border-r border-gray-800 relative group overflow-hidden">
+          {/* EDITOR TITLE BAR */}
+          <div className="w-full bg-black border-b border-gray-800 p-3 sm:p-4 flex justify-center items-center z-30 shadow-md shrink-0">
+            <div className="text-white px-6 py-1.5 rounded-full font-bold tracking-widest text-xs sm:text-sm border border-white/10 bg-gray-800/80 shadow-inner flex items-center gap-2">
+              {activeTab === "pro" && "PRO FX"}
+              {activeTab === "convert" && "Convert FX"}
+              {activeTab === "drift" && (
+                <div className="flex items-center gap-2">
+                  <span>3DX</span>
+                  <img src={drift_icon} alt="Drift" className="h-4 w-auto" />
+                  <span>Camera FX</span>
+                </div>
+              )}
             </div>
-          ) : (
-            <>
-              {/* Undo/Redo */}
-              <div className="absolute top-4 right-4 z-10 flex gap-2">
-                <button
-                  onClick={handleUndo}
-                  disabled={currentIndex === 0}
-                  className="p-2 bg-gray-800/80 rounded-full text-white disabled:opacity-30 hover:bg-gray-700 backdrop-blur-md"
-                >
-                  ↩️
-                </button>
-                <span className="bg-black/50 text-white px-3 py-1.5 rounded-full text-xs font-mono backdrop-blur-md flex items-center">
-                  v{currentIndex + 1}
-                </span>
-                <button
-                  onClick={handleRedo}
-                  disabled={currentIndex === history.length - 1}
-                  className="p-2 bg-gray-800/80 rounded-full text-white disabled:opacity-30 hover:bg-gray-700 backdrop-blur-md"
-                >
-                  ↪️
-                </button>
-              </div>
+          </div>
 
-              {referenceAsset &&
-                activeTab !== "drift" &&
-                activeTab !== "convert" && (
-                  <div className="absolute bottom-4 right-4 w-32 border-2 border-purple-500 rounded-lg overflow-hidden bg-gray-800 shadow-2xl z-20">
-                    <div className="relative aspect-video">
-                      <img
-                        src={referenceAsset.url}
-                        className="w-full h-full object-cover opacity-90"
-                        crossOrigin="anonymous"
-                      />
-                      <button
-                        onClick={() => setReferenceAsset(null)}
-                        className="absolute top-1 right-1 bg-red-600/80 text-white w-5 h-5 flex items-center justify-center text-xs rounded-full hover:bg-red-500"
-                      >
-                        ✕
-                      </button>
+          <div className="flex-1 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+            {driftVideoUrl ? (
+              <div className="w-full h-full flex flex-col items-center justify-center">
+                <DriftFrameExtractor
+                  videoUrl={driftVideoUrl}
+                  onExtract={handleFrameExtraction}
+                  onCancel={() => setDriftVideoUrl(null)}
+                />
+              </div>
+            ) : (
+              <>
+                {/* Undo/Redo */}
+                <div className="absolute top-4 right-4 z-10 flex gap-2">
+                  <button
+                    onClick={handleUndo}
+                    disabled={currentIndex === 0}
+                    className="p-2 bg-gray-800/80 rounded-full text-white disabled:opacity-30 hover:bg-gray-700 backdrop-blur-md"
+                  >
+                    ↩️
+                  </button>
+                  <span className="bg-black/50 text-white px-3 py-1.5 rounded-full text-xs font-mono backdrop-blur-md flex items-center">
+                    v{currentIndex + 1}
+                  </span>
+                  <button
+                    onClick={handleRedo}
+                    disabled={currentIndex === history.length - 1}
+                    className="p-2 bg-gray-800/80 rounded-full text-white disabled:opacity-30 hover:bg-gray-700 backdrop-blur-md"
+                  >
+                    ↪️
+                  </button>
+                </div>
+
+                {referenceAsset &&
+                  activeTab !== "drift" &&
+                  activeTab !== "convert" && (
+                    <div className="absolute bottom-4 right-4 w-32 border-2 border-purple-500 rounded-lg overflow-hidden bg-gray-800 shadow-2xl z-20">
+                      <div className="relative aspect-video">
+                        <img
+                          src={referenceAsset.url}
+                          className="w-full h-full object-cover opacity-90"
+                          crossOrigin="anonymous"
+                        />
+                        <button
+                          onClick={() => setReferenceAsset(null)}
+                          className="absolute top-1 right-1 bg-red-600/80 text-white w-5 h-5 flex items-center justify-center text-xs rounded-full hover:bg-red-500"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className="bg-purple-900/90 text-[8px] text-center py-0.5 text-white font-bold tracking-wide">
+                        REFERENCE
+                      </div>
                     </div>
-                    <div className="bg-purple-900/90 text-[8px] text-center py-0.5 text-white font-bold tracking-wide">
-                      REFERENCE
+                  )}
+
+                {isProcessing && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30 backdrop-blur-sm">
+                    <div className="flex flex-col items-center gap-4 w-full max-w-sm px-6">
+                      {activeTab === "drift" && driftPostId ? (
+                        <ProgressBar
+                          progress={driftProgress}
+                          label={driftStatusMsg}
+                        />
+                      ) : (
+                        <>
+                          <LoadingSpinner size="lg" variant="neon" />
+                          <span className="text-cyan-300 font-bold animate-pulse mt-4">
+                            {driftStatusMsg}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
 
-              {isProcessing && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30 backdrop-blur-sm">
-                  <div className="flex flex-col items-center gap-4 w-full max-w-sm px-6">
-                    {activeTab === "drift" && driftPostId ? (
-                      <ProgressBar
-                        progress={driftProgress}
-                        label={driftStatusMsg}
-                      />
-                    ) : (
-                      <>
-                        <LoadingSpinner size="lg" variant="neon" />
-                        <span className="text-cyan-300 font-bold animate-pulse mt-4">
-                          {driftStatusMsg}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {isCropping ? (
-                <ReactCrop
-                  crop={crop}
-                  onChange={(_, percentCrop) => setCrop(percentCrop)}
-                  onComplete={(c) => setCompletedCrop(c)}
-                  aspect={cropAspect}
-                  className="max-h-[80vh] flex items-center justify-center"
-                >
+                {isCropping ? (
+                  <ReactCrop
+                    crop={crop}
+                    onChange={(_, percentCrop) => setCrop(percentCrop)}
+                    onComplete={(c) => setCompletedCrop(c)}
+                    aspect={cropAspect}
+                    className="max-h-[80vh] flex items-center justify-center"
+                  >
+                    <img
+                      ref={imgRef}
+                      src={getCORSProxyUrl(currentAsset.url)}
+                      className="max-h-[80vh] object-contain rounded-lg border border-gray-700 shadow-2xl"
+                      crossOrigin="anonymous"
+                    />
+                  </ReactCrop>
+                ) : (
                   <img
-                    ref={imgRef}
                     src={getCORSProxyUrl(currentAsset.url)}
                     className="max-h-[80vh] object-contain rounded-lg border border-gray-700 shadow-2xl"
                     crossOrigin="anonymous"
                   />
-                </ReactCrop>
-              ) : (
-                <img
-                  src={getCORSProxyUrl(currentAsset.url)}
-                  className="max-h-[80vh] object-contain rounded-lg border border-gray-700 shadow-2xl"
-                  crossOrigin="anonymous"
-                />
-              )}
-            </>
-          )}
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         {/* RIGHT: CONTROLS */}
