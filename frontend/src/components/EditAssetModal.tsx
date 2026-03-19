@@ -446,7 +446,7 @@ export function EditAssetModal({
               {activeTab === "drift" && (
                 <div className="flex items-center gap-2">
                   <img src={drift_icon} alt="Drift" className="h-4 w-auto" />
-                  <span>Camera FX</span>
+                  <span>Camera</span>
                 </div>
               )}
             </div>
@@ -933,7 +933,7 @@ export function EditAssetModal({
                   </div>
                   <textarea
                     className="w-full flex-1 bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none leading-relaxed placeholder-gray-500"
-                    placeholder="e.g. 'A silver robot' (Helps maintain identity)"
+                    placeholder="e.g. Describe where you want the camera to move to create a path."
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     disabled={isProcessing}
