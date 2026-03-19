@@ -235,6 +235,7 @@ function Dashboard() {
   const [editingVideoUrl, setEditingVideoUrl] = useState<string | undefined>(
     undefined,
   );
+  const [showEditorModal, setShowEditorModal] = useState(false);
 
   // New State for Extraction (Timeline Scissors)
   const [extractingVideoUrl, setExtractingVideoUrl] = useState<string | null>(
@@ -1476,7 +1477,9 @@ function Dashboard() {
                             {/* TAB 3: 3DX */}
                             <button
                               type="button"
-                              onClick={() => setActiveEngine("3dx")}
+                              onClick={() => {
+                                setShowEditorModal(true);
+                              }}
                               className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${currentVisualTab === "3dx"
                                 ? "border-white/20 bg-gradient-to-br from-purple-600 to-indigo-600 shadow-2xl scale-105"
                                 : "border-white/5 bg-gray-800/50 hover:border-white/10"
@@ -1618,7 +1621,7 @@ function Dashboard() {
                         )}
 
                         {/* PICDRIFT SUB-MENU */}
-                        {currentVisualTab === "picdrift" && (
+                        {currentVisualTab === "picdrift" && user?.view !== "PICDRIFT" && (
                           <div className="mb-6 animate-in fade-in space-y-4">
                             <div className="flex bg-gray-900/50 p-1 rounded-xl w-full sm:max-w-sm mx-auto border border-white/5">
                               <button
@@ -2819,12 +2822,14 @@ function Dashboard() {
               currentConfig={brandConfig}
             />
           )}
-          {editingAsset && (
+          {(editingAsset || showEditorModal) && (
             <EditAssetModal
-              asset={editingAsset}
+              asset={editingAsset || undefined}
+              initialTab={showEditorModal ? "drift" : undefined}
               initialVideoUrl={editingVideoUrl}
               onClose={() => {
                 setEditingAsset(null);
+                setShowEditorModal(false);
                 setEditingVideoUrl(undefined); // Reset
               }}
             />

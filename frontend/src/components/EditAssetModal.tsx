@@ -17,7 +17,8 @@ interface Asset {
 }
 
 interface EditAssetModalProps {
-  asset: Asset;
+  asset?: Asset;
+  initialTab?: "pro" | "drift" | "convert";
   onClose: () => void;
   initialVideoUrl?: string;
   onEditSuccess?: (originalId: string, newAsset: Asset) => void;
@@ -25,38 +26,21 @@ interface EditAssetModalProps {
 
 type EditorMode = "pro" | "drift" | "convert";
 
-interface DriftPreset {
-  label: string;
-  h: number;
-  v: number;
-  z: number;
-  icon: string;
-}
-
-const DRIFT_PRESETS: DriftPreset[] = [
-  { label: "Orbit Right", h: 5, v: 0, z: 0, icon: "↪️" },
-  { label: "Orbit Left", h: -5, v: 0, z: 0, icon: "↩️" },
-  { label: "Dolly Right", h: 3, v: 0, z: 0, icon: "➡️" },
-  { label: "Dolly Left", h: -3, v: 0, z: 0, icon: "⬅️" },
-  { label: "Crane Up", h: 0, v: 5, z: 0, icon: "⬆️" },
-  { label: "Crane Down", h: 0, v: -5, z: 0, icon: "⬇️" },
-  { label: "Zoom In", h: 0, v: 0, z: 5, icon: "🔍" },
-];
-
 export function EditAssetModal({
   asset: initialAsset,
+  initialTab,
   onClose,
   initialVideoUrl,
   onEditSuccess,
 }: EditAssetModalProps) {
   const queryClient = useQueryClient();
   const refFileInput = useRef<HTMLInputElement>(null);
-  const [history, setHistory] = useState<Asset[]>([initialAsset]);
+  const [history, setHistory] = useState<Asset[]>(initialAsset ? [initialAsset] : []);
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentAsset = history[currentIndex];
 
   const [activeTab, setActiveTab] = useState<EditorMode>(
-    initialVideoUrl ? "drift" : "pro",
+    initialTab || (initialVideoUrl ? "drift" : "pro"),
   );
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -74,6 +58,43 @@ export function EditAssetModal({
   const [showRefSelector, setShowRefSelector] = useState(false);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
 
+  // PromptFX State
+  const [showPromptFxMenu, setShowPromptFxMenu] = useState(false);
+  const [newPromptFxName, setNewPromptFxName] = useState("");
+  const [newPromptFxText, setNewPromptFxText] = useState("");
+  const [isAddingPromptFx, setIsAddingPromptFx] = useState(false);
+
+  const { data: promptFxList = [] } = useQuery({
+    queryKey: ["prompt-fx"],
+    queryFn: async () => {
+      const res = await apiEndpoints.getPromptFx();
+      return res.data.promptFx || [];
+    },
+  });
+
+  const savePromptFxMutation = useMutation({
+    mutationFn: (newPromptFx: { name: string; prompt: string }[]) =>
+      apiEndpoints.savePromptFx(newPromptFx),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["prompt-fx"] });
+      setNewPromptFxName("");
+      setNewPromptFxText("");
+      setIsAddingPromptFx(false);
+    },
+  });
+
+  const handleAddPromptFx = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPromptFxName.trim() || !newPromptFxText.trim()) return;
+    const newList = [...promptFxList, { name: newPromptFxName.trim(), prompt: newPromptFxText.trim() }];
+    savePromptFxMutation.mutate(newList);
+  };
+
+  const handleRemovePromptFx = (indexToRemove: number) => {
+    const newList = promptFxList.filter((_: any, idx: number) => idx !== indexToRemove);
+    savePromptFxMutation.mutate(newList);
+  };
+
   // Convert Tab State
   const [convertTargetRatio, setConvertTargetRatio] = useState<
     "16:9" | "9:16" | "1:1"
@@ -81,11 +102,11 @@ export function EditAssetModal({
   const [convertMode, setConvertMode] = useState<"auto" | "custom">("custom");
 
   // Drift State
-  const [driftParams, setDriftParams] = useState({
+  const driftParams = {
     horizontal: 0,
     vertical: 0,
     zoom: 0,
-  });
+  };
 
   const [driftVideoUrl, setDriftVideoUrl] = useState<string | null>(
     initialVideoUrl || null,
@@ -97,11 +118,12 @@ export function EditAssetModal({
   const { data: allAssets = [] } = useQuery({
     queryKey: ["assets"],
     queryFn: async () => (await apiEndpoints.getAssets()).data.assets,
-    enabled: showRefSelector,
+    enabled: showRefSelector || !currentAsset,
   });
 
   // 1. RECOVERY LOGIC
   useEffect(() => {
+    if (!currentAsset) return;
     const pendingPostId = localStorage.getItem(
       `active_drift_post_${currentAsset.id}`,
     );
@@ -110,11 +132,11 @@ export function EditAssetModal({
       setDriftPostId(pendingPostId);
       setIsProcessing(true);
     }
-  }, [currentAsset.id]);
+  }, [currentAsset?.id]);
 
   // 2. POLLING LOGIC
   useEffect(() => {
-    if (!driftPostId) return;
+    if (!driftPostId || !currentAsset) return;
 
     const interval = setInterval(async () => {
       try {
@@ -303,7 +325,7 @@ export function EditAssetModal({
     setHistory(newHistory);
     setCurrentIndex(newHistory.length - 1);
     if (activeTab !== "drift") setPrompt("");
-    if (onEditSuccess) onEditSuccess(initialAsset.id, newAsset);
+    if (onEditSuccess && initialAsset) onEditSuccess(initialAsset.id, newAsset);
     queryClient.invalidateQueries({ queryKey: ["assets"] });
   };
 
@@ -439,6 +461,49 @@ export function EditAssetModal({
                   onExtract={handleFrameExtraction}
                   onCancel={() => setDriftVideoUrl(null)}
                 />
+              </div>
+            ) : !currentAsset ? (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-6 text-center animate-in fade-in">
+                <div className="w-24 h-24 bg-gray-800/50 rounded-full flex items-center justify-center border border-gray-700">
+                  <span className="text-4xl text-gray-500">📷</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white mb-2">Upload a Reference Image</h3>
+                  <p className="text-gray-400 max-w-sm">To use the 3DX Editor, you need a starting image. Upload one or select from your library.</p>
+                </div>
+                <div className="flex gap-4">
+                  <label className="cursor-pointer px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all">
+                    Upload Image
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setIsProcessing(true);
+                        try {
+                          const formData = new FormData();
+                          formData.append("image", file);
+                          formData.append("raw", "true");
+                          const activeProject = localStorage.getItem("visionlight_active_project");
+                          if (activeProject) formData.append("projectId", activeProject);
+                          
+                          const res = await apiEndpoints.uploadAssetSync(formData);
+                          if (res.data.success && res.data.asset) {
+                            setHistory([res.data.asset]);
+                            setCurrentIndex(0);
+                            queryClient.invalidateQueries({ queryKey: ["assets"] });
+                          }
+                        } catch (err: any) {
+                          alert("Upload failed: " + err.message);
+                        } finally {
+                          setIsProcessing(false);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
               </div>
             ) : (
               <>
@@ -756,34 +821,116 @@ export function EditAssetModal({
 
             {/* DRIFT UI */}
             {activeTab === "drift" && (
-              <div className="space-y-6 animate-in fade-in h-full flex flex-col">
-                <div className="grid grid-cols-3 gap-2">
-                  {DRIFT_PRESETS.map((preset) => (
-                    <button
-                      key={preset.label}
-                      onClick={() =>
-                        setDriftParams({
-                          horizontal: preset.h,
-                          vertical: preset.v,
-                          zoom: preset.z,
-                        })
-                      }
-                      className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg p-2 text-center transition-all active:scale-95 flex flex-col items-center"
-                    >
-                      <span className="text-lg">{preset.icon}</span>
-                      <span className="text-[9px] text-gray-300 font-bold block mt-1">
-                        {preset.label}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-
+              <div className="space-y-6 animate-in fade-in h-full flex flex-col relative">
                 {/* Prompt Box */}
                 <div className="space-y-3 flex-1 flex flex-col min-h-[250px]">
-                  <div className="flex justify-between items-end">
+                  <div className="flex justify-between items-end relative">
                     <label className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
                       Subject Description
                     </label>
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowPromptFxMenu(!showPromptFxMenu);
+                        }}
+                        className="text-[10px] bg-indigo-900/50 hover:bg-indigo-800 text-indigo-300 px-3 py-1.5 rounded-md border border-indigo-500/30 flex items-center gap-1 transition-colors"
+                      >
+                        <span className="text-lg">✨</span> PromptFX
+                      </button>
+
+                      {/* PROMPT FX DROPDOWN */}
+                      {showPromptFxMenu && (
+                        <div className="absolute right-0 top-full mt-2 w-64 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[60] overflow-hidden">
+                          <div className="p-3 border-b border-gray-800 bg-gray-950 flex justify-between items-center">
+                            <span className="text-xs font-bold text-indigo-300">
+                              Saved Prompts
+                            </span>
+                            <button
+                              onClick={() => setIsAddingPromptFx(true)}
+                              className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded"
+                            >
+                              + New
+                            </button>
+                          </div>
+
+                          {isAddingPromptFx && (
+                            <form
+                              onSubmit={handleAddPromptFx}
+                              className="p-3 bg-gray-800 border-b border-gray-700 space-y-2"
+                            >
+                              <input
+                                type="text"
+                                placeholder="Preset Name..."
+                                value={newPromptFxName}
+                                onChange={(e) => setNewPromptFxName(e.target.value)}
+                                className="w-full bg-gray-950 border border-gray-700 rounded p-2 text-xs text-white"
+                                required
+                              />
+                              <textarea
+                                placeholder="Prompt text..."
+                                value={newPromptFxText}
+                                onChange={(e) => setNewPromptFxText(e.target.value)}
+                                className="w-full h-16 bg-gray-950 border border-gray-700 rounded p-2 text-xs text-white resize-none"
+                                required
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setIsAddingPromptFx(false)}
+                                  className="flex-1 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="submit"
+                                  className="flex-1 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded"
+                                >
+                                  Save
+                                </button>
+                              </div>
+                            </form>
+                          )}
+
+                          <div className="max-h-48 overflow-y-auto">
+                            {promptFxList.length === 0 && !isAddingPromptFx ? (
+                              <div className="p-4 text-center text-xs text-gray-500">
+                                No saved prompts.
+                              </div>
+                            ) : (
+                              promptFxList.map((pfx: any, idx: number) => (
+                                <div
+                                  key={idx}
+                                  className="group flex flex-col p-3 border-b border-gray-800 hover:bg-gray-800 cursor-pointer transition-colors"
+                                  onClick={() => {
+                                    setPrompt(pfx.prompt);
+                                    setShowPromptFxMenu(false);
+                                  }}
+                                >
+                                  <div className="flex justify-between items-start mb-1">
+                                    <span className="text-xs font-bold text-gray-200">
+                                      {pfx.name}
+                                    </span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRemovePromptFx(idx);
+                                      }}
+                                      className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-400 text-xs transition-opacity"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                  <span className="text-[10px] text-gray-500 line-clamp-2">
+                                    {pfx.prompt}
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <textarea
                     className="w-full flex-1 bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none leading-relaxed placeholder-gray-500"
