@@ -698,18 +698,21 @@ export function FullscreenVideoEditor({
                                       className="w-full h-full object-contain absolute inset-0 z-10"
                                       muted
                                       playsInline
+                                      crossOrigin="anonymous"
                                   />
                                   <video 
                                       ref={standbyVideoRef}
                                       className="w-full h-full object-contain absolute inset-0 z-0 opacity-0 pointer-events-none"
                                       muted
                                       playsInline
+                                      crossOrigin="anonymous"
                                   />
                                 </>
                             ) : (
                                 <img 
                                     src={currentItem.url}
                                     className="w-full h-full object-contain absolute inset-0 z-10"
+                                    crossOrigin="anonymous"
                                 />
                             )}
                         </>

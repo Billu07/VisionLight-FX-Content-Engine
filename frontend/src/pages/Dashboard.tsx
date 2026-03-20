@@ -1595,15 +1595,17 @@ function Dashboard() {
                               >
                                 Image FX
                               </button>
-                              <button
-                                onClick={() => setStudioMode("carousel")}
-                                className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${studioMode === "carousel"
-                                  ? "bg-fuchsia-600 text-white shadow-lg"
-                                  : "text-gray-400 hover:text-white"
-                                  }`}
-                              >
-                                Carousel
-                              </button>
+                              {user?.view !== "PICDRIFT" && (
+                                <button
+                                  onClick={() => setStudioMode("carousel")}
+                                  className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${studioMode === "carousel"
+                                    ? "bg-fuchsia-600 text-white shadow-lg"
+                                    : "text-gray-400 hover:text-white"
+                                    }`}
+                                >
+                                  Carousel
+                                </button>
+                              )}
                               <button
                                 onClick={() => setStudioMode("edit")}
                                 className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${studioMode === "edit"
