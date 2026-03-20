@@ -1,7 +1,9 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import axios from "axios";
-import dotenv from "dotenv";
 import { getCost, getTargetPool } from "./config/pricing";
 import { upload, uploadToCloudinary } from "./utils/fileUpload";
 import { ROIService } from "./services/roi";
@@ -15,8 +17,6 @@ import { authenticateToken, AuthenticatedRequest } from "./middleware/auth";
 import superadminRouter from "./routes/superadmin";
 import tenantRouter from "./routes/tenant";
 
-dotenv.config();
-
 console.log("🔧 Environment Check:", {
   airtableKey: process.env.AIRTABLE_API_KEY ? "✅ Loaded" : "❌ Missing",
   airtableBase: process.env.AIRTABLE_BASE_ID ? "✅ Loaded" : "❌ Missing",
@@ -24,6 +24,8 @@ console.log("🔧 Environment Check:", {
   openai: process.env.OPENAI_API_KEY ? "✅ Loaded" : "❌ Missing",
   google: process.env.GOOGLE_AI_API_KEY ? "✅ Loaded" : "❌ Missing",
   supabase: process.env.SUPABASE_URL ? "✅ Loaded" : "❌ Missing",
+  r2AccountId: process.env.R2_ACCOUNT_ID ? "✅ Loaded" : "❌ Missing",
+  r2Bucket: process.env.R2_BUCKET_NAME ? "✅ Loaded" : "❌ Missing",
 });
 
 const app = express();

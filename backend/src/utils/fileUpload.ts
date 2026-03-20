@@ -2,15 +2,23 @@ import multer from "multer";
 import { Request } from "express";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import crypto from "crypto";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+// Helper to clean environment variables (handles quotes in some VPS environments)
+const cleanEnvVar = (val?: string) => val?.replace(/['"]/g, "").trim() || "";
+
+const r2AccountId = cleanEnvVar(process.env.R2_ACCOUNT_ID);
 
 // Configure AWS S3 Client for Cloudflare R2
 const r2Client = new S3Client({
   region: "auto",
-  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  endpoint: `https://${r2AccountId}.r2.cloudflarestorage.com`,
   forcePathStyle: true,
   credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
+    accessKeyId: cleanEnvVar(process.env.R2_ACCESS_KEY_ID),
+    secretAccessKey: cleanEnvVar(process.env.R2_SECRET_ACCESS_KEY),
   },
 });
 
