@@ -159,7 +159,11 @@ export function AssetLibrary({
       .filter(Boolean) as Asset[];
   }
 
-  // Navigation Helpers
+  const getAssetImageSrc = (asset: Asset) => {
+    const proxyUrl = getCORSProxyUrl(asset.url);
+    const separator = proxyUrl.includes('?') ? '&' : '?';
+    return `${proxyUrl}${separator}v=${asset.createdAt}`;
+  };
   const handleNextAsset = () => {
     if (!selectedAsset) return;
     const currentIndex = filteredAssets.findIndex(
@@ -308,7 +312,9 @@ export function AssetLibrary({
       }
 
       // Existing logic for images
-      const response = await fetch(asset.url);
+      const proxyUrl = getCORSProxyUrl(asset.url);
+      const response = await fetch(proxyUrl);
+      if (!response.ok) throw new Error("Failed to fetch image");
       const blob = await response.blob();
       const file = new File([blob], `asset_${asset.id}.jpg`, {
         type: "image/jpeg",
@@ -316,6 +322,7 @@ export function AssetLibrary({
       onSelect(file, asset.url, asset.aspectRatio);
       onClose();
     } catch (e) {
+      console.error("handleUseImage Error:", e);
       alert("Could not load media.");
     }
   };
@@ -598,7 +605,7 @@ export function AssetLibrary({
                       </div>
                     ) : (
                       <img
-                        src={`${getCORSProxyUrl(asset.url)}${asset.url.includes('?') ? '&' : '?'}v=${asset.createdAt}`}
+                        src={getAssetImageSrc(asset)}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         loading="lazy"
                         crossOrigin="anonymous"
