@@ -37,7 +37,12 @@ export const uploadToCloudinary = async (
     const publicUrl = process.env.R2_PUBLIC_URL || "";
     
     // Generate a unique file name
-    const fileExtension = file.originalname.split('.').pop();
+    let fileExtension = "jpg";
+    if (file.originalname && file.originalname.includes(".")) {
+      fileExtension = file.originalname.split('.').pop() || "jpg";
+    } else if (file.mimetype) {
+      fileExtension = file.mimetype.split('/').pop() || "jpg";
+    }
     const uniqueId = crypto.randomUUID();
     const fileKey = `visionlight-reference-images/${uniqueId}.${fileExtension}`;
 

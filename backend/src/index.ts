@@ -969,13 +969,20 @@ app.post(
         generateAudio,
       } = req.body;
 
+      console.log("📦 Generation Request Body:", { mediaType, model, duration, aspectRatio });
+
       // 1. Fetch Tenant Pricing & User
+      // ✅ LOG: Start DB Fetch
+      console.log("🔍 Fetching settings and user for:", req.user!.id);
       const [settings, user] = await Promise.all([
         getTenantSettings(req.user!.id),
         airtableService.findUserById(req.user!.id),
       ]);
 
-      if (!user) return res.status(404).json({ error: "User not found" });
+      if (!user) {
+        console.warn("❌ User not found in DB");
+        return res.status(404).json({ error: "User not found" });
+      }
 
       // 2. Identify the correct Pool and calculate Cost based on Admin Settings
       const pool = getTargetPool(user, mediaType, model);
@@ -988,6 +995,8 @@ app.post(
         },
         settings,
       );
+
+      console.log(`💰 Cost Calculation: Pool=${pool}, Cost=${cost}, UserBal=${(user as any)[pool]}`);
 
       // 3. Granular Balance Check (Casted to any to fix TS7053)
       const userAny = user as any;
@@ -1002,12 +1011,14 @@ app.post(
       const uploadedUrls: string[] = [];
       if (referenceFiles.length > 0) {
         try {
+          console.log(`📤 Uploading ${referenceFiles.length} reference images to R2...`);
           for (const file of referenceFiles) {
             const url = await uploadToCloudinary(file);
             uploadedUrls.push(url);
           }
-        } catch (err) {
-          return res.status(500).json({ error: "Image upload failed" });
+        } catch (err: any) {
+          console.error("❌ Upload Error in generate-media:", err);
+          return res.status(500).json({ error: "Image upload failed: " + err.message });
         }
       }
       const primaryRefUrl = uploadedUrls.length > 0 ? uploadedUrls[0] : "";
@@ -1028,14 +1039,16 @@ app.post(
       };
 
       // 4. Deduct from the specific Granular Pool
+      console.log(`📉 Deducting ${cost} from ${pool}...`);
       await airtableService.deductGranularCredits(req.user!.id, pool, cost);
 
       // 5. CREATE POST (Your original setup intact)
+      console.log("📝 Creating post in database...");
       const post = await airtableService.createPost({
         userId: req.user!.id,
         prompt,
         title: title || "",
-        mediaType: mediaType.toUpperCase() as any,
+        mediaType: (mediaType || "video").toUpperCase() as any,
         platform: "INSTAGRAM",
         projectId: req.body.projectId || undefined,
         generationParams,
@@ -1045,6 +1058,7 @@ app.post(
       });
 
       // 3. RESPOND
+      console.log("✅ Request successful, postId:", post.id);
       res.json({ success: true, postId: post.id });
 
       // 4. TRIGGER PROCESS (Your original setup intact)
@@ -1086,8 +1100,8 @@ app.post(
         }
       })();
     } catch (error: any) {
-      console.error("API Error:", error);
-      res.status(500).json({ error: error.message });
+      console.error("💥 API Error in /api/generate-media:", error);
+      res.status(500).json({ error: error.message || "Internal server error during generation request" });
     }
   },
 );
