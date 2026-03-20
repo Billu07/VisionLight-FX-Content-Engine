@@ -15,8 +15,7 @@ import { EditAssetModal } from "../components/EditAssetModal";
 import { DriftFrameExtractor } from "../components/DriftFrameExtractor";
 import { RenderReserveModal } from "../components/RenderReserveModal";
 import { StockPhotosModal } from "../components/StockPhotosModal";
-import { type SequenceItem } from "../components/SequenceEditor";
-import { FullscreenVideoEditor } from "../components/FullscreenVideoEditor";
+import { FullscreenVideoEditor, type SequenceItem } from "../components/FullscreenVideoEditor";
 import { MobileNavbar } from "../components/MobileNavbar";
 
 // Import your logo images
@@ -190,6 +189,16 @@ function Dashboard() {
   const [sequence, setSequence] = useState<SequenceItem[]>(() => {
     try {
       const stored = localStorage.getItem(sequenceKey);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const binKey = `visionlight_bin_${localStorage.getItem("visionlight_active_project") || "default"}`;
+  const [binItems, setBinItems] = useState<SequenceItem[]>(() => {
+    try {
+      const stored = localStorage.getItem(binKey);
       return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
@@ -510,16 +519,18 @@ function Dashboard() {
       setPicDriftFrames((prev) => ({ ...prev, end: file }));
       setPicDriftUrls((prev) => ({ ...prev, end: url }));
     } else if (activeLibrarySlot === "sequencer") {
-      // ✅ Add to Sequence
+      // ✅ Add to Bin
       const isVideo = file.type.startsWith("video");
       const newItem: SequenceItem = {
         id: crypto.randomUUID(),
         url,
         type: isVideo ? "VIDEO" : "IMAGE",
         title: file.name,
-        duration: isVideo ? undefined : 3000,
+        duration: isVideo ? 5000 : 3000,
+        originalDuration: isVideo ? 15000 : 3000,
       };
-      setSequence((prev) => [...prev, newItem]);
+      setBinItems((prev) => [...prev, newItem]);
+      alert("✅ Added to Editor Bin");
     } else {
       if (activeEngine === "studio" && studioMode === "carousel") {
         setReferenceImages((prev) => [...prev, file]);
@@ -841,13 +852,18 @@ function Dashboard() {
             projectId={localStorage.getItem("visionlight_active_project") || undefined}
             sequence={sequence}
             setSequence={setSequence}
+            binItems={binItems}
+            setBinItems={setBinItems}
             audioTracks={audioTracks}
             setAudioTracks={setAudioTracks}
             onAddFromLibrary={() => {
               setLibrarySource("field");
               setActiveLibrarySlot("sequencer");
             }}
-            onClear={() => setSequence([])}
+            onClear={() => {
+              setSequence([]);
+              setBinItems([]);
+            }}
             onClose={() => setViewMode("create")}
           />
         )}

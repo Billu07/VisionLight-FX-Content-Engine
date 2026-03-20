@@ -19,6 +19,7 @@ export interface SequenceItem {
   type: "IMAGE" | "VIDEO" | "CAROUSEL";
   title?: string;
   duration?: number; // In milliseconds
+  originalDuration?: number; // Max possible duration for video
   thumbnail?: string;
   trimStart?: number; // Offset in ms for playback
   speed?: number; // Playback speed multiplier (0.5, 1, 2, etc.)
@@ -28,6 +29,8 @@ interface FullscreenVideoEditorProps {
   projectId?: string; // Optional: To sync with backend project storage
   sequence: SequenceItem[];
   setSequence: React.Dispatch<React.SetStateAction<SequenceItem[]>>;
+  binItems: SequenceItem[];
+  setBinItems: React.Dispatch<React.SetStateAction<SequenceItem[]>>;
   audioTracks?: AudioItem[];
   setAudioTracks?: React.Dispatch<React.SetStateAction<AudioItem[]>>;
   onClose: () => void;
@@ -39,6 +42,8 @@ export function FullscreenVideoEditor({
   projectId,
   sequence,
   setSequence,
+  binItems,
+  setBinItems,
   audioTracks,
   setAudioTracks,
   onClose,
@@ -51,7 +56,8 @@ export function FullscreenVideoEditor({
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [viewportRatio, setViewportRatio] = useState<"16:9" | "9:16" | "1:1">("16:9");
-  const [sidebarTab, setSidebarTab] = useState<"project" | "timeline" | "exports">("project");
+  const [sidebarTab, setSidebarTab] = useState<"project" | "bin" | "exports">("bin");
+  const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
   
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -70,7 +76,8 @@ export function FullscreenVideoEditor({
 
   const [draggingEdge, setDraggingEdge] = useState<{ id: string, edge: 'left' | 'right', initialX: number, initialDuration: number, initialTrim: number } | null>(null);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const activeVideoRef = useRef<HTMLVideoElement>(null);
+  const standbyVideoRef = useRef<HTMLVideoElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<number | null>(null);
 
@@ -80,9 +87,9 @@ export function FullscreenVideoEditor({
   }, [sequence]);
 
   // Find current item and local time
-  const { currentItem, localTime, itemStartIndex } = useMemo(() => {
+  const { currentItem, localTime, itemStartIndex, nextItem } = useMemo(() => {
     if (sequence.length === 0) {
-      return { currentItem: null, localTime: 0, itemStartIndex: -1 };
+      return { currentItem: null, localTime: 0, itemStartIndex: -1, nextItem: null };
     }
     let accumulated = 0;
     for (let i = 0; i < sequence.length; i++) {
@@ -92,7 +99,8 @@ export function FullscreenVideoEditor({
         return { 
           currentItem: item, 
           localTime: currentTime - accumulated,
-          itemStartIndex: i
+          itemStartIndex: i,
+          nextItem: i + 1 < sequence.length ? sequence[i + 1] : null
         };
       }
       accumulated += duration;
@@ -101,27 +109,49 @@ export function FullscreenVideoEditor({
     return { 
       currentItem: sequence[sequence.length - 1], 
       localTime: sequence[sequence.length - 1]?.duration || 0,
-      itemStartIndex: sequence.length - 1
+      itemStartIndex: sequence.length - 1,
+      nextItem: null
     };
   }, [sequence, currentTime]);
 
   // Sync Video Element
   useEffect(() => {
-    if (currentItem?.type === "VIDEO" && videoRef.current) {
+    // 1. Manage Active Video
+    if (currentItem?.type === "VIDEO" && activeVideoRef.current) {
         // Only update if drift is significant to avoid stutter
         const trimOffset = currentItem.trimStart || 0;
         const videoTime = (localTime + trimOffset) / 1000;
-        videoRef.current.playbackRate = currentItem.speed || 1;
-        if (Math.abs(videoRef.current.currentTime - videoTime) > 0.1) {
-            videoRef.current.currentTime = videoTime;
+        
+        // Handle source change dynamically if it doesn't match
+        if (activeVideoRef.current.src !== currentItem.url) {
+            activeVideoRef.current.src = currentItem.url;
+            activeVideoRef.current.load();
+        }
+
+        activeVideoRef.current.playbackRate = currentItem.speed || 1;
+        // If playing, allow a small 0.1s drift to prevent stutter. If paused (scrubbing), force exact frame update.
+        if (Math.abs(activeVideoRef.current.currentTime - videoTime) > (isPlaying ? 0.1 : 0.01)) {
+            activeVideoRef.current.currentTime = videoTime;
         }
         if (isPlaying) {
-            videoRef.current.play().catch(() => {});
+            activeVideoRef.current.play().catch(() => {});
         } else {
-            videoRef.current.pause();
+            activeVideoRef.current.pause();
+        }
+    } else if (activeVideoRef.current) {
+         activeVideoRef.current.pause();
+    }
+
+    // 2. Manage Standby Video (Preload next clip)
+    if (nextItem?.type === "VIDEO" && standbyVideoRef.current) {
+        if (standbyVideoRef.current.src !== nextItem.url) {
+            standbyVideoRef.current.src = nextItem.url;
+            standbyVideoRef.current.load();
+            standbyVideoRef.current.currentTime = (nextItem.trimStart || 0) / 1000;
         }
     }
-  }, [currentItem, isPlaying]);
+
+  }, [currentItem, nextItem, isPlaying, localTime]);
 
   // Playback Loop
   useEffect(() => {
@@ -222,15 +252,21 @@ export function FullscreenVideoEditor({
       const msPerPixel = totalDuration / timelineRect.width;
       const deltaTimeMs = deltaX * msPerPixel;
 
-      setSequence(prev => prev.map(item => {
-        if (item.id !== draggingEdge.id) return item;
+      setSequence(prev => {
+        const newSeq = [...prev];
+        const itemIndex = newSeq.findIndex(i => i.id === draggingEdge.id);
+        if (itemIndex === -1) return prev;
 
+        const item = newSeq[itemIndex];
         let newDuration = draggingEdge.initialDuration;
         let newTrim = draggingEdge.initialTrim;
 
         if (draggingEdge.edge === 'right') {
           // Dragging right edge changes duration
           newDuration = Math.max(500, draggingEdge.initialDuration + deltaTimeMs);
+          if (item.originalDuration) {
+            newDuration = Math.min(newDuration, item.originalDuration - newTrim);
+          }
         } else if (draggingEdge.edge === 'left') {
           // Dragging left edge changes trimStart AND duration
           const maxTrim = draggingEdge.initialTrim + draggingEdge.initialDuration - 500;
@@ -240,8 +276,22 @@ export function FullscreenVideoEditor({
           newDuration = Math.max(500, draggingEdge.initialDuration - changeInTrim);
         }
 
-        return { ...item, duration: newDuration, trimStart: newTrim };
-      }));
+        newSeq[itemIndex] = { ...item, duration: newDuration, trimStart: newTrim };
+
+        // Real-time visual scrubbing to the dragged edge
+        let accumulated = 0;
+        for(let i = 0; i < itemIndex; i++) {
+            accumulated += newSeq[i].duration || 3000;
+        }
+        
+        if (draggingEdge.edge === 'left') {
+            setCurrentTime(accumulated); 
+        } else {
+            setCurrentTime(accumulated + newDuration - 50); // Show just before the very end frame
+        }
+
+        return newSeq;
+      });
     };
 
     const handleMouseUp = () => {
@@ -309,36 +359,37 @@ export function FullscreenVideoEditor({
     setIsExporting(true);
     setExportProgress(0);
 
-    // 1. Simulate Rendering Progress
-    for (let i = 0; i <= 100; i += 10) {
-      setExportProgress(i);
-      await new Promise(r => setTimeout(r, 300));
-    }
+    // Fake progress up to 90% while the backend works
+    const progressInterval = setInterval(() => {
+        setExportProgress(prev => {
+            if (prev >= 90) return prev;
+            // Slower progress as it gets higher
+            const increment = prev > 70 ? 2 : prev > 40 ? 5 : 10;
+            return prev + increment;
+        });
+    }, 1000);
 
     try {
-      // 2. Mock Export (Since we don't have backend FFmpeg yet)
-      // We will take the first video clip and save it as an "EXPORTED" video in the project
-      const firstClipUrl = sequence.find(s => s.type === "VIDEO")?.url || sequence[0].url;
-      const response = await fetch(firstClipUrl);
-      const blob = await response.blob();
-      const file = new File([blob], `exported_video_${Date.now()}.mp4`, { type: "video/mp4" });
+      // 2. Real Backend Export using FFmpeg
+      const editorState = { sequence, audioTracks: audioTracks || [] };
+      await apiEndpoints.exportVideo({ editorState, projectId });
 
-      const formData = new FormData();
-      formData.append("image", file);
-      formData.append("raw", "true");
-      formData.append("aspectRatio", "EXPORTED_VIDEO"); // Custom tag to filter in the Exports tab
-      if (projectId) formData.append("projectId", projectId);
+      clearInterval(progressInterval);
+      setExportProgress(100);
 
-      await apiEndpoints.uploadAssetSync(formData);
+      // Refresh the assets list to show the newly exported video
       queryClient.invalidateQueries({ queryKey: ["assets"] });
       
-      setIsExporting(false);
-      setSidebarTab("exports");
-      if (!sidebarOpen) setSidebarOpen(true);
+      setTimeout(() => {
+          setIsExporting(false);
+          setSidebarTab("exports");
+          if (!sidebarOpen) setSidebarOpen(true);
+      }, 500);
       
     } catch (e) {
+      clearInterval(progressInterval);
       console.error(e);
-      alert("Failed to export video.");
+      alert("Failed to export video. Check console for details.");
       setIsExporting(false);
     }
   };
@@ -349,18 +400,6 @@ export function FullscreenVideoEditor({
     const seconds = totalSeconds % 60;
     const centiseconds = Math.floor((ms % 1000) / 10);
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}`;
-  };
-
-  const removeItem = (id: string) => {
-    setSequence(prev => prev.filter(item => item.id !== id));
-  };
-
-  const moveItem = (index: number, direction: number) => {
-    const newSeq = [...sequence];
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= sequence.length) return;
-    [newSeq[index], newSeq[targetIndex]] = [newSeq[targetIndex], newSeq[index]];
-    setSequence(newSeq);
   };
 
   return (
@@ -434,16 +473,16 @@ export function FullscreenVideoEditor({
                     <button 
                         onClick={() => setSidebarTab("project")}
                         className={`px-3 py-1 rounded text-[10px] font-bold transition-colors flex items-center gap-1 ${sidebarTab === "project" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
-                        title="View files saved in this project folder"
+                        title="View project media folder"
                     >
                         <span>📁</span> Folder
                     </button>
                     <button 
-                        onClick={() => setSidebarTab("timeline")}
-                        className={`px-3 py-1 rounded text-[10px] font-bold transition-colors flex items-center gap-1 ${sidebarTab === "timeline" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
-                        title="View clips currently in your sequence"
+                        onClick={() => setSidebarTab("bin")}
+                        className={`px-3 py-1 rounded text-[10px] font-bold transition-colors flex items-center gap-1 ${sidebarTab === "bin" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                        title="View media staging bin"
                     >
-                        <span>🎞️</span> Pool
+                        <span>📦</span> Bin
                     </button>
                     <button 
                         onClick={() => setSidebarTab("exports")}
@@ -492,80 +531,25 @@ export function FullscreenVideoEditor({
             </div>
             
             <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
-              {sidebarTab === "timeline" && (
-                  <>
-                      {sequence.map((item, idx) => (
-                        <div 
-                            key={item.id}
-                            className={`group relative p-2 rounded-xl border transition-all cursor-pointer ${
-                                itemStartIndex === idx ? 'bg-cyan-500/10 border-cyan-500/50' : 'bg-[#1a1a1a] border-white/5 hover:border-white/20'
-                            }`}
-                            onClick={() => {
-                                let offset = 0;
-                                for(let i=0; i<idx; i++) offset += (sequence[i].duration || 3000);
-                                handleSeek(offset);
-                            }}
-                        >
-                          <div className="flex gap-3">
-                            <div className="w-16 h-12 rounded-lg bg-black overflow-hidden shrink-0 border border-white/5 relative">
-                                {item.type === "VIDEO" ? (
-                                     <video src={item.url} className="w-full h-full object-cover opacity-60" />
-                                ) : (
-                                     <img src={item.url} className="w-full h-full object-cover" />
-                                )}
-                                <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors"></div>
-                                <div className="absolute bottom-1 right-1 text-[8px] bg-black/60 px-1 rounded text-gray-400 font-mono">
-                                    {Math.round((item.duration || 3000) / 1000)}s
-                                </div>
-                            </div>
-                            <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                <p className="text-[11px] font-bold text-white truncate">{item.title || "Untitled"}</p>
-                                <p className="text-[9px] text-gray-500 uppercase">{item.type}</p>
-                            </div>
-                          </div>
-                          
-                          {/* Item Actions */}
-                          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={(e) => { e.stopPropagation(); moveItem(idx, -1); }} className="p-1 hover:text-white text-gray-500">▲</button>
-                            <button onClick={(e) => { e.stopPropagation(); moveItem(idx, 1); }} className="p-1 hover:text-white text-gray-500">▼</button>
-                            <button onClick={(e) => { e.stopPropagation(); removeItem(item.id); }} className="p-1 hover:text-red-400 text-gray-500 ml-1">✕</button>
-                          </div>
-                        </div>
-                      ))}
-                      
-                      {sequence.length === 0 && (
-                        <div className="h-64 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-white/5 rounded-2xl">
-                            <span className="text-3xl mb-4">📂</span>
-                            <p className="text-xs text-gray-500 font-medium">Timeline empty.</p>
-                            <button 
-                                onClick={onAddFromLibrary}
-                                className="mt-4 text-[10px] text-cyan-400 hover:text-cyan-300 font-black uppercase tracking-widest"
-                            >
-                                Import Clips
-                            </button>
-                        </div>
-                      )}
-                  </>
-              )}
-
               {sidebarTab === "project" && (
                   <div className="grid grid-cols-2 gap-2">
                       {isLoadingAssets ? (
                           <div className="col-span-2 flex justify-center py-10"><LoadingSpinner /></div>
                       ) : projectAssets.filter((a: any) => a.aspectRatio !== "EXPORTED_VIDEO").length === 0 ? (
-                          <div className="col-span-2 text-center text-gray-500 text-xs py-10">No media saved to this project yet.</div>
+                          <div className="col-span-2 text-center text-gray-500 text-xs py-10">No media in project folder.</div>
                       ) : (
                           projectAssets.filter((a: any) => a.aspectRatio !== "EXPORTED_VIDEO").map((asset: any) => (
                               <div 
                                 key={asset.id} 
                                 className="relative aspect-square bg-black rounded-lg border border-white/5 overflow-hidden group cursor-pointer hover:border-cyan-500/50 transition-all"
                                 onClick={() => {
-                                    setSequence(prev => [...prev, {
+                                    setBinItems(prev => [...prev, {
                                         id: crypto.randomUUID(),
                                         url: getCORSProxyUrl(asset.url),
                                         type: asset.type === "VIDEO" ? "VIDEO" : "IMAGE",
                                         duration: asset.type === "VIDEO" ? 5000 : 3000,
-                                        title: "Project Media"
+                                        originalDuration: asset.type === "VIDEO" ? 15000 : 3000,
+                                        title: asset.type === "VIDEO" ? "Video Clip" : "Image Frame"
                                     }]);
                                 }}
                               >
@@ -574,8 +558,48 @@ export function FullscreenVideoEditor({
                                   ) : (
                                       <img src={getCORSProxyUrl(asset.url)} className="w-full h-full object-cover" crossOrigin="anonymous" />
                                   )}
-                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                      <span className="bg-cyan-500 text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider">+ Add</span>
+                                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm text-center p-2">
+                                      <span className="bg-cyan-600 hover:bg-cyan-500 text-white text-[9px] font-bold px-2 py-1.5 rounded uppercase tracking-wider transition-colors shadow-lg">
+                                        + Add to Bin
+                                      </span>
+                                  </div>
+                              </div>
+                          ))
+                      )}
+                  </div>
+              )}
+
+              {sidebarTab === "bin" && (
+                  <div className="grid grid-cols-2 gap-2">
+                      {binItems.length === 0 ? (
+                          <div className="col-span-2 text-center text-gray-500 text-xs py-10">Staging Bin empty.</div>
+                      ) : (
+                          binItems.map((item, idx) => (
+                              <div 
+                                key={item.id} 
+                                className="relative aspect-square bg-black rounded-lg border border-white/5 overflow-hidden group cursor-pointer hover:border-purple-500/50 transition-all"
+                                onClick={() => {
+                                    setSequence(prev => [...prev, { ...item, id: crypto.randomUUID() }]);
+                                }}
+                              >
+                                  {item.type === "VIDEO" ? (
+                                      <video src={item.url} className="w-full h-full object-cover" muted />
+                                  ) : (
+                                      <img src={item.url} className="w-full h-full object-cover" />
+                                  )}
+                                  <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setBinItems(prev => prev.filter((_, i) => i !== idx));
+                                        }}
+                                        className="w-5 h-5 bg-red-600/80 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-[10px]"
+                                      >✕</button>
+                                  </div>
+                                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm text-center p-2">
+                                      <span className="bg-purple-600 hover:bg-purple-500 text-white text-[9px] font-bold px-2 py-1.5 rounded uppercase tracking-wider transition-colors shadow-lg">
+                                        + Add to Sequence
+                                      </span>
                                   </div>
                               </div>
                           ))
@@ -668,17 +692,24 @@ export function FullscreenVideoEditor({
                     {currentItem ? (
                         <>
                             {currentItem.type === "VIDEO" ? (
-                                <video 
-                                    ref={videoRef}
-                                    src={currentItem.url}
-                                    className="w-full h-full object-contain"
-                                    muted
-                                    playsInline
-                                />
+                                <>
+                                  <video 
+                                      ref={activeVideoRef}
+                                      className="w-full h-full object-contain absolute inset-0 z-10"
+                                      muted
+                                      playsInline
+                                  />
+                                  <video 
+                                      ref={standbyVideoRef}
+                                      className="w-full h-full object-contain absolute inset-0 z-0 opacity-0 pointer-events-none"
+                                      muted
+                                      playsInline
+                                  />
+                                </>
                             ) : (
                                 <img 
                                     src={currentItem.url}
-                                    className="w-full h-full object-contain"
+                                    className="w-full h-full object-contain absolute inset-0 z-10"
                                 />
                             )}
                         </>
@@ -792,11 +823,25 @@ export function FullscreenVideoEditor({
                     {sequence.map((item, idx) => (
                         <div 
                             key={item.id}
+                            draggable
+                            onDragStart={() => setDraggedItemIndex(idx)}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                if (draggedItemIndex === null || draggedItemIndex === idx) return;
+                                setSequence(prev => {
+                                    const newSeq = [...prev];
+                                    const [movedItem] = newSeq.splice(draggedItemIndex, 1);
+                                    newSeq.splice(idx, 0, movedItem);
+                                    return newSeq;
+                                });
+                                setDraggedItemIndex(null);
+                            }}
                             onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
                             className={`h-20 border-r border-black/50 overflow-hidden relative group/clip transition-all cursor-pointer hover:opacity-80 ${
                                 selectedItemId === item.id ? 'ring-2 ring-purple-500 ring-inset z-10' : 
                                 itemStartIndex === idx ? 'ring-2 ring-cyan-500 ring-inset' : ''
-                            }`}
+                            } ${draggedItemIndex === idx ? 'opacity-50 grayscale' : ''}`}
                             style={{ width: `${((item.duration || 3000) / totalDuration) * 100}%` }}
                         >
                             {item.type === "VIDEO" ? (

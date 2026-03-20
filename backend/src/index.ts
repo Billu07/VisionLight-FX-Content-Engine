@@ -380,6 +380,28 @@ app.post(
   },
 );
 
+import { renderVideoSequence } from "./services/videoEditor";
+
+// ✅ Video Export Endpoint
+app.post("/api/export/video", authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { editorState, projectId } = req.body;
+    if (!editorState || !editorState.sequence) {
+      return res.status(400).json({ error: "Invalid editor state provided." });
+    }
+
+    // In a production app, you might want to run this in a background job queue (like BullMQ) 
+    // because FFmpeg rendering can take a long time and time out the HTTP request.
+    // For now, we will await it directly.
+    const finalUrl = await renderVideoSequence(editorState, req.user!.id, projectId);
+
+    res.json({ success: true, url: finalUrl });
+  } catch (error: any) {
+    console.error("Export Error:", error);
+    res.status(500).json({ error: "Failed to render video: " + error.message });
+  }
+});
+
 // ✅ Sync Upload (Magic Edit & Direct Reference)
 app.post(
   "/api/assets/upload-sync",

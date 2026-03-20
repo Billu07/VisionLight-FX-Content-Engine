@@ -101,6 +101,10 @@ export const apiEndpoints = {
       headers: { "Content-Type": "multipart/form-data" },
     }),
 
+  // ✅ Video Export
+  exportVideo: (data: { editorState: any; projectId?: string }) => 
+    api.post("/api/export/video", data),
+
   // === Asset Library ===
   getAssets: (projectId?: string) => api.get("/api/assets", { params: { projectId } }),
   getStoryboard: (projectId?: string) => api.get("/api/storyboard", { params: { projectId } }),

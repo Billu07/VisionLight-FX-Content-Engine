@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import ReactCrop, { type Crop, type PixelCrop } from "react-image-crop";
+import ReactCrop, { type Crop, type PixelCrop, centerCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
 import { DriftFrameExtractor } from "./DriftFrameExtractor";
@@ -426,6 +426,30 @@ export function EditAssetModal({
     );
   };
 
+  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { width, height } = e.currentTarget;
+    if (width && height) {
+      if (cropAspect) {
+        setCrop(centerCrop(makeAspectCrop({ unit: '%', width: 90 }, cropAspect, width, height), width, height));
+      } else {
+        setCrop(centerCrop(makeAspectCrop({ unit: '%', width: 90 }, 1, width, height), width, height));
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (isCropping && imgRef.current) {
+      const { width, height } = imgRef.current;
+      if (width && height) {
+        if (cropAspect) {
+          setCrop(centerCrop(makeAspectCrop({ unit: '%', width: 90 }, cropAspect, width, height), width, height));
+        } else {
+          setCrop(centerCrop(makeAspectCrop({ unit: '%', width: 90 }, 1, width, height), width, height));
+        }
+      }
+    }
+  }, [cropAspect, isCropping]);
+
   return (
     <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/95 p-4 backdrop-blur-md">
       <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-6xl flex flex-col md:flex-row overflow-hidden shadow-2xl h-[90vh] relative">
@@ -585,6 +609,7 @@ export function EditAssetModal({
                       src={getCORSProxyUrl(currentAsset.url)}
                       className="max-h-[80vh] object-contain rounded-lg border border-gray-700 shadow-2xl"
                       crossOrigin="anonymous"
+                      onLoad={onImageLoad}
                     />
                   </ReactCrop>
                 ) : (
