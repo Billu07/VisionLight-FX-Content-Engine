@@ -16,8 +16,8 @@ export const assetsLogic = {
       const width = metadata.width || 1000;
       const height = metadata.height || 1000;
 
-      // We log the ratio but we SAVE it as "original" so it goes to the correct tab
-      console.log(`🚀 Uploading Raw Asset: ${width}x${height}`);
+      // We log the ratio but we SAVE it as "original" so it goes to the correct tab, UNLESS it's a special type like 3DX_FRAME or VIDEO
+      console.log(`🚀 Uploading Raw Asset: ${width}x${height}, Requested Ratio: ${requestedRatio}`);
 
       const url = await uploadToCloudinary(
         fileBuffer,
@@ -27,10 +27,12 @@ export const assetsLogic = {
         "image",
       );
 
+      const finalRatio = (requestedRatio === "3DX_FRAME" || requestedRatio === "VIDEO") ? requestedRatio : "original";
+
       return await airtableService.createAsset(
         userId,
         url,
-        "original", // We force original so it lands in Media Pool specifically
+        finalRatio, // We force original so it lands in Media Pool specifically, unless it's a special system frame
         "IMAGE",
         undefined,
         projectId,
