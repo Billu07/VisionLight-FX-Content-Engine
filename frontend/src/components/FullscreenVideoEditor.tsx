@@ -76,8 +76,8 @@ export function FullscreenVideoEditor({
 
   const [draggingEdge, setDraggingEdge] = useState<{ id: string, edge: 'left' | 'right', initialX: number, initialDuration: number, initialTrim: number } | null>(null);
 
-  const activeVideoRef = useRef<HTMLVideoElement>(null);
-  const standbyVideoRef = useRef<HTMLVideoElement>(null);
+  const player1Ref = useRef<HTMLVideoElement>(null);
+  const player2Ref = useRef<HTMLVideoElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<number | null>(null);
 
@@ -116,42 +116,85 @@ export function FullscreenVideoEditor({
 
   // Sync Video Element
   useEffect(() => {
-    // 1. Manage Active Video
-    if (currentItem?.type === "VIDEO" && activeVideoRef.current) {
-        // Only update if drift is significant to avoid stutter
+    const player1 = player1Ref.current;
+    const player2 = player2Ref.current;
+    if (!player1 || !player2) return;
+
+    let activePlayer: HTMLVideoElement | null = null;
+    let standbyPlayer: HTMLVideoElement | null = null;
+
+    if (currentItem?.type === "VIDEO") {
+        // Find which player already has the current URL loaded
+        if (player1.getAttribute('data-url') === currentItem.url) {
+            activePlayer = player1;
+            standbyPlayer = player2;
+        } else if (player2.getAttribute('data-url') === currentItem.url) {
+            activePlayer = player2;
+            standbyPlayer = player1;
+        } else {
+            // Neither has it (jumped). Use player1 as active.
+            activePlayer = player1;
+            standbyPlayer = player2;
+            activePlayer.src = currentItem.url;
+            activePlayer.setAttribute('data-url', currentItem.url);
+            activePlayer.load();
+        }
+
+        // Apply active player styling
+        activePlayer.style.opacity = "1";
+        activePlayer.style.zIndex = "10";
+        standbyPlayer.style.opacity = "0";
+        standbyPlayer.style.zIndex = "0";
+
+        // Sync active player time
         const trimOffset = currentItem.trimStart || 0;
         const videoTime = (localTime + trimOffset) / 1000;
+        activePlayer.playbackRate = currentItem.speed || 1;
         
-        // Handle source change dynamically if it doesn't match
-        if (activeVideoRef.current.src !== currentItem.url) {
-            activeVideoRef.current.src = currentItem.url;
-            activeVideoRef.current.load();
-        }
-
-        activeVideoRef.current.playbackRate = currentItem.speed || 1;
-        // If playing, allow a small 0.1s drift to prevent stutter. If paused (scrubbing), force exact frame update.
-        if (Math.abs(activeVideoRef.current.currentTime - videoTime) > (isPlaying ? 0.1 : 0.01)) {
-            activeVideoRef.current.currentTime = videoTime;
+        // Exact frame scrubbing when paused, looser sync when playing
+        if (Math.abs(activePlayer.currentTime - videoTime) > (isPlaying ? 0.1 : 0.01)) {
+            activePlayer.currentTime = videoTime;
         }
         if (isPlaying) {
-            activeVideoRef.current.play().catch(() => {});
+            activePlayer.play().catch(() => {});
         } else {
-            activeVideoRef.current.pause();
+            activePlayer.pause();
         }
-    } else if (activeVideoRef.current) {
-         activeVideoRef.current.pause();
+    } else {
+        // Current is not video. Pause both and hide.
+        player1.pause();
+        player2.pause();
+        player1.style.opacity = "0";
+        player1.style.zIndex = "0";
+        player2.style.opacity = "0";
+        player2.style.zIndex = "0";
+        standbyPlayer = player1; // Just pick one to preload the next
     }
 
-    // 2. Manage Standby Video (Preload next clip)
-    if (nextItem?.type === "VIDEO" && standbyVideoRef.current) {
-        if (standbyVideoRef.current.src !== nextItem.url) {
-            standbyVideoRef.current.src = nextItem.url;
-            standbyVideoRef.current.load();
-            standbyVideoRef.current.currentTime = (nextItem.trimStart || 0) / 1000;
+    // Preload next video clip in standby player
+    let nextVideoItem = null;
+    if (nextItem?.type === "VIDEO") {
+        nextVideoItem = nextItem;
+    } else {
+        // Look ahead in sequence for the next video
+        for (let i = itemStartIndex + 1; i < sequence.length; i++) {
+            if (sequence[i].type === "VIDEO") {
+                nextVideoItem = sequence[i];
+                break;
+            }
         }
     }
 
-  }, [currentItem, nextItem, isPlaying, localTime]);
+    if (nextVideoItem && standbyPlayer) {
+        if (standbyPlayer.getAttribute('data-url') !== nextVideoItem.url) {
+            standbyPlayer.src = nextVideoItem.url;
+            standbyPlayer.setAttribute('data-url', nextVideoItem.url);
+            standbyPlayer.load();
+            standbyPlayer.currentTime = (nextVideoItem.trimStart || 0) / 1000;
+        }
+    }
+
+  }, [currentItem, localTime, isPlaying, sequence, itemStartIndex, nextItem]);
 
   // Playback Loop
   useEffect(() => {
@@ -694,14 +737,14 @@ export function FullscreenVideoEditor({
                             {currentItem.type === "VIDEO" ? (
                                 <>
                                   <video 
-                                      ref={activeVideoRef}
+                                      ref={player1Ref}
                                       className="w-full h-full object-contain absolute inset-0 z-10"
                                       muted
                                       playsInline
                                       crossOrigin="anonymous"
                                   />
                                   <video 
-                                      ref={standbyVideoRef}
+                                      ref={player2Ref}
                                       className="w-full h-full object-contain absolute inset-0 z-0 opacity-0 pointer-events-none"
                                       muted
                                       playsInline
