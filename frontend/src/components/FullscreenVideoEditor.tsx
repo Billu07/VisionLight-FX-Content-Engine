@@ -541,18 +541,31 @@ export function FullscreenVideoEditor({
                             const fileInput = document.createElement('input');
                             fileInput.type = 'file';
                             fileInput.accept = 'audio/*';
-                            fileInput.onchange = (e: any) => {
+                            fileInput.onchange = async (e: any) => {
                                 const file = e.target.files?.[0];
                                 if (file && setAudioTracks) {
-                                    const url = URL.createObjectURL(file);
-                                    const newAudio: AudioItem = {
-                                        id: crypto.randomUUID(),
-                                        url,
-                                        title: file.name,
-                                        startTime: currentTime,
-                                        duration: 10000 // default 10s until we can read metadata
-                                    };
-                                    setAudioTracks(prev => [...(prev || []), newAudio]);
+                                    // Upload to backend first so it has a real URL for export
+                                    try {
+                                        const formData = new FormData();
+                                        formData.append("image", file); // Backend expects "image" field for generic uploads
+                                        formData.append("raw", "true");
+                                        if (projectId) formData.append("projectId", projectId);
+                                        
+                                        const res = await apiEndpoints.uploadAssetSync(formData);
+                                        if (res.data.success && res.data.asset) {
+                                            const newAudio: AudioItem = {
+                                                id: crypto.randomUUID(),
+                                                url: res.data.asset.url,
+                                                title: file.name,
+                                                startTime: currentTime,
+                                                duration: 10000 // default 10s
+                                            };
+                                            setAudioTracks(prev => [...(prev || []), newAudio]);
+                                        }
+                                    } catch (err) {
+                                        console.error("Audio upload failed:", err);
+                                        alert("Failed to upload audio track.");
+                                    }
                                 }
                             };
                             fileInput.click();
@@ -588,7 +601,7 @@ export function FullscreenVideoEditor({
                                 onClick={() => {
                                     setBinItems(prev => [...prev, {
                                         id: crypto.randomUUID(),
-                                        url: getCORSProxyUrl(asset.url),
+                                        url: asset.url, // Store raw URL for backend
                                         type: asset.type === "VIDEO" ? "VIDEO" : "IMAGE",
                                         duration: asset.type === "VIDEO" ? 5000 : 3000,
                                         originalDuration: asset.type === "VIDEO" ? 15000 : 3000,
@@ -626,9 +639,9 @@ export function FullscreenVideoEditor({
                                 }}
                               >
                                   {item.type === "VIDEO" ? (
-                                      <video src={item.url} className="w-full h-full object-cover" muted />
+                                      <video src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover" muted />
                                   ) : (
-                                      <img src={item.url} className="w-full h-full object-cover" />
+                                      <img src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover" />
                                   )}
                                   <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                       <button 

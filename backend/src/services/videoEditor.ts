@@ -59,7 +59,8 @@ const processClip = (inputPath: string, outputPath: string, item: SequenceItem):
     let videoFilter = `scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1:1,fps=30`;
 
     if (item.type === "IMAGE") {
-      command.loop(durationSec); // Loop the image for the specified duration
+      command.inputOptions(["-loop 1"]);
+      command.duration(durationSec);
     } else if (item.type === "VIDEO") {
       const trimStartSec = (item.trimStart || 0) / 1000;
       const speed = item.speed || 1;
@@ -156,6 +157,13 @@ const mixAudio = (videoPath: string, audioTracks: AudioItem[], outputPath: strin
   });
 };
 
+const cleanUrl = (url: string) => {
+  if (url.includes("/api/proxy-image?url=")) {
+    return decodeURIComponent(url.split("/api/proxy-image?url=")[1]);
+  }
+  return url;
+};
+
 export const renderVideoSequence = async (
   editorState: EditorState,
   userId: string,
@@ -179,8 +187,9 @@ export const renderVideoSequence = async (
       const localPath = path.join(tempDir, `raw_clip_${i}${ext}`);
       const processedPath = path.join(tempDir, `processed_clip_${i}.mp4`);
 
-      console.log(`Downloading ${item.url} to ${localPath}...`);
-      await downloadFile(item.url, localPath);
+      const rawUrl = cleanUrl(item.url);
+      console.log(`Downloading ${rawUrl} to ${localPath}...`);
+      await downloadFile(rawUrl, localPath);
 
       console.log(`Processing clip ${i}...`);
       await processClip(localPath, processedPath, item);
@@ -195,7 +204,10 @@ export const renderVideoSequence = async (
     // 3. Mix audio tracks
     const finalOutputPath = path.join(tempDir, "final_output.mp4");
     console.log(`Mixing audio tracks...`);
-    await mixAudio(concatenatedVideoPath, audioTracks || [], finalOutputPath, tempDir);
+    
+    // Clean audio urls too
+    const cleanAudioTracks = (audioTracks || []).map(a => ({ ...a, url: cleanUrl(a.url) }));
+    await mixAudio(concatenatedVideoPath, cleanAudioTracks, finalOutputPath, tempDir);
 
     // 4. Upload to Cloudinary / R2
     console.log(`Uploading final render...`);
