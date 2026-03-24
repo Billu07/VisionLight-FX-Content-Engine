@@ -63,6 +63,7 @@ export function EditAssetModal({
   const [newPromptFxName, setNewPromptFxName] = useState("");
   const [newPromptFxText, setNewPromptFxText] = useState("");
   const [isAddingPromptFx, setIsAddingPromptFx] = useState(false);
+  const [editingPromptFxIndex, setEditingPromptFxIndex] = useState<number | null>(null);
   const [isUploadingInitial, setIsUploadingInitial] = useState(false);
 
   const { data: promptFxList = [] } = useQuery({
@@ -81,19 +82,29 @@ export function EditAssetModal({
       setNewPromptFxName("");
       setNewPromptFxText("");
       setIsAddingPromptFx(false);
+      setEditingPromptFxIndex(null);
     },
   });
 
   const handleAddPromptFx = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPromptFxName.trim() || !newPromptFxText.trim()) return;
-    const newList = [...promptFxList, { name: newPromptFxName.trim(), prompt: newPromptFxText.trim() }];
+    
+    let newList = [...promptFxList];
+    if (editingPromptFxIndex !== null) {
+      newList[editingPromptFxIndex] = { name: newPromptFxName.trim(), prompt: newPromptFxText.trim() };
+    } else {
+      newList.push({ name: newPromptFxName.trim(), prompt: newPromptFxText.trim() });
+    }
+    
     savePromptFxMutation.mutate(newList);
   };
 
   const handleRemovePromptFx = (indexToRemove: number) => {
-    const newList = promptFxList.filter((_: any, idx: number) => idx !== indexToRemove);
-    savePromptFxMutation.mutate(newList);
+    if (window.confirm("Are you sure you want to delete this prompt preset?")) {
+      const newList = promptFxList.filter((_: any, idx: number) => idx !== indexToRemove);
+      savePromptFxMutation.mutate(newList);
+    }
   };
 
   // Convert Tab State
@@ -946,15 +957,29 @@ export function EditAssetModal({
                                     <span className="text-xs font-bold text-gray-200">
                                       {pfx.name}
                                     </span>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleRemovePromptFx(idx);
-                                      }}
-                                      className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-400 text-xs transition-opacity"
-                                    >
-                                      ✕
-                                    </button>
+                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setNewPromptFxName(pfx.name);
+                                          setNewPromptFxText(pfx.prompt);
+                                          setEditingPromptFxIndex(idx);
+                                          setIsAddingPromptFx(true);
+                                        }}
+                                        className="text-blue-400 hover:text-blue-300 text-xs"
+                                      >
+                                        ✎
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleRemovePromptFx(idx);
+                                        }}
+                                        className="text-red-500 hover:text-red-400 text-xs"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
                                   </div>
                                   <span className="text-[10px] text-gray-500 line-clamp-2">
                                     {pfx.prompt}
