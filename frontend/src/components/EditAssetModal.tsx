@@ -635,7 +635,10 @@ export function EditAssetModal({
               ].map((mode) => (
                 <button
                   key={mode.id}
-                  onClick={() => setActiveTab(mode.id as any)}
+                  onClick={() => {
+                    setActiveTab(mode.id as any);
+                    setIsCropping(false);
+                  }}
                   className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex flex-col items-center gap-1 ${activeTab === mode.id
                     ? "bg-purple-600 text-white shadow-lg"
                     : "text-gray-400 hover:text-white hover:bg-gray-800"
@@ -730,7 +733,10 @@ export function EditAssetModal({
                       className="w-full h-24 bg-gray-800 border border-gray-700 rounded-xl p-3 text-sm text-white focus:ring-2 focus:ring-purple-500 outline-none resize-none leading-relaxed placeholder-gray-500"
                       placeholder="e.g. 'Expand the sky and add clouds'"
                       value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
+                      onChange={(e) => {
+                        setPrompt(e.target.value);
+                        setIsCropping(false);
+                      }}
                     />
                   </div>
                 )}
@@ -764,7 +770,10 @@ export function EditAssetModal({
                   </div>
                   {!showRefSelector ? (
                     <button
-                      onClick={() => setShowRefSelector(true)}
+                      onClick={() => {
+                        setShowRefSelector(true);
+                        setIsCropping(false);
+                      }}
                       className={`w-full border border-dashed rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${referenceAsset
                         ? "border-purple-500/50 bg-purple-500/10"
                         : "border-gray-700 hover:border-gray-500"
