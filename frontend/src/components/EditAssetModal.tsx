@@ -559,7 +559,7 @@ export function EditAssetModal({
                     <div className="absolute bottom-4 right-4 w-32 border-2 border-purple-500 rounded-lg overflow-hidden bg-gray-800 shadow-2xl z-20">
                       <div className="relative aspect-video">
                         <img
-                          src={referenceAsset.url}
+                          src={getCORSProxyUrl(referenceAsset.url)}
                           className="w-full h-full object-cover opacity-90"
                           crossOrigin="anonymous"
                         />
