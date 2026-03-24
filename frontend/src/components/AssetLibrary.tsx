@@ -747,6 +747,7 @@ export function AssetLibrary({
                         );
                       } else {
                         setStoryboardIds([...storyboardIds, selectedAsset.id]);
+                        setActiveTab("STORYBOARD");
                       }
                     }}
                     className={`w-full py-3 rounded-xl font-bold transition-all border text-sm ${storyboardIds.includes(selectedAsset.id)

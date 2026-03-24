@@ -224,7 +224,7 @@ export function EditAssetModal({
   const ratioMutation = useMutation({
     mutationFn: async (targetRatio: string) => {
       // 1. Fetch current image as Blob
-      const response = await fetch(currentAsset.url);
+      const response = await fetch(getCORSProxyUrl(currentAsset.url));
       const blob = await response.blob();
       const file = new File([blob], "convert.jpg", { type: "image/jpeg" });
 
