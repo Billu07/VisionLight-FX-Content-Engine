@@ -807,7 +807,7 @@ export function EditAssetModal({
                           allAssets.map((a: Asset) => (
                             <img
                               key={a.id}
-                              src={a.url}
+                              src={getCORSProxyUrl(a.url)}
                               className="w-full h-12 object-cover rounded cursor-pointer border border-transparent hover:border-purple-500"
                               crossOrigin="anonymous"
                               onClick={() => {
