@@ -160,10 +160,10 @@ export const videoLogic = {
       const cameraMove = getKlingCameraPrompt(horizontal, vertical, zoom);
       
       // ✅ IMPROVED PROMPT LOGIC:
-      // If user provides a prompt, we use it as the subject.
-      // If not, we describe the scene generally but prioritize the camera movement.
-      const subject = prompt?.trim() || "The scene";
-      const finalPrompt = `${subject}. Action: ${cameraMove}. Style: High fidelity, smooth motion, cinematic 3D depth, professional lighting.`;
+      // If user provides a prompt, we use ONLY their prompt.
+      // If not, we use the generated camera move pre-prompt.
+      const userPrompt = prompt?.trim();
+      const finalPrompt = userPrompt ? userPrompt : `The scene. Action: ${cameraMove}. Style: High fidelity, smooth motion, cinematic 3D depth, professional lighting.`;
 
       const credentials = apiKeys?.falApiKey;
       if (!credentials) throw new Error("API Key is missing. Please configure your Fal AI key in the Admin Panel.");
