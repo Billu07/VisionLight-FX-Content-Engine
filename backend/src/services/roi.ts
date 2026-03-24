@@ -1,5 +1,5 @@
 // backend/src/services/roi.ts
-import { airtableService } from "./airtable";
+import { dbService as airtableService } from "./database";
 
 export class ROIService {
   static async getMetrics(userId: string) {

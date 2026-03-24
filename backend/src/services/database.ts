@@ -338,6 +338,12 @@ export const dbService = {
     }
     return metrics;
   },
+  async updateROIMetrics(userId: string, data: any) {
+    return prisma.rOIMetrics.update({
+      where: { userId },
+      data,
+    });
+  },
 
   // === NOTIFICATIONS (Intact) ===
   async createCreditRequest(userId: string, email: string, name: string) {
