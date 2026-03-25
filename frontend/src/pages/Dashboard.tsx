@@ -1930,13 +1930,22 @@ function Dashboard() {
                                     <div className="absolute top-full right-0 mt-2 w-72 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
                                       <div className="p-3 border-b border-gray-800 flex justify-between items-center bg-gray-800/30">
                                         <h4 className="text-xs font-bold text-gray-300 uppercase tracking-widest">Saved Prompts</h4>
-                                        <button
-                                          type="button"
-                                          onClick={() => setIsAddingPromptFx(!isAddingPromptFx)}
-                                          className="text-[10px] bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-white transition-colors"
-                                        >
-                                          {isAddingPromptFx ? "Cancel" : "+ Add New"}
-                                        </button>
+                                        <div className="flex gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => setIsAddingPromptFx(!isAddingPromptFx)}
+                                            className="text-[10px] bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-white transition-colors"
+                                          >
+                                            {isAddingPromptFx ? "Cancel" : "+ Add New"}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => setShowPromptFxMenu(false)}
+                                            className="text-[10px] text-gray-400 hover:text-white hover:bg-gray-700 px-2 py-1 rounded transition-colors"
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
                                       </div>
 
                                       {isAddingPromptFx && (

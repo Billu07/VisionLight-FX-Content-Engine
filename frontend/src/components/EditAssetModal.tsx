@@ -892,12 +892,20 @@ export function EditAssetModal({
                             <span className="text-xs font-bold text-indigo-300">
                               Saved Prompts
                             </span>
-                            <button
-                              onClick={() => setIsAddingPromptFx(true)}
-                              className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded"
-                            >
-                              + New
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setIsAddingPromptFx(true)}
+                                className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded transition-colors"
+                              >
+                                + New
+                              </button>
+                              <button
+                                onClick={() => setShowPromptFxMenu(false)}
+                                className="text-xs text-gray-400 hover:text-white hover:bg-gray-800 px-2 py-1 rounded transition-colors"
+                              >
+                                ✕
+                              </button>
+                            </div>
                           </div>
 
                           {isAddingPromptFx && (
