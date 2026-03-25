@@ -49,6 +49,7 @@ function Dashboard() {
   const [newPromptFxName, setNewPromptFxName] = useState("");
   const [newPromptFxText, setNewPromptFxText] = useState("");
   const [isAddingPromptFx, setIsAddingPromptFx] = useState(false);
+  const [editingPromptFxIndex, setEditingPromptFxIndex] = useState<number | null>(null);
 
   const { data: promptFxList = [] } = useQuery({
     queryKey: ["prompt-fx"],
@@ -66,19 +67,29 @@ function Dashboard() {
       setNewPromptFxName("");
       setNewPromptFxText("");
       setIsAddingPromptFx(false);
+      setEditingPromptFxIndex(null);
     },
   });
 
   const handleAddPromptFx = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPromptFxName.trim() || !newPromptFxText.trim()) return;
-    const newList = [...promptFxList, { name: newPromptFxName.trim(), prompt: newPromptFxText.trim() }];
+    
+    let newList = [...promptFxList];
+    if (editingPromptFxIndex !== null) {
+      newList[editingPromptFxIndex] = { name: newPromptFxName.trim(), prompt: newPromptFxText.trim() };
+    } else {
+      newList.push({ name: newPromptFxName.trim(), prompt: newPromptFxText.trim() });
+    }
+    
     savePromptFxMutation.mutate(newList);
   };
 
   const handleRemovePromptFx = (indexToRemove: number) => {
-    const newList = promptFxList.filter((_: any, idx: number) => idx !== indexToRemove);
-    savePromptFxMutation.mutate(newList);
+    if (window.confirm("Are you sure you want to delete this prompt preset?")) {
+      const newList = promptFxList.filter((_: any, idx: number) => idx !== indexToRemove);
+      savePromptFxMutation.mutate(newList);
+    }
   };
 
   const [activeLibrarySlot, setActiveLibrarySlot] = useState<
@@ -1968,22 +1979,38 @@ function Dashboard() {
                                                   setPrompt(pf.prompt);
                                                   setShowPromptFxMenu(false);
                                                 }}
-                                                className="w-full text-left p-3 pr-10 flex flex-col gap-1"
+                                                className="w-full text-left p-3 pr-20 flex flex-col gap-1"
                                               >
                                                 <span className="text-sm font-bold text-gray-200">{pf.name}</span>
                                                 <span className="text-xs text-gray-500 truncate">{pf.prompt}</span>
                                               </button>
-                                              <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  handleRemovePromptFx(idx);
-                                                }}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-all"
-                                                title="Delete"
-                                              >
-                                                ✕
-                                              </button>
+                                              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setNewPromptFxName(pf.name);
+                                                    setNewPromptFxText(pf.prompt);
+                                                    setEditingPromptFxIndex(idx);
+                                                    setIsAddingPromptFx(true);
+                                                  }}
+                                                  className="w-7 h-7 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded flex items-center justify-center text-xs"
+                                                  title="Edit"
+                                                >
+                                                  ✎
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleRemovePromptFx(idx);
+                                                  }}
+                                                  className="w-7 h-7 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded flex items-center justify-center text-xs"
+                                                  title="Delete"
+                                                >
+                                                  ✕
+                                                </button>
+                                              </div>
                                             </div>
                                           ))
                                         )}
