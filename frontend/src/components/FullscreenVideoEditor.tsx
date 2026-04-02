@@ -94,28 +94,35 @@ export function FullscreenVideoEditor({
     if (sequence.length === 0) {
       return { currentItem: null, localTime: 0, itemStartIndex: -1, nextItem: null };
     }
+    
+    // Clamp currentTime to totalDuration to avoid index overflow at the very end
+    const clampedTime = Math.max(0, Math.min(currentTime, totalDuration - 0.001));
+    
     let accumulated = 0;
     for (let i = 0; i < sequence.length; i++) {
       const item = sequence[i];
       const duration = item.duration || 3000;
-      if (currentTime >= accumulated && currentTime < accumulated + duration) {
+      
+      if (clampedTime >= accumulated && clampedTime < accumulated + duration) {
         return { 
           currentItem: item, 
-          localTime: currentTime - accumulated,
+          localTime: clampedTime - accumulated,
           itemStartIndex: i,
           nextItem: i + 1 < sequence.length ? sequence[i + 1] : null
         };
       }
       accumulated += duration;
     }
-    // Fallback to last item if at the very end
+
+    // Fallback to last frame of last item
+    const lastItem = sequence[sequence.length - 1];
     return { 
-      currentItem: sequence[sequence.length - 1], 
-      localTime: sequence[sequence.length - 1]?.duration || 0,
+      currentItem: lastItem, 
+      localTime: lastItem?.duration || 0,
       itemStartIndex: sequence.length - 1,
       nextItem: null
     };
-  }, [sequence, currentTime]);
+  }, [sequence, currentTime, totalDuration]);
 
   // Sync Video Element
   useEffect(() => {
