@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import ReactCrop, { type Crop, type PixelCrop, centerCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
+import { useAuth } from "../hooks/useAuth"; // 👈 Added this
 import { DriftFrameExtractor } from "./DriftFrameExtractor";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { ProgressBar } from "./ProgressBar";
@@ -65,6 +66,8 @@ export function EditAssetModal({
   const [isAddingPromptFx, setIsAddingPromptFx] = useState(false);
   const [editingPromptFxIndex, setEditingPromptFxIndex] = useState<number | null>(null);
   const [isUploadingInitial, setIsUploadingInitial] = useState(false);
+
+  const { systemPresets } = useAuth(); // 👈 Global presets from auth context
 
   const { data: promptFxList = [] } = useQuery({
     queryKey: ["prompt-fx"],
@@ -979,7 +982,35 @@ export function EditAssetModal({
                           )}
 
                           <div className="max-h-48 overflow-y-auto">
-                            {promptFxList.length === 0 && !isAddingPromptFx ? (
+                            {/* Global Presets */}
+                            {systemPresets && systemPresets.length > 0 && (
+                              <div className="bg-indigo-900/10">
+                                <div className="px-3 py-1 bg-gray-950/50 text-[8px] font-black text-indigo-400 uppercase tracking-[0.2em] border-b border-gray-800">System Presets</div>
+                                {systemPresets.map((pfx: any) => (
+                                  <div
+                                    key={pfx.id}
+                                    className="group flex flex-col p-3 border-b border-gray-800 hover:bg-indigo-900/20 cursor-pointer transition-colors"
+                                    onClick={() => {
+                                      setPrompt(pfx.prompt);
+                                      setShowPromptFxMenu(false);
+                                    }}
+                                  >
+                                    <div className="flex justify-between items-start mb-1">
+                                      <span className="text-xs font-bold text-indigo-200">
+                                        {pfx.name}
+                                      </span>
+                                      <span className="text-[8px] bg-indigo-500/20 text-indigo-400 px-1.5 py-0.5 rounded uppercase font-bold">Global</span>
+                                    </div>
+                                    <span className="text-[10px] text-gray-500 line-clamp-2">
+                                      {pfx.prompt}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* User Presets */}
+                            {promptFxList.length === 0 && !isAddingPromptFx && (!systemPresets || systemPresets.length === 0) ? (
                               <div className="p-4 text-center text-xs text-gray-500">
                                 No saved prompts.
                               </div>

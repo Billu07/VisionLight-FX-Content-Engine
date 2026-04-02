@@ -53,6 +53,12 @@ export const apiEndpoints = {
   superadminGetGlobalSettings: () => api.get("/api/superadmin/settings/global"),
   superadminUpdateGlobalSettings: (data: any) => api.put("/api/superadmin/settings/global", data),
 
+  // Global Presets
+  superadminGetPresets: () => api.get("/api/superadmin/presets"),
+  superadminCreatePreset: (data: any) => api.post("/api/superadmin/presets", data),
+  superadminUpdatePreset: (id: string, data: any) => api.put(`/api/superadmin/presets/${id}`, data),
+  superadminDeletePreset: (id: string) => api.delete(`/api/superadmin/presets/${id}`),
+
   // === Tenant (Team Management) ===
   tenantGetTeam: () => api.get("/api/tenant/team"),
   tenantAddUser: (data: any) => api.post("/api/tenant/team/user", data),

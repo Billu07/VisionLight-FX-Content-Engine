@@ -146,8 +146,15 @@ app.get(
         }
       }
 
+      // Fetch system-wide preset prompts
+      const systemPresets = await prisma.presetPrompt.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true, prompt: true }
+      });
+
       res.json({ 
         success: true, 
+        systemPresets, // 👈 Added global presets
         user: { 
           ...req.user, 
           isOrgActive, 

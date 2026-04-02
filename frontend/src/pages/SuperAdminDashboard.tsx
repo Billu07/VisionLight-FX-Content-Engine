@@ -33,10 +33,11 @@ export default function SuperAdminDashboard() {
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<"tenants" | "my-agency" | "demo-leads" | "global-settings">("tenants");
+  const [activeTab, setActiveTab] = useState<"tenants" | "my-agency" | "demo-leads" | "global-settings" | "global-presets">("tenants");
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [globalSettings, setGlobalSettings] = useState<any>(null);
+  const [presets, setPresets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [msg, setMsg] = useState("");
@@ -45,70 +46,76 @@ export default function SuperAdminDashboard() {
   const [showTenantModal, setShowTenantModal] = useState(false);
   const [showDemoModal, setShowDemoModal] = useState(false);
   const [showAddTeamModal, setShowAddTeamModal] = useState(false);
+  const [showPresetModal, setShowPresetModal] = useState(false);
 
-  // Edit Tenant Modal
-  const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
-  const [tenantUpdates, setTenantUpdates] = useState({
+  // Edit Preset State
+  const [editingPreset, setEditingPreset] = useState<any | null>(null);
+  const [presetForm, setPresetForm] = useState({
     name: "",
-    maxUsers: 0,
-    maxProjectsTotal: 0,
-    maxStorageMb: 500,
-    view: "VISIONLIGHT",
+    prompt: "",
     isActive: true
   });
-
-  // Edit User Modal
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [userUpdates, setUserUpdates] = useState({
-    view: "VISIONLIGHT",
-    role: "USER"
-  });
-
-  // Forms
-  const [newTenant, setNewTenant] = useState({
-    orgName: "",
-    adminEmail: "",
-    adminPassword: "",
-    adminName: "",
-    maxUsers: 5,
-    maxProjectsTotal: 20,
-    view: "VISIONLIGHT"
-  });
-
-  const [newDemo, setNewDemo] = useState({
-    email: "",
-    password: "",
-    name: ""
-  });
-
-  const [newTeamMember, setNewTeamMember] = useState({
-    email: "",
-    password: "",
-    name: "",
-    role: "USER"
-  });
-
-  useEffect(() => {
-    fetchInitialData();
-  }, []);
 
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const [tenantsRes, settingsRes, usersRes] = await Promise.all([
+      const [tenantsRes, settingsRes, usersRes, presetsRes] = await Promise.all([
         apiEndpoints.superadminGetOrganizations(),
         apiEndpoints.superadminGetGlobalSettings(),
-        apiEndpoints.superadminGetUsers()
+        apiEndpoints.superadminGetUsers(),
+        apiEndpoints.superadminGetPresets()
       ]);
 
       if (tenantsRes.data.success) setTenants(tenantsRes.data.organizations);
       if (settingsRes.data.success) setGlobalSettings(settingsRes.data.settings);
       if (usersRes.data.success) setUsers(usersRes.data.users);
+      if (presetsRes.data.success) setPresets(presetsRes.data.presets);
     } catch (err: any) {
       setMsg("Error loading data: " + err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSavePreset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActionLoading(true);
+    try {
+      if (editingPreset) {
+        await apiEndpoints.superadminUpdatePreset(editingPreset.id, presetForm);
+      } else {
+        await apiEndpoints.superadminCreatePreset(presetForm);
+      }
+      setMsg(`Preset ${editingPreset ? 'updated' : 'created'} successfully.`);
+      setShowPresetModal(false);
+      setEditingPreset(null);
+      setPresetForm({ name: "", prompt: "", isActive: true });
+      fetchInitialData();
+    } catch (err: any) {
+      setMsg("Error: " + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeletePreset = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this global preset?")) return;
+    try {
+      await apiEndpoints.superadminDeletePreset(id);
+      fetchInitialData();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const openEditPreset = (p: any) => {
+    setEditingPreset(p);
+    setPresetForm({
+      name: p.name,
+      prompt: p.prompt,
+      isActive: p.isActive
+    });
+    setShowPresetModal(true);
   };
 
   const handleCreateTenant = async (e: React.FormEvent) => {
@@ -264,7 +271,7 @@ export default function SuperAdminDashboard() {
             >
               Back to App
             </button>
-            {["tenants", "my-agency", "demo-leads", "global-settings"].map((tab) => (
+            {["tenants", "my-agency", "demo-leads", "global-settings", "global-presets"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
@@ -281,6 +288,81 @@ export default function SuperAdminDashboard() {
           <div className="mb-8 p-4 rounded-lg bg-brand-accent/10 border border-brand-accent/20 text-brand-accent text-sm font-semibold flex justify-between items-center">
             {msg}
             <button onClick={() => setMsg("")} className="text-lg">×</button>
+          </div>
+        )}
+
+        {/* TAB CONTENT: GLOBAL PRESETS */}
+        {activeTab === "global-presets" && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">Global Prompt Presets</h2>
+                <p className="text-xs text-gray-500 mt-1">These presets automatically appear in every user's PromptFX menu.</p>
+              </div>
+              <button
+                onClick={() => {
+                  setEditingPreset(null);
+                  setPresetForm({ name: "", prompt: "", isActive: true });
+                  setShowPresetModal(true);
+                }}
+                className="bg-brand-accent hover:bg-cyan-300 text-gray-950 px-6 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest"
+              >
+                Add New Preset
+              </button>
+            </div>
+
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+              <table className="w-full text-left">
+                <thead className="bg-gray-950 text-[10px] uppercase tracking-widest text-gray-500">
+                  <tr>
+                    <th className="p-6">Preset Name</th>
+                    <th className="p-6">Prompt Content</th>
+                    <th className="p-6 text-center">Status</th>
+                    <th className="p-6 text-right">Operations</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                  {presets.length === 0 ? (
+                    <tr><td colSpan={4} className="p-10 text-center text-gray-500 italic">No global presets created yet.</td></tr>
+                  ) : presets.map(p => (
+                    <tr key={p.id} className="hover:bg-gray-800/30 transition-colors">
+                      <td className="p-6">
+                        <div className="font-bold text-white">{p.name}</div>
+                      </td>
+                      <td className="p-6">
+                        <div className="text-xs text-gray-400 line-clamp-2 max-w-md">{p.prompt}</div>
+                      </td>
+                      <td className="p-6 text-center">
+                        <span
+                          className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${p.isActive
+                              ? "bg-green-500/10 text-green-400 border-green-500/20"
+                              : "bg-red-500/10 text-red-400 border-red-500/20"
+                            }`}
+                        >
+                          {p.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="p-6 text-right">
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            className="text-gray-400 hover:text-white text-[10px] font-bold uppercase tracking-widest px-4 py-2 bg-gray-800 rounded-md border border-gray-700 hover:bg-gray-700 transition-colors"
+                            onClick={() => openEditPreset(p)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="text-red-500/50 hover:text-red-400 text-[10px] font-bold uppercase tracking-widest px-4 py-2 hover:bg-red-500/10 transition-colors rounded-md"
+                            onClick={() => handleDeletePreset(p.id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -792,6 +874,66 @@ export default function SuperAdminDashboard() {
                 <button type="button" onClick={() => setShowDemoModal(false)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
                 <button type="submit" disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
                   {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : "Create Demo"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: GLOBAL PRESET */}
+      {showPresetModal && (
+        <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+            <div className="p-8 border-b border-gray-800 flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-bold text-white uppercase tracking-tight">
+                  {editingPreset ? "Edit Global Preset" : "New Global Preset"}
+                </h3>
+                <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Appears for every user</p>
+              </div>
+              <button onClick={() => setShowPresetModal(false)} className="text-gray-500 hover:text-white font-bold text-xl">×</button>
+            </div>
+            <form onSubmit={handleSavePreset} className="p-8 space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Preset Name</label>
+                <input
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                  placeholder="e.g. Cinematic 8K"
+                  required
+                  value={presetForm.name}
+                  onChange={e => setPresetForm({ ...presetForm, name: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Prompt Content</label>
+                <textarea
+                  className="w-full h-32 p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent resize-none"
+                  placeholder="The base prompt to apply..."
+                  required
+                  value={presetForm.prompt}
+                  onChange={e => setPresetForm({ ...presetForm, prompt: e.target.value })}
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="preset-active"
+                  className="w-4 h-4 rounded bg-gray-950 border-gray-800 text-brand-accent focus:ring-brand-accent"
+                  checked={presetForm.isActive}
+                  onChange={e => setPresetForm({ ...presetForm, isActive: e.target.checked })}
+                />
+                <label htmlFor="preset-active" className="text-xs font-bold text-gray-400 uppercase tracking-widest cursor-pointer">
+                  Preset is Active
+                </label>
+              </div>
+
+              <div className="flex gap-4 pt-4">
+                <button type="button" onClick={() => setShowPresetModal(false)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
+                <button type="submit" disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
+                  {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : (editingPreset ? "Update Preset" : "Save Preset")}
                 </button>
               </div>
             </form>

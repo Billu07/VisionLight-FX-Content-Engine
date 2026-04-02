@@ -308,6 +308,59 @@ router.post("/users/superadmin", async (req: AuthenticatedRequest, res) => {
 
 // === GLOBAL CONTROLS ===
 
+// Preset Prompts CRUD
+router.get("/presets", async (req, res) => {
+  try {
+    const presets = await prisma.presetPrompt.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+    res.json({ success: true, presets });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post("/presets", async (req, res) => {
+  const { name, prompt, isActive } = req.body;
+  if (!name || !prompt) {
+    return res.status(400).json({ error: "Name and Prompt are required." });
+  }
+  try {
+    const preset = await prisma.presetPrompt.create({
+      data: { name, prompt, isActive: isActive !== undefined ? !!isActive : true },
+    });
+    res.json({ success: true, preset });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.put("/presets/:id", async (req, res) => {
+  const { name, prompt, isActive } = req.body;
+  try {
+    const preset = await prisma.presetPrompt.update({
+      where: { id: req.params.id },
+      data: { 
+        name, 
+        prompt, 
+        isActive: isActive !== undefined ? !!isActive : undefined 
+      },
+    });
+    res.json({ success: true, preset });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete("/presets/:id", async (req, res) => {
+  try {
+    await prisma.presetPrompt.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get Global Pricing Template
 router.get("/settings/global", async (req, res) => {
   try {

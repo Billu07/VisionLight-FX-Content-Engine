@@ -237,3 +237,12 @@ model CreditRequest {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+model PresetPrompt {
+  id        String   @id @default(uuid())
+  name      String
+  prompt    String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
