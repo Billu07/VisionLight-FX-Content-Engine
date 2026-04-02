@@ -373,10 +373,18 @@ export function FullscreenVideoEditor({
     const seekToPoint = (clientX: number) => {
         if (!timelineRef.current) return;
         const rect = timelineRef.current.getBoundingClientRect();
-        const x = clientX - rect.left;
+        
+        // Use the scroll container to get accurate scroll position
+        const scrollContainer = timelineRef.current.parentElement;
+        if (!scrollContainer) return;
+
+        const scrollLeft = scrollContainer.scrollLeft;
+        const x = clientX - rect.left + scrollLeft;
         const scrollWidth = timelineRef.current.scrollWidth;
+        
+        // Ensure we don't go out of bounds
         const clickedTime = (x / scrollWidth) * totalDuration;
-        handleSeek(clickedTime);
+        handleSeek(Math.max(0, Math.min(clickedTime, totalDuration)));
     };
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
@@ -674,6 +682,7 @@ export function FullscreenVideoEditor({
                                         originalDuration: asset.type === "VIDEO" ? 15000 : 3000,
                                         title: asset.type === "VIDEO" ? "Video Clip" : "Image Frame"
                                     }]);
+                                    setSidebarTab("bin");
                                 }}
                               >
                                   {asset.type === "VIDEO" ? (
@@ -991,12 +1000,12 @@ export function FullscreenVideoEditor({
         <div className="flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar-h" style={{ scrollBehavior: 'smooth' }}>
             <div 
                 ref={timelineRef}
-                className="h-full relative py-6"
+                className="h-full relative py-6 pr-[50%]"
                 style={{ width: `${Math.max(100, (totalDuration / 100) * zoom)}%`, minWidth: '100%' }}
                 onMouseDown={handleTimelineMouseDown}
             >
                 {/* Time Rulers */}
-                <div className="absolute top-0 left-0 right-0 h-4 flex items-end opacity-20 pointer-events-none">
+                <div className="absolute top-0 left-0 right-0 h-4 flex items-end opacity-20 pointer-events-none px-2">
                     {Array.from({ length: Math.ceil(totalDuration / 1000) + 1 }).map((_, i) => (
                         <div key={i} className="border-l border-white h-2 flex-shrink-0" style={{ width: `${(1000 / totalDuration) * 100}%` }}>
                             <span className="text-[8px] ml-1">{i}s</span>
