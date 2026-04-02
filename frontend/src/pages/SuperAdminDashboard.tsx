@@ -33,7 +33,7 @@ export default function SuperAdminDashboard() {
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<"tenants" | "my-agency" | "demo-leads" | "global-settings" | "global-presets">("tenants");
+  const [activeTab, setActiveTab] = useState<"platform" | "my-agency" | "demo-leads" | "global-settings" | "global-presets">("platform");
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [globalSettings, setGlobalSettings] = useState<any>(null);

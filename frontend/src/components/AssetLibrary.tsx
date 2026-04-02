@@ -770,23 +770,6 @@ export function AssetLibrary({
                   crossOrigin="anonymous"
                 />
 
-                <div className="absolute bottom-4 right-4 z-20 flex gap-2">
-                  <button
-                    onClick={handleFullscreen}
-                    className="p-2.5 bg-black/60 hover:bg-black text-white rounded-lg border border-white/10 backdrop-blur-md transition-all flex items-center gap-2 text-xs font-bold"
-                    title="Fullscreen"
-                  >
-                    <span>⛶</span> Fullscreen
-                  </button>
-                  <button
-                    onClick={() => handleDirectDownload(selectedAsset)}
-                    className="p-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg border border-cyan-500/30 backdrop-blur-md transition-all flex items-center gap-2 text-xs font-bold shadow-lg shadow-cyan-500/20"
-                    title="Direct Download"
-                  >
-                    <span>📥</span> Download
-                  </button>
-                </div>
-
                 {/* Navigation Arrows (HIDDEN ON MOBILE for better touch experience) */}
                 <button
                   onClick={(e) => {
@@ -883,9 +866,15 @@ export function AssetLibrary({
               </div>
               <div className="flex sm:flex-col gap-3 pt-6 border-t border-gray-800 mt-6 sm:mt-0">
                 <button
-                  onClick={() => handleDownloadAsset(selectedAsset)}
+                  onClick={handleFullscreen}
+                  className="flex-1 sm:w-full py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs sm:text-sm font-bold border border-white/5 transition-colors"
+                >
+                  Fullscreen
+                </button>
+                <button
+                  onClick={() => handleDirectDownload(selectedAsset)}
                   disabled={isDownloading}
-                  className="flex-1 sm:w-full py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs sm:text-sm"
+                  className="flex-1 sm:w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs sm:text-sm font-bold shadow-lg shadow-cyan-500/20 transition-all"
                 >
                   {isDownloading ? <LoadingSpinner size="sm" /> : "Download"}
                 </button>

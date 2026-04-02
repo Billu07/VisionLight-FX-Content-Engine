@@ -434,6 +434,10 @@ export function FullscreenVideoEditor({
   };
 
   const confirmExportVideo = async () => {
+    if (totalDuration > 60000) {
+      alert("Total sequence duration cannot exceed 60 seconds.");
+      return;
+    }
     setShowExportModal(false);
     setIsExporting(true);
     setExportProgress(0);
@@ -496,7 +500,7 @@ export function FullscreenVideoEditor({
           </button>
           <div className="h-6 w-[1px] bg-white/10 mx-2"></div>
           <div>
-            <h1 className="text-sm font-bold text-white tracking-wide uppercase">Sequence Merger PRO</h1>
+            <h1 className="text-sm font-bold text-white tracking-wide uppercase">PicFX Editor</h1>
             <p className="text-[10px] text-gray-500 font-mono">{formatTime(currentTime)} / {formatTime(totalDuration)}</p>
           </div>
         </div>

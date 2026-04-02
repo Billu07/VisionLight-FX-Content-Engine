@@ -120,6 +120,42 @@ export function DriftFrameExtractor({
     }
   };
 
+  const downloadSpecificFrame = (time: number, filename: string) => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    // Store current time to restore it
+    const originalTime = video.currentTime;
+    
+    // Seek to target time
+    video.currentTime = time;
+
+    const capture = () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = filename;
+          a.click();
+          window.URL.revokeObjectURL(url);
+        }
+        // Restore video time
+        video.currentTime = originalTime;
+        video.removeEventListener('seeked', capture);
+      }, "image/jpeg", 0.95);
+    };
+
+    video.addEventListener('seeked', capture);
+  };
+
   return (
     <div className="flex flex-col items-center justify-center w-full h-full p-2 animate-in fade-in">
       {/* Video Container */}
@@ -151,9 +187,25 @@ export function DriftFrameExtractor({
 
       {/* Controls Container */}
       <div className="w-full max-w-3xl space-y-4 bg-gray-900/80 p-4 rounded-2xl border border-gray-700">
+        
+        <div className="flex flex-wrap gap-2 justify-center pb-2 border-b border-gray-700/50">
+          <button 
+            onClick={() => downloadSpecificFrame(0, "start_frame.jpg")}
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-bold transition-all border border-white/5"
+          >
+            Download Start Frame
+          </button>
+          <button 
+            onClick={() => downloadSpecificFrame(duration, "end_frame.jpg")}
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-bold transition-all border border-white/5"
+          >
+            Download End Frame
+          </button>
+        </div>
+
         {/* Scrubber Row */}
         <div className="flex items-center gap-4">
-          {/* ✅ NEW: Dedicated Play/Pause Button on toolbar */}
+          {/* Dedicated Play/Pause Button on toolbar */}
           <button
             onClick={togglePlay}
             disabled={!isReady}
@@ -194,7 +246,7 @@ export function DriftFrameExtractor({
             disabled={!isReady || isExtracting}
             className="flex-1 py-3 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg hover:from-rose-500 hover:to-orange-500 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
           >
-            <span>{isExtracting ? "⏳" : "📸"}</span> {isExtracting ? "Capturing..." : "Capture 3DX Frame"}
+            {isExtracting ? "Capturing..." : "Capture 3DX Frame"}
           </button>
 
           <a
@@ -202,7 +254,7 @@ export function DriftFrameExtractor({
             onClick={handleDownloadVideo}
             className="px-6 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-xl text-white font-semibold text-center flex items-center justify-center gap-2 text-sm transition-colors cursor-pointer"
           >
-            <span></span> Download Video
+            Download Video
           </a>
 
           <button
