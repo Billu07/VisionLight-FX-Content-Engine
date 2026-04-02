@@ -4,6 +4,7 @@ dotenv.config();
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import axios from "axios";
+import archiver from "archiver";
 import { getCost, getTargetPool } from "./config/pricing";
 import { upload, uploadToCloudinary } from "./utils/fileUpload";
 import { ROIService } from "./services/roi";
@@ -387,15 +388,15 @@ import { renderVideoSequence } from "./services/videoEditor";
 // ✅ Video Export Endpoint
 app.post("/api/export/video", authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
-    const { editorState, projectId } = req.body;
+    const { editorState, projectId, fps } = req.body;
     if (!editorState || !editorState.sequence) {
       return res.status(400).json({ error: "Invalid editor state provided." });
     }
 
-    // In a production app, you might want to run this in a background job queue (like BullMQ) 
+    // In a production app, you might want to run this in a background job queue (like BullMQ)
     // because FFmpeg rendering can take a long time and time out the HTTP request.
     // For now, we will await it directly.
-    const finalUrl = await renderVideoSequence(editorState, req.user!.id, projectId);
+    const finalUrl = await renderVideoSequence(editorState, req.user!.id, projectId, fps || 30);
 
     res.json({ success: true, url: finalUrl });
   } catch (error: any) {
@@ -403,7 +404,6 @@ app.post("/api/export/video", authenticateToken, async (req: AuthenticatedReques
     res.status(500).json({ error: "Failed to render video: " + error.message });
   }
 });
-
 // ✅ Sync Upload (Magic Edit & Direct Reference)
 app.post(
   "/api/assets/upload-sync",
@@ -624,7 +624,7 @@ app.post(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const { assetUrl, prompt, horizontal, vertical, zoom, aspectRatio, generateAudio, projectId } =
+      const { assetUrl, prompt, horizontal, vertical, zoom, aspectRatio, duration, generateAudio, projectId } =
         req.body;
 
       const [settings, user] = await Promise.all([
@@ -657,6 +657,7 @@ app.post(
         Number(vertical),
         Number(zoom),
         aspectRatio,
+        duration || "5",
         generateAudio === "true" || generateAudio === true,
         projectId,
         apiKeys
@@ -833,6 +834,46 @@ app.delete(
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// ✅ Download Multiple Assets as ZIP
+app.post(
+  "/api/assets/download-zip",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { assetUrls, filename } = req.body;
+      if (!assetUrls || !Array.isArray(assetUrls) || assetUrls.length === 0) {
+        return res.status(400).json({ error: "No asset URLs provided" });
+      }
+
+      const zipFilename = filename || `visionlight-storyboard-${Date.now()}.zip`;
+      
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="${zipFilename}"`);
+
+      const archive = archiver("zip", { zlib: { level: 9 } });
+      archive.pipe(res);
+
+      for (let i = 0; i < assetUrls.length; i++) {
+        try {
+          const url = assetUrls[i];
+          const response = await axios({ url, method: "GET", responseType: "stream", timeout: 10000 });
+          const ext = url.split(".").pop()?.split("?")[0] || "jpg";
+          archive.append(response.data, { name: `image-${i + 1}.${ext}` });
+        } catch (e) {
+          console.error(`Failed to add asset ${assetUrls[i]} to zip:`, e);
+        }
+      }
+
+      await archive.finalize();
+    } catch (error: any) {
+      console.error("ZIP Error:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to generate ZIP" });
+      }
     }
   },
 );

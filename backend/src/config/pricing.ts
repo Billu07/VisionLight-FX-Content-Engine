@@ -63,7 +63,11 @@ export const calculateGranularCost = (
 };
 
 export const getCost = (user: any, params: any, settings: any) => {
-  if (user.view === "PICDRIFT") return 1; // Always 1 render per action for Demo View
+  if (user.view === "PICDRIFT") {
+    // For Demo Users, PicDrift Plus (kling-3) costs 2, everything else costs 1
+    if (params.model === "kling-3") return 2;
+    return 1;
+  }
   return calculateGranularCost(params, settings);
 }
 

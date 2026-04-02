@@ -183,15 +183,26 @@ router.put("/organizations/:id/status", async (req: AuthenticatedRequest, res) =
   }
 });
 
-// Update Organization Limits
+// Update Organization Config/Limits
 router.put("/organizations/:id/limits", async (req: AuthenticatedRequest, res) => {
-  const { maxUsers, maxProjectsTotal, maxStorageMb } = req.body;
+  const { maxUsers, maxProjectsTotal, maxStorageMb, name, view } = req.body;
   try {
-    const org = await dbService.updateOrganization(req.params.id, {
+    const orgUpdates: any = {
       maxUsers: maxUsers !== undefined ? Number(maxUsers) : undefined,
       maxProjectsTotal: maxProjectsTotal !== undefined ? Number(maxProjectsTotal) : undefined,
       maxStorageMb: maxStorageMb !== undefined ? Number(maxStorageMb) : undefined,
-    });
+    };
+    if (name) orgUpdates.name = name;
+
+    const org = await dbService.updateOrganization(req.params.id, orgUpdates);
+
+    if (view) {
+      await prisma.user.updateMany({
+        where: { organizationId: req.params.id },
+        data: { view }
+      });
+    }
+
     res.json({ success: true, organization: org });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

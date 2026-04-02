@@ -50,13 +50,13 @@ const downloadFile = async (url: string, outputPath: string): Promise<void> => {
   });
 };
 
-const processClip = (inputPath: string, outputPath: string, item: SequenceItem): Promise<void> => {
+const processClip = (inputPath: string, outputPath: string, item: SequenceItem, fps: number = 30): Promise<void> => {
   return new Promise((resolve, reject) => {
     const durationSec = (item.duration || 3000) / 1000;
     const command = ffmpeg(inputPath);
 
-    // Standardize output to 1080p, 30fps, with padding to avoid aspect ratio stretching
-    let videoFilter = `scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1:1,fps=30`;
+    // Standardize output to 1080p, dynamic fps, with padding to avoid aspect ratio stretching
+    let videoFilter = `scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1:1,fps=${fps}`;
 
     if (item.type === "IMAGE") {
       command.inputOptions(["-loop 1"]);
@@ -68,7 +68,6 @@ const processClip = (inputPath: string, outputPath: string, item: SequenceItem):
       // Trim first
       command.setStartTime(trimStartSec);
       // We set duration *before* speed adjustment so we capture the right amount of source footage
-      // Wait, if we want the FINAL clip to be durationSec, we need durationSec * speed of source.
       const sourceDurationToCapture = durationSec * speed;
       command.setDuration(sourceDurationToCapture);
 
@@ -167,7 +166,8 @@ const cleanUrl = (url: string) => {
 export const renderVideoSequence = async (
   editorState: EditorState,
   userId: string,
-  projectId?: string
+  projectId?: string,
+  fps: number = 30
 ): Promise<string> => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "visionlight-render-"));
   
@@ -192,7 +192,7 @@ export const renderVideoSequence = async (
       await downloadFile(rawUrl, localPath);
 
       console.log(`Processing clip ${i}...`);
-      await processClip(localPath, processedPath, item);
+      await processClip(localPath, processedPath, item, fps);
       processedClips.push(processedPath);
     }
     

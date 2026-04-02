@@ -56,11 +56,14 @@ export function FullscreenVideoEditor({
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [viewportRatio, setViewportRatio] = useState<"16:9" | "9:16" | "1:1">("16:9");
-  const [sidebarTab, setSidebarTab] = useState<"project" | "bin" | "exports">("bin");
+  const [sidebarTab, setSidebarTab] = useState<"project" | "bin" | "storyline" | "exports">("bin");
+  const [storylineTab, setStorylineTab] = useState<"videos" | "images">("videos");
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
   
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFps, setExportFps] = useState(30);
 
   const queryClient = useQueryClient();
 
@@ -124,50 +127,57 @@ export function FullscreenVideoEditor({
     let standbyPlayer: HTMLVideoElement | null = null;
 
     if (currentItem?.type === "VIDEO") {
+        const itemUrl = getCORSProxyUrl(currentItem.url);
         // Find which player already has the current URL loaded
-        if (player1.getAttribute('data-url') === currentItem.url) {
+        if (player1.getAttribute('data-url') === itemUrl) {
             activePlayer = player1;
             standbyPlayer = player2;
-        } else if (player2.getAttribute('data-url') === currentItem.url) {
+        } else if (player2.getAttribute('data-url') === itemUrl) {
             activePlayer = player2;
             standbyPlayer = player1;
         } else {
             // Neither has it (jumped). Use player1 as active.
             activePlayer = player1;
             standbyPlayer = player2;
-            activePlayer.src = currentItem.url;
-            activePlayer.setAttribute('data-url', currentItem.url);
+            activePlayer.src = itemUrl;
+            activePlayer.setAttribute('data-url', itemUrl);
             activePlayer.load();
         }
 
         // Apply active player styling
+        activePlayer.style.display = "block";
         activePlayer.style.opacity = "1";
         activePlayer.style.zIndex = "10";
         standbyPlayer.style.opacity = "0";
         standbyPlayer.style.zIndex = "0";
+        standbyPlayer.style.display = "none";
 
         // Sync active player time
         const trimOffset = currentItem.trimStart || 0;
         const videoTime = (localTime + trimOffset) / 1000;
         activePlayer.playbackRate = currentItem.speed || 1;
         
-        // Exact frame scrubbing when paused, looser sync when playing
-        if (Math.abs(activePlayer.currentTime - videoTime) > (isPlaying ? 0.1 : 0.01)) {
+        // Use a smaller threshold for frame-accurate scrubbing
+        const diff = Math.abs(activePlayer.currentTime - videoTime);
+        if (diff > (isPlaying ? 0.05 : 0.01)) {
             activePlayer.currentTime = videoTime;
         }
+
         if (isPlaying) {
-            activePlayer.play().catch(() => {});
+            if (activePlayer.paused) {
+                activePlayer.play().catch(() => {});
+            }
         } else {
-            activePlayer.pause();
+            if (!activePlayer.paused) {
+                activePlayer.pause();
+            }
         }
     } else {
         // Current is not video. Pause both and hide.
         player1.pause();
         player2.pause();
-        player1.style.opacity = "0";
-        player1.style.zIndex = "0";
-        player2.style.opacity = "0";
-        player2.style.zIndex = "0";
+        player1.style.display = "none";
+        player2.style.display = "none";
         standbyPlayer = player1; // Just pick one to preload the next
     }
 
@@ -186,9 +196,10 @@ export function FullscreenVideoEditor({
     }
 
     if (nextVideoItem && standbyPlayer) {
-        if (standbyPlayer.getAttribute('data-url') !== nextVideoItem.url) {
-            standbyPlayer.src = nextVideoItem.url;
-            standbyPlayer.setAttribute('data-url', nextVideoItem.url);
+        const nextUrl = getCORSProxyUrl(nextVideoItem.url);
+        if (standbyPlayer.getAttribute('data-url') !== nextUrl) {
+            standbyPlayer.src = nextUrl;
+            standbyPlayer.setAttribute('data-url', nextUrl);
             standbyPlayer.load();
             standbyPlayer.currentTime = (nextVideoItem.trimStart || 0) / 1000;
         }
@@ -198,17 +209,21 @@ export function FullscreenVideoEditor({
 
   // Playback Loop
   useEffect(() => {
+    let lastUpdate = performance.now();
     if (isPlaying) {
-      const startTimestamp = performance.now() - currentTime;
       const animate = (now: number) => {
-        const newTime = now - startTimestamp;
-        if (newTime >= totalDuration) {
-          setCurrentTime(0);
-          setIsPlaying(false);
-        } else {
-          setCurrentTime(newTime);
-          animationRef.current = requestAnimationFrame(animate);
-        }
+        const delta = now - lastUpdate;
+        lastUpdate = now;
+        
+        setCurrentTime(prev => {
+            const next = prev + delta;
+            if (next >= totalDuration) {
+                setIsPlaying(false);
+                return 0;
+            }
+            return next;
+        });
+        animationRef.current = requestAnimationFrame(animate);
       };
       animationRef.current = requestAnimationFrame(animate);
     } else {
@@ -270,6 +285,7 @@ export function FullscreenVideoEditor({
 
   const handleEdgeDrag = (e: React.MouseEvent, id: string, edge: 'left' | 'right') => {
     e.stopPropagation();
+    e.preventDefault();
     const item = sequence.find(i => i.id === id);
     if (!item) return;
 
@@ -289,11 +305,12 @@ export function FullscreenVideoEditor({
       if (!timelineRef.current) return;
       
       const deltaX = e.clientX - draggingEdge.initialX;
-      const timelineRect = timelineRef.current.getBoundingClientRect();
       
       // Calculate time delta based on current zoom and timeline width
-      const msPerPixel = totalDuration / timelineRect.width;
-      const deltaTimeMs = deltaX * msPerPixel;
+      // Re-calculate more accurately:
+      const scrollWidth = timelineRef.current.scrollWidth;
+      const msPerPx = totalDuration / scrollWidth;
+      const deltaTimeMs = deltaX * msPerPx;
 
       setSequence(prev => {
         const newSeq = [...prev];
@@ -341,21 +358,30 @@ export function FullscreenVideoEditor({
       setDraggingEdge(null);
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousemove', handleMouseMove, { passive: false });
     window.addEventListener('mouseup', handleMouseUp);
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [draggingEdge, totalDuration]);
+  }, [draggingEdge, totalDuration, zoom]);
 
   const handleTimelineMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // If we click an edge or a clip handle, don't seek immediately
+    if ((e.target as HTMLElement).closest('.drag-handle')) return;
+
+    const seekToPoint = (clientX: number) => {
+        if (!timelineRef.current) return;
+        const rect = timelineRef.current.getBoundingClientRect();
+        const scrollLeft = timelineRef.current.parentElement?.scrollLeft || 0;
+        const x = clientX - rect.left;
+        const scrollWidth = timelineRef.current.scrollWidth;
+        const clickedTime = (x / scrollWidth) * totalDuration;
+        handleSeek(clickedTime);
+    };
+
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (!timelineRef.current) return;
-      const rect = timelineRef.current.getBoundingClientRect();
-      const x = moveEvent.clientX - rect.left;
-      const clickedTime = (x / rect.width) * totalDuration;
-      handleSeek(clickedTime);
+      seekToPoint(moveEvent.clientX);
     };
 
     const handleMouseUp = () => {
@@ -366,13 +392,7 @@ export function FullscreenVideoEditor({
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
     
-    // Also trigger for the initial click
-    if (timelineRef.current) {
-      const rect = timelineRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const clickedTime = (x / rect.width) * totalDuration;
-      handleSeek(clickedTime);
-    }
+    seekToPoint(e.clientX);
   };
 
   const handleSaveProject = async () => {
@@ -398,7 +418,11 @@ export function FullscreenVideoEditor({
       alert("Timeline is empty. Add clips to export.");
       return;
     }
-    
+    setShowExportModal(true);
+  };
+
+  const confirmExportVideo = async () => {
+    setShowExportModal(false);
     setIsExporting(true);
     setExportProgress(0);
 
@@ -415,7 +439,7 @@ export function FullscreenVideoEditor({
     try {
       // 2. Real Backend Export using FFmpeg
       const editorState = { sequence, audioTracks: audioTracks || [] };
-      await apiEndpoints.exportVideo({ editorState, projectId });
+      await apiEndpoints.exportVideo({ editorState, projectId, fps: exportFps });
 
       clearInterval(progressInterval);
       setExportProgress(100);
@@ -504,32 +528,76 @@ export function FullscreenVideoEditor({
           </div>
       )}
 
+      {/* EXPORT SETTINGS MODAL */}
+      {showExportModal && (
+          <div className="absolute inset-0 z-[200] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center">
+              <div className="w-96 p-8 bg-gray-900 border border-gray-700 rounded-2xl flex flex-col space-y-6">
+                  <h3 className="text-white font-bold text-lg text-center border-b border-gray-800 pb-4">Export Settings</h3>
+                  
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Frames Per Second (FPS)</label>
+                    <select 
+                      value={exportFps}
+                      onChange={(e) => setExportFps(Number(e.target.value))}
+                      className="w-full p-3 bg-black border border-gray-800 rounded-lg text-white font-bold outline-none cursor-pointer hover:border-gray-600 transition-colors"
+                    >
+                      <option value={24}>24 FPS (Cinematic)</option>
+                      <option value={30}>30 FPS (Standard)</option>
+                      <option value={60}>60 FPS (Smooth)</option>
+                    </select>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                      <button 
+                          onClick={() => setShowExportModal(false)}
+                          className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-bold text-xs uppercase tracking-widest transition-colors"
+                      >
+                          Cancel
+                      </button>
+                      <button 
+                          onClick={confirmExportVideo}
+                          className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold text-xs uppercase tracking-widest transition-colors shadow-lg shadow-cyan-500/20"
+                      >
+                          Start Render
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex overflow-hidden">
         
         {/* ASSET SIDEBAR */}
         {sidebarOpen && (
-          <div className="w-72 bg-[#141414] border-r border-white/5 flex flex-col shrink-0 animate-in slide-in-from-left duration-300">
-            <div className="p-4 border-b border-white/5 flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <div className="flex gap-1 bg-gray-900 rounded-lg p-1">
+          <div className="w-80 bg-[#141414] border-r border-white/5 flex flex-col shrink-0 animate-in slide-in-from-left duration-300">
+            <div className="p-4 border-b border-white/5 flex flex-col gap-4">
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap gap-1 bg-gray-900 rounded-lg p-1">
                     <button 
                         onClick={() => setSidebarTab("project")}
-                        className={`px-3 py-1 rounded text-[10px] font-bold transition-colors flex items-center gap-1 ${sidebarTab === "project" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                        className={`flex-1 min-w-[60px] px-2 py-1.5 rounded text-[10px] font-bold transition-colors flex items-center justify-center gap-1 ${sidebarTab === "project" ? "bg-white/10 text-white shadow-sm" : "text-gray-500 hover:text-gray-300"}`}
                         title="View project media folder"
                     >
                         <span>📁</span> Folder
                     </button>
                     <button 
                         onClick={() => setSidebarTab("bin")}
-                        className={`px-3 py-1 rounded text-[10px] font-bold transition-colors flex items-center gap-1 ${sidebarTab === "bin" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                        className={`flex-1 min-w-[60px] px-2 py-1.5 rounded text-[10px] font-bold transition-colors flex items-center justify-center gap-1 ${sidebarTab === "bin" ? "bg-white/10 text-white shadow-sm" : "text-gray-500 hover:text-gray-300"}`}
                         title="View media staging bin"
                     >
                         <span>📦</span> Bin
                     </button>
                     <button 
+                        onClick={() => setSidebarTab("storyline")}
+                        className={`flex-1 min-w-[60px] px-2 py-1.5 rounded text-[10px] font-bold transition-colors flex items-center justify-center gap-1 ${sidebarTab === "storyline" ? "bg-white/10 text-white shadow-sm" : "text-gray-500 hover:text-gray-300"}`}
+                        title="View storyline media"
+                    >
+                        <span>📖</span> Story
+                    </button>
+                    <button 
                         onClick={() => setSidebarTab("exports")}
-                        className={`px-3 py-1 rounded text-[10px] font-bold transition-colors flex items-center gap-1 ${sidebarTab === "exports" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                        className={`flex-1 min-w-[60px] px-2 py-1.5 rounded text-[10px] font-bold transition-colors flex items-center justify-center gap-1 ${sidebarTab === "exports" ? "bg-white/10 text-white shadow-sm" : "text-gray-500 hover:text-gray-300"}`}
                         title="View rendered exported videos"
                     >
                         <span>🎬</span> Exports
@@ -570,17 +638,17 @@ export function FullscreenVideoEditor({
                             };
                             fileInput.click();
                         }}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-white transition-all text-xs"
+                        className="flex-1 h-9 flex items-center justify-center gap-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-white transition-all text-[10px] font-bold uppercase tracking-wider"
                         title="Add Audio"
                     >
-                        🎵
+                        <span>🎵</span> Add Audio
                     </button>
                     <button 
                         onClick={onAddFromLibrary}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500 hover:text-white transition-all"
+                        className="flex-1 h-9 flex items-center justify-center gap-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500 hover:text-white transition-all text-[10px] font-bold uppercase tracking-wider"
                         title="Add Visual Media"
                     >
-                        +
+                        <span>+</span> Add Media
                     </button>
                 </div>
               </div>
@@ -660,6 +728,67 @@ export function FullscreenVideoEditor({
                               </div>
                           ))
                       )}
+                  </div>
+              )}
+
+              {sidebarTab === "storyline" && (
+                  <div className="flex flex-col h-full space-y-3">
+                      <div className="flex bg-gray-900 p-1 rounded-lg">
+                          <button
+                              onClick={() => setStorylineTab("videos")}
+                              className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-colors ${storylineTab === "videos" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                          >
+                              Videos
+                          </button>
+                          <button
+                              onClick={() => setStorylineTab("images")}
+                              className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-colors ${storylineTab === "images" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                          >
+                              Images
+                          </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 flex-1">
+                          {isLoadingAssets ? (
+                              <div className="col-span-2 flex justify-center py-10"><LoadingSpinner /></div>
+                          ) : (
+                              projectAssets
+                                .filter((a: any) => a.aspectRatio !== "EXPORTED_VIDEO" && a.type === (storylineTab === "videos" ? "VIDEO" : "IMAGE"))
+                                .length === 0 ? (
+                                  <div className="col-span-2 text-center text-gray-500 text-xs py-10">No {storylineTab} in storyline.</div>
+                              ) : (
+                                  projectAssets
+                                    .filter((a: any) => a.aspectRatio !== "EXPORTED_VIDEO" && a.type === (storylineTab === "videos" ? "VIDEO" : "IMAGE"))
+                                    .map((asset: any) => (
+                                      <div 
+                                        key={asset.id} 
+                                        className="relative aspect-square bg-black rounded-lg border border-white/5 overflow-hidden group cursor-pointer hover:border-purple-500/50 transition-all"
+                                        onClick={() => {
+                                            setSequence(prev => [...prev, {
+                                                id: crypto.randomUUID(),
+                                                url: asset.url,
+                                                type: asset.type === "VIDEO" ? "VIDEO" : "IMAGE",
+                                                duration: asset.type === "VIDEO" ? 5000 : 3000,
+                                                originalDuration: asset.type === "VIDEO" ? 15000 : 3000,
+                                                title: asset.type === "VIDEO" ? "Storyline Video" : "Storyline Image"
+                                            }]);
+                                        }}
+                                      >
+                                          {asset.type === "VIDEO" ? (
+                                              <video src={getCORSProxyUrl(asset.url)} className="w-full h-full object-cover" muted />
+                                          ) : (
+                                              <img src={getCORSProxyUrl(asset.url)} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                          )}
+                                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm text-center p-2">
+                                              <span className="bg-purple-600 hover:bg-purple-500 text-white text-[9px] font-bold px-2 py-1.5 rounded uppercase tracking-wider transition-colors shadow-lg">
+                                                + Add to Sequence
+                                              </span>
+                                          </div>
+                                      </div>
+                                  ))
+                              )
+                          )}
+                      </div>
                   </div>
               )}
 
@@ -765,13 +894,12 @@ export function FullscreenVideoEditor({
                                   />
                                 </>
                             ) : (
-                                <img 
-                                    src={currentItem.url}
+                                <img
+                                    src={getCORSProxyUrl(currentItem.url)}
                                     className="w-full h-full object-contain absolute inset-0 z-10"
                                     crossOrigin="anonymous"
                                 />
-                            )}
-                        </>
+                            )}                        </>
                     ) : (
                         <div className="text-center">
                             <span className="text-5xl block mb-4 opacity-20">🎬</span>
@@ -904,9 +1032,9 @@ export function FullscreenVideoEditor({
                             style={{ width: `${((item.duration || 3000) / totalDuration) * 100}%` }}
                         >
                             {item.type === "VIDEO" ? (
-                                <video src={item.url} className="w-full h-full object-cover opacity-50" />
+                                <video src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover opacity-50" />
                             ) : (
-                                <img src={item.url} className="w-full h-full object-cover opacity-50" />
+                                <img src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover opacity-50" />
                             )}
                             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/40"></div>
                             <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center pointer-events-none">

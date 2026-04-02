@@ -52,13 +52,14 @@ export const videoLogic = {
     vertical: number,
     zoom: number,
     userAspectRatio?: string,
+    duration: string = "5",
     generateAudio: boolean = false,
     projectId?: string,
     apiKeys?: TenantApiKeys
   ) {
     try {
       console.log(
-        `🎬 Kling 2.6 Drift Request: H${horizontal} V${vertical} Z${zoom} | AR: ${userAspectRatio} | Audio: ${generateAudio} | Project: ${projectId}`,
+        `🎬 Kling 2.6 Drift Request: H${horizontal} V${vertical} Z${zoom} | AR: ${userAspectRatio} | Dur: ${duration} | Audio: ${generateAudio} | Project: ${projectId}`,
       );
 
       // ✅ FIX: Download Image FIRST to detect aspect ratio
@@ -172,7 +173,7 @@ export const videoLogic = {
       const payload: any = {
         prompt: finalPrompt,
         start_image_url: finalImageUrl,
-        duration: "5",
+        duration: duration,
         generate_audio: generateAudio,
       };
 

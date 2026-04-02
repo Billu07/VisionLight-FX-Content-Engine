@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { getCORSProxyUrl } from "../lib/api";
 
 export interface SequenceItem {
   id: string;
@@ -146,7 +147,7 @@ export function SequenceEditor({
                     {currentItem?.type === "VIDEO" ? (
                         <video
                             ref={videoRef}
-                            src={currentItem.url}
+                            src={getCORSProxyUrl(currentItem.url)}
                             className="w-full h-full object-contain"
                             onEnded={handleNext}
                             onTimeUpdate={(e) => {
@@ -159,7 +160,7 @@ export function SequenceEditor({
                         />
                     ) : (
                         <img 
-                            src={currentItem?.url}
+                            src={getCORSProxyUrl(currentItem?.url || "")}
                             className="w-full h-full object-contain animate-in fade-in duration-500"
                         />
                     )}
@@ -270,9 +271,9 @@ export function SequenceEditor({
                             }}
                         >
                             {item.type === "VIDEO" ? (
-                                <video src={item.url} className="w-full h-full object-cover opacity-80" muted />
+                                <video src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover opacity-80" muted />
                             ) : (
-                                <img src={item.url} className="w-full h-full object-cover" />
+                                <img src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover" />
                             )}
                         </div>
 

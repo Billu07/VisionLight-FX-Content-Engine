@@ -102,15 +102,18 @@ export const apiEndpoints = {
     }),
 
   // ✅ Video Export
-  exportVideo: (data: { editorState: any; projectId?: string }) => 
+  exportVideo: (data: { editorState: any; projectId?: string; fps?: number }) =>
     api.post("/api/export/video", data),
-
   // === Asset Library ===
   getAssets: (projectId?: string) => api.get("/api/assets", { params: { projectId } }),
   getStoryboard: (projectId?: string) => api.get("/api/storyboard", { params: { projectId } }),
   saveStoryboard: (sequence: string[], projectId?: string) => api.post("/api/storyboard", { sequence, projectId }),
 
   deleteAsset: (id: string) => api.delete(`/api/assets/${id}`),
+
+  // ✅ Download Multiple Assets as ZIP
+  downloadZip: (data: { assetUrls: string[]; filename?: string }) =>
+    api.post("/api/assets/download-zip", data, { responseType: "blob" }),
 
   movePostToAsset: (postId: string) =>
     api.post(`/api/posts/${postId}/to-asset`),

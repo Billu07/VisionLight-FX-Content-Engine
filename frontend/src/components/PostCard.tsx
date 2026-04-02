@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { LoadingSpinner } from "./LoadingSpinner";
-import { apiEndpoints, api } from "../lib/api";
+import { apiEndpoints, api, getCORSProxyUrl } from "../lib/api";
 
 interface PostCardProps {
   post: any;
@@ -306,7 +306,7 @@ export function PostCard({
         >
           {slides.length > 0 && (
             <img
-              src={slides[slideIndex]}
+              src={getCORSProxyUrl(slides[slideIndex])}
               alt="Carousel"
               className="w-full h-full object-cover"
             />
@@ -351,7 +351,7 @@ export function PostCard({
             onMouseOver={(e) => minimal && e.currentTarget.play()}
             onMouseOut={(e) => minimal && e.currentTarget.pause()}
           >
-            <source src={getCleanUrl(post.mediaUrl)} type="video/mp4" />
+            <source src={getCORSProxyUrl(getCleanUrl(post.mediaUrl))} type="video/mp4" />
           </video>
 
           {!minimal && (
@@ -376,7 +376,7 @@ export function PostCard({
         onClick={onPreview}
       >
         <img
-          src={getCleanUrl(post.mediaUrl)}
+          src={getCORSProxyUrl(getCleanUrl(post.mediaUrl))}
           alt={post.title}
           className="w-full h-full object-cover transition-transform hover:scale-105"
           onError={handleMediaError}

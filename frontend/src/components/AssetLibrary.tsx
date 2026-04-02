@@ -95,6 +95,72 @@ export function AssetLibrary({
   const [viewingVideoAsset, setViewingVideoAsset] = useState<Asset | null>(
     null,
   );
+  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+
+  const handleDownloadZip = async () => {
+    const storyboardAssets = storyboardIds
+      .map((id) => assets.find((a: Asset) => a.id === id))
+      .filter(Boolean) as Asset[];
+
+    if (storyboardAssets.length === 0) return;
+
+    try {
+      setIsDownloadingZip(true);
+      const assetUrls = storyboardAssets.map((a) => a.url);
+      const res = await apiEndpoints.downloadZip({ 
+        assetUrls, 
+        filename: `visionlight-storyboard-${Date.now()}.zip` 
+      });
+
+      // Create a blob link to download
+      const blob = new Blob([res.data], { type: 'application/zip' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `visionlight-storyboard-${Date.now()}.zip`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to download ZIP:", error);
+      alert("Failed to generate ZIP file.");
+    } finally {
+      setIsDownloadingZip(false);
+    }
+  };
+
+  const handleDirectDownload = async (asset: Asset) => {
+    try {
+      const response = await fetch(getCORSProxyUrl(asset.url));
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const ext = asset.url.split('.').pop()?.split('?')[0] || 'jpg';
+      link.setAttribute('download', `visionlight-${asset.id}.${ext}`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Direct download failed, falling back to window.open", error);
+      window.open(getCORSProxyUrl(asset.url), "_blank");
+    }
+  };
+
+  const handleFullscreen = () => {
+    const imgElement = document.getElementById('preview-image-main');
+    if (imgElement) {
+      if (imgElement.requestFullscreen) {
+        imgElement.requestFullscreen();
+      } else if ((imgElement as any).webkitRequestFullscreen) {
+        (imgElement as any).webkitRequestFullscreen();
+      } else if ((imgElement as any).msRequestFullscreen) {
+        (imgElement as any).msRequestFullscreen();
+      }
+    }
+  };
 
   // Polling & Skeleton State
   const [pollingUntil, setPollingUntil] = useState<number>(0);
@@ -441,20 +507,33 @@ export function AssetLibrary({
 
           <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto justify-between md:justify-end">
             {activeTab === "STORYBOARD" && storyboardIds.length > 0 && (
-              <button
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      "Clear all items from your Storyboard sequence?",
-                    )
-                  ) {
-                    setStoryboardIds([]);
-                  }
-                }}
-                className="px-4 py-2 text-xs font-bold rounded-lg bg-red-900/50 text-red-400 hover:bg-red-900 hover:text-red-300 border border-red-500/30 transition-colors"
-              >
-                🗑️ Clear Sequence
-              </button>
+              <>
+                <button
+                  onClick={handleDownloadZip}
+                  disabled={isDownloadingZip}
+                  className="px-4 py-2 text-xs font-bold rounded-lg bg-cyan-600/20 text-cyan-400 hover:bg-cyan-600 hover:text-white border border-cyan-500/30 transition-all flex items-center gap-2"
+                >
+                  {isDownloadingZip ? (
+                    <LoadingSpinner size="sm" />
+                  ) : (
+                    <>📥 Download ZIP</>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Clear all items from your Storyboard sequence?",
+                      )
+                    ) {
+                      setStoryboardIds([]);
+                    }
+                  }}
+                  className="px-4 py-2 text-xs font-bold rounded-lg bg-red-900/50 text-red-400 hover:bg-red-900 hover:text-red-300 border border-red-500/30 transition-colors"
+                >
+                  🗑️ Clear Sequence
+                </button>
+              </>
             )}
             <input
               type="file"
@@ -685,10 +764,28 @@ export function AssetLibrary({
                 </div>
 
                 <img
+                  id="preview-image-main"
                   src={`${getCORSProxyUrl(selectedAsset.url)}${selectedAsset.url.includes('?') ? '&' : '?'}v=${selectedAsset.createdAt}`}
                   className="max-w-full max-h-full object-contain rounded shadow-lg"
                   crossOrigin="anonymous"
                 />
+
+                <div className="absolute bottom-4 right-4 z-20 flex gap-2">
+                  <button
+                    onClick={handleFullscreen}
+                    className="p-2.5 bg-black/60 hover:bg-black text-white rounded-lg border border-white/10 backdrop-blur-md transition-all flex items-center gap-2 text-xs font-bold"
+                    title="Fullscreen"
+                  >
+                    <span>⛶</span> Fullscreen
+                  </button>
+                  <button
+                    onClick={() => handleDirectDownload(selectedAsset)}
+                    className="p-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg border border-cyan-500/30 backdrop-blur-md transition-all flex items-center gap-2 text-xs font-bold shadow-lg shadow-cyan-500/20"
+                    title="Direct Download"
+                  >
+                    <span>📥</span> Download
+                  </button>
+                </div>
 
                 {/* Navigation Arrows (HIDDEN ON MOBILE for better touch experience) */}
                 <button

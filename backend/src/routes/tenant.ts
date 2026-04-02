@@ -55,17 +55,20 @@ router.post("/team/user", async (req: AuthenticatedRequest, res) => {
     // 2. Create User
     // Security: Tenants can only create USER or MANAGER roles.
     const finalRole = (role === "MANAGER") ? "MANAGER" : "USER";
-    
+
+    // Enforce View Inheritance
+    const requestingUser = await dbService.findUserById(req.user!.id);
+    const finalView = (requestingUser?.view === "PICDRIFT") ? "PICDRIFT" : (view || "VISIONLIGHT");
+
     const newUser = await AuthService.createSystemUser(
       email,
       password,
       name || "Team Member",
-      view || "VISIONLIGHT", // Allow view selection, default to VISIONLIGHT
+      finalView,
       maxProjects !== undefined ? Number(maxProjects) : 3,
       org.id,
       finalRole
     );
-
     res.json({ success: true, user: newUser });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

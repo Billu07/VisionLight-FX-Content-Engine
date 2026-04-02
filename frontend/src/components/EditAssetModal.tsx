@@ -119,6 +119,7 @@ export function EditAssetModal({
     vertical: 0,
     zoom: 0,
   };
+  const [driftDuration, setDriftDuration] = useState<"5" | "10">("5");
 
   const [driftVideoUrl, setDriftVideoUrl] = useState<string | null>(
     initialVideoUrl || null,
@@ -284,6 +285,7 @@ export function EditAssetModal({
         vertical: driftParams.vertical,
         zoom: driftParams.zoom,
         aspectRatio: currentAsset.aspectRatio,
+        duration: driftDuration,
         projectId: activeProject,
       });
     },
@@ -868,6 +870,36 @@ export function EditAssetModal({
             {/* DRIFT UI */}
             {activeTab === "drift" && (
               <div className="space-y-6 animate-in fade-in h-full flex flex-col relative">
+                
+                {/* Duration Selection */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    Generation Duration
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setDriftDuration("5")}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-all ${
+                        driftDuration === "5"
+                          ? "bg-purple-600 border-purple-500 text-white"
+                          : "bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500"
+                      }`}
+                    >
+                      5 Seconds
+                    </button>
+                    <button
+                      onClick={() => setDriftDuration("10")}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-all ${
+                        driftDuration === "10"
+                          ? "bg-purple-600 border-purple-500 text-white"
+                          : "bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500"
+                      }`}
+                    >
+                      10 Seconds
+                    </button>
+                  </div>
+                </div>
+
                 {/* Prompt Box */}
                 <div className="space-y-3 flex-1 flex flex-col min-h-[250px]">
                   <div className="flex justify-between items-end relative">

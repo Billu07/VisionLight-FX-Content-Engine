@@ -1,5 +1,6 @@
 // components/MediaPreview.tsx
 import React from "react";
+import { getCORSProxyUrl } from "../lib/api";
 
 interface MediaPreviewProps {
   mediaUrl: string;
@@ -20,7 +21,7 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
           autoPlay
           className="max-w-full max-h-full object-contain shadow-2xl"
         >
-          <source src={mediaUrl} type="video/mp4" />
+          <source src={getCORSProxyUrl(mediaUrl)} type="video/mp4" />
           Your browser does not support the video tag.
         </video>
       </div>
@@ -30,7 +31,7 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
   return (
     <div className="w-full h-full flex items-center justify-center">
       <img
-        src={mediaUrl}
+        src={getCORSProxyUrl(mediaUrl)}
         alt="Generated content"
         className="max-w-full max-h-full object-contain shadow-2xl"
         loading="lazy"

@@ -49,9 +49,11 @@ export default function SuperAdminDashboard() {
   // Edit Tenant Modal
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
   const [tenantUpdates, setTenantUpdates] = useState({
+    name: "",
     maxUsers: 0,
     maxProjectsTotal: 0,
     maxStorageMb: 500,
+    view: "VISIONLIGHT",
     isActive: true
   });
 
@@ -143,8 +145,11 @@ export default function SuperAdminDashboard() {
     setActionLoading(true);
     try {
       await apiEndpoints.superadminUpdateOrgLimits(editingTenant.id, {
+        name: tenantUpdates.name,
         maxUsers: tenantUpdates.maxUsers,
-        maxProjectsTotal: tenantUpdates.maxProjectsTotal
+        maxProjectsTotal: tenantUpdates.maxProjectsTotal,
+        maxStorageMb: tenantUpdates.maxStorageMb,
+        view: tenantUpdates.view
       });
       if (editingTenant.isActive !== tenantUpdates.isActive) {
         await apiEndpoints.superadminUpdateOrgStatus(editingTenant.id, tenantUpdates.isActive);
@@ -160,11 +165,15 @@ export default function SuperAdminDashboard() {
   };
 
   const openEditTenant = (t: Tenant) => {
+    // Try to find an admin user for this tenant to get the current view
+    const adminUser = users.find(u => u.organizationId === t.id && u.role === "ADMIN");
     setEditingTenant(t);
     setTenantUpdates({
+      name: t.name,
       maxUsers: t.maxUsers,
       maxProjectsTotal: t.maxProjectsTotal,
       maxStorageMb: t.maxStorageMb || 500,
+      view: adminUser ? adminUser.view : "VISIONLIGHT",
       isActive: t.isActive
     });
   };
@@ -617,6 +626,15 @@ export default function SuperAdminDashboard() {
               <button onClick={() => setEditingTenant(null)} className="text-gray-500 hover:text-white font-bold text-xl">×</button>
             </div>
             <div className="p-8 space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Organization Name</label>
+                <input
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                  value={tenantUpdates.name}
+                  onChange={e => setTenantUpdates({ ...tenantUpdates, name: e.target.value })}
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Max Users</label>
@@ -636,6 +654,28 @@ export default function SuperAdminDashboard() {
                     onChange={e => setTenantUpdates({ ...tenantUpdates, maxProjectsTotal: parseInt(e.target.value) })}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Storage Limit (MB)</label>
+                <input
+                  type="number"
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                  value={tenantUpdates.maxStorageMb}
+                  onChange={e => setTenantUpdates({ ...tenantUpdates, maxStorageMb: parseInt(e.target.value) })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform View (Applies to all users)</label>
+                <select
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                  value={tenantUpdates.view}
+                  onChange={e => setTenantUpdates({ ...tenantUpdates, view: e.target.value })}
+                >
+                  <option value="VISIONLIGHT">VisionLight View (Full)</option>
+                  <option value="PICDRIFT">PicDrift View (Limited)</option>
+                </select>
               </div>
 
               <div className="space-y-2">
