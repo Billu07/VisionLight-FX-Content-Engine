@@ -410,8 +410,8 @@ export default function SuperAdminDashboard() {
           </div>
         )}
 
-        {/* TAB CONTENT: TENANTS */}
-        {activeTab === "tenants" && (
+        {/* TAB CONTENT: PLATFORM (TENANTS) */}
+        {activeTab === "platform" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
             <div className="flex justify-between items-center">
               <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">Subscription Management</h2>
