@@ -393,27 +393,6 @@ export function AssetLibrary({
     }
   };
 
-  const handleDownloadAsset = async (asset: Asset) => {
-    try {
-      setIsDownloading(true);
-      const response = await fetch(asset.url);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      const ext = asset.type === "VIDEO" ? "mp4" : "jpg";
-      link.setAttribute("download", `picdrift-asset-${asset.id}.${ext}`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (e) {
-      window.open(asset.url, "_blank");
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
   const handleGoToOriginal = () => {
     if (!selectedAsset || !selectedAsset.originalAssetId) return;
     const original = assets.find(
