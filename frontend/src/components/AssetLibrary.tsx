@@ -89,7 +89,6 @@ export function AssetLibrary({
 
   // UI States
   const [isUploading, setIsUploading] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [viewingVideoAsset, setViewingVideoAsset] = useState<Asset | null>(

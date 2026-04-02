@@ -315,7 +315,7 @@ export default function SuperAdminDashboard() {
             >
               Back to App
             </button>
-            {["tenants", "my-agency", "demo-leads", "global-settings", "global-presets"].map((tab) => (
+            {["platform", "my-agency", "demo-leads", "global-settings", "global-presets"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
