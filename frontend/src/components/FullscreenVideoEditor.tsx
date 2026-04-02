@@ -373,7 +373,6 @@ export function FullscreenVideoEditor({
     const seekToPoint = (clientX: number) => {
         if (!timelineRef.current) return;
         const rect = timelineRef.current.getBoundingClientRect();
-        const scrollLeft = timelineRef.current.parentElement?.scrollLeft || 0;
         const x = clientX - rect.left;
         const scrollWidth = timelineRef.current.scrollWidth;
         const clickedTime = (x / scrollWidth) * totalDuration;
