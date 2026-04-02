@@ -89,6 +89,7 @@ export function AssetLibrary({
 
   // UI States
   const [isUploading, setIsUploading] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [viewingVideoAsset, setViewingVideoAsset] = useState<Asset | null>(
@@ -131,6 +132,7 @@ export function AssetLibrary({
 
   const handleDirectDownload = async (asset: Asset) => {
     try {
+      setIsDownloading(true);
       const response = await fetch(getCORSProxyUrl(asset.url));
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -145,6 +147,8 @@ export function AssetLibrary({
     } catch (error) {
       console.error("Direct download failed, falling back to window.open", error);
       window.open(getCORSProxyUrl(asset.url), "_blank");
+    } finally {
+      setIsDownloading(false);
     }
   };
 
