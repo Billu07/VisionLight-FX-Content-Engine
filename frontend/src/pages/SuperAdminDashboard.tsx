@@ -56,6 +56,50 @@ export default function SuperAdminDashboard() {
     isActive: true
   });
 
+  // Restore Missing States
+  const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
+  const [tenantUpdates, setTenantUpdates] = useState({
+    name: "",
+    maxUsers: 0,
+    maxProjectsTotal: 0,
+    maxStorageMb: 500,
+    view: "VISIONLIGHT",
+    isActive: true
+  });
+
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [userUpdates, setUserUpdates] = useState({
+    view: "VISIONLIGHT",
+    role: "USER"
+  });
+
+  const [newTenant, setNewTenant] = useState({
+    orgName: "",
+    adminEmail: "",
+    adminPassword: "",
+    adminName: "",
+    maxUsers: 5,
+    maxProjectsTotal: 20,
+    view: "VISIONLIGHT"
+  });
+
+  const [newDemo, setNewDemo] = useState({
+    email: "",
+    password: "",
+    name: ""
+  });
+
+  const [newTeamMember, setNewTeamMember] = useState({
+    email: "",
+    password: "",
+    name: "",
+    role: "USER"
+  });
+
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
+
   const fetchInitialData = async () => {
     setLoading(true);
     try {
