@@ -202,7 +202,6 @@ export function DriftFrameExtractor({
           loop
           playsInline
           crossOrigin="anonymous"
-          controls
         />
 
         {/* Removed the big centered Play button Overlay from here */}
@@ -259,7 +258,7 @@ export function DriftFrameExtractor({
               value={currentTime}
               disabled={!isReady}
               onChange={handleSliderChange}
-              className="w-full accent-rose-500 cursor-pointer disabled:opacity-50 h-2 bg-gray-700 rounded-lg appearance-none"
+              className="w-full accent-rose-500 cursor-pointer disabled:opacity-50 h-2 bg-gray-700 rounded-lg"
             />
           </div>
         </div>

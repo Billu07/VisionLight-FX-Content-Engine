@@ -878,42 +878,44 @@ export function AssetLibrary({
 
       {viewingVideoAsset && (
         <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/95 p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-4xl p-6 relative flex flex-col items-center">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-4xl h-full max-h-[90vh] p-6 relative flex flex-col items-center">
             <button
               onClick={() => setViewingVideoAsset(null)}
               className="absolute top-4 right-4 text-gray-400 hover:text-white z-10"
             >
               ✕
             </button>
-            <div className="w-full flex justify-between items-center mb-4 pr-6">
-              <img src="/drift_icon.png" alt="Drift" className="w-24 h-24 object-contain" />
-              <h3 className="text-white font-bold tracking-widest text-sm">
+            <div className="w-full flex justify-between items-center mb-4 pr-6 shrink-0">
+              <img src="/drift_icon.png" alt="Drift" className="w-16 h-16 sm:w-24 sm:h-24 object-contain" />
+              <h3 className="text-white font-bold tracking-widest text-xs sm:text-sm">
                 3DX FRAME CAPTURE
               </h3>
             </div>
-            <DriftFrameExtractor
-              videoUrl={viewingVideoAsset.url}
-              onExtract={async (blob) => {
-                const file = new File([blob], "extracted_frame.jpg", {
-                  type: "image/jpeg",
-                });
-                const formData = new FormData();
-                formData.append("image", file);
-                formData.append("raw", "true");
-                formData.append("aspectRatio", "3DX_FRAME");
-                const activeProject = localStorage.getItem(
-                  "visionlight_active_project",
-                );
-                if (activeProject) formData.append("projectId", activeProject);
+            <div className="flex-1 min-h-0 w-full overflow-y-auto custom-scrollbar flex flex-col">
+              <DriftFrameExtractor
+                videoUrl={viewingVideoAsset.url}
+                onExtract={async (blob) => {
+                  const file = new File([blob], "extracted_frame.jpg", {
+                    type: "image/jpeg",
+                  });
+                  const formData = new FormData();
+                  formData.append("image", file);
+                  formData.append("raw", "true");
+                  formData.append("aspectRatio", "3DX_FRAME");
+                  const activeProject = localStorage.getItem(
+                    "visionlight_active_project",
+                  );
+                  if (activeProject) formData.append("projectId", activeProject);
 
-                await apiEndpoints.uploadAssetSync(formData);
-                alert("Frame Saved to Library!");
-                setViewingVideoAsset(null);
-                setActiveTab("3DX_FRAME");
-                queryClient.invalidateQueries({ queryKey: ["assets"] });
-              }}
-              onCancel={() => setViewingVideoAsset(null)}
-            />
+                  await apiEndpoints.uploadAssetSync(formData);
+                  alert("Frame Saved to Library!");
+                  setViewingVideoAsset(null);
+                  setActiveTab("3DX_FRAME");
+                  queryClient.invalidateQueries({ queryKey: ["assets"] });
+                }}
+                onCancel={() => setViewingVideoAsset(null)}
+              />
+            </div>
           </div>
         </div>
       )}
