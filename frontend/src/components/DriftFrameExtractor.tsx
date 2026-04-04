@@ -20,10 +20,11 @@ export function DriftFrameExtractor({
   const [duration, setDuration] = useState(0);
   const [isReady, setIsReady] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [isScrubbing, setIsScrubbing] = useState(false);
 
   // Sync slider with video time
   const handleTimeUpdate = () => {
-    if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
+    if (!isScrubbing && videoRef.current) setCurrentTime(videoRef.current.currentTime);
   };
 
   const togglePlay = () => {
@@ -61,11 +62,9 @@ export function DriftFrameExtractor({
   // Pause while scrubbing for precision
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const time = parseFloat(e.target.value);
+    setCurrentTime(time);
     if (videoRef.current) {
-      videoRef.current.pause(); // Pause so frame doesn't drift
-      setIsPlaying(false);
       videoRef.current.currentTime = time;
-      setCurrentTime(time);
     }
   };
 
@@ -258,6 +257,8 @@ export function DriftFrameExtractor({
               value={currentTime}
               disabled={!isReady}
               onChange={handleSliderChange}
+              onPointerDown={() => setIsScrubbing(true)}
+              onPointerUp={() => setIsScrubbing(false)}
               className="w-full accent-rose-500 cursor-pointer disabled:opacity-50 h-2 bg-gray-700 rounded-lg"
             />
           </div>
