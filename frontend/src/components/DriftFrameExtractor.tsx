@@ -120,40 +120,62 @@ export function DriftFrameExtractor({
     }
   };
 
-  const downloadSpecificFrame = (time: number, filename: string) => {
+  const extractSpecificFrame = (time: number) => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
-    // Store current time to restore it
-    const originalTime = video.currentTime;
-    
-    // Seek to target time
-    video.currentTime = time;
+    try {
+      if (video.readyState < 2) {
+        alert("Video is still loading, please wait a moment.");
+        return;
+      }
 
-    const capture = () => {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      setIsExtracting(true);
+      const originalTime = video.currentTime;
+      video.currentTime = time;
 
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = filename;
-          a.click();
-          window.URL.revokeObjectURL(url);
+      const capture = () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          setIsExtracting(false);
+          return;
         }
-        // Restore video time
-        video.currentTime = originalTime;
-        video.removeEventListener('seeked', capture);
-      }, "image/jpeg", 0.95);
-    };
 
-    video.addEventListener('seeked', capture);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(
+          async (blob) => {
+            if (blob) {
+              try {
+                await onExtract(blob);
+              } catch (err) {
+                console.error("onExtract Error:", err);
+              } finally {
+                setIsExtracting(false);
+              }
+            } else {
+              setIsExtracting(false);
+              throw new Error("Canvas extraction failed (Empty Blob).");
+            }
+            // Restore video time
+            video.currentTime = originalTime;
+            video.removeEventListener('seeked', capture);
+          },
+          "image/jpeg",
+          0.95,
+        );
+      };
+
+      video.addEventListener('seeked', capture);
+    } catch (e: any) {
+      setIsExtracting(false);
+      console.error("Frame Extraction Error:", e);
+      alert(
+        "Security Error: The browser blocked frame extraction. \n\nEnsure your Cloudinary settings allow 'Access-Control-Allow-Origin: *'"
+      );
+    }
   };
 
   return (
@@ -180,6 +202,7 @@ export function DriftFrameExtractor({
           loop
           playsInline
           crossOrigin="anonymous"
+          controls
         />
 
         {/* Removed the big centered Play button Overlay from here */}
@@ -190,16 +213,18 @@ export function DriftFrameExtractor({
         
         <div className="flex flex-wrap gap-2 justify-center pb-2 border-b border-gray-700/50">
           <button 
-            onClick={() => downloadSpecificFrame(0, "start_frame.jpg")}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-bold transition-all border border-white/5"
+            onClick={() => extractSpecificFrame(0)}
+            disabled={!isReady || isExtracting}
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-bold transition-all border border-white/5 disabled:opacity-50"
           >
-            Download Start Frame
+            Capture Start Frame
           </button>
           <button 
-            onClick={() => downloadSpecificFrame(duration, "end_frame.jpg")}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-bold transition-all border border-white/5"
+            onClick={() => extractSpecificFrame(duration)}
+            disabled={!isReady || isExtracting}
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-bold transition-all border border-white/5 disabled:opacity-50"
           >
-            Download End Frame
+            Capture End Frame
           </button>
         </div>
 

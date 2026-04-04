@@ -909,6 +909,7 @@ export function AssetLibrary({
                 await apiEndpoints.uploadAssetSync(formData);
                 alert("Frame Saved to Library!");
                 setViewingVideoAsset(null);
+                setActiveTab("3DX_FRAME");
                 queryClient.invalidateQueries({ queryKey: ["assets"] });
               }}
               onCancel={() => setViewingVideoAsset(null)}
