@@ -1,5 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { getCORSProxyUrl } from "../lib/api";
+import { LoadingSpinner } from "./LoadingSpinner";
 
 interface DriftFrameExtractorProps {
   videoUrl: string;
@@ -21,6 +22,38 @@ export function DriftFrameExtractor({
   const [isReady, setIsReady] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isScrubbing, setIsScrubbing] = useState(false);
+
+  // Local URL for smooth scrubbing
+  const [localUrl, setLocalUrl] = useState<string | null>(null);
+  const [isDownloadingLocal, setIsDownloadingLocal] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLocalVideo = async () => {
+      try {
+        setIsDownloadingLocal(true);
+        const res = await fetch(getCORSProxyUrl(videoUrl));
+        const blob = await res.blob();
+        if (isMounted) {
+          setLocalUrl(URL.createObjectURL(blob));
+          setIsDownloadingLocal(false);
+        }
+      } catch (err) {
+        console.error("Failed to load local video for scrubbing:", err);
+        if (isMounted) {
+          setLocalUrl(getCORSProxyUrl(videoUrl)); // fallback
+          setIsDownloadingLocal(false);
+        }
+      }
+    };
+    fetchLocalVideo();
+    return () => {
+      isMounted = false;
+      if (localUrl && localUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(localUrl);
+      }
+    };
+  }, [videoUrl]);
 
   // Sync slider with video time
   const handleTimeUpdate = () => {
@@ -186,24 +219,29 @@ export function DriftFrameExtractor({
       >
         <canvas ref={canvasRef} className="hidden" />
 
-        <video
-          key={videoUrl}
-          ref={videoRef}
-          src={getCORSProxyUrl(videoUrl)}
-          className="w-full h-full object-contain max-h-[60vh]"
-          onTimeUpdate={handleTimeUpdate}
-          onLoadedMetadata={() => {
-            setDuration(videoRef.current?.duration || 0);
-            setIsReady(true);
-          }}
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
-          loop
-          playsInline
-          crossOrigin="anonymous"
-        />
-
-        {/* Removed the big centered Play button Overlay from here */}
+        {isDownloadingLocal ? (
+          <div className="flex flex-col items-center justify-center gap-4">
+            <LoadingSpinner size="lg" />
+            <p className="text-gray-400 text-sm font-mono tracking-widest animate-pulse">PREPARING VIDEO FOR SCRUBBING...</p>
+          </div>
+        ) : (
+          <video
+            key={localUrl || videoUrl}
+            ref={videoRef}
+            src={localUrl || getCORSProxyUrl(videoUrl)}
+            className="w-full h-full object-contain max-h-[60vh]"
+            onTimeUpdate={handleTimeUpdate}
+            onLoadedMetadata={() => {
+              setDuration(videoRef.current?.duration || 0);
+              setIsReady(true);
+            }}
+            onPlay={() => setIsPlaying(true)}
+            onPause={() => setIsPlaying(false)}
+            loop
+            playsInline
+            crossOrigin="anonymous"
+          />
+        )}
       </div>
 
       {/* Controls Container */}
