@@ -112,7 +112,7 @@ export function RenderReserveModal({
                 <PriceCard label="Standard Image" value={prices?.pricePicFX_Standard} />
                 <PriceCard label="Carousel Batch" value={prices?.pricePicFX_Carousel} />
                 <PriceCard label="Drift Path Tool" value={prices?.priceAsset_DriftPath} />
-                <PriceCard label="Pro Editor" value={prices?.priceEditor_Pro} />
+                <PriceCard label="PicFX Editor" value={prices?.priceEditor_Pro} />
                 <PriceCard label="Enhance / Upscale" value={prices?.priceEditor_Enhance} />
                 <PriceCard label="Format Convert" value={prices?.priceEditor_Convert} />
               </div>

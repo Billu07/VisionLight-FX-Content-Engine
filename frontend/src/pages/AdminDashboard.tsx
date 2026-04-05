@@ -618,7 +618,7 @@ export default function AdminDashboard() {
                 {
                   title: "PicFX Editor & Path",
                   items: [
-                    { label: "Pro Editor", key: "priceEditor_Pro" },
+                    { label: "PicFX Editor", key: "priceEditor_Pro" },
                     { label: "Enhance / Upscale", key: "priceEditor_Enhance" },
                     { label: "Format Convert", key: "priceEditor_Convert" },
                     { label: "Generate Path", key: "priceAsset_DriftPath" },

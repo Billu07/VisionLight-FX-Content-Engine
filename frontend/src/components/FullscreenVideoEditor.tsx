@@ -4,1122 +4,1120 @@ import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
 import { LoadingSpinner } from "./LoadingSpinner";
 
 export interface AudioItem {
-  id: string;
-  url: string;
-  title: string;
-  startTime: number; // When it starts on the timeline (ms)
-  duration: number; // How long it plays (ms)
-  trimStart?: number; // Internal trim
-  volume?: number;
+    id: string;
+    url: string;
+    title: string;
+    startTime: number; // When it starts on the timeline (ms)
+    duration: number; // How long it plays (ms)
+    trimStart?: number; // Internal trim
+    volume?: number;
 }
 
 export interface SequenceItem {
-  id: string;
-  url: string;
-  type: "IMAGE" | "VIDEO" | "CAROUSEL";
-  title?: string;
-  duration?: number; // In milliseconds
-  originalDuration?: number; // Max possible duration for video
-  thumbnail?: string;
-  trimStart?: number; // Offset in ms for playback
-  speed?: number; // Playback speed multiplier (0.5, 1, 2, etc.)
+    id: string;
+    url: string;
+    type: "IMAGE" | "VIDEO" | "CAROUSEL";
+    title?: string;
+    duration?: number; // In milliseconds
+    originalDuration?: number; // Max possible duration for video
+    thumbnail?: string;
+    trimStart?: number; // Offset in ms for playback
+    speed?: number; // Playback speed multiplier (0.5, 1, 2, etc.)
 }
 
 interface FullscreenVideoEditorProps {
-  projectId?: string; // Optional: To sync with backend project storage
-  sequence: SequenceItem[];
-  setSequence: React.Dispatch<React.SetStateAction<SequenceItem[]>>;
-  binItems: SequenceItem[];
-  setBinItems: React.Dispatch<React.SetStateAction<SequenceItem[]>>;
-  audioTracks?: AudioItem[];
-  setAudioTracks?: React.Dispatch<React.SetStateAction<AudioItem[]>>;
-  onClose: () => void;
-  onAddFromLibrary: () => void;
-  onClear: () => void;
+    projectId?: string; // Optional: To sync with backend project storage
+    sequence: SequenceItem[];
+    setSequence: React.Dispatch<React.SetStateAction<SequenceItem[]>>;
+    binItems: SequenceItem[];
+    setBinItems: React.Dispatch<React.SetStateAction<SequenceItem[]>>;
+    audioTracks?: AudioItem[];
+    setAudioTracks?: React.Dispatch<React.SetStateAction<AudioItem[]>>;
+    onClose: () => void;
+    onAddFromLibrary: () => void;
+    onClear: () => void;
 }
 
 export function FullscreenVideoEditor({
-  projectId,
-  sequence,
-  setSequence,
-  binItems,
-  setBinItems,
-  audioTracks,
-  setAudioTracks,
-  onClose,
-  onAddFromLibrary,
-  onClear,
+    projectId,
+    sequence,
+    setSequence,
+    binItems,
+    setBinItems,
+    audioTracks,
+    setAudioTracks,
+    onClose,
+    onAddFromLibrary,
+    onClear,
 }: FullscreenVideoEditorProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0); // Global time in ms
-  const [zoom, setZoom] = useState(1);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [viewportRatio, setViewportRatio] = useState<"16:9" | "9:16" | "1:1">("16:9");
-  const [sidebarTab, setSidebarTab] = useState<"project" | "bin" | "storyline" | "exports">("bin");
-  const [storylineTab, setStorylineTab] = useState<"videos" | "images">("videos");
-  const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
-  
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState(0);
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [exportFps, setExportFps] = useState(30);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [currentTime, setCurrentTime] = useState(0); // Global time in ms
+    const [zoom, setZoom] = useState(1);
+    const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+    const [viewportRatio, setViewportRatio] = useState<"16:9" | "9:16" | "1:1">("16:9");
+    const [sidebarTab, setSidebarTab] = useState<"project" | "bin" | "storyline" | "exports">("bin");
+    const [storylineTab, setStorylineTab] = useState<"videos" | "images">("videos");
+    const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
 
-  const queryClient = useQueryClient();
+    const [isExporting, setIsExporting] = useState(false);
+    const [exportProgress, setExportProgress] = useState(0);
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [exportFps, setExportFps] = useState(30);
 
-  const { data: projectAssets = [], isLoading: isLoadingAssets } = useQuery({
-    queryKey: ["assets", projectId],
-    queryFn: async () => {
-      if (!projectId) return [];
-      const res = await apiEndpoints.getAssets();
-      return (res.data.assets || []).filter((a: any) => a.projectId === projectId);
-    },
-    enabled: !!projectId,
-  });
+    const queryClient = useQueryClient();
 
-  const [draggingEdge, setDraggingEdge] = useState<{ id: string, edge: 'left' | 'right', initialX: number, initialDuration: number, initialTrim: number } | null>(null);
-
-  const player1Ref = useRef<HTMLVideoElement>(null);
-  const player2Ref = useRef<HTMLVideoElement>(null);
-  const timelineRef = useRef<HTMLDivElement>(null);
-  const animationRef = useRef<number | null>(null);
-
-  // Calculate total duration
-  const totalDuration = useMemo(() => {
-    return sequence.reduce((acc, item) => acc + (item.duration || 3000), 0);
-  }, [sequence]);
-
-  // Find current item and local time
-  const { currentItem, localTime, itemStartIndex, nextItem } = useMemo(() => {
-    if (sequence.length === 0) {
-      return { currentItem: null, localTime: 0, itemStartIndex: -1, nextItem: null };
-    }
-    
-    // Clamp currentTime to totalDuration to avoid index overflow at the very end
-    const clampedTime = Math.max(0, Math.min(currentTime, totalDuration - 0.001));
-    
-    let accumulated = 0;
-    for (let i = 0; i < sequence.length; i++) {
-      const item = sequence[i];
-      const duration = item.duration || 3000;
-      
-      if (clampedTime >= accumulated && clampedTime < accumulated + duration) {
-        return { 
-          currentItem: item, 
-          localTime: clampedTime - accumulated,
-          itemStartIndex: i,
-          nextItem: i + 1 < sequence.length ? sequence[i + 1] : null
-        };
-      }
-      accumulated += duration;
-    }
-
-    // Fallback to last frame of last item
-    const lastItem = sequence[sequence.length - 1];
-    return { 
-      currentItem: lastItem, 
-      localTime: lastItem?.duration || 0,
-      itemStartIndex: sequence.length - 1,
-      nextItem: null
-    };
-  }, [sequence, currentTime, totalDuration]);
-
-  // Sync Video Element
-  useEffect(() => {
-    const player1 = player1Ref.current;
-    const player2 = player2Ref.current;
-    if (!player1 || !player2) return;
-
-    let activePlayer: HTMLVideoElement | null = null;
-    let standbyPlayer: HTMLVideoElement | null = null;
-
-    if (currentItem?.type === "VIDEO") {
-        const itemUrl = getCORSProxyUrl(currentItem.url);
-        // Find which player already has the current URL loaded
-        if (player1.getAttribute('data-url') === itemUrl) {
-            activePlayer = player1;
-            standbyPlayer = player2;
-        } else if (player2.getAttribute('data-url') === itemUrl) {
-            activePlayer = player2;
-            standbyPlayer = player1;
-        } else {
-            // Neither has it (jumped). Use player1 as active.
-            activePlayer = player1;
-            standbyPlayer = player2;
-            activePlayer.src = itemUrl;
-            activePlayer.setAttribute('data-url', itemUrl);
-            activePlayer.load();
-        }
-
-        // Apply active player styling
-        activePlayer.style.display = "block";
-        activePlayer.style.opacity = "1";
-        activePlayer.style.zIndex = "10";
-        standbyPlayer.style.opacity = "0";
-        standbyPlayer.style.zIndex = "0";
-        standbyPlayer.style.display = "none";
-
-        // Sync active player time
-        const trimOffset = currentItem.trimStart || 0;
-        const videoTime = (localTime + trimOffset) / 1000;
-        activePlayer.playbackRate = currentItem.speed || 1;
-        
-        // Use a smaller threshold for frame-accurate scrubbing
-        const diff = Math.abs(activePlayer.currentTime - videoTime);
-        if (diff > (isPlaying ? 0.05 : 0.01)) {
-            activePlayer.currentTime = videoTime;
-        }
-
-        if (isPlaying) {
-            if (activePlayer.paused) {
-                activePlayer.play().catch(() => {});
-            }
-        } else {
-            if (!activePlayer.paused) {
-                activePlayer.pause();
-            }
-        }
-    } else {
-        // Current is not video. Pause both and hide.
-        player1.pause();
-        player2.pause();
-        player1.style.display = "none";
-        player2.style.display = "none";
-        standbyPlayer = player1; // Just pick one to preload the next
-    }
-
-    // Preload next video clip in standby player
-    let nextVideoItem = null;
-    if (nextItem?.type === "VIDEO") {
-        nextVideoItem = nextItem;
-    } else {
-        // Look ahead in sequence for the next video
-        for (let i = itemStartIndex + 1; i < sequence.length; i++) {
-            if (sequence[i].type === "VIDEO") {
-                nextVideoItem = sequence[i];
-                break;
-            }
-        }
-    }
-
-    if (nextVideoItem && standbyPlayer) {
-        const nextUrl = getCORSProxyUrl(nextVideoItem.url);
-        if (standbyPlayer.getAttribute('data-url') !== nextUrl) {
-            standbyPlayer.src = nextUrl;
-            standbyPlayer.setAttribute('data-url', nextUrl);
-            standbyPlayer.load();
-            standbyPlayer.currentTime = (nextVideoItem.trimStart || 0) / 1000;
-        }
-    }
-
-  }, [currentItem, localTime, isPlaying, sequence, itemStartIndex, nextItem]);
-
-  // Playback Loop
-  useEffect(() => {
-    let lastUpdate = performance.now();
-    if (isPlaying) {
-      const animate = (now: number) => {
-        const delta = now - lastUpdate;
-        lastUpdate = now;
-        
-        setCurrentTime(prev => {
-            const next = prev + delta;
-            if (next >= totalDuration) {
-                setIsPlaying(false);
-                return 0;
-            }
-            return next;
-        });
-        animationRef.current = requestAnimationFrame(animate);
-      };
-      animationRef.current = requestAnimationFrame(animate);
-    } else {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    }
-    return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    };
-  }, [isPlaying, totalDuration]);
-
-  const handleTogglePlay = () => {
-    if (sequence.length === 0) return;
-    if (currentTime >= totalDuration) setCurrentTime(0);
-    setIsPlaying(!isPlaying);
-  };
-
-  const handleSeek = (time: number) => {
-    setCurrentTime(Math.max(0, Math.min(time, totalDuration)));
-  };
-
-  const handleSplit = () => {
-    if (!currentItem || itemStartIndex === -1 || localTime <= 0 || localTime >= (currentItem.duration || 3000)) return;
-
-    const newSeq = [...sequence];
-    const itemToSplit = newSeq[itemStartIndex];
-    
-    // First half
-    const firstHalf: SequenceItem = {
-      ...itemToSplit,
-      id: crypto.randomUUID(),
-      duration: localTime,
-    };
-
-    // Second half
-    const secondHalf: SequenceItem = {
-      ...itemToSplit,
-      id: crypto.randomUUID(),
-      duration: (itemToSplit.duration || 3000) - localTime,
-      trimStart: (itemToSplit.trimStart || 0) + localTime,
-    };
-
-    newSeq.splice(itemStartIndex, 1, firstHalf, secondHalf);
-    setSequence(newSeq);
-    setSelectedItemId(secondHalf.id); // Select the new right half
-  };
-
-  const handleDeleteSelected = () => {
-    if (window.confirm("Are you sure you want to remove this clip from the timeline?")) {
-      if (selectedItemId) {
-        setSequence(prev => prev.filter(item => item.id !== selectedItemId));
-        setSelectedItemId(null);
-      } else if (currentItem) {
-        // If nothing explicitly selected, delete the one under playhead
-        setSequence(prev => prev.filter(item => item.id !== currentItem.id));
-      }
-    }
-  };
-
-
-  const handleEdgeDrag = (e: React.MouseEvent, id: string, edge: 'left' | 'right') => {
-    e.stopPropagation();
-    e.preventDefault();
-    const item = sequence.find(i => i.id === id);
-    if (!item) return;
-
-    setDraggingEdge({
-      id,
-      edge,
-      initialX: e.clientX,
-      initialDuration: item.duration || 3000,
-      initialTrim: item.trimStart || 0
+    const { data: projectAssets = [], isLoading: isLoadingAssets } = useQuery({
+        queryKey: ["assets", projectId],
+        queryFn: async () => {
+            if (!projectId) return [];
+            const res = await apiEndpoints.getAssets();
+            return (res.data.assets || []).filter((a: any) => a.projectId === projectId);
+        },
+        enabled: !!projectId,
     });
-  };
 
-  useEffect(() => {
-    if (!draggingEdge) return;
+    const [draggingEdge, setDraggingEdge] = useState<{ id: string, edge: 'left' | 'right', initialX: number, initialDuration: number, initialTrim: number } | null>(null);
 
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!timelineRef.current) return;
-      
-      const deltaX = e.clientX - draggingEdge.initialX;
-      
-      // Calculate time delta based on current zoom and timeline width
-      // Re-calculate more accurately:
-      const scrollWidth = timelineRef.current.scrollWidth;
-      const msPerPx = totalDuration / scrollWidth;
-      const deltaTimeMs = deltaX * msPerPx;
+    const player1Ref = useRef<HTMLVideoElement>(null);
+    const player2Ref = useRef<HTMLVideoElement>(null);
+    const timelineRef = useRef<HTMLDivElement>(null);
+    const animationRef = useRef<number | null>(null);
 
-      setSequence(prev => {
-        const newSeq = [...prev];
-        const itemIndex = newSeq.findIndex(i => i.id === draggingEdge.id);
-        if (itemIndex === -1) return prev;
+    // Calculate total duration
+    const totalDuration = useMemo(() => {
+        return sequence.reduce((acc, item) => acc + (item.duration || 3000), 0);
+    }, [sequence]);
 
-        const item = newSeq[itemIndex];
-        let newDuration = draggingEdge.initialDuration;
-        let newTrim = draggingEdge.initialTrim;
-
-        if (draggingEdge.edge === 'right') {
-          // Dragging right edge changes duration
-          newDuration = Math.max(500, draggingEdge.initialDuration + deltaTimeMs);
-          if (item.originalDuration) {
-            newDuration = Math.min(newDuration, item.originalDuration - newTrim);
-          }
-        } else if (draggingEdge.edge === 'left') {
-          // Dragging left edge changes trimStart AND duration
-          const maxTrim = draggingEdge.initialTrim + draggingEdge.initialDuration - 500;
-          newTrim = Math.max(0, Math.min(draggingEdge.initialTrim + deltaTimeMs, maxTrim));
-          
-          const changeInTrim = newTrim - draggingEdge.initialTrim;
-          newDuration = Math.max(500, draggingEdge.initialDuration - changeInTrim);
+    // Find current item and local time
+    const { currentItem, localTime, itemStartIndex, nextItem } = useMemo(() => {
+        if (sequence.length === 0) {
+            return { currentItem: null, localTime: 0, itemStartIndex: -1, nextItem: null };
         }
 
-        newSeq[itemIndex] = { ...item, duration: newDuration, trimStart: newTrim };
+        // Clamp currentTime to totalDuration to avoid index overflow at the very end
+        const clampedTime = Math.max(0, Math.min(currentTime, totalDuration - 0.001));
 
-        // Real-time visual scrubbing to the dragged edge
         let accumulated = 0;
-        for(let i = 0; i < itemIndex; i++) {
-            accumulated += newSeq[i].duration || 3000;
+        for (let i = 0; i < sequence.length; i++) {
+            const item = sequence[i];
+            const duration = item.duration || 3000;
+
+            if (clampedTime >= accumulated && clampedTime < accumulated + duration) {
+                return {
+                    currentItem: item,
+                    localTime: clampedTime - accumulated,
+                    itemStartIndex: i,
+                    nextItem: i + 1 < sequence.length ? sequence[i + 1] : null
+                };
+            }
+            accumulated += duration;
         }
-        
-        if (draggingEdge.edge === 'left') {
-            setCurrentTime(accumulated); 
-        } else {
-            setCurrentTime(accumulated + newDuration - 50); // Show just before the very end frame
-        }
 
-        return newSeq;
-      });
-    };
-
-    const handleMouseUp = () => {
-      setDraggingEdge(null);
-    };
-
-    window.addEventListener('mousemove', handleMouseMove, { passive: false });
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [draggingEdge, totalDuration, zoom]);
-
-  const handleTimelineMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    // If we click an edge or a clip handle, don't seek immediately
-    if ((e.target as HTMLElement).closest('.drag-handle')) return;
-
-    const seekToPoint = (clientX: number) => {
-        if (!timelineRef.current) return;
-        const rect = timelineRef.current.getBoundingClientRect();
-        
-        // Calculate the absolute X position within the timeline element
-        const x = clientX - rect.left;
-        const width = rect.width;
-        
-        // Ensure we don't go out of bounds (0 to 100%)
-        const percentage = Math.max(0, Math.min(x / width, 1));
-        const clickedTime = percentage * totalDuration;
-        
-        handleSeek(clickedTime);
-    };
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      seekToPoint(moveEvent.clientX);
-    };
-
-    const handleMouseUp = () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    
-    seekToPoint(e.clientX);
-  };
-
-  const handleSaveProject = async () => {
-    if (!projectId) {
-        alert("Cannot save: No active project detected.");
-        return;
-    }
-    try {
-        const editorState = {
-            sequence,
-            audioTracks: audioTracks || []
+        // Fallback to last frame of last item
+        const lastItem = sequence[sequence.length - 1];
+        return {
+            currentItem: lastItem,
+            localTime: lastItem?.duration || 0,
+            itemStartIndex: sequence.length - 1,
+            nextItem: null
         };
-        await apiEndpoints.updateProject(projectId, { editorState });
-        alert("Project saved successfully!");
-    } catch (error) {
-        console.error("Failed to save project", error);
-        alert("Failed to save project.");
-    }
-  };
+    }, [sequence, currentTime, totalDuration]);
 
-  const handleExportVideo = async () => {
-    if (sequence.length === 0) {
-      alert("Timeline is empty. Add clips to export.");
-      return;
-    }
-    setShowExportModal(true);
-  };
+    // Sync Video Element
+    useEffect(() => {
+        const player1 = player1Ref.current;
+        const player2 = player2Ref.current;
+        if (!player1 || !player2) return;
 
-  const confirmExportVideo = async () => {
-    if (totalDuration > 60000) {
-      alert("Total sequence duration cannot exceed 60 seconds.");
-      return;
-    }
-    setShowExportModal(false);
-    setIsExporting(true);
-    setExportProgress(0);
+        let activePlayer: HTMLVideoElement | null = null;
+        let standbyPlayer: HTMLVideoElement | null = null;
 
-    // Fake progress up to 90% while the backend works
-    const progressInterval = setInterval(() => {
-        setExportProgress(prev => {
-            if (prev >= 90) return prev;
-            // Slower progress as it gets higher
-            const increment = prev > 70 ? 2 : prev > 40 ? 5 : 10;
-            return prev + increment;
+        if (currentItem?.type === "VIDEO") {
+            const itemUrl = getCORSProxyUrl(currentItem.url);
+            // Find which player already has the current URL loaded
+            if (player1.getAttribute('data-url') === itemUrl) {
+                activePlayer = player1;
+                standbyPlayer = player2;
+            } else if (player2.getAttribute('data-url') === itemUrl) {
+                activePlayer = player2;
+                standbyPlayer = player1;
+            } else {
+                // Neither has it (jumped). Use player1 as active.
+                activePlayer = player1;
+                standbyPlayer = player2;
+                activePlayer.src = itemUrl;
+                activePlayer.setAttribute('data-url', itemUrl);
+                activePlayer.load();
+            }
+
+            // Apply active player styling
+            activePlayer.style.display = "block";
+            activePlayer.style.opacity = "1";
+            activePlayer.style.zIndex = "10";
+            standbyPlayer.style.opacity = "0";
+            standbyPlayer.style.zIndex = "0";
+            standbyPlayer.style.display = "none";
+
+            // Sync active player time
+            const trimOffset = currentItem.trimStart || 0;
+            const videoTime = (localTime + trimOffset) / 1000;
+            activePlayer.playbackRate = currentItem.speed || 1;
+
+            // Use a smaller threshold for frame-accurate scrubbing
+            const diff = Math.abs(activePlayer.currentTime - videoTime);
+            if (diff > (isPlaying ? 0.05 : 0.01)) {
+                activePlayer.currentTime = videoTime;
+            }
+
+            if (isPlaying) {
+                if (activePlayer.paused) {
+                    activePlayer.play().catch(() => { });
+                }
+            } else {
+                if (!activePlayer.paused) {
+                    activePlayer.pause();
+                }
+            }
+        } else {
+            // Current is not video. Pause both and hide.
+            player1.pause();
+            player2.pause();
+            player1.style.display = "none";
+            player2.style.display = "none";
+            standbyPlayer = player1; // Just pick one to preload the next
+        }
+
+        // Preload next video clip in standby player
+        let nextVideoItem = null;
+        if (nextItem?.type === "VIDEO") {
+            nextVideoItem = nextItem;
+        } else {
+            // Look ahead in sequence for the next video
+            for (let i = itemStartIndex + 1; i < sequence.length; i++) {
+                if (sequence[i].type === "VIDEO") {
+                    nextVideoItem = sequence[i];
+                    break;
+                }
+            }
+        }
+
+        if (nextVideoItem && standbyPlayer) {
+            const nextUrl = getCORSProxyUrl(nextVideoItem.url);
+            if (standbyPlayer.getAttribute('data-url') !== nextUrl) {
+                standbyPlayer.src = nextUrl;
+                standbyPlayer.setAttribute('data-url', nextUrl);
+                standbyPlayer.load();
+                standbyPlayer.currentTime = (nextVideoItem.trimStart || 0) / 1000;
+            }
+        }
+
+    }, [currentItem, localTime, isPlaying, sequence, itemStartIndex, nextItem]);
+
+    // Playback Loop
+    useEffect(() => {
+        let lastUpdate = performance.now();
+        if (isPlaying) {
+            const animate = (now: number) => {
+                const delta = now - lastUpdate;
+                lastUpdate = now;
+
+                setCurrentTime(prev => {
+                    const next = prev + delta;
+                    if (next >= totalDuration) {
+                        setIsPlaying(false);
+                        return 0;
+                    }
+                    return next;
+                });
+                animationRef.current = requestAnimationFrame(animate);
+            };
+            animationRef.current = requestAnimationFrame(animate);
+        } else {
+            if (animationRef.current) cancelAnimationFrame(animationRef.current);
+        }
+        return () => {
+            if (animationRef.current) cancelAnimationFrame(animationRef.current);
+        };
+    }, [isPlaying, totalDuration]);
+
+    const handleTogglePlay = () => {
+        if (sequence.length === 0) return;
+        if (currentTime >= totalDuration) setCurrentTime(0);
+        setIsPlaying(!isPlaying);
+    };
+
+    const handleSeek = (time: number) => {
+        setCurrentTime(Math.max(0, Math.min(time, totalDuration)));
+    };
+
+    const handleSplit = () => {
+        if (!currentItem || itemStartIndex === -1 || localTime <= 0 || localTime >= (currentItem.duration || 3000)) return;
+
+        const newSeq = [...sequence];
+        const itemToSplit = newSeq[itemStartIndex];
+
+        // First half
+        const firstHalf: SequenceItem = {
+            ...itemToSplit,
+            id: crypto.randomUUID(),
+            duration: localTime,
+        };
+
+        // Second half
+        const secondHalf: SequenceItem = {
+            ...itemToSplit,
+            id: crypto.randomUUID(),
+            duration: (itemToSplit.duration || 3000) - localTime,
+            trimStart: (itemToSplit.trimStart || 0) + localTime,
+        };
+
+        newSeq.splice(itemStartIndex, 1, firstHalf, secondHalf);
+        setSequence(newSeq);
+        setSelectedItemId(secondHalf.id); // Select the new right half
+    };
+
+    const handleDeleteSelected = () => {
+        if (window.confirm("Are you sure you want to remove this clip from the timeline?")) {
+            if (selectedItemId) {
+                setSequence(prev => prev.filter(item => item.id !== selectedItemId));
+                setSelectedItemId(null);
+            } else if (currentItem) {
+                // If nothing explicitly selected, delete the one under playhead
+                setSequence(prev => prev.filter(item => item.id !== currentItem.id));
+            }
+        }
+    };
+
+
+    const handleEdgeDrag = (e: React.MouseEvent, id: string, edge: 'left' | 'right') => {
+        e.stopPropagation();
+        e.preventDefault();
+        const item = sequence.find(i => i.id === id);
+        if (!item) return;
+
+        setDraggingEdge({
+            id,
+            edge,
+            initialX: e.clientX,
+            initialDuration: item.duration || 3000,
+            initialTrim: item.trimStart || 0
         });
-    }, 1000);
+    };
 
-    try {
-      // 2. Real Backend Export using FFmpeg
-      const editorState = { sequence, audioTracks: audioTracks || [] };
-      await apiEndpoints.exportVideo({ editorState, projectId, fps: exportFps });
+    useEffect(() => {
+        if (!draggingEdge) return;
 
-      clearInterval(progressInterval);
-      setExportProgress(100);
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!timelineRef.current) return;
 
-      // Refresh the assets list to show the newly exported video
-      queryClient.invalidateQueries({ queryKey: ["assets"] });
-      
-      setTimeout(() => {
-          setIsExporting(false);
-          setSidebarTab("exports");
-          if (!sidebarOpen) setSidebarOpen(true);
-      }, 500);
-      
-    } catch (e) {
-      clearInterval(progressInterval);
-      console.error(e);
-      alert("Failed to export video. Check console for details.");
-      setIsExporting(false);
-    }
-  };
+            const deltaX = e.clientX - draggingEdge.initialX;
 
-  const formatTime = (ms: number) => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    const centiseconds = Math.floor((ms % 1000) / 10);
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}`;
-  };
+            // Calculate time delta based on current zoom and timeline width
+            // Re-calculate more accurately:
+            const scrollWidth = timelineRef.current.scrollWidth;
+            const msPerPx = totalDuration / scrollWidth;
+            const deltaTimeMs = deltaX * msPerPx;
 
-  return (
-    <div className="fixed inset-0 z-[100] bg-[#0f0f0f] text-gray-200 flex flex-col font-sans select-none overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-      
-      {/* HEADER */}
-      <div className="h-14 bg-[#1a1a1a] border-b border-white/5 flex items-center justify-between px-6 shrink-0">
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors"
-            title="Exit Editor"
-          >
-            <span className="text-xl">✕</span>
-          </button>
-          <div className="h-6 w-[1px] bg-white/10 mx-2"></div>
-          <div>
-            <h1 className="text-sm font-bold text-white tracking-wide uppercase">PicFX Editor</h1>
-            <p className="text-[10px] text-gray-500 font-mono">{formatTime(currentTime)} / {formatTime(totalDuration)}</p>
-          </div>
-        </div>
+            setSequence(prev => {
+                const newSeq = [...prev];
+                const itemIndex = newSeq.findIndex(i => i.id === draggingEdge.id);
+                if (itemIndex === -1) return prev;
 
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={handleSaveProject}
-            className="px-4 py-1.5 rounded-lg text-xs font-bold text-gray-400 hover:text-white hover:bg-white/10 transition-all border border-transparent"
-          >
-            Save Project
-          </button>
-          <button 
-            onClick={onClear}
-            className="px-4 py-1.5 rounded-lg text-xs font-bold text-gray-400 hover:text-red-400 hover:bg-red-400/10 transition-all border border-transparent hover:border-red-400/20"
-          >
-            Clear
-          </button>
-          <button 
-            onClick={handleExportVideo}
-            disabled={isExporting}
-            className="px-6 py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-2"
-          >
-            <span>💾</span> {isExporting ? "Rendering..." : "Export Video"}
-          </button>
-        </div>
-      </div>
+                const item = newSeq[itemIndex];
+                let newDuration = draggingEdge.initialDuration;
+                let newTrim = draggingEdge.initialTrim;
 
-      {/* RENDER PROGRESS OVERLAY */}
-      {isExporting && (
-          <div className="absolute inset-0 z-[200] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center">
-              <div className="w-96 p-8 bg-gray-900 border border-gray-700 rounded-2xl flex flex-col items-center">
-                  <h3 className="text-white font-bold text-lg mb-2">Rendering Video</h3>
-                  <p className="text-gray-400 text-xs text-center mb-6">
-                      (Note: True server-side NLE FFmpeg rendering is required for complex sequences. Saving demo clip...)
-                  </p>
-                  <div className="w-full bg-gray-800 rounded-full h-3 mb-2 overflow-hidden">
-                      <div className="bg-cyan-500 h-full transition-all duration-300" style={{ width: `${exportProgress}%` }}></div>
-                  </div>
-                  <span className="text-cyan-400 font-mono text-sm">{exportProgress}%</span>
-              </div>
-          </div>
-      )}
+                if (draggingEdge.edge === 'right') {
+                    // Dragging right edge changes duration
+                    newDuration = Math.max(500, draggingEdge.initialDuration + deltaTimeMs);
+                    if (item.originalDuration) {
+                        newDuration = Math.min(newDuration, item.originalDuration - newTrim);
+                    }
+                } else if (draggingEdge.edge === 'left') {
+                    // Dragging left edge changes trimStart AND duration
+                    const maxTrim = draggingEdge.initialTrim + draggingEdge.initialDuration - 500;
+                    newTrim = Math.max(0, Math.min(draggingEdge.initialTrim + deltaTimeMs, maxTrim));
 
-      {/* EXPORT SETTINGS MODAL */}
-      {showExportModal && (
-          <div className="absolute inset-0 z-[200] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center">
-              <div className="w-96 p-8 bg-gray-900 border border-gray-700 rounded-2xl flex flex-col space-y-6">
-                  <h3 className="text-white font-bold text-lg text-center border-b border-gray-800 pb-4">Export Settings</h3>
-                  
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Frames Per Second (FPS)</label>
-                    <select 
-                      value={exportFps}
-                      onChange={(e) => setExportFps(Number(e.target.value))}
-                      className="w-full p-3 bg-black border border-gray-800 rounded-lg text-white font-bold outline-none cursor-pointer hover:border-gray-600 transition-colors"
-                    >
-                      <option value={24}>24 FPS (Cinematic)</option>
-                      <option value={30}>30 FPS (Standard)</option>
-                      <option value={60}>60 FPS (Smooth)</option>
-                    </select>
-                  </div>
+                    const changeInTrim = newTrim - draggingEdge.initialTrim;
+                    newDuration = Math.max(500, draggingEdge.initialDuration - changeInTrim);
+                }
 
-                  <div className="flex gap-3 pt-2">
-                      <button 
-                          onClick={() => setShowExportModal(false)}
-                          className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-bold text-xs uppercase tracking-widest transition-colors"
-                      >
-                          Cancel
-                      </button>
-                      <button 
-                          onClick={confirmExportVideo}
-                          className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold text-xs uppercase tracking-widest transition-colors shadow-lg shadow-cyan-500/20"
-                      >
-                          Start Render
-                      </button>
-                  </div>
-              </div>
-          </div>
-      )}
+                newSeq[itemIndex] = { ...item, duration: newDuration, trimStart: newTrim };
 
-      {/* MAIN CONTENT AREA */}
-      <div className="flex-1 flex overflow-hidden">
-        
-        {/* ASSET SIDEBAR */}
-        {sidebarOpen && (
-          <div className="w-80 bg-[#141414] border-r border-white/5 flex flex-col shrink-0 animate-in slide-in-from-left duration-300">
-            <div className="p-4 border-b border-white/5 flex flex-col gap-4">
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-wrap gap-1 bg-gray-900 rounded-lg p-1">
-                    <button 
-                        onClick={() => setSidebarTab("project")}
-                        className={`flex-1 min-w-[60px] px-2 py-1.5 rounded text-[10px] font-bold transition-colors flex items-center justify-center gap-1 ${sidebarTab === "project" ? "bg-white/10 text-white shadow-sm" : "text-gray-500 hover:text-gray-300"}`}
-                        title="View project media folder"
-                    >
-                        <span>📁</span> Folder
-                    </button>
-                    <button 
-                        onClick={() => setSidebarTab("bin")}
-                        className={`flex-1 min-w-[60px] px-2 py-1.5 rounded text-[10px] font-bold transition-colors flex items-center justify-center gap-1 ${sidebarTab === "bin" ? "bg-white/10 text-white shadow-sm" : "text-gray-500 hover:text-gray-300"}`}
-                        title="View media staging bin"
-                    >
-                        <span>📦</span> Bin
-                    </button>
-                    <button 
-                        onClick={() => setSidebarTab("storyline")}
-                        className={`flex-1 min-w-[60px] px-2 py-1.5 rounded text-[10px] font-bold transition-colors flex items-center justify-center gap-1 ${sidebarTab === "storyline" ? "bg-white/10 text-white shadow-sm" : "text-gray-500 hover:text-gray-300"}`}
-                        title="View storyline media"
-                    >
-                        <span>📖</span> Story
-                    </button>
-                    <button 
-                        onClick={() => setSidebarTab("exports")}
-                        className={`flex-1 min-w-[60px] px-2 py-1.5 rounded text-[10px] font-bold transition-colors flex items-center justify-center gap-1 ${sidebarTab === "exports" ? "bg-white/10 text-white shadow-sm" : "text-gray-500 hover:text-gray-300"}`}
-                        title="View rendered exported videos"
-                    >
-                        <span>🎬</span> Exports
-                    </button>
-                </div>
-                <div className="flex gap-2">
-                    <button 
-                        onClick={() => {
-                            const fileInput = document.createElement('input');
-                            fileInput.type = 'file';
-                            fileInput.accept = 'audio/*';
-                            fileInput.onchange = async (e: any) => {
-                                const file = e.target.files?.[0];
-                                if (file && setAudioTracks) {
-                                    // Upload to backend first so it has a real URL for export
-                                    try {
-                                        const formData = new FormData();
-                                        formData.append("image", file); // Backend expects "image" field for generic uploads
-                                        formData.append("raw", "true");
-                                        if (projectId) formData.append("projectId", projectId);
-                                        
-                                        const res = await apiEndpoints.uploadAssetSync(formData);
-                                        if (res.data.success && res.data.asset) {
-                                            const newAudio: AudioItem = {
-                                                id: crypto.randomUUID(),
-                                                url: res.data.asset.url,
-                                                title: file.name,
-                                                startTime: currentTime,
-                                                duration: 10000 // default 10s
-                                            };
-                                            setAudioTracks(prev => [...(prev || []), newAudio]);
-                                        }
-                                    } catch (err) {
-                                        console.error("Audio upload failed:", err);
-                                        alert("Failed to upload audio track.");
-                                    }
-                                }
-                            };
-                            fileInput.click();
-                        }}
-                        className="flex-1 h-9 flex items-center justify-center gap-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-white transition-all text-[10px] font-bold uppercase tracking-wider"
-                        title="Add Audio"
-                    >
-                        <span>🎵</span> Add Audio
-                    </button>
-                    <button 
-                        onClick={onAddFromLibrary}
-                        className="flex-1 h-9 flex items-center justify-center gap-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500 hover:text-white transition-all text-[10px] font-bold uppercase tracking-wider"
-                        title="Add Visual Media"
-                    >
-                        <span>+</span> Add Media
-                    </button>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
-              {sidebarTab === "project" && (
-                  <div className="grid grid-cols-2 gap-2">
-                      {isLoadingAssets ? (
-                          <div className="col-span-2 flex justify-center py-10"><LoadingSpinner /></div>
-                      ) : projectAssets.filter((a: any) => a.aspectRatio !== "EXPORTED_VIDEO").length === 0 ? (
-                          <div className="col-span-2 text-center text-gray-500 text-xs py-10">No media in project folder.</div>
-                      ) : (
-                          projectAssets.filter((a: any) => a.aspectRatio !== "EXPORTED_VIDEO").map((asset: any) => (
-                              <div 
-                                key={asset.id} 
-                                className="relative aspect-square bg-black rounded-lg border border-white/5 overflow-hidden group cursor-pointer hover:border-cyan-500/50 transition-all"
-                                onClick={() => {
-                                    setBinItems(prev => [...prev, {
-                                        id: crypto.randomUUID(),
-                                        url: asset.url, // Store raw URL for backend
-                                        type: asset.type === "VIDEO" ? "VIDEO" : "IMAGE",
-                                        duration: asset.type === "VIDEO" ? 5000 : 3000,
-                                        originalDuration: asset.type === "VIDEO" ? 15000 : 3000,
-                                        title: asset.type === "VIDEO" ? "Video Clip" : "Image Frame"
-                                    }]);
-                                    setSidebarTab("bin");
-                                }}
-                              >
-                                  {asset.type === "VIDEO" ? (
-                                      <video src={getCORSProxyUrl(asset.url)} className="w-full h-full object-cover" muted />
-                                  ) : (
-                                      <img src={getCORSProxyUrl(asset.url)} className="w-full h-full object-cover" crossOrigin="anonymous" />
-                                  )}
-                                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm text-center p-2">
-                                      <span className="bg-cyan-600 hover:bg-cyan-500 text-white text-[9px] font-bold px-2 py-1.5 rounded uppercase tracking-wider transition-colors shadow-lg">
-                                        + Add to Bin
-                                      </span>
-                                  </div>
-                              </div>
-                          ))
-                      )}
-                  </div>
-              )}
+                // Real-time visual scrubbing to the dragged edge
+                let accumulated = 0;
+                for (let i = 0; i < itemIndex; i++) {
+                    accumulated += newSeq[i].duration || 3000;
+                }
 
-              {sidebarTab === "bin" && (
-                  <div className="grid grid-cols-2 gap-2">
-                      {binItems.length === 0 ? (
-                          <div className="col-span-2 text-center text-gray-500 text-xs py-10">Staging Bin empty.</div>
-                      ) : (
-                          binItems.map((item, idx) => (
-                              <div 
-                                key={item.id} 
-                                className="relative aspect-square bg-black rounded-lg border border-white/5 overflow-hidden group cursor-pointer hover:border-purple-500/50 transition-all"
-                                onClick={() => {
-                                    setSequence(prev => [...prev, { ...item, id: crypto.randomUUID() }]);
-                                }}
-                              >
-                                  {item.type === "VIDEO" ? (
-                                      <video src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover" muted />
-                                  ) : (
-                                      <img src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover" />
-                                  )}
-                                  <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <button 
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setBinItems(prev => prev.filter((_, i) => i !== idx));
-                                        }}
-                                        className="w-5 h-5 bg-red-600/80 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-[10px]"
-                                      >✕</button>
-                                  </div>
-                                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm text-center p-2">
-                                      <span className="bg-purple-600 hover:bg-purple-500 text-white text-[9px] font-bold px-2 py-1.5 rounded uppercase tracking-wider transition-colors shadow-lg">
-                                        + Add to Sequence
-                                      </span>
-                                  </div>
-                              </div>
-                          ))
-                      )}
-                  </div>
-              )}
+                if (draggingEdge.edge === 'left') {
+                    setCurrentTime(accumulated);
+                } else {
+                    setCurrentTime(accumulated + newDuration - 50); // Show just before the very end frame
+                }
 
-              {sidebarTab === "storyline" && (
-                  <div className="flex flex-col h-full space-y-3">
-                      <div className="flex bg-gray-900 p-1 rounded-lg">
-                          <button
-                              onClick={() => setStorylineTab("videos")}
-                              className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-colors ${storylineTab === "videos" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
-                          >
-                              Videos
-                          </button>
-                          <button
-                              onClick={() => setStorylineTab("images")}
-                              className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-colors ${storylineTab === "images" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
-                          >
-                              Images
-                          </button>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-2 flex-1">
-                          {isLoadingAssets ? (
-                              <div className="col-span-2 flex justify-center py-10"><LoadingSpinner /></div>
-                          ) : (
-                              projectAssets
-                                .filter((a: any) => a.aspectRatio !== "EXPORTED_VIDEO" && a.type === (storylineTab === "videos" ? "VIDEO" : "IMAGE"))
-                                .length === 0 ? (
-                                  <div className="col-span-2 text-center text-gray-500 text-xs py-10">No {storylineTab} in storyline.</div>
-                              ) : (
-                                  projectAssets
-                                    .filter((a: any) => a.aspectRatio !== "EXPORTED_VIDEO" && a.type === (storylineTab === "videos" ? "VIDEO" : "IMAGE"))
-                                    .map((asset: any) => (
-                                      <div 
-                                        key={asset.id} 
-                                        className="relative aspect-square bg-black rounded-lg border border-white/5 overflow-hidden group cursor-pointer hover:border-purple-500/50 transition-all"
-                                        onClick={() => {
-                                            setSequence(prev => [...prev, {
-                                                id: crypto.randomUUID(),
-                                                url: asset.url,
-                                                type: asset.type === "VIDEO" ? "VIDEO" : "IMAGE",
-                                                duration: asset.type === "VIDEO" ? 5000 : 3000,
-                                                originalDuration: asset.type === "VIDEO" ? 15000 : 3000,
-                                                title: asset.type === "VIDEO" ? "Storyline Video" : "Storyline Image"
-                                            }]);
-                                        }}
-                                      >
-                                          {asset.type === "VIDEO" ? (
-                                              <video src={getCORSProxyUrl(asset.url)} className="w-full h-full object-cover" muted />
-                                          ) : (
-                                              <img src={getCORSProxyUrl(asset.url)} className="w-full h-full object-cover" crossOrigin="anonymous" />
-                                          )}
-                                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm text-center p-2">
-                                              <span className="bg-purple-600 hover:bg-purple-500 text-white text-[9px] font-bold px-2 py-1.5 rounded uppercase tracking-wider transition-colors shadow-lg">
-                                                + Add to Sequence
-                                              </span>
-                                          </div>
-                                      </div>
-                                  ))
-                              )
-                          )}
-                      </div>
-                  </div>
-              )}
+                return newSeq;
+            });
+        };
 
-              {sidebarTab === "exports" && (
-                  <div className="flex flex-col gap-3">
-                      {isLoadingAssets ? (
-                          <div className="flex justify-center py-10"><LoadingSpinner /></div>
-                      ) : projectAssets.filter((a: any) => a.aspectRatio === "EXPORTED_VIDEO").length === 0 ? (
-                          <div className="text-center text-gray-500 text-xs py-10 border-2 border-dashed border-white/5 rounded-2xl">
-                              <span className="text-3xl mb-2 block">🎬</span>
-                              No exported videos yet. Click "Export Video" to render your sequence.
-                          </div>
-                      ) : (
-                          projectAssets.filter((a: any) => a.aspectRatio === "EXPORTED_VIDEO").map((asset: any) => (
-                              <div key={asset.id} className="bg-black/40 border border-white/10 rounded-xl overflow-hidden group">
-                                  <div className="aspect-video relative bg-black">
-                                      <video src={getCORSProxyUrl(asset.url)} className="w-full h-full object-contain" controls />
-                                  </div>
-                                  <div className="p-3 flex items-center justify-between">
-                                      <div className="text-[10px] text-gray-400 font-mono">
-                                          {new Date(asset.createdAt).toLocaleDateString()}
-                                      </div>
-                                      <a 
-                                          href={getCORSProxyUrl(asset.url)} 
-                                          download={`Render_${asset.id}.mp4`}
-                                          target="_blank"
-                                          className="text-xs font-bold text-cyan-400 hover:text-cyan-300"
-                                      >
-                                          Download
-                                      </a>
-                                  </div>
-                              </div>
-                          ))
-                      )}
-                  </div>
-              )}
-            </div>
-          </div>
-        )}
+        const handleMouseUp = () => {
+            setDraggingEdge(null);
+        };
 
-        {/* PREVIEW VIEWPORT */}
-        <div className="flex-1 bg-black relative flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
-            <button 
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="absolute top-4 left-4 z-10 w-8 h-8 bg-white/5 hover:bg-white/10 rounded-lg flex items-center justify-center border border-white/10 text-gray-400 transition-colors"
-            >
-                {sidebarOpen ? (
-                    <svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                ) : (
-                    <svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                )}
-            </button>
+        window.addEventListener('mousemove', handleMouseMove, { passive: false });
+        window.addEventListener('mouseup', handleMouseUp);
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [draggingEdge, totalDuration, zoom]);
 
-            {/* Viewport Ratio Switcher */}
-            <div className="absolute top-4 right-4 z-10 flex gap-1 bg-black/50 backdrop-blur-md p-1 rounded-lg border border-white/10">
-                {[
-                    { id: "16:9", icon: "▭", label: "Landscape" },
-                    { id: "9:16", icon: "▯", label: "Portrait" },
-                    { id: "1:1", icon: "□", label: "Square" },
-                ].map((ratio) => (
+    const handleTimelineMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+        // If we click an edge or a clip handle, don't seek immediately
+        if ((e.target as HTMLElement).closest('.drag-handle')) return;
+
+        const seekToPoint = (clientX: number) => {
+            if (!timelineRef.current) return;
+            const rect = timelineRef.current.getBoundingClientRect();
+
+            // Calculate the absolute X position within the timeline element
+            const x = clientX - rect.left;
+            const width = rect.width;
+
+            // Ensure we don't go out of bounds (0 to 100%)
+            const percentage = Math.max(0, Math.min(x / width, 1));
+            const clickedTime = percentage * totalDuration;
+
+            handleSeek(clickedTime);
+        };
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            seekToPoint(moveEvent.clientX);
+        };
+
+        const handleMouseUp = () => {
+            window.removeEventListener("mousemove", handleMouseMove);
+            window.removeEventListener("mouseup", handleMouseUp);
+        };
+
+        window.addEventListener("mousemove", handleMouseMove);
+        window.addEventListener("mouseup", handleMouseUp);
+
+        seekToPoint(e.clientX);
+    };
+
+    const handleSaveProject = async () => {
+        if (!projectId) {
+            alert("Cannot save: No active project detected.");
+            return;
+        }
+        try {
+            const editorState = {
+                sequence,
+                audioTracks: audioTracks || []
+            };
+            await apiEndpoints.updateProject(projectId, { editorState });
+            alert("Project saved successfully!");
+        } catch (error) {
+            console.error("Failed to save project", error);
+            alert("Failed to save project.");
+        }
+    };
+
+    const handleExportVideo = async () => {
+        if (sequence.length === 0) {
+            alert("Timeline is empty. Add clips to export.");
+            return;
+        }
+        setShowExportModal(true);
+    };
+
+    const confirmExportVideo = async () => {
+        if (totalDuration > 60000) {
+            alert("Total sequence duration cannot exceed 60 seconds.");
+            return;
+        }
+        setShowExportModal(false);
+        setIsExporting(true);
+        setExportProgress(0);
+
+        // Fake progress up to 90% while the backend works
+        const progressInterval = setInterval(() => {
+            setExportProgress(prev => {
+                if (prev >= 90) return prev;
+                // Slower progress as it gets higher
+                const increment = prev > 70 ? 2 : prev > 40 ? 5 : 10;
+                return prev + increment;
+            });
+        }, 1000);
+
+        try {
+            // 2. Real Backend Export using FFmpeg
+            const editorState = { sequence, audioTracks: audioTracks || [] };
+            await apiEndpoints.exportVideo({ editorState, projectId, fps: exportFps });
+
+            clearInterval(progressInterval);
+            setExportProgress(100);
+
+            // Refresh the assets list to show the newly exported video
+            queryClient.invalidateQueries({ queryKey: ["assets"] });
+
+            setTimeout(() => {
+                setIsExporting(false);
+                setSidebarTab("exports");
+                if (!sidebarOpen) setSidebarOpen(true);
+            }, 500);
+
+        } catch (e) {
+            clearInterval(progressInterval);
+            console.error(e);
+            alert("Failed to export video. Check console for details.");
+            setIsExporting(false);
+        }
+    };
+
+    const formatTime = (ms: number) => {
+        const totalSeconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const centiseconds = Math.floor((ms % 1000) / 10);
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}`;
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] bg-[#0f0f0f] text-gray-200 flex flex-col font-sans select-none overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+
+            {/* HEADER */}
+            <div className="h-14 bg-[#1a1a1a] border-b border-white/5 flex items-center justify-between px-6 shrink-0">
+                <div className="flex items-center gap-4">
                     <button
-                        key={ratio.id}
-                        onClick={() => setViewportRatio(ratio.id as any)}
-                        className={`px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-1 ${
-                            viewportRatio === ratio.id ? "bg-cyan-600 text-white" : "text-gray-400 hover:text-white hover:bg-white/10"
-                        }`}
-                        title={ratio.label}
+                        onClick={onClose}
+                        className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+                        title="Exit Editor"
                     >
-                        <span>{ratio.icon}</span>
-                        <span className="hidden sm:inline">{ratio.id}</span>
+                        <span className="text-xl">✕</span>
                     </button>
-                ))}
-            </div>
-
-            <div className="relative w-full h-full flex flex-col items-center justify-center pt-8">
-                <div 
-                    className="relative bg-[#050505] rounded-lg overflow-hidden border border-white/5 shadow-[0_0_50px_rgba(0,0,0,0.5)] flex items-center justify-center group transition-all duration-500"
-                    style={{
-                        width: viewportRatio === "16:9" ? "100%" : viewportRatio === "9:16" ? "auto" : "auto",
-                        height: viewportRatio === "16:9" ? "auto" : "100%",
-                        aspectRatio: viewportRatio === "16:9" ? "16/9" : viewportRatio === "9:16" ? "9/16" : "1/1",
-                        maxHeight: "100%",
-                        maxWidth: "100%"
-                    }}
-                >
-                    {currentItem ? (
-                        <>
-                            {currentItem.type === "VIDEO" ? (
-                                <>
-                                  <video 
-                                      ref={player1Ref}
-                                      className="w-full h-full object-contain absolute inset-0 z-10"
-                                      muted
-                                      playsInline
-                                      crossOrigin="anonymous"
-                                  />
-                                  <video 
-                                      ref={player2Ref}
-                                      className="w-full h-full object-contain absolute inset-0 z-0 opacity-0 pointer-events-none"
-                                      muted
-                                      playsInline
-                                      crossOrigin="anonymous"
-                                  />
-                                </>
-                            ) : (
-                                <img
-                                    src={getCORSProxyUrl(currentItem.url)}
-                                    className="w-full h-full object-contain absolute inset-0 z-10"
-                                    crossOrigin="anonymous"
-                                />
-                            )}                        </>
-                    ) : (
-                        <div className="text-center">
-                            <span className="text-5xl block mb-4 opacity-20">🎬</span>
-                            <p className="text-gray-500 font-medium">No media selected</p>
-                        </div>
-                    )}
-                    
-                    {/* Play Overlay */}
-                    {!isPlaying && currentItem && (
-                        <button 
-                            onClick={handleTogglePlay}
-                            className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/30 transition-all duration-300 group-hover:bg-black/40"
-                        >
-                            <div className="w-24 h-24 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center scale-90 group-hover:scale-100 transition-transform shadow-2xl text-white">
-                                <svg className="w-10 h-10 ml-2 drop-shadow-lg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                            </div>
-                        </button>
-                    )}
+                    <div className="h-6 w-[1px] bg-white/10 mx-2"></div>
+                    <div>
+                        <h1 className="text-sm font-bold text-white tracking-wide uppercase">Video Editor</h1>
+                        <p className="text-[10px] text-gray-500 font-mono">{formatTime(currentTime)} / {formatTime(totalDuration)}</p>
+                    </div>
                 </div>
 
-                {/* Player Controls */}
-                <div className="h-16 flex items-center justify-center gap-8 mt-4">
-                    <button className="text-gray-500 hover:text-white transition-colors" onClick={() => handleSeek(currentTime - 5000)}>
-                        <svg className="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 19 2 12 11 5 11 19"></polygon><polygon points="22 19 13 12 22 5 22 19"></polygon></svg>
-                    </button>
-                    <button 
-                        onClick={handleTogglePlay}
-                        className="w-14 h-14 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 transition-transform shadow-xl shadow-white/10"
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={handleSaveProject}
+                        className="px-4 py-1.5 rounded-lg text-xs font-bold text-gray-400 hover:text-white hover:bg-white/10 transition-all border border-transparent"
                     >
-                        {isPlaying ? (
-                            <svg className="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                        Save Project
+                    </button>
+                    <button
+                        onClick={onClear}
+                        className="px-4 py-1.5 rounded-lg text-xs font-bold text-gray-400 hover:text-red-400 hover:bg-red-400/10 transition-all border border-transparent hover:border-red-400/20"
+                    >
+                        Clear
+                    </button>
+                    <button
+                        onClick={handleExportVideo}
+                        disabled={isExporting}
+                        className="px-6 py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-lg shadow-cyan-500/20 transition-all flex items-center gap-2"
+                    >
+                        <span>💾</span> {isExporting ? "Rendering..." : "Export Video"}
+                    </button>
+                </div>
+            </div>
+
+            {/* RENDER PROGRESS OVERLAY */}
+            {isExporting && (
+                <div className="absolute inset-0 z-[200] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center">
+                    <div className="w-96 p-8 bg-gray-900 border border-gray-700 rounded-2xl flex flex-col items-center">
+                        <h3 className="text-white font-bold text-lg mb-2">Rendering Video</h3>
+                        <p className="text-gray-400 text-xs text-center mb-6">
+                            (Note: True server-side NLE FFmpeg rendering is required for complex sequences. Saving demo clip...)
+                        </p>
+                        <div className="w-full bg-gray-800 rounded-full h-3 mb-2 overflow-hidden">
+                            <div className="bg-cyan-500 h-full transition-all duration-300" style={{ width: `${exportProgress}%` }}></div>
+                        </div>
+                        <span className="text-cyan-400 font-mono text-sm">{exportProgress}%</span>
+                    </div>
+                </div>
+            )}
+
+            {/* EXPORT SETTINGS MODAL */}
+            {showExportModal && (
+                <div className="absolute inset-0 z-[200] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center">
+                    <div className="w-96 p-8 bg-gray-900 border border-gray-700 rounded-2xl flex flex-col space-y-6">
+                        <h3 className="text-white font-bold text-lg text-center border-b border-gray-800 pb-4">Export Settings</h3>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Frames Per Second (FPS)</label>
+                            <select
+                                value={exportFps}
+                                onChange={(e) => setExportFps(Number(e.target.value))}
+                                className="w-full p-3 bg-black border border-gray-800 rounded-lg text-white font-bold outline-none cursor-pointer hover:border-gray-600 transition-colors"
+                            >
+                                <option value={24}>24 FPS (Cinematic)</option>
+                                <option value={30}>30 FPS (Standard)</option>
+                                <option value={60}>60 FPS (Smooth)</option>
+                            </select>
+                        </div>
+
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                onClick={() => setShowExportModal(false)}
+                                className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-bold text-xs uppercase tracking-widest transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmExportVideo}
+                                className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold text-xs uppercase tracking-widest transition-colors shadow-lg shadow-cyan-500/20"
+                            >
+                                Start Render
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MAIN CONTENT AREA */}
+            <div className="flex-1 flex overflow-hidden">
+
+                {/* ASSET SIDEBAR */}
+                {sidebarOpen && (
+                    <div className="w-80 bg-[#141414] border-r border-white/5 flex flex-col shrink-0 animate-in slide-in-from-left duration-300">
+                        <div className="p-4 border-b border-white/5 flex flex-col gap-4">
+                            <div className="flex flex-col gap-3">
+                                <div className="flex flex-wrap gap-1 bg-gray-900 rounded-lg p-1">
+                                    <button
+                                        onClick={() => setSidebarTab("project")}
+                                        className={`flex-1 min-w-[60px] px-2 py-1.5 rounded text-[10px] font-bold transition-colors flex items-center justify-center gap-1 ${sidebarTab === "project" ? "bg-white/10 text-white shadow-sm" : "text-gray-500 hover:text-gray-300"}`}
+                                        title="View project media folder"
+                                    >
+                                        <span>📁</span> Folder
+                                    </button>
+                                    <button
+                                        onClick={() => setSidebarTab("bin")}
+                                        className={`flex-1 min-w-[60px] px-2 py-1.5 rounded text-[10px] font-bold transition-colors flex items-center justify-center gap-1 ${sidebarTab === "bin" ? "bg-white/10 text-white shadow-sm" : "text-gray-500 hover:text-gray-300"}`}
+                                        title="View media staging bin"
+                                    >
+                                        <span>📦</span> Bin
+                                    </button>
+                                    <button
+                                        onClick={() => setSidebarTab("storyline")}
+                                        className={`flex-1 min-w-[60px] px-2 py-1.5 rounded text-[10px] font-bold transition-colors flex items-center justify-center gap-1 ${sidebarTab === "storyline" ? "bg-white/10 text-white shadow-sm" : "text-gray-500 hover:text-gray-300"}`}
+                                        title="View storyline media"
+                                    >
+                                        <span>📖</span> Story
+                                    </button>
+                                    <button
+                                        onClick={() => setSidebarTab("exports")}
+                                        className={`flex-1 min-w-[60px] px-2 py-1.5 rounded text-[10px] font-bold transition-colors flex items-center justify-center gap-1 ${sidebarTab === "exports" ? "bg-white/10 text-white shadow-sm" : "text-gray-500 hover:text-gray-300"}`}
+                                        title="View rendered exported videos"
+                                    >
+                                        <span>🎬</span> Exports
+                                    </button>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => {
+                                            const fileInput = document.createElement('input');
+                                            fileInput.type = 'file';
+                                            fileInput.accept = 'audio/*';
+                                            fileInput.onchange = async (e: any) => {
+                                                const file = e.target.files?.[0];
+                                                if (file && setAudioTracks) {
+                                                    // Upload to backend first so it has a real URL for export
+                                                    try {
+                                                        const formData = new FormData();
+                                                        formData.append("image", file); // Backend expects "image" field for generic uploads
+                                                        formData.append("raw", "true");
+                                                        if (projectId) formData.append("projectId", projectId);
+
+                                                        const res = await apiEndpoints.uploadAssetSync(formData);
+                                                        if (res.data.success && res.data.asset) {
+                                                            const newAudio: AudioItem = {
+                                                                id: crypto.randomUUID(),
+                                                                url: res.data.asset.url,
+                                                                title: file.name,
+                                                                startTime: currentTime,
+                                                                duration: 10000 // default 10s
+                                                            };
+                                                            setAudioTracks(prev => [...(prev || []), newAudio]);
+                                                        }
+                                                    } catch (err) {
+                                                        console.error("Audio upload failed:", err);
+                                                        alert("Failed to upload audio track.");
+                                                    }
+                                                }
+                                            };
+                                            fileInput.click();
+                                        }}
+                                        className="flex-1 h-9 flex items-center justify-center gap-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500 hover:text-white transition-all text-[10px] font-bold uppercase tracking-wider"
+                                        title="Add Audio"
+                                    >
+                                        <span>🎵</span> Add Audio
+                                    </button>
+                                    <button
+                                        onClick={onAddFromLibrary}
+                                        className="flex-1 h-9 flex items-center justify-center gap-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500 hover:text-white transition-all text-[10px] font-bold uppercase tracking-wider"
+                                        title="Add Visual Media"
+                                    >
+                                        <span>+</span> Add Media
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
+                            {sidebarTab === "project" && (
+                                <div className="grid grid-cols-2 gap-2">
+                                    {isLoadingAssets ? (
+                                        <div className="col-span-2 flex justify-center py-10"><LoadingSpinner /></div>
+                                    ) : projectAssets.filter((a: any) => a.aspectRatio !== "EXPORTED_VIDEO").length === 0 ? (
+                                        <div className="col-span-2 text-center text-gray-500 text-xs py-10">No media in project folder.</div>
+                                    ) : (
+                                        projectAssets.filter((a: any) => a.aspectRatio !== "EXPORTED_VIDEO").map((asset: any) => (
+                                            <div
+                                                key={asset.id}
+                                                className="relative aspect-square bg-black rounded-lg border border-white/5 overflow-hidden group cursor-pointer hover:border-cyan-500/50 transition-all"
+                                                onClick={() => {
+                                                    setBinItems(prev => [...prev, {
+                                                        id: crypto.randomUUID(),
+                                                        url: asset.url, // Store raw URL for backend
+                                                        type: asset.type === "VIDEO" ? "VIDEO" : "IMAGE",
+                                                        duration: asset.type === "VIDEO" ? 5000 : 3000,
+                                                        originalDuration: asset.type === "VIDEO" ? 15000 : 3000,
+                                                        title: asset.type === "VIDEO" ? "Video Clip" : "Image Frame"
+                                                    }]);
+                                                    setSidebarTab("bin");
+                                                }}
+                                            >
+                                                {asset.type === "VIDEO" ? (
+                                                    <video src={getCORSProxyUrl(asset.url)} className="w-full h-full object-cover" muted />
+                                                ) : (
+                                                    <img src={getCORSProxyUrl(asset.url)} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                                )}
+                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm text-center p-2">
+                                                    <span className="bg-cyan-600 hover:bg-cyan-500 text-white text-[9px] font-bold px-2 py-1.5 rounded uppercase tracking-wider transition-colors shadow-lg">
+                                                        + Add to Bin
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+
+                            {sidebarTab === "bin" && (
+                                <div className="grid grid-cols-2 gap-2">
+                                    {binItems.length === 0 ? (
+                                        <div className="col-span-2 text-center text-gray-500 text-xs py-10">Staging Bin empty.</div>
+                                    ) : (
+                                        binItems.map((item, idx) => (
+                                            <div
+                                                key={item.id}
+                                                className="relative aspect-square bg-black rounded-lg border border-white/5 overflow-hidden group cursor-pointer hover:border-purple-500/50 transition-all"
+                                                onClick={() => {
+                                                    setSequence(prev => [...prev, { ...item, id: crypto.randomUUID() }]);
+                                                }}
+                                            >
+                                                {item.type === "VIDEO" ? (
+                                                    <video src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover" muted />
+                                                ) : (
+                                                    <img src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover" />
+                                                )}
+                                                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setBinItems(prev => prev.filter((_, i) => i !== idx));
+                                                        }}
+                                                        className="w-5 h-5 bg-red-600/80 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-[10px]"
+                                                    >✕</button>
+                                                </div>
+                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm text-center p-2">
+                                                    <span className="bg-purple-600 hover:bg-purple-500 text-white text-[9px] font-bold px-2 py-1.5 rounded uppercase tracking-wider transition-colors shadow-lg">
+                                                        + Add to Sequence
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+
+                            {sidebarTab === "storyline" && (
+                                <div className="flex flex-col h-full space-y-3">
+                                    <div className="flex bg-gray-900 p-1 rounded-lg">
+                                        <button
+                                            onClick={() => setStorylineTab("videos")}
+                                            className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-colors ${storylineTab === "videos" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                                        >
+                                            Videos
+                                        </button>
+                                        <button
+                                            onClick={() => setStorylineTab("images")}
+                                            className={`flex-1 py-1.5 text-[10px] font-bold rounded-md transition-colors ${storylineTab === "images" ? "bg-white/10 text-white" : "text-gray-500 hover:text-gray-300"}`}
+                                        >
+                                            Images
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2 flex-1">
+                                        {isLoadingAssets ? (
+                                            <div className="col-span-2 flex justify-center py-10"><LoadingSpinner /></div>
+                                        ) : (
+                                            projectAssets
+                                                .filter((a: any) => a.aspectRatio !== "EXPORTED_VIDEO" && a.type === (storylineTab === "videos" ? "VIDEO" : "IMAGE"))
+                                                .length === 0 ? (
+                                                <div className="col-span-2 text-center text-gray-500 text-xs py-10">No {storylineTab} in storyline.</div>
+                                            ) : (
+                                                projectAssets
+                                                    .filter((a: any) => a.aspectRatio !== "EXPORTED_VIDEO" && a.type === (storylineTab === "videos" ? "VIDEO" : "IMAGE"))
+                                                    .map((asset: any) => (
+                                                        <div
+                                                            key={asset.id}
+                                                            className="relative aspect-square bg-black rounded-lg border border-white/5 overflow-hidden group cursor-pointer hover:border-purple-500/50 transition-all"
+                                                            onClick={() => {
+                                                                setSequence(prev => [...prev, {
+                                                                    id: crypto.randomUUID(),
+                                                                    url: asset.url,
+                                                                    type: asset.type === "VIDEO" ? "VIDEO" : "IMAGE",
+                                                                    duration: asset.type === "VIDEO" ? 5000 : 3000,
+                                                                    originalDuration: asset.type === "VIDEO" ? 15000 : 3000,
+                                                                    title: asset.type === "VIDEO" ? "Storyline Video" : "Storyline Image"
+                                                                }]);
+                                                            }}
+                                                        >
+                                                            {asset.type === "VIDEO" ? (
+                                                                <video src={getCORSProxyUrl(asset.url)} className="w-full h-full object-cover" muted />
+                                                            ) : (
+                                                                <img src={getCORSProxyUrl(asset.url)} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                                            )}
+                                                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm text-center p-2">
+                                                                <span className="bg-purple-600 hover:bg-purple-500 text-white text-[9px] font-bold px-2 py-1.5 rounded uppercase tracking-wider transition-colors shadow-lg">
+                                                                    + Add to Sequence
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                            )
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {sidebarTab === "exports" && (
+                                <div className="flex flex-col gap-3">
+                                    {isLoadingAssets ? (
+                                        <div className="flex justify-center py-10"><LoadingSpinner /></div>
+                                    ) : projectAssets.filter((a: any) => a.aspectRatio === "EXPORTED_VIDEO").length === 0 ? (
+                                        <div className="text-center text-gray-500 text-xs py-10 border-2 border-dashed border-white/5 rounded-2xl">
+                                            <span className="text-3xl mb-2 block">🎬</span>
+                                            No exported videos yet. Click "Export Video" to render your sequence.
+                                        </div>
+                                    ) : (
+                                        projectAssets.filter((a: any) => a.aspectRatio === "EXPORTED_VIDEO").map((asset: any) => (
+                                            <div key={asset.id} className="bg-black/40 border border-white/10 rounded-xl overflow-hidden group">
+                                                <div className="aspect-video relative bg-black">
+                                                    <video src={getCORSProxyUrl(asset.url)} className="w-full h-full object-contain" controls />
+                                                </div>
+                                                <div className="p-3 flex items-center justify-between">
+                                                    <div className="text-[10px] text-gray-400 font-mono">
+                                                        {new Date(asset.createdAt).toLocaleDateString()}
+                                                    </div>
+                                                    <a
+                                                        href={getCORSProxyUrl(asset.url)}
+                                                        download={`Render_${asset.id}.mp4`}
+                                                        target="_blank"
+                                                        className="text-xs font-bold text-cyan-400 hover:text-cyan-300"
+                                                    >
+                                                        Download
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* PREVIEW VIEWPORT */}
+                <div className="flex-1 bg-black relative flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
+                    <button
+                        onClick={() => setSidebarOpen(!sidebarOpen)}
+                        className="absolute top-4 left-4 z-10 w-8 h-8 bg-white/5 hover:bg-white/10 rounded-lg flex items-center justify-center border border-white/10 text-gray-400 transition-colors"
+                    >
+                        {sidebarOpen ? (
+                            <svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
                         ) : (
-                            <svg className="w-6 h-6 ml-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                            <svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
                         )}
                     </button>
-                    <button className="text-gray-500 hover:text-white transition-colors" onClick={() => handleSeek(currentTime + 5000)}>
-                        <svg className="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 19 22 12 13 5 13 19"></polygon><polygon points="2 19 11 12 2 5 2 19"></polygon></svg>
-                    </button>
-                </div>
-            </div>
-        </div>
-      </div>
 
-      {/* TIMELINE AREA */}
-      <div className="h-48 sm:h-56 bg-[#141414] border-t border-white/10 flex flex-col shrink-0">
-        <div className="h-10 border-b border-white/5 flex items-center px-4 justify-between bg-[#1a1a1a]">
-            <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Zoom</span>
-                    <input 
-                        type="range" 
-                        min="1" 
-                        max="10" 
-                        step="0.1"
-                        value={zoom}
-                        onChange={(e) => setZoom(parseFloat(e.target.value))}
-                        className="w-24 accent-cyan-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
-                    />
-                </div>
-                <div className="h-4 w-[1px] bg-white/10"></div>
-                <div className="text-[10px] font-mono text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded">
-                    {formatTime(currentTime)}
-                </div>
-            </div>
+                    {/* Viewport Ratio Switcher */}
+                    <div className="absolute top-4 right-4 z-10 flex gap-1 bg-black/50 backdrop-blur-md p-1 rounded-lg border border-white/10">
+                        {[
+                            { id: "16:9", icon: "▭", label: "Landscape" },
+                            { id: "9:16", icon: "▯", label: "Portrait" },
+                            { id: "1:1", icon: "□", label: "Square" },
+                        ].map((ratio) => (
+                            <button
+                                key={ratio.id}
+                                onClick={() => setViewportRatio(ratio.id as any)}
+                                className={`px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-1 ${viewportRatio === ratio.id ? "bg-cyan-600 text-white" : "text-gray-400 hover:text-white hover:bg-white/10"
+                                    }`}
+                                title={ratio.label}
+                            >
+                                <span>{ratio.icon}</span>
+                                <span className="hidden sm:inline">{ratio.id}</span>
+                            </button>
+                        ))}
+                    </div>
 
-            <div className="flex items-center gap-2">
-                {sequence.find(i => i.id === selectedItemId)?.type === "VIDEO" && (
-                    <select 
-                        value={sequence.find(i => i.id === selectedItemId)?.speed || 1}
-                        onChange={(e) => {
-                            const speed = parseFloat(e.target.value);
-                            setSequence(prev => prev.map(item => item.id === selectedItemId ? { ...item, speed } : item));
-                        }}
-                        className="bg-gray-900 border border-white/10 text-[10px] text-cyan-400 font-bold uppercase tracking-widest rounded px-2 py-1 outline-none cursor-pointer"
-                        title="Playback Speed"
-                    >
-                        <option value="0.5">0.5x Speed</option>
-                        <option value="1">1.0x Speed</option>
-                        <option value="2">2.0x Speed</option>
-                        <option value="4">4.0x Speed</option>
-                        <option value="8">8.0x Speed</option>
-                    </select>
-                )}
-                <button onClick={handleSplit} className="text-[10px] font-bold text-gray-500 hover:text-white transition-colors uppercase tracking-widest px-3 py-1 bg-white/5 rounded hover:bg-white/10">✂ Split</button>
-                <button onClick={handleDeleteSelected} className="text-[10px] font-bold text-red-500/70 hover:text-red-400 transition-colors uppercase tracking-widest px-3 py-1 bg-red-500/10 rounded hover:bg-red-500/20">🗑 Delete</button>
-            </div>
-        </div>
-
-        {/* Tracks */}
-        <div className="flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar-h" style={{ scrollBehavior: 'smooth' }}>
-            <div 
-                ref={timelineRef}
-                className="h-full relative py-6"
-                style={{ width: `${Math.max(100, (totalDuration / 100) * zoom)}%`, minWidth: '100%', paddingRight: '100px' }}
-                onMouseDown={handleTimelineMouseDown}
-            >
-                {/* Time Rulers */}
-                <div className="absolute top-0 left-0 right-0 h-4 flex items-end opacity-20 pointer-events-none">
-                    {Array.from({ length: Math.ceil(totalDuration / 1000) + 1 }).map((_, i) => (
-                        <div key={i} className="border-l border-white h-2 flex-shrink-0" style={{ width: `${(1000 / totalDuration) * 100}%` }}>
-                            <span className="text-[8px] ml-1">{i}s</span>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Primary Video Track */}
-                <div className="relative h-24 bg-white/5 rounded-xl flex items-center px-0 group/track">
-                    {sequence.map((item, idx) => (
-                        <div 
-                            key={item.id}
-                            draggable
-                            onDragStart={() => setDraggedItemIndex(idx)}
-                            onDragOver={(e) => e.preventDefault()}
-                            onDrop={(e) => {
-                                e.preventDefault();
-                                if (draggedItemIndex === null || draggedItemIndex === idx) return;
-                                setSequence(prev => {
-                                    const newSeq = [...prev];
-                                    const [movedItem] = newSeq.splice(draggedItemIndex, 1);
-                                    newSeq.splice(idx, 0, movedItem);
-                                    return newSeq;
-                                });
-                                setDraggedItemIndex(null);
+                    <div className="relative w-full h-full flex flex-col items-center justify-center pt-8">
+                        <div
+                            className="relative bg-[#050505] rounded-lg overflow-hidden border border-white/5 shadow-[0_0_50px_rgba(0,0,0,0.5)] flex items-center justify-center group transition-all duration-500"
+                            style={{
+                                width: viewportRatio === "16:9" ? "100%" : viewportRatio === "9:16" ? "auto" : "auto",
+                                height: viewportRatio === "16:9" ? "auto" : "100%",
+                                aspectRatio: viewportRatio === "16:9" ? "16/9" : viewportRatio === "9:16" ? "9/16" : "1/1",
+                                maxHeight: "100%",
+                                maxWidth: "100%"
                             }}
-                            onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
-                            className={`h-20 border-r border-black/50 overflow-hidden relative group/clip transition-all cursor-pointer hover:opacity-80 ${
-                                selectedItemId === item.id ? 'ring-2 ring-purple-500 ring-inset z-10' : 
-                                itemStartIndex === idx ? 'ring-2 ring-cyan-500 ring-inset' : ''
-                            } ${draggedItemIndex === idx ? 'opacity-50 grayscale' : ''}`}
-                            style={{ width: `${((item.duration || 3000) / totalDuration) * 100}%` }}
                         >
-                            {item.type === "VIDEO" ? (
-                                <video src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover opacity-50" />
-                            ) : (
-                                <img src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover opacity-50" />
-                            )}
-                            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/40"></div>
-                            <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center pointer-events-none">
-                                <span className="text-[9px] font-bold text-white/80 truncate drop-shadow-md">{item.title || "Clip"}</span>
-                                <span className="text-[8px] text-white/40 font-mono">{Math.round((item.duration || 3000) / 1000)}s</span>
-                            </div>
-
-                            {/* Drag Handles (Visible when selected) */}
-                            {selectedItemId === item.id && (
+                            {currentItem ? (
                                 <>
-                                    <div 
-                                        className="absolute left-0 top-0 bottom-0 w-2 bg-purple-500 cursor-ew-resize hover:w-3 transition-all z-20 flex items-center justify-center opacity-80 hover:opacity-100"
-                                        onMouseDown={(e) => handleEdgeDrag(e, item.id, 'left')}
-                                    >
-                                        <div className="w-[1px] h-4 bg-white/50"></div>
+                                    {currentItem.type === "VIDEO" ? (
+                                        <>
+                                            <video
+                                                ref={player1Ref}
+                                                className="w-full h-full object-contain absolute inset-0 z-10"
+                                                muted
+                                                playsInline
+                                                crossOrigin="anonymous"
+                                            />
+                                            <video
+                                                ref={player2Ref}
+                                                className="w-full h-full object-contain absolute inset-0 z-0 opacity-0 pointer-events-none"
+                                                muted
+                                                playsInline
+                                                crossOrigin="anonymous"
+                                            />
+                                        </>
+                                    ) : (
+                                        <img
+                                            src={getCORSProxyUrl(currentItem.url)}
+                                            className="w-full h-full object-contain absolute inset-0 z-10"
+                                            crossOrigin="anonymous"
+                                        />
+                                    )}                        </>
+                            ) : (
+                                <div className="text-center">
+                                    <span className="text-5xl block mb-4 opacity-20">🎬</span>
+                                    <p className="text-gray-500 font-medium">No media selected</p>
+                                </div>
+                            )}
+
+                            {/* Play Overlay */}
+                            {!isPlaying && currentItem && (
+                                <button
+                                    onClick={handleTogglePlay}
+                                    className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/30 transition-all duration-300 group-hover:bg-black/40"
+                                >
+                                    <div className="w-24 h-24 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center scale-90 group-hover:scale-100 transition-transform shadow-2xl text-white">
+                                        <svg className="w-10 h-10 ml-2 drop-shadow-lg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>
                                     </div>
-                                    <div 
-                                        className="absolute right-0 top-0 bottom-0 w-2 bg-purple-500 cursor-ew-resize hover:w-3 transition-all z-20 flex items-center justify-center opacity-80 hover:opacity-100"
-                                        onMouseDown={(e) => handleEdgeDrag(e, item.id, 'right')}
-                                    >
-                                        <div className="w-[1px] h-4 bg-white/50"></div>
-                                    </div>
-                                </>
+                                </button>
                             )}
                         </div>
-                    ))}
-                    
-                    {sequence.length === 0 && (
-                        <div className="absolute inset-0 flex items-center justify-center text-gray-700 text-[10px] font-black uppercase tracking-[0.2em]">
-                            Drop media here to start editing
-                        </div>
-                    )}
-                </div>
 
-                {/* Audio Track Container */}
-                <div className="relative h-12 bg-white/5 mx-2 mt-2 rounded-xl flex items-center group/track border border-dashed border-white/10">
-                    {audioTracks?.map((audio) => (
-                        <div 
-                            key={audio.id}
-                            className="absolute h-10 top-1 bg-emerald-600/30 border border-emerald-500/50 rounded-md overflow-hidden flex items-center px-2"
-                            style={{ 
-                                left: `${(audio.startTime / totalDuration) * 100}%`,
-                                width: `${(audio.duration / totalDuration) * 100}%` 
-                            }}
-                        >
-                            <span className="text-[9px] font-bold text-emerald-300 truncate">🎵 {audio.title}</span>
+                        {/* Player Controls */}
+                        <div className="h-16 flex items-center justify-center gap-8 mt-4">
+                            <button className="text-gray-500 hover:text-white transition-colors" onClick={() => handleSeek(currentTime - 5000)}>
+                                <svg className="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 19 2 12 11 5 11 19"></polygon><polygon points="22 19 13 12 22 5 22 19"></polygon></svg>
+                            </button>
+                            <button
+                                onClick={handleTogglePlay}
+                                className="w-14 h-14 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 transition-transform shadow-xl shadow-white/10"
+                            >
+                                {isPlaying ? (
+                                    <svg className="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                                ) : (
+                                    <svg className="w-6 h-6 ml-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                                )}
+                            </button>
+                            <button className="text-gray-500 hover:text-white transition-colors" onClick={() => handleSeek(currentTime + 5000)}>
+                                <svg className="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 19 22 12 13 5 13 19"></polygon><polygon points="2 19 11 12 2 5 2 19"></polygon></svg>
+                            </button>
                         </div>
-                    ))}
-                    
-                    {(!audioTracks || audioTracks.length === 0) && (
-                         <div className="absolute inset-0 flex items-center justify-center text-gray-700 text-[9px] font-black uppercase tracking-[0.2em] pointer-events-none">
-                            Drop audio here
-                        </div>
-                    )}
-                </div>
-
-                {/* Playhead Scrubber */}
-                <div 
-                    className="absolute top-0 bottom-0 w-[2px] bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.8)] z-20 pointer-events-none transition-transform duration-100 ease-linear"
-                    style={{ left: `${(currentTime / totalDuration) * 100}%`, transform: 'translateX(-1px)' }}
-                >
-                    <div className="w-3 h-3 bg-cyan-500 rounded-full -ml-[5.5px] -mt-1 shadow-lg"></div>
+                    </div>
                 </div>
             </div>
-        </div>
-      </div>
 
-      <style>{`
+            {/* TIMELINE AREA */}
+            <div className="h-48 sm:h-56 bg-[#141414] border-t border-white/10 flex flex-col shrink-0">
+                <div className="h-10 border-b border-white/5 flex items-center px-4 justify-between bg-[#1a1a1a]">
+                    <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Zoom</span>
+                            <input
+                                type="range"
+                                min="1"
+                                max="10"
+                                step="0.1"
+                                value={zoom}
+                                onChange={(e) => setZoom(parseFloat(e.target.value))}
+                                className="w-24 accent-cyan-500 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer"
+                            />
+                        </div>
+                        <div className="h-4 w-[1px] bg-white/10"></div>
+                        <div className="text-[10px] font-mono text-cyan-400 font-bold bg-cyan-500/10 px-2 py-0.5 rounded">
+                            {formatTime(currentTime)}
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        {sequence.find(i => i.id === selectedItemId)?.type === "VIDEO" && (
+                            <select
+                                value={sequence.find(i => i.id === selectedItemId)?.speed || 1}
+                                onChange={(e) => {
+                                    const speed = parseFloat(e.target.value);
+                                    setSequence(prev => prev.map(item => item.id === selectedItemId ? { ...item, speed } : item));
+                                }}
+                                className="bg-gray-900 border border-white/10 text-[10px] text-cyan-400 font-bold uppercase tracking-widest rounded px-2 py-1 outline-none cursor-pointer"
+                                title="Playback Speed"
+                            >
+                                <option value="0.5">0.5x Speed</option>
+                                <option value="1">1.0x Speed</option>
+                                <option value="2">2.0x Speed</option>
+                                <option value="4">4.0x Speed</option>
+                                <option value="8">8.0x Speed</option>
+                            </select>
+                        )}
+                        <button onClick={handleSplit} className="text-[10px] font-bold text-gray-500 hover:text-white transition-colors uppercase tracking-widest px-3 py-1 bg-white/5 rounded hover:bg-white/10">✂ Split</button>
+                        <button onClick={handleDeleteSelected} className="text-[10px] font-bold text-red-500/70 hover:text-red-400 transition-colors uppercase tracking-widest px-3 py-1 bg-red-500/10 rounded hover:bg-red-500/20">🗑 Delete</button>
+                    </div>
+                </div>
+
+                {/* Tracks */}
+                <div className="flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar-h" style={{ scrollBehavior: 'smooth' }}>
+                    <div
+                        ref={timelineRef}
+                        className="h-full relative py-6"
+                        style={{ width: `${Math.max(100, (totalDuration / 100) * zoom)}%`, minWidth: '100%', paddingRight: '100px' }}
+                        onMouseDown={handleTimelineMouseDown}
+                    >
+                        {/* Time Rulers */}
+                        <div className="absolute top-0 left-0 right-0 h-4 flex items-end opacity-20 pointer-events-none">
+                            {Array.from({ length: Math.ceil(totalDuration / 1000) + 1 }).map((_, i) => (
+                                <div key={i} className="border-l border-white h-2 flex-shrink-0" style={{ width: `${(1000 / totalDuration) * 100}%` }}>
+                                    <span className="text-[8px] ml-1">{i}s</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Primary Video Track */}
+                        <div className="relative h-24 bg-white/5 rounded-xl flex items-center px-0 group/track">
+                            {sequence.map((item, idx) => (
+                                <div
+                                    key={item.id}
+                                    draggable
+                                    onDragStart={() => setDraggedItemIndex(idx)}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        if (draggedItemIndex === null || draggedItemIndex === idx) return;
+                                        setSequence(prev => {
+                                            const newSeq = [...prev];
+                                            const [movedItem] = newSeq.splice(draggedItemIndex, 1);
+                                            newSeq.splice(idx, 0, movedItem);
+                                            return newSeq;
+                                        });
+                                        setDraggedItemIndex(null);
+                                    }}
+                                    onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
+                                    className={`h-20 border-r border-black/50 overflow-hidden relative group/clip transition-all cursor-pointer hover:opacity-80 ${selectedItemId === item.id ? 'ring-2 ring-purple-500 ring-inset z-10' :
+                                        itemStartIndex === idx ? 'ring-2 ring-cyan-500 ring-inset' : ''
+                                        } ${draggedItemIndex === idx ? 'opacity-50 grayscale' : ''}`}
+                                    style={{ width: `${((item.duration || 3000) / totalDuration) * 100}%` }}
+                                >
+                                    {item.type === "VIDEO" ? (
+                                        <video src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover opacity-50" />
+                                    ) : (
+                                        <img src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover opacity-50" />
+                                    )}
+                                    <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/40"></div>
+                                    <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center pointer-events-none">
+                                        <span className="text-[9px] font-bold text-white/80 truncate drop-shadow-md">{item.title || "Clip"}</span>
+                                        <span className="text-[8px] text-white/40 font-mono">{Math.round((item.duration || 3000) / 1000)}s</span>
+                                    </div>
+
+                                    {/* Drag Handles (Visible when selected) */}
+                                    {selectedItemId === item.id && (
+                                        <>
+                                            <div
+                                                className="absolute left-0 top-0 bottom-0 w-2 bg-purple-500 cursor-ew-resize hover:w-3 transition-all z-20 flex items-center justify-center opacity-80 hover:opacity-100"
+                                                onMouseDown={(e) => handleEdgeDrag(e, item.id, 'left')}
+                                            >
+                                                <div className="w-[1px] h-4 bg-white/50"></div>
+                                            </div>
+                                            <div
+                                                className="absolute right-0 top-0 bottom-0 w-2 bg-purple-500 cursor-ew-resize hover:w-3 transition-all z-20 flex items-center justify-center opacity-80 hover:opacity-100"
+                                                onMouseDown={(e) => handleEdgeDrag(e, item.id, 'right')}
+                                            >
+                                                <div className="w-[1px] h-4 bg-white/50"></div>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            ))}
+
+                            {sequence.length === 0 && (
+                                <div className="absolute inset-0 flex items-center justify-center text-gray-700 text-[10px] font-black uppercase tracking-[0.2em]">
+                                    Drop media here to start editing
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Audio Track Container */}
+                        <div className="relative h-12 bg-white/5 mx-2 mt-2 rounded-xl flex items-center group/track border border-dashed border-white/10">
+                            {audioTracks?.map((audio) => (
+                                <div
+                                    key={audio.id}
+                                    className="absolute h-10 top-1 bg-emerald-600/30 border border-emerald-500/50 rounded-md overflow-hidden flex items-center px-2"
+                                    style={{
+                                        left: `${(audio.startTime / totalDuration) * 100}%`,
+                                        width: `${(audio.duration / totalDuration) * 100}%`
+                                    }}
+                                >
+                                    <span className="text-[9px] font-bold text-emerald-300 truncate">🎵 {audio.title}</span>
+                                </div>
+                            ))}
+
+                            {(!audioTracks || audioTracks.length === 0) && (
+                                <div className="absolute inset-0 flex items-center justify-center text-gray-700 text-[9px] font-black uppercase tracking-[0.2em] pointer-events-none">
+                                    Drop audio here
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Playhead Scrubber */}
+                        <div
+                            className="absolute top-0 bottom-0 w-[2px] bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.8)] z-20 pointer-events-none transition-transform duration-100 ease-linear"
+                            style={{ left: `${(currentTime / totalDuration) * 100}%`, transform: 'translateX(-1px)' }}
+                        >
+                            <div className="w-3 h-3 bg-cyan-500 rounded-full -ml-[5.5px] -mt-1 shadow-lg"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
@@ -1138,6 +1136,6 @@ export function FullscreenVideoEditor({
             animation: pulse-slow 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
       `}</style>
-    </div>
-  );
+        </div>
+    );
 }

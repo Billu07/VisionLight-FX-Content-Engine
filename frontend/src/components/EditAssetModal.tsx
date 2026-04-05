@@ -482,7 +482,7 @@ export function EditAssetModal({
           {/* EDITOR TITLE BAR */}
           <div className="w-full bg-black border-b border-gray-800 p-3 sm:p-4 flex justify-center items-center z-30 shadow-md shrink-0">
             <div className="text-white px-6 py-1.5 rounded-full font-bold tracking-widest text-xs sm:text-sm border border-white/10 bg-gray-800/80 shadow-inner flex items-center gap-2">
-              {activeTab === "pro" && "PRO FX"}
+              {activeTab === "pro" && "PicFX Editor"}
               {activeTab === "convert" && "Convert FX"}
               {activeTab === "drift" && (
                 <div className="flex items-center gap-2">
@@ -645,7 +645,7 @@ export function EditAssetModal({
           <div className="p-4 border-b border-gray-800 bg-gray-950">
             <div className="flex bg-gray-900 p-1 rounded-xl">
               {[
-                { id: "pro", label: "Pro" },
+                { id: "pro", label: "PicFX" },
                 { id: "convert", label: "Convert" },
                 { id: "drift", label: <div className="flex items-center gap-2"><img src={drift_icon} alt="3DX" className="h-3 w-auto" /></div> },
               ].map((mode) => (
