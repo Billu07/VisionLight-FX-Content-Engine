@@ -45,6 +45,7 @@ export function EditAssetModal({
   );
 
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   const [isCropping, setIsCropping] = useState(false);
@@ -337,6 +338,7 @@ export function EditAssetModal({
   };
 
   const handleSuccess = (newAsset: Asset) => {
+    setIsImageLoading(true);
     const newHistory = history.slice(0, currentIndex + 1);
     newHistory.push(newAsset);
     setHistory(newHistory);
@@ -592,7 +594,7 @@ export function EditAssetModal({
                     </div>
                   )}
 
-                {isProcessing && (
+                {(isProcessing || isImageLoading) && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30 backdrop-blur-sm">
                     <div className="flex flex-col items-center gap-4 w-full max-w-sm px-6">
                       {activeTab === "drift" && driftPostId ? (
@@ -604,7 +606,7 @@ export function EditAssetModal({
                         <>
                           <LoadingSpinner size="lg" variant="neon" />
                           <span className="text-cyan-300 font-bold animate-pulse mt-4">
-                            {driftStatusMsg}
+                            {isImageLoading ? "Loading Image..." : driftStatusMsg}
                           </span>
                         </>
                       )}
