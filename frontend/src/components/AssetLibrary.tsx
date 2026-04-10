@@ -88,7 +88,6 @@ export function AssetLibrary({
   }, [storyboardIds, isStoryboardLoaded, activeProject]);
 
   // UI States
-  const [isMinimized, setIsMinimized] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);

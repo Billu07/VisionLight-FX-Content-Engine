@@ -49,6 +49,7 @@ export function EditAssetModal({
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   const [isCropping, setIsCropping] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
   const [cropAspect, setCropAspect] = useState<number | undefined>(undefined);
@@ -447,11 +448,11 @@ export function EditAssetModal({
   const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const { width, height } = e.currentTarget;
     if (width && height) {
-      if (cropAspect) {
-        setCrop(centerCrop(makeAspectCrop({ unit: '%', width: 90 }, cropAspect, width, height), width, height));
-      } else {
-        setCrop(centerCrop(makeAspectCrop({ unit: '%', width: 90 }, 1, width, height), width, height));
-      }
+      const aspect = cropAspect || 1;
+      const initialCrop = makeAspectCrop({ unit: '%', width: 100 }, aspect, width, height);
+      initialCrop.x = 0;
+      initialCrop.y = 0;
+      setCrop(initialCrop);
     }
   };
 
@@ -459,25 +460,58 @@ export function EditAssetModal({
     if (isCropping && imgRef.current) {
       const { width, height } = imgRef.current;
       if (width && height) {
-        if (cropAspect) {
-          setCrop(centerCrop(makeAspectCrop({ unit: '%', width: 90 }, cropAspect, width, height), width, height));
-        } else {
-          setCrop(centerCrop(makeAspectCrop({ unit: '%', width: 90 }, 1, width, height), width, height));
-        }
+        const aspect = cropAspect || 1;
+        const initialCrop = makeAspectCrop({ unit: '%', width: 100 }, aspect, width, height);
+        initialCrop.x = 0;
+        initialCrop.y = 0;
+        setCrop(initialCrop);
       }
     }
   }, [cropAspect, isCropping]);
+
+  const isRendering = isProcessing || isImageLoading || isEnhancing || isConverting;
+
+  if (isMinimized) {
+    return (
+      <div 
+        className="fixed bottom-4 right-4 z-[140] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-gray-800 transition-colors animate-in slide-in-from-bottom-5"
+        onClick={() => setIsMinimized(false)}
+      >
+        <div className="flex flex-col">
+          <span className="text-white font-bold text-sm">🎨 Editor Running</span>
+          <span className="text-purple-400 text-xs font-mono tracking-widest animate-pulse">{isRendering ? driftStatusMsg : "Running in background..."}</span>
+        </div>
+        <button 
+          onClick={(e) => { 
+            e.stopPropagation(); 
+            onClose(); 
+          }} 
+          className="text-gray-400 hover:text-red-500 font-bold ml-2 p-2"
+        >
+          ✕
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/95 p-4 backdrop-blur-md">
       <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-6xl flex flex-col md:flex-row overflow-hidden shadow-2xl h-[90vh] relative">
         {/* CLOSE BUTTON */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 left-4 z-50 bg-black/50 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors font-bold border border-white/20"
-        >
-          ✕
-        </button>
+        <div className="absolute top-4 left-4 z-50 flex gap-2">
+          <button
+            onClick={onClose}
+            className="bg-black/50 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors font-bold border border-white/20"
+          >
+            ✕
+          </button>
+          <button
+            onClick={() => setIsMinimized(true)}
+            className="bg-black/50 hover:bg-cyan-600 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors font-bold border border-white/20 pb-2"
+          >
+            _
+          </button>
+        </div>
 
         {/* LEFT: CANVAS */}
         <div className="flex-1 bg-black flex flex-col border-r border-gray-800 relative group overflow-hidden">
