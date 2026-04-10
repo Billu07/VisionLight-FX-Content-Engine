@@ -31,6 +31,7 @@ export function AssetLibrary({
   onClose,
   initialAspectRatio,
   isSequencerMode,
+  onEditAsset,
 }: AssetLibraryProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
