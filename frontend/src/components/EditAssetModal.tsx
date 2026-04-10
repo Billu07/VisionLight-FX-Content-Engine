@@ -229,13 +229,13 @@ export function EditAssetModal({
 
   // === MUTATION 1: TEXT EDIT ===
   const textEditMutation = useMutation({
-    mutationFn: async (customRatio?: string) => {
+    mutationFn: async ({ prompt: editPrompt, customRatio }: { prompt: string; customRatio?: string }) => {
       const rootId = currentAsset.originalAssetId || currentAsset.id;
       return apiEndpoints.editAsset({
         assetId: currentAsset.id,
         originalAssetId: rootId,
         assetUrl: currentAsset.url,
-        prompt: prompt,
+        prompt: editPrompt,
         aspectRatio: customRatio || "original",
         referenceUrl: referenceAsset?.url,
         mode: activeTab as "standard" | "pro",
@@ -340,11 +340,11 @@ export function EditAssetModal({
 
   // === MUTATION 4: DRIFT START ===
   const driftStartMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ prompt: driftPrompt }: { prompt: string }) => {
       const activeProject = localStorage.getItem("visionlight_active_project") || undefined;
       return apiEndpoints.startDriftVideo({
         assetUrl: currentAsset.url,
-        prompt: prompt,
+        prompt: driftPrompt,
         horizontal: driftParams.horizontal,
         vertical: driftParams.vertical,
         zoom: driftParams.zoom,
@@ -457,7 +457,7 @@ export function EditAssetModal({
       ratioMutation.mutate(convertTargetRatio);
     } else {
       if (!prompt.trim()) return alert("Please enter a prompt");
-      textEditMutation.mutate(convertTargetRatio);
+      textEditMutation.mutate({ prompt: prompt.trim(), customRatio: convertTargetRatio });
     }
   };
 
@@ -1046,7 +1046,7 @@ export function EditAssetModal({
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
-                        if (prompt.trim()) textEditMutation.mutate(undefined);
+                        if (prompt.trim()) textEditMutation.mutate({ prompt: prompt.trim() });
                       }
                     }}
                   />
@@ -1255,7 +1255,7 @@ export function EditAssetModal({
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
-                        driftStartMutation.mutate();
+                        if (prompt.trim()) driftStartMutation.mutate({ prompt: prompt.trim() });
                       }
                     }}
                   />
@@ -1312,8 +1312,11 @@ export function EditAssetModal({
               </>
             ) : activeTab === "drift" ? (
               <button
-                onClick={() => driftStartMutation.mutate()}
-                className="w-full py-4 bg-gradient-to-r from-violet-900 to-violet-900 rounded-xl text-white font-bold hover:shadow-lg flex items-center justify-center gap-3"
+                onClick={() => {
+                  if (prompt.trim()) driftStartMutation.mutate({ prompt: prompt.trim() });
+                }}
+                disabled={!prompt.trim()}
+                className="w-full py-4 bg-gradient-to-r from-violet-900 to-violet-900 rounded-xl text-white font-bold hover:shadow-lg flex items-center justify-center gap-3 disabled:opacity-50"
               >
                   <>
                     <img src={drift_icon} alt="Logo" className="h-2 w-auto" />
@@ -1324,7 +1327,7 @@ export function EditAssetModal({
               null // Convert button is in the UI block above
             ) : (
               <button
-                onClick={() => textEditMutation.mutate(undefined)}
+                onClick={() => textEditMutation.mutate({ prompt: prompt.trim() })}
                 disabled={!prompt.trim()}
                 className="w-full py-4 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
               >
