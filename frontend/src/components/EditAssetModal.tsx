@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import ReactCrop, { type Crop, type PixelCrop, centerCrop, makeAspectCrop } from "react-image-crop";
+import ReactCrop, { type Crop, type PixelCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
 import { useAuth } from "../hooks/useAuth"; // 👈 Added this

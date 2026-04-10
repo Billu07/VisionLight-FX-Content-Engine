@@ -440,29 +440,6 @@ export function AssetLibrary({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedAsset, filteredAssets]);
 
-  if (isMinimized) {
-    return (
-      <div 
-        className="fixed bottom-4 right-4 z-[110] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-gray-800 transition-colors animate-in slide-in-from-bottom-5"
-        onClick={() => setIsMinimized(false)}
-      >
-        <div className="flex flex-col">
-          <span className="text-white font-bold text-sm">📚 Asset Library</span>
-          <span className="text-cyan-400 text-xs font-mono tracking-widest animate-pulse">Running in background...</span>
-        </div>
-        <button 
-          onClick={(e) => { 
-            e.stopPropagation(); 
-            onClose(); 
-          }} 
-          className="text-gray-400 hover:text-red-500 font-bold ml-2 p-2"
-        >
-          ✕
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black sm:bg-black/95 sm:p-4 backdrop-blur-md">
       <div className="bg-gray-900 w-full h-full sm:max-w-6xl sm:h-[85vh] sm:rounded-2xl border-0 sm:border border-gray-700 flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
@@ -476,22 +453,13 @@ export function AssetLibrary({
               Manage your assets
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsMinimized(true)}
-              className="text-gray-400 hover:text-cyan-400 text-xl p-2 font-bold flex items-center justify-center transition-colors"
-              title="Minimize to Background"
-            >
-              <span className="mb-2">_</span>
-            </button>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-red-500 text-xl p-2 transition-colors"
-              title="Close"
-            >
-              ✕
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-red-500 text-xl p-2 transition-colors"
+            title="Close"
+          >
+            ✕
+          </button>
         </div>
 
         {/* CONTROLS */}
