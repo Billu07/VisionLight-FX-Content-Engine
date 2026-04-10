@@ -31,7 +31,7 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
   return (
     <div className="w-full h-full flex items-center justify-center">
       <img
-        src={getCORSProxyUrl(mediaUrl)}
+        src={getCORSProxyUrl(mediaUrl, 1920, 85)}
         alt="Generated content"
         className="max-w-full max-h-full object-contain shadow-2xl"
         loading="lazy"

@@ -968,7 +968,7 @@ function Dashboard() {
                 Array.isArray(previewMedia.url) ? (
                 <div className="flex flex-col items-center w-full h-full justify-center p-4">
                   <img
-                    src={previewMedia.url[previewCarouselIndex]}
+                    src={getCORSProxyUrl(previewMedia.url[previewCarouselIndex], 1920, 85)}
                     className="max-h-full max-w-full object-contain rounded-lg shadow-2xl"
                   />
                   {previewMedia.url.length > 1 && (
