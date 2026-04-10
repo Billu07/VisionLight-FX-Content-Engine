@@ -304,6 +304,25 @@ export const dbService = {
     return prisma.post.findUnique({ where: { id } });
   },
   async getUserPosts(userId: string, projectId?: string) {
+    // Lazy Cleanup: Automatically fail jobs older than 15 minutes that are stuck in 'PROCESSING' or 'NEW'
+    const timeout = new Date(Date.now() - 15 * 60 * 1000);
+    try {
+      await prisma.post.updateMany({
+        where: {
+          userId,
+          status: { in: ["PROCESSING", "NEW"] },
+          createdAt: { lt: timeout },
+        },
+        data: {
+          status: "FAILED",
+          error: "Job timed out (Automatic Cleanup)",
+          progress: 0,
+        },
+      });
+    } catch (e) {
+      console.error("Lazy cleanup failed:", e);
+    }
+
     return prisma.post.findMany({
       where: projectId ? {
         userId,

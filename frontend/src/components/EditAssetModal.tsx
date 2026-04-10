@@ -56,6 +56,15 @@ export function EditAssetModal({
 
   const [jobs, setJobs] = useState<BackgroundJob[]>([]);
   const [showJobsMenu, setShowJobsMenu] = useState(false);
+  const [lastJobId, setLastJobId] = useState<string | null>(null);
+
+  const triggerJobAdded = (job: BackgroundJob) => {
+    setJobs((prev) => [...prev, job]);
+    setLastJobId(job.id);
+    setPrompt(""); // Clear prompt to protect credits and give feedback
+    // Reset animation after 2s
+    setTimeout(() => setLastJobId(null), 2000);
+  };
 
   const [isImageLoading, setIsImageLoading] = useState(false);
   const [isCropping, setIsCropping] = useState(false);
@@ -234,7 +243,7 @@ export function EditAssetModal({
     },
     onMutate: () => {
       const id = Date.now().toString();
-      setJobs((prev) => [...prev, { id, type: "edit", status: "processing", message: "Editing text..." }]);
+      triggerJobAdded({ id, type: "edit", status: "processing", message: "Editing text..." });
       return { id };
     },
     onSuccess: (res: any, _variables, context) => {
@@ -264,7 +273,7 @@ export function EditAssetModal({
     },
     onMutate: () => {
       const id = Date.now().toString();
-      setJobs((prev) => [...prev, { id, type: "enhance", status: "processing", message: "Enhancing..." }]);
+      triggerJobAdded({ id, type: "enhance", status: "processing", message: "Enhancing..." });
       return { id };
     },
     onSuccess: (res: any, _variables, context) => {
@@ -310,7 +319,7 @@ export function EditAssetModal({
     },
     onMutate: () => {
       const id = Date.now().toString();
-      setJobs((prev) => [...prev, { id, type: "convert", status: "processing", message: "Converting..." }]);
+      triggerJobAdded({ id, type: "convert", status: "processing", message: "Converting..." });
       return { id };
     },
     onSuccess: (res: any, _variables, context) => {
@@ -346,7 +355,7 @@ export function EditAssetModal({
     },
     onMutate: () => {
       const id = Date.now().toString();
-      setJobs((prev) => [...prev, { id, type: "drift", status: "processing", message: "Initiating Drift Engine..." }]);
+      triggerJobAdded({ id, type: "drift", status: "processing", message: "Initiating Drift Engine..." });
       return { id };
     },
     onSuccess: (res: any, _variables, context) => {
@@ -381,7 +390,7 @@ export function EditAssetModal({
     }
     
     const id = Date.now().toString();
-    setJobs((prev) => [...prev, { id, type: "extract", status: "processing", message: "Extracting frame..." }]);
+    triggerJobAdded({ id, type: "extract", status: "processing", message: "Extracting frame..." });
 
     try {
       const res = await apiEndpoints.uploadAssetSync(formData);
@@ -477,7 +486,7 @@ export function EditAssetModal({
     );
 
     const id = Date.now().toString();
-    setJobs((prev) => [...prev, { id, type: "crop", status: "processing", message: "Cropping..." }]);
+    triggerJobAdded({ id, type: "crop", status: "processing", message: "Cropping..." });
     setIsCropping(false);
     setCrop(undefined);
     setCompletedCrop(undefined);
@@ -753,9 +762,11 @@ export function EditAssetModal({
                 <button
                   onClick={() => setShowJobsMenu(!showJobsMenu)}
                   className={`text-[10px] px-3 py-1.5 rounded-lg border flex items-center gap-2 transition-all font-bold ${
+                    lastJobId ? "animate-bounce scale-110" : ""
+                  } ${
                     jobs.length > 0
                       ? jobs.some(j => j.status === 'ready')
-                        ? "bg-green-600/20 text-green-400 border-green-500/50 animate-pulse"
+                        ? "bg-green-600/20 text-green-400 border-green-500/50"
                         : "bg-blue-600/20 text-blue-400 border-blue-500/50"
                       : "bg-gray-800 text-gray-500 border-gray-700"
                   }`}
