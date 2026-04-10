@@ -55,6 +55,7 @@ export function EditAssetModal({
   );
 
   const [jobs, setJobs] = useState<BackgroundJob[]>([]);
+  const [showJobsMenu, setShowJobsMenu] = useState(false);
 
   const [isImageLoading, setIsImageLoading] = useState(false);
   const [isCropping, setIsCropping] = useState(false);
@@ -399,8 +400,14 @@ export function EditAssetModal({
 
   const handleSuccess = (newAsset: Asset) => {
     setIsImageLoading(true);
-    const newHistory = history.slice(0, currentIndex + 1);
-    newHistory.push(newAsset);
+    // If the new asset is already in history, just jump to it
+    const existingIndex = history.findIndex(a => a.id === newAsset.id);
+    if (existingIndex !== -1) {
+      setCurrentIndex(existingIndex);
+      if (activeTab !== "drift") setPrompt("");
+      return;
+    }
+    const newHistory = [...history, newAsset];
     setHistory(newHistory);
     setCurrentIndex(newHistory.length - 1);
     if (activeTab !== "drift") setPrompt("");
@@ -734,66 +741,96 @@ export function EditAssetModal({
                 )}
               </>
             )}
-            
-            {/* JOBS QUEUE FLOATING UI */}
-            <div className="absolute right-4 top-20 flex flex-col gap-2 z-40 max-w-xs">
-              {jobs.map((job) => (
-                <div
-                  key={job.id}
-                  className={`p-3 rounded-lg border shadow-lg cursor-pointer transition-all ${
-                    job.status === "processing"
-                      ? "bg-gray-800/90 border-blue-500/50 hover:bg-gray-800"
-                      : job.status === "ready"
-                      ? "bg-green-900/90 border-green-500 hover:bg-green-800/90"
-                      : "bg-red-900/90 border-red-500 hover:bg-red-800/90"
-                  }`}
-                  onClick={() => {
-                    if (job.status === "ready" && job.resultAsset) {
-                      if (job.type === "drift" && job.resultAsset.type === "VIDEO") {
-                         setDriftVideoUrl(job.resultAsset.url);
-                      } else {
-                         handleSuccess(job.resultAsset);
-                      }
-                      setJobs((prev) => prev.filter((j) => j.id !== job.id));
-                    }
-                  }}
-                >
-                  <div className="flex justify-between items-center mb-1 gap-4">
-                    <span className="text-xs font-bold text-white capitalize">
-                      {job.type} Job
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setJobs((prev) => prev.filter((j) => j.id !== job.id));
-                      }}
-                      className="text-gray-400 hover:text-white"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div className="text-[10px] text-gray-300">
-                    {job.status === "processing" ? (
-                      <div className="flex items-center gap-2">
-                         <LoadingSpinner size="sm" />
-                         {job.message || "Processing..."}
-                      </div>
-                    ) : job.status === "ready" ? (
-                      "Click to apply ✨"
-                    ) : (
-                      job.error || "Failed"
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
           </div>
         </div>
 
         {/* RIGHT: CONTROLS */}
-        <div className="w-full md:w-96 flex flex-col bg-gray-900">
-          <div className="p-4 border-b border-gray-800 bg-gray-950">
+        <div className="w-full md:w-96 flex flex-col bg-gray-900 relative">
+          <div className="p-4 border-b border-gray-800 bg-gray-950 flex flex-col gap-3">
+            <div className="flex justify-between items-center">
+              <span className="text-white font-bold text-xs uppercase tracking-widest text-gray-500">Editor Controls</span>
+              <div className="relative">
+                <button
+                  onClick={() => setShowJobsMenu(!showJobsMenu)}
+                  className={`text-[10px] px-3 py-1.5 rounded-lg border flex items-center gap-2 transition-all font-bold ${
+                    jobs.length > 0
+                      ? jobs.some(j => j.status === 'ready')
+                        ? "bg-green-600/20 text-green-400 border-green-500/50 animate-pulse"
+                        : "bg-blue-600/20 text-blue-400 border-blue-500/50"
+                      : "bg-gray-800 text-gray-500 border-gray-700"
+                  }`}
+                >
+                  {jobs.some(j => j.status === 'processing') ? <LoadingSpinner size="sm" variant="neon" /> : "📋"}
+                  Tasks ({jobs.length})
+                </button>
+
+                {/* JOBS DROPDOWN MENU */}
+                {showJobsMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-64 bg-gray-950 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden animate-in slide-in-from-top-2">
+                    <div className="p-3 border-b border-gray-800 flex justify-between items-center bg-gray-900">
+                      <span className="text-xs font-bold text-white">Active Tasks</span>
+                      <button onClick={() => setShowJobsMenu(false)} className="text-gray-500 hover:text-white">✕</button>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto p-2 space-y-2">
+                      {jobs.length === 0 ? (
+                        <div className="p-4 text-center text-xs text-gray-600">No active tasks</div>
+                      ) : (
+                        jobs.map((job) => (
+                          <div
+                            key={job.id}
+                            className={`p-2.5 rounded-lg border cursor-pointer transition-all ${
+                              job.status === "processing"
+                                ? "bg-gray-800/50 border-blue-500/30"
+                                : job.status === "ready"
+                                ? "bg-green-900/20 border-green-500/50 hover:bg-green-900/40"
+                                : "bg-red-900/20 border-red-500/50"
+                            }`}
+                            onClick={() => {
+                              if (job.status === "ready" && job.resultAsset) {
+                                if (job.type === "drift" && job.resultAsset.type === "VIDEO") {
+                                   setDriftVideoUrl(job.resultAsset.url);
+                                } else {
+                                   handleSuccess(job.resultAsset);
+                                }
+                                // setShowJobsMenu(false);
+                              }
+                            }}
+                          >
+                            <div className="flex justify-between items-center mb-1">
+                              <span className={`text-[10px] font-bold capitalize ${job.status === 'ready' ? 'text-green-400' : 'text-blue-400'}`}>
+                                {job.type} {job.status === 'ready' ? '✓' : ''}
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setJobs((prev) => prev.filter((j) => j.id !== job.id));
+                                }}
+                                className="text-gray-600 hover:text-red-400"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                            <div className="text-[10px] text-gray-400 truncate">
+                              {job.status === "processing" ? (
+                                <div className="flex items-center gap-2">
+                                   <LoadingSpinner size="sm" />
+                                   {job.message || "Processing..."}
+                                </div>
+                              ) : job.status === "ready" ? (
+                                <span className="text-green-300 font-medium">Click to view result ✨</span>
+                              ) : (
+                                <span className="text-red-400">{job.error || "Failed"}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="flex bg-gray-900 p-1 rounded-xl">
               {[
                 { id: "pro", label: "PicFX" },
