@@ -856,6 +856,10 @@ function Dashboard() {
             initialAspectRatio={
               librarySource === "top" ? "original" : getCurrentRatioForLibrary()
             }
+            onEditAsset={(asset) => {
+              setEditingAsset(asset);
+              // setActiveLibrarySlot(null); // Keep library open underneath so when they minimize, they see where they were
+            }}
           />
         )}
 

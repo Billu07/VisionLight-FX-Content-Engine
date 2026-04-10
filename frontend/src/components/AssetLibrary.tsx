@@ -23,6 +23,7 @@ interface AssetLibraryProps {
   onClose: () => void;
   initialAspectRatio?: string;
   isSequencerMode?: boolean;
+  onEditAsset?: (asset: Asset) => void;
 }
 
 export function AssetLibrary({
@@ -834,7 +835,11 @@ export function AssetLibrary({
                   )}
                   <button
                     onClick={() => {
-                      setEditingAsset(selectedAsset);
+                      if (onEditAsset) {
+                        onEditAsset(selectedAsset);
+                      } else {
+                        setEditingAsset(selectedAsset);
+                      }
                       setSelectedAsset(null);
                     }}
                     className={`w-full py-2 sm:py-3 border rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${activeDriftIds.has(selectedAsset.id) ? "bg-rose-600 text-white border-rose-500" : "bg-purple-600/20 text-purple-300 border-purple-500/50"}`}

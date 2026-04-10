@@ -548,9 +548,12 @@ function Dashboard() {
           onClose={() => setActiveLibrarySlot(null)}
           onSelect={handleAssetSelect}
           initialAspectRatio={getCurrentRatioForLibrary()}
+          onEditAsset={(asset) => {
+            setEditingAsset(asset);
+            // setActiveLibrarySlot(null);
+          }}
         />
       )}
-
       {/* EXTRACTOR MODAL */}
       {extractingVideoUrl && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 p-4 animate-in fade-in">
