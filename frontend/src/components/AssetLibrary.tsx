@@ -229,7 +229,7 @@ export function AssetLibrary({
   }
 
   const getAssetImageSrc = (asset: Asset) => {
-    const proxyUrl = getCORSProxyUrl(asset.url);
+    const proxyUrl = getCORSProxyUrl(asset.url, 400, 75);
     const separator = proxyUrl.includes('?') ? '&' : '?';
     return `${proxyUrl}${separator}v=${asset.createdAt}`;
   };

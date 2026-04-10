@@ -5,6 +5,7 @@ import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import axios from "axios";
 import archiver from "archiver";
+import sharp from "sharp";
 import { getCost, getTargetPool } from "./config/pricing";
 import { upload, uploadToCloudinary } from "./utils/fileUpload";
 import { ROIService } from "./services/roi";
@@ -92,22 +93,38 @@ app.get("/", (req, res) => {
 
 // ✅ Image Proxy to bypass R2 CORS
 app.get("/api/proxy-image", async (req, res) => {
-  const { url } = req.query;
+  const { url, w, q } = req.query;
   if (!url) return res.status(400).json({ error: "URL required" });
 
   try {
     const response = await axios({
       url: url as string,
       method: "GET",
-      responseType: "stream",
+      responseType: (w || q) ? "arraybuffer" : "stream",
       timeout: 15000,
     });
 
-    res.setHeader("Content-Type", response.headers["content-type"] || "image/jpeg");
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24h
-    
-    response.data.pipe(res);
+    if (w || q) {
+      let imageBuffer = response.data;
+      let sharpInstance = sharp(imageBuffer);
+
+      if (w) {
+        sharpInstance = sharpInstance.resize({ width: parseInt(w as string, 10), withoutEnlargement: true });
+      }
+
+      const quality = q ? parseInt(q as string, 10) : 80;
+      imageBuffer = await sharpInstance.webp({ quality }).toBuffer();
+
+      res.setHeader("Content-Type", "image/webp");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24h
+      res.send(imageBuffer);
+    } else {
+      res.setHeader("Content-Type", response.headers["content-type"] || "image/jpeg");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Cache-Control", "public, max-age=86400"); // Cache for 24h
+      response.data.pipe(res);
+    }
   } catch (error: any) {
     console.error("Proxy Error:", error.message);
     res.status(500).json({ error: "Failed to proxy image" });

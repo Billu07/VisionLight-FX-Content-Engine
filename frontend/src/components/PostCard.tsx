@@ -306,7 +306,7 @@ export function PostCard({
         >
           {slides.length > 0 && (
             <img
-              src={getCORSProxyUrl(slides[slideIndex])}
+              src={getCORSProxyUrl(slides[slideIndex], 400, 75)}
               alt="Carousel"
               className="w-full h-full object-cover"
             />
@@ -376,7 +376,7 @@ export function PostCard({
         onClick={onPreview}
       >
         <img
-          src={getCORSProxyUrl(getCleanUrl(post.mediaUrl))}
+          src={getCORSProxyUrl(getCleanUrl(post.mediaUrl), 400, 75)}
           alt={post.title}
           className="w-full h-full object-cover transition-transform hover:scale-105"
           onError={handleMediaError}
