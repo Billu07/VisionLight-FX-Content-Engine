@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import ReactCrop, { type Crop, type PixelCrop, makeAspectCrop } from "react-image-crop";
+import ReactCrop, { type Crop, type PixelCrop, makeAspectCrop, centerCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
@@ -532,10 +532,7 @@ export function EditAssetModal({
     const { width, height } = e.currentTarget;
     if (width && height) {
       const aspect = cropAspect || 1;
-      const initialCrop = makeAspectCrop({ unit: '%', width: 100 }, aspect, width, height);
-      initialCrop.x = 0;
-      initialCrop.y = 0;
-      setCrop(initialCrop);
+      setCrop(centerCrop(makeAspectCrop({ unit: '%', width: 100 }, aspect, width, height), width, height));
     }
   };
 
@@ -544,10 +541,7 @@ export function EditAssetModal({
       const { width, height } = imgRef.current;
       if (width && height) {
         const aspect = cropAspect || 1;
-        const initialCrop = makeAspectCrop({ unit: '%', width: 100 }, aspect, width, height);
-        initialCrop.x = 0;
-        initialCrop.y = 0;
-        setCrop(initialCrop);
+        setCrop(centerCrop(makeAspectCrop({ unit: '%', width: 100 }, aspect, width, height), width, height));
       }
     }
   }, [cropAspect, isCropping]);
