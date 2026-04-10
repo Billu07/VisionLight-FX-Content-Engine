@@ -3,11 +3,21 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import ReactCrop, { type Crop, type PixelCrop, makeAspectCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
-import { useAuth } from "../hooks/useAuth"; // 👈 Added this
+import { useAuth } from "../hooks/useAuth";
 import { DriftFrameExtractor } from "./DriftFrameExtractor";
 import { LoadingSpinner } from "./LoadingSpinner";
-import { ProgressBar } from "./ProgressBar";
 import drift_icon from "../assets/drift_icon.png";
+
+export interface BackgroundJob {
+  id: string;
+  type: string;
+  status: "processing" | "ready" | "failed";
+  progress?: number;
+  message?: string;
+  resultAsset?: any;
+  error?: string;
+  driftPostId?: string;
+}
 
 interface Asset {
   id: string;
@@ -44,10 +54,9 @@ export function EditAssetModal({
     initialTab || (initialVideoUrl ? "drift" : "pro"),
   );
 
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [jobs, setJobs] = useState<BackgroundJob[]>([]);
+
   const [isImageLoading, setIsImageLoading] = useState(false);
-  const [isEnhancing, setIsEnhancing] = useState(false);
-  const [isConverting, setIsConverting] = useState(false);
   const [isCropping, setIsCropping] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [crop, setCrop] = useState<Crop>();
@@ -69,7 +78,7 @@ export function EditAssetModal({
   const [editingPromptFxIndex, setEditingPromptFxIndex] = useState<number | null>(null);
   const [isUploadingInitial, setIsUploadingInitial] = useState(false);
 
-  const { systemPresets } = useAuth(); // 👈 Global presets from auth context
+  const { systemPresets } = useAuth();
 
   const { data: promptFxList = [] } = useQuery({
     queryKey: ["prompt-fx"],
@@ -129,9 +138,6 @@ export function EditAssetModal({
   const [driftVideoUrl, setDriftVideoUrl] = useState<string | null>(
     initialVideoUrl || null,
   );
-  const [driftStatusMsg, setDriftStatusMsg] = useState("Processing...");
-  const [driftProgress, setDriftProgress] = useState(0);
-  const [driftPostId, setDriftPostId] = useState<string | null>(null);
 
   const { data: allAssets = [] } = useQuery({
     queryKey: ["assets"],
@@ -146,64 +152,78 @@ export function EditAssetModal({
       `active_drift_post_${currentAsset.id}`,
     );
     if (pendingPostId) {
+      setJobs((prev) => {
+        if (prev.some((j) => j.driftPostId === pendingPostId)) return prev;
+        return [
+          ...prev,
+          {
+            id: `recovered_${pendingPostId}`,
+            type: "drift",
+            status: "processing",
+            message: "Recovering...",
+            driftPostId: pendingPostId,
+          }
+        ];
+      });
       setActiveTab("drift");
-      setDriftPostId(pendingPostId);
-      setIsProcessing(true);
     }
   }, [currentAsset?.id]);
 
   // 2. POLLING LOGIC
   useEffect(() => {
-    if (!driftPostId || !currentAsset) return;
+    const activeDriftJobs = jobs.filter((j) => j.type === "drift" && j.status === "processing" && j.driftPostId);
+    if (activeDriftJobs.length === 0 || !currentAsset) return;
 
     const interval = setInterval(async () => {
-      try {
-        const res = await apiEndpoints.getPostStatus(driftPostId);
-        const { status, progress, mediaUrl, error } = res.data;
+      for (const job of activeDriftJobs) {
+        if (!job.driftPostId) continue;
+        try {
+          const res = await apiEndpoints.getPostStatus(job.driftPostId);
+          const { status, progress, mediaUrl, error } = res.data;
 
-        if (status === "PROCESSING") {
-          setDriftStatusMsg(`Rendering Path... ${progress}%`);
-          setDriftProgress(progress);
-        } else if (status === "READY" || status === "COMPLETED") {
-          clearInterval(interval);
-          setDriftProgress(100);
-          setDriftStatusMsg("Loading Video...");
-
-          localStorage.removeItem(`active_drift_post_${currentAsset.id}`);
-          setDriftPostId(null);
-          setDriftVideoUrl(mediaUrl);
-          setIsProcessing(false);
-
-          queryClient.invalidateQueries({ queryKey: ["assets"] });
-        } else if (status === "FAILED") {
-          clearInterval(interval);
-          localStorage.removeItem(`active_drift_post_${currentAsset.id}`);
-          setDriftPostId(null);
-          setIsProcessing(false);
-          alert("Drift Generation Failed: " + (error || "Unknown error"));
-        }
-      } catch (e: any) {
-        if (e.message?.includes("404") || e.response?.status === 404) {
-          clearInterval(interval);
-          localStorage.removeItem(`active_drift_post_${currentAsset.id}`);
-          setDriftPostId(null);
-          setIsProcessing(false);
+          setJobs((prev) =>
+            prev.map((j) => {
+              if (j.id === job.id) {
+                if (status === "PROCESSING") {
+                  return { ...j, progress, message: `Rendering Path... ${progress}%` };
+                } else if (status === "READY" || status === "COMPLETED") {
+                  localStorage.removeItem(`active_drift_post_${currentAsset.id}`);
+                  return { 
+                    ...j, 
+                    status: "ready", 
+                    message: "Ready!", 
+                    progress: 100, 
+                    resultAsset: { ...currentAsset, url: mediaUrl, type: "VIDEO" } 
+                  };
+                } else if (status === "FAILED") {
+                  localStorage.removeItem(`active_drift_post_${currentAsset.id}`);
+                  return { ...j, status: "failed", error: error || "Generation failed" };
+                }
+              }
+              return j;
+            })
+          );
+        } catch (e: any) {
+          if (e.message?.includes("404") || e.response?.status === 404) {
+             setJobs((prev) =>
+              prev.map((j) => (j.id === job.id ? { ...j, status: "failed", error: "Not found" } : j))
+            );
+            localStorage.removeItem(`active_drift_post_${currentAsset.id}`);
+          }
         }
       }
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [driftPostId, currentAsset?.id, queryClient]);
+  }, [jobs, currentAsset?.id]);
 
   // === MUTATION 1: TEXT EDIT ===
   const textEditMutation = useMutation({
     mutationFn: async (customRatio?: string) => {
-      // ✅ Identify the root parent to ensure it leaves the "Originals" tab
       const rootId = currentAsset.originalAssetId || currentAsset.id;
-
       return apiEndpoints.editAsset({
         assetId: currentAsset.id,
-        originalAssetId: rootId, // 👈 Added this
+        originalAssetId: rootId,
         assetUrl: currentAsset.url,
         prompt: prompt,
         aspectRatio: customRatio || "original",
@@ -211,44 +231,67 @@ export function EditAssetModal({
         mode: activeTab as "standard" | "pro",
       });
     },
-    onMutate: () => setIsProcessing(true),
-    onSuccess: (res: any) => handleSuccess(res.data.asset),
-    onError: (err: any) => alert("Edit failed: " + err.message),
-    onSettled: () => setIsProcessing(false),
+    onMutate: () => {
+      const id = Date.now().toString();
+      setJobs((prev) => [...prev, { id, type: "edit", status: "processing", message: "Editing text..." }]);
+      return { id };
+    },
+    onSuccess: (res: any, _variables, context) => {
+      if (context?.id) {
+        setJobs((prev) =>
+          prev.map((j) => (j.id === context.id ? { ...j, status: "ready", resultAsset: res.data.asset, message: "Edit Ready" } : j))
+        );
+      }
+    },
+    onError: (err: any, _variables, context) => {
+      if (context?.id) {
+        setJobs((prev) =>
+          prev.map((j) => (j.id === context.id ? { ...j, status: "failed", error: err.message } : j))
+        );
+      }
+    },
   });
 
   // === MUTATION 2: ENHANCE ===
   const enhanceMutation = useMutation({
     mutationFn: async () => {
-      // ✅ Identify the root parent
       const rootId = currentAsset.originalAssetId || currentAsset.id;
-
       return apiEndpoints.enhanceAsset({
         assetUrl: currentAsset.url,
-        originalAssetId: rootId, // 👈 Added this
+        originalAssetId: rootId,
       });
     },
-    onMutate: () => setIsEnhancing(true),
-    onSuccess: (res: any) => {
-      handleSuccess(res.data.asset);
-      alert("Image Enhanced Successfully! ✨");
+    onMutate: () => {
+      const id = Date.now().toString();
+      setJobs((prev) => [...prev, { id, type: "enhance", status: "processing", message: "Enhancing..." }]);
+      return { id };
     },
-    onError: (err: any) => alert("Enhancement failed: " + err.message),
-    onSettled: () => setIsEnhancing(false),
+    onSuccess: (res: any, _variables, context) => {
+      if (context?.id) {
+        setJobs((prev) =>
+          prev.map((j) => (j.id === context.id ? { ...j, status: "ready", resultAsset: res.data.asset, message: "Enhance Ready" } : j))
+        );
+      }
+    },
+    onError: (err: any, _variables, context) => {
+       if (context?.id) {
+        setJobs((prev) =>
+          prev.map((j) => (j.id === context.id ? { ...j, status: "failed", error: err.message } : j))
+        );
+      }
+    },
   });
 
   // === MUTATION 3: RATIO CONVERSION (Auto Only) ===
   const ratioMutation = useMutation({
     mutationFn: async (targetRatio: string) => {
-      // 1. Fetch current image as Blob
       const response = await fetch(getCORSProxyUrl(currentAsset.url));
       const blob = await response.blob();
       const file = new File([blob], "convert.jpg", { type: "image/jpeg" });
 
-      // 2. Upload to Sync Endpoint
       const formData = new FormData();
       formData.append("image", file);
-      formData.append("raw", "false"); // Force Processing
+      formData.append("raw", "false");
       formData.append("aspectRatio", targetRatio);
 
       if (currentAsset.originalAssetId) {
@@ -265,17 +308,23 @@ export function EditAssetModal({
       return apiEndpoints.uploadAssetSync(formData);
     },
     onMutate: () => {
-      setIsProcessing(true);
-      setIsConverting(true);
-      setDriftStatusMsg("Creating Your View...");
+      const id = Date.now().toString();
+      setJobs((prev) => [...prev, { id, type: "convert", status: "processing", message: "Converting..." }]);
+      return { id };
     },
-    onSuccess: (res: any) => {
-      handleSuccess(res.data.asset);
+    onSuccess: (res: any, _variables, context) => {
+      if (context?.id) {
+        setJobs((prev) =>
+          prev.map((j) => (j.id === context.id ? { ...j, status: "ready", resultAsset: res.data.asset, message: "Convert Ready" } : j))
+        );
+      }
     },
-    onError: (err: any) => alert("Conversion failed: " + err.message),
-    onSettled: () => {
-      setIsProcessing(false);
-      setIsConverting(false);
+    onError: (err: any, _variables, context) => {
+      if (context?.id) {
+        setJobs((prev) =>
+          prev.map((j) => (j.id === context.id ? { ...j, status: "failed", error: err.message } : j))
+        );
+      }
     },
   });
 
@@ -295,18 +344,25 @@ export function EditAssetModal({
       });
     },
     onMutate: () => {
-      setIsProcessing(true);
-      setDriftStatusMsg("Initiating Drift Engine...");
-      setDriftProgress(5);
+      const id = Date.now().toString();
+      setJobs((prev) => [...prev, { id, type: "drift", status: "processing", message: "Initiating Drift Engine..." }]);
+      return { id };
     },
-    onSuccess: (res: any) => {
+    onSuccess: (res: any, _variables, context) => {
       const newPostId = res.data.postId;
-      setDriftPostId(newPostId);
       localStorage.setItem(`active_drift_post_${currentAsset.id}`, newPostId);
+      if (context?.id) {
+        setJobs((prev) =>
+          prev.map((j) => (j.id === context.id ? { ...j, driftPostId: newPostId, message: "Rendering Path..." } : j))
+        );
+      }
     },
-    onError: (err: any) => {
-      alert("Drift Start Failed: " + err.message);
-      setIsProcessing(false);
+    onError: (err: any, _variables, context) => {
+      if (context?.id) {
+        setJobs((prev) =>
+          prev.map((j) => (j.id === context.id ? { ...j, status: "failed", error: err.message } : j))
+        );
+      }
     },
   });
 
@@ -322,19 +378,22 @@ export function EditAssetModal({
     if (activeProject) {
       formData.append("projectId", activeProject);
     }
+    
+    const id = Date.now().toString();
+    setJobs((prev) => [...prev, { id, type: "extract", status: "processing", message: "Extracting frame..." }]);
 
     try {
-      setIsProcessing(true);
-      setDriftStatusMsg("Saving frame...");
       const res = await apiEndpoints.uploadAssetSync(formData);
       if (res.data.success) {
-        handleSuccess(res.data.asset);
+        setJobs((prev) =>
+          prev.map((j) => (j.id === id ? { ...j, status: "ready", resultAsset: res.data.asset, message: "Frame Ready" } : j))
+        );
         setDriftVideoUrl(null);
       }
     } catch (e: any) {
-      alert("Failed to save frame: " + e.message);
-    } finally {
-      setIsProcessing(false);
+      setJobs((prev) =>
+        prev.map((j) => (j.id === id ? { ...j, status: "failed", error: e.message } : j))
+      );
     }
   };
 
@@ -381,7 +440,6 @@ export function EditAssetModal({
     if (convertMode === "auto") {
       ratioMutation.mutate(convertTargetRatio);
     } else {
-      // Custom prompt convert uses Text Edit mutation but with target ratio
       if (!prompt.trim()) return alert("Please enter a prompt");
       textEditMutation.mutate(convertTargetRatio);
     }
@@ -411,9 +469,21 @@ export function EditAssetModal({
       completedCrop.height * scaleY,
     );
 
+    const id = Date.now().toString();
+    setJobs((prev) => [...prev, { id, type: "crop", status: "processing", message: "Cropping..." }]);
+    setIsCropping(false);
+    setCrop(undefined);
+    setCompletedCrop(undefined);
+    setCropAspect(undefined);
+
     canvas.toBlob(
       async (blob) => {
-        if (!blob) return;
+        if (!blob) {
+          setJobs((prev) =>
+            prev.map((j) => (j.id === id ? { ...j, status: "failed", error: "Failed to create blob" } : j))
+          );
+          return;
+        }
         const file = new File([blob], "cropped.jpg", { type: "image/jpeg" });
         const formData = new FormData();
         formData.append("image", file);
@@ -424,20 +494,17 @@ export function EditAssetModal({
         );
         if (activeProject) formData.append("projectId", activeProject);
 
-        setIsProcessing(true);
         try {
           const res = await apiEndpoints.uploadAssetSync(formData);
           if (res.data.success) {
-            handleSuccess(res.data.asset);
-            setIsCropping(false);
-            setCrop(undefined);
-            setCompletedCrop(undefined);
-            setCropAspect(undefined);
+            setJobs((prev) =>
+              prev.map((j) => (j.id === id ? { ...j, status: "ready", resultAsset: res.data.asset, message: "Crop Ready" } : j))
+            );
           }
         } catch (err: any) {
-          alert("Crop failed: " + err.message);
-        } finally {
-          setIsProcessing(false);
+          setJobs((prev) =>
+            prev.map((j) => (j.id === id ? { ...j, status: "failed", error: err.message } : j))
+          );
         }
       },
       "image/jpeg",
@@ -469,7 +536,7 @@ export function EditAssetModal({
     }
   }, [cropAspect, isCropping]);
 
-  const isRendering = isProcessing || isImageLoading || isEnhancing || isConverting;
+  const activeJobsCount = jobs.filter(j => j.status === "processing").length;
 
   if (isMinimized) {
     return (
@@ -479,7 +546,9 @@ export function EditAssetModal({
       >
         <div className="flex flex-col">
           <span className="text-white font-bold text-sm">🎨 Editor Running</span>
-          <span className="text-purple-400 text-xs font-mono tracking-widest animate-pulse">{isRendering ? driftStatusMsg : "Running in background..."}</span>
+          <span className="text-purple-400 text-xs font-mono tracking-widest animate-pulse">
+            {activeJobsCount > 0 ? `${activeJobsCount} Jobs Running` : "Idle"}
+          </span>
         </div>
         <button 
           onClick={(e) => { 
@@ -628,22 +697,13 @@ export function EditAssetModal({
                     </div>
                   )}
 
-                {(isProcessing || isImageLoading) && (
+                {isImageLoading && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30 backdrop-blur-sm">
                     <div className="flex flex-col items-center gap-4 w-full max-w-sm px-6">
-                      {activeTab === "drift" && driftPostId ? (
-                        <ProgressBar
-                          progress={driftProgress}
-                          label={driftStatusMsg}
-                        />
-                      ) : (
-                        <>
-                          <LoadingSpinner size="lg" variant="neon" />
-                          <span className="text-cyan-300 font-bold animate-pulse mt-4">
-                            {isImageLoading ? "Loading Image..." : driftStatusMsg}
-                          </span>
-                        </>
-                      )}
+                      <LoadingSpinner size="lg" variant="neon" />
+                      <span className="text-cyan-300 font-bold animate-pulse mt-4">
+                        Loading Image...
+                      </span>
                     </div>
                   </div>
                 )}
@@ -669,10 +729,65 @@ export function EditAssetModal({
                     src={getCORSProxyUrl(currentAsset.url)}
                     className="max-h-[80vh] object-contain rounded-lg border border-gray-700 shadow-2xl"
                     crossOrigin="anonymous"
+                    onLoad={() => setIsImageLoading(false)}
                   />
                 )}
               </>
             )}
+            
+            {/* JOBS QUEUE FLOATING UI */}
+            <div className="absolute right-4 top-20 flex flex-col gap-2 z-40 max-w-xs">
+              {jobs.map((job) => (
+                <div
+                  key={job.id}
+                  className={`p-3 rounded-lg border shadow-lg cursor-pointer transition-all ${
+                    job.status === "processing"
+                      ? "bg-gray-800/90 border-blue-500/50 hover:bg-gray-800"
+                      : job.status === "ready"
+                      ? "bg-green-900/90 border-green-500 hover:bg-green-800/90"
+                      : "bg-red-900/90 border-red-500 hover:bg-red-800/90"
+                  }`}
+                  onClick={() => {
+                    if (job.status === "ready" && job.resultAsset) {
+                      if (job.type === "drift" && job.resultAsset.type === "VIDEO") {
+                         setDriftVideoUrl(job.resultAsset.url);
+                      } else {
+                         handleSuccess(job.resultAsset);
+                      }
+                      setJobs((prev) => prev.filter((j) => j.id !== job.id));
+                    }
+                  }}
+                >
+                  <div className="flex justify-between items-center mb-1 gap-4">
+                    <span className="text-xs font-bold text-white capitalize">
+                      {job.type} Job
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setJobs((prev) => prev.filter((j) => j.id !== job.id));
+                      }}
+                      className="text-gray-400 hover:text-white"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="text-[10px] text-gray-300">
+                    {job.status === "processing" ? (
+                      <div className="flex items-center gap-2">
+                         <LoadingSpinner size="sm" />
+                         {job.message || "Processing..."}
+                      </div>
+                    ) : job.status === "ready" ? (
+                      "Click to apply ✨"
+                    ) : (
+                      job.error || "Failed"
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
           </div>
         </div>
 
@@ -708,7 +823,6 @@ export function EditAssetModal({
               <div className="flex gap-2">
                 <button
                   onClick={() => setIsCropping(true)}
-                  disabled={isProcessing || isEnhancing}
                   className="flex-1 text-xs bg-gray-800 text-cyan-300 px-3 py-2 rounded-lg border border-cyan-500/30 hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
                 >
                   <span>✂️</span> Crop
@@ -716,14 +830,9 @@ export function EditAssetModal({
 
                 <button
                   onClick={() => enhanceMutation.mutate()}
-                  disabled={isProcessing || isEnhancing}
                   className="flex-1 text-xs bg-gradient-to-r from-amber-600/20 to-orange-600/20 text-orange-300 px-3 py-2 rounded-lg border border-orange-500/30 hover:bg-orange-900/20 transition-colors flex items-center justify-center gap-2"
                 >
-                  {isEnhancing ? (
-                    <LoadingSpinner size="sm" variant="light" />
-                  ) : (
-                    <span>Enhance</span>
-                  )}
+                  <span>Enhance</span>
                 </button>
               </div>
             )}
@@ -796,17 +905,9 @@ export function EditAssetModal({
                 {/* 4. Action Button */}
                 <button
                   onClick={handleConvertAction}
-                  disabled={isProcessing || isConverting}
-                  className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white font-bold hover:shadow-lg flex items-center justify-center gap-2"
                 >
-                  {isConverting ? (
-                    <>
-                      <LoadingSpinner size="sm" variant="light" />
-                      <span>Converting...</span>
-                    </>
-                  ) : (
-                    <span>🔄 Convert to {convertTargetRatio}</span>
-                  )}
+                  <span>🔄 Convert to {convertTargetRatio}</span>
                 </button>
               </div>
             )}
@@ -894,7 +995,6 @@ export function EditAssetModal({
                     placeholder="e.g. 'Make it night time', 'Add neon lights'..."
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    disabled={isProcessing}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
@@ -1104,7 +1204,6 @@ export function EditAssetModal({
                     placeholder="e.g. Describe where you want the camera to move to create a path."
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    disabled={isProcessing}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
@@ -1146,12 +1245,11 @@ export function EditAssetModal({
                   onClick={handleCrop}
                   disabled={
                     !completedCrop?.width ||
-                    !completedCrop?.height ||
-                    isProcessing
+                    !completedCrop?.height
                   }
                   className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {isProcessing ? "Cropping..." : "Confirm Crop"}
+                  Confirm Crop
                 </button>
                 <button
                   onClick={() => {
@@ -1159,7 +1257,6 @@ export function EditAssetModal({
                     setCrop(undefined);
                     setCropAspect(undefined);
                   }}
-                  disabled={isProcessing}
                   className="w-full py-2 text-gray-500 hover:text-white text-sm"
                 >
                   Cancel Crop
@@ -1168,33 +1265,27 @@ export function EditAssetModal({
             ) : activeTab === "drift" ? (
               <button
                 onClick={() => driftStartMutation.mutate()}
-                disabled={isProcessing || !!driftPostId}
-                className="w-full py-4 bg-gradient-to-r from-violet-900 to-violet-900 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-3"
+                className="w-full py-4 bg-gradient-to-r from-violet-900 to-violet-900 rounded-xl text-white font-bold hover:shadow-lg flex items-center justify-center gap-3"
               >
-                {isProcessing ? (
-                  "Processing Path..."
-                ) : (
                   <>
                     <img src={drift_icon} alt="Logo" className="h-2 w-auto" />
                     <span>Generate Path</span>
                   </>
-                )}
               </button>
             ) : activeTab === "convert" ? (
               null // Convert button is in the UI block above
             ) : (
               <button
                 onClick={() => textEditMutation.mutate(undefined)}
-                disabled={!prompt.trim() || isProcessing}
+                disabled={!prompt.trim()}
                 className="w-full py-4 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isProcessing ? "Refining..." : <span>Apply Edit</span>}
+                <span>Apply Edit</span>
               </button>
             )}
 
             <button
               onClick={onClose}
-              disabled={isProcessing}
               className="w-full py-2 text-gray-500 hover:text-white text-sm"
             >
               Save & Close
