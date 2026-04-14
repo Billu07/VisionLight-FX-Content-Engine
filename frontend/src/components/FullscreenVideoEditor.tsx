@@ -1,7 +1,15 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
+import { videoEngine } from "../lib/videoEngine";
 import { LoadingSpinner } from "./LoadingSpinner";
+
+export interface Marker {
+    id: string;
+    time: number; // Time in ms
+    label?: string;
+    color?: string;
+}
 
 export interface AudioItem {
     id: string;
@@ -65,7 +73,15 @@ export function FullscreenVideoEditor({
     const [showExportModal, setShowExportModal] = useState(false);
     const [exportFps, setExportFps] = useState(30);
 
+    const [markers, setMarkers] = useState<Marker[]>([]);
+    const [isCapturingFrame, setIsCapturingFrame] = useState(false);
+
     const queryClient = useQueryClient();
+
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const playheadRef = useRef<HTMLDivElement>(null);
+    const videoPoolRef = useRef<Map<string, HTMLVideoElement>>(new Map());
+    const [cachedUrls, setCachedUrls] = useState<Map<string, string>>(new Map());
 
     const { data: projectAssets = [], isLoading: isLoadingAssets } = useQuery({
         queryKey: ["assets", projectId],
@@ -89,139 +105,105 @@ export function FullscreenVideoEditor({
         return sequence.reduce((acc, item) => acc + (item.duration || 3000), 0);
     }, [sequence]);
 
+    // Blob Caching Engine
+    useEffect(() => {
+        let isMounted = true;
+        const cacheAssets = async () => {
+            const urlsToCache = [...new Set([
+                ...sequence.map(i => i.url),
+                ...binItems.map(i => i.url)
+            ])];
+
+            for (const url of urlsToCache) {
+                if (!cachedUrls.has(url)) {
+                    const blobUrl = await videoEngine.getAssetUrl(url, getCORSProxyUrl);
+                    if (isMounted) {
+                        setCachedUrls(prev => new Map(prev).set(url, blobUrl));
+                    }
+                }
+            }
+        };
+        cacheAssets();
+        return () => { isMounted = false; };
+    }, [sequence, binItems]);
+
     // Find current item and local time
-    const { currentItem, localTime, itemStartIndex, nextItem } = useMemo(() => {
+    const { currentItem, localTime, itemStartIndex } = useMemo(() => {
         if (sequence.length === 0) {
-            return { currentItem: null, localTime: 0, itemStartIndex: -1, nextItem: null };
+            return { currentItem: null, localTime: 0, itemStartIndex: -1 };
         }
-
-        // Clamp currentTime to totalDuration to avoid index overflow at the very end
         const clampedTime = Math.max(0, Math.min(currentTime, totalDuration - 0.001));
-
         let accumulated = 0;
         for (let i = 0; i < sequence.length; i++) {
             const item = sequence[i];
             const duration = item.duration || 3000;
-
             if (clampedTime >= accumulated && clampedTime < accumulated + duration) {
                 return {
                     currentItem: item,
                     localTime: clampedTime - accumulated,
-                    itemStartIndex: i,
-                    nextItem: i + 1 < sequence.length ? sequence[i + 1] : null
+                    itemStartIndex: i
                 };
             }
             accumulated += duration;
         }
-
-        // Fallback to last frame of last item
         const lastItem = sequence[sequence.length - 1];
-        return {
-            currentItem: lastItem,
-            localTime: lastItem?.duration || 0,
-            itemStartIndex: sequence.length - 1,
-            nextItem: null
-        };
+        return { currentItem: lastItem, localTime: lastItem?.duration || 0, itemStartIndex: sequence.length - 1 };
     }, [sequence, currentTime, totalDuration]);
 
-    // Sync Video Element
+    // PRE-FETCH & POOL MANAGEMENT
     useEffect(() => {
-        const player1 = player1Ref.current;
-        const player2 = player2Ref.current;
-        if (!player1 || !player2) return;
+        const pool = videoPoolRef.current;
+        const activeUrls = new Set(sequence.filter(i => i.type === "VIDEO").map(i => cachedUrls.get(i.url)).filter(Boolean));
 
-        let activePlayer: HTMLVideoElement | null = null;
-        let standbyPlayer: HTMLVideoElement | null = null;
-
-        if (currentItem?.type === "VIDEO") {
-            const itemUrl = getCORSProxyUrl(currentItem.url);
-            // Find which player already has the current URL loaded
-            if (player1.getAttribute('data-url') === itemUrl) {
-                activePlayer = player1;
-                standbyPlayer = player2;
-            } else if (player2.getAttribute('data-url') === itemUrl) {
-                activePlayer = player2;
-                standbyPlayer = player1;
-            } else {
-                // Neither has it (jumped). Use player1 as active.
-                activePlayer = player1;
-                standbyPlayer = player2;
-                activePlayer.src = itemUrl;
-                activePlayer.setAttribute('data-url', itemUrl);
-                activePlayer.load();
+        // Cleanup stale videos from pool
+        pool.forEach((video, url) => {
+            if (!activeUrls.has(url)) {
+                video.pause();
+                video.src = "";
+                video.load();
+                pool.delete(url);
             }
+        });
 
-            // Apply active player styling
-            activePlayer.style.display = "block";
-            activePlayer.style.opacity = "1";
-            activePlayer.style.zIndex = "10";
-            standbyPlayer.style.opacity = "0";
-            standbyPlayer.style.zIndex = "0";
-            standbyPlayer.style.display = "none";
-
-            // Sync active player time
-            const trimOffset = currentItem.trimStart || 0;
-            const videoTime = (localTime + trimOffset) / 1000;
-            activePlayer.playbackRate = currentItem.speed || 1;
-
-            // Use a smaller threshold for frame-accurate scrubbing
-            const diff = Math.abs(activePlayer.currentTime - videoTime);
-            if (diff > (isPlaying ? 0.05 : 0.01)) {
-                activePlayer.currentTime = videoTime;
+        // Pre-warm pool with next few videos
+        const lookAheadCount = 3;
+        const startIndex = itemStartIndex === -1 ? 0 : itemStartIndex;
+        for (let i = startIndex; i < Math.min(sequence.length, startIndex + lookAheadCount); i++) {
+            const item = sequence[i];
+            if (item.type === "VIDEO") {
+                const blobUrl = cachedUrls.get(item.url);
+                if (blobUrl && !pool.has(blobUrl)) {
+                    const v = document.createElement("video");
+                    v.src = blobUrl;
+                    v.preload = "auto";
+                    v.muted = true;
+                    v.playsInline = true;
+                    v.crossOrigin = "anonymous";
+                    v.load();
+                    pool.set(blobUrl, v);
+                }
             }
+        }
+    }, [sequence, itemStartIndex, cachedUrls]);
 
+    const imagePoolRef = useRef<Map<string, HTMLImageElement>>(new Map());
+
+    // RENDER LOOP (Dual-Loop Architecture)
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d", { alpha: false });
+        if (!ctx) return;
+
+        let lastFrameTime = performance.now();
+        
+        const render = () => {
+            const now = performance.now();
+            const delta = now - lastFrameTime;
+            lastFrameTime = now;
+
+            // 1. Update Clock if playing
             if (isPlaying) {
-                if (activePlayer.paused) {
-                    activePlayer.play().catch(() => { });
-                }
-            } else {
-                if (!activePlayer.paused) {
-                    activePlayer.pause();
-                }
-            }
-        } else {
-            // Current is not video. Pause both and hide.
-            player1.pause();
-            player2.pause();
-            player1.style.display = "none";
-            player2.style.display = "none";
-            standbyPlayer = player1; // Just pick one to preload the next
-        }
-
-        // Preload next video clip in standby player
-        let nextVideoItem = null;
-        if (nextItem?.type === "VIDEO") {
-            nextVideoItem = nextItem;
-        } else {
-            // Look ahead in sequence for the next video
-            for (let i = itemStartIndex + 1; i < sequence.length; i++) {
-                if (sequence[i].type === "VIDEO") {
-                    nextVideoItem = sequence[i];
-                    break;
-                }
-            }
-        }
-
-        if (nextVideoItem && standbyPlayer) {
-            const nextUrl = getCORSProxyUrl(nextVideoItem.url);
-            if (standbyPlayer.getAttribute('data-url') !== nextUrl) {
-                standbyPlayer.src = nextUrl;
-                standbyPlayer.setAttribute('data-url', nextUrl);
-                standbyPlayer.load();
-                standbyPlayer.currentTime = (nextVideoItem.trimStart || 0) / 1000;
-            }
-        }
-
-    }, [currentItem, localTime, isPlaying, sequence, itemStartIndex, nextItem]);
-
-    // Playback Loop
-    useEffect(() => {
-        let lastUpdate = performance.now();
-        if (isPlaying) {
-            const animate = (now: number) => {
-                const delta = now - lastUpdate;
-                lastUpdate = now;
-
                 setCurrentTime(prev => {
                     const next = prev + delta;
                     if (next >= totalDuration) {
@@ -230,16 +212,152 @@ export function FullscreenVideoEditor({
                     }
                     return next;
                 });
-                animationRef.current = requestAnimationFrame(animate);
-            };
-            animationRef.current = requestAnimationFrame(animate);
-        } else {
-            if (animationRef.current) cancelAnimationFrame(animationRef.current);
-        }
+            }
+
+            // 2. Draw current frame to canvas
+            if (currentItem) {
+                const blobUrl = cachedUrls.get(currentItem.url);
+                const drawMedia = (media: HTMLVideoElement | HTMLImageElement) => {
+                    const canvasWidth = canvas.width;
+                    const canvasHeight = canvas.height;
+                    const mediaWidth = media instanceof HTMLVideoElement ? media.videoWidth : media.width;
+                    const mediaHeight = media instanceof HTMLVideoElement ? media.videoHeight : media.height;
+
+                    if (!mediaWidth || !mediaHeight) return;
+
+                    const scale = Math.min(canvasWidth / mediaWidth, canvasHeight / mediaHeight);
+                    const x = (canvasWidth / 2) - (mediaWidth / 2) * scale;
+                    const y = (canvasHeight / 2) - (mediaHeight / 2) * scale;
+
+                    ctx.fillStyle = "#000";
+                    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+                    ctx.drawImage(media, x, y, mediaWidth * scale, mediaHeight * scale);
+                };
+
+                if (currentItem.type === "VIDEO" && blobUrl) {
+                    const video = videoPoolRef.current.get(blobUrl);
+                    if (video) {
+                        const targetVideoTime = ((localTime * (currentItem.speed || 1)) + (currentItem.trimStart || 0)) / 1000;
+                        if (Math.abs(video.currentTime - targetVideoTime) > 0.03) {
+                            video.currentTime = targetVideoTime;
+                        }
+                        if (isPlaying && video.paused) video.play().catch(() => {});
+                        if (!isPlaying && !video.paused) video.pause();
+
+                        if (video.readyState >= 2) {
+                            drawMedia(video);
+                        } else {
+                            ctx.fillStyle = "#050505";
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        }
+                    }
+                } else if (currentItem.type === "IMAGE" && blobUrl) {
+                    let img = imagePoolRef.current.get(blobUrl);
+                    if (!img) {
+                        img = new Image();
+                        img.src = blobUrl;
+                        img.crossOrigin = "anonymous";
+                        imagePoolRef.current.set(blobUrl, img);
+                    }
+                    if (img.complete) {
+                        drawMedia(img);
+                    } else {
+                        ctx.fillStyle = "#050505";
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    }
+                }
+            } else {
+                ctx.fillStyle = "#000";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // 3. Update Playhead (Uncontrolled for 60fps)
+            if (playheadRef.current) {
+                const percentage = (currentTime / totalDuration) * 100;
+                playheadRef.current.style.transform = `translateX(${percentage}%)`;
+            }
+
+            animationRef.current = requestAnimationFrame(render);
+        };
+
+        animationRef.current = requestAnimationFrame(render);
         return () => {
             if (animationRef.current) cancelAnimationFrame(animationRef.current);
         };
-    }, [isPlaying, totalDuration]);
+    }, [isPlaying, totalDuration, currentItem, localTime, currentTime, cachedUrls]);
+
+    // Keyboard Shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
+
+            switch (e.code) {
+                case "Space":
+                    e.preventDefault();
+                    handleTogglePlay();
+                    break;
+                case "ArrowLeft":
+                    e.preventDefault();
+                    handleSeek(currentTime - (e.shiftKey ? 1000 : 33)); // 1 frame at 30fps
+                    break;
+                case "ArrowRight":
+                    e.preventDefault();
+                    handleSeek(currentTime + (e.shiftKey ? 1000 : 33));
+                    break;
+                case "KeyM":
+                    handleToggleMarker();
+                    break;
+                case "KeyS":
+                    if (e.ctrlKey) { e.preventDefault(); handleSaveProject(); }
+                    break;
+                case "Delete":
+                case "Backspace":
+                    handleDeleteSelected();
+                    break;
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [currentTime, isPlaying, totalDuration, selectedItemId]);
+
+    const handleToggleMarker = () => {
+        const existing = markers.find(m => Math.abs(m.time - currentTime) < 100);
+        if (existing) {
+            setMarkers(prev => prev.filter(m => m.id !== existing.id));
+        } else {
+            setMarkers(prev => [...prev, { id: crypto.randomUUID(), time: currentTime }]);
+        }
+    };
+
+    const handleSnapshot = async () => {
+        const canvas = canvasRef.current;
+        if (!canvas || isCapturingFrame) return;
+
+        setIsCapturingFrame(true);
+        canvas.toBlob(async (blob) => {
+            if (!blob) {
+                setIsCapturingFrame(false);
+                return;
+            }
+            try {
+                const file = new File([blob], `Snapshot_${Date.now()}.jpg`, { type: "image/jpeg" });
+                const formData = new FormData();
+                formData.append("image", file);
+                formData.append("raw", "true");
+                if (projectId) formData.append("projectId", projectId);
+
+                const res = await apiEndpoints.uploadAssetSync(formData);
+                if (res.data.success) {
+                    queryClient.invalidateQueries({ queryKey: ["assets"] });
+                    alert("Frame captured and added to library! ✨");
+                }
+            } catch (err) {
+                console.error("Snapshot failed", err);
+            } finally {
+                setIsCapturingFrame(false);
+            }
+        }, "image/jpeg", 0.95);
+    };
 
     const handleTogglePlay = () => {
         if (sequence.length === 0) return;
@@ -248,7 +366,10 @@ export function FullscreenVideoEditor({
     };
 
     const handleSeek = (time: number) => {
-        setCurrentTime(Math.max(0, Math.min(time, totalDuration)));
+        // Snap to markers if within 100ms
+        const snapMarker = markers.find(m => Math.abs(m.time - time) < 150);
+        const finalTime = snapMarker ? snapMarker.time : time;
+        setCurrentTime(Math.max(0, Math.min(finalTime, totalDuration)));
     };
 
     const handleSplit = () => {
@@ -883,48 +1004,32 @@ export function FullscreenVideoEditor({
                         <div
                             className="relative bg-[#050505] rounded-lg overflow-hidden border border-white/5 shadow-[0_0_50px_rgba(0,0,0,0.5)] flex items-center justify-center group transition-all duration-500"
                             style={{
-                                width: viewportRatio === "16:9" ? "100%" : viewportRatio === "9:16" ? "auto" : "auto",
+                                width: viewportRatio === "16:9" ? "100%" : "auto",
                                 height: viewportRatio === "16:9" ? "auto" : "100%",
                                 aspectRatio: viewportRatio === "16:9" ? "16/9" : viewportRatio === "9:16" ? "9/16" : "1/1",
                                 maxHeight: "100%",
                                 maxWidth: "100%"
                             }}
                         >
-                            {currentItem ? (
-                                <>
-                                    {currentItem.type === "VIDEO" ? (
-                                        <>
-                                            <video
-                                                ref={player1Ref}
-                                                className="w-full h-full object-contain absolute inset-0 z-10"
-                                                muted
-                                                playsInline
-                                                crossOrigin="anonymous"
-                                            />
-                                            <video
-                                                ref={player2Ref}
-                                                className="w-full h-full object-contain absolute inset-0 z-0 opacity-0 pointer-events-none"
-                                                muted
-                                                playsInline
-                                                crossOrigin="anonymous"
-                                            />
-                                        </>
-                                    ) : (
-                                        <img
-                                            src={getCORSProxyUrl(currentItem.url)}
-                                            className="w-full h-full object-contain absolute inset-0 z-10"
-                                            crossOrigin="anonymous"
-                                        />
-                                    )}                        </>
-                            ) : (
-                                <div className="text-center">
-                                    <span className="text-5xl block mb-4 opacity-20">🎬</span>
-                                    <p className="text-gray-500 font-medium">No media selected</p>
-                                </div>
-                            )}
+                            <canvas
+                                ref={canvasRef}
+                                width={1920}
+                                height={1080}
+                                className="w-full h-full object-contain"
+                            />
+
+                            {/* Snapshot Button Overlay */}
+                            <button
+                                onClick={handleSnapshot}
+                                disabled={isCapturingFrame}
+                                className="absolute bottom-4 right-4 z-20 w-10 h-10 bg-black/50 hover:bg-cyan-600 text-white rounded-full flex items-center justify-center backdrop-blur-md border border-white/10 opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-xl"
+                                title="Snapshot Frame"
+                            >
+                                {isCapturingFrame ? <LoadingSpinner size="sm" /> : "📸"}
+                            </button>
 
                             {/* Play Overlay */}
-                            {!isPlaying && currentItem && (
+                            {!isPlaying && (
                                 <button
                                     onClick={handleTogglePlay}
                                     className="absolute inset-0 flex items-center justify-center bg-black/10 hover:bg-black/30 transition-all duration-300 group-hover:bg-black/40"
@@ -1004,7 +1109,7 @@ export function FullscreenVideoEditor({
                     </div>
                 </div>
 
-                {/* Tracks */}
+                {/* Tracks Container */}
                 <div className="flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar-h" style={{ scrollBehavior: 'smooth' }}>
                     <div
                         ref={timelineRef}
@@ -1012,17 +1117,37 @@ export function FullscreenVideoEditor({
                         style={{ width: `${Math.max(100, (totalDuration / 100) * zoom)}%`, minWidth: '100%', paddingRight: '100px' }}
                         onMouseDown={handleTimelineMouseDown}
                     >
-                        {/* Time Rulers */}
-                        <div className="absolute top-0 left-0 right-0 h-4 flex items-end opacity-20 pointer-events-none">
+                        {/* Time Rulers (Accurate Alignment) */}
+                        <div className="absolute top-0 left-0 right-0 h-6 flex items-end border-b border-white/5 bg-black/20 pointer-events-none">
                             {Array.from({ length: Math.ceil(totalDuration / 1000) + 1 }).map((_, i) => (
-                                <div key={i} className="border-l border-white h-2 flex-shrink-0" style={{ width: `${(1000 / totalDuration) * 100}%` }}>
-                                    <span className="text-[8px] ml-1">{i}s</span>
+                                <div 
+                                    key={i} 
+                                    className="border-l border-gray-600 h-3 flex-shrink-0" 
+                                    style={{ width: `${(1000 / totalDuration) * 100}%`, minWidth: '1px' }}
+                                >
+                                    <span className="text-[7px] ml-1 text-gray-500 font-mono">{i}s</span>
                                 </div>
                             ))}
                         </div>
 
+                        {/* Markers Track */}
+                        <div className="absolute top-6 left-0 right-0 h-4 z-10">
+                            {markers.map(marker => (
+                                <div
+                                    key={marker.id}
+                                    className="absolute top-0 w-3 h-3 bg-cyan-400 rounded-sm transform -rotate-45 -translate-x-1/2 cursor-pointer hover:bg-white transition-colors"
+                                    style={{ left: `${(marker.time / totalDuration) * 100}%` }}
+                                    title={`Marker at ${formatTime(marker.time)}`}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSeek(marker.time);
+                                    }}
+                                />
+                            ))}
+                        </div>
+
                         {/* Primary Video Track */}
-                        <div className="relative h-24 bg-white/5 rounded-xl flex items-center px-0 group/track">
+                        <div className="relative h-24 bg-white/5 rounded-xl flex items-center px-0 group/track mt-4">
                             {sequence.map((item, idx) => (
                                 <div
                                     key={item.id}
@@ -1046,10 +1171,11 @@ export function FullscreenVideoEditor({
                                         } ${draggedItemIndex === idx ? 'opacity-50 grayscale' : ''}`}
                                     style={{ width: `${((item.duration || 3000) / totalDuration) * 100}%` }}
                                 >
+                                    {/* Clip Thumbnail using Blob URL for instant loading */}
                                     {item.type === "VIDEO" ? (
-                                        <video src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover opacity-50" />
+                                        <video src={cachedUrls.get(item.url)} className="w-full h-full object-cover opacity-50 pointer-events-none" />
                                     ) : (
-                                        <img src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover opacity-50" />
+                                        <img src={cachedUrls.get(item.url)} className="w-full h-full object-cover opacity-50 pointer-events-none" />
                                     )}
                                     <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/40"></div>
                                     <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center pointer-events-none">
@@ -1106,12 +1232,15 @@ export function FullscreenVideoEditor({
                             )}
                         </div>
 
-                        {/* Playhead Scrubber */}
+                        {/* Playhead Scrubber (Uncontrolled for 60fps Smoothness) */}
                         <div
-                            className="absolute top-0 bottom-0 w-[2px] bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.8)] z-20 pointer-events-none transition-transform duration-100 ease-linear"
-                            style={{ left: `${(currentTime / totalDuration) * 100}%`, transform: 'translateX(-1px)' }}
+                            ref={playheadRef}
+                            className="absolute top-0 bottom-0 w-[2px] bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.8)] z-20 pointer-events-none transition-none"
+                            style={{ left: 0, transform: `translateX(${(currentTime / totalDuration) * 100}%)` }}
                         >
-                            <div className="w-3 h-3 bg-cyan-500 rounded-full -ml-[5.5px] -mt-1 shadow-lg"></div>
+                            <div className="w-3 h-3 bg-cyan-500 rounded-full -ml-[5.5px] -mt-1 shadow-lg border border-white/20"></div>
+                            {/* Vertical Line across track */}
+                            <div className="absolute top-0 bottom-0 w-[1px] bg-cyan-500/30 left-0"></div>
                         </div>
                     </div>
                 </div>
