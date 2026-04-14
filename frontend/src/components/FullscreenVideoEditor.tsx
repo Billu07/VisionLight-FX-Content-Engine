@@ -95,8 +95,6 @@ export function FullscreenVideoEditor({
 
     const [draggingEdge, setDraggingEdge] = useState<{ id: string, edge: 'left' | 'right', initialX: number, initialDuration: number, initialTrim: number } | null>(null);
 
-    const player1Ref = useRef<HTMLVideoElement>(null);
-    const player2Ref = useRef<HTMLVideoElement>(null);
     const timelineRef = useRef<HTMLDivElement>(null);
     const animationRef = useRef<number | null>(null);
 
