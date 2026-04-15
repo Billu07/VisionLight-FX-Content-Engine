@@ -678,6 +678,16 @@ export function FullscreenVideoEditor({
 
     return (
         <div className="fixed inset-0 z-[100] bg-[#0f0f0f] text-gray-200 flex flex-col font-sans select-none overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+            
+            {/* PREPARING OVERLAY */}
+            {isPreparing && (
+                <div className="absolute inset-0 z-[300] bg-black flex flex-col items-center justify-center">
+                    <LoadingSpinner size="lg" variant="neon" />
+                    <h2 className="mt-6 text-xl font-black uppercase tracking-[0.3em] text-cyan-400 animate-pulse">Preparing Studio</h2>
+                    <p className="mt-2 text-xs text-gray-500 font-mono">Caching media for instant playback...</p>
+                </div>
+            )}
+
             {/* HEADER */}
             <div className="h-14 bg-[#1a1a1a] border-b border-white/5 flex items-center justify-between px-6 shrink-0">
                 <div className="flex items-center gap-4">
@@ -873,11 +883,6 @@ export function FullscreenVideoEditor({
                             <button onClick={handleSnapshot} disabled={isCapturingFrame} className="absolute bottom-4 right-4 z-20 w-10 h-10 bg-black/50 hover:bg-cyan-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-xl">
                                 {isCapturingFrame ? <LoadingSpinner size="sm" /> : "📸"}
                             </button>
-                            {!isPlaying && (
-                                <button onClick={handleTogglePlay} className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/40 transition-all">
-                                    <div className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center text-white text-3xl shadow-2xl">▶</div>
-                                </button>
-                            )}
                         </div>
                         <div className="h-16 flex items-center justify-center gap-8 mt-4">
                             <button className="text-gray-500 hover:text-white" onClick={() => handleSeek(currentTime - 5000)}>⏪</button>
@@ -912,7 +917,7 @@ export function FullscreenVideoEditor({
                 </div>
 
                 <div className="flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar-h" style={{ scrollBehavior: 'smooth' }}>
-                    <div ref={timelineRef} className="h-full relative py-6" style={{ width: `${Math.max(timelineRef.current?.clientWidth || 0, (totalDuration / 100) * zoom)}px`, minWidth: '100%', paddingRight: '100px' }} onMouseDown={handleTimelineMouseDown}>
+                    <div ref={timelineRef} className="h-full relative py-6" style={{ width: `${Math.max(100, (totalDuration / 100) * zoom)}%`, minWidth: '100%', paddingRight: '100px' }} onMouseDown={handleTimelineMouseDown}>
                         {/* Time Rulers */}
                         <div className="absolute top-0 left-0 right-0 h-6 flex items-end border-b border-white/5 bg-black/20 pointer-events-none">
                             {Array.from({ length: Math.ceil(totalDuration / 1000) + 1 }).map((_, i) => (
