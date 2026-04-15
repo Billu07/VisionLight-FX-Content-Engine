@@ -141,17 +141,32 @@ export function FullscreenVideoEditor({
                 return;
             }
 
-            let loadedCount = 0;
+            // We only block "Preparing Studio" for items actually on the timeline (sequence)
+            // Bin items will be cached silently in the background
+            const sequenceUrls = new Set(sequence.map(i => i.url));
+            let sequenceLoadedCount = 0;
+            const sequenceTotal = sequenceUrls.size;
+
+            if (sequenceTotal === 0) setIsPreparing(false);
+
             for (const url of urlsToCache) {
+                const isTimelineItem = sequenceUrls.has(url);
                 if (!cachedUrls.has(url)) {
                     const blobUrl = await videoEngine.getAssetUrl(url, getCORSProxyUrl);
                     if (isMounted) {
-                        setCachedUrls(prev => new Map(prev).set(url, blobUrl));
+                        setCachedUrls(prev => {
+                            const next = new Map(prev);
+                            next.set(url, blobUrl);
+                            return next;
+                        });
                     }
                 }
-                loadedCount++;
-                if (loadedCount === urlsToCache.length && isMounted) {
-                    setIsPreparing(false);
+                
+                if (isTimelineItem) {
+                    sequenceLoadedCount++;
+                    if (sequenceLoadedCount >= sequenceTotal && isMounted) {
+                        setIsPreparing(false);
+                    }
                 }
             }
         };
