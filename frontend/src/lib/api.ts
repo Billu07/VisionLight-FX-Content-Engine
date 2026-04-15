@@ -191,7 +191,7 @@ export const apiEndpoints = {
  * This ensures images load with correct headers for Canvas/Editor use.
  */
 export const getCORSProxyUrl = (url: string, width?: number, quality?: number) => {
-  if (!url || !url.includes("r2.dev")) return url;
+  if (!url || !url.includes("r2.dev") || url.includes(".m3u8") || url.includes(".ts")) return url;
   
   // Use our backend as a proxy to bypass R2 CORS restrictions and optionally resize
   let proxyUrl = `${API_BASE_URL}/api/proxy-image?url=${encodeURIComponent(url)}`;

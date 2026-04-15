@@ -12,6 +12,12 @@ class AssetCache {
    * Caches results to prevent redundant network requests.
    */
   async getAssetUrl(url: string, getCORSProxyUrl: (url: string) => string): Promise<string> {
+    // HLS playlists (.m3u8) must not be converted to local blobs because their internal 
+    // .ts segment paths need the correct base URL to resolve.
+    if (url.includes('.m3u8') || url.includes('/hls/')) {
+        return getCORSProxyUrl(url); 
+    }
+
     if (this.cache.has(url)) return this.cache.get(url)!;
     if (this.loading.has(url)) return this.loading.get(url)!;
 

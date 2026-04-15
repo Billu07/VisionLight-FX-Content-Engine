@@ -15,7 +15,7 @@ const cleanEnvVar = (val?: string) => val?.replace(/['"]/g, "").trim() || "";
 const r2AccountId = cleanEnvVar(process.env.R2_ACCOUNT_ID);
 
 // Configure AWS S3 Client for Cloudflare R2
-const r2Client = new S3Client({
+export const r2Client = new S3Client({
   region: "auto",
   endpoint: `https://${r2AccountId}.r2.cloudflarestorage.com`,
   forcePathStyle: true,
@@ -146,6 +146,30 @@ export const resizeWithGemini = async (
   }
 };
 
+// Helper: Upload
+export const uploadFileToR2 = async (
+  buffer: Buffer,
+  fileKey: string,
+  contentType: string
+): Promise<string> => {
+  try {
+    const bucketName = process.env.R2_BUCKET_NAME || "";
+    const publicUrl = process.env.R2_PUBLIC_URL || "";
+
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: fileKey,
+      Body: buffer,
+      ContentType: contentType,
+    });
+
+    await r2Client.send(command);
+    return `${publicUrl}/${fileKey}`;
+  } catch (error) {
+    console.error(`Error uploading ${fileKey} to R2:`, error);
+    throw error;
+  }
+};
 // Helper: Upload
 export const uploadToCloudinary = async (
   f: any,

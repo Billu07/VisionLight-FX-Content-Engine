@@ -17,6 +17,7 @@
     "axios": "^1.13.2",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.33.0",
+    "hls.js": "^1.6.16",
     "js-cookie": "^3.0.5",
     "lucide-react": "^0.553.0",
     "react": "^19.2.0",

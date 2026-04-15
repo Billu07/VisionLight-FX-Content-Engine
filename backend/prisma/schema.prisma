@@ -179,6 +179,7 @@ model Asset {
   userId      String
   url         String
   proxyUrl    String?  // Lightweight proxy video URL for editing
+  hlsUrl      String?  // HLS stream URL (.m3u8)
   spriteSheetUrl String? // Timeline thumbnail sprite sheet URL
   aspectRatio String
   type        String   @default("IMAGE")

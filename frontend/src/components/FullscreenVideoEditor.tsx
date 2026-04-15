@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
 import { videoEngine } from "../lib/videoEngine";
 import { LoadingSpinner } from "./LoadingSpinner";
+import Hls from "hls.js";
 
 export interface Marker {
     id: string;
@@ -25,6 +26,7 @@ export interface SequenceItem {
     id: string;
     url: string;
     proxyUrl?: string;
+    hlsUrl?: string;
     spriteSheetUrl?: string;
     type: "IMAGE" | "VIDEO" | "CAROUSEL";
     title?: string;
@@ -205,6 +207,9 @@ export function FullscreenVideoEditor({
         // Cleanup stale videos from pool
         pool.forEach((video, url) => {
             if (!activeUrls.has(url)) {
+                if ((video as any).hls) {
+                    (video as any).hls.destroy();
+                }
                 video.pause();
                 video.src = "";
                 video.load();
@@ -218,17 +223,31 @@ export function FullscreenVideoEditor({
         for (let i = startIndex; i < Math.min(sequence.length, startIndex + lookAheadCount); i++) {
             const item = sequence[i];
             if (item.type === "VIDEO") {
-                const blobUrl = cachedUrls.get(item.proxyUrl || item.url);
+                const blobUrl = cachedUrls.get(item.hlsUrl || item.proxyUrl || item.url);
                 if (blobUrl && !pool.has(blobUrl)) {
                     const v = document.createElement("video");
-                    v.src = blobUrl;
                     v.preload = "auto";
                     v.muted = true;
                     v.playsInline = true;
                     v.crossOrigin = "anonymous";
-                    v.load();
-                    // Pre-seek to trimStart for instant transitions
-                    v.currentTime = (item.trimStart || 0) / 1000;
+                    
+                    const startTime = (item.trimStart || 0) / 1000;
+
+                    if (blobUrl.includes('.m3u8') || blobUrl.includes('/hls/')) {
+                        if (Hls.isSupported()) {
+                            const hls = new Hls({ startPosition: startTime });
+                            hls.loadSource(blobUrl);
+                            hls.attachMedia(v);
+                            (v as any).hls = hls;
+                        } else if (v.canPlayType('application/vnd.apple.mpegurl')) {
+                            v.src = blobUrl;
+                            v.currentTime = startTime;
+                        }
+                    } else {
+                        v.src = blobUrl;
+                        v.load();
+                        v.currentTime = startTime;
+                    }
                     pool.set(blobUrl, v);
                 }
             }
