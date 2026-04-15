@@ -76,6 +76,7 @@ export function FullscreenVideoEditor({
 
     const [markers, setMarkers] = useState<Marker[]>([]);
     const [isCapturingFrame, setIsCapturingFrame] = useState(false);
+    const [isPreparing, setIsPreparing] = useState(true);
 
     const queryClient = useQueryClient();
 
@@ -135,12 +136,22 @@ export function FullscreenVideoEditor({
                 ...binItems.map(i => i.url)
             ])];
 
+            if (urlsToCache.length === 0) {
+                setIsPreparing(false);
+                return;
+            }
+
+            let loadedCount = 0;
             for (const url of urlsToCache) {
                 if (!cachedUrls.has(url)) {
                     const blobUrl = await videoEngine.getAssetUrl(url, getCORSProxyUrl);
                     if (isMounted) {
                         setCachedUrls(prev => new Map(prev).set(url, blobUrl));
                     }
+                }
+                loadedCount++;
+                if (loadedCount === urlsToCache.length && isMounted) {
+                    setIsPreparing(false);
                 }
             }
         };
@@ -266,7 +277,7 @@ export function FullscreenVideoEditor({
                 accumulated += duration;
             }
 
-            // 2. Draw current frame to canvas
+    // 2. Draw current frame to canvas
             if (loopItem) {
                 const blobUrl = cachedUrlsRef.current.get(loopItem.url);
                 const drawMedia = (media: HTMLVideoElement | HTMLImageElement) => {
@@ -294,8 +305,11 @@ export function FullscreenVideoEditor({
                         const targetVideoTime = ((loopLocalTime * (loopItem.speed || 1)) + (loopItem.trimStart || 0)) / 1000;
                         const drift = Math.abs(video.currentTime - targetVideoTime);
                         
-                        // DRIFT PREVENTION: Only re-seek if drift is > 500ms while playing, or sync perfectly if paused
-                        if (!isPlaying || drift > 0.5) {
+                        // Optimized Seek Logic:
+                        // While playing: only sync if drift is large (>500ms)
+                        // While scrubbing (not playing): sync if drift > 33ms (1 frame) to ensure live feedback
+                        const threshold = isPlaying ? 0.5 : 0.033;
+                        if (drift > threshold) {
                             video.currentTime = targetVideoTime;
                         }
 
