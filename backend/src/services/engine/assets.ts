@@ -1,5 +1,6 @@
 import sharp from "sharp";
 import { dbService as airtableService, Asset } from "../database"; // Fixed import path
+import { processVideoAssetBackground } from "./processor";
 import {
   uploadToCloudinary,
   resizeStrict,
@@ -153,7 +154,7 @@ export const assetsLogic = {
       type = "VIDEO";
     }
 
-    return await airtableService.createAsset(
+    const newAsset = await airtableService.createAsset(
       userId,
       targetUrl,
       dbAspectRatio,
@@ -161,5 +162,11 @@ export const assetsLogic = {
       undefined,
       post.projectId || undefined
     );
+
+    if (type === "VIDEO") {
+      processVideoAssetBackground(newAsset.id, targetUrl, userId).catch(e => console.error("Processor failure", e));
+    }
+
+    return newAsset;
   },
 };

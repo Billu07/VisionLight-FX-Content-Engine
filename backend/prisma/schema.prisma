@@ -178,6 +178,8 @@ model Asset {
   id          String   @id @default(uuid())
   userId      String
   url         String
+  proxyUrl    String?  // Lightweight proxy video URL for editing
+  spriteSheetUrl String? // Timeline thumbnail sprite sheet URL
   aspectRatio String
   type        String   @default("IMAGE")
   sizeBytes   Int?     // To track the 500mb limit per project

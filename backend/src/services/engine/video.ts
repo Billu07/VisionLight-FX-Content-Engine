@@ -3,6 +3,7 @@ import sharp from "sharp";
 import FormData from "form-data";
 import { dbService as airtableService, Post } from "../database";
 import { ROIService } from "../roi";
+import { processVideoAssetBackground } from "./processor";
 import {
   uploadToCloudinary,
   getOptimizedUrl,
@@ -714,7 +715,7 @@ export const videoLogic = {
       const params = post.generationParams as any;
       if (params?.source === "DRIFT_EDITOR") {
         try {
-          await airtableService.createAsset(
+          const newAsset = await airtableService.createAsset(
             userId,
             url,
             params.aspectRatio || "16:9",
@@ -722,6 +723,8 @@ export const videoLogic = {
             undefined,
             post.projectId || undefined
           );
+          // Trigger background processing for proxy and sprite sheet
+          processVideoAssetBackground(newAsset.id, url, userId).catch(e => console.error("Processor failure", e));
         } catch (e) {
           console.warn("Asset Save Failed");
         }
