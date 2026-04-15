@@ -80,8 +80,20 @@ export function FullscreenVideoEditor({
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const playheadRef = useRef<HTMLDivElement>(null);
+    const internalTimeRef = useRef(0);
+    const lastStateSyncRef = useRef(0);
     const videoPoolRef = useRef<Map<string, HTMLVideoElement>>(new Map());
     const [cachedUrls, setCachedUrls] = useState<Map<string, string>>(new Map());
+    const sequenceRef = useRef(sequence);
+    const cachedUrlsRef = useRef(cachedUrls);
+
+    useEffect(() => {
+        sequenceRef.current = sequence;
+    }, [sequence]);
+
+    useEffect(() => {
+        cachedUrlsRef.current = cachedUrls;
+    }, [cachedUrls]);
 
     const { data: projectAssets = [], isLoading: isLoadingAssets } = useQuery({
         queryKey: ["assets", projectId],
@@ -125,28 +137,28 @@ export function FullscreenVideoEditor({
         return () => { isMounted = false; };
     }, [sequence, binItems]);
 
-    // Find current item and local time
-    const { currentItem, localTime, itemStartIndex } = useMemo(() => {
-        if (sequence.length === 0) {
-            return { currentItem: null, localTime: 0, itemStartIndex: -1 };
-        }
-        const clampedTime = Math.max(0, Math.min(currentTime, totalDuration - 0.001));
+    // Helper to find item at specific time
+    const findItemAtTime = (time: number) => {
+        if (sequence.length === 0) return { item: null, localTime: 0, index: -1 };
+        const clampedTime = Math.max(0, Math.min(time, totalDuration - 0.001));
         let accumulated = 0;
-        for (let i = 0; i < sequence.length; i++) {
-            const item = sequence[i];
+        const currentSequence = sequence; 
+        for (let i = 0; i < currentSequence.length; i++) {
+            const item = currentSequence[i];
             const duration = item.duration || 3000;
             if (clampedTime >= accumulated && clampedTime < accumulated + duration) {
-                return {
-                    currentItem: item,
-                    localTime: clampedTime - accumulated,
-                    itemStartIndex: i
-                };
+                return { item, localTime: clampedTime - accumulated, index: i };
             }
             accumulated += duration;
         }
-        const lastItem = sequence[sequence.length - 1];
-        return { currentItem: lastItem, localTime: lastItem?.duration || 0, itemStartIndex: sequence.length - 1 };
-    }, [sequence, currentTime, totalDuration]);
+        const lastItem = currentSequence[currentSequence.length - 1];
+        return { item: lastItem, localTime: lastItem?.duration || 0, index: currentSequence.length - 1 };
+    };
+
+    // Find current item and local time for React UI state
+    const { item: currentItem, localTime, index: itemStartIndex } = useMemo(() => 
+        findItemAtTime(currentTime),
+    [sequence, currentTime, totalDuration]);
 
     // PRE-FETCH & POOL MANAGEMENT
     useEffect(() => {
@@ -202,19 +214,46 @@ export function FullscreenVideoEditor({
 
             // 1. Update Clock if playing
             if (isPlaying) {
-                setCurrentTime(prev => {
-                    const next = prev + delta;
-                    if (next >= totalDuration) {
-                        setIsPlaying(false);
-                        return 0;
-                    }
-                    return next;
-                });
+                internalTimeRef.current += delta;
+                if (internalTimeRef.current >= totalDuration) {
+                    internalTimeRef.current = 0;
+                    setIsPlaying(false);
+                }
+
+                // Sync React state every 100ms for UI
+                if (now - lastStateSyncRef.current > 100) {
+                    setCurrentTime(internalTimeRef.current);
+                    lastStateSyncRef.current = now;
+                }
+            } else {
+                // If paused, ensure state is perfectly in sync
+                if (Math.abs(currentTime - internalTimeRef.current) > 1) {
+                    setCurrentTime(internalTimeRef.current);
+                }
+            }
+
+            const clampedTime = Math.max(0, Math.min(internalTimeRef.current, totalDuration - 0.001));
+
+            // Find current item and local time directly in loop
+            let currentItem: SequenceItem | null = null;
+            let localTime = 0;
+            let accumulated = 0;
+            const currentSequence = sequenceRef.current;
+            
+            for (let i = 0; i < currentSequence.length; i++) {
+                const item = currentSequence[i];
+                const duration = item.duration || 3000;
+                if (clampedTime >= accumulated && clampedTime < accumulated + duration) {
+                    currentItem = item;
+                    localTime = clampedTime - accumulated;
+                    break;
+                }
+                accumulated += duration;
             }
 
             // 2. Draw current frame to canvas
             if (currentItem) {
-                const blobUrl = cachedUrls.get(currentItem.url);
+                const blobUrl = cachedUrlsRef.current.get(currentItem.url);
                 const drawMedia = (media: HTMLVideoElement | HTMLImageElement) => {
                     const canvasWidth = canvas.width;
                     const canvasHeight = canvas.height;
@@ -224,23 +263,32 @@ export function FullscreenVideoEditor({
                     if (!mediaWidth || !mediaHeight) return;
 
                     const scale = Math.min(canvasWidth / mediaWidth, canvasHeight / mediaHeight);
-                    const x = (canvasWidth / 2) - (mediaWidth / 2) * scale;
-                    const y = (canvasHeight / 2) - (mediaHeight / 2) * scale;
+                    const drawWidth = mediaWidth * scale;
+                    const drawHeight = mediaHeight * scale;
+                    const x = (canvasWidth - drawWidth) / 2;
+                    const y = (canvasHeight - drawHeight) / 2;
 
                     ctx.fillStyle = "#000";
                     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-                    ctx.drawImage(media, x, y, mediaWidth * scale, mediaHeight * scale);
+                    ctx.drawImage(media, x, y, drawWidth, drawHeight);
                 };
 
                 if (currentItem.type === "VIDEO" && blobUrl) {
                     const video = videoPoolRef.current.get(blobUrl);
                     if (video) {
                         const targetVideoTime = ((localTime * (currentItem.speed || 1)) + (currentItem.trimStart || 0)) / 1000;
-                        if (Math.abs(video.currentTime - targetVideoTime) > 0.03) {
+                        const drift = Math.abs(video.currentTime - targetVideoTime);
+                        
+                        // Only re-seek if drift is significant (> 100ms) or we're paused
+                        if (!isPlaying || drift > 0.1) {
                             video.currentTime = targetVideoTime;
                         }
-                        if (isPlaying && video.paused) video.play().catch(() => {});
-                        if (!isPlaying && !video.paused) video.pause();
+
+                        if (isPlaying && video.paused) {
+                            video.play().catch(() => {});
+                        } else if (!isPlaying && !video.paused) {
+                            video.pause();
+                        }
 
                         if (video.readyState >= 2) {
                             drawMedia(video);
@@ -271,7 +319,7 @@ export function FullscreenVideoEditor({
 
             // 3. Update Playhead (Uncontrolled for 60fps)
             if (playheadRef.current) {
-                const percentage = (currentTime / totalDuration) * 100;
+                const percentage = (clampedTime / totalDuration) * 100;
                 playheadRef.current.style.transform = `translateX(${percentage}%)`;
             }
 
@@ -281,8 +329,15 @@ export function FullscreenVideoEditor({
         animationRef.current = requestAnimationFrame(render);
         return () => {
             if (animationRef.current) cancelAnimationFrame(animationRef.current);
+            // Cleanup video pool on unmount
+            videoPoolRef.current.forEach(v => {
+                v.pause();
+                v.src = "";
+                v.load();
+            });
+            videoPoolRef.current.clear();
         };
-    }, [isPlaying, totalDuration, currentItem, localTime, currentTime, cachedUrls]);
+    }, [isPlaying, totalDuration, sequence]);
 
     // Keyboard Shortcuts
     useEffect(() => {
@@ -296,11 +351,11 @@ export function FullscreenVideoEditor({
                     break;
                 case "ArrowLeft":
                     e.preventDefault();
-                    handleSeek(currentTime - (e.shiftKey ? 1000 : 33)); // 1 frame at 30fps
+                    handleSeek(internalTimeRef.current - (e.shiftKey ? 1000 : 33)); // 1 frame at 30fps
                     break;
                 case "ArrowRight":
                     e.preventDefault();
-                    handleSeek(currentTime + (e.shiftKey ? 1000 : 33));
+                    handleSeek(internalTimeRef.current + (e.shiftKey ? 1000 : 33));
                     break;
                 case "KeyM":
                     handleToggleMarker();
@@ -316,14 +371,15 @@ export function FullscreenVideoEditor({
         };
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [currentTime, isPlaying, totalDuration, selectedItemId]);
+    }, [isPlaying, totalDuration, selectedItemId, markers]); // Added markers to deps so handleToggleMarker has fresh list
 
     const handleToggleMarker = () => {
-        const existing = markers.find(m => Math.abs(m.time - currentTime) < 100);
+        const time = internalTimeRef.current;
+        const existing = markers.find(m => Math.abs(m.time - time) < 100);
         if (existing) {
             setMarkers(prev => prev.filter(m => m.id !== existing.id));
         } else {
-            setMarkers(prev => [...prev, { id: crypto.randomUUID(), time: currentTime }]);
+            setMarkers(prev => [...prev, { id: crypto.randomUUID(), time }]);
         }
     };
 
@@ -359,15 +415,26 @@ export function FullscreenVideoEditor({
 
     const handleTogglePlay = () => {
         if (sequence.length === 0) return;
-        if (currentTime >= totalDuration) setCurrentTime(0);
+        if (internalTimeRef.current >= totalDuration) {
+            internalTimeRef.current = 0;
+            setCurrentTime(0);
+        }
         setIsPlaying(!isPlaying);
     };
 
     const handleSeek = (time: number) => {
-        // Snap to markers if within 100ms
+        // Snap to markers if within 150ms
         const snapMarker = markers.find(m => Math.abs(m.time - time) < 150);
-        const finalTime = snapMarker ? snapMarker.time : time;
-        setCurrentTime(Math.max(0, Math.min(finalTime, totalDuration)));
+        const finalTime = Math.max(0, Math.min(snapMarker ? snapMarker.time : time, totalDuration));
+        
+        internalTimeRef.current = finalTime;
+        setCurrentTime(finalTime);
+
+        // Immediate playhead sync
+        if (playheadRef.current) {
+            const percentage = (finalTime / totalDuration) * 100;
+            playheadRef.current.style.transform = `translateX(${percentage}%)`;
+        }
     };
 
     const handleSplit = () => {
@@ -471,9 +538,12 @@ export function FullscreenVideoEditor({
                 }
 
                 if (draggingEdge.edge === 'left') {
+                    internalTimeRef.current = accumulated;
                     setCurrentTime(accumulated);
                 } else {
-                    setCurrentTime(accumulated + newDuration - 50); // Show just before the very end frame
+                    const time = accumulated + newDuration - 50;
+                    internalTimeRef.current = time;
+                    setCurrentTime(time); // Show just before the very end frame
                 }
 
                 return newSeq;
@@ -1234,7 +1304,7 @@ export function FullscreenVideoEditor({
                         <div
                             ref={playheadRef}
                             className="absolute top-0 bottom-0 w-[2px] bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.8)] z-20 pointer-events-none transition-none"
-                            style={{ left: 0, transform: `translateX(${(currentTime / totalDuration) * 100}%)` }}
+                            style={{ left: 0 }}
                         >
                             <div className="w-3 h-3 bg-cyan-500 rounded-full -ml-[5.5px] -mt-1 shadow-lg border border-white/20"></div>
                             {/* Vertical Line across track */}
