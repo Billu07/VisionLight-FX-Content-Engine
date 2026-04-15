@@ -142,7 +142,6 @@ export function FullscreenVideoEditor({
             }
 
             // We only block "Preparing Studio" for items actually on the timeline (sequence)
-            // Bin items will be cached silently in the background
             const sequenceUrls = new Set(sequence.map(i => i.url));
             let sequenceLoadedCount = 0;
             const sequenceTotal = sequenceUrls.size;
@@ -236,6 +235,8 @@ export function FullscreenVideoEditor({
 
     const imagePoolRef = useRef<Map<string, HTMLImageElement>>(new Map());
 
+    const pixelsPerMs = (zoom) / 10; // At zoom 1, 100px = 1s
+
     // RENDER LOOP (Dual-Loop Architecture) - Completely Stable & Continuous
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -292,7 +293,7 @@ export function FullscreenVideoEditor({
                 accumulated += duration;
             }
 
-    // 2. Draw current frame to canvas
+            // 2. Draw current frame to canvas
             if (loopItem) {
                 const blobUrl = cachedUrlsRef.current.get(loopItem.url);
                 const drawMedia = (media: HTMLVideoElement | HTMLImageElement) => {
@@ -320,9 +321,7 @@ export function FullscreenVideoEditor({
                         const targetVideoTime = ((loopLocalTime * (loopItem.speed || 1)) + (loopItem.trimStart || 0)) / 1000;
                         const drift = Math.abs(video.currentTime - targetVideoTime);
                         
-                        // Optimized Seek Logic:
-                        // While playing: only sync if drift is large (>500ms)
-                        // While scrubbing (not playing): sync if drift > 33ms (1 frame) to ensure live feedback
+                        // Optimized Seek Logic for live feedback while scrubbing
                         const threshold = isPlaying ? 0.5 : 0.033;
                         if (drift > threshold) {
                             video.currentTime = targetVideoTime;
@@ -361,10 +360,9 @@ export function FullscreenVideoEditor({
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
 
-            // 3. Update Playhead every single frame based on internalTimeRef
+            // 3. Update Playhead every single frame based on internalTimeRef (Pixels)
             if (playheadRef.current && totalDur > 0) {
-                const percentage = (clampedTime / totalDur) * 100;
-                playheadRef.current.style.left = `${percentage}%`;
+                playheadRef.current.style.left = `${clampedTime * pixelsPerMs}px`;
             }
 
             animationRef.current = requestAnimationFrame(render);
@@ -381,7 +379,7 @@ export function FullscreenVideoEditor({
             });
             videoPoolRef.current.clear();
         };
-    }, []); // Continuous loop
+    }, [pixelsPerMs]); // Re-run loop only if zoom (pixelsPerMs) changes
 
     // Keyboard Shortcuts
     useEffect(() => {
@@ -429,8 +427,8 @@ export function FullscreenVideoEditor({
 
     const handleZoomFit = () => {
         if (!timelineRef.current || totalDuration <= 0) return;
-        // Formula: zoom = (clientWidth / totalDuration) * 100
-        const newZoom = (timelineRef.current.clientWidth / totalDuration) * 100;
+        const containerWidth = timelineRef.current.parentElement?.clientWidth || 1000;
+        const newZoom = (containerWidth / totalDuration) * 10;
         setZoom(Math.max(0.1, newZoom));
     };
 
@@ -481,8 +479,7 @@ export function FullscreenVideoEditor({
         setCurrentTime(finalTime);
 
         if (playheadRef.current && totalDurationRef.current > 0) {
-            const percentage = (finalTime / totalDurationRef.current) * 100;
-            playheadRef.current.style.left = `${percentage}%`;
+            playheadRef.current.style.left = `${finalTime * pixelsPerMs}px`;
         }
     };
 
@@ -544,7 +541,7 @@ export function FullscreenVideoEditor({
             if (!timelineRef.current) return;
 
             const deltaX = e.clientX - draggingEdge.initialX;
-            const msPerPx = 100 / zoom;
+            const msPerPx = 1 / pixelsPerMs;
             const deltaTimeMs = deltaX * msPerPx;
 
             const itemIndex = sequenceRef.current.findIndex(i => i.id === draggingEdge.id);
@@ -595,7 +592,7 @@ export function FullscreenVideoEditor({
             window.removeEventListener('mousemove', handleMouseMove);
             window.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [draggingEdge, zoom]);
+    }, [draggingEdge, zoom, pixelsPerMs]);
 
     const handleTimelineMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
         if ((e.target as HTMLElement).closest('.drag-handle')) return;
@@ -604,9 +601,7 @@ export function FullscreenVideoEditor({
             if (!timelineRef.current) return;
             const rect = timelineRef.current.getBoundingClientRect();
             const x = clientX - rect.left;
-            const width = rect.width;
-            const percentage = Math.max(0, Math.min(x / width, 1));
-            const clickedTime = percentage * totalDurationRef.current;
+            const clickedTime = x / pixelsPerMs;
             handleSeek(clickedTime);
         };
 
@@ -690,6 +685,8 @@ export function FullscreenVideoEditor({
         const centiseconds = Math.floor((ms % 1000) / 10);
         return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}`;
     };
+
+    const timelineWidthPx = totalDuration * pixelsPerMs;
 
     return (
         <div className="fixed inset-0 z-[100] bg-[#0f0f0f] text-gray-200 flex flex-col font-sans select-none overflow-hidden animate-in fade-in zoom-in-95 duration-300">
@@ -900,9 +897,9 @@ export function FullscreenVideoEditor({
                             </button>
                         </div>
                         <div className="h-16 flex items-center justify-center gap-8 mt-4">
-                            <button className="text-gray-500 hover:text-white" onClick={() => handleSeek(currentTime - 5000)}>⏪</button>
+                            <button className="text-gray-500 hover:text-white" onClick={() => handleSeek(internalTimeRef.current - 5000)}>⏪</button>
                             <button onClick={handleTogglePlay} className="w-14 h-14 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 transition-transform shadow-xl">{isPlaying ? "⏸" : "▶"}</button>
-                            <button className="text-gray-500 hover:text-white" onClick={() => handleSeek(currentTime + 5000)}>⏩</button>
+                            <button className="text-gray-500 hover:text-white" onClick={() => handleSeek(internalTimeRef.current + 5000)}>⏩</button>
                         </div>
                     </div>
                 </div>
@@ -932,11 +929,11 @@ export function FullscreenVideoEditor({
                 </div>
 
                 <div className="flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar-h" style={{ scrollBehavior: 'smooth' }}>
-                    <div ref={timelineRef} className="h-full relative py-6" style={{ width: `${Math.max(100, (totalDuration / 100) * zoom)}%`, minWidth: '100%', paddingRight: '100px' }} onMouseDown={handleTimelineMouseDown}>
+                    <div ref={timelineRef} className="h-full relative py-6" style={{ width: `${Math.max(100, (timelineWidthPx / (timelineRef.current?.parentElement?.clientWidth || 1)) * 100)}%`, minWidth: '100%' }} onMouseDown={handleTimelineMouseDown}>
                         {/* Time Rulers */}
                         <div className="absolute top-0 left-0 right-0 h-6 flex items-end border-b border-white/5 bg-black/20 pointer-events-none">
                             {Array.from({ length: Math.ceil(totalDuration / 1000) + 1 }).map((_, i) => (
-                                <div key={i} className="border-l border-gray-600 h-3 flex-shrink-0" style={{ width: `${(1000 / totalDuration) * 100}%`, minWidth: '1px' }}>
+                                <div key={i} className="border-l border-gray-600 h-3 flex-shrink-0" style={{ width: `${1000 * pixelsPerMs}px`, minWidth: '1px' }}>
                                     <span className="text-[7px] ml-1 text-gray-500 font-mono">{i}s</span>
                                 </div>
                             ))}
@@ -945,17 +942,17 @@ export function FullscreenVideoEditor({
                         <div className="absolute top-6 left-0 right-0 h-4 z-10">
                             {markers.map(marker => (
                                 <div key={marker.id} className="absolute top-0 w-3 h-3 bg-cyan-400 rounded-sm transform -rotate-45 -translate-x-1/2 cursor-pointer hover:bg-white shadow-[0_0_8px_rgba(34,211,238,0.8)]"
-                                     style={{ left: `${(marker.time / totalDuration) * 100}%` }} onClick={(e) => { e.stopPropagation(); handleSeek(marker.time); }} />
+                                     style={{ left: `${marker.time * pixelsPerMs}px` }} onClick={(e) => { e.stopPropagation(); handleSeek(marker.time); }} />
                             ))}
                         </div>
                         {/* Video Track */}
-                        <div className="relative h-24 bg-white/5 rounded-xl flex items-center px-0 mt-4">
+                        <div className="relative h-24 bg-white/5 rounded-xl flex items-center px-0 mt-4 overflow-hidden" style={{ width: `${timelineWidthPx}px` }}>
                             {sequence.map((item, idx) => (
                                 <div key={item.id} draggable onDragStart={() => setDraggedItemIndex(idx)} onDragOver={(e) => e.preventDefault()}
                                      onDrop={(e) => { e.preventDefault(); if (draggedItemIndex === null || draggedItemIndex === idx) return; setSequence(prev => { const newSeq = [...prev]; const [movedItem] = newSeq.splice(draggedItemIndex, 1); newSeq.splice(idx, 0, movedItem); return newSeq; }); setDraggedItemIndex(null); }}
                                      onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
                                      className={`h-20 border-r border-black/50 overflow-hidden relative transition-all cursor-pointer ${selectedItemId === item.id ? 'ring-2 ring-purple-500 z-10' : itemStartIndex === idx ? 'ring-2 ring-cyan-500' : ''}`}
-                                     style={{ width: `${((item.duration || 3000) / totalDuration) * 100}%` }}>
+                                     style={{ width: `${(item.duration || 3000) * pixelsPerMs}px` }}>
                                     {item.type === "VIDEO" ? <video src={cachedUrls.get(item.url)} className="w-full h-full object-cover opacity-50 pointer-events-none" /> : <img src={cachedUrls.get(item.url)} className="w-full h-full object-cover opacity-50 pointer-events-none" />}
                                     <div className="absolute bottom-2 left-2 text-[9px] font-bold text-white/80 truncate">{item.title || "Clip"}</div>
                                     {selectedItemId === item.id && (
@@ -968,14 +965,14 @@ export function FullscreenVideoEditor({
                             ))}
                         </div>
                         {/* Audio Track */}
-                        <div className="relative h-12 bg-emerald-500/5 rounded-xl flex items-center px-0 mt-2 border border-emerald-500/10">
+                        <div className="relative h-12 bg-emerald-500/5 rounded-xl flex items-center px-0 mt-2 border border-emerald-500/10 overflow-hidden" style={{ width: `${timelineWidthPx}px` }}>
                             {audioTracks?.map((track) => (
                                 <div key={track.id} 
                                      onClick={(e) => { e.stopPropagation(); setSelectedItemId(track.id); }}
                                      className={`h-10 bg-emerald-500/20 border border-emerald-500/40 rounded-lg absolute flex items-center px-3 cursor-pointer transition-all ${selectedItemId === track.id ? 'ring-2 ring-white z-10' : ''}`}
                                      style={{ 
-                                         left: `${(track.startTime / totalDuration) * 100}%`,
-                                         width: `${(track.duration / totalDuration) * 100}%` 
+                                         left: `${track.startTime * pixelsPerMs}px`,
+                                         width: `${track.duration * pixelsPerMs}px` 
                                      }}>
                                     <span className="text-[9px] font-bold text-emerald-400 truncate">🎵 {track.title}</span>
                                 </div>
