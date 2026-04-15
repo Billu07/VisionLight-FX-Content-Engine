@@ -11,6 +11,8 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB Limit
 interface Asset {
   id: string;
   url: string;
+  proxyUrl?: string;
+  spriteSheetUrl?: string;
   aspectRatio: "16:9" | "9:16" | "1:1" | "original" | "custom" | "3DX_FRAME";
   type: "IMAGE" | "VIDEO";
   createdAt: string;

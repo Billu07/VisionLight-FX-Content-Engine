@@ -24,6 +24,8 @@ export interface AudioItem {
 export interface SequenceItem {
     id: string;
     url: string;
+    proxyUrl?: string;
+    spriteSheetUrl?: string;
     type: "IMAGE" | "VIDEO" | "CAROUSEL";
     title?: string;
     duration?: number; // In milliseconds
@@ -132,8 +134,8 @@ export function FullscreenVideoEditor({
         let isMounted = true;
         const cacheAssets = async () => {
             const urlsToCache = [...new Set([
-                ...sequence.map(i => i.url),
-                ...binItems.map(i => i.url)
+                ...sequence.map(i => i.type === "VIDEO" ? (i.proxyUrl || i.url) : i.url),
+                ...binItems.map(i => i.type === "VIDEO" ? (i.proxyUrl || i.url) : i.url)
             ])];
 
             if (urlsToCache.length === 0) {
@@ -142,7 +144,7 @@ export function FullscreenVideoEditor({
             }
 
             // We only block "Preparing Studio" for items actually on the timeline (sequence)
-            const sequenceUrls = new Set(sequence.map(i => i.url));
+            const sequenceUrls = new Set(sequence.map(i => i.type === "VIDEO" ? (i.proxyUrl || i.url) : i.url));
             let sequenceLoadedCount = 0;
             const sequenceTotal = sequenceUrls.size;
 
@@ -198,7 +200,7 @@ export function FullscreenVideoEditor({
     // PRE-FETCH & POOL MANAGEMENT
     useEffect(() => {
         const pool = videoPoolRef.current;
-        const activeUrls = new Set(sequence.filter(i => i.type === "VIDEO").map(i => cachedUrls.get(i.url)).filter(Boolean));
+        const activeUrls = new Set(sequence.filter(i => i.type === "VIDEO").map(i => cachedUrls.get(i.proxyUrl || i.url)).filter(Boolean));
 
         // Cleanup stale videos from pool
         pool.forEach((video, url) => {
@@ -216,7 +218,7 @@ export function FullscreenVideoEditor({
         for (let i = startIndex; i < Math.min(sequence.length, startIndex + lookAheadCount); i++) {
             const item = sequence[i];
             if (item.type === "VIDEO") {
-                const blobUrl = cachedUrls.get(item.url);
+                const blobUrl = cachedUrls.get(item.proxyUrl || item.url);
                 if (blobUrl && !pool.has(blobUrl)) {
                     const v = document.createElement("video");
                     v.src = blobUrl;
@@ -295,7 +297,7 @@ export function FullscreenVideoEditor({
 
             // 2. Draw current frame to canvas
             if (loopItem) {
-                const blobUrl = cachedUrlsRef.current.get(loopItem.url);
+                const blobUrl = cachedUrlsRef.current.get(loopItem.proxyUrl || loopItem.url);
                 const drawMedia = (media: HTMLVideoElement | HTMLImageElement) => {
                     const canvasWidth = canvas.width;
                     const canvasHeight = canvas.height;
@@ -836,8 +838,8 @@ export function FullscreenVideoEditor({
                                     {isLoadingAssets ? <div className="col-span-2 flex justify-center py-10"><LoadingSpinner /></div> : 
                                      projectAssets.filter((a: any) => a.aspectRatio !== "EXPORTED_VIDEO").map((asset: any) => (
                                         <div key={asset.id} className="relative aspect-square bg-black rounded-lg border border-white/5 overflow-hidden group cursor-pointer hover:border-cyan-500/50 transition-all"
-                                             onClick={() => { setBinItems(prev => [...prev, { id: crypto.randomUUID(), url: asset.url, type: asset.type === "VIDEO" ? "VIDEO" : "IMAGE", duration: asset.type === "VIDEO" ? 5000 : 3000, originalDuration: asset.type === "VIDEO" ? 15000 : 3000, title: asset.type === "VIDEO" ? "Video Clip" : "Image Frame" }]); setSidebarTab("bin"); }}>
-                                            {asset.type === "VIDEO" ? <video src={getCORSProxyUrl(asset.url)} className="w-full h-full object-cover" muted /> : <img src={getCORSProxyUrl(asset.url)} className="w-full h-full object-cover" crossOrigin="anonymous" />}
+                                             onClick={() => { setBinItems(prev => [...prev, { id: crypto.randomUUID(), url: asset.url, proxyUrl: asset.proxyUrl, spriteSheetUrl: asset.spriteSheetUrl, type: asset.type === "VIDEO" ? "VIDEO" : "IMAGE", duration: asset.type === "VIDEO" ? 5000 : 3000, originalDuration: asset.type === "VIDEO" ? 15000 : 3000, title: asset.type === "VIDEO" ? "Video Clip" : "Image Frame" }]); setSidebarTab("bin"); }}>
+                                            {asset.type === "VIDEO" ? <video src={getCORSProxyUrl(asset.proxyUrl || asset.url)} className="w-full h-full object-cover" muted /> : <img src={getCORSProxyUrl(asset.url)} className="w-full h-full object-cover" crossOrigin="anonymous" />}
                                             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm p-2">
                                                 <span className="bg-cyan-600 text-white text-[9px] font-bold px-2 py-1.5 rounded uppercase shadow-lg">+ Add to Bin</span>
                                             </div>
@@ -850,7 +852,7 @@ export function FullscreenVideoEditor({
                                     {binItems.map((item, idx) => (
                                         <div key={item.id} className="relative aspect-square bg-black rounded-lg border border-white/5 overflow-hidden group cursor-pointer hover:border-purple-500/50 transition-all"
                                              onClick={() => { setSequence(prev => [...prev, { ...item, id: crypto.randomUUID() }]); }}>
-                                            {item.type === "VIDEO" ? <video src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover" muted /> : <img src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover" />}
+                                            {item.type === "VIDEO" ? <video src={getCORSProxyUrl(item.proxyUrl || item.url)} className="w-full h-full object-cover" muted /> : <img src={getCORSProxyUrl(item.url)} className="w-full h-full object-cover" />}
                                             <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button onClick={(e) => { e.stopPropagation(); setBinItems(prev => prev.filter((_, i) => i !== idx)); }} className="w-5 h-5 bg-red-600/80 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-[10px]">✕</button>
                                             </div>
@@ -953,7 +955,15 @@ export function FullscreenVideoEditor({
                                      onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
                                      className={`h-20 border-r border-black/50 overflow-hidden relative transition-all cursor-pointer ${selectedItemId === item.id ? 'ring-2 ring-purple-500 z-10' : itemStartIndex === idx ? 'ring-2 ring-cyan-500' : ''}`}
                                      style={{ width: `${(item.duration || 3000) * pixelsPerMs}px` }}>
-                                    {item.type === "VIDEO" ? <video src={cachedUrls.get(item.url)} className="w-full h-full object-cover opacity-50 pointer-events-none" /> : <img src={cachedUrls.get(item.url)} className="w-full h-full object-cover opacity-50 pointer-events-none" />}
+                                    {item.type === "VIDEO" ? (
+                                        item.spriteSheetUrl ? (
+                                            <div className="w-full h-full opacity-50 pointer-events-none" style={{ backgroundImage: `url(${getCORSProxyUrl(item.spriteSheetUrl)})`, backgroundSize: 'auto 100%', backgroundRepeat: 'repeat-x', backgroundPosition: 'left center' }} />
+                                        ) : (
+                                            <video src={cachedUrls.get(item.proxyUrl || item.url)} className="w-full h-full object-cover opacity-50 pointer-events-none" />
+                                        )
+                                    ) : (
+                                        <img src={cachedUrls.get(item.url)} className="w-full h-full object-cover opacity-50 pointer-events-none" />
+                                    )}
                                     <div className="absolute bottom-2 left-2 text-[9px] font-bold text-white/80 truncate">{item.title || "Clip"}</div>
                                     {selectedItemId === item.id && (
                                         <>
