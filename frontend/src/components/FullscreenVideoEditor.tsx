@@ -75,6 +75,7 @@ export function FullscreenVideoEditor({
 
     const [isExporting, setIsExporting] = useState(false);
     const [exportProgress, setExportProgress] = useState(0);
+    const [exportStatusMsg, setExportStatusMsg] = useState("Initializing...");
     const [showExportModal, setShowExportModal] = useState(false);
     const [exportFps, setExportFps] = useState(30);
 
@@ -598,10 +599,17 @@ export function FullscreenVideoEditor({
                 accumulated += newSeq[i].duration || 3000;
             }
 
-            const targetTime = draggingEdge.edge === 'left' ? accumulated : accumulated + newDuration;
+            // INSTANT PREVIEW: Update internalTimeRef to show the frame being trimmed
+            // INSTANT PREVIEW: Update internalTimeRef to show the frame being trimmed
+            const targetTime = draggingEdge.edge === 'left' ? accumulated : accumulated + newDuration - 1;
             internalTimeRef.current = targetTime;
             setCurrentTime(targetTime);
-        };
+
+            // Sync playhead immediately for visual feedback
+            if (playheadRef.current) {
+                playheadRef.current.style.left = `${targetTime * pixelsPerMs}px`;
+            }
+            };
 
         const handleMouseUp = () => {
             setDraggingEdge(null);
@@ -671,30 +679,47 @@ export function FullscreenVideoEditor({
         setShowExportModal(false);
         setIsExporting(true);
         setExportProgress(0);
-
-        const progressInterval = setInterval(() => {
-            setExportProgress(prev => {
-                if (prev >= 90) return prev;
-                const increment = prev > 70 ? 2 : prev > 40 ? 5 : 10;
-                return prev + increment;
-            });
-        }, 1000);
+        setExportStatusMsg("Initializing render...");
 
         try {
             const editorState = { sequence, audioTracks: audioTracks || [] };
-            await apiEndpoints.exportVideo({ editorState, projectId, fps: exportFps });
-            clearInterval(progressInterval);
-            setExportProgress(100);
-            queryClient.invalidateQueries({ queryKey: ["assets"] });
-            setTimeout(() => {
-                setIsExporting(false);
-                setSidebarTab("exports");
-                if (!sidebarOpen) setSidebarOpen(true);
-            }, 500);
+            const res = await apiEndpoints.exportVideo({ editorState, projectId, fps: exportFps });
+            
+            if (res.data.success && res.data.postId) {
+                const postId = res.data.postId;
+                
+                // Poll for progress
+                const pollInterval = setInterval(async () => {
+                    try {
+                        const statusRes = await apiEndpoints.getPostStatus(postId);
+                        const { status, progress, error, generationStep } = statusRes.data;
+                        
+                        setExportProgress(progress || 0);
+                        if (generationStep) setExportStatusMsg(generationStep);
+
+                        if (status === "READY" || status === "COMPLETED") {
+                            clearInterval(pollInterval);
+                            setExportProgress(100);
+                            setExportStatusMsg("Ready");
+                            queryClient.invalidateQueries({ queryKey: ["assets"] });
+                            setTimeout(() => {
+                                setIsExporting(false);
+                                setSidebarTab("exports");
+                                if (!sidebarOpen) setSidebarOpen(true);
+                            }, 1000);
+                        } else if (status === "FAILED") {
+                            clearInterval(pollInterval);
+                            setIsExporting(false);
+                            alert("Export failed: " + (error || "Unknown server error"));
+                        }
+                    } catch (err) {
+                        console.error("Polling error", err);
+                    }
+                }, 2000);
+            }
         } catch (e) {
-            clearInterval(progressInterval);
             console.error(e);
-            alert("Failed to export video. Check console for details.");
+            alert("Failed to initiate export video.");
             setIsExporting(false);
         }
     };
@@ -752,6 +777,7 @@ export function FullscreenVideoEditor({
                 <div className="absolute inset-0 z-[200] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center">
                     <div className="w-96 p-8 bg-gray-900 border border-gray-700 rounded-2xl flex flex-col items-center">
                         <h3 className="text-white font-bold text-lg mb-2">Rendering Video</h3>
+                        <p className="text-xs text-gray-400 mb-4 animate-pulse">{exportStatusMsg}</p>
                         <div className="w-full bg-gray-800 rounded-full h-3 mb-2 overflow-hidden">
                             <div className="bg-cyan-500 h-full transition-all duration-300" style={{ width: `${exportProgress}%` }}></div>
                         </div>
@@ -950,7 +976,7 @@ export function FullscreenVideoEditor({
                 </div>
 
                 <div className="flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar-h" style={{ scrollBehavior: 'smooth' }}>
-                    <div ref={timelineRef} className="h-full relative py-6" style={{ width: `${Math.max(100, (timelineWidthPx / (timelineRef.current?.parentElement?.clientWidth || 1)) * 100)}%`, minWidth: '100%' }} onMouseDown={handleTimelineMouseDown}>
+                    <div ref={timelineRef} className="h-full relative py-6" style={{ width: `${Math.max(timelineRef.current?.parentElement?.clientWidth || 0, timelineWidthPx)}px`, minWidth: '100%' }} onMouseDown={handleTimelineMouseDown}>
                         {/* Time Rulers */}
                         <div className="absolute top-0 left-0 right-0 h-6 flex items-end border-b border-white/5 bg-black/20 pointer-events-none">
                             {Array.from({ length: Math.ceil(totalDuration / 1000) + 1 }).map((_, i) => (

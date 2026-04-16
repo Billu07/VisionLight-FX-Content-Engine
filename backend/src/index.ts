@@ -417,15 +417,43 @@ app.post("/api/export/video", authenticateToken, async (req: AuthenticatedReques
       return res.status(400).json({ error: "Invalid editor state provided." });
     }
 
-    // In a production app, you might want to run this in a background job queue (like BullMQ)
-    // because FFmpeg rendering can take a long time and time out the HTTP request.
-    // For now, we will await it directly.
-    const finalUrl = await renderVideoSequence(editorState, req.user!.id, projectId, fps || 30);
+    // 1. Create a "Post" record to track the background job progress
+    const post = await airtableService.createPost({
+      userId: req.user!.id,
+      title: `Export: ${new Date().toLocaleString()}`,
+      prompt: "Video Export",
+      mediaType: "video",
+      status: "PROCESSING",
+      platform: "Internal",
+      projectId: projectId || undefined,
+      generationStep: "Starting render...",
+      progress: 0,
+    });
 
-    res.json({ success: true, url: finalUrl });
+    // 2. Fire and forget the render process in the background
+    renderVideoSequence(editorState, req.user!.id, projectId, fps || 30, post.id)
+      .then(async (finalUrl) => {
+        // Mark as ready when done
+        await airtableService.updatePost(post.id, {
+          status: "READY",
+          mediaUrl: finalUrl,
+          progress: 100,
+          generationStep: "Ready"
+        });
+      })
+      .catch(async (error) => {
+        console.error(`Export Background Error [${post.id}]:`, error);
+        await airtableService.updatePost(post.id, {
+          status: "FAILED",
+          error: error.message
+        });
+      });
+
+    // 3. Return the post ID immediately so the frontend can poll for progress
+    res.json({ success: true, postId: post.id });
   } catch (error: any) {
-    console.error("Export Error:", error);
-    res.status(500).json({ error: "Failed to render video: " + error.message });
+    console.error("Export Route Error:", error);
+    res.status(500).json({ error: "Failed to initiate video export: " + error.message });
   }
 });
 // ✅ Sync Upload (Magic Edit & Direct Reference)

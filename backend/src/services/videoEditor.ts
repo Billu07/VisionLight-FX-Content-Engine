@@ -167,10 +167,17 @@ export const renderVideoSequence = async (
   editorState: EditorState,
   userId: string,
   projectId?: string,
-  fps: number = 30
+  fps: number = 30,
+  postId?: string // Pass the post ID to track progress
 ): Promise<string> => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "visionlight-render-"));
   
+  const updateProgress = async (progress: number, step: string) => {
+    if (postId) {
+      await dbService.updatePost(postId, { progress, generationStep: step });
+    }
+  };
+
   try {
     const { sequence, audioTracks } = editorState;
 
@@ -178,11 +185,16 @@ export const renderVideoSequence = async (
       throw new Error("Timeline is empty.");
     }
 
+    await updateProgress(5, "Downloading clips...");
+
     const processedClips: string[] = [];
 
     // 1. Download and process each sequence item into a standard MP4
     for (let i = 0; i < sequence.length; i++) {
       const item = sequence[i];
+      const stepProgress = 5 + Math.floor((i / sequence.length) * 60);
+      await updateProgress(stepProgress, `Processing clip ${i + 1}/${sequence.length}...`);
+
       const ext = item.type === "VIDEO" ? ".mp4" : ".jpg";
       const localPath = path.join(tempDir, `raw_clip_${i}${ext}`);
       const processedPath = path.join(tempDir, `processed_clip_${i}.mp4`);
@@ -199,11 +211,13 @@ export const renderVideoSequence = async (
     // 2. Concat the standardized clips
     const concatenatedVideoPath = path.join(tempDir, "concatenated.mp4");
     console.log(`Concatenating ${processedClips.length} clips...`);
+    await updateProgress(70, "Assembling project...");
     await concatClips(processedClips, concatenatedVideoPath);
 
     // 3. Mix audio tracks
     const finalOutputPath = path.join(tempDir, "final_output.mp4");
     console.log(`Mixing audio tracks...`);
+    await updateProgress(85, "Mixing audio...");
     
     // Clean audio urls too
     const cleanAudioTracks = (audioTracks || []).map(a => ({ ...a, url: cleanUrl(a.url) }));
@@ -211,6 +225,7 @@ export const renderVideoSequence = async (
 
     // 4. Upload to Cloudinary / R2
     console.log(`Uploading final render...`);
+    await updateProgress(95, "Uploading final render...");
     const fileBuffer = fs.readFileSync(finalOutputPath);
     const finalUrl = await uploadToCloudinary(
       fileBuffer,
@@ -231,9 +246,13 @@ export const renderVideoSequence = async (
       fileBuffer.length
     );
 
+    await updateProgress(100, "Ready");
     return finalUrl;
   } catch (err) {
       console.error("Rendering failed:", err);
+      if (postId) {
+        await dbService.updatePost(postId, { status: "FAILED", error: (err as any).message });
+      }
       throw err;
   } finally {
       // Clean up temp directory
