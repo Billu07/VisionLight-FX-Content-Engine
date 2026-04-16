@@ -132,13 +132,13 @@ export function FullscreenVideoEditor({
     const timelineRef = useRef<HTMLDivElement>(null);
     const animationRef = useRef<number | null>(null);
 
-    // Blob Caching Engine
+    // Blob Caching Engine - Now Non-Blocking
     useEffect(() => {
         let isMounted = true;
         const cacheAssets = async () => {
             const urlsToCache = [...new Set([
-                ...sequence.map(i => i.type === "VIDEO" ? (i.proxyUrl || i.url) : i.url),
-                ...binItems.map(i => i.type === "VIDEO" ? (i.proxyUrl || i.url) : i.url)
+                ...sequence.map(i => i.type === "VIDEO" ? (i.hlsUrl || i.proxyUrl || i.url) : i.url),
+                ...binItems.map(i => i.type === "VIDEO" ? (i.hlsUrl || i.proxyUrl || i.url) : i.url)
             ])];
 
             if (urlsToCache.length === 0) {
@@ -146,15 +146,11 @@ export function FullscreenVideoEditor({
                 return;
             }
 
-            // We only block "Preparing Studio" for items actually on the timeline (sequence)
-            const sequenceUrls = new Set(sequence.map(i => i.type === "VIDEO" ? (i.proxyUrl || i.url) : i.url));
-            let sequenceLoadedCount = 0;
-            const sequenceTotal = sequenceUrls.size;
-
-            if (sequenceTotal === 0) setIsPreparing(false);
+            // We no longer block the UI with "Preparing Studio".
+            // Users see the timeline instantly, and clips show a "Loading" spinner until cached.
+            setIsPreparing(false); 
 
             for (const url of urlsToCache) {
-                const isTimelineItem = sequenceUrls.has(url);
                 if (!cachedUrls.has(url)) {
                     const blobUrl = await videoEngine.getAssetUrl(url, getCORSProxyUrl);
                     if (isMounted) {
@@ -163,13 +159,6 @@ export function FullscreenVideoEditor({
                             next.set(url, blobUrl);
                             return next;
                         });
-                    }
-                }
-                
-                if (isTimelineItem) {
-                    sequenceLoadedCount++;
-                    if (sequenceLoadedCount >= sequenceTotal && isMounted) {
-                        setIsPreparing(false);
                     }
                 }
             }
@@ -1000,6 +989,14 @@ export function FullscreenVideoEditor({
                                      onClick={(e) => { e.stopPropagation(); setSelectedItemId(item.id); }}
                                      className={`h-20 border-r border-black/50 overflow-hidden relative transition-all cursor-pointer ${selectedItemId === item.id ? 'ring-2 ring-purple-500 z-10' : itemStartIndex === idx ? 'ring-2 ring-cyan-500' : ''}`}
                                      style={{ width: `${(item.duration || 3000) * pixelsPerMs}px` }}>
+                                    {/* Loading Overlay */}
+                                    {!cachedUrls.has(item.type === "VIDEO" ? (item.proxyUrl || item.url) : item.url) && (
+                                        <div className="absolute inset-0 z-20 bg-black/60 flex flex-col items-center justify-center border border-cyan-500/30 animate-pulse">
+                                            <div className="w-4 h-4 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mb-1"></div>
+                                            <span className="text-[7px] font-black uppercase tracking-widest text-cyan-400">Loading</span>
+                                        </div>
+                                    )}
+
                                     {item.type === "VIDEO" ? (
                                         item.spriteSheetUrl ? (
                                             <div className="w-full h-full opacity-50 pointer-events-none" style={{ backgroundImage: `url(${getCORSProxyUrl(item.spriteSheetUrl)})`, backgroundSize: 'auto 100%', backgroundRepeat: 'repeat-x', backgroundPosition: 'left center' }} />
