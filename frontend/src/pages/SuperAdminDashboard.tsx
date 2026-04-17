@@ -29,6 +29,23 @@ interface User {
   creditsVideoFX3: number;
 }
 
+interface CreditRequest {
+  id: string;
+  email: string;
+  name?: string;
+  createdAt: string;
+  organization?: {
+    id: string;
+    name: string;
+  } | null;
+  user?: {
+    id: string;
+    email: string;
+    name?: string;
+    role?: string;
+  } | null;
+}
+
 export default function SuperAdminDashboard() {
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
@@ -36,6 +53,7 @@ export default function SuperAdminDashboard() {
   const [activeTab, setActiveTab] = useState<"platform" | "my-agency" | "demo-leads" | "global-settings" | "global-presets">("platform");
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [creditRequests, setCreditRequests] = useState<CreditRequest[]>([]);
   const [globalSettings, setGlobalSettings] = useState<any>(null);
   const [presets, setPresets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,28 +114,62 @@ export default function SuperAdminDashboard() {
     role: "USER"
   });
 
+  const toInt = (value: string, fallback = 0) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(0, Math.round(n));
+  };
+
   useEffect(() => {
     fetchInitialData();
   }, []);
 
+  useEffect(() => {
+    if (activeTab !== "platform") return;
+    const interval = setInterval(async () => {
+      try {
+        const requestsRes = await apiEndpoints.superadminGetRequests();
+        if (requestsRes.data.success) {
+          setCreditRequests(requestsRes.data.requests || []);
+        }
+      } catch {
+        // Silent polling failure
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [activeTab]);
+
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const [tenantsRes, settingsRes, usersRes, presetsRes] = await Promise.all([
+      const [tenantsRes, settingsRes, usersRes, presetsRes, requestsRes] = await Promise.all([
         apiEndpoints.superadminGetOrganizations(),
         apiEndpoints.superadminGetGlobalSettings(),
         apiEndpoints.superadminGetUsers(),
-        apiEndpoints.superadminGetPresets()
+        apiEndpoints.superadminGetPresets(),
+        apiEndpoints.superadminGetRequests(),
       ]);
 
       if (tenantsRes.data.success) setTenants(tenantsRes.data.organizations);
       if (settingsRes.data.success) setGlobalSettings(settingsRes.data.settings);
       if (usersRes.data.success) setUsers(usersRes.data.users);
       if (presetsRes.data.success) setPresets(presetsRes.data.presets);
+      if (requestsRes.data.success) setCreditRequests(requestsRes.data.requests || []);
     } catch (err: any) {
       setMsg("Error loading data: " + err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResolveCreditRequest = async (requestId: string) => {
+    try {
+      await apiEndpoints.superadminResolveRequest(requestId);
+      setMsg("Credit request resolved.");
+      fetchInitialData();
+    } catch (err: any) {
+      alert(err.message);
     }
   };
 
@@ -271,7 +323,7 @@ export default function SuperAdminDashboard() {
   const handleUpdateUserBasic = async () => {
     if (!editingUser) return;
     try {
-      await apiEndpoints.adminUpdateUser(editingUser.id, userUpdates);
+      await apiEndpoints.superadminUpdateUser(editingUser.id, userUpdates);
       setMsg("User updated.");
       setEditingUser(null);
       fetchInitialData();
@@ -413,6 +465,50 @@ export default function SuperAdminDashboard() {
         {/* TAB CONTENT: PLATFORM (TENANTS) */}
         {activeTab === "platform" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+              <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">Pending Render Requests</h2>
+                <span className="text-[11px] font-bold uppercase tracking-widest text-brand-accent">
+                  {creditRequests.length} Pending
+                </span>
+              </div>
+              {creditRequests.length === 0 ? (
+                <div className="p-6 text-xs text-gray-500 italic">No pending render requests across all tenants.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left min-w-[900px]">
+                    <thead className="bg-gray-950 text-[10px] uppercase tracking-widest text-gray-500">
+                      <tr>
+                        <th className="p-6">Requester</th>
+                        <th className="p-6">Email</th>
+                        <th className="p-6">Organization</th>
+                        <th className="p-6">Submitted</th>
+                        <th className="p-6 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-800">
+                      {creditRequests.map((r) => (
+                        <tr key={r.id} className="hover:bg-gray-800/30 transition-colors">
+                          <td className="p-6 text-sm text-white">{r.user?.name || r.name || "Unknown User"}</td>
+                          <td className="p-6 text-xs text-gray-400 font-mono">{r.user?.email || r.email}</td>
+                          <td className="p-6 text-xs text-gray-300">{r.organization?.name || "Unassigned"}</td>
+                          <td className="p-6 text-xs text-gray-500">{new Date(r.createdAt).toLocaleString()}</td>
+                          <td className="p-6 text-right">
+                            <button
+                              onClick={() => handleResolveCreditRequest(r.id)}
+                              className="px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest bg-brand-accent hover:bg-cyan-300 text-gray-950 transition-colors"
+                            >
+                              Mark Resolved
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
             <div className="flex justify-between items-center">
               <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">Subscription Management</h2>
               <button
@@ -519,22 +615,22 @@ export default function SuperAdminDashboard() {
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center justify-center gap-2">
                             <span className="text-[10px] text-gray-500">Std:</span>
-                            <input type="number" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDrift} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsPicDrift, creditType: "creditsPicDrift" })} />
+                            <input type="number" step="1" min="0" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDrift} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsPicDrift) - u.creditsPicDrift, creditType: "creditsPicDrift" })} />
                           </div>
                           <div className="flex items-center justify-center gap-2">
                             <span className="text-[10px] text-gray-500">Plus:</span>
-                            <input type="number" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsPicDriftPlus, creditType: "creditsPicDriftPlus" })} />
+                            <input type="number" step="1" min="0" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsPicDriftPlus) - u.creditsPicDriftPlus, creditType: "creditsPicDriftPlus" })} />
                           </div>
                         </div>
                       </td>
                       <td className="p-6 text-center">
-                        <input type="number" className="w-16 bg-gray-950 border border-gray-800 rounded p-1 text-center text-xs text-white" defaultValue={u.creditsImageFX} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsImageFX, creditType: "creditsImageFX" })} />
+                        <input type="number" step="1" min="0" className="w-16 bg-gray-950 border border-gray-800 rounded p-1 text-center text-xs text-white" defaultValue={u.creditsImageFX} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsImageFX) - u.creditsImageFX, creditType: "creditsImageFX" })} />
                       </td>
                       <td className="p-6 text-center">
                         <div className="flex gap-2 justify-center">
-                          <input type="number" title="VidFX 1" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsVideoFX1, creditType: "creditsVideoFX1" })} />
-                          <input type="number" title="VidFX 2" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsVideoFX2, creditType: "creditsVideoFX2" })} />
-                          <input type="number" title="VidFX 3" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: parseFloat(e.target.value) - u.creditsVideoFX3, creditType: "creditsVideoFX3" })} />
+                          <input type="number" step="1" min="0" title="VidFX 1" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1, creditType: "creditsVideoFX1" })} />
+                          <input type="number" step="1" min="0" title="VidFX 2" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2, creditType: "creditsVideoFX2" })} />
+                          <input type="number" step="1" min="0" title="VidFX 3" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3, creditType: "creditsVideoFX3" })} />
                         </div>
                       </td>
                       <td className="p-6 text-right">
@@ -617,10 +713,11 @@ export default function SuperAdminDashboard() {
                       <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
                       <input
                         type="number"
-                        step="0.1"
+                        step="1"
+                        min="0"
                         className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
                         defaultValue={globalSettings[key]}
-                        onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: parseFloat(e.target.value) })}
+                        onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: toInt(e.target.value, globalSettings[key]) })}
                       />
                     </div>
                   ))}
@@ -635,10 +732,11 @@ export default function SuperAdminDashboard() {
                       <span className="text-[10px] text-gray-400 uppercase font-bold truncate max-w-[100px]" title={key}>{key.replace('price', '').replace(/_/g, ' ')}</span>
                       <input
                         type="number"
-                        step="0.1"
+                        step="1"
+                        min="0"
                         className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
                         defaultValue={globalSettings[key]}
-                        onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: parseFloat(e.target.value) })}
+                        onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: toInt(e.target.value, globalSettings[key]) })}
                       />
                     </div>
                   ))}
@@ -653,10 +751,11 @@ export default function SuperAdminDashboard() {
                       <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
                       <input
                         type="number"
-                        step="0.1"
+                        step="1"
+                        min="0"
                         className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
                         defaultValue={globalSettings[key]}
-                        onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: parseFloat(e.target.value) })}
+                        onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: toInt(e.target.value, globalSettings[key]) })}
                       />
                     </div>
                   ))}

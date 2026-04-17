@@ -1,6 +1,39 @@
 /**
  * Resolves the cost of a generation based on Admin-defined Global Settings
  */
+export const PRICE_KEYS = [
+  "pricePicDrift_5s",
+  "pricePicDrift_10s",
+  "pricePicDrift_Plus_5s",
+  "pricePicDrift_Plus_10s",
+  "pricePicFX_Standard",
+  "pricePicFX_Carousel",
+  "pricePicFX_Batch",
+  "priceEditor_Pro",
+  "priceEditor_Enhance",
+  "priceEditor_Convert",
+  "priceVideoFX1_10s",
+  "priceVideoFX1_15s",
+  "priceVideoFX2_4s",
+  "priceVideoFX2_8s",
+  "priceVideoFX2_12s",
+  "priceVideoFX3_4s",
+  "priceVideoFX3_6s",
+  "priceVideoFX3_8s",
+  "priceAsset_DriftPath",
+] as const;
+
+const normalizeCost = (value: any) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 1;
+  return Math.max(0, Math.round(n));
+};
+
+const isDemoPicdriftUser = (user: any) =>
+  user?.view === "PICDRIFT" &&
+  user?.creditSystem === "INTERNAL" &&
+  (user?.organization?.isDefault === true || !user?.organizationId);
+
 export const calculateGranularCost = (
   params: {
     mediaType: string;
@@ -28,6 +61,7 @@ export const calculateGranularCost = (
   // 2. PIC FX (Dashboard)
   if (mediaType === "image") return settings.pricePicFX_Standard;
   if (mediaType === "carousel") return settings.pricePicFX_Carousel;
+  if (mode === "batch") return settings.pricePicFX_Batch;
 
   // 3. VIDEO FX 1 (Kling)
   if (
@@ -63,13 +97,13 @@ export const calculateGranularCost = (
 };
 
 export const getCost = (user: any, params: any, settings: any) => {
-  if (user.view === "PICDRIFT") {
+  if (isDemoPicdriftUser(user)) {
     // For Demo Users, PicDrift Plus (kling-3) costs 2, everything else costs 1
     if (params.model === "kling-3") return 2;
     return 1;
   }
-  return calculateGranularCost(params, settings);
-}
+  return normalizeCost(calculateGranularCost(params, settings));
+};
 
 /**
  * Maps the request to the correct Credit Pool

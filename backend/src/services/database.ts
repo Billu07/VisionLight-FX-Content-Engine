@@ -9,6 +9,37 @@ export type {
   ROIMetrics,
 } from "@prisma/client";
 
+export type CreditPool =
+  | "creditsPicDrift"
+  | "creditsPicDriftPlus"
+  | "creditsImageFX"
+  | "creditsVideoFX1"
+  | "creditsVideoFX2"
+  | "creditsVideoFX3";
+
+export const CREDIT_POOLS: CreditPool[] = [
+  "creditsPicDrift",
+  "creditsPicDriftPlus",
+  "creditsImageFX",
+  "creditsVideoFX1",
+  "creditsVideoFX2",
+  "creditsVideoFX3",
+];
+
+const isValidCreditPool = (value: string): value is CreditPool =>
+  CREDIT_POOLS.includes(value as CreditPool);
+
+const toFiniteNumber = (value: any) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+const normalizeNonNegativeInt = (value: any, fallback = 0) => {
+  const n = toFiniteNumber(value);
+  if (n === null) return fallback;
+  return Math.max(0, Math.round(n));
+};
+
 export const dbService = {
   // === NEW: GLOBAL SETTINGS (PRICING CONTROL) ===
   async getGlobalSettings() {
@@ -133,12 +164,46 @@ export const dbService = {
   async adminUpdateUser(id: string, data: any) {
     const { addCredits, creditType, ...otherData } = data;
 
+    if (otherData.maxProjects !== undefined) {
+      otherData.maxProjects = Math.max(1, normalizeNonNegativeInt(otherData.maxProjects, 1));
+    }
+
+    for (const pool of CREDIT_POOLS) {
+      if (otherData[pool] !== undefined) {
+        otherData[pool] = normalizeNonNegativeInt(otherData[pool]);
+      }
+    }
+
     // Logic to handle specific credit pool top-ups
     if (addCredits !== undefined && creditType) {
+      if (!isValidCreditPool(creditType)) {
+        throw new Error("INVALID_CREDIT_POOL");
+      }
+
+      const delta = toFiniteNumber(addCredits);
+      if (delta === null) {
+        throw new Error("INVALID_CREDIT_AMOUNT");
+      }
+
+      const current = await prisma.user.findUnique({
+        where: { id },
+        select: { [creditType]: true } as any,
+      });
+      if (!current) {
+        throw new Error("USER_NOT_FOUND");
+      }
+
+      const currentVal = normalizeNonNegativeInt((current as any)[creditType], 0);
+      const deltaInt = Math.round(delta);
+      const nextVal = currentVal + deltaInt;
+      if (nextVal < 0) {
+        throw new Error("CREDIT_UNDERFLOW");
+      }
+
       return prisma.user.update({
         where: { id },
         data: {
-          [creditType]: { increment: parseFloat(addCredits) }, // ✅ Changed to parseFloat
+          [creditType]: nextVal,
           ...otherData,
         },
       });
@@ -149,12 +214,81 @@ export const dbService = {
 
   // === NEW: PROJECT ===
   async createProject(userId: string, name: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { organizationId: true },
+    });
+
     return prisma.project.create({
       data: {
         userId,
         name,
+        organizationId: user?.organizationId || undefined,
       },
     });
+  },
+  async createProjectWithLimits(userId: string, name: string) {
+    const maxRetries = 3;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await prisma.$transaction(
+          async (tx) => {
+            const user = await tx.user.findUnique({
+              where: { id: userId },
+              include: { organization: true },
+            });
+
+            if (!user) {
+              throw new Error("USER_NOT_FOUND");
+            }
+
+            const userProjectCount = await tx.project.count({
+              where: { userId },
+            });
+
+            if (userProjectCount >= user.maxProjects) {
+              throw new Error("USER_PROJECT_LIMIT");
+            }
+
+            if (user.organizationId && user.organization) {
+              const orgProjectCount = await tx.project.count({
+                where: {
+                  OR: [
+                    { organizationId: user.organizationId },
+                    {
+                      organizationId: null,
+                      user: { organizationId: user.organizationId },
+                    },
+                  ],
+                },
+              });
+
+              if (orgProjectCount >= user.organization.maxProjectsTotal) {
+                throw new Error("ORG_PROJECT_LIMIT");
+              }
+            }
+
+            return tx.project.create({
+              data: {
+                userId,
+                name,
+                organizationId: user.organizationId || undefined,
+              },
+            });
+          },
+          { isolationLevel: "Serializable" },
+        );
+      } catch (error: any) {
+        const isSerializationError = error?.code === "P2034";
+        if (isSerializationError && attempt < maxRetries) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw new Error("PROJECT_CREATE_FAILED");
   },
   async getUserProjects(userId: string) {
     return prisma.project.findMany({
@@ -199,35 +333,27 @@ export const dbService = {
   // === NEW: GRANULAR CREDIT LOGIC ===
   async deductGranularCredits(
     userId: string,
-    pool:
-      | "creditsPicDrift"
-      | "creditsPicDriftPlus"
-      | "creditsImageFX"
-      | "creditsVideoFX1"
-      | "creditsVideoFX2"
-      | "creditsVideoFX3",
+    pool: CreditPool,
     amount: number,
   ) {
+    const delta = normalizeNonNegativeInt(amount);
+    if (delta <= 0) return prisma.user.findUnique({ where: { id: userId } });
     return prisma.user.update({
       where: { id: userId },
-      data: { [pool]: { decrement: amount } },
+      data: { [pool]: { decrement: delta } },
     });
   },
 
   async refundGranularCredits(
     userId: string,
-    pool:
-      | "creditsPicDrift"
-      | "creditsPicDriftPlus"
-      | "creditsImageFX"
-      | "creditsVideoFX1"
-      | "creditsVideoFX2"
-      | "creditsVideoFX3",
+    pool: CreditPool,
     amount: number,
   ) {
+    const delta = normalizeNonNegativeInt(amount);
+    if (delta <= 0) return prisma.user.findUnique({ where: { id: userId } });
     return prisma.user.update({
       where: { id: userId },
-      data: { [pool]: { increment: amount } },
+      data: { [pool]: { increment: delta } },
     });
   },
 
@@ -263,6 +389,11 @@ export const dbService = {
         variations: true,
         originalAsset: true,
       },
+    });
+  },
+  async getAssetById(id: string) {
+    return prisma.asset.findUnique({
+      where: { id },
     });
   },
   async deleteAsset(id: string) {
@@ -307,18 +438,58 @@ export const dbService = {
     // Lazy Cleanup: Automatically fail jobs older than 15 minutes that are stuck in 'PROCESSING' or 'NEW'
     const timeout = new Date(Date.now() - 15 * 60 * 1000);
     try {
-      await prisma.post.updateMany({
+      const stalePosts = await prisma.post.findMany({
         where: {
           userId,
           status: { in: ["PROCESSING", "NEW"] },
           createdAt: { lt: timeout },
         },
-        data: {
-          status: "FAILED",
-          error: "Job timed out (Automatic Cleanup)",
-          progress: 0,
-        },
+        select: { id: true, generationParams: true },
       });
+
+      for (const stalePost of stalePosts) {
+        await prisma.$transaction(async (tx) => {
+          const updated = await tx.post.updateMany({
+            where: {
+              id: stalePost.id,
+              userId,
+              status: { in: ["PROCESSING", "NEW"] },
+            },
+            data: {
+              status: "FAILED",
+              error: "Job timed out (Automatic Cleanup)",
+              progress: 0,
+            },
+          });
+
+          if (updated.count === 0) return;
+
+          const paramsRaw = stalePost.generationParams;
+          const parsedParams =
+            typeof paramsRaw === "string"
+              ? (() => {
+                  try {
+                    return JSON.parse(paramsRaw);
+                  } catch {
+                    return null;
+                  }
+                })()
+              : paramsRaw;
+          const chargedPool = (parsedParams as any)?.chargedPool;
+          const chargedCost = normalizeNonNegativeInt((parsedParams as any)?.cost);
+
+          if (
+            typeof chargedPool === "string" &&
+            isValidCreditPool(chargedPool) &&
+            chargedCost > 0
+          ) {
+            await tx.user.update({
+              where: { id: userId },
+              data: { [chargedPool]: { increment: chargedCost } },
+            });
+          }
+        });
+      }
     } catch (e) {
       console.error("Lazy cleanup failed:", e);
     }
@@ -360,22 +531,92 @@ export const dbService = {
   async updateROIMetrics(userId: string, data: any) {
     return prisma.rOIMetrics.update({
       where: { userId },
-      data,
+      data: {
+        ...data,
+      },
     });
   },
 
   // === NOTIFICATIONS (Intact) ===
-  async createCreditRequest(userId: string, email: string, name: string) {
-    return prisma.creditRequest.create({ data: { userId, email, name } });
+  async createCreditRequest(
+    userId: string,
+    email: string,
+    name: string,
+    organizationId?: string | null,
+  ) {
+    return prisma.creditRequest.create({
+      data: {
+        userId,
+        email,
+        name,
+        organizationId: organizationId || undefined,
+      },
+    });
   },
   async getPendingCreditRequests() {
-    return prisma.creditRequest.findMany({ where: { status: "PENDING" } });
+    return prisma.creditRequest.findMany({
+      where: { status: "PENDING" },
+      orderBy: { createdAt: "desc" },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            organizationId: true,
+          },
+        },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+  },
+  async getPendingCreditRequestsByOrganization(organizationId: string) {
+    return prisma.creditRequest.findMany({
+      where: {
+        status: "PENDING",
+        organizationId,
+      },
+      orderBy: { createdAt: "desc" },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            organizationId: true,
+          },
+        },
+      },
+    });
   },
   async resolveCreditRequest(id: string) {
     return prisma.creditRequest.update({
       where: { id },
       data: { status: "RESOLVED" },
     });
+  },
+  async resolveCreditRequestForOrganization(id: string, organizationId: string) {
+    const result = await prisma.creditRequest.updateMany({
+      where: {
+        id,
+        organizationId,
+        status: "PENDING",
+      },
+      data: { status: "RESOLVED" },
+    });
+
+    if (result.count === 0) {
+      return null;
+    }
+
+    return prisma.creditRequest.findUnique({ where: { id } });
   },
 
   // === STORYBOARD PERSISTENCE ===

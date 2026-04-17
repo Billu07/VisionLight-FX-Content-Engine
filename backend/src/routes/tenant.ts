@@ -3,8 +3,28 @@ import { dbService, prisma } from "../services/database";
 import { AuthService } from "../services/auth";
 import { authenticateToken, requireAdmin, AuthenticatedRequest } from "../middleware/auth";
 import { encryptionUtils } from "../utils/encryption";
+import { PRICE_KEYS } from "../config/pricing";
 
 const router = express.Router();
+
+const toNonNegativeInt = (value: any) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.round(n));
+};
+
+const sanitizePricingUpdate = (pricing: any) => {
+  const updates: Record<string, number> = {};
+  for (const key of PRICE_KEYS) {
+    if (pricing?.[key] === undefined) continue;
+    const parsed = toNonNegativeInt(pricing[key]);
+    if (parsed === null) {
+      throw new Error(`INVALID_PRICING_VALUE:${key}`);
+    }
+    updates[key] = parsed;
+  }
+  return updates;
+};
 
 // Apply middleware
 router.use(authenticateToken);
@@ -45,6 +65,11 @@ router.post("/team/user", async (req: AuthenticatedRequest, res) => {
 
   try {
     const org = await getOrg(req);
+    const parsedMaxProjects =
+      maxProjects !== undefined ? toNonNegativeInt(maxProjects) : 3;
+    if (parsedMaxProjects === null) {
+      return res.status(400).json({ error: "Invalid maxProjects value." });
+    }
 
     // 1. Enforce maxUsers limit
     const userCount = await prisma.user.count({ where: { organizationId: org.id } });
@@ -65,7 +90,7 @@ router.post("/team/user", async (req: AuthenticatedRequest, res) => {
       password,
       name || "Team Member",
       finalView,
-      maxProjects !== undefined ? Number(maxProjects) : 3,
+      Math.max(1, parsedMaxProjects),
       org.id,
       finalRole
     );
@@ -92,7 +117,13 @@ router.put("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
     // Prepare updates
     const updates: any = {};
     if (name) updates.name = name;
-    if (maxProjects !== undefined) updates.maxProjects = Number(maxProjects);
+    if (maxProjects !== undefined) {
+      const parsedMaxProjects = toNonNegativeInt(maxProjects);
+      if (parsedMaxProjects === null) {
+        return res.status(400).json({ error: "Invalid maxProjects value." });
+      }
+      updates.maxProjects = Math.max(1, parsedMaxProjects);
+    }
     if (role === "USER" || role === "MANAGER") updates.role = role;
 
     // Handle credits
@@ -104,6 +135,12 @@ router.put("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
     const updatedUser = await dbService.adminUpdateUser(userId, updates);
     res.json({ success: true, user: updatedUser });
   } catch (error: any) {
+    if (error?.message === "INVALID_CREDIT_POOL" || error?.message === "INVALID_CREDIT_AMOUNT") {
+      return res.status(400).json({ error: "Invalid credit update payload." });
+    }
+    if (error?.message === "CREDIT_UNDERFLOW") {
+      return res.status(400).json({ error: "Credit amount cannot reduce balance below zero." });
+    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -128,6 +165,35 @@ router.delete("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
     await dbService.deleteUser(userId);
 
     res.json({ success: true, message: "User removed from team." });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// === CREDIT REQUESTS (ORG INBOX) ===
+router.get("/requests", async (req: AuthenticatedRequest, res) => {
+  try {
+    const org = await getOrg(req);
+    const requests = await dbService.getPendingCreditRequestsByOrganization(org.id);
+    res.json({ success: true, requests });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.put("/requests/:id/resolve", async (req: AuthenticatedRequest, res) => {
+  try {
+    const org = await getOrg(req);
+    const resolved = await dbService.resolveCreditRequestForOrganization(
+      req.params.id,
+      org.id,
+    );
+
+    if (!resolved) {
+      return res.status(404).json({ error: "Credit request not found" });
+    }
+
+    res.json({ success: true, request: resolved });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -164,6 +230,8 @@ router.get("/config", async (req: AuthenticatedRequest, res) => {
           priceAsset_DriftPath: org.priceAsset_DriftPath,
           priceVideoFX1_10s: org.priceVideoFX1_10s,
           priceVideoFX1_15s: org.priceVideoFX1_15s,
+          priceVideoFX2_4s: org.priceVideoFX2_4s,
+          priceVideoFX2_8s: org.priceVideoFX2_8s,
           priceVideoFX2_12s: org.priceVideoFX2_12s,
           priceVideoFX3_4s: org.priceVideoFX3_4s,
           priceVideoFX3_6s: org.priceVideoFX3_6s,
@@ -191,19 +259,23 @@ router.put("/config", async (req: AuthenticatedRequest, res) => {
 
     // Apply pricing overrides if provided
     if (pricing) {
-       Object.keys(pricing).forEach(key => {
-         if (key.startsWith('price')) {
-            updates[key] = Number(pricing[key]);
-         }
-       });
+      Object.assign(updates, sanitizePricingUpdate(pricing));
     }
 
     await dbService.updateOrganization(orgId, updates);
 
     res.json({ success: true, message: "Configuration updated." });
   } catch (error: any) {
+    if (typeof error?.message === "string" && error.message.startsWith("INVALID_PRICING_VALUE:")) {
+      const key = error.message.split(":")[1] || "unknown";
+      return res.status(400).json({ error: `Invalid pricing value for ${key}` });
+    }
     res.status(500).json({ error: error.message });
   }
 });
 
 export default router;
+
+
+
+

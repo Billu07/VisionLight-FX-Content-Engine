@@ -1,7 +1,7 @@
 import axios from "axios";
 import sharp from "sharp";
 import FormData from "form-data";
-import { dbService as airtableService, Post } from "../database";
+import { dbService as airtableService, Post, CreditPool } from "../database";
 import { ROIService } from "../roi";
 import { processVideoAssetBackground } from "./processor";
 import {
@@ -23,6 +23,28 @@ export interface TenantApiKeys {
   falApiKey?: string;
   kieApiKey?: string;
   openaiApiKey?: string;
+}
+
+function getChargedPool(params: any): CreditPool | undefined {
+  const pool = params?.chargedPool;
+  if (
+    pool === "creditsPicDrift" ||
+    pool === "creditsPicDriftPlus" ||
+    pool === "creditsImageFX" ||
+    pool === "creditsVideoFX1" ||
+    pool === "creditsVideoFX2" ||
+    pool === "creditsVideoFX3"
+  ) {
+    return pool;
+  }
+  return undefined;
+}
+
+async function refundChargedPool(userId: string, params: any) {
+  const pool = getChargedPool(params);
+  const cost = Number(params?.cost);
+  if (!pool || !Number.isFinite(cost) || cost <= 0) return;
+  await airtableService.refundGranularCredits(userId, pool, cost);
 }
 
 // Convert Sliders to Prompt
@@ -56,6 +78,8 @@ export const videoLogic = {
     duration: string = "5",
     generateAudio: boolean = false,
     projectId?: string,
+    chargedPool: CreditPool = "creditsPicDrift",
+    chargedCost: number = 0,
     apiKeys?: TenantApiKeys
   ) {
     try {
@@ -201,7 +225,8 @@ export const videoLogic = {
           externalId: submitRes.data.request_id,
           statusUrl: submitRes.data.status_url,
           aspectRatio: targetRatioString,
-          cost: 0,
+          chargedPool,
+          cost: chargedCost,
         },
       });
 
@@ -595,7 +620,7 @@ export const videoLogic = {
         error: error.message,
         progress: 0,
       });
-      await airtableService.refundUserCredit(params.userId, params.cost || 2);
+      await refundChargedPool(params.userId, params);
     }
   },
 
@@ -684,7 +709,7 @@ export const videoLogic = {
           error: errorMessage || "Generation failed",
           progress: 0,
         });
-        await airtableService.refundUserCredit(userId, params?.cost || 5);
+        await refundChargedPool(userId, params);
       } else if (progress !== post.progress) {
         try {
           await airtableService.updatePost(post.id, { progress });

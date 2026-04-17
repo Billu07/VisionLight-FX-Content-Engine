@@ -17,23 +17,17 @@ import { RenderReserveModal } from "../components/RenderReserveModal";
 import { StockPhotosModal } from "../components/StockPhotosModal";
 import { FullscreenVideoEditor, type SequenceItem } from "../components/FullscreenVideoEditor";
 import { MobileNavbar } from "../components/MobileNavbar";
+import { dashboardAssets } from "../features/dashboard/assets";
+import { usePromptFxManager } from "../features/dashboard/hooks/usePromptFxManager";
+import { useProjectEditorState } from "../features/dashboard/hooks/useProjectEditorState";
+import type {
+  EngineType,
+  StudioMode,
+  VisualTab,
+  GenerationState,
+} from "../features/dashboard/types";
 
-// Import your logo images
-import picdriftLogo from "../assets/picdrift.png";
-import fxLogo from "../assets/fx.png";
-import driftLogo from "../assets/drift_icon.png";
-
-type EngineType = "kie" | "studio" | "openai" | "veo" | "3dx";
-type StudioMode = "image" | "carousel" | "edit";
-
-// Visual Tab Type
-type VisualTab = "picdrift" | "studio" | "videofx" | "3dx";
-
-interface GenerationState {
-  status: "idle" | "generating" | "completed" | "error";
-  result?: any;
-  error?: string;
-}
+const { picdriftLogo, fxLogo, driftLogo } = dashboardAssets;
 
 function Dashboard() {
   // ==========================================
@@ -44,55 +38,22 @@ function Dashboard() {
   const [prompt, setPrompt] = useState("");
   const [videoTitle, setVideoTitle] = useState("");
 
-  // PromptFX State
-  const [showPromptFxMenu, setShowPromptFxMenu] = useState(false);
-  const [newPromptFxName, setNewPromptFxName] = useState("");
-  const [newPromptFxText, setNewPromptFxText] = useState("");
-  const [isAddingPromptFx, setIsAddingPromptFx] = useState(false);
-  const [editingPromptFxIndex, setEditingPromptFxIndex] = useState<number | null>(null);
-
-  const { systemPresets } = useAuth(); // 👈 Global presets from auth context
-
-  const { data: promptFxList = [] } = useQuery({
-    queryKey: ["prompt-fx"],
-    queryFn: async () => {
-      const res = await apiEndpoints.getPromptFx();
-      return res.data.promptFx || [];
-    },
-  });
-
-  const savePromptFxMutation = useMutation({
-    mutationFn: (newPromptFx: { name: string; prompt: string }[]) =>
-      apiEndpoints.savePromptFx(newPromptFx),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["prompt-fx"] });
-      setNewPromptFxName("");
-      setNewPromptFxText("");
-      setIsAddingPromptFx(false);
-      setEditingPromptFxIndex(null);
-    },
-  });
-
-  const handleAddPromptFx = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPromptFxName.trim() || !newPromptFxText.trim()) return;
-    
-    let newList = [...promptFxList];
-    if (editingPromptFxIndex !== null) {
-      newList[editingPromptFxIndex] = { name: newPromptFxName.trim(), prompt: newPromptFxText.trim() };
-    } else {
-      newList.push({ name: newPromptFxName.trim(), prompt: newPromptFxText.trim() });
-    }
-    
-    savePromptFxMutation.mutate(newList);
-  };
-
-  const handleRemovePromptFx = (indexToRemove: number) => {
-    if (window.confirm("Are you sure you want to delete this prompt preset?")) {
-      const newList = promptFxList.filter((_: any, idx: number) => idx !== indexToRemove);
-      savePromptFxMutation.mutate(newList);
-    }
-  };
+  const { systemPresets } = useAuth();
+  const {
+    promptFxList,
+    showPromptFxMenu,
+    setShowPromptFxMenu,
+    newPromptFxName,
+    setNewPromptFxName,
+    newPromptFxText,
+    setNewPromptFxText,
+    isAddingPromptFx,
+    setIsAddingPromptFx,
+    setEditingPromptFxIndex,
+    handleAddPromptFx,
+    handleRemovePromptFx,
+    isSavingPromptFx,
+  } = usePromptFxManager();
 
   const [activeLibrarySlot, setActiveLibrarySlot] = useState<
     "start" | "end" | "generic" | "sequencer" | null
@@ -197,58 +158,14 @@ function Dashboard() {
   // === SEQUENCER STATE ===
   const [viewMode, setViewMode] = useState<"create" | "sequencer" | "history">("create");
 
-  const sequenceKey = `visionlight_sequence_${localStorage.getItem("visionlight_active_project") || "default"
-    }`;
-  const [sequence, setSequence] = useState<SequenceItem[]>(() => {
-    try {
-      const stored = localStorage.getItem(sequenceKey);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const binKey = `visionlight_bin_${localStorage.getItem("visionlight_active_project") || "default"}`;
-  const [binItems, setBinItems] = useState<SequenceItem[]>(() => {
-    try {
-      const stored = localStorage.getItem(binKey);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  // Track audio for NLE
-  const audioTracksKey = `visionlight_audio_${localStorage.getItem("visionlight_active_project") || "default"}`;
-  const [audioTracks, setAudioTracks] = useState<any[]>(() => {
-    try {
-      const stored = localStorage.getItem(audioTracksKey);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    localStorage.setItem(sequenceKey, JSON.stringify(sequence));
-  }, [sequence, sequenceKey]);
-
-  useEffect(() => {
-    localStorage.setItem(audioTracksKey, JSON.stringify(audioTracks));
-  }, [audioTracks, audioTracksKey]);
-
-  useEffect(() => {
-    const activeProjectId = localStorage.getItem("visionlight_active_project");
-    if (activeProjectId) {
-      apiEndpoints.getProjects().then(res => {
-        const project = res.data.projects?.find((p: any) => p.id === activeProjectId);
-        if (project && project.editorState) {
-          setSequence(project.editorState.sequence || []);
-          setAudioTracks(project.editorState.audioTracks || []);
-        }
-      }).catch(err => console.error("Failed to fetch project editor state", err));
-    }
-  }, []);
+  const {
+    sequence,
+    setSequence,
+    binItems,
+    setBinItems,
+    audioTracks,
+    setAudioTracks,
+  } = useProjectEditorState();
 
   const [previewCarouselIndex, setPreviewCarouselIndex] = useState(0);
 
@@ -391,8 +308,8 @@ function Dashboard() {
   };
   const [isRequesting, setIsRequesting] = useState(false);
   const creditLink = isCommercial
-    ? "http://picdrift.com/fx-Credits"
-    : "http://PicDrift.com/fx-request";
+    ? "https://picdrift.com/fx-credits"
+    : "https://picdrift.com/renders";
   const creditBtnText = isCommercial ? "Buy Credit" : "Request Render";
 
   // ✅ 5. BACKGROUND JOB POLLING
@@ -511,10 +428,11 @@ function Dashboard() {
 
   const handleRequestCredits = async () => {
     if (!confirm("Request more Render Reserve to Admin?")) return;
+    window.open("https://picdrift.com/renders", "_blank", "noopener,noreferrer");
     setIsRequesting(true);
     try {
       await apiEndpoints.requestCredits();
-      alert("Request sent! The admin has been notified.");
+      alert("Request sent! Admin inbox updated and renders page opened.");
     } catch (err) {
       alert("Failed to send request.");
     } finally {
@@ -782,10 +700,41 @@ function Dashboard() {
 
     if (!prompt.trim()) return;
 
+    const toRequiredInt = (value: any, fallback = 1) => {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return fallback;
+      return Math.max(0, Math.round(n));
+    };
+
+    const getPicDriftRequiredCost = () => {
+      if (user?.view === "PICDRIFT" && user?.creditSystem === "INTERNAL") {
+        return picDriftMode === "plus" ? 2 : 1;
+      }
+
+      const priceMap = (credits as any)?.prices || {};
+      const isLong = kieDuration >= 10;
+      if (picDriftMode === "plus") {
+        return toRequiredInt(
+          isLong ? priceMap.pricePicDrift_Plus_10s : priceMap.pricePicDrift_Plus_5s,
+        );
+      }
+      return toRequiredInt(
+        isLong ? priceMap.pricePicDrift_10s : priceMap.pricePicDrift_5s,
+      );
+    };
+
     // Check correct pool balance based on current visual tab
     let hasBalance = false;
-    if (currentVisualTab === "picdrift")
-      hasBalance = credits.creditsPicDrift > 0;
+    if (currentVisualTab === "picdrift") {
+      const required = getPicDriftRequiredCost();
+      if (user?.view === "PICDRIFT") {
+        hasBalance = (credits.creditsPicDrift || 0) >= required;
+      } else if (picDriftMode === "plus") {
+        hasBalance = (credits.creditsPicDriftPlus || 0) >= required;
+      } else {
+        hasBalance = (credits.creditsPicDrift || 0) >= required;
+      }
+    }
     else if (currentVisualTab === "studio")
       hasBalance = credits.creditsImageFX > 0;
     else if (activeEngine === "kie") hasBalance = credits.creditsVideoFX1 > 0;
@@ -1972,7 +1921,7 @@ function Dashboard() {
                                           <button
                                             type="button"
                                             onClick={handleAddPromptFx}
-                                            disabled={savePromptFxMutation.isPending || !newPromptFxName.trim() || !newPromptFxText.trim()}
+                                            disabled={isSavingPromptFx || !newPromptFxName.trim() || !newPromptFxText.trim()}
                                             className="w-full py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-bold rounded transition-colors"
                                           >
                                             Save Prompt

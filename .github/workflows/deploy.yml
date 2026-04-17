@@ -4,38 +4,98 @@ on:
   push:
     branches: ["main"]
 
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      APP_DIR: /var/www/myapp
+      BRANCH: main
+      BACKEND_HEALTH_URL: ${{ secrets.BACKEND_HEALTH_URL }}
+      FRONTEND_HEALTH_URL: ${{ secrets.FRONTEND_HEALTH_URL }}
     steps:
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          debug: true
+          envs: APP_DIR,BRANCH,BACKEND_HEALTH_URL,FRONTEND_HEALTH_URL
           script: |
-            # 1. Navigate to project folder
-            cd /var/www/myapp
+            set -eu
 
-            # 2. Pull latest code
-            # We reset purely to avoid merge conflicts with local changes on server
-            # Note: This won't delete your .env files if they are in .gitignore
-            git reset --hard origin/main
-            git pull origin main
+            echo "--------- DEPLOY START ---------"
+            cd "$APP_DIR"
 
-            # 3. Update Backend
+            echo "Checking branch and working tree..."
+            CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+            if [ "$CURRENT_BRANCH" != "$BRANCH" ]; then
+              echo "Deploy aborted: expected branch '$BRANCH', found '$CURRENT_BRANCH'."
+              exit 1
+            fi
+
+            if [ -n "$(git status --porcelain)" ]; then
+              echo "Deploy aborted: working tree is dirty."
+              git status --short
+              exit 1
+            fi
+
+            echo "Fetching latest origin/$BRANCH..."
+            git fetch --prune origin
+
+            LOCAL_SHA="$(git rev-parse HEAD)"
+            REMOTE_SHA="$(git rev-parse "origin/$BRANCH")"
+            BASE_SHA="$(git merge-base HEAD "origin/$BRANCH")"
+
+            if [ "$LOCAL_SHA" = "$REMOTE_SHA" ]; then
+              echo "Repository already up to date."
+            elif [ "$LOCAL_SHA" = "$BASE_SHA" ]; then
+              echo "Fast-forwarding to origin/$BRANCH..."
+              git pull --ff-only origin "$BRANCH"
+            else
+              echo "Deploy aborted: branch cannot fast-forward cleanly."
+              echo "Local:  $LOCAL_SHA"
+              echo "Remote: $REMOTE_SHA"
+              exit 1
+            fi
+
             echo "--------- UPDATING BACKEND ---------"
             cd backend
-            npm install
-            npm run build
-            pm2 restart my-backend
+            npm ci --no-audit --no-fund
 
-            # 4. Update Frontend
+            if [ -d prisma/migrations ] && [ -n "$(ls -A prisma/migrations 2>/dev/null)" ]; then
+              echo "Applying Prisma migrations..."
+              npx prisma migrate deploy
+            else
+              echo "No prisma/migrations found, skipping migrate deploy."
+            fi
+
+            npm run build
+            pm2 restart my-backend --update-env
+
             echo "--------- UPDATING FRONTEND ---------"
             cd ../frontend
-            npm install
+            npm ci --no-audit --no-fund
             npm run build
+
+            echo "--------- OPTIONAL HEALTH CHECKS ---------"
+            if [ -n "${BACKEND_HEALTH_URL:-}" ]; then
+              echo "Checking backend health: $BACKEND_HEALTH_URL"
+              curl -fsS --max-time 20 "$BACKEND_HEALTH_URL" >/dev/null
+              echo "Backend health check passed."
+            else
+              echo "Skipping backend health check (BACKEND_HEALTH_URL not set)."
+            fi
+
+            if [ -n "${FRONTEND_HEALTH_URL:-}" ]; then
+              echo "Checking frontend health: $FRONTEND_HEALTH_URL"
+              curl -fsS --max-time 20 "$FRONTEND_HEALTH_URL" >/dev/null
+              echo "Frontend health check passed."
+            else
+              echo "Skipping frontend health check (FRONTEND_HEALTH_URL not set)."
+            fi
 
             echo "--------- DEPLOYMENT COMPLETE ---------"

@@ -3,8 +3,28 @@ import { dbService, prisma } from "../services/database";
 import { AuthService } from "../services/auth";
 import { authenticateToken, requireSuperAdmin, AuthenticatedRequest } from "../middleware/auth";
 import { encryptionUtils } from "../utils/encryption";
+import { PRICE_KEYS } from "../config/pricing";
 
 const router = express.Router();
+
+const toNonNegativeInt = (value: any) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.round(n));
+};
+
+const sanitizePricingUpdate = (payload: any) => {
+  const updates: Record<string, number> = {};
+  for (const key of PRICE_KEYS) {
+    if (payload?.[key] === undefined) continue;
+    const parsed = toNonNegativeInt(payload[key]);
+    if (parsed === null) {
+      throw new Error(`INVALID_PRICING_VALUE:${key}`);
+    }
+    updates[key] = parsed;
+  }
+  return updates;
+};
 
 // Debug Logger
 router.use((req, res, next) => {
@@ -41,12 +61,16 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
   const userView = view === "PICDRIFT" ? "PICDRIFT" : "VISIONLIGHT";
 
   try {
+    const parsedMaxUsers = toNonNegativeInt(maxUsers);
+    const parsedMaxProjectsTotal = toNonNegativeInt(maxProjectsTotal);
+    const parsedMaxStorageMb = toNonNegativeInt(maxStorageMb);
+
     // 1. Create Organization
     const org = await dbService.createOrganization({
       name: orgName,
-      maxUsers: Number(maxUsers) || 5,
-      maxProjectsTotal: Number(maxProjectsTotal) || 20,
-      maxStorageMb: Number(maxStorageMb) || 500,
+      maxUsers: parsedMaxUsers ?? 5,
+      maxProjectsTotal: parsedMaxProjectsTotal ?? 20,
+      maxStorageMb: parsedMaxStorageMb ?? 500,
       isDefault: false
     });
     // 2. Check if User already exists
@@ -187,10 +211,22 @@ router.put("/organizations/:id/status", async (req: AuthenticatedRequest, res) =
 router.put("/organizations/:id/limits", async (req: AuthenticatedRequest, res) => {
   const { maxUsers, maxProjectsTotal, maxStorageMb, name, view } = req.body;
   try {
+    const parsedMaxUsers = maxUsers !== undefined ? toNonNegativeInt(maxUsers) : undefined;
+    const parsedMaxProjectsTotal = maxProjectsTotal !== undefined ? toNonNegativeInt(maxProjectsTotal) : undefined;
+    const parsedMaxStorageMb = maxStorageMb !== undefined ? toNonNegativeInt(maxStorageMb) : undefined;
+
+    if (
+      (maxUsers !== undefined && parsedMaxUsers === null) ||
+      (maxProjectsTotal !== undefined && parsedMaxProjectsTotal === null) ||
+      (maxStorageMb !== undefined && parsedMaxStorageMb === null)
+    ) {
+      return res.status(400).json({ error: "Invalid organization limit values." });
+    }
+
     const orgUpdates: any = {
-      maxUsers: maxUsers !== undefined ? Number(maxUsers) : undefined,
-      maxProjectsTotal: maxProjectsTotal !== undefined ? Number(maxProjectsTotal) : undefined,
-      maxStorageMb: maxStorageMb !== undefined ? Number(maxStorageMb) : undefined,
+      maxUsers: parsedMaxUsers,
+      maxProjectsTotal: parsedMaxProjectsTotal,
+      maxStorageMb: parsedMaxStorageMb,
     };
     if (name) orgUpdates.name = name;
 
@@ -306,6 +342,25 @@ router.post("/users/superadmin", async (req: AuthenticatedRequest, res) => {
   }
 });
 
+// === CREDIT REQUESTS (GLOBAL INBOX) ===
+router.get("/requests", async (req: AuthenticatedRequest, res) => {
+  try {
+    const requests = await dbService.getPendingCreditRequests();
+    res.json({ success: true, requests });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.put("/requests/:id/resolve", async (req: AuthenticatedRequest, res) => {
+  try {
+    const request = await dbService.resolveCreditRequest(req.params.id);
+    res.json({ success: true, request });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // === GLOBAL CONTROLS ===
 
 // Preset Prompts CRUD
@@ -374,9 +429,18 @@ router.get("/settings/global", async (req, res) => {
 // Update Global Pricing Template
 router.put("/settings/global", async (req, res) => {
   try {
-    const settings = await dbService.updateGlobalSettings(req.body);
+    const updates = sanitizePricingUpdate(req.body);
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: "No valid pricing keys provided." });
+    }
+
+    const settings = await dbService.updateGlobalSettings(updates);
     res.json({ success: true, settings });
   } catch (error: any) {
+    if (typeof error?.message === "string" && error.message.startsWith("INVALID_PRICING_VALUE:")) {
+      const key = error.message.split(":")[1] || "unknown";
+      return res.status(400).json({ error: `Invalid pricing value for ${key}` });
+    }
     res.status(500).json({ error: error.message });
   }
 });

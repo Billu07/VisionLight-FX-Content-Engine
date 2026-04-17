@@ -227,8 +227,12 @@ export default function AdminDashboard() {
   ) => {
     setActionLoading(true);
     try {
+      const parsedDelta = Math.round(Number(amount));
+      if (!Number.isFinite(parsedDelta)) {
+        throw new Error("Invalid credit amount");
+      }
       await apiEndpoints.adminUpdateUser(userId, {
-        addCredits: parseFloat(amount),
+        addCredits: parsedDelta,
         creditType: type,
       });
       setMsg(`Render limits updated.`);
@@ -642,12 +646,13 @@ export default function AdminDashboard() {
                           {item.label}
                         </span>
                         <input
-                          step="0.01"
+                          step="1"
+                          min="0"
                           type="number"
                           className="w-24 bg-gray-950 border border-gray-700 rounded-md p-2 text-center text-xs font-semibold text-white outline-none focus:border-brand-accent transition-colors"
                           defaultValue={(settings as any)[item.key]}
                           onBlur={(e) => {
-                            const val = parseFloat(e.target.value);
+                            const val = Math.round(Number(e.target.value));
                             if (!isNaN(val)) {
                               handleUpdateGlobalSettings({
                                 [item.key]: val,

@@ -48,8 +48,12 @@ export const apiEndpoints = {
   superadminUpdateOrgStatus: (id: string, isActive: boolean) => api.put(`/api/superadmin/organizations/${id}/status`, { isActive }),
   superadminUpdateOrgLimits: (id: string, data: any) => api.put(`/api/superadmin/organizations/${id}/limits`, data),
   superadminGetUsers: () => api.get("/api/superadmin/users"),
+  superadminUpdateUser: (userId: string, data: any) =>
+    api.put(`/api/superadmin/users/${userId}`, data),
   superadminCreateDemoUser: (data: any) => api.post("/api/superadmin/users/demo", data),
   superadminCreateSuperAdmin: (data: any) => api.post("/api/superadmin/users/superadmin", data),
+  superadminGetRequests: () => api.get("/api/superadmin/requests"),
+  superadminResolveRequest: (id: string) => api.put(`/api/superadmin/requests/${id}/resolve`),
   superadminGetGlobalSettings: () => api.get("/api/superadmin/settings/global"),
   superadminUpdateGlobalSettings: (data: any) => api.put("/api/superadmin/settings/global", data),
 
@@ -64,6 +68,8 @@ export const apiEndpoints = {
   tenantAddUser: (data: any) => api.post("/api/tenant/team/user", data),
   tenantUpdateUser: (userId: string, data: any) => api.put(`/api/tenant/team/user/${userId}`, data),
   tenantDeleteUser: (userId: string) => api.delete(`/api/tenant/team/user/${userId}`),
+  tenantGetRequests: () => api.get("/api/tenant/requests"),
+  tenantResolveRequest: (id: string) => api.put(`/api/tenant/requests/${id}/resolve`),
   tenantGetConfig: () => api.get("/api/tenant/config"),
   tenantUpdateConfig: (data: any) => api.put("/api/tenant/config", data),
 
@@ -163,7 +169,7 @@ export const apiEndpoints = {
     horizontal: number;
     vertical: number;
     zoom: number;
-  }) => api.post("/api/assets/drift", data),
+  }) => api.post("/api/assets/drift-video", data),
 
   // === Generation ===
   generateMediaDirect: (formData: FormData) =>

@@ -1,6 +1,6 @@
 import axios from "axios";
 import sharp from "sharp";
-import { dbService as airtableService, Asset } from "../database"; // Fixed path
+import { dbService as airtableService, Asset, CreditPool } from "../database"; // Fixed path
 import { GeminiService } from "../gemini";
 import { FalService } from "../fal";
 import { ROIService } from "../roi";
@@ -12,6 +12,13 @@ import {
 } from "./utils";
 
 import { TenantApiKeys } from "./video";
+
+async function refundChargedPool(params: any) {
+  const pool = params?.chargedPool as CreditPool | undefined;
+  const cost = Number(params?.cost);
+  if (!pool || !Number.isFinite(cost) || cost <= 0) return;
+  await airtableService.refundGranularCredits(params.userId, pool, cost);
+}
 
 export const imageLogic = {
   // === GENERATION ===
@@ -62,7 +69,7 @@ export const imageLogic = {
         error: e.message,
         progress: 0,
       });
-      await airtableService.refundUserCredit(params.userId, 1);
+      await refundChargedPool(params);
     }
   },
 
@@ -130,7 +137,7 @@ export const imageLogic = {
         error: e.message,
         progress: 0,
       });
-      await airtableService.refundUserCredit(params.userId, 3);
+      await refundChargedPool(params);
     }
   },
 

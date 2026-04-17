@@ -26,12 +26,25 @@ interface Config {
   pricing: any;
 }
 
+interface CreditRequest {
+  id: string;
+  email: string;
+  name?: string;
+  createdAt: string;
+  user?: {
+    id: string;
+    email: string;
+    name?: string;
+  };
+}
+
 export default function TenantDashboard() {
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<"team" | "pricing" | "integrations">("team");
   const [users, setUsers] = useState<User[]>([]);
+  const [creditRequests, setCreditRequests] = useState<CreditRequest[]>([]);
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -49,16 +62,48 @@ export default function TenantDashboard() {
   // Edit User Modal
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
+  const toInt = (value: string, fallback = 0) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(0, Math.round(n));
+  };
+
+  const toSignedInt = (value: string, fallback = 0) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.round(n);
+  };
+
   useEffect(() => {
     fetchData();
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== "team") return;
+    const interval = setInterval(async () => {
+      try {
+        const requestsRes = await apiEndpoints.tenantGetRequests();
+        if (requestsRes.data.success) {
+          setCreditRequests(requestsRes.data.requests || []);
+        }
+      } catch {
+        // Silent polling failure
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, [activeTab]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
       if (activeTab === "team") {
-        const res = await apiEndpoints.tenantGetTeam();
-        if (res.data.success) setUsers(res.data.users);
+        const [teamRes, requestsRes] = await Promise.all([
+          apiEndpoints.tenantGetTeam(),
+          apiEndpoints.tenantGetRequests(),
+        ]);
+        if (teamRes.data.success) setUsers(teamRes.data.users);
+        if (requestsRes.data.success) setCreditRequests(requestsRes.data.requests || []);
       } else {
         const res = await apiEndpoints.tenantGetConfig();
         if (res.data.success) setConfig(res.data.config);
@@ -101,9 +146,19 @@ export default function TenantDashboard() {
   const handleUpdateUserCredits = async (userId: string, pool: string, amount: string) => {
     try {
       await apiEndpoints.tenantUpdateUser(userId, {
-        addCredits: parseFloat(amount),
+        addCredits: toSignedInt(amount),
         creditType: pool
       });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleResolveCreditRequest = async (requestId: string) => {
+    try {
+      await apiEndpoints.tenantResolveRequest(requestId);
+      setMsg("Credit request resolved.");
       fetchData();
     } catch (err: any) {
       alert(err.message);
@@ -163,6 +218,48 @@ export default function TenantDashboard() {
         {/* TEAM TAB */}
         {activeTab === "team" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-xl">
+              <div className="p-5 border-b border-gray-800 flex items-center justify-between">
+                <h2 className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Pending Render Requests</h2>
+                <span className="text-[10px] font-bold text-brand-accent uppercase tracking-widest">
+                  {creditRequests.length} Pending
+                </span>
+              </div>
+              {creditRequests.length === 0 ? (
+                <div className="p-6 text-xs text-gray-500 italic">No pending render requests.</div>
+              ) : (
+                <table className="w-full text-left min-w-[700px]">
+                  <thead className="bg-gray-950/50 text-[9px] uppercase tracking-widest text-gray-500 font-bold">
+                    <tr>
+                      <th className="p-5">Requester</th>
+                      <th className="p-5">Email</th>
+                      <th className="p-5">Submitted</th>
+                      <th className="p-5 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800">
+                    {creditRequests.map((r) => (
+                      <tr key={r.id} className="hover:bg-gray-800/20 transition-colors">
+                        <td className="p-5 text-sm text-white">{r.user?.name || r.name || "Unknown User"}</td>
+                        <td className="p-5 text-xs text-gray-400 font-mono">{r.user?.email || r.email}</td>
+                        <td className="p-5 text-xs text-gray-500">
+                          {new Date(r.createdAt).toLocaleString()}
+                        </td>
+                        <td className="p-5 text-right">
+                          <button
+                            onClick={() => handleResolveCreditRequest(r.id)}
+                            className="px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-brand-accent hover:bg-cyan-300 text-gray-950 transition-all"
+                          >
+                            Mark Resolved
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
             <div className="flex justify-between items-center">
               <h2 className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Team Members</h2>
               <button
@@ -201,22 +298,22 @@ export default function TenantDashboard() {
                         <div className="flex flex-col gap-1 items-center">
                           <div className="flex items-center gap-2">
                             <span className="text-[9px] text-gray-500">Std:</span>
-                            <input type="number" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDrift} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsPicDrift", (parseFloat(e.target.value) - u.creditsPicDrift).toString())} />
+                            <input type="number" step="1" min="0" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDrift} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsPicDrift", (toInt(e.target.value, u.creditsPicDrift) - u.creditsPicDrift).toString())} />
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-[9px] text-gray-500">Plus:</span>
-                            <input type="number" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsPicDriftPlus", (parseFloat(e.target.value) - u.creditsPicDriftPlus).toString())} />
+                            <input type="number" step="1" min="0" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsPicDriftPlus", (toInt(e.target.value, u.creditsPicDriftPlus) - u.creditsPicDriftPlus).toString())} />
                           </div>
                         </div>
                       </td>
                       <td className="p-5 text-center">
-                        <input type="number" className="w-16 bg-gray-950 border border-gray-800 rounded p-1 text-center text-xs" defaultValue={u.creditsImageFX} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsImageFX", (parseFloat(e.target.value) - u.creditsImageFX).toString())} />
+                        <input type="number" step="1" min="0" className="w-16 bg-gray-950 border border-gray-800 rounded p-1 text-center text-xs" defaultValue={u.creditsImageFX} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsImageFX", (toInt(e.target.value, u.creditsImageFX) - u.creditsImageFX).toString())} />
                       </td>
                       <td className="p-5 text-center">
                         <div className="flex gap-1 justify-center">
-                          <input type="number" title="VidFX 1" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX1", (parseFloat(e.target.value) - u.creditsVideoFX1).toString())} />
-                          <input type="number" title="VidFX 2" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX2", (parseFloat(e.target.value) - u.creditsVideoFX2).toString())} />
-                          <input type="number" title="VidFX 3" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX3", (parseFloat(e.target.value) - u.creditsVideoFX3).toString())} />
+                          <input type="number" step="1" min="0" title="VidFX 1" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX1", (toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1).toString())} />
+                          <input type="number" step="1" min="0" title="VidFX 2" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX2", (toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2).toString())} />
+                          <input type="number" step="1" min="0" title="VidFX 3" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX3", (toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3).toString())} />
                         </div>
                       </td>
                       <td className="p-5 text-right">
@@ -255,10 +352,11 @@ export default function TenantDashboard() {
                       <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
                       <input
                         type="number"
-                        step="0.1"
+                        step="1"
+                        min="0"
                         className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
                         value={config.pricing[key]}
-                        onChange={(e) => setConfig({ ...config, pricing: { ...config.pricing, [key]: parseFloat(e.target.value) } })}
+                        onChange={(e) => setConfig({ ...config, pricing: { ...config.pricing, [key]: toInt(e.target.value, config.pricing[key]) } })}
                         onBlur={() => handleUpdateConfig()}
                       />
                     </div>
@@ -274,10 +372,11 @@ export default function TenantDashboard() {
                       <span className="text-[10px] text-gray-400 uppercase font-bold truncate max-w-[100px]" title={key}>{key.replace('price', '').replace(/_/g, ' ')}</span>
                       <input
                         type="number"
-                        step="0.1"
+                        step="1"
+                        min="0"
                         className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
                         value={config.pricing[key]}
-                        onChange={(e) => setConfig({ ...config, pricing: { ...config.pricing, [key]: parseFloat(e.target.value) } })}
+                        onChange={(e) => setConfig({ ...config, pricing: { ...config.pricing, [key]: toInt(e.target.value, config.pricing[key]) } })}
                         onBlur={() => handleUpdateConfig()}
                       />
                     </div>
@@ -293,10 +392,11 @@ export default function TenantDashboard() {
                       <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
                       <input
                         type="number"
-                        step="0.1"
+                        step="1"
+                        min="0"
                         className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
                         value={config.pricing[key]}
-                        onChange={(e) => setConfig({ ...config, pricing: { ...config.pricing, [key]: parseFloat(e.target.value) } })}
+                        onChange={(e) => setConfig({ ...config, pricing: { ...config.pricing, [key]: toInt(e.target.value, config.pricing[key]) } })}
                         onBlur={() => handleUpdateConfig()}
                       />
                     </div>

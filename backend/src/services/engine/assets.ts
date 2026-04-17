@@ -132,6 +132,7 @@ export const assetsLogic = {
   async copyPostMediaToAsset(postId: string, userId: string): Promise<Asset> {
     const post = await airtableService.getPostById(postId);
     if (!post || !post.mediaUrl) throw new Error("Post has no media");
+    if (post.userId !== userId) throw new Error("Access denied");
 
     let targetUrl = post.mediaUrl;
     try {
