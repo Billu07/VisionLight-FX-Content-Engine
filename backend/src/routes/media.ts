@@ -15,6 +15,7 @@ import {
 } from "../lib/app-runtime";
 
 const router = express.Router();
+const MAX_GENERATION_REFERENCE_IMAGES = 14;
 
 // ==================== ASSET MANAGEMENT ====================
 router.post(
@@ -269,10 +270,34 @@ router.post(
     let charged = false;
     let chargedCost = 0;
     try {
-      const { prompt, assetUrl, aspectRatio, referenceUrl, mode, originalAssetId } =
-        req.body;
+      const {
+        prompt,
+        assetUrl,
+        aspectRatio,
+        referenceUrl,
+        referenceUrls: rawReferenceUrls,
+        mode,
+        originalAssetId,
+      } = req.body;
       if (!assetUrl || !prompt) {
         return res.status(400).json({ error: "Missing asset or prompt" });
+      }
+
+      const referenceUrls = Array.from(
+        new Set(
+          [
+            ...(Array.isArray(rawReferenceUrls) ? rawReferenceUrls : []),
+            ...(typeof referenceUrl === "string" ? [referenceUrl] : []),
+          ].filter(
+            (url): url is string => typeof url === "string" && url.trim().length > 0,
+          ),
+        ),
+      );
+
+      if (referenceUrls.length > 5) {
+        return res
+          .status(400)
+          .json({ error: "A maximum of 5 reference images is supported." });
       }
 
       const [settings, user] = await Promise.all([
@@ -296,7 +321,7 @@ router.post(
         prompt,
         req.user!.id,
         aspectRatio || "16:9",
-        referenceUrl,
+        referenceUrls,
         mode || "pro",
         originalAssetId,
         apiKeys,
@@ -773,7 +798,7 @@ router.delete(
 router.post(
   "/api/generate-media",
   authenticateToken,
-  upload.array("referenceImages", 5),
+  upload.array("referenceImages", MAX_GENERATION_REFERENCE_IMAGES),
   async (req: AuthenticatedRequest, res) => {
     let charged = false;
     let chargedPool: CreditPool | null = null;
@@ -793,6 +818,10 @@ router.post(
         height,
         title,
         generateAudio,
+        negativePrompt,
+        seed,
+        autoFix,
+        veoMode,
         projectId,
       } = req.body;
 
@@ -860,6 +889,10 @@ router.post(
         model,
         aspectRatio,
         generateAudio,
+        negativePrompt,
+        seed,
+        autoFix,
+        veoMode,
         imageReference: primaryRefUrl,
         imageReferences: uploadedUrls,
         hasReferenceImage: uploadedUrls.length > 0,

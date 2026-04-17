@@ -65,6 +65,26 @@ const getKlingCameraPrompt = (h: number, v: number, z: number) => {
   return parts.join(", ") + ". Smooth cinematic movement.";
 };
 
+const toBoolean = (value: any, fallback = false) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
+  }
+  return fallback;
+};
+
+const isLikelyVideoUrl = (url?: string) => {
+  if (!url || typeof url !== "string") return false;
+  const normalized = url.toLowerCase();
+  return (
+    normalized.endsWith(".mp4") ||
+    normalized.includes("/video/") ||
+    normalized.includes(".mp4?")
+  );
+};
+
 export const videoLogic = {
   // === DRIFT VIDEO PATH (Kling 2.6 Pro) ===
   async processKlingDrift(
@@ -309,7 +329,7 @@ export const videoLogic = {
       let finalInputImageBuffer: Buffer | undefined;
       const rawRefUrl = params.imageReferences?.[0] || params.imageReference;
 
-      // Veo does not support image input (Text-to-Video only)
+      // Preprocess single reference image for non-Veo models only.
       if (rawRefUrl && params.hasReferenceImage && !isVeo) {
         try {
           const imageResponse = await axios.get(getOptimizedUrl(rawRefUrl), {
@@ -353,65 +373,126 @@ export const videoLogic = {
       let provider = "";
 
       if (isVeo) {
-        provider = "kling"; // Using Fal infrastructure (wrapper)
+        provider = "veo";
+        const referenceUrls = (params.imageReferences || []).filter(
+          (url: any): url is string => typeof url === "string" && url.length > 0,
+        );
+        const primaryRefUrl = referenceUrls[0] || params.imageReference;
+        const secondaryRefUrl = referenceUrls[1];
 
-        let endpoint = "fal-ai/veo3.1"; // Default Text-to-Video
+        const requestedDuration = Number(params.duration);
+        const normalizedDuration =
+          requestedDuration === 4 || requestedDuration === 6 || requestedDuration === 8
+            ? `${requestedDuration}s`
+            : "8s";
+        const normalizedResolution =
+          params.resolution === "1080p" || params.resolution === "4k"
+            ? params.resolution
+            : "720p";
+
+        let veoMode = typeof params.veoMode === "string" ? params.veoMode : "";
+        if (!veoMode) {
+          if (isLikelyVideoUrl(primaryRefUrl)) {
+            veoMode = "extend_video";
+          } else if (
+            referenceUrls.length > 2 &&
+            referenceUrls.every((url: string) => !isLikelyVideoUrl(url))
+          ) {
+            veoMode = "reference_to_video";
+          } else if (
+            primaryRefUrl &&
+            secondaryRefUrl &&
+            !isLikelyVideoUrl(primaryRefUrl) &&
+            !isLikelyVideoUrl(secondaryRefUrl)
+          ) {
+            veoMode = "first_last_frame";
+          } else if (primaryRefUrl) {
+            veoMode = "image_to_video";
+          } else {
+            veoMode = "image_to_video";
+          }
+        }
+        params.veoMode = veoMode;
+
         const payload: any = {
           prompt: finalPrompt,
-          resolution: params.resolution || "720p", // Default to 720p for safety
           aspect_ratio: targetRatioString === "16:9" ? "16:9" : "9:16",
-          duration: params.duration ? `${params.duration}s` : "8s",
-          generate_audio: true,
+          generate_audio: toBoolean(params.generateAudio, true),
+          auto_fix: toBoolean(params.autoFix, true),
         };
 
-        // Determine Mode based on Input
-        // 1. EXTEND VIDEO (Input is a Video URL)
-        if (
-          params.imageReference &&
-          (params.imageReference.endsWith(".mp4") ||
-            params.imageReference.includes("/video/") ||
-            params.imageReference.includes("cloudinary.com")) &&
-            // Simple heuristic to check if it looks like a video
-             !params.imageReference.match(/\.(jpg|jpeg|png|webp)$/i)
-        ) {
+        let endpoint = "fal-ai/veo3.1/image-to-video";
+        if (veoMode === "extend_video") {
+          if (!primaryRefUrl || !isLikelyVideoUrl(primaryRefUrl)) {
+            throw new Error("Veo extend mode requires a valid source video.");
+          }
           endpoint = "fal-ai/veo3.1/extend-video";
-          payload.video_url = getOptimizedUrl(params.imageReference);
-          
-          // Extend Video specific constraints
-          // API says: "Input videos up to 8 seconds"
-          // API says: "duration" enum: "7s" (Wait, docs say "Default value: 7s", "Possible enum values: 7s")
-          // Let's force 7s or stick to what API allows if different.
-          // The API text says "Possible enum values: 7s" for Extend Video.
-          payload.duration = "7s"; 
-          
-          // Remove unsupported params for extend
-          delete payload.resolution; // API docs don't list resolution for extend input, but output is implicitly defined?
-          // Actually, "resolution" IS listed in Extend Video Input schema in the text provided?
-          // "resolution ResolutionEnum ... Default value: 720p" -> Yes it is.
-          // Wait, earlier I saw "delete payload.resolution" in the old code. 
-          // Re-reading API text for Extend Video:
-          // Input Schema: prompt, aspect_ratio, duration, negative_prompt, resolution, generate_audio, seed, auto_fix, video_url
-          // So resolution IS supported. I will keep it.
-        } 
-        // 2. IMAGE TO VIDEO (Single Image)
-        else if (finalInputImageBuffer) {
-           endpoint = "fal-ai/veo3.1/image-to-video";
-           const veoInputUrl = await uploadToCloudinary(
-             finalInputImageBuffer,
-             `${postId}_veo_input`,
-             params.userId,
-             "Veo Input",
-             "image",
-           );
-           payload.image_url = veoInputUrl;
-        } 
-        // 3. IMAGE TO VIDEO (URL Reference)
-        else if (params.imageReference) {
-           endpoint = "fal-ai/veo3.1/image-to-video";
-           payload.image_url = getOptimizedUrl(params.imageReference);
+          payload.video_url = getOptimizedUrl(primaryRefUrl);
+          payload.duration = "7s";
+          payload.resolution = "720p";
+          params.duration = 7;
+          params.resolution = "720p";
+        } else if (veoMode === "reference_to_video") {
+          if (referenceUrls.length === 0) {
+            throw new Error("Veo reference mode requires at least one reference image.");
+          }
+          if (referenceUrls.some((url: string) => isLikelyVideoUrl(url))) {
+            throw new Error("Veo reference mode only accepts image references.");
+          }
+          endpoint = "fal-ai/veo3.1/reference-to-video";
+          payload.image_urls = referenceUrls.map((url: string) =>
+            getOptimizedUrl(url),
+          );
+          payload.duration = "8s";
+          payload.resolution = normalizedResolution;
+          params.duration = 8;
+          params.resolution = normalizedResolution;
+        } else if (veoMode === "first_last_frame") {
+          if (!primaryRefUrl || !secondaryRefUrl) {
+            throw new Error("Veo first/last mode requires both first and last frame images.");
+          }
+          if (isLikelyVideoUrl(primaryRefUrl) || isLikelyVideoUrl(secondaryRefUrl)) {
+            throw new Error("Veo first/last mode only accepts image frames.");
+          }
+          endpoint = "fal-ai/veo3.1/first-last-frame-to-video";
+          payload.first_frame_url = getOptimizedUrl(primaryRefUrl);
+          payload.last_frame_url = getOptimizedUrl(secondaryRefUrl);
+          payload.duration = normalizedDuration;
+          payload.resolution = normalizedResolution;
+          params.duration = Number(normalizedDuration.replace("s", ""));
+          params.resolution = normalizedResolution;
+        } else {
+          if (!primaryRefUrl || isLikelyVideoUrl(primaryRefUrl)) {
+            throw new Error("Veo image-to-video mode requires an image source.");
+          }
+          endpoint = "fal-ai/veo3.1/image-to-video";
+          payload.image_url = getOptimizedUrl(primaryRefUrl);
+          payload.duration = normalizedDuration;
+          payload.resolution = normalizedResolution;
+          params.duration = Number(normalizedDuration.replace("s", ""));
+          params.resolution = normalizedResolution;
         }
 
-        console.log(`🚀 Veo Request: ${endpoint}`, JSON.stringify(payload, null, 2));
+        if (veoMode !== "reference_to_video") {
+          if (
+            typeof params.negativePrompt === "string" &&
+            params.negativePrompt.trim()
+          ) {
+            payload.negative_prompt = params.negativePrompt.trim();
+          }
+          if (
+            params.seed !== undefined &&
+            params.seed !== null &&
+            `${params.seed}`.trim() !== ""
+          ) {
+            const parsedSeed = Number(params.seed);
+            if (Number.isFinite(parsedSeed)) {
+              payload.seed = Math.max(0, Math.floor(parsedSeed));
+            }
+          }
+        }
+
+        console.log(`Veo Request: ${endpoint}`, JSON.stringify(payload, null, 2));
 
         const falKey = apiKeys?.falApiKey;
         if (!falKey) throw new Error("API Key is missing. Please configure your Fal AI key in the Admin Panel.");
@@ -651,7 +732,7 @@ export const videoLogic = {
           isFailed = true;
           errorMessage = checkRes.data.data.failMsg;
         } else progress = Math.min(95, progress + 5);
-      } else if (provider.includes("kling")) {
+      } else if (provider.includes("kling") || provider.includes("veo")) {
         const falKey = apiKeys?.falApiKey || FAL_KEY;
         const checkUrl =
           params.statusUrl || `${FAL_BASE_PATH}/requests/${externalId}/status`;
@@ -760,3 +841,4 @@ export const videoLogic = {
     }
   },
 };
+

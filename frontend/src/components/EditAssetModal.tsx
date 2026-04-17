@@ -41,6 +41,7 @@ interface EditAssetModalProps {
 }
 
 type EditorMode = "pro" | "drift" | "convert";
+const MAX_EDITOR_REFERENCE_IMAGES = 5;
 
 export function EditAssetModal({
   asset: initialAsset,
@@ -88,7 +89,7 @@ export function EditAssetModal({
 
   // Text Edit State
   const [prompt, setPrompt] = useState("");
-  const [referenceAsset, setReferenceAsset] = useState<Asset | null>(null);
+  const [referenceAssets, setReferenceAssets] = useState<Asset[]>([]);
   const [showRefSelector, setShowRefSelector] = useState(false);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
 
@@ -169,6 +170,66 @@ export function EditAssetModal({
     queryFn: async () => (await apiEndpoints.getAssets()).data.assets,
     enabled: showRefSelector || !currentAsset,
   });
+  const imageAssets = Array.isArray(allAssets)
+    ? allAssets.filter((asset: Asset) => asset.type !== "VIDEO")
+    : [];
+
+  const appendReferenceAssets = (incomingAssets: Asset[]) => {
+    const existingKeys = new Set(
+      referenceAssets.map((asset) => asset.id || asset.url),
+    );
+    const uniqueIncoming = incomingAssets.filter((asset) => {
+      const key = asset.id || asset.url;
+      return !existingKeys.has(key);
+    });
+
+    if (referenceAssets.length >= MAX_EDITOR_REFERENCE_IMAGES) {
+      alert(
+        `Only ${MAX_EDITOR_REFERENCE_IMAGES} reference image(s) are supported in PicFX Editor.`,
+      );
+      return;
+    }
+
+    const nextAssets = uniqueIncoming.slice(
+      0,
+      MAX_EDITOR_REFERENCE_IMAGES - referenceAssets.length,
+    );
+    if (nextAssets.length === 0) return;
+
+    if (nextAssets.length < uniqueIncoming.length) {
+      alert(
+        `Only ${MAX_EDITOR_REFERENCE_IMAGES} reference image(s) are supported in PicFX Editor.`,
+      );
+    }
+
+    setReferenceAssets((prev) => [...prev, ...nextAssets]);
+  };
+
+  const toggleReferenceAsset = (asset: Asset) => {
+    const exists = referenceAssets.some(
+      (referenceAsset) =>
+        referenceAsset.id === asset.id || referenceAsset.url === asset.url,
+    );
+
+    if (exists) {
+      setReferenceAssets((prev) =>
+        prev.filter(
+          (referenceAsset) =>
+            referenceAsset.id !== asset.id && referenceAsset.url !== asset.url,
+        ),
+      );
+      return;
+    }
+
+    if (referenceAssets.length >= MAX_EDITOR_REFERENCE_IMAGES) {
+      alert(
+        `Only ${MAX_EDITOR_REFERENCE_IMAGES} reference image(s) are supported in PicFX Editor.`,
+      );
+      return;
+    }
+
+    setReferenceAssets((prev) => [...prev, asset]);
+  };
 
   useEffect(() => {
     if (!currentAsset?.url) return;
@@ -270,7 +331,7 @@ export function EditAssetModal({
         assetUrl: currentAsset.url,
         prompt: editPrompt,
         aspectRatio: customRatio || "original",
-        referenceUrl: referenceAsset?.url,
+        referenceUrls: referenceAssets.map((asset) => asset.url),
         mode: activeTab as "standard" | "pro",
       });
     },
@@ -470,15 +531,23 @@ export function EditAssetModal({
   };
 
   const uploadRefMutation = useMutation({
-    mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append("image", file);
-      formData.append("raw", "true");
-      return apiEndpoints.uploadAssetSync(formData);
+    mutationFn: async (files: File[]) => {
+      return Promise.all(
+        files.map((file) => {
+          const formData = new FormData();
+          formData.append("image", file);
+          formData.append("raw", "true");
+          return apiEndpoints.uploadAssetSync(formData);
+        }),
+      );
     },
     onMutate: () => setIsUploadingRef(true),
-    onSuccess: (res: any) => {
-      setReferenceAsset(res.data.asset);
+    onSuccess: (responses: any[]) => {
+      appendReferenceAssets(
+        responses
+          .map((response) => response?.data?.asset)
+          .filter(Boolean) as Asset[],
+      );
       setShowRefSelector(false);
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     },
@@ -493,7 +562,28 @@ export function EditAssetModal({
     if (currentIndex < history.length - 1) setCurrentIndex(currentIndex + 1);
   };
   const handleRefFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) uploadRefMutation.mutate(e.target.files[0]);
+    const selectedFiles = Array.from(e.target.files || []);
+    if (selectedFiles.length === 0) return;
+
+    const remainingSlots =
+      MAX_EDITOR_REFERENCE_IMAGES - referenceAssets.length;
+    if (remainingSlots <= 0) {
+      alert(
+        `Only ${MAX_EDITOR_REFERENCE_IMAGES} reference image(s) are supported in PicFX Editor.`,
+      );
+      e.target.value = "";
+      return;
+    }
+
+    const files = selectedFiles.slice(0, remainingSlots);
+    if (files.length < selectedFiles.length) {
+      alert(
+        `Only ${MAX_EDITOR_REFERENCE_IMAGES} reference image(s) are supported in PicFX Editor.`,
+      );
+    }
+
+    uploadRefMutation.mutate(files);
+    e.target.value = "";
   };
 
   // Handle Convert Action
@@ -752,25 +842,37 @@ export function EditAssetModal({
                   </button>
                 </div>
 
-                {referenceAsset &&
+                {referenceAssets.length > 0 &&
                   activeTab !== "drift" &&
                   activeTab !== "convert" && (
-                    <div className="absolute bottom-4 right-4 w-32 border-2 border-purple-500 rounded-lg overflow-hidden bg-gray-800 shadow-2xl z-20">
-                      <div className="relative aspect-video">
-                        <img
-                          src={getCORSProxyUrl(referenceAsset.url, 720, 80)}
-                          className="w-full h-full object-cover opacity-90"
-                          crossOrigin="anonymous"
-                        />
-                        <button
-                          onClick={() => setReferenceAsset(null)}
-                          className="absolute top-1 right-1 bg-red-600/80 text-white w-5 h-5 flex items-center justify-center text-xs rounded-full hover:bg-red-500"
-                        >
-                          x
-                        </button>
+                    <div className="absolute bottom-4 right-4 w-40 border-2 border-purple-500 rounded-lg overflow-hidden bg-gray-800 shadow-2xl z-20">
+                      <div className="grid grid-cols-2 gap-1 p-1 bg-gray-900/90">
+                        {referenceAssets.slice(0, 4).map((referenceAsset) => (
+                          <div
+                            key={referenceAsset.id}
+                            className="relative aspect-square overflow-hidden rounded"
+                          >
+                            <img
+                              src={getCORSProxyUrl(referenceAsset.url, 720, 80)}
+                              className="w-full h-full object-cover opacity-90"
+                              crossOrigin="anonymous"
+                            />
+                            <button
+                              onClick={() =>
+                                setReferenceAssets((prev) =>
+                                  prev.filter((asset) => asset.id !== referenceAsset.id),
+                                )
+                              }
+                              className="absolute top-1 right-1 bg-red-600/80 text-white w-5 h-5 flex items-center justify-center text-xs rounded-full hover:bg-red-500"
+                            >
+                              x
+                            </button>
+                          </div>
+                        ))}
                       </div>
                       <div className="bg-purple-900/90 text-[8px] text-center py-0.5 text-white font-bold tracking-wide">
-                        REFERENCE
+                        {referenceAssets.length} REFERENCE
+                        {referenceAssets.length > 1 ? "S" : ""}
                       </div>
                     </div>
                   )}
@@ -1058,8 +1160,16 @@ export function EditAssetModal({
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-bold text-purple-300 uppercase tracking-wider">
-                      Reference
+                      References
                     </label>
+                    {referenceAssets.length > 0 && (
+                      <button
+                        onClick={() => setReferenceAssets([])}
+                        className="text-[10px] text-gray-400 hover:text-white"
+                      >
+                        Clear all
+                      </button>
+                    )}
                   </div>
                   {!showRefSelector ? (
                     <button
@@ -1067,13 +1177,15 @@ export function EditAssetModal({
                         setShowRefSelector(true);
                         setIsCropping(false);
                       }}
-                      className={`w-full border border-dashed rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${referenceAsset
+                      className={`w-full border border-dashed rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${referenceAssets.length > 0
                         ? "border-purple-500/50 bg-purple-500/10"
                         : "border-gray-700 hover:border-gray-500"
                         }`}
                     >
                       <span className="text-xs text-gray-300">
-                        {referenceAsset ? "Change Reference" : "Add Reference"}
+                        {referenceAssets.length > 0
+                          ? `Manage References (${referenceAssets.length}/${MAX_EDITOR_REFERENCE_IMAGES})`
+                          : `Add References (up to ${MAX_EDITOR_REFERENCE_IMAGES})`}
                       </span>
                     </button>
                   ) : (
@@ -1095,6 +1207,7 @@ export function EditAssetModal({
                           ref={refFileInput}
                           className="hidden"
                           accept="image/*"
+                          multiple
                           onChange={handleRefFileUpload}
                         />
                         <button
@@ -1105,19 +1218,26 @@ export function EditAssetModal({
                         </button>
                       </div>
                       <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto custom-scrollbar">
-                        {Array.isArray(allAssets) &&
-                          allAssets.map((a: Asset) => (
+                        {imageAssets.map((a: Asset) => {
+                          const isSelected = referenceAssets.some(
+                            (referenceAsset) =>
+                              referenceAsset.id === a.id || referenceAsset.url === a.url,
+                          );
+
+                          return (
                             <img
                               key={a.id}
                               src={getCORSProxyUrl(a.url)}
-                              className="w-full h-12 object-cover rounded cursor-pointer border border-transparent hover:border-purple-500"
+                              className={`w-full h-12 object-cover rounded cursor-pointer border ${
+                                isSelected
+                                  ? "border-purple-500 ring-1 ring-purple-400"
+                                  : "border-transparent hover:border-purple-500"
+                              }`}
                               crossOrigin="anonymous"
-                              onClick={() => {
-                                setReferenceAsset(a);
-                                setShowRefSelector(false);
-                              }}
+                              onClick={() => toggleReferenceAsset(a)}
                             />
-                          ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}

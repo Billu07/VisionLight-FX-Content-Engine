@@ -159,6 +159,7 @@ export const apiEndpoints = {
     prompt: string;
     aspectRatio: string;
     referenceUrl?: string;
+    referenceUrls?: string[];
     mode?: "standard" | "pro";
   }) => api.post("/api/assets/edit", data),
 

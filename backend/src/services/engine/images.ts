@@ -1,12 +1,10 @@
 import axios from "axios";
 import sharp from "sharp";
 import { dbService as airtableService, Asset, CreditPool } from "../database"; // Fixed path
-import { GeminiService } from "../gemini";
 import { FalService } from "../fal";
 import { ROIService } from "../roi";
 import {
   uploadToCloudinary,
-  getOptimizedUrl,
   downloadAndOptimizeImages,
   getClosestAspectRatio,
 } from "./utils";
@@ -147,7 +145,7 @@ export const imageLogic = {
     prompt: string,
     userId: string,
     aspectRatio: "16:9" | "9:16" | "original" | "1:1",
-    referenceUrl?: string,
+    referenceUrls: string[] = [],
     mode: "standard" | "pro" = "pro",
     originalAssetId?: string, // 👈 ADDED PARAMETER
     apiKeys?: TenantApiKeys
@@ -185,13 +183,15 @@ export const imageLogic = {
       let finalPrompt = prompt;
       const modelType = mode === "standard" ? "speed" : "quality";
 
-      if (referenceUrl) {
-        const refRes = await axios.get(getOptimizedUrl(referenceUrl), {
-          responseType: "arraybuffer",
-        });
-        inputBuffers.push(Buffer.from(refRes.data));
-        if (mode === "pro")
-          finalPrompt = `TASK: ${prompt} \nINPUT 2 is style reference. Maintain ID of INPUT 1.`;
+      const refBuffers = await downloadAndOptimizeImages(referenceUrls);
+      if (refBuffers.length > 0) {
+        inputBuffers.push(...refBuffers);
+        if (mode === "pro") {
+          finalPrompt =
+            refBuffers.length === 1
+              ? `TASK: ${prompt}\nINPUT 2 is a reference image. Maintain the identity of INPUT 1.`
+              : `TASK: ${prompt}\nINPUT 2-${refBuffers.length + 1} are reference images. Use them for style, composition, and detail guidance while preserving the identity of INPUT 1.`;
+        }
       }
 
       const editedBuffer = await FalService.generateOrEditImage({
