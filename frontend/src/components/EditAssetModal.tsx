@@ -17,6 +17,10 @@ export interface BackgroundJob {
   resultAsset?: any;
   error?: string;
   driftPostId?: string;
+  sourceAssetId?: string;
+  sourcePreviewUrl?: string;
+  promptPreview?: string;
+  createdAt?: number;
 }
 
 interface Asset {
@@ -33,6 +37,7 @@ interface EditAssetModalProps {
   onClose: () => void;
   initialVideoUrl?: string;
   onEditSuccess?: (originalId: string, newAsset: Asset) => void;
+  dockIndex?: number;
 }
 
 type EditorMode = "pro" | "drift" | "convert";
@@ -43,6 +48,7 @@ export function EditAssetModal({
   onClose,
   initialVideoUrl,
   onEditSuccess,
+  dockIndex = 0,
 }: EditAssetModalProps) {
   const queryClient = useQueryClient();
   const refFileInput = useRef<HTMLInputElement>(null);
@@ -59,7 +65,13 @@ export function EditAssetModal({
   const [lastJobId, setLastJobId] = useState<string | null>(null);
 
   const triggerJobAdded = (job: BackgroundJob) => {
-    setJobs((prev) => [...prev, job]);
+    const enrichedJob: BackgroundJob = {
+      createdAt: Date.now(),
+      sourceAssetId: currentAsset?.id,
+      sourcePreviewUrl: currentAsset?.url,
+      ...job,
+    };
+    setJobs((prev) => [...prev, enrichedJob]);
     setLastJobId(job.id);
     setPrompt(""); // Clear prompt to protect credits and give feedback
     // Reset animation after 2s
@@ -148,12 +160,33 @@ export function EditAssetModal({
   const [driftVideoUrl, setDriftVideoUrl] = useState<string | null>(
     initialVideoUrl || null,
   );
+  const previewAssetUrl = currentAsset?.url
+    ? getCORSProxyUrl(currentAsset.url, 2048, 82)
+    : undefined;
 
   const { data: allAssets = [] } = useQuery({
     queryKey: ["assets"],
     queryFn: async () => (await apiEndpoints.getAssets()).data.assets,
     enabled: showRefSelector || !currentAsset,
   });
+
+  useEffect(() => {
+    if (!currentAsset?.url) return;
+    setIsImageLoading(true);
+  }, [currentAsset?.url]);
+
+  useEffect(() => {
+    if (!initialAsset) return;
+    setHistory((prev) => {
+      if (prev[0]?.id === initialAsset.id) return prev;
+      return [initialAsset];
+    });
+    setCurrentIndex(0);
+    setIsMinimized(false);
+    setIsCropping(false);
+    setDriftVideoUrl(initialVideoUrl || null);
+    if (initialTab) setActiveTab(initialTab);
+  }, [initialAsset?.id, initialTab, initialVideoUrl]);
 
   // 1. RECOVERY LOGIC
   useEffect(() => {
@@ -241,9 +274,15 @@ export function EditAssetModal({
         mode: activeTab as "standard" | "pro",
       });
     },
-    onMutate: () => {
+    onMutate: (variables) => {
       const id = Date.now().toString();
-      triggerJobAdded({ id, type: "edit", status: "processing", message: "Editing text..." });
+      triggerJobAdded({
+        id,
+        type: "edit",
+        status: "processing",
+        message: "Editing text...",
+        promptPreview: variables.prompt,
+      });
       return { id };
     },
     onSuccess: (res: any, _variables, context) => {
@@ -353,9 +392,15 @@ export function EditAssetModal({
         projectId: activeProject,
       });
     },
-    onMutate: () => {
+    onMutate: (variables) => {
       const id = Date.now().toString();
-      triggerJobAdded({ id, type: "drift", status: "processing", message: "Initiating Drift Engine..." });
+      triggerJobAdded({
+        id,
+        type: "drift",
+        status: "processing",
+        message: "Initiating Drift Engine...",
+        promptPreview: variables.prompt,
+      });
       return { id };
     },
     onSuccess: (res: any, _variables, context) => {
@@ -547,15 +592,38 @@ export function EditAssetModal({
   }, [cropAspect, isCropping]);
 
   const activeJobsCount = jobs.filter(j => j.status === "processing").length;
+  const hasRunningJobs = activeJobsCount > 0;
+
+  const handleSafeClose = () => {
+    if (hasRunningJobs) {
+      setIsMinimized(true);
+      return;
+    }
+    onClose();
+  };
+
+  const handleForceClose = () => {
+    if (
+      hasRunningJobs &&
+      !window.confirm("You still have running tasks. Closing will hide this editor task list. Continue?")
+    ) {
+      return;
+    }
+    onClose();
+  };
 
   if (isMinimized) {
     return (
       <div 
-        className="fixed bottom-4 right-4 z-[140] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-gray-800 transition-colors animate-in slide-in-from-bottom-5"
+        className="fixed right-4 z-[140] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-gray-800 transition-colors animate-in slide-in-from-bottom-5"
+        style={{
+          bottom: `${16 + dockIndex * 88}px`,
+          zIndex: 140 + dockIndex,
+        }}
         onClick={() => setIsMinimized(false)}
       >
         <div className="flex flex-col">
-          <span className="text-white font-bold text-sm">🎨 Editor Running</span>
+          <span className="text-white font-bold text-sm">Editor Running</span>
           <span className="text-purple-400 text-xs font-mono tracking-widest animate-pulse">
             {activeJobsCount > 0 ? `${activeJobsCount} Jobs Running` : "Idle"}
           </span>
@@ -563,11 +631,11 @@ export function EditAssetModal({
         <button 
           onClick={(e) => { 
             e.stopPropagation(); 
-            onClose(); 
+            handleForceClose(); 
           }} 
           className="text-gray-400 hover:text-red-500 font-bold ml-2 p-2"
         >
-          ✕
+          x
         </button>
       </div>
     );
@@ -579,10 +647,10 @@ export function EditAssetModal({
         {/* CLOSE BUTTON */}
         <div className="absolute top-4 left-4 z-50 flex gap-2">
           <button
-            onClick={onClose}
+            onClick={handleSafeClose}
             className="bg-black/50 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center transition-colors font-bold border border-white/20"
           >
-            ✕
+            x
           </button>
           <button
             onClick={() => setIsMinimized(true)}
@@ -620,7 +688,7 @@ export function EditAssetModal({
             ) : !currentAsset ? (
               <div className="w-full h-full flex flex-col items-center justify-center gap-6 text-center animate-in fade-in">
                 <div className="w-24 h-24 bg-gray-800/50 rounded-full flex items-center justify-center border border-gray-700">
-                  <span className="text-4xl text-gray-500">📷</span>
+                  <span className="text-4xl text-gray-500">IMG</span>
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-white mb-2">Upload a Reference Image</h3>
@@ -670,7 +738,7 @@ export function EditAssetModal({
                     disabled={currentIndex === 0}
                     className="p-2 bg-gray-800/80 rounded-full text-white disabled:opacity-30 hover:bg-gray-700 backdrop-blur-md"
                   >
-                    ↩️
+                    Undo
                   </button>
                   <span className="bg-black/50 text-white px-3 py-1.5 rounded-full text-xs font-mono backdrop-blur-md flex items-center">
                     v{currentIndex + 1}
@@ -680,7 +748,7 @@ export function EditAssetModal({
                     disabled={currentIndex === history.length - 1}
                     className="p-2 bg-gray-800/80 rounded-full text-white disabled:opacity-30 hover:bg-gray-700 backdrop-blur-md"
                   >
-                    ↪️
+                    Redo
                   </button>
                 </div>
 
@@ -690,7 +758,7 @@ export function EditAssetModal({
                     <div className="absolute bottom-4 right-4 w-32 border-2 border-purple-500 rounded-lg overflow-hidden bg-gray-800 shadow-2xl z-20">
                       <div className="relative aspect-video">
                         <img
-                          src={getCORSProxyUrl(referenceAsset.url)}
+                          src={getCORSProxyUrl(referenceAsset.url, 720, 80)}
                           className="w-full h-full object-cover opacity-90"
                           crossOrigin="anonymous"
                         />
@@ -698,7 +766,7 @@ export function EditAssetModal({
                           onClick={() => setReferenceAsset(null)}
                           className="absolute top-1 right-1 bg-red-600/80 text-white w-5 h-5 flex items-center justify-center text-xs rounded-full hover:bg-red-500"
                         >
-                          ✕
+                          x
                         </button>
                       </div>
                       <div className="bg-purple-900/90 text-[8px] text-center py-0.5 text-white font-bold tracking-wide">
@@ -728,7 +796,7 @@ export function EditAssetModal({
                   >
                     <img
                       ref={imgRef}
-                      src={getCORSProxyUrl(currentAsset.url)}
+                      src={previewAssetUrl || currentAsset.url}
                       className="max-h-[80vh] object-contain rounded-lg border border-gray-700 shadow-2xl"
                       crossOrigin="anonymous"
                       onLoad={onImageLoad}
@@ -736,10 +804,13 @@ export function EditAssetModal({
                   </ReactCrop>
                 ) : (
                   <img
-                    src={getCORSProxyUrl(currentAsset.url)}
+                    src={previewAssetUrl || currentAsset.url}
                     className="max-h-[80vh] object-contain rounded-lg border border-gray-700 shadow-2xl"
                     crossOrigin="anonymous"
+                    loading="eager"
+                    decoding="async"
                     onLoad={() => setIsImageLoading(false)}
+                    onError={() => setIsImageLoading(false)}
                   />
                 )}
               </>
@@ -765,70 +836,97 @@ export function EditAssetModal({
                       : "bg-gray-800 text-gray-500 border-gray-700"
                   }`}
                 >
-                  {jobs.some(j => j.status === 'processing') ? <LoadingSpinner size="sm" variant="neon" /> : "📋"}
+                  {jobs.some(j => j.status === 'processing') ? <LoadingSpinner size="sm" variant="neon" /> : "List"}
                   Tasks ({jobs.length})
                 </button>
 
                 {/* JOBS DROPDOWN MENU */}
                 {showJobsMenu && (
-                  <div className="absolute right-0 top-full mt-2 w-64 bg-gray-950 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden animate-in slide-in-from-top-2">
+                  <div className="absolute right-0 top-full mt-2 w-80 bg-gray-950 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden animate-in slide-in-from-top-2">
                     <div className="p-3 border-b border-gray-800 flex justify-between items-center bg-gray-900">
                       <span className="text-xs font-bold text-white">Active Tasks</span>
-                      <button onClick={() => setShowJobsMenu(false)} className="text-gray-500 hover:text-white">✕</button>
+                      <button onClick={() => setShowJobsMenu(false)} className="text-gray-500 hover:text-white">x</button>
                     </div>
-                    <div className="max-h-64 overflow-y-auto p-2 space-y-2">
+                    <div className="max-h-80 overflow-y-auto p-2 space-y-2">
                       {jobs.length === 0 ? (
                         <div className="p-4 text-center text-xs text-gray-600">No active tasks</div>
                       ) : (
-                        jobs.map((job) => (
-                          <div
-                            key={job.id}
-                            className={`p-2.5 rounded-lg border cursor-pointer transition-all ${
-                              job.status === "processing"
-                                ? "bg-gray-800/50 border-blue-500/30"
-                                : job.status === "ready"
-                                ? "bg-green-900/20 border-green-500/50 hover:bg-green-900/40"
-                                : "bg-red-900/20 border-red-500/50"
-                            }`}
-                            onClick={() => {
-                              if (job.status === "ready" && job.resultAsset) {
-                                if (job.type === "drift" && job.resultAsset.type === "VIDEO") {
-                                   setDriftVideoUrl(job.resultAsset.url);
-                                } else {
-                                   handleSuccess(job.resultAsset);
+                        [...jobs]
+                          .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+                          .map((job) => (
+                            <div
+                              key={job.id}
+                              className={`p-2.5 rounded-lg border cursor-pointer transition-all ${
+                                job.status === "processing"
+                                  ? "bg-gray-800/50 border-blue-500/30"
+                                  : job.status === "ready"
+                                  ? "bg-green-900/20 border-green-500/50 hover:bg-green-900/40"
+                                  : "bg-red-900/20 border-red-500/50"
+                              }`}
+                              onClick={() => {
+                                if (job.status === "ready" && job.resultAsset) {
+                                  if (job.type === "drift" && job.resultAsset.type === "VIDEO") {
+                                    setDriftVideoUrl(job.resultAsset.url);
+                                  } else {
+                                    handleSuccess(job.resultAsset);
+                                  }
                                 }
-                                // setShowJobsMenu(false);
-                              }
-                            }}
-                          >
-                            <div className="flex justify-between items-center mb-1">
-                              <span className={`text-[10px] font-bold capitalize ${job.status === 'ready' ? 'text-green-400' : 'text-blue-400'}`}>
-                                {job.type} {job.status === 'ready' ? '✓' : ''}
-                              </span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setJobs((prev) => prev.filter((j) => j.id !== job.id));
-                                }}
-                                className="text-gray-600 hover:text-red-400"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                            <div className="text-[10px] text-gray-400 truncate">
-                              {job.status === "processing" ? (
-                                <div className="flex items-center gap-2">
-                                   <LoadingSpinner size="sm" />
-                                   {job.message || "Processing..."}
+                              }}
+                            >
+                              <div className="flex items-start gap-2">
+                                {job.sourcePreviewUrl ? (
+                                  <img
+                                    src={getCORSProxyUrl(job.sourcePreviewUrl, 256, 70)}
+                                    className="w-12 h-12 rounded-md border border-gray-700 object-cover shrink-0"
+                                    alt="Task source"
+                                    crossOrigin="anonymous"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 rounded-md border border-gray-700 bg-gray-900 shrink-0 flex items-center justify-center text-[9px] text-gray-600">
+                                    N/A
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex justify-between items-center mb-1">
+                                    <span className={`text-[10px] font-bold capitalize ${job.status === "ready" ? "text-green-400" : "text-blue-400"}`}>
+                                      {job.type} {job.status === "ready" ? "Done" : ""}
+                                    </span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setJobs((prev) => prev.filter((j) => j.id !== job.id));
+                                      }}
+                                      className="text-gray-600 hover:text-red-400"
+                                    >
+                                      x
+                                    </button>
+                                  </div>
+                                  {job.promptPreview && (
+                                    <div className="text-[10px] text-gray-500 leading-snug max-h-8 overflow-hidden">
+                                      {job.promptPreview}
+                                    </div>
+                                  )}
+                                  <div className="text-[10px] text-gray-400 mt-1 truncate">
+                                    {job.status === "processing" ? (
+                                      <div className="flex items-center gap-2">
+                                        <LoadingSpinner size="sm" />
+                                        {job.message || "Processing..."}
+                                      </div>
+                                    ) : job.status === "ready" ? (
+                                      <span className="text-green-300 font-medium">Click to open result</span>
+                                    ) : (
+                                      <span className="text-red-400">{job.error || "Failed"}</span>
+                                    )}
+                                  </div>
+                                  {job.createdAt && (
+                                    <div className="text-[9px] text-gray-600 mt-1">
+                                      {new Date(job.createdAt).toLocaleTimeString()}
+                                    </div>
+                                  )}
                                 </div>
-                              ) : job.status === "ready" ? (
-                                <span className="text-green-300 font-medium">Click to view result ✨</span>
-                              ) : (
-                                <span className="text-red-400">{job.error || "Failed"}</span>
-                              )}
+                              </div>
                             </div>
-                          </div>
-                        ))
+                          ))
                       )}
                     </div>
                   </div>
@@ -867,7 +965,7 @@ export function EditAssetModal({
                   onClick={() => setIsCropping(true)}
                   className="flex-1 text-xs bg-gray-800 text-cyan-300 px-3 py-2 rounded-lg border border-cyan-500/30 hover:bg-gray-700 transition-colors flex items-center justify-center gap-2"
                 >
-                  <span>✂️</span> Crop
+                  <span>Crop</span>
                 </button>
 
                 <button
@@ -949,7 +1047,7 @@ export function EditAssetModal({
                   onClick={handleConvertAction}
                   className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white font-bold hover:shadow-lg flex items-center justify-center gap-2"
                 >
-                  <span>🔄 Convert to {convertTargetRatio}</span>
+                  <span>Convert to {convertTargetRatio}</span>
                 </button>
               </div>
             )}
@@ -1095,7 +1193,7 @@ export function EditAssetModal({
                         }}
                         className="text-[10px] bg-indigo-900/50 hover:bg-indigo-800 text-indigo-300 px-3 py-1.5 rounded-md border border-indigo-500/30 flex items-center gap-1 transition-colors"
                       >
-                        <span className="text-lg">✨</span> PromptFX
+                        <span className="text-lg">*</span> PromptFX
                       </button>
 
                       {/* PROMPT FX DROPDOWN */}
@@ -1116,7 +1214,7 @@ export function EditAssetModal({
                                 onClick={() => setShowPromptFxMenu(false)}
                                 className="text-xs text-gray-400 hover:text-white hover:bg-gray-800 px-2 py-1 rounded transition-colors"
                               >
-                                ✕
+                                x
                               </button>
                             </div>
                           </div>
@@ -1217,7 +1315,7 @@ export function EditAssetModal({
                                         }}
                                         className="text-blue-400 hover:text-blue-300 text-xs"
                                       >
-                                        ✎
+                                        Edit
                                       </button>
                                       <button
                                         onClick={(e) => {
@@ -1226,7 +1324,7 @@ export function EditAssetModal({
                                         }}
                                         className="text-red-500 hover:text-red-400 text-xs"
                                       >
-                                        ✕
+                                        x
                                       </button>
                                     </div>
                                   </div>
@@ -1330,7 +1428,7 @@ export function EditAssetModal({
             )}
 
             <button
-              onClick={onClose}
+              onClick={handleSafeClose}
               className="w-full py-2 text-gray-500 hover:text-white text-sm"
             >
               Save & Close
@@ -1341,3 +1439,4 @@ export function EditAssetModal({
     </div>
   );
 }
+

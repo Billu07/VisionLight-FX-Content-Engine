@@ -427,14 +427,22 @@ function Dashboard() {
   };
 
   const handleRequestCredits = async () => {
+    if (isRequesting) return;
     if (!confirm("Request more Render Reserve to Admin?")) return;
-    window.open("https://picdrift.com/renders", "_blank", "noopener,noreferrer");
+    const rendersUrl = "https://picdrift.com/renders";
+    const openedTab = window.open(rendersUrl, "_blank", "noopener,noreferrer");
     setIsRequesting(true);
     try {
-      await apiEndpoints.requestCredits();
-      alert("Request sent! Admin inbox updated and renders page opened.");
-    } catch (err) {
-      alert("Failed to send request.");
+      const res = await apiEndpoints.requestCredits();
+      if (!openedTab) {
+        window.location.assign(rendersUrl);
+      }
+      alert(res?.data?.message || "Request sent! Admin inbox updated and renders page opened.");
+    } catch (err: any) {
+      if (!openedTab) {
+        window.location.assign(rendersUrl);
+      }
+      alert(`Failed to send request: ${err?.message || "Unknown error"}`);
     } finally {
       setIsRequesting(false);
     }
@@ -583,6 +591,8 @@ function Dashboard() {
       const res = await apiEndpoints.uploadAssetSync(formData);
       if (res.data.success && res.data.asset) {
         setEditingAsset(res.data.asset);
+        setShowEditorModal(false);
+        setEditingVideoUrl(undefined);
         e.target.value = "";
       }
     } catch (err: any) {
@@ -807,6 +817,8 @@ function Dashboard() {
             }
             onEditAsset={(asset) => {
               setEditingAsset(asset);
+              setShowEditorModal(false);
+              setEditingVideoUrl(undefined);
               // setActiveLibrarySlot(null); // Keep library open underneath so when they minimize, they see where they were
             }}
           />

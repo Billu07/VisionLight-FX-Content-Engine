@@ -22,38 +22,14 @@ export function DriftFrameExtractor({
   const [isReady, setIsReady] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isScrubbing, setIsScrubbing] = useState(false);
-
-  // Local URL for smooth scrubbing
-  const [localUrl, setLocalUrl] = useState<string | null>(null);
-  const [isDownloadingLocal, setIsDownloadingLocal] = useState(true);
+  const proxiedVideoUrl = getCORSProxyUrl(videoUrl);
 
   useEffect(() => {
-    let isMounted = true;
-    const fetchLocalVideo = async () => {
-      try {
-        setIsDownloadingLocal(true);
-        const res = await fetch(getCORSProxyUrl(videoUrl));
-        const blob = await res.blob();
-        if (isMounted) {
-          setLocalUrl(URL.createObjectURL(blob));
-          setIsDownloadingLocal(false);
-        }
-      } catch (err) {
-        console.error("Failed to load local video for scrubbing:", err);
-        if (isMounted) {
-          setLocalUrl(getCORSProxyUrl(videoUrl)); // fallback
-          setIsDownloadingLocal(false);
-        }
-      }
-    };
-    fetchLocalVideo();
-    return () => {
-      isMounted = false;
-      if (localUrl && localUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(localUrl);
-      }
-    };
-  }, [videoUrl]);
+    setIsReady(false);
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+  }, [proxiedVideoUrl]);
 
   // Sync slider with video time
   const handleTimeUpdate = () => {
@@ -219,28 +195,28 @@ export function DriftFrameExtractor({
       >
         <canvas ref={canvasRef} className="hidden" />
 
-        {isDownloadingLocal ? (
-          <div className="flex flex-col items-center justify-center gap-4">
+        <video
+          key={proxiedVideoUrl}
+          ref={videoRef}
+          src={proxiedVideoUrl}
+          className="w-full h-full object-contain max-h-[60vh]"
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={() => {
+            setDuration(videoRef.current?.duration || 0);
+            setIsReady(true);
+          }}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          loop
+          playsInline
+          preload="metadata"
+          crossOrigin="anonymous"
+        />
+        {!isReady && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 backdrop-blur-sm">
             <LoadingSpinner size="lg" />
-            <p className="text-gray-400 text-sm font-mono tracking-widest animate-pulse">PREPARING VIDEO FOR SCRUBBING...</p>
+            <p className="text-gray-300 text-xs font-mono tracking-widest animate-pulse">LOADING VIDEO...</p>
           </div>
-        ) : (
-          <video
-            key={localUrl || videoUrl}
-            ref={videoRef}
-            src={localUrl || getCORSProxyUrl(videoUrl)}
-            className="w-full h-full object-contain max-h-[60vh]"
-            onTimeUpdate={handleTimeUpdate}
-            onLoadedMetadata={() => {
-              setDuration(videoRef.current?.duration || 0);
-              setIsReady(true);
-            }}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
-            loop
-            playsInline
-            crossOrigin="anonymous"
-          />
         )}
       </div>
 
