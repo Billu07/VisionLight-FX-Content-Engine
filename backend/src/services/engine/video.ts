@@ -171,6 +171,7 @@ export const videoLogic = {
             targetWidth,
             targetHeight,
             targetRatioString as any,
+            apiKeys,
           );
           finalImageUrl = await uploadToCloudinary(
             outpaintedBuffer,
@@ -332,8 +333,16 @@ export const videoLogic = {
       let finalInputImageBuffer: Buffer | undefined;
       const rawRefUrl = params.imageReferences?.[0] || params.imageReference;
 
-      // Preprocess single reference image for non-Veo models only.
-      if (rawRefUrl && params.hasReferenceImage && !isVeo) {
+      // Preprocess reference frame only for models that benefit from strict canvas fitting.
+      // Seedance generally performs better with original reference frames.
+      const shouldPreprocessReference =
+        rawRefUrl &&
+        params.hasReferenceImage &&
+        !isVeo &&
+        !isSeedanceKie &&
+        !isSeedanceFal;
+
+      if (shouldPreprocessReference) {
         try {
           const imageResponse = await axios.get(getOptimizedUrl(rawRefUrl), {
             responseType: "arraybuffer",
@@ -351,6 +360,7 @@ export const videoLogic = {
                 targetWidth,
                 targetHeight,
                 targetRatioString as any,
+                apiKeys,
               );
             } catch (e) {
               finalInputImageBuffer = await resizeWithBlurFill(
@@ -622,6 +632,15 @@ export const videoLogic = {
         statusUrl = submitRes.data.status_url;
       } else if (isKie) {
         provider = "kie";
+        const referenceUrls = (params.imageReferences || []).filter(
+          (url: any): url is string => typeof url === "string" && url.length > 0,
+        );
+        const imageRefs = referenceUrls.filter(
+          (url: string) => !isLikelyVideoUrl(url),
+        );
+        const lastFrameRefUrl =
+          imageRefs.length > 1 ? getOptimizedUrl(imageRefs[1]) : "";
+
         let kieInputUrl = "";
         let isImageToVideo = false;
         if (finalInputImageBuffer) {
@@ -633,28 +652,35 @@ export const videoLogic = {
             "image",
           );
           isImageToVideo = true;
+        } else if (params.imageReference) {
+          // Fallback: if preprocessing is skipped/failed, still pass original first frame.
+          kieInputUrl = getOptimizedUrl(params.imageReference);
+          isImageToVideo = true;
         }
+        const seedanceDuration = Math.max(
+          4,
+          Math.min(15, Number(params.duration) || 10),
+        );
+        const seedanceResolution =
+          params.resolution === "480p" ||
+          params.resolution === "720p" ||
+          params.resolution === "1080p"
+            ? params.resolution
+            : "720p";
+        const seedanceAspectRatio =
+          targetRatioString === "9:16"
+            ? "9:16"
+            : targetRatioString === "1:1"
+              ? "1:1"
+              : "16:9";
         const kiePayload: any = isSeedanceKie
           ? {
               model: "bytedance/seedance-2",
               input: {
                 prompt: finalPrompt,
-                aspect_ratio:
-                  targetRatioString === "9:16"
-                    ? "9:16"
-                    : targetRatioString === "1:1"
-                      ? "1:1"
-                      : "16:9",
-                duration: Math.max(
-                  4,
-                  Math.min(15, Number(params.duration) || 10),
-                ),
-                resolution:
-                  params.resolution === "480p" ||
-                  params.resolution === "720p" ||
-                  params.resolution === "1080p"
-                    ? params.resolution
-                    : "720p",
+                aspect_ratio: seedanceAspectRatio,
+                duration: seedanceDuration,
+                resolution: seedanceResolution,
                 generate_audio: toBoolean(params.generateAudio, true),
                 web_search: false,
                 nsfw_checker: false,
@@ -678,9 +704,19 @@ export const videoLogic = {
         if (isImageToVideo) {
           if (isSeedanceKie) {
             kiePayload.input.first_frame_url = kieInputUrl;
+            if (lastFrameRefUrl) {
+              kiePayload.input.last_frame_url = lastFrameRefUrl;
+            }
           } else {
             kiePayload.input.image_urls = [kieInputUrl];
           }
+        }
+
+        if (isSeedanceKie) {
+          console.log(
+            "Seedance Kie Request:",
+            JSON.stringify(kiePayload, null, 2),
+          );
         }
 
         const kieKey = apiKeys?.kieApiKey;
@@ -749,6 +785,22 @@ export const videoLogic = {
             }
           }
         }
+
+        const falSeedanceLogPayload = {
+          ...payload,
+          image_urls: payload.image_urls
+            ? `[${payload.image_urls.length} image refs]`
+            : undefined,
+          video_urls: payload.video_urls
+            ? `[${payload.video_urls.length} video refs]`
+            : undefined,
+          image_url: payload.image_url ? "[image_url_set]" : undefined,
+          end_image_url: payload.end_image_url ? "[end_image_url_set]" : undefined,
+        };
+        console.log(
+          `Seedance Fal Request: ${endpoint}`,
+          JSON.stringify(falSeedanceLogPayload, null, 2),
+        );
 
         const falKey = apiKeys?.falApiKey;
         if (!falKey) throw new Error("API Key is missing. Please configure your Fal AI key in the Admin Panel.");

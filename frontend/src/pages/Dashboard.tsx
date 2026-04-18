@@ -31,6 +31,8 @@ const { picdriftLogo, fxLogo, driftLogo } = dashboardAssets;
 const MAX_PICFX_REFERENCE_IMAGES = 5;
 const MAX_VEO_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_VEO_REFERENCE_IMAGES = 5;
+const MAX_VIDEOFX1_REFERENCES = 2;
+const MAX_VIDEOFX2_REFERENCES = 12;
 type VeoMode =
   | "image_to_video"
   | "first_last_frame"
@@ -93,9 +95,7 @@ function Dashboard() {
   const [driftParams, setDriftParams] = useState({ horizontal: 0, vertical: 0, zoom: 0 });
 
   // ✅ UPDATED DEFAULT: Pro Model
-  const [kieModel, setKieModel] = useState<"kie-seedance-2">(
-    "kie-seedance-2",
-  );
+  const kieModel = "kie-seedance-2" as const;
 
   // Video FX Sub-mode (Video vs PicDrift)
   const [videoFxMode, setVideoFxMode] = useState<"video" | "picdrift">(
@@ -132,9 +132,7 @@ function Dashboard() {
   // ✅ UPDATED DEFAULT: 12s
   const [videoDuration, setVideoDuration] = useState<4 | 8 | 12>(12);
   // ✅ UPDATED DEFAULT: Pro Model
-  const [videoModel, setVideoModel] = useState<"seedance-fal-2.0">(
-    "seedance-fal-2.0",
-  );
+  const videoModel = "seedance-fal-2.0" as const;
   // ✅ UPDATED DEFAULT: 9:16 (Portrait)
   const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16">("9:16");
   // ✅ UPDATED DEFAULT: Portrait Resolution
@@ -150,6 +148,16 @@ function Dashboard() {
   // Upload & UI
   const [referenceImages, setReferenceImages] = useState<File[]>([]);
   const [referenceImageUrls, setReferenceImageUrls] = useState<string[]>([]);
+  const [videoFxFrames, setVideoFxFrames] = useState<{
+    start: File | null;
+    end: File | null;
+  }>({ start: null, end: null });
+  const [videoFxFrameUrls, setVideoFxFrameUrls] = useState<{
+    start: string | null;
+    end: string | null;
+  }>({ start: null, end: null });
+  const [videoFxExtraRefs, setVideoFxExtraRefs] = useState<File[]>([]);
+  const [videoFxExtraUrls, setVideoFxExtraUrls] = useState<string[]>([]);
 
   // Explicit State for PicDrift Frames
   const [picDriftFrames, setPicDriftFrames] = useState<{
@@ -233,6 +241,10 @@ function Dashboard() {
   useEffect(() => {
     setReferenceImages([]);
     setReferenceImageUrls([]);
+    setVideoFxFrames({ start: null, end: null });
+    setVideoFxFrameUrls({ start: null, end: null });
+    setVideoFxExtraRefs([]);
+    setVideoFxExtraUrls([]);
     setPicDriftFrames({ start: null, end: null });
     setPicDriftUrls({ start: null, end: null });
     setVeoSourceFile(null);
@@ -453,6 +465,10 @@ function Dashboard() {
         setVideoTitle("");
         setReferenceImages([]);
         setReferenceImageUrls([]);
+        setVideoFxFrames({ start: null, end: null });
+        setVideoFxFrameUrls({ start: null, end: null });
+        setVideoFxExtraRefs([]);
+        setVideoFxExtraUrls([]);
         setPicDriftFrames({ start: null, end: null });
         setPicDriftUrls({ start: null, end: null });
         queryClient.invalidateQueries({ queryKey: ["posts"] });
@@ -556,6 +572,100 @@ function Dashboard() {
     setVeoReferenceUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const isVideoFxSlotEngine = () =>
+    (activeEngine === "kie" && videoFxMode === "video") ||
+    activeEngine === "openai";
+
+  const getVideoFxReferenceCount = () =>
+    (videoFxFrames.start ? 1 : 0) +
+    (videoFxFrames.end ? 1 : 0) +
+    videoFxExtraRefs.length;
+
+  const setVideoFxFrame = (
+    slot: "start" | "end",
+    file: File,
+    url: string,
+  ): boolean => {
+    if (isVideoFile(file)) {
+      alert("Start/End frame must be an image.");
+      return false;
+    }
+    setVideoFxFrames((prev) => ({ ...prev, [slot]: file }));
+    setVideoFxFrameUrls((prev) => ({ ...prev, [slot]: url }));
+    return true;
+  };
+
+  const removeVideoFxFrame = (slot: "start" | "end") => {
+    setVideoFxFrames((prev) => ({ ...prev, [slot]: null }));
+    setVideoFxFrameUrls((prev) => ({ ...prev, [slot]: null }));
+  };
+
+  const addVideoFxExtraReference = (file: File, url: string) => {
+    if (
+      videoFxExtraUrls.includes(url) ||
+      videoFxFrameUrls.start === url ||
+      videoFxFrameUrls.end === url
+    ) {
+      return;
+    }
+
+    if (getVideoFxReferenceCount() >= MAX_VIDEOFX2_REFERENCES) {
+      alert(
+        `Only ${MAX_VIDEOFX2_REFERENCES} reference file(s) allowed for Video FX 2.`,
+      );
+      return;
+    }
+
+    setVideoFxExtraRefs((prev) => [...prev, file]);
+    setVideoFxExtraUrls((prev) => [...prev, url]);
+  };
+
+  const removeVideoFxExtraReference = (index: number) => {
+    setVideoFxExtraRefs((prev) => prev.filter((_, i) => i !== index));
+    setVideoFxExtraUrls((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleVideoFxSlotUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    slot: "start" | "end",
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (slot === "end" && !videoFxFrames.start) {
+      alert("Please set Start Frame first.");
+      e.target.value = "";
+      return;
+    }
+    setVideoFxFrame(slot, file, URL.createObjectURL(file));
+    e.target.value = "";
+  };
+
+  const handleVideoFxExtraUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    let remaining = MAX_VIDEOFX2_REFERENCES - getVideoFxReferenceCount();
+    if (remaining <= 0) {
+      alert(
+        `Only ${MAX_VIDEOFX2_REFERENCES} reference file(s) allowed for Video FX 2.`,
+      );
+      e.target.value = "";
+      return;
+    }
+
+    const acceptedFiles = files.slice(0, remaining);
+    if (acceptedFiles.length < files.length) {
+      alert(
+        `Only ${MAX_VIDEOFX2_REFERENCES} reference file(s) allowed for Video FX 2.`,
+      );
+    }
+
+    const acceptedUrls = acceptedFiles.map((file) => URL.createObjectURL(file));
+    setVideoFxExtraRefs((prev) => [...prev, ...acceptedFiles]);
+    setVideoFxExtraUrls((prev) => [...prev, ...acceptedUrls]);
+    e.target.value = "";
+  };
+
   // --- 1. ASSET LIBRARY SELECTION HANDLER ---
   const handleAssetSelect = (file: File, url: string, ratio?: string) => {
     // 1. Handle File Setting (Existing Logic)
@@ -567,6 +677,11 @@ function Dashboard() {
           return;
         }
         setVeoFrame("first", file, url);
+      } else if (isVideoFxSlotEngine()) {
+        if (!setVideoFxFrame("start", file, url)) {
+          setActiveLibrarySlot(null);
+          return;
+        }
       } else {
         setPicDriftFrames((prev) => ({ ...prev, start: file }));
         setPicDriftUrls((prev) => ({ ...prev, start: url }));
@@ -579,6 +694,16 @@ function Dashboard() {
           return;
         }
         setVeoFrame("last", file, url);
+      } else if (isVideoFxSlotEngine()) {
+        if (!videoFxFrames.start) {
+          alert("Please set Start Frame first.");
+          setActiveLibrarySlot(null);
+          return;
+        }
+        if (!setVideoFxFrame("end", file, url)) {
+          setActiveLibrarySlot(null);
+          return;
+        }
       } else {
         setPicDriftFrames((prev) => ({ ...prev, end: file }));
         setPicDriftUrls((prev) => ({ ...prev, end: url }));
@@ -666,6 +791,27 @@ function Dashboard() {
           else if (!veoFrames.last) setVeoFrame("last", file, url);
           else setVeoFrame("first", file, url);
         }
+      } else if (activeEngine === "kie" && videoFxMode === "video") {
+        if (isVideoFile(file)) {
+          alert("Video FX 1 start/end mode supports image references only.");
+          setActiveLibrarySlot(null);
+          return;
+        }
+        if (videoFxFrameUrls.start === url || videoFxFrameUrls.end === url) {
+          setActiveLibrarySlot(null);
+          return;
+        }
+        if (!videoFxFrames.start) setVideoFxFrame("start", file, url);
+        else if (!videoFxFrames.end) setVideoFxFrame("end", file, url);
+        else {
+          alert(
+            `Only ${MAX_VIDEOFX1_REFERENCES} ordered frame(s) allowed for Video FX 1.`,
+          );
+          setActiveLibrarySlot(null);
+          return;
+        }
+      } else if (activeEngine === "openai") {
+        addVideoFxExtraReference(file, url);
       } else {
         setReferenceImages([file]);
         setReferenceImageUrls([url]);
@@ -735,11 +881,88 @@ function Dashboard() {
     if (!files || files.length === 0) return;
     const newFiles = Array.from(files);
 
+    if (activeEngine === "kie" && videoFxMode === "video") {
+      if (newFiles.some((file) => isVideoFile(file))) {
+        alert("Video FX 1 start/end mode supports image references only.");
+        e.target.value = "";
+        return;
+      }
+
+      let hasStart = !!videoFxFrames.start;
+      let hasEnd = !!videoFxFrames.end;
+      for (const file of newFiles) {
+        const url = URL.createObjectURL(file);
+        if (!hasStart) {
+          setVideoFxFrame("start", file, url);
+          hasStart = true;
+          continue;
+        }
+        if (!hasEnd) {
+          setVideoFxFrame("end", file, url);
+          hasEnd = true;
+          continue;
+        }
+        alert(
+          `Only ${MAX_VIDEOFX1_REFERENCES} ordered frame(s) allowed for Video FX 1.`,
+        );
+        break;
+      }
+      e.target.value = "";
+      return;
+    }
+
+    if (activeEngine === "openai") {
+      const remainingSlots = MAX_VIDEOFX2_REFERENCES - getVideoFxReferenceCount();
+      if (remainingSlots <= 0) {
+        alert(
+          `Only ${MAX_VIDEOFX2_REFERENCES} reference file(s) allowed for Video FX 2.`,
+        );
+        e.target.value = "";
+        return;
+      }
+
+      const usableFiles = newFiles.slice(0, remainingSlots);
+      if (usableFiles.length < newFiles.length) {
+        alert(
+          `Only ${MAX_VIDEOFX2_REFERENCES} reference file(s) allowed for Video FX 2.`,
+        );
+      }
+
+      let hasStart = !!videoFxFrames.start;
+      let hasEnd = !!videoFxFrames.end;
+      for (const file of usableFiles) {
+        const url = URL.createObjectURL(file);
+        if (!hasStart && !isVideoFile(file)) {
+          setVideoFxFrame("start", file, url);
+          hasStart = true;
+          continue;
+        }
+        if (!hasEnd && !isVideoFile(file)) {
+          setVideoFxFrame("end", file, url);
+          hasEnd = true;
+          continue;
+        }
+        addVideoFxExtraReference(file, url);
+      }
+
+      e.target.value = "";
+      return;
+    }
+
     if (
       activeEngine === "studio" &&
       newFiles.some((file) => !file.type.startsWith("image/"))
     ) {
       alert("Pic FX only supports image references.");
+      return;
+    }
+
+    if (
+      activeEngine === "kie" &&
+      videoFxMode === "video" &&
+      newFiles.some((file) => file.type.startsWith("video/"))
+    ) {
+      alert("Video FX 1 start/end mode supports image references only.");
       return;
     }
 
@@ -771,6 +994,9 @@ function Dashboard() {
     let maxFiles = 1;
     if (activeEngine === "studio") {
       maxFiles = studioMode === "carousel" ? 14 : MAX_PICFX_REFERENCE_IMAGES;
+    }
+    if (activeEngine === "kie" && videoFxMode === "video") {
+      maxFiles = MAX_VIDEOFX1_REFERENCES;
     }
     if (activeEngine === "veo") {
       maxFiles =
@@ -932,9 +1158,8 @@ function Dashboard() {
     } else if (activeEngine === "kie" && videoFxMode === "video") {
       formData.append("mediaType", "video");
       formData.append("model", kieModel);
-      referenceImages.forEach((file) =>
-        formData.append("referenceImages", file),
-      );
+      if (videoFxFrames.start) formData.append("referenceImages", videoFxFrames.start);
+      if (videoFxFrames.end) formData.append("referenceImages", videoFxFrames.end);
       formData.append("duration", kieDuration.toString());
       formData.append("aspectRatio", kieAspect);
       formData.append("resolution", kieResolution);
@@ -944,9 +1169,9 @@ function Dashboard() {
       formData.append("duration", videoDuration.toString());
       formData.append("aspectRatio", aspectRatio);
       formData.append("resolution", videoResolution);
-      referenceImages.forEach((file) =>
-        formData.append("referenceImages", file),
-      );
+      if (videoFxFrames.start) formData.append("referenceImages", videoFxFrames.start);
+      if (videoFxFrames.end) formData.append("referenceImages", videoFxFrames.end);
+      videoFxExtraRefs.forEach((file) => formData.append("referenceImages", file));
     } else if (activeEngine === "veo") {
       formData.append("mediaType", "video");
       formData.append("model", "veo-3");
@@ -1060,6 +1285,25 @@ function Dashboard() {
       }
     }
 
+    if (
+      (activeEngine === "kie" && videoFxMode === "video") ||
+      activeEngine === "openai"
+    ) {
+      if (!videoFxFrames.start && videoFxFrames.end) {
+        alert("Please provide Start Frame before setting End Frame.");
+        return;
+      }
+      if (
+        activeEngine === "openai" &&
+        getVideoFxReferenceCount() > MAX_VIDEOFX2_REFERENCES
+      ) {
+        alert(
+          `Video FX 2 supports up to ${MAX_VIDEOFX2_REFERENCES} total references.`,
+        );
+        return;
+      }
+    }
+
     if (!prompt.trim()) return;
 
     const toRequiredInt = (value: any, fallback = 1) => {
@@ -1147,6 +1391,10 @@ function Dashboard() {
     return { logo: fxLogo, text: "Video Generation" }; // videofx
   };
   const { logo: currentLogo, text: currentHeaderText } = getHeaderContent();
+  const isVideoFxSlotMode =
+    currentVisualTab === "videofx" &&
+    ((activeEngine === "kie" && videoFxMode === "video") ||
+      activeEngine === "openai");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-purple-950 to-violet-950 text-gray-200 relative overflow-hidden pb-24 lg:pb-0">
@@ -2407,28 +2655,6 @@ function Dashboard() {
                               {currentVisualTab === "videofx" &&
                                 activeEngine === "kie" && (
                                   <div className="space-y-4 sm:space-y-6 animate-in fade-in">
-                                    <div className="space-y-2">
-                                      <label className="block text-sm font-semibold text-white">
-                                        AI Model
-                                      </label>
-                                      <div className="grid grid-cols-1 gap-2">
-                                        {[
-                                          { id: "kie-seedance-2", label: "Video FX 1" },
-                                        ].map((m) => (
-                                          <button
-                                            key={m.id}
-                                            type="button"
-                                            onClick={() => setKieModel(m.id as any)}
-                                            className={`p-3 rounded-xl border text-left text-sm font-medium ${kieModel === m.id
-                                              ? "bg-cyan-600 border-cyan-500 text-white"
-                                              : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
-                                              }`}
-                                          >
-                                            {m.label}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                                       <div>
                                         <label className="text-sm font-semibold text-white mb-2 block">
@@ -2607,22 +2833,6 @@ function Dashboard() {
                               {currentVisualTab === "videofx" &&
                                 activeEngine === "openai" && (
                                   <div className="space-y-4 sm:space-y-6 animate-in fade-in">
-                                    <div className="space-y-2">
-                                      <label className="block text-sm font-semibold text-white">
-                                        AI Model
-                                      </label>
-                                      <div className="grid grid-cols-1 gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => setVideoModel("seedance-fal-2.0")}
-                                          className="p-3 rounded-xl border text-left text-sm font-medium bg-cyan-600 border-cyan-500 text-white"
-                                        >
-                                          <div className="font-semibold text-sm">
-                                            Video FX 2
-                                          </div>
-                                        </button>
-                                      </div>
-                                    </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                                       <div>
                                         <label className="text-sm font-semibold text-white mb-2 block">
@@ -3131,6 +3341,194 @@ function Dashboard() {
                                       </p>
                                     </div>
                                     )
+                                  ) : isVideoFxSlotMode ? (
+                                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        {(["start", "end"] as const).map((slot) => {
+                                          const src =
+                                            slot === "start"
+                                              ? videoFxFrameUrls.start
+                                              : videoFxFrameUrls.end;
+                                          const label =
+                                            slot === "start" ? "Start Frame" : "End Frame";
+                                          const isEndLocked =
+                                            slot === "end" && !videoFxFrames.start;
+
+                                          return (
+                                            <div key={slot} className="space-y-2">
+                                              <div className="flex justify-between items-center">
+                                                <label className="text-xs text-cyan-200 font-semibold uppercase tracking-wider">
+                                                  {label}
+                                                </label>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    setLibrarySource("field");
+                                                    setActiveLibrarySlot(
+                                                      slot === "start" ? "start" : "end",
+                                                    );
+                                                  }}
+                                                  disabled={isEndLocked}
+                                                  className={`text-[10px] px-2 py-1 rounded-md border ${
+                                                    isEndLocked
+                                                      ? "border-gray-700 text-gray-500 cursor-not-allowed"
+                                                      : "border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10"
+                                                  }`}
+                                                >
+                                                  Library
+                                                </button>
+                                              </div>
+                                              <div className="relative aspect-video bg-gray-900/60 border-2 border-dashed border-cyan-500/30 rounded-xl overflow-hidden">
+                                                {src ? (
+                                                  <>
+                                                    <img
+                                                      src={src}
+                                                      className="w-full h-full object-cover"
+                                                    />
+                                                    <button
+                                                      type="button"
+                                                      onClick={() =>
+                                                        removeVideoFxFrame(slot)
+                                                      }
+                                                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs"
+                                                    >
+                                                      x
+                                                    </button>
+                                                  </>
+                                                ) : (
+                                                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-xs">
+                                                    <label
+                                                      className={`cursor-pointer px-3 py-1.5 rounded-md border ${
+                                                        isEndLocked
+                                                          ? "border-gray-700 text-gray-500 cursor-not-allowed"
+                                                          : "border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10"
+                                                      }`}
+                                                    >
+                                                      Upload
+                                                      <input
+                                                        type="file"
+                                                        className="hidden"
+                                                        accept="image/*"
+                                                        disabled={isEndLocked}
+                                                        onChange={(e) =>
+                                                          handleVideoFxSlotUpload(
+                                                            e,
+                                                            slot,
+                                                          )
+                                                        }
+                                                      />
+                                                    </label>
+                                                    <span className="text-[10px] text-gray-500">
+                                                      {slot === "start"
+                                                        ? "Required for frame-to-frame flow"
+                                                        : "Optional transition target"}
+                                                    </span>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+
+                                      <p className="text-[10px] text-gray-500 text-center">
+                                        End Frame is optional. If provided, motion transitions
+                                        from Start Frame to End Frame.
+                                      </p>
+
+                                      {activeEngine === "openai" && (
+                                        <div className="space-y-3">
+                                          <div className="flex justify-between items-center">
+                                            <label className="text-xs text-cyan-200 font-semibold uppercase tracking-wider">
+                                              Additional References
+                                            </label>
+                                            <span className="text-[10px] text-gray-500">
+                                              {getVideoFxReferenceCount()}/
+                                              {MAX_VIDEOFX2_REFERENCES}
+                                            </span>
+                                          </div>
+                                          <div className="w-full border-2 border-dashed border-cyan-500/30 rounded-xl hover:border-cyan-400 hover:bg-cyan-900/10 transition-all p-4">
+                                            <div className="flex items-center justify-center gap-8">
+                                              <label className="cursor-pointer flex flex-col items-center transition-transform hover:scale-105">
+                                                <span className="text-[10px] mb-1 px-2 py-0.5 rounded border border-cyan-400/30 text-cyan-100">
+                                                  Upload
+                                                </span>
+                                                <span className="text-xs text-cyan-300 font-bold">
+                                                  Upload Files
+                                                </span>
+                                                <input
+                                                  type="file"
+                                                  className="hidden"
+                                                  accept="image/*,video/*"
+                                                  multiple
+                                                  onChange={handleVideoFxExtraUpload}
+                                                />
+                                              </label>
+                                              <div className="h-8 w-px bg-cyan-500/30" />
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setLibrarySource("field");
+                                                  setActiveLibrarySlot("generic");
+                                                }}
+                                                className="flex flex-col items-center transition-transform hover:scale-105"
+                                              >
+                                                <span className="text-[10px] mb-1 px-2 py-0.5 rounded border border-cyan-400/30 text-cyan-100">
+                                                  Library
+                                                </span>
+                                                <span className="text-xs text-cyan-300 font-bold">
+                                                  From Library
+                                                </span>
+                                              </button>
+                                            </div>
+                                            <p className="text-[10px] text-gray-500 text-center mt-3">
+                                              Optional style or motion references (image/video).
+                                            </p>
+                                          </div>
+                                          {videoFxExtraUrls.length > 0 && (
+                                            <div className="grid grid-cols-5 gap-2 animate-in fade-in">
+                                              {videoFxExtraUrls.map((url, index) => (
+                                                <div
+                                                  key={`${url}_${index}`}
+                                                  className="relative aspect-square group"
+                                                >
+                                                  {url.includes("video") ||
+                                                  url.endsWith(".mp4") ? (
+                                                    <video
+                                                      src={url}
+                                                      className="w-full h-full object-cover rounded-lg border border-white/20"
+                                                      muted
+                                                      onMouseEnter={(e) =>
+                                                        e.currentTarget.play()
+                                                      }
+                                                      onMouseLeave={(e) =>
+                                                        e.currentTarget.pause()
+                                                      }
+                                                    />
+                                                  ) : (
+                                                    <img
+                                                      src={url}
+                                                      className="w-full h-full object-cover rounded-lg border border-white/20"
+                                                    />
+                                                  )}
+                                                  <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                      removeVideoFxExtraReference(
+                                                        index,
+                                                      )
+                                                    }
+                                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs"
+                                                  >
+                                                    x
+                                                  </button>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
                                   ) : (
                                     /* GENERIC UPLOAD BOX (Pic FX, Video FX 1&2) */
                                     <div className="space-y-3">
@@ -3146,9 +3544,16 @@ function Dashboard() {
                                             <input
                                               type="file"
                                               className="hidden"
-                                              multiple={activeEngine === "studio"}
+                                              multiple={
+                                                activeEngine === "studio" ||
+                                                (activeEngine === "kie" &&
+                                                  videoFxMode === "video") ||
+                                                activeEngine === "openai"
+                                              }
                                               accept={
-                                                activeEngine === "studio"
+                                                activeEngine === "studio" ||
+                                                (activeEngine === "kie" &&
+                                                  videoFxMode === "video")
                                                   ? "image/*"
                                                   : "image/*,video/*"
                                               }
@@ -3178,7 +3583,12 @@ function Dashboard() {
                                             ? "Up to 14 images"
                                             : activeEngine === "studio"
                                               ? `Up to ${MAX_PICFX_REFERENCE_IMAGES} reference images`
-                                            : "Single frame (PNG/JPG/MP4)"}
+                                              : activeEngine === "kie" &&
+                                                  videoFxMode === "video"
+                                                ? "Up to 2 ordered images (Start + End)"
+                                              : activeEngine === "openai"
+                                                ? `Up to ${MAX_VIDEOFX2_REFERENCES} references (PNG/JPG/MP4)`
+                                                : "Single frame (PNG/JPG/MP4)"}
                                         </p>
                                       </div>
                                       {referenceImageUrls.length > 0 && (
