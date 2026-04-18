@@ -72,7 +72,7 @@ function Dashboard() {
   const [activeEngine, setActiveEngine] = useState<EngineType>("kie");
   const [studioMode, setStudioMode] = useState<StudioMode>("image");
 
-  // Kie AI (Video FX & PicDrift)
+  // Video FX 1 / PicDrift Engine
   // ✅ UPDATED DEFAULT: 10s (Matches PicDrift Standard)
   const [kieDuration, setKieDuration] = useState<5 | 10 | 15>(10);
   // ✅ UPDATED DEFAULT: 1080p
@@ -128,7 +128,7 @@ function Dashboard() {
   const [veoReferenceFiles, setVeoReferenceFiles] = useState<File[]>([]);
   const [veoReferenceUrls, setVeoReferenceUrls] = useState<string[]>([]);
 
-  // Seedance via Fal (Video FX 2)
+  // Video FX 2 Engine
   // ✅ UPDATED DEFAULT: 12s
   const [videoDuration, setVideoDuration] = useState<4 | 8 | 12>(12);
   // ✅ UPDATED DEFAULT: Pro Model
@@ -679,16 +679,16 @@ function Dashboard() {
       // Determine standardized Ratio ID
       const r = ratio as "16:9" | "9:16" | "1:1";
 
-      // A. KIE / VIDEO FX 1 / PICDRIFT
+      // A. VIDEO FX 1 / PICDRIFT
       if (activeEngine === "kie") {
         if (r === "16:9") setKieAspect("landscape");
         else if (r === "9:16") setKieAspect("portrait");
         else if (r === "1:1") setKieAspect("square");
       }
 
-      // B. OPENAI / VIDEO FX 2
+      // B. VIDEO FX 2
       else if (activeEngine === "openai") {
-        // Seedance Fal mode in this UI uses landscape or portrait only.
+        // This mode in this UI uses landscape or portrait only.
         if (r === "16:9") {
           setAspectRatio("16:9");
         } else if (r === "9:16") {
@@ -1438,7 +1438,7 @@ function Dashboard() {
                 Your agency environment for <span className="text-white font-bold">{user.organizationName}</span> is not yet active.
                 <br /><br />
                 {user.role === 'ADMIN' || user.role === 'SUPERADMIN'
-                  ? "Connect your Fal AI credentials in the Admin Panel to unlock all generation tools."
+                  ? "Connect your platform API credentials in the Admin Panel to unlock all generation tools."
                   : "Please contact your system administrator to configure the required API credentials."
                 }
               </p>
@@ -2022,7 +2022,7 @@ function Dashboard() {
                                   : "text-gray-400 hover:text-white"
                                   }`}
                               >
-                                Seedance 2.0 · Kie
+                                Video FX 1
                               </button>
                               <button
                                 type="button"
@@ -2032,7 +2032,7 @@ function Dashboard() {
                                   : "text-gray-400 hover:text-white"
                                   }`}
                               >
-                                Seedance 2.0 · Fal
+                                Video FX 2
                               </button>
                               <button
                                 type="button"
@@ -2403,7 +2403,7 @@ function Dashboard() {
 
                               {/* 3. SETTINGS (Moved below Title) */}
 
-                              {/* VIDEO FX / KIE SETTINGS */}
+                              {/* VIDEO FX 1 SETTINGS */}
                               {currentVisualTab === "videofx" &&
                                 activeEngine === "kie" && (
                                   <div className="space-y-4 sm:space-y-6 animate-in fade-in">
@@ -2413,7 +2413,7 @@ function Dashboard() {
                                       </label>
                                       <div className="grid grid-cols-1 gap-2">
                                         {[
-                                          { id: "kie-seedance-2", label: "Seedance 2.0 (Kie)" },
+                                          { id: "kie-seedance-2", label: "Video FX 1" },
                                         ].map((m) => (
                                           <button
                                             key={m.id}
@@ -2603,7 +2603,7 @@ function Dashboard() {
                                 </div>
                               )}
 
-                              {/* FAL SEEDANCE SETTINGS (Video FX 2) */}
+                              {/* VIDEO FX 2 SETTINGS */}
                               {currentVisualTab === "videofx" &&
                                 activeEngine === "openai" && (
                                   <div className="space-y-4 sm:space-y-6 animate-in fade-in">
@@ -2615,84 +2615,83 @@ function Dashboard() {
                                         <button
                                           type="button"
                                           onClick={() => setVideoModel("seedance-fal-2.0")}
-                                          className="p-3 rounded-2xl border-2 text-left text-sm font-medium border-cyan-400 bg-cyan-500/20"
+                                          className="p-3 rounded-xl border text-left text-sm font-medium bg-cyan-600 border-cyan-500 text-white"
                                         >
-                                          <div className="font-semibold text-white text-sm">
-                                            Seedance 2.0 (Fal)
+                                          <div className="font-semibold text-sm">
+                                            Video FX 2
                                           </div>
                                         </button>
                                       </div>
                                     </div>
-                                    <div className="space-y-2">
-                                      <label className="block text-sm font-semibold text-white">
-                                        Aspect Ratio
-                                      </label>
-                                      <div className="grid grid-cols-2 gap-2">
-                                        {[
-                                          { ratio: "16:9", label: "Landscape" },
-                                          { ratio: "9:16", label: "Portrait" },
-                                        ].map(({ ratio, label }) => (
-                                          <button
-                                            key={ratio}
-                                            type="button"
-                                            onClick={() => setAspectRatio(ratio as any)}
-                                            className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${aspectRatio === ratio
-                                              ? "border-purple-400 bg-purple-500/20"
-                                              : "border-white/10 bg-gray-800/50"
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                                      <div>
+                                        <label className="text-sm font-semibold text-white mb-2 block">
+                                          Aspect Ratio
+                                        </label>
+                                        <div className="flex gap-2">
+                                          {[
+                                            { ratio: "16:9", label: "Landscape" },
+                                            { ratio: "9:16", label: "Portrait" },
+                                          ].map(({ ratio, label }) => (
+                                            <button
+                                              key={ratio}
+                                              type="button"
+                                              onClick={() => setAspectRatio(ratio as any)}
+                                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                                                aspectRatio === ratio
+                                                  ? "bg-cyan-600 border-cyan-600 text-white"
+                                                  : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
                                               }`}
-                                          >
-                                            <div className="font-semibold text-white text-sm">
+                                            >
                                               {label}
-                                            </div>
-                                          </button>
-                                        ))}
+                                            </button>
+                                          ))}
+                                        </div>
                                       </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                      <label className="block text-sm font-semibold text-white">
-                                        Resolution
-                                      </label>
-                                      <div className="grid grid-cols-2 gap-2">
-                                        {[
-                                          { value: "480p", label: "480p (Faster)" },
-                                          { value: "720p", label: "720p (Balanced)" },
-                                        ].map(({ value, label }) => (
-                                          <button
-                                            key={value}
-                                            type="button"
-                                            onClick={() => setVideoResolution(value as any)}
-                                            className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${videoResolution === value
-                                              ? "border-green-400 bg-green-500/20"
-                                              : "border-white/10 bg-gray-800/50"
+                                      <div>
+                                        <label className="text-sm font-semibold text-white mb-2 block">
+                                          Resolution
+                                        </label>
+                                        <div className="flex gap-2">
+                                          {[
+                                            { value: "480p", label: "480p" },
+                                            { value: "720p", label: "720p" },
+                                          ].map(({ value, label }) => (
+                                            <button
+                                              key={value}
+                                              type="button"
+                                              onClick={() => setVideoResolution(value as any)}
+                                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                                                videoResolution === value
+                                                  ? "bg-cyan-600 border-cyan-600 text-white"
+                                                  : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
                                               }`}
-                                          >
-                                            <div className="font-semibold text-white text-sm">
+                                            >
                                               {label}
-                                            </div>
-                                          </button>
-                                        ))}
+                                            </button>
+                                          ))}
+                                        </div>
                                       </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                      <label className="block text-sm font-semibold text-white">
-                                        Duration
-                                      </label>
-                                      <div className="flex gap-2">
-                                        {[4, 8, 12].map((sec) => (
-                                          <button
-                                            key={sec}
-                                            type="button"
-                                            onClick={() =>
-                                              setVideoDuration(sec as any)
-                                            }
-                                            className={`px-3 py-2 rounded-xl border text-sm flex-1 ${videoDuration === sec
-                                              ? "bg-cyan-500 border-cyan-500 text-white"
-                                              : "bg-gray-800/50 border-white/10 text-purple-200"
+                                      <div className="sm:col-span-2">
+                                        <label className="text-sm font-semibold text-white mb-2 block">
+                                          Duration
+                                        </label>
+                                        <div className="flex gap-2">
+                                          {[4, 8, 12].map((sec) => (
+                                            <button
+                                              key={sec}
+                                              type="button"
+                                              onClick={() => setVideoDuration(sec as any)}
+                                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                                                videoDuration === sec
+                                                  ? "bg-cyan-600 border-cyan-600 text-white"
+                                                  : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
                                               }`}
-                                          >
-                                            {sec}s
-                                          </button>
-                                        ))}
+                                            >
+                                              {sec}s
+                                            </button>
+                                          ))}
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
@@ -3449,3 +3448,4 @@ function Dashboard() {
 }
 
 export default Dashboard;
+

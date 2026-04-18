@@ -92,22 +92,22 @@ export function RenderReserveModal({
 
   const motionAndDrift: ReserveItem[] = [
     {
-      label: "PicDrift Standard · 5s",
+      label: "PicDrift Standard  -  5s",
       key: "pricePicDrift_5s",
       wallet: "PicDrift",
     },
     {
-      label: "PicDrift Standard · 10s",
+      label: "PicDrift Standard  -  10s",
       key: "pricePicDrift_10s",
       wallet: "PicDrift",
     },
     {
-      label: "PicDrift Plus · 5s",
+      label: "PicDrift Plus  -  5s",
       key: "pricePicDrift_Plus_5s",
       wallet: "PicDrift+",
     },
     {
-      label: "PicDrift Plus · 10s",
+      label: "PicDrift Plus  -  10s",
       key: "pricePicDrift_Plus_10s",
       wallet: "PicDrift+",
     },
@@ -121,29 +121,29 @@ export function RenderReserveModal({
 
   const videoEngines: ReserveItem[] = [
     {
-      label: "Seedance 2.0 (Kie) · 10s",
+      label: "Video FX 1 · 10s",
       key: "priceVideoFX1_10s",
       wallet: "Video FX 1",
-      note: "Current UI defaults to 1080p.",
+      note: "Current UI default: 1080p.",
     },
     {
-      label: "Seedance 2.0 (Kie) · 15s",
+      label: "Video FX 1 · 15s",
       key: "priceVideoFX1_15s",
       wallet: "Video FX 1",
     },
     {
-      label: "Seedance 2.0 (Fal) · 4s",
+      label: "Video FX 2 · 4s",
       key: "priceVideoFX2_4s",
       wallet: "Video FX 2",
-      note: "Fal resolution support in UI: 480p, 720p.",
+      note: "Resolution support in UI: 480p, 720p.",
     },
     {
-      label: "Seedance 2.0 (Fal) · 8s",
+      label: "Video FX 2 · 8s",
       key: "priceVideoFX2_8s",
       wallet: "Video FX 2",
     },
     {
-      label: "Seedance 2.0 (Fal) · 12s",
+      label: "Video FX 2 · 12s",
       key: "priceVideoFX2_12s",
       wallet: "Video FX 2",
     },
@@ -268,7 +268,7 @@ export function RenderReserveModal({
               />
               <Section
                 title="Video Engines"
-                subtitle="Seedance migrations and Video FX 3 tiers."
+                subtitle="Video FX 1, Video FX 2, and Video FX 3 tiers."
                 items={videoEngines}
                 accent="bg-cyan-400"
               />
@@ -297,4 +297,5 @@ export function RenderReserveModal({
     </AnimatePresence>
   );
 }
+
 
