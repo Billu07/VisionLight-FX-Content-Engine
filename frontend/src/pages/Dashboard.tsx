@@ -93,8 +93,8 @@ function Dashboard() {
   const [driftParams, setDriftParams] = useState({ horizontal: 0, vertical: 0, zoom: 0 });
 
   // ✅ UPDATED DEFAULT: Pro Model
-  const [kieModel, setKieModel] = useState<"kie-sora-2" | "kie-sora-2-pro">(
-    "kie-sora-2-pro",
+  const [kieModel, setKieModel] = useState<"kie-seedance-2">(
+    "kie-seedance-2",
   );
 
   // Video FX Sub-mode (Video vs PicDrift)
@@ -128,19 +128,19 @@ function Dashboard() {
   const [veoReferenceFiles, setVeoReferenceFiles] = useState<File[]>([]);
   const [veoReferenceUrls, setVeoReferenceUrls] = useState<string[]>([]);
 
-  // OpenAI (Video FX 2)
+  // Seedance via Fal (Video FX 2)
   // ✅ UPDATED DEFAULT: 12s
   const [videoDuration, setVideoDuration] = useState<4 | 8 | 12>(12);
   // ✅ UPDATED DEFAULT: Pro Model
-  const [videoModel, setVideoModel] = useState<"sora-2" | "sora-2-pro">(
-    "sora-2-pro",
+  const [videoModel, setVideoModel] = useState<"seedance-fal-2.0">(
+    "seedance-fal-2.0",
   );
   // ✅ UPDATED DEFAULT: 9:16 (Portrait)
   const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16">("9:16");
   // ✅ UPDATED DEFAULT: Portrait Resolution
-  const [videoSize, setVideoSize] = useState<
-    "1280x720" | "1792x1024" | "720x1280" | "1024x1792"
-  >("1024x1792");
+  const [videoResolution, setVideoResolution] = useState<"480p" | "720p">(
+    "720p",
+  );
 
   // Studio (Gemini) Aspect Ratio
   const [geminiAspect, setGeminiAspect] = useState<"1:1" | "16:9" | "9:16">(
@@ -634,7 +634,7 @@ function Dashboard() {
             return;
           }
           if (file.size > MAX_VEO_IMAGE_BYTES) {
-            alert("Image source must be 8MB or smaller for Veo.");
+            alert("Image source must be 8MB or smaller for Video FX 3.");
             setActiveLibrarySlot(null);
             return;
           }
@@ -646,7 +646,7 @@ function Dashboard() {
             return;
           }
           if (file.size > MAX_VEO_IMAGE_BYTES) {
-            alert("Each reference image must be 8MB or smaller for Veo.");
+            alert("Each reference image must be 8MB or smaller for Video FX 3.");
             setActiveLibrarySlot(null);
             return;
           }
@@ -658,7 +658,7 @@ function Dashboard() {
             return;
           }
           if (file.size > MAX_VEO_IMAGE_BYTES) {
-            alert("Frame image must be 8MB or smaller for Veo.");
+            alert("Frame image must be 8MB or smaller for Video FX 3.");
             setActiveLibrarySlot(null);
             return;
           }
@@ -688,13 +688,11 @@ function Dashboard() {
 
       // B. OPENAI / VIDEO FX 2
       else if (activeEngine === "openai") {
-        // OpenAI typically only supports 16:9 / 9:16 in standard UI, fallback to 1:1 if needed
+        // Seedance Fal mode in this UI uses landscape or portrait only.
         if (r === "16:9") {
           setAspectRatio("16:9");
-          setVideoSize("1792x1024");
         } else if (r === "9:16") {
           setAspectRatio("9:16");
-          setVideoSize("1024x1792");
         }
       }
 
@@ -756,7 +754,7 @@ function Dashboard() {
           veoMode === "reference_to_video") &&
         newFiles.some((file) => isVideoFile(file))
       ) {
-        alert("This Veo mode requires image input.");
+        alert("This mode requires image input.");
         return;
       }
       if (
@@ -765,7 +763,7 @@ function Dashboard() {
           veoMode === "reference_to_video") &&
         newFiles.some((file) => file.size > MAX_VEO_IMAGE_BYTES)
       ) {
-        alert("Veo image input must be 8MB or smaller.");
+        alert("Image input must be 8MB or smaller for Video FX 3.");
         return;
       }
     }
@@ -818,7 +816,7 @@ function Dashboard() {
         continue;
       }
       if (file.size > MAX_VEO_IMAGE_BYTES) {
-        alert("Each reference image must be 8MB or smaller for Veo.");
+        alert("Each reference image must be 8MB or smaller for Video FX 3.");
         continue;
       }
       addVeoReference(file, URL.createObjectURL(file));
@@ -944,8 +942,8 @@ function Dashboard() {
       formData.append("mediaType", "video");
       formData.append("model", videoModel);
       formData.append("duration", videoDuration.toString());
-      formData.append("size", videoSize);
       formData.append("aspectRatio", aspectRatio);
+      formData.append("resolution", videoResolution);
       referenceImages.forEach((file) =>
         formData.append("referenceImages", file),
       );
@@ -1014,16 +1012,16 @@ function Dashboard() {
     if (activeEngine === "veo") {
       if (veoMode === "first_last_frame") {
         if (!veoFrames.first || !veoFrames.last) {
-          alert("Please provide both first and last frame images for Veo.");
+          alert("Please provide both first and last frame images.");
           return;
         }
         if (veoFrames.first.size > MAX_VEO_IMAGE_BYTES || veoFrames.last.size > MAX_VEO_IMAGE_BYTES) {
-          alert("Each Veo frame image must be 8MB or smaller.");
+          alert("Each frame image must be 8MB or smaller for Video FX 3.");
           return;
         }
       } else if (veoMode === "reference_to_video") {
         if (veoReferenceFiles.length === 0) {
-          alert("Please provide at least one reference image for Veo.");
+          alert("Please provide at least one reference image.");
           return;
         }
         if (veoReferenceFiles.length > MAX_VEO_REFERENCE_IMAGES) {
@@ -1037,14 +1035,14 @@ function Dashboard() {
             (file) => isVideoFile(file) || file.size > MAX_VEO_IMAGE_BYTES,
           )
         ) {
-          alert("All Veo reference images must be image files up to 8MB.");
+          alert("All reference images must be image files up to 8MB.");
           return;
         }
       } else if (!veoSourceFile) {
         alert(
           veoMode === "extend_video"
-            ? "Please upload a source video for Veo extend mode."
-            : "Please upload a source image for Veo image-to-video mode.",
+            ? "Please upload a source video for extend mode."
+            : "Please upload a source image for image-to-video mode.",
         );
         return;
       } else if (veoMode === "extend_video" && !isVideoFile(veoSourceFile)) {
@@ -1056,7 +1054,7 @@ function Dashboard() {
           return;
         }
         if (veoSourceFile.size > MAX_VEO_IMAGE_BYTES) {
-          alert("Veo source image must be 8MB or smaller.");
+          alert("Source image must be 8MB or smaller for Video FX 3.");
           return;
         }
       }
@@ -2024,7 +2022,7 @@ function Dashboard() {
                                   : "text-gray-400 hover:text-white"
                                   }`}
                               >
-                                Video FX 1
+                                Seedance 2.0 · Kie
                               </button>
                               <button
                                 type="button"
@@ -2034,7 +2032,7 @@ function Dashboard() {
                                   : "text-gray-400 hover:text-white"
                                   }`}
                               >
-                                Video FX 2
+                                Seedance 2.0 · Fal
                               </button>
                               <button
                                 type="button"
@@ -2413,13 +2411,9 @@ function Dashboard() {
                                       <label className="block text-sm font-semibold text-white">
                                         AI Model
                                       </label>
-                                      <div className="grid grid-cols-2 gap-2">
+                                      <div className="grid grid-cols-1 gap-2">
                                         {[
-                                          { id: "kie-sora-2", label: "Video FX" },
-                                          {
-                                            id: "kie-sora-2-pro",
-                                            label: "Video FX Pro",
-                                          },
+                                          { id: "kie-seedance-2", label: "Seedance 2.0 (Kie)" },
                                         ].map((m) => (
                                           <button
                                             key={m.id}
@@ -2609,7 +2603,7 @@ function Dashboard() {
                                 </div>
                               )}
 
-                              {/* OPENAI SETTINGS (Video FX 2) */}
+                              {/* FAL SEEDANCE SETTINGS (Video FX 2) */}
                               {currentVisualTab === "videofx" &&
                                 activeEngine === "openai" && (
                                   <div className="space-y-4 sm:space-y-6 animate-in fade-in">
@@ -2617,30 +2611,16 @@ function Dashboard() {
                                       <label className="block text-sm font-semibold text-white">
                                         AI Model
                                       </label>
-                                      <div className="grid grid-cols-2 gap-2">
-                                        {[
-                                          { id: "sora-2", label: "Video FX 2" },
-                                          {
-                                            id: "sora-2-pro",
-                                            label: "Video FX 2 Pro",
-                                          },
-                                        ].map((model) => (
-                                          <button
-                                            key={model.id}
-                                            type="button"
-                                            onClick={() =>
-                                              setVideoModel(model.id as any)
-                                            }
-                                            className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${videoModel === model.id
-                                              ? "border-cyan-400 bg-cyan-500/20"
-                                              : "border-white/10 bg-gray-800/50"
-                                              }`}
-                                          >
-                                            <div className="font-semibold text-white text-sm">
-                                              {model.label}
-                                            </div>
-                                          </button>
-                                        ))}
+                                      <div className="grid grid-cols-1 gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => setVideoModel("seedance-fal-2.0")}
+                                          className="p-3 rounded-2xl border-2 text-left text-sm font-medium border-cyan-400 bg-cyan-500/20"
+                                        >
+                                          <div className="font-semibold text-white text-sm">
+                                            Seedance 2.0 (Fal)
+                                          </div>
+                                        </button>
                                       </div>
                                     </div>
                                     <div className="space-y-2">
@@ -2655,14 +2635,7 @@ function Dashboard() {
                                           <button
                                             key={ratio}
                                             type="button"
-                                            onClick={() => {
-                                              setAspectRatio(ratio as any);
-                                              setVideoSize(
-                                                ratio === "16:9"
-                                                  ? "1792x1024"
-                                                  : "1024x1792",
-                                              );
-                                            }}
+                                            onClick={() => setAspectRatio(ratio as any)}
                                             className={`p-3 rounded-2xl border-2 text-center text-sm font-medium ${aspectRatio === ratio
                                               ? "border-purple-400 bg-purple-500/20"
                                               : "border-white/10 bg-gray-800/50"
@@ -2677,46 +2650,18 @@ function Dashboard() {
                                     </div>
                                     <div className="space-y-2">
                                       <label className="block text-sm font-semibold text-white">
-                                        Video Size
+                                        Resolution
                                       </label>
                                       <div className="grid grid-cols-2 gap-2">
-                                        {(aspectRatio === "16:9"
-                                          ? [
-                                            {
-                                              size: "1280x720",
-                                              label: "720p HD",
-                                            },
-                                            ...(videoModel === "sora-2-pro"
-                                              ? [
-                                                {
-                                                  size: "1792x1024",
-                                                  label: "1080p",
-                                                },
-                                              ]
-                                              : []),
-                                          ]
-                                          : [
-                                            {
-                                              size: "720x1280",
-                                              label: "720p HD",
-                                            },
-                                            ...(videoModel === "sora-2-pro"
-                                              ? [
-                                                {
-                                                  size: "1024x1792",
-                                                  label: "1080p",
-                                                },
-                                              ]
-                                              : []),
-                                          ]
-                                        ).map(({ size, label }) => (
+                                        {[
+                                          { value: "480p", label: "480p (Faster)" },
+                                          { value: "720p", label: "720p (Balanced)" },
+                                        ].map(({ value, label }) => (
                                           <button
-                                            key={size}
+                                            key={value}
                                             type="button"
-                                            onClick={() =>
-                                              setVideoSize(size as any)
-                                            }
-                                            className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${videoSize === size
+                                            onClick={() => setVideoResolution(value as any)}
+                                            className={`p-3 rounded-2xl border-2 text-left text-sm font-medium ${videoResolution === value
                                               ? "border-green-400 bg-green-500/20"
                                               : "border-white/10 bg-gray-800/50"
                                               }`}
@@ -2784,12 +2729,12 @@ function Dashboard() {
                                       </div>
                                       {veoMode === "extend_video" && (
                                         <p className="text-[10px] text-amber-300/90">
-                                          Extend mode follows Veo API limits: fixed 7s duration and 720p output.
+                                          Extend mode follows platform API limits: fixed 7s duration and 720p output.
                                         </p>
                                       )}
                                       {veoMode === "reference_to_video" && (
                                         <p className="text-[10px] text-amber-300/90">
-                                          Reference mode follows Veo API limits: fixed 8s duration and multi-image input.
+                                          Reference mode follows platform API limits: fixed 8s duration and multi-image input.
                                         </p>
                                       )}
                                     </div>
@@ -2939,7 +2884,7 @@ function Dashboard() {
                                       className={`block text-sm font-semibold ${activeEngine === "veo" ? "text-indigo-200" : "text-white"}`}
                                     >
                                       {activeEngine === "veo"
-                                        ? "Veo Inputs"
+                                        ? "Generation Inputs"
                                         : "Reference Images"}
                                     </label>
                                     {activeEngine === "veo" && (
@@ -3027,8 +2972,8 @@ function Dashboard() {
                                         <div className="w-full border-2 border-dashed border-indigo-500/30 rounded-xl hover:border-indigo-400 hover:bg-indigo-900/10 transition-all p-4">
                                           <div className="flex items-center justify-center gap-8">
                                             <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
-                                              <span className="text-2xl mb-1">
-                                                ðŸ“‚
+                                              <span className="text-[10px] mb-1 px-2 py-0.5 rounded border border-indigo-400/30 text-indigo-100">
+                                                Upload
                                               </span>
                                               <span className="text-xs text-indigo-300 font-bold group-hover:text-white">
                                                 Upload Images
@@ -3050,8 +2995,8 @@ function Dashboard() {
                                               }}
                                               className="flex flex-col items-center group-hover:scale-105 transition-transform"
                                             >
-                                              <span className="text-2xl mb-1">
-                                                ðŸ“š
+                                              <span className="text-[10px] mb-1 px-2 py-0.5 rounded border border-indigo-400/30 text-indigo-100">
+                                                Library
                                               </span>
                                               <span className="text-xs text-indigo-300 font-bold group-hover:text-white">
                                                 From Library
@@ -3131,8 +3076,8 @@ function Dashboard() {
                                         ) : (
                                           <div className="flex items-center gap-8">
                                             <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
-                                              <span className="text-2xl mb-1">
-                                                📂
+                                              <span className="text-[10px] mb-1 px-2 py-0.5 rounded border border-indigo-400/30 text-indigo-100">
+                                                Upload
                                               </span>
                                               <span className="text-xs text-indigo-300 font-bold group-hover:text-white">
                                                 Upload File
@@ -3154,7 +3099,7 @@ function Dashboard() {
                                                     return;
                                                   }
                                                   if (!isVideo && file.size > MAX_VEO_IMAGE_BYTES) {
-                                                    alert("Veo image input must be 8MB or smaller.");
+                                                    alert("Image input must be 8MB or smaller for Video FX 3.");
                                                     return;
                                                   }
                                                   setVeoSingleSource(file, URL.createObjectURL(file));
@@ -3170,8 +3115,8 @@ function Dashboard() {
                                               }}
                                               className="flex flex-col items-center group-hover:scale-105 transition-transform"
                                             >
-                                              <span className="text-2xl mb-1">
-                                                📚
+                                              <span className="text-[10px] mb-1 px-2 py-0.5 rounded border border-indigo-400/30 text-indigo-100">
+                                                Library
                                               </span>
                                               <span className="text-xs text-indigo-300 font-bold group-hover:text-white">
                                                 From Library
@@ -3183,7 +3128,7 @@ function Dashboard() {
                                       <p className="text-[10px] text-slate-500 text-center">
                                         {veoMode === "extend_video"
                                           ? "Upload a source video to continue it."
-                                          : "Upload one image source to animate with Veo."}
+                                          : "Upload one image source to animate it."}
                                       </p>
                                     </div>
                                     )

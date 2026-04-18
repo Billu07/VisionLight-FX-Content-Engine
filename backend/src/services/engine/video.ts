@@ -276,16 +276,19 @@ export const videoLogic = {
     console.log(
       `🎬 Video Gen for ${postId} | Model: ${params.model} | AR: ${params.aspectRatio}`,
     );
-    const isKie = params.model.includes("kie");
+    const model = typeof params.model === "string" ? params.model : "";
+    const isKie = model.includes("kie");
+    const isSeedanceKie = model.includes("kie-seedance");
+    const isSeedanceFal = model.includes("seedance-fal");
     // Check for Kling variants
-    const isKling = params.model.includes("kling");
-    const isKling3 = params.model === "kling-3";
+    const isKling = model.includes("kling");
+    const isKling3 = model === "kling-3";
 
     // Check for Veo
-    const isVeo = params.model === "veo-3";
+    const isVeo = model === "veo-3";
 
-    const isOpenAI = !isKie && !isKling && !isVeo;
-    const isPro = params.model.includes("pro") || params.model.includes("Pro");
+    const isOpenAI = !isKie && !isKling && !isVeo && !isSeedanceFal;
+    const isPro = model.includes("pro") || model.includes("Pro");
 
     try {
       let targetWidth = 1280;
@@ -631,21 +634,54 @@ export const videoLogic = {
           );
           isImageToVideo = true;
         }
-        const baseModel = isPro ? "sora-2-pro" : "sora-2";
-        const mode = isImageToVideo ? "image-to-video" : "text-to-video";
-        const kiePayload: any = {
-          model: `${baseModel}-${mode}`,
-          input: {
-            prompt: finalPrompt,
-            aspect_ratio:
-              targetRatioString === "9:16" ? "portrait" : "landscape",
-            n_frames: params.duration
-              ? params.duration.toString().replace("s", "")
-              : "10",
-            remove_watermark: true,
-          },
-        };
-        if (isImageToVideo) kiePayload.input.image_urls = [kieInputUrl];
+        const kiePayload: any = isSeedanceKie
+          ? {
+              model: "bytedance/seedance-2",
+              input: {
+                prompt: finalPrompt,
+                aspect_ratio:
+                  targetRatioString === "9:16"
+                    ? "9:16"
+                    : targetRatioString === "1:1"
+                      ? "1:1"
+                      : "16:9",
+                duration: Math.max(
+                  4,
+                  Math.min(15, Number(params.duration) || 10),
+                ),
+                resolution:
+                  params.resolution === "480p" ||
+                  params.resolution === "720p" ||
+                  params.resolution === "1080p"
+                    ? params.resolution
+                    : "720p",
+                generate_audio: toBoolean(params.generateAudio, true),
+                web_search: false,
+                nsfw_checker: false,
+              },
+            }
+          : {
+              model: `${isPro ? "sora-2-pro" : "sora-2"}-${
+                isImageToVideo ? "image-to-video" : "text-to-video"
+              }`,
+              input: {
+                prompt: finalPrompt,
+                aspect_ratio:
+                  targetRatioString === "9:16" ? "portrait" : "landscape",
+                n_frames: params.duration
+                  ? params.duration.toString().replace("s", "")
+                  : "10",
+                remove_watermark: true,
+              },
+            };
+
+        if (isImageToVideo) {
+          if (isSeedanceKie) {
+            kiePayload.input.first_frame_url = kieInputUrl;
+          } else {
+            kiePayload.input.image_urls = [kieInputUrl];
+          }
+        }
 
         const kieKey = apiKeys?.kieApiKey;
         if (!kieKey) throw new Error("API Key is missing. Please configure your KIE API key in the Admin Panel.");
@@ -657,6 +693,74 @@ export const videoLogic = {
         );
         if (kieRes.data.code !== 200) throw new Error("Kie Error");
         externalId = kieRes.data.data.taskId;
+      } else if (isSeedanceFal) {
+        provider = "seedance-fal";
+        const referenceUrls = (params.imageReferences || []).filter(
+          (url: any): url is string => typeof url === "string" && url.length > 0,
+        );
+        const imageRefs = referenceUrls.filter((url: string) => !isLikelyVideoUrl(url));
+        const videoRefs = referenceUrls.filter((url: string) => isLikelyVideoUrl(url));
+
+        const payload: any = {
+          prompt: finalPrompt,
+          resolution:
+            params.resolution === "480p" || params.resolution === "720p"
+              ? params.resolution
+              : "720p",
+          duration: Math.max(4, Math.min(15, Number(params.duration) || 8)),
+          aspect_ratio:
+            targetRatioString === "9:16"
+              ? "9:16"
+              : targetRatioString === "1:1"
+                ? "1:1"
+                : "16:9",
+          generate_audio: toBoolean(params.generateAudio, true),
+        };
+        if (params.seed !== undefined && params.seed !== null && `${params.seed}`.trim() !== "") {
+          const parsedSeed = Number(params.seed);
+          if (Number.isFinite(parsedSeed)) payload.seed = Math.max(0, Math.floor(parsedSeed));
+        }
+
+        let endpoint = "bytedance/seedance-2.0/text-to-video";
+        if (imageRefs.length > 0 || videoRefs.length > 0) {
+          if (videoRefs.length > 0 || imageRefs.length > 2) {
+            endpoint = "bytedance/seedance-2.0/reference-to-video";
+            if (imageRefs.length > 0) {
+              payload.image_urls = imageRefs.map((url: string) => getOptimizedUrl(url));
+            }
+            if (videoRefs.length > 0) {
+              payload.video_urls = videoRefs.map((url: string) => getOptimizedUrl(url));
+            }
+          } else {
+            endpoint = "bytedance/seedance-2.0/image-to-video";
+            if (finalInputImageBuffer) {
+              payload.image_url = await uploadToCloudinary(
+                finalInputImageBuffer,
+                `${postId}_seedance_fal_input`,
+                params.userId,
+                "Seedance Fal Input",
+                "image",
+              );
+            } else {
+              payload.image_url = getOptimizedUrl(imageRefs[0]);
+            }
+            if (imageRefs.length > 1) {
+              payload.end_image_url = getOptimizedUrl(imageRefs[1]);
+            }
+          }
+        }
+
+        const falKey = apiKeys?.falApiKey;
+        if (!falKey) throw new Error("API Key is missing. Please configure your Fal AI key in the Admin Panel.");
+
+        const submitRes = await axios.post(`https://queue.fal.run/${endpoint}`, payload, {
+          headers: {
+            Authorization: `Key ${falKey}`,
+            "Content-Type": "application/json",
+          },
+        });
+        externalId = submitRes.data.request_id;
+        statusUrl = submitRes.data.status_url;
       } else if (isOpenAI) {
         provider = "openai";
         const form = new FormData();
@@ -732,7 +836,11 @@ export const videoLogic = {
           isFailed = true;
           errorMessage = checkRes.data.data.failMsg;
         } else progress = Math.min(95, progress + 5);
-      } else if (provider.includes("kling") || provider.includes("veo")) {
+      } else if (
+        provider.includes("kling") ||
+        provider.includes("veo") ||
+        provider.includes("seedance-fal")
+      ) {
         const falKey = apiKeys?.falApiKey || FAL_KEY;
         const checkUrl =
           params.statusUrl || `${FAL_BASE_PATH}/requests/${externalId}/status`;

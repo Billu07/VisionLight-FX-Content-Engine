@@ -63,17 +63,24 @@ export const calculateGranularCost = (
   if (mediaType === "carousel") return settings.pricePicFX_Carousel;
   if (mode === "batch") return settings.pricePicFX_Batch;
 
-  // 3. VIDEO FX 1 (Kling)
+  // 3. VIDEO FX 1 (Seedance Kie)
   if (
     mediaType === "video" &&
-    (model === "kie-sora-2" || model === "kie-sora-2-pro")
+    (model === "kie-seedance-2" ||
+      model === "kie-sora-2" ||
+      model === "kie-sora-2-pro")
   ) {
     if (duration === 15) return settings.priceVideoFX1_15s;
     return settings.priceVideoFX1_10s;
   }
 
-  // 4. VIDEO FX 2 (OpenAI/Sora)
-  if (mediaType === "video" && (model === "sora-2" || model === "sora-2-pro")) {
+  // 4. VIDEO FX 2 (Seedance Fal)
+  if (
+    mediaType === "video" &&
+    (model === "seedance-fal-2.0" ||
+      model === "sora-2" ||
+      model === "sora-2-pro")
+  ) {
     if (duration === 8) return settings.priceVideoFX2_8s;
     if (duration === 12) return settings.priceVideoFX2_12s;
     return settings.priceVideoFX2_4s;
@@ -128,8 +135,10 @@ export const getTargetPool = (
   if (model === "kling-2.5") return "creditsPicDrift";
   if (mediaType === "image" || mediaType === "carousel")
     return "creditsImageFX";
-  if (model?.includes("kie-sora")) return "creditsVideoFX1";
-  if (model?.includes("sora-2")) return "creditsVideoFX2";
+  if (model?.includes("kie-seedance") || model?.includes("kie-sora"))
+    return "creditsVideoFX1";
+  if (model?.includes("seedance-fal") || model?.includes("sora-2"))
+    return "creditsVideoFX2";
   if (model === "veo-3") return "creditsVideoFX3";
 
   // Editor fallback
