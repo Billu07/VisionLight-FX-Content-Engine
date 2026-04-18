@@ -822,6 +822,7 @@ router.post(
         seed,
         autoFix,
         veoMode,
+        videoGenerationMode,
         projectId,
       } = req.body;
 
@@ -870,18 +871,25 @@ router.post(
 
       const referenceFiles = (req.files as Express.Multer.File[]) || [];
       const uploadedUrls: string[] = [];
+      const uploadedImageUrls: string[] = [];
+      const uploadedVideoUrls: string[] = [];
+      const uploadedAudioUrls: string[] = [];
       if (referenceFiles.length > 0) {
         try {
           for (const file of referenceFiles) {
             const url = await uploadToCloudinary(file);
             uploadedUrls.push(url);
+            if (file.mimetype.startsWith("image/")) uploadedImageUrls.push(url);
+            else if (file.mimetype.startsWith("video/")) uploadedVideoUrls.push(url);
+            else if (file.mimetype.startsWith("audio/")) uploadedAudioUrls.push(url);
           }
         } catch (err: any) {
           console.error("Upload Error in generate-media:", err);
           return res.status(500).json({ error: "Image upload failed: " + err.message });
         }
       }
-      const primaryRefUrl = uploadedUrls.length > 0 ? uploadedUrls[0] : "";
+      const primaryRefUrl =
+        uploadedImageUrls[0] || uploadedVideoUrls[0] || uploadedUrls[0] || "";
 
       const generationParams = {
         mediaType,
@@ -893,9 +901,13 @@ router.post(
         seed,
         autoFix,
         veoMode,
+        videoGenerationMode,
         imageReference: primaryRefUrl,
         imageReferences: uploadedUrls,
-        hasReferenceImage: uploadedUrls.length > 0,
+        referenceImageUrls: uploadedImageUrls,
+        referenceVideoUrls: uploadedVideoUrls,
+        referenceAudioUrls: uploadedAudioUrls,
+        hasReferenceImage: uploadedImageUrls.length > 0,
         timestamp: new Date().toISOString(),
         title: title || "",
         userId: req.user!.id,

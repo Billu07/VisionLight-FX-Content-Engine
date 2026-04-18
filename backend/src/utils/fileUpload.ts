@@ -26,13 +26,17 @@ const r2Client = new S3Client({
 export const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 55 * 1024 * 1024, // Supports Seedance reference video/audio limits
   },
   fileFilter: (req: Request, file: Express.Multer.File, cb: any) => {
-    if (file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/")) {
+    if (
+      file.mimetype.startsWith("image/") ||
+      file.mimetype.startsWith("video/") ||
+      file.mimetype.startsWith("audio/")
+    ) {
       cb(null, true);
     } else {
-      cb(new Error("Only image and video files are allowed"), false);
+      cb(new Error("Only image, video, and audio files are allowed"), false);
     }
   },
 });

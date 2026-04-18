@@ -33,6 +33,7 @@ const MAX_VEO_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_VEO_REFERENCE_IMAGES = 5;
 const MAX_VIDEOFX1_REFERENCES = 2;
 const MAX_VIDEOFX2_REFERENCES = 12;
+const MAX_VIDEOFX_ADV_REFERENCES = 12;
 type VeoMode =
   | "image_to_video"
   | "first_last_frame"
@@ -78,7 +79,7 @@ function Dashboard() {
   // ✅ UPDATED DEFAULT: 10s (Matches PicDrift Standard)
   const [kieDuration, setKieDuration] = useState<5 | 10 | 15>(10);
   // ✅ UPDATED DEFAULT: 1080p
-  const [kieResolution, setKieResolution] = useState<"720p" | "1080p">("1080p");
+  const [kieResolution] = useState<"720p" | "1080p">("1080p");
 
   // ✅ UPDATED DEFAULT: Portrait
   const [kieAspect, setKieAspect] = useState<
@@ -96,6 +97,17 @@ function Dashboard() {
 
   // ✅ UPDATED DEFAULT: Pro Model
   const kieModel = "kie-seedance-2" as const;
+  const [videoFx1Mode, setVideoFx1Mode] = useState<
+    "text" | "frames" | "references"
+  >("frames");
+  const [videoFx1Duration, setVideoFx1Duration] = useState<10 | 15>(10);
+  const [videoFx1Resolution, setVideoFx1Resolution] = useState<
+    "480p" | "720p" | "1080p"
+  >("1080p");
+  const [videoFx1Aspect, setVideoFx1Aspect] = useState<
+    "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "21:9" | "auto"
+  >("9:16");
+  const [videoFx1GenerateAudio, setVideoFx1GenerateAudio] = useState(true);
 
   // Video FX Sub-mode (Video vs PicDrift)
   const [videoFxMode, setVideoFxMode] = useState<"video" | "picdrift">(
@@ -133,10 +145,19 @@ function Dashboard() {
   const [videoDuration, setVideoDuration] = useState<4 | 8 | 12>(12);
   // ✅ UPDATED DEFAULT: Pro Model
   const videoModel = "seedance-fal-2.0" as const;
+  const [videoFx2Mode, setVideoFx2Mode] = useState<
+    "text" | "frames" | "references"
+  >("references");
+  const [videoFx2Aspect, setVideoFx2Aspect] = useState<
+    "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "21:9" | "auto"
+  >("9:16");
+  const [videoFx2GenerateAudio, setVideoFx2GenerateAudio] = useState(true);
   // ✅ UPDATED DEFAULT: 9:16 (Portrait)
   const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16">("9:16");
   // ✅ UPDATED DEFAULT: Portrait Resolution
-  const [videoResolution, setVideoResolution] = useState<"480p" | "720p">(
+  const [videoFx2Resolution, setVideoFx2Resolution] = useState<
+    "480p" | "720p"
+  >(
     "720p",
   );
 
@@ -158,6 +179,7 @@ function Dashboard() {
   }>({ start: null, end: null });
   const [videoFxExtraRefs, setVideoFxExtraRefs] = useState<File[]>([]);
   const [videoFxExtraUrls, setVideoFxExtraUrls] = useState<string[]>([]);
+  const [videoFxExtraNames, setVideoFxExtraNames] = useState<string[]>([]);
 
   // Explicit State for PicDrift Frames
   const [picDriftFrames, setPicDriftFrames] = useState<{
@@ -245,6 +267,7 @@ function Dashboard() {
     setVideoFxFrameUrls({ start: null, end: null });
     setVideoFxExtraRefs([]);
     setVideoFxExtraUrls([]);
+    setVideoFxExtraNames([]);
     setPicDriftFrames({ start: null, end: null });
     setPicDriftUrls({ start: null, end: null });
     setVeoSourceFile(null);
@@ -254,6 +277,24 @@ function Dashboard() {
     setVeoReferenceFiles([]);
     setVeoReferenceUrls([]);
   }, [activeEngine, studioMode, videoFxMode]);
+
+  useEffect(() => {
+    if (!(activeEngine === "kie" && videoFxMode === "video")) return;
+    setVideoFxFrames({ start: null, end: null });
+    setVideoFxFrameUrls({ start: null, end: null });
+    setVideoFxExtraRefs([]);
+    setVideoFxExtraUrls([]);
+    setVideoFxExtraNames([]);
+  }, [activeEngine, videoFxMode, videoFx1Mode]);
+
+  useEffect(() => {
+    if (activeEngine !== "openai") return;
+    setVideoFxFrames({ start: null, end: null });
+    setVideoFxFrameUrls({ start: null, end: null });
+    setVideoFxExtraRefs([]);
+    setVideoFxExtraUrls([]);
+    setVideoFxExtraNames([]);
+  }, [activeEngine, videoFx2Mode]);
 
   useEffect(() => {
     if (activeEngine !== "veo") return;
@@ -469,6 +510,7 @@ function Dashboard() {
         setVideoFxFrameUrls({ start: null, end: null });
         setVideoFxExtraRefs([]);
         setVideoFxExtraUrls([]);
+        setVideoFxExtraNames([]);
         setPicDriftFrames({ start: null, end: null });
         setPicDriftUrls({ start: null, end: null });
         queryClient.invalidateQueries({ queryKey: ["posts"] });
@@ -522,6 +564,12 @@ function Dashboard() {
   };
 
   const isVideoFile = (file: File) => file.type.startsWith("video/");
+  const isAudioFile = (file: File) =>
+    file.type.startsWith("audio/") || /\.(mp3|wav|m4a|aac|ogg)$/i.test(file.name);
+  const isAudioUrl = (url: string) =>
+    /\.(mp3|wav|m4a|aac|ogg)(\?|$)/i.test(url);
+  const isAudioName = (name?: string | null) =>
+    !!name && /\.(mp3|wav|m4a|aac|ogg)$/i.test(name);
 
   const removeVeoSource = () => {
     setVeoSourceFile(null);
@@ -572,14 +620,30 @@ function Dashboard() {
     setVeoReferenceUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const getCurrentVideoFxMode = () => {
+    if (activeEngine === "kie" && videoFxMode === "video") return videoFx1Mode;
+    if (activeEngine === "openai") return videoFx2Mode;
+    return null;
+  };
+
   const isVideoFxSlotEngine = () =>
     (activeEngine === "kie" && videoFxMode === "video") ||
     activeEngine === "openai";
 
-  const getVideoFxReferenceCount = () =>
-    (videoFxFrames.start ? 1 : 0) +
-    (videoFxFrames.end ? 1 : 0) +
-    videoFxExtraRefs.length;
+  const getVideoFxReferenceLimit = () => {
+    if (activeEngine === "kie" && videoFxMode === "video") {
+      return MAX_VIDEOFX_ADV_REFERENCES;
+    }
+    return MAX_VIDEOFX2_REFERENCES;
+  };
+
+  const getVideoFxReferenceCount = () => {
+    const mode = getCurrentVideoFxMode();
+    if (mode === "frames") {
+      return (videoFxFrames.start ? 1 : 0) + (videoFxFrames.end ? 1 : 0);
+    }
+    return videoFxExtraRefs.length;
+  };
 
   const setVideoFxFrame = (
     slot: "start" | "end",
@@ -601,6 +665,17 @@ function Dashboard() {
   };
 
   const addVideoFxExtraReference = (file: File, url: string) => {
+    const mode = getCurrentVideoFxMode();
+    if (mode !== "references") return;
+    const isAllowedType =
+      file.type.startsWith("image/") ||
+      file.type.startsWith("video/") ||
+      isAudioFile(file);
+    if (!isAllowedType) {
+      alert("Only image, video, and audio files are supported in reference mode.");
+      return;
+    }
+
     if (
       videoFxExtraUrls.includes(url) ||
       videoFxFrameUrls.start === url ||
@@ -609,20 +684,23 @@ function Dashboard() {
       return;
     }
 
-    if (getVideoFxReferenceCount() >= MAX_VIDEOFX2_REFERENCES) {
+    const maxRefs = getVideoFxReferenceLimit();
+    if (getVideoFxReferenceCount() >= maxRefs) {
       alert(
-        `Only ${MAX_VIDEOFX2_REFERENCES} reference file(s) allowed for Video FX 2.`,
+        `Only ${maxRefs} reference file(s) allowed for this mode.`,
       );
       return;
     }
 
     setVideoFxExtraRefs((prev) => [...prev, file]);
     setVideoFxExtraUrls((prev) => [...prev, url]);
+    setVideoFxExtraNames((prev) => [...prev, file.name]);
   };
 
   const removeVideoFxExtraReference = (index: number) => {
     setVideoFxExtraRefs((prev) => prev.filter((_, i) => i !== index));
     setVideoFxExtraUrls((prev) => prev.filter((_, i) => i !== index));
+    setVideoFxExtraNames((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleVideoFxSlotUpload = (
@@ -644,25 +722,50 @@ function Dashboard() {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    let remaining = MAX_VIDEOFX2_REFERENCES - getVideoFxReferenceCount();
+    const mode = getCurrentVideoFxMode();
+    if (mode !== "references") {
+      e.target.value = "";
+      return;
+    }
+
+    const maxRefs = getVideoFxReferenceLimit();
+    let remaining = maxRefs - getVideoFxReferenceCount();
     if (remaining <= 0) {
       alert(
-        `Only ${MAX_VIDEOFX2_REFERENCES} reference file(s) allowed for Video FX 2.`,
+        `Only ${maxRefs} reference file(s) allowed for this mode.`,
       );
       e.target.value = "";
       return;
     }
 
-    const acceptedFiles = files.slice(0, remaining);
+    const allowedFiles = files.filter(
+      (file) =>
+        file.type.startsWith("image/") ||
+        file.type.startsWith("video/") ||
+        isAudioFile(file),
+    );
+    if (allowedFiles.length < files.length) {
+      alert("Only image, video, and audio files are supported in reference mode.");
+    }
+
+    const acceptedFiles = allowedFiles.slice(0, remaining);
+    if (acceptedFiles.length === 0) {
+      e.target.value = "";
+      return;
+    }
     if (acceptedFiles.length < files.length) {
       alert(
-        `Only ${MAX_VIDEOFX2_REFERENCES} reference file(s) allowed for Video FX 2.`,
+        `Only ${maxRefs} reference file(s) allowed for this mode.`,
       );
     }
 
     const acceptedUrls = acceptedFiles.map((file) => URL.createObjectURL(file));
     setVideoFxExtraRefs((prev) => [...prev, ...acceptedFiles]);
     setVideoFxExtraUrls((prev) => [...prev, ...acceptedUrls]);
+    setVideoFxExtraNames((prev) => [
+      ...prev,
+      ...acceptedFiles.map((file) => file.name),
+    ]);
     e.target.value = "";
   };
 
@@ -677,7 +780,7 @@ function Dashboard() {
           return;
         }
         setVeoFrame("first", file, url);
-      } else if (isVideoFxSlotEngine()) {
+      } else if (isVideoFxSlotEngine() && getCurrentVideoFxMode() === "frames") {
         if (!setVideoFxFrame("start", file, url)) {
           setActiveLibrarySlot(null);
           return;
@@ -694,7 +797,7 @@ function Dashboard() {
           return;
         }
         setVeoFrame("last", file, url);
-      } else if (isVideoFxSlotEngine()) {
+      } else if (isVideoFxSlotEngine() && getCurrentVideoFxMode() === "frames") {
         if (!videoFxFrames.start) {
           alert("Please set Start Frame first.");
           setActiveLibrarySlot(null);
@@ -792,26 +895,47 @@ function Dashboard() {
           else setVeoFrame("first", file, url);
         }
       } else if (activeEngine === "kie" && videoFxMode === "video") {
-        if (isVideoFile(file)) {
-          alert("Video FX 1 start/end mode supports image references only.");
-          setActiveLibrarySlot(null);
-          return;
-        }
-        if (videoFxFrameUrls.start === url || videoFxFrameUrls.end === url) {
-          setActiveLibrarySlot(null);
-          return;
-        }
-        if (!videoFxFrames.start) setVideoFxFrame("start", file, url);
-        else if (!videoFxFrames.end) setVideoFxFrame("end", file, url);
-        else {
-          alert(
-            `Only ${MAX_VIDEOFX1_REFERENCES} ordered frame(s) allowed for Video FX 1.`,
-          );
-          setActiveLibrarySlot(null);
-          return;
+        const mode = getCurrentVideoFxMode();
+        if (mode === "frames") {
+          if (isVideoFile(file) || isAudioFile(file)) {
+            alert("Frame mode requires image files only.");
+            setActiveLibrarySlot(null);
+            return;
+          }
+          if (videoFxFrameUrls.start === url || videoFxFrameUrls.end === url) {
+            setActiveLibrarySlot(null);
+            return;
+          }
+          if (!videoFxFrames.start) setVideoFxFrame("start", file, url);
+          else if (!videoFxFrames.end) setVideoFxFrame("end", file, url);
+          else {
+            alert(
+              `Only ${MAX_VIDEOFX1_REFERENCES} ordered frame(s) allowed in frame mode.`,
+            );
+            setActiveLibrarySlot(null);
+            return;
+          }
+        } else if (mode === "references") {
+          addVideoFxExtraReference(file, url);
         }
       } else if (activeEngine === "openai") {
-        addVideoFxExtraReference(file, url);
+        const mode = getCurrentVideoFxMode();
+        if (mode === "frames") {
+          if (isVideoFile(file) || isAudioFile(file)) {
+            alert("Frame mode requires image files only.");
+            setActiveLibrarySlot(null);
+            return;
+          }
+          if (!videoFxFrames.start) setVideoFxFrame("start", file, url);
+          else if (!videoFxFrames.end) setVideoFxFrame("end", file, url);
+          else {
+            alert("Frame mode supports start and end images only.");
+            setActiveLibrarySlot(null);
+            return;
+          }
+        } else if (mode === "references") {
+          addVideoFxExtraReference(file, url);
+        }
       } else {
         setReferenceImages([file]);
         setReferenceImageUrls([url]);
@@ -823,23 +947,29 @@ function Dashboard() {
       console.log(`Auto-setting ratio to: ${ratio}`);
 
       // Determine standardized Ratio ID
-      const r = ratio as "16:9" | "9:16" | "1:1";
+      const r = ratio as
+        | "16:9"
+        | "9:16"
+        | "1:1"
+        | "4:3"
+        | "3:4"
+        | "21:9"
+        | "auto";
 
       // A. VIDEO FX 1 / PICDRIFT
       if (activeEngine === "kie") {
-        if (r === "16:9") setKieAspect("landscape");
-        else if (r === "9:16") setKieAspect("portrait");
-        else if (r === "1:1") setKieAspect("square");
+        if (videoFxMode === "video") {
+          setVideoFx1Aspect(r);
+        } else {
+          if (r === "16:9") setKieAspect("landscape");
+          else if (r === "9:16") setKieAspect("portrait");
+          else if (r === "1:1") setKieAspect("square");
+        }
       }
 
       // B. VIDEO FX 2
       else if (activeEngine === "openai") {
-        // This mode in this UI uses landscape or portrait only.
-        if (r === "16:9") {
-          setAspectRatio("16:9");
-        } else if (r === "9:16") {
-          setAspectRatio("9:16");
-        }
+        setVideoFx2Aspect(r);
       }
 
       // C. VEO / VIDEO FX 3
@@ -850,7 +980,9 @@ function Dashboard() {
 
       // D. STUDIO / GEMINI
       else if (activeEngine === "studio") {
-        setGeminiAspect(r);
+        if (r === "16:9" || r === "9:16" || r === "1:1") {
+          setGeminiAspect(r);
+        }
       }
     }
 
@@ -882,67 +1014,112 @@ function Dashboard() {
     const newFiles = Array.from(files);
 
     if (activeEngine === "kie" && videoFxMode === "video") {
-      if (newFiles.some((file) => isVideoFile(file))) {
-        alert("Video FX 1 start/end mode supports image references only.");
+      const mode = getCurrentVideoFxMode();
+      if (mode === "frames") {
+        if (newFiles.some((file) => isVideoFile(file) || isAudioFile(file))) {
+          alert("Frame mode supports image files only.");
+          e.target.value = "";
+          return;
+        }
+
+        let hasStart = !!videoFxFrames.start;
+        let hasEnd = !!videoFxFrames.end;
+        for (const file of newFiles) {
+          const url = URL.createObjectURL(file);
+          if (!hasStart) {
+            setVideoFxFrame("start", file, url);
+            hasStart = true;
+            continue;
+          }
+          if (!hasEnd) {
+            setVideoFxFrame("end", file, url);
+            hasEnd = true;
+            continue;
+          }
+          alert(
+            `Only ${MAX_VIDEOFX1_REFERENCES} ordered frame(s) allowed in frame mode.`,
+          );
+          break;
+        }
         e.target.value = "";
         return;
       }
 
-      let hasStart = !!videoFxFrames.start;
-      let hasEnd = !!videoFxFrames.end;
-      for (const file of newFiles) {
-        const url = URL.createObjectURL(file);
-        if (!hasStart) {
-          setVideoFxFrame("start", file, url);
-          hasStart = true;
-          continue;
+      if (mode === "references") {
+        const remainingSlots =
+          getVideoFxReferenceLimit() - getVideoFxReferenceCount();
+        if (remainingSlots <= 0) {
+          alert(
+            `Only ${getVideoFxReferenceLimit()} reference file(s) allowed for this mode.`,
+          );
+          e.target.value = "";
+          return;
         }
-        if (!hasEnd) {
-          setVideoFxFrame("end", file, url);
-          hasEnd = true;
-          continue;
+        const usableFiles = newFiles.slice(0, remainingSlots);
+        if (usableFiles.length < newFiles.length) {
+          alert(
+            `Only ${getVideoFxReferenceLimit()} reference file(s) allowed for this mode.`,
+          );
         }
-        alert(
-          `Only ${MAX_VIDEOFX1_REFERENCES} ordered frame(s) allowed for Video FX 1.`,
+        usableFiles.forEach((file) =>
+          addVideoFxExtraReference(file, URL.createObjectURL(file)),
         );
-        break;
       }
       e.target.value = "";
       return;
     }
 
     if (activeEngine === "openai") {
-      const remainingSlots = MAX_VIDEOFX2_REFERENCES - getVideoFxReferenceCount();
-      if (remainingSlots <= 0) {
-        alert(
-          `Only ${MAX_VIDEOFX2_REFERENCES} reference file(s) allowed for Video FX 2.`,
-        );
+      const mode = getCurrentVideoFxMode();
+      if (mode === "frames") {
+        if (newFiles.some((file) => isVideoFile(file) || isAudioFile(file))) {
+          alert("Frame mode supports image files only.");
+          e.target.value = "";
+          return;
+        }
+
+        let hasStart = !!videoFxFrames.start;
+        let hasEnd = !!videoFxFrames.end;
+        for (const file of newFiles) {
+          const url = URL.createObjectURL(file);
+          if (!hasStart) {
+            setVideoFxFrame("start", file, url);
+            hasStart = true;
+            continue;
+          }
+          if (!hasEnd) {
+            setVideoFxFrame("end", file, url);
+            hasEnd = true;
+            continue;
+          }
+          alert("Frame mode supports start and end images only.");
+          break;
+        }
         e.target.value = "";
         return;
       }
 
-      const usableFiles = newFiles.slice(0, remainingSlots);
-      if (usableFiles.length < newFiles.length) {
-        alert(
-          `Only ${MAX_VIDEOFX2_REFERENCES} reference file(s) allowed for Video FX 2.`,
-        );
-      }
+      if (mode === "references") {
+        const remainingSlots =
+          getVideoFxReferenceLimit() - getVideoFxReferenceCount();
+        if (remainingSlots <= 0) {
+          alert(
+            `Only ${getVideoFxReferenceLimit()} reference file(s) allowed for this mode.`,
+          );
+          e.target.value = "";
+          return;
+        }
 
-      let hasStart = !!videoFxFrames.start;
-      let hasEnd = !!videoFxFrames.end;
-      for (const file of usableFiles) {
-        const url = URL.createObjectURL(file);
-        if (!hasStart && !isVideoFile(file)) {
-          setVideoFxFrame("start", file, url);
-          hasStart = true;
-          continue;
+        const usableFiles = newFiles.slice(0, remainingSlots);
+        if (usableFiles.length < newFiles.length) {
+          alert(
+            `Only ${getVideoFxReferenceLimit()} reference file(s) allowed for this mode.`,
+          );
         }
-        if (!hasEnd && !isVideoFile(file)) {
-          setVideoFxFrame("end", file, url);
-          hasEnd = true;
-          continue;
-        }
-        addVideoFxExtraReference(file, url);
+
+        usableFiles.forEach((file) =>
+          addVideoFxExtraReference(file, URL.createObjectURL(file)),
+        );
       }
 
       e.target.value = "";
@@ -954,15 +1131,6 @@ function Dashboard() {
       newFiles.some((file) => !file.type.startsWith("image/"))
     ) {
       alert("Pic FX only supports image references.");
-      return;
-    }
-
-    if (
-      activeEngine === "kie" &&
-      videoFxMode === "video" &&
-      newFiles.some((file) => file.type.startsWith("video/"))
-    ) {
-      alert("Video FX 1 start/end mode supports image references only.");
       return;
     }
 
@@ -1158,20 +1326,31 @@ function Dashboard() {
     } else if (activeEngine === "kie" && videoFxMode === "video") {
       formData.append("mediaType", "video");
       formData.append("model", kieModel);
-      if (videoFxFrames.start) formData.append("referenceImages", videoFxFrames.start);
-      if (videoFxFrames.end) formData.append("referenceImages", videoFxFrames.end);
-      formData.append("duration", kieDuration.toString());
-      formData.append("aspectRatio", kieAspect);
-      formData.append("resolution", kieResolution);
+      formData.append("videoGenerationMode", videoFx1Mode);
+      formData.append("duration", videoFx1Duration.toString());
+      formData.append("aspectRatio", videoFx1Aspect);
+      formData.append("resolution", videoFx1Resolution);
+      formData.append("generateAudio", videoFx1GenerateAudio.toString());
+      if (videoFx1Mode === "frames") {
+        if (videoFxFrames.start) formData.append("referenceImages", videoFxFrames.start);
+        if (videoFxFrames.end) formData.append("referenceImages", videoFxFrames.end);
+      } else if (videoFx1Mode === "references") {
+        videoFxExtraRefs.forEach((file) => formData.append("referenceImages", file));
+      }
     } else if (activeEngine === "openai") {
       formData.append("mediaType", "video");
       formData.append("model", videoModel);
+      formData.append("videoGenerationMode", videoFx2Mode);
       formData.append("duration", videoDuration.toString());
-      formData.append("aspectRatio", aspectRatio);
-      formData.append("resolution", videoResolution);
-      if (videoFxFrames.start) formData.append("referenceImages", videoFxFrames.start);
-      if (videoFxFrames.end) formData.append("referenceImages", videoFxFrames.end);
-      videoFxExtraRefs.forEach((file) => formData.append("referenceImages", file));
+      formData.append("aspectRatio", videoFx2Aspect);
+      formData.append("resolution", videoFx2Resolution);
+      formData.append("generateAudio", videoFx2GenerateAudio.toString());
+      if (videoFx2Mode === "frames") {
+        if (videoFxFrames.start) formData.append("referenceImages", videoFxFrames.start);
+        if (videoFxFrames.end) formData.append("referenceImages", videoFxFrames.end);
+      } else if (videoFx2Mode === "references") {
+        videoFxExtraRefs.forEach((file) => formData.append("referenceImages", file));
+      }
     } else if (activeEngine === "veo") {
       formData.append("mediaType", "video");
       formData.append("model", "veo-3");
@@ -1285,22 +1464,67 @@ function Dashboard() {
       }
     }
 
-    if (
-      (activeEngine === "kie" && videoFxMode === "video") ||
-      activeEngine === "openai"
-    ) {
-      if (!videoFxFrames.start && videoFxFrames.end) {
-        alert("Please provide Start Frame before setting End Frame.");
-        return;
-      }
-      if (
-        activeEngine === "openai" &&
-        getVideoFxReferenceCount() > MAX_VIDEOFX2_REFERENCES
-      ) {
-        alert(
-          `Video FX 2 supports up to ${MAX_VIDEOFX2_REFERENCES} total references.`,
+    if (activeEngine === "kie" && videoFxMode === "video") {
+      if (videoFx1Mode === "frames") {
+        if (!videoFxFrames.start) {
+          alert("Frame mode requires a Start Frame.");
+          return;
+        }
+        if (!videoFxFrames.start && videoFxFrames.end) {
+          alert("Please provide Start Frame before setting End Frame.");
+          return;
+        }
+      } else if (videoFx1Mode === "references") {
+        if (videoFxExtraRefs.length === 0) {
+          alert("Reference mode requires at least one reference file.");
+          return;
+        }
+        if (videoFxExtraRefs.length > MAX_VIDEOFX_ADV_REFERENCES) {
+          alert(
+            `Reference mode supports up to ${MAX_VIDEOFX_ADV_REFERENCES} files.`,
+          );
+          return;
+        }
+        const hasImageOrVideo = videoFxExtraRefs.some(
+          (file) => !isAudioFile(file),
         );
-        return;
+        const hasAudio = videoFxExtraRefs.some((file) => isAudioFile(file));
+        if (hasAudio && !hasImageOrVideo) {
+          alert("Audio references require at least one image or video reference.");
+          return;
+        }
+      }
+    }
+
+    if (activeEngine === "openai") {
+      if (videoFx2Mode === "frames") {
+        if (!videoFxFrames.start) {
+          alert("Frame mode requires a Start Frame.");
+          return;
+        }
+        if (!videoFxFrames.start && videoFxFrames.end) {
+          alert("Please provide Start Frame before setting End Frame.");
+          return;
+        }
+      } else if (videoFx2Mode === "references") {
+        if (videoFxExtraRefs.length === 0) {
+          alert("Reference mode requires at least one reference file.");
+          return;
+        }
+        if (videoFxExtraRefs.length > MAX_VIDEOFX2_REFERENCES) {
+          alert(
+            `Reference mode supports up to ${MAX_VIDEOFX2_REFERENCES} files.`,
+          );
+          return;
+        }
+        const hasImageOrVideo = videoFxExtraRefs.some(
+          (file) => !isAudioFile(file),
+        );
+        const hasAudio = videoFxExtraRefs.some((file) => isAudioFile(file));
+        if (hasAudio && !hasImageOrVideo) {
+          alert("Audio references require at least one image or video reference.");
+          return;
+        }
       }
     }
 
@@ -1374,8 +1598,10 @@ function Dashboard() {
 
   // ✅ HELPER: Get currently selected aspect ratio string for context-aware library
   const getCurrentRatioForLibrary = () => {
-    if (activeEngine === "kie") return kieAspect; // "portrait", "landscape", "square"
-    if (activeEngine === "openai") return aspectRatio; // "16:9", "9:16"
+    if (activeEngine === "kie") {
+      return videoFxMode === "video" ? videoFx1Aspect : kieAspect;
+    }
+    if (activeEngine === "openai") return videoFx2Aspect;
     if (activeEngine === "studio") return geminiAspect; // "1:1", "16:9", "9:16"
     return undefined;
   };
@@ -1391,8 +1617,25 @@ function Dashboard() {
     return { logo: fxLogo, text: "Video Generation" }; // videofx
   };
   const { logo: currentLogo, text: currentHeaderText } = getHeaderContent();
+  const currentVideoFxMode =
+    activeEngine === "kie" && videoFxMode === "video"
+      ? videoFx1Mode
+      : activeEngine === "openai"
+        ? videoFx2Mode
+        : null;
   const isVideoFxSlotMode =
     currentVisualTab === "videofx" &&
+    currentVideoFxMode === "frames" &&
+    ((activeEngine === "kie" && videoFxMode === "video") ||
+      activeEngine === "openai");
+  const isVideoFxReferenceMode =
+    currentVisualTab === "videofx" &&
+    currentVideoFxMode === "references" &&
+    ((activeEngine === "kie" && videoFxMode === "video") ||
+      activeEngine === "openai");
+  const isVideoFxTextMode =
+    currentVisualTab === "videofx" &&
+    currentVideoFxMode === "text" &&
     ((activeEngine === "kie" && videoFxMode === "video") ||
       activeEngine === "openai");
 
@@ -2263,7 +2506,7 @@ function Dashboard() {
                                 onClick={() => {
                                   setActiveEngine("kie");
                                   setVideoFxMode("video");
-                                  setKieDuration(15);
+                                  setVideoFx1Duration(10);
                                 }}
                                 className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeEngine === "kie"
                                   ? "bg-cyan-600 text-white shadow-lg"
@@ -2655,20 +2898,47 @@ function Dashboard() {
                               {currentVisualTab === "videofx" &&
                                 activeEngine === "kie" && (
                                   <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+                                    <div className="space-y-3">
+                                      <label className="text-sm font-semibold text-white mb-2 block">
+                                        Generation Mode
+                                      </label>
+                                      <div className="grid grid-cols-3 gap-2">
+                                        {[
+                                          { id: "text", label: "Text" },
+                                          { id: "frames", label: "Frames" },
+                                          { id: "references", label: "References" },
+                                        ].map((mode) => (
+                                          <button
+                                            key={mode.id}
+                                            type="button"
+                                            onClick={() =>
+                                              setVideoFx1Mode(
+                                                mode.id as "text" | "frames" | "references",
+                                              )
+                                            }
+                                            className={`py-2 rounded-lg border text-sm font-medium transition-all ${videoFx1Mode === mode.id
+                                              ? "bg-cyan-600 border-cyan-600 text-white"
+                                              : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                              }`}
+                                          >
+                                            {mode.label}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                                       <div>
                                         <label className="text-sm font-semibold text-white mb-2 block">
                                           Duration
                                         </label>
-                                        <div className="flex gap-2">
+                                        <div className="grid grid-cols-3 gap-2">
                                           {[10, 15].map((d) => (
                                             <button
                                               key={d}
                                               type="button"
-                                              onClick={() =>
-                                                setKieDuration(d as any)
-                                              }
-                                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieDuration === d
+                                              onClick={() => setVideoFx1Duration(d as 10 | 15)}
+                                              className={`py-2 rounded-lg border text-sm font-medium ${videoFx1Duration === d
                                                 ? "bg-cyan-600 border-cyan-600 text-white"
                                                 : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
                                                 }`}
@@ -2680,21 +2950,62 @@ function Dashboard() {
                                       </div>
                                       <div>
                                         <label className="text-sm font-semibold text-white mb-2 block">
-                                          Aspect Ratio
+                                          Resolution
                                         </label>
                                         <div className="flex gap-2">
-                                          {/* ✅ ADDED SQUARE HERE TOO FOR CONSISTENCY */}
                                           {[
-                                            { id: "landscape", label: "Landscape" },
-                                            { id: "portrait", label: "Portrait" },
+                                            { id: "480p", label: "480p" },
+                                            { id: "720p", label: "720p" },
+                                            { id: "1080p", label: "1080p" },
+                                          ].map((r) => (
+                                            <button
+                                              key={r.id}
+                                              type="button"
+                                              onClick={() =>
+                                                setVideoFx1Resolution(
+                                                  r.id as "480p" | "720p" | "1080p",
+                                                )
+                                              }
+                                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${videoFx1Resolution === r.id
+                                                ? "bg-cyan-600 border-cyan-600 text-white"
+                                                : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                                }`}
+                                            >
+                                              {r.label}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                      <div className="sm:col-span-2">
+                                        <label className="text-sm font-semibold text-white mb-2 block">
+                                          Aspect Ratio
+                                        </label>
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                          {[
+                                            { id: "16:9", label: "16:9" },
+                                            { id: "9:16", label: "9:16" },
+                                            { id: "1:1", label: "1:1" },
+                                            { id: "4:3", label: "4:3" },
+                                            { id: "3:4", label: "3:4" },
+                                            { id: "21:9", label: "21:9" },
+                                            { id: "auto", label: "Auto" },
                                           ].map((a) => (
                                             <button
                                               key={a.id}
                                               type="button"
                                               onClick={() =>
-                                                setKieAspect(a.id as any)
+                                                setVideoFx1Aspect(
+                                                  a.id as
+                                                    | "16:9"
+                                                    | "9:16"
+                                                    | "1:1"
+                                                    | "4:3"
+                                                    | "3:4"
+                                                    | "21:9"
+                                                    | "auto",
+                                                )
                                               }
-                                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieAspect === a.id
+                                              className={`py-2 rounded-lg border text-sm font-medium ${videoFx1Aspect === a.id
                                                 ? "bg-cyan-600 border-cyan-600 text-white"
                                                 : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
                                                 }`}
@@ -2705,29 +3016,22 @@ function Dashboard() {
                                         </div>
                                       </div>
                                       <div className="sm:col-span-2">
-                                        <label className="text-sm font-semibold text-white mb-2 block">
-                                          Resolution
+                                        <label className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-gray-800/50 cursor-pointer hover:bg-gray-800 transition-colors">
+                                          <input
+                                            type="checkbox"
+                                            checked={videoFx1GenerateAudio}
+                                            onChange={(e) => setVideoFx1GenerateAudio(e.target.checked)}
+                                            className="w-5 h-5 rounded border-gray-600 text-cyan-600 focus:ring-cyan-500 bg-gray-700"
+                                          />
+                                          <div>
+                                            <div className="font-semibold text-white text-sm">
+                                              Generate Audio
+                                            </div>
+                                            <div className="text-xs text-gray-400">
+                                              Include synchronized audio in output.
+                                            </div>
+                                          </div>
                                         </label>
-                                        <div className="flex gap-2">
-                                          {[
-                                            { id: "720p", label: "720p (Fast)" },
-                                            { id: "1080p", label: "1080p (HD)" },
-                                          ].map((r) => (
-                                            <button
-                                              key={r.id}
-                                              type="button"
-                                              onClick={() =>
-                                                setKieResolution(r.id as any)
-                                              }
-                                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieResolution === r.id
-                                                ? "bg-cyan-600 border-cyan-600 text-white"
-                                                : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                                }`}
-                                            >
-                                              {r.label}
-                                            </button>
-                                          ))}
-                                        </div>
                                       </div>
                                     </div>
                                   </div>
@@ -2833,27 +3137,52 @@ function Dashboard() {
                               {currentVisualTab === "videofx" &&
                                 activeEngine === "openai" && (
                                   <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+                                    <div className="space-y-3">
+                                      <label className="text-sm font-semibold text-white mb-2 block">
+                                        Generation Mode
+                                      </label>
+                                      <div className="grid grid-cols-3 gap-2">
+                                        {[
+                                          { id: "text", label: "Text" },
+                                          { id: "frames", label: "Frames" },
+                                          { id: "references", label: "References" },
+                                        ].map((mode) => (
+                                          <button
+                                            key={mode.id}
+                                            type="button"
+                                            onClick={() =>
+                                              setVideoFx2Mode(
+                                                mode.id as "text" | "frames" | "references",
+                                              )
+                                            }
+                                            className={`py-2 rounded-lg border text-sm font-medium transition-all ${videoFx2Mode === mode.id
+                                              ? "bg-cyan-600 border-cyan-600 text-white"
+                                              : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                              }`}
+                                          >
+                                            {mode.label}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                                       <div>
                                         <label className="text-sm font-semibold text-white mb-2 block">
-                                          Aspect Ratio
+                                          Duration
                                         </label>
-                                        <div className="flex gap-2">
-                                          {[
-                                            { ratio: "16:9", label: "Landscape" },
-                                            { ratio: "9:16", label: "Portrait" },
-                                          ].map(({ ratio, label }) => (
+                                        <div className="grid grid-cols-3 gap-2">
+                                          {[4, 8, 12].map((sec) => (
                                             <button
-                                              key={ratio}
+                                              key={sec}
                                               type="button"
-                                              onClick={() => setAspectRatio(ratio as any)}
-                                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                                aspectRatio === ratio
-                                                  ? "bg-cyan-600 border-cyan-600 text-white"
-                                                  : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                              }`}
+                                              onClick={() => setVideoDuration(sec as 4 | 8 | 12)}
+                                              className={`py-2 rounded-lg border text-sm font-medium ${videoDuration === sec
+                                                ? "bg-cyan-600 border-cyan-600 text-white"
+                                                : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                                }`}
                                             >
-                                              {label}
+                                              {sec}s
                                             </button>
                                           ))}
                                         </div>
@@ -2870,12 +3199,13 @@ function Dashboard() {
                                             <button
                                               key={value}
                                               type="button"
-                                              onClick={() => setVideoResolution(value as any)}
-                                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                                videoResolution === value
-                                                  ? "bg-cyan-600 border-cyan-600 text-white"
-                                                  : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                              }`}
+                                              onClick={() =>
+                                                setVideoFx2Resolution(value as "480p" | "720p")
+                                              }
+                                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${videoFx2Resolution === value
+                                                ? "bg-cyan-600 border-cyan-600 text-white"
+                                                : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                                }`}
                                             >
                                               {label}
                                             </button>
@@ -2884,24 +3214,60 @@ function Dashboard() {
                                       </div>
                                       <div className="sm:col-span-2">
                                         <label className="text-sm font-semibold text-white mb-2 block">
-                                          Duration
+                                          Aspect Ratio
                                         </label>
-                                        <div className="flex gap-2">
-                                          {[4, 8, 12].map((sec) => (
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                          {[
+                                            { id: "16:9", label: "16:9" },
+                                            { id: "9:16", label: "9:16" },
+                                            { id: "1:1", label: "1:1" },
+                                            { id: "4:3", label: "4:3" },
+                                            { id: "3:4", label: "3:4" },
+                                            { id: "21:9", label: "21:9" },
+                                            { id: "auto", label: "Auto" },
+                                          ].map((a) => (
                                             <button
-                                              key={sec}
+                                              key={a.id}
                                               type="button"
-                                              onClick={() => setVideoDuration(sec as any)}
-                                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
-                                                videoDuration === sec
-                                                  ? "bg-cyan-600 border-cyan-600 text-white"
-                                                  : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                              }`}
+                                              onClick={() =>
+                                                setVideoFx2Aspect(
+                                                  a.id as
+                                                    | "16:9"
+                                                    | "9:16"
+                                                    | "1:1"
+                                                    | "4:3"
+                                                    | "3:4"
+                                                    | "21:9"
+                                                    | "auto",
+                                                )
+                                              }
+                                              className={`py-2 rounded-lg border text-sm font-medium ${videoFx2Aspect === a.id
+                                                ? "bg-cyan-600 border-cyan-600 text-white"
+                                                : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                                }`}
                                             >
-                                              {sec}s
+                                              {a.label}
                                             </button>
                                           ))}
                                         </div>
+                                      </div>
+                                      <div className="sm:col-span-2">
+                                        <label className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-gray-800/50 cursor-pointer hover:bg-gray-800 transition-colors">
+                                          <input
+                                            type="checkbox"
+                                            checked={videoFx2GenerateAudio}
+                                            onChange={(e) => setVideoFx2GenerateAudio(e.target.checked)}
+                                            className="w-5 h-5 rounded border-gray-600 text-cyan-600 focus:ring-cyan-500 bg-gray-700"
+                                          />
+                                          <div>
+                                            <div className="font-semibold text-white text-sm">
+                                              Generate Audio
+                                            </div>
+                                            <div className="text-xs text-gray-400">
+                                              Include synchronized audio in output.
+                                            </div>
+                                          </div>
+                                        </label>
                                       </div>
                                     </div>
                                   </div>
@@ -3341,7 +3707,7 @@ function Dashboard() {
                                       </p>
                                     </div>
                                     )
-                                  ) : isVideoFxSlotMode ? (
+                                                                    ) : isVideoFxSlotMode ? (
                                     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-700">
                                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {(["start", "end"] as const).map((slot) => {
@@ -3435,99 +3801,114 @@ function Dashboard() {
                                         End Frame is optional. If provided, motion transitions
                                         from Start Frame to End Frame.
                                       </p>
-
-                                      {activeEngine === "openai" && (
-                                        <div className="space-y-3">
-                                          <div className="flex justify-between items-center">
-                                            <label className="text-xs text-cyan-200 font-semibold uppercase tracking-wider">
-                                              Additional References
-                                            </label>
-                                            <span className="text-[10px] text-gray-500">
-                                              {getVideoFxReferenceCount()}/
-                                              {MAX_VIDEOFX2_REFERENCES}
+                                    </div>
+                                  ) : isVideoFxReferenceMode ? (
+                                    <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                                      <div className="flex justify-between items-center">
+                                        <label className="text-xs text-cyan-200 font-semibold uppercase tracking-wider">
+                                          Reference Inputs
+                                        </label>
+                                        <span className="text-[10px] text-gray-500">
+                                          {getVideoFxReferenceCount()}/{getVideoFxReferenceLimit()}
+                                        </span>
+                                      </div>
+                                      <div className="w-full border-2 border-dashed border-cyan-500/30 rounded-xl hover:border-cyan-400 hover:bg-cyan-900/10 transition-all p-4">
+                                        <div className="flex items-center justify-center gap-8">
+                                          <label className="cursor-pointer flex flex-col items-center transition-transform hover:scale-105">
+                                            <span className="text-[10px] mb-1 px-2 py-0.5 rounded border border-cyan-400/30 text-cyan-100">
+                                              Upload
                                             </span>
-                                          </div>
-                                          <div className="w-full border-2 border-dashed border-cyan-500/30 rounded-xl hover:border-cyan-400 hover:bg-cyan-900/10 transition-all p-4">
-                                            <div className="flex items-center justify-center gap-8">
-                                              <label className="cursor-pointer flex flex-col items-center transition-transform hover:scale-105">
-                                                <span className="text-[10px] mb-1 px-2 py-0.5 rounded border border-cyan-400/30 text-cyan-100">
-                                                  Upload
-                                                </span>
-                                                <span className="text-xs text-cyan-300 font-bold">
-                                                  Upload Files
-                                                </span>
-                                                <input
-                                                  type="file"
-                                                  className="hidden"
-                                                  accept="image/*,video/*"
-                                                  multiple
-                                                  onChange={handleVideoFxExtraUpload}
-                                                />
-                                              </label>
-                                              <div className="h-8 w-px bg-cyan-500/30" />
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  setLibrarySource("field");
-                                                  setActiveLibrarySlot("generic");
-                                                }}
-                                                className="flex flex-col items-center transition-transform hover:scale-105"
+                                            <span className="text-xs text-cyan-300 font-bold">
+                                              Add References
+                                            </span>
+                                            <input
+                                              type="file"
+                                              className="hidden"
+                                              accept="image/*,video/*,audio/*,.mp3,.wav,.m4a,.aac,.ogg"
+                                              multiple
+                                              onChange={handleVideoFxExtraUpload}
+                                            />
+                                          </label>
+                                          <div className="h-8 w-px bg-cyan-500/30" />
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setLibrarySource("field");
+                                              setActiveLibrarySlot("generic");
+                                            }}
+                                            className="flex flex-col items-center transition-transform hover:scale-105"
+                                          >
+                                            <span className="text-[10px] mb-1 px-2 py-0.5 rounded border border-cyan-400/30 text-cyan-100">
+                                              Library
+                                            </span>
+                                            <span className="text-xs text-cyan-300 font-bold">
+                                              From Library
+                                            </span>
+                                          </button>
+                                        </div>
+                                        <p className="text-[10px] text-gray-500 text-center mt-3">
+                                          Mix image, video, and audio references in one request.
+                                        </p>
+                                      </div>
+                                      {videoFxExtraUrls.length > 0 && (
+                                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 animate-in fade-in">
+                                          {videoFxExtraUrls.map((url, index) => {
+                                            const file = videoFxExtraRefs[index];
+                                            const name = videoFxExtraNames[index] || file?.name || "reference";
+                                            const isVideo = file ? isVideoFile(file) : url.endsWith(".mp4") || url.endsWith(".mov");
+                                            const isAudio = file
+                                              ? isAudioFile(file)
+                                              : isAudioUrl(url) || isAudioName(name);
+                                            return (
+                                              <div
+                                                key={`${url}_${index}`}
+                                                className="relative aspect-square group"
                                               >
-                                                <span className="text-[10px] mb-1 px-2 py-0.5 rounded border border-cyan-400/30 text-cyan-100">
-                                                  Library
-                                                </span>
-                                                <span className="text-xs text-cyan-300 font-bold">
-                                                  From Library
-                                                </span>
-                                              </button>
-                                            </div>
-                                            <p className="text-[10px] text-gray-500 text-center mt-3">
-                                              Optional style or motion references (image/video).
-                                            </p>
-                                          </div>
-                                          {videoFxExtraUrls.length > 0 && (
-                                            <div className="grid grid-cols-5 gap-2 animate-in fade-in">
-                                              {videoFxExtraUrls.map((url, index) => (
-                                                <div
-                                                  key={`${url}_${index}`}
-                                                  className="relative aspect-square group"
-                                                >
-                                                  {url.includes("video") ||
-                                                  url.endsWith(".mp4") ? (
-                                                    <video
-                                                      src={url}
-                                                      className="w-full h-full object-cover rounded-lg border border-white/20"
-                                                      muted
-                                                      onMouseEnter={(e) =>
-                                                        e.currentTarget.play()
-                                                      }
-                                                      onMouseLeave={(e) =>
-                                                        e.currentTarget.pause()
-                                                      }
-                                                    />
-                                                  ) : (
-                                                    <img
-                                                      src={url}
-                                                      className="w-full h-full object-cover rounded-lg border border-white/20"
-                                                    />
-                                                  )}
-                                                  <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                      removeVideoFxExtraReference(
-                                                        index,
-                                                      )
+                                                {isAudio ? (
+                                                  <div className="w-full h-full rounded-lg border border-white/20 bg-gray-900/80 flex flex-col items-center justify-center p-2 text-center">
+                                                    <span className="text-[10px] text-cyan-200 font-semibold uppercase">
+                                                      Audio
+                                                    </span>
+                                                    <span className="text-[9px] text-gray-400 truncate w-full">
+                                                      {name}
+                                                    </span>
+                                                  </div>
+                                                ) : isVideo ? (
+                                                  <video
+                                                    src={url}
+                                                    className="w-full h-full object-cover rounded-lg border border-white/20"
+                                                    muted
+                                                    onMouseEnter={(e) =>
+                                                      e.currentTarget.play()
                                                     }
-                                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs"
-                                                  >
-                                                    x
-                                                  </button>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          )}
+                                                    onMouseLeave={(e) =>
+                                                      e.currentTarget.pause()
+                                                    }
+                                                  />
+                                                ) : (
+                                                  <img
+                                                    src={url}
+                                                    className="w-full h-full object-cover rounded-lg border border-white/20"
+                                                  />
+                                                )}
+                                                <button
+                                                  type="button"
+                                                  onClick={() =>
+                                                    removeVideoFxExtraReference(index)
+                                                  }
+                                                  className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs"
+                                                >
+                                                  x
+                                                </button>
+                                              </div>
+                                            );
+                                          })}
                                         </div>
                                       )}
+                                    </div>
+                                  ) : isVideoFxTextMode ? (
+                                    <div className="rounded-xl border border-cyan-500/20 bg-cyan-900/10 p-4 text-xs text-cyan-100">
+                                      Text mode does not require references. Add prompt details for motion, camera, and scene behavior.
                                     </div>
                                   ) : (
                                     /* GENERIC UPLOAD BOX (Pic FX, Video FX 1&2) */
@@ -3535,8 +3916,8 @@ function Dashboard() {
                                       <div className="w-full h-24 border-2 border-dashed border-gray-600 rounded-xl hover:border-cyan-500 hover:bg-gray-800/50 transition-all group relative flex items-center justify-center">
                                         <div className="flex items-center gap-6">
                                           <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
-                                            <span className="text-2xl mb-1">
-                                              📂
+                                            <span className="text-[10px] mb-1 px-2 py-0.5 rounded border border-gray-500/40 text-gray-300">
+                                              Upload
                                             </span>
                                             <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
                                               Upload File
@@ -3569,8 +3950,8 @@ function Dashboard() {
                                             }}
                                             className="flex flex-col items-center group-hover:scale-105 transition-transform"
                                           >
-                                            <span className="text-2xl mb-1">
-                                              📚
+                                            <span className="text-[10px] mb-1 px-2 py-0.5 rounded border border-gray-500/40 text-gray-300">
+                                              Library
                                             </span>
                                             <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
                                               From Library
@@ -3585,9 +3966,9 @@ function Dashboard() {
                                               ? `Up to ${MAX_PICFX_REFERENCE_IMAGES} reference images`
                                               : activeEngine === "kie" &&
                                                   videoFxMode === "video"
-                                                ? "Up to 2 ordered images (Start + End)"
+                                                ? "Reference upload is managed by generation mode."
                                               : activeEngine === "openai"
-                                                ? `Up to ${MAX_VIDEOFX2_REFERENCES} references (PNG/JPG/MP4)`
+                                                ? "Reference upload is managed by generation mode."
                                                 : "Single frame (PNG/JPG/MP4)"}
                                         </p>
                                       </div>
@@ -3858,4 +4239,7 @@ function Dashboard() {
 }
 
 export default Dashboard;
+
+
+
 

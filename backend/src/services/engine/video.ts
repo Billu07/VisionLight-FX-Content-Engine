@@ -80,8 +80,27 @@ const isLikelyVideoUrl = (url?: string) => {
   const normalized = url.toLowerCase();
   return (
     normalized.endsWith(".mp4") ||
+    normalized.endsWith(".mov") ||
     normalized.includes("/video/") ||
-    normalized.includes(".mp4?")
+    normalized.includes(".mp4?") ||
+    normalized.includes(".mov?")
+  );
+};
+
+const isLikelyAudioUrl = (url?: string) => {
+  if (!url || typeof url !== "string") return false;
+  const normalized = url.toLowerCase();
+  return (
+    normalized.endsWith(".mp3") ||
+    normalized.endsWith(".wav") ||
+    normalized.endsWith(".m4a") ||
+    normalized.endsWith(".aac") ||
+    normalized.endsWith(".ogg") ||
+    normalized.includes(".mp3?") ||
+    normalized.includes(".wav?") ||
+    normalized.includes(".m4a?") ||
+    normalized.includes(".aac?") ||
+    normalized.includes(".ogg?")
   );
 };
 
@@ -290,6 +309,10 @@ export const videoLogic = {
 
     const isOpenAI = !isKie && !isKling && !isVeo && !isSeedanceFal;
     const isPro = model.includes("pro") || model.includes("Pro");
+    const videoGenerationMode =
+      typeof params.videoGenerationMode === "string"
+        ? params.videoGenerationMode
+        : undefined;
 
     try {
       let targetWidth = 1280;
@@ -307,6 +330,18 @@ export const videoLogic = {
         targetWidth = 1024;
         targetHeight = 1024;
         targetRatioString = "1:1";
+      } else if (params.aspectRatio === "4:3") {
+        targetWidth = 1024;
+        targetHeight = 768;
+        targetRatioString = "4:3";
+      } else if (params.aspectRatio === "3:4") {
+        targetWidth = 768;
+        targetHeight = 1024;
+        targetRatioString = "3:4";
+      } else if (params.aspectRatio === "21:9") {
+        targetWidth = 1680;
+        targetHeight = 720;
+        targetRatioString = "21:9";
       }
 
       if (params.resolution === "1080p" || isKling3) {
@@ -330,8 +365,29 @@ export const videoLogic = {
         }
       }
 
+      const referenceUrls = (params.imageReferences || []).filter(
+        (url: any): url is string => typeof url === "string" && url.length > 0,
+      );
+      const imageRefUrls: string[] = Array.isArray(params.referenceImageUrls)
+        ? params.referenceImageUrls.filter(
+            (url: any): url is string => typeof url === "string" && url.length > 0,
+          )
+        : referenceUrls.filter(
+            (url: string) => !isLikelyVideoUrl(url) && !isLikelyAudioUrl(url),
+          );
+      const videoRefUrls: string[] = Array.isArray(params.referenceVideoUrls)
+        ? params.referenceVideoUrls.filter(
+            (url: any): url is string => typeof url === "string" && url.length > 0,
+          )
+        : referenceUrls.filter((url: string) => isLikelyVideoUrl(url));
+      const audioRefUrls: string[] = Array.isArray(params.referenceAudioUrls)
+        ? params.referenceAudioUrls.filter(
+            (url: any): url is string => typeof url === "string" && url.length > 0,
+          )
+        : referenceUrls.filter((url: string) => isLikelyAudioUrl(url));
+
       let finalInputImageBuffer: Buffer | undefined;
-      const rawRefUrl = params.imageReferences?.[0] || params.imageReference;
+      const rawRefUrl = imageRefUrls[0] || params.imageReference;
 
       // Preprocess reference frame only for models that benefit from strict canvas fitting.
       // Seedance generally performs better with original reference frames.
@@ -632,18 +688,25 @@ export const videoLogic = {
         statusUrl = submitRes.data.status_url;
       } else if (isKie) {
         provider = "kie";
-        const referenceUrls = (params.imageReferences || []).filter(
-          (url: any): url is string => typeof url === "string" && url.length > 0,
-        );
-        const imageRefs = referenceUrls.filter(
-          (url: string) => !isLikelyVideoUrl(url),
-        );
-        const lastFrameRefUrl =
-          imageRefs.length > 1 ? getOptimizedUrl(imageRefs[1]) : "";
+        const imageRefs = imageRefUrls;
+        const videoRefs = videoRefUrls;
+        const audioRefs = audioRefUrls;
+        const seedanceMode = isSeedanceKie
+          ? videoGenerationMode === "text" ||
+            videoGenerationMode === "frames" ||
+            videoGenerationMode === "references"
+            ? videoGenerationMode
+            : audioRefs.length > 0 || videoRefs.length > 0
+              ? "references"
+              : imageRefs.length > 0
+                ? "frames"
+                : "text"
+          : undefined;
+        const normalizedImageRefs = imageRefs.map((url: string) => getOptimizedUrl(url));
 
         let kieInputUrl = "";
         let isImageToVideo = false;
-        if (finalInputImageBuffer) {
+        if (isSeedanceKie && seedanceMode === "frames" && finalInputImageBuffer) {
           kieInputUrl = await uploadToCloudinary(
             finalInputImageBuffer,
             `${postId}_input`,
@@ -652,7 +715,10 @@ export const videoLogic = {
             "image",
           );
           isImageToVideo = true;
-        } else if (params.imageReference) {
+        } else if (
+          (isSeedanceKie && seedanceMode === "frames" && params.imageReference) ||
+          (!isSeedanceKie && params.imageReference)
+        ) {
           // Fallback: if preprocessing is skipped/failed, still pass original first frame.
           kieInputUrl = getOptimizedUrl(params.imageReference);
           isImageToVideo = true;
@@ -668,11 +734,24 @@ export const videoLogic = {
             ? params.resolution
             : "720p";
         const seedanceAspectRatio =
-          targetRatioString === "9:16"
-            ? "9:16"
-            : targetRatioString === "1:1"
-              ? "1:1"
-              : "16:9";
+          params.aspectRatio === "auto" || params.aspectRatio === "adaptive"
+            ? "adaptive"
+            : params.aspectRatio === "1:1" ||
+                params.aspectRatio === "4:3" ||
+                params.aspectRatio === "3:4" ||
+                params.aspectRatio === "16:9" ||
+                params.aspectRatio === "9:16" ||
+                params.aspectRatio === "21:9"
+              ? params.aspectRatio
+              : targetRatioString === "4:3" ||
+                  targetRatioString === "3:4" ||
+                  targetRatioString === "21:9"
+                ? targetRatioString
+                : targetRatioString === "9:16"
+                  ? "9:16"
+                  : targetRatioString === "1:1"
+                    ? "1:1"
+                    : "16:9";
         const kiePayload: any = isSeedanceKie
           ? {
               model: "bytedance/seedance-2",
@@ -701,15 +780,44 @@ export const videoLogic = {
               },
             };
 
-        if (isImageToVideo) {
-          if (isSeedanceKie) {
-            kiePayload.input.first_frame_url = kieInputUrl;
-            if (lastFrameRefUrl) {
-              kiePayload.input.last_frame_url = lastFrameRefUrl;
+        if (isSeedanceKie) {
+          if (seedanceMode === "frames") {
+            const firstFrameUrl = kieInputUrl || normalizedImageRefs[0];
+            if (!firstFrameUrl) {
+              throw new Error("Frame mode requires at least one image reference.");
             }
-          } else {
-            kiePayload.input.image_urls = [kieInputUrl];
+            kiePayload.input.first_frame_url = firstFrameUrl;
+            if (normalizedImageRefs[1]) {
+              kiePayload.input.last_frame_url = normalizedImageRefs[1];
+            }
+          } else if (seedanceMode === "references") {
+            const normalizedVideoRefs = videoRefs.map((url: string) =>
+              getOptimizedUrl(url),
+            );
+            const normalizedAudioRefs = audioRefs.map((url: string) =>
+              getOptimizedUrl(url),
+            );
+            if (
+              normalizedAudioRefs.length > 0 &&
+              normalizedImageRefs.length === 0 &&
+              normalizedVideoRefs.length === 0
+            ) {
+              throw new Error(
+                "Audio references require at least one image or video reference.",
+              );
+            }
+            if (normalizedImageRefs.length > 0) {
+              kiePayload.input.reference_image_urls = normalizedImageRefs.slice(0, 9);
+            }
+            if (normalizedVideoRefs.length > 0) {
+              kiePayload.input.reference_video_urls = normalizedVideoRefs.slice(0, 3);
+            }
+            if (normalizedAudioRefs.length > 0) {
+              kiePayload.input.reference_audio_urls = normalizedAudioRefs.slice(0, 3);
+            }
           }
+        } else if (isImageToVideo) {
+          kiePayload.input.image_urls = [kieInputUrl];
         }
 
         if (isSeedanceKie) {
@@ -731,11 +839,42 @@ export const videoLogic = {
         externalId = kieRes.data.data.taskId;
       } else if (isSeedanceFal) {
         provider = "seedance-fal";
-        const referenceUrls = (params.imageReferences || []).filter(
-          (url: any): url is string => typeof url === "string" && url.length > 0,
-        );
-        const imageRefs = referenceUrls.filter((url: string) => !isLikelyVideoUrl(url));
-        const videoRefs = referenceUrls.filter((url: string) => isLikelyVideoUrl(url));
+        const imageRefs = imageRefUrls.map((url: string) => getOptimizedUrl(url));
+        const videoRefs = videoRefUrls.map((url: string) => getOptimizedUrl(url));
+        const audioRefs = audioRefUrls.map((url: string) => getOptimizedUrl(url));
+        const falMode =
+          videoGenerationMode === "text" ||
+          videoGenerationMode === "frames" ||
+          videoGenerationMode === "references"
+            ? videoGenerationMode
+            : audioRefs.length > 0 || videoRefs.length > 0 || imageRefs.length > 2
+              ? "references"
+              : imageRefs.length > 0
+                ? "frames"
+                : "text";
+        const parsedDuration =
+          params.duration === "auto"
+            ? "auto"
+            : Math.max(4, Math.min(15, Number(params.duration) || 8));
+        const falAspectRatio =
+          params.aspectRatio === "auto" || params.aspectRatio === "adaptive"
+            ? "auto"
+            : params.aspectRatio === "1:1" ||
+                params.aspectRatio === "4:3" ||
+                params.aspectRatio === "3:4" ||
+                params.aspectRatio === "16:9" ||
+                params.aspectRatio === "9:16" ||
+                params.aspectRatio === "21:9"
+              ? params.aspectRatio
+              : targetRatioString === "4:3" ||
+                  targetRatioString === "3:4" ||
+                  targetRatioString === "21:9"
+                ? targetRatioString
+                : targetRatioString === "9:16"
+                  ? "9:16"
+                  : targetRatioString === "1:1"
+                    ? "1:1"
+                    : "16:9";
 
         const payload: any = {
           prompt: finalPrompt,
@@ -743,13 +882,8 @@ export const videoLogic = {
             params.resolution === "480p" || params.resolution === "720p"
               ? params.resolution
               : "720p",
-          duration: Math.max(4, Math.min(15, Number(params.duration) || 8)),
-          aspect_ratio:
-            targetRatioString === "9:16"
-              ? "9:16"
-              : targetRatioString === "1:1"
-                ? "1:1"
-                : "16:9",
+          duration: parsedDuration,
+          aspect_ratio: falAspectRatio,
           generate_audio: toBoolean(params.generateAudio, true),
         };
         if (params.seed !== undefined && params.seed !== null && `${params.seed}`.trim() !== "") {
@@ -758,31 +892,46 @@ export const videoLogic = {
         }
 
         let endpoint = "bytedance/seedance-2.0/text-to-video";
-        if (imageRefs.length > 0 || videoRefs.length > 0) {
-          if (videoRefs.length > 0 || imageRefs.length > 2) {
-            endpoint = "bytedance/seedance-2.0/reference-to-video";
-            if (imageRefs.length > 0) {
-              payload.image_urls = imageRefs.map((url: string) => getOptimizedUrl(url));
-            }
-            if (videoRefs.length > 0) {
-              payload.video_urls = videoRefs.map((url: string) => getOptimizedUrl(url));
-            }
+        if (falMode === "frames") {
+          endpoint = "bytedance/seedance-2.0/image-to-video";
+          if (finalInputImageBuffer) {
+            payload.image_url = await uploadToCloudinary(
+              finalInputImageBuffer,
+              `${postId}_seedance_fal_input`,
+              params.userId,
+              "Seedance Fal Input",
+              "image",
+            );
+          } else if (imageRefs[0]) {
+            payload.image_url = imageRefs[0];
+          } else if (params.imageReference) {
+            payload.image_url = getOptimizedUrl(params.imageReference);
           } else {
-            endpoint = "bytedance/seedance-2.0/image-to-video";
-            if (finalInputImageBuffer) {
-              payload.image_url = await uploadToCloudinary(
-                finalInputImageBuffer,
-                `${postId}_seedance_fal_input`,
-                params.userId,
-                "Seedance Fal Input",
-                "image",
-              );
-            } else {
-              payload.image_url = getOptimizedUrl(imageRefs[0]);
-            }
-            if (imageRefs.length > 1) {
-              payload.end_image_url = getOptimizedUrl(imageRefs[1]);
-            }
+            throw new Error("Frame mode requires at least one image reference.");
+          }
+          if (imageRefs.length > 1) {
+            payload.end_image_url = imageRefs[1];
+          }
+        } else if (falMode === "references") {
+          endpoint = "bytedance/seedance-2.0/reference-to-video";
+          if (imageRefs.length > 0) payload.image_urls = imageRefs;
+          if (videoRefs.length > 0) payload.video_urls = videoRefs;
+          if (audioRefs.length > 0) payload.audio_urls = audioRefs;
+          if (
+            audioRefs.length > 0 &&
+            imageRefs.length === 0 &&
+            videoRefs.length === 0
+          ) {
+            throw new Error(
+              "Audio references require at least one image or video reference.",
+            );
+          }
+          if (
+            imageRefs.length === 0 &&
+            videoRefs.length === 0 &&
+            audioRefs.length === 0
+          ) {
+            throw new Error("Reference mode requires at least one reference.");
           }
         }
 
@@ -793,6 +942,9 @@ export const videoLogic = {
             : undefined,
           video_urls: payload.video_urls
             ? `[${payload.video_urls.length} video refs]`
+            : undefined,
+          audio_urls: payload.audio_urls
+            ? `[${payload.audio_urls.length} audio refs]`
             : undefined,
           image_url: payload.image_url ? "[image_url_set]" : undefined,
           end_image_url: payload.end_image_url ? "[end_image_url_set]" : undefined,
