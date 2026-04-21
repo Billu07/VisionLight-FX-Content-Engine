@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { getCORSProxyVideoUrl } from "../lib/api";
 
 interface DriftFrameExtractorProps {
   videoUrl: string;
@@ -21,16 +22,20 @@ export function DriftFrameExtractor({
   const [hasVideoError, setHasVideoError] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isScrubbing, setIsScrubbing] = useState(false);
-  const directVideoUrl = videoUrl;
+  const initialVideoUrl = getCORSProxyVideoUrl(videoUrl);
+  const [activeVideoUrl, setActiveVideoUrl] = useState(initialVideoUrl);
+  const [triedDirectFallback, setTriedDirectFallback] = useState(false);
   const controlsReady = hasMetadata && !hasVideoError;
 
   useEffect(() => {
+    setActiveVideoUrl(initialVideoUrl);
+    setTriedDirectFallback(false);
     setHasMetadata(false);
     setHasVideoError(false);
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
-  }, [directVideoUrl]);
+  }, [initialVideoUrl]);
 
   useEffect(() => {
     if (hasMetadata || hasVideoError) return;
@@ -38,7 +43,7 @@ export function DriftFrameExtractor({
       setHasVideoError(true);
     }, 12000);
     return () => clearTimeout(timeout);
-  }, [hasMetadata, hasVideoError, directVideoUrl]);
+  }, [hasMetadata, hasVideoError, initialVideoUrl]);
 
   // Sync slider with video time
   const handleTimeUpdate = () => {
@@ -60,7 +65,7 @@ export function DriftFrameExtractor({
   const handleDownloadVideo = async (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     try {
-      const response = await fetch(videoUrl);
+      const response = await fetch(activeVideoUrl);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -192,9 +197,9 @@ export function DriftFrameExtractor({
         <canvas ref={canvasRef} className="hidden" />
 
         <video
-          key={directVideoUrl}
+          key={activeVideoUrl}
           ref={videoRef}
-          src={directVideoUrl}
+          src={activeVideoUrl}
           className="w-full h-full object-contain max-h-[60vh]"
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={() => {
@@ -210,6 +215,15 @@ export function DriftFrameExtractor({
             if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
           }}
           onError={() => {
+            if (!triedDirectFallback && activeVideoUrl !== videoUrl) {
+              setTriedDirectFallback(true);
+              setHasMetadata(false);
+              setHasVideoError(false);
+              setDuration(0);
+              setCurrentTime(0);
+              setActiveVideoUrl(videoUrl);
+              return;
+            }
             setHasVideoError(true);
           }}
           onPlay={() => setIsPlaying(true)}

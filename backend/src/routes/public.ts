@@ -80,4 +80,54 @@ router.get("/api/proxy-image", async (req, res) => {
   }
 });
 
+router.get("/api/proxy-video", async (req, res) => {
+  const { url } = req.query;
+  if (!url || typeof url !== "string") {
+    return res.status(400).json({ error: "URL required" });
+  }
+  if (!isAllowedProxyImageUrl(url)) {
+    return res
+      .status(403)
+      .json({ error: "URL host is not allowed for proxying" });
+  }
+
+  try {
+    const range = req.headers.range;
+    const upstream = await axios({
+      url,
+      method: "GET",
+      responseType: "stream",
+      timeout: 30000,
+      headers: range ? { Range: range } : undefined,
+      validateStatus: (status) => status >= 200 && status < 400,
+    });
+
+    res.status(upstream.status);
+    const passthroughHeaders = [
+      "content-type",
+      "content-length",
+      "content-range",
+      "accept-ranges",
+      "etag",
+      "last-modified",
+      "cache-control",
+    ] as const;
+
+    for (const header of passthroughHeaders) {
+      const value = upstream.headers[header];
+      if (value) res.setHeader(header, value);
+    }
+
+    if (!upstream.headers["accept-ranges"]) {
+      res.setHeader("accept-ranges", "bytes");
+    }
+
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    upstream.data.pipe(res);
+  } catch (error: any) {
+    console.error("Video Proxy Error:", error.message);
+    res.status(500).json({ error: "Failed to proxy video" });
+  }
+});
+
 export default router;
