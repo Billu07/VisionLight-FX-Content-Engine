@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import { LoadingSpinner } from "./LoadingSpinner";
 
 interface DriftFrameExtractorProps {
   videoUrl: string;
@@ -18,25 +17,18 @@ export function DriftFrameExtractor({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [isReady, setIsReady] = useState(false);
   const [hasMetadata, setHasMetadata] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const directVideoUrl = videoUrl;
+  const controlsReady = hasMetadata && duration > 0;
 
   useEffect(() => {
-    setIsReady(false);
     setHasMetadata(false);
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
   }, [directVideoUrl]);
-
-  useEffect(() => {
-    if (!hasMetadata) return;
-    const timer = setTimeout(() => setIsReady(true), 80);
-    return () => clearTimeout(timer);
-  }, [hasMetadata]);
 
   // Sync slider with video time
   const handleTimeUpdate = () => {
@@ -209,12 +201,9 @@ export function DriftFrameExtractor({
           preload="metadata"
           crossOrigin="anonymous"
         />
-        {!isReady && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 backdrop-blur-sm">
-            <LoadingSpinner size="lg" />
-            <p className="text-gray-300 text-xs font-mono tracking-widest animate-pulse">
-              PREPARING VIDEO...
-            </p>
+        {!controlsReady && (
+          <div className="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-black/55 border border-white/10 text-[10px] tracking-wider text-gray-300 pointer-events-none">
+            Loading metadata...
           </div>
         )}
       </div>
@@ -225,14 +214,14 @@ export function DriftFrameExtractor({
         <div className="flex flex-wrap gap-2 justify-center pb-2 border-b border-gray-700/50">
           <button 
             onClick={() => extractSpecificFrame(0)}
-            disabled={!isReady || isExtracting}
+            disabled={!controlsReady || isExtracting}
             className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-bold transition-all border border-white/5 disabled:opacity-50"
           >
             Capture Start Frame
           </button>
           <button 
             onClick={() => extractSpecificFrame(duration)}
-            disabled={!isReady || isExtracting}
+            disabled={!controlsReady || isExtracting}
             className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-bold transition-all border border-white/5 disabled:opacity-50"
           >
             Capture End Frame
@@ -244,7 +233,7 @@ export function DriftFrameExtractor({
           {/* Dedicated Play/Pause Button on toolbar */}
           <button
             onClick={togglePlay}
-            disabled={!isReady}
+            disabled={!controlsReady}
             className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
           >
             {isPlaying ? (
@@ -268,7 +257,7 @@ export function DriftFrameExtractor({
               max={duration || 100}
               step="0.033" // ~30fps precision
               value={currentTime}
-              disabled={!isReady}
+              disabled={!controlsReady}
               onChange={handleSliderChange}
               onInput={(e) =>
                 handleSliderChange(e as React.ChangeEvent<HTMLInputElement>)
@@ -284,7 +273,7 @@ export function DriftFrameExtractor({
         <div className="flex gap-3 pt-2 border-t border-gray-700/50">
           <button
             onClick={captureFrame}
-            disabled={!isReady || isExtracting}
+            disabled={!controlsReady || isExtracting}
             className="flex-1 py-3 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg hover:from-rose-500 hover:to-orange-500 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
           >
             {isExtracting ? "Capturing..." : "Capture 3DX Frame"}
