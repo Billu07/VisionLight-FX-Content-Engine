@@ -225,3 +225,35 @@ export const getCORSProxyVideoUrl = (url: string) => {
   }
   return `${API_BASE_URL}/api/proxy-video?url=${encodeURIComponent(url)}`;
 };
+
+const canProxyAsset = (url: string) =>
+  !!url &&
+  (url.includes("r2.dev") || url.includes("cloudinary.com")) &&
+  !url.includes(".m3u8") &&
+  !url.includes(".ts");
+
+export const getDirectDownloadVideoUrl = (url: string, filename?: string) => {
+  if (!url) return "";
+  if (!canProxyAsset(url)) return url;
+  const params = new URLSearchParams({
+    url,
+    download: "1",
+  });
+  if (filename && filename.trim()) {
+    params.set("filename", filename.trim());
+  }
+  return `${API_BASE_URL}/api/proxy-video?${params.toString()}`;
+};
+
+export const getDirectDownloadImageUrl = (url: string, filename?: string) => {
+  if (!url) return "";
+  if (!canProxyAsset(url)) return url;
+  const params = new URLSearchParams({
+    url,
+    download: "1",
+  });
+  if (filename && filename.trim()) {
+    params.set("filename", filename.trim());
+  }
+  return `${API_BASE_URL}/api/proxy-image?${params.toString()}`;
+};

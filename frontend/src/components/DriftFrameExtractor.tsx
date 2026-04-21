@@ -1,5 +1,9 @@
 import { useState, useRef, useEffect } from "react";
-import { apiEndpoints, getCORSProxyVideoUrl } from "../lib/api";
+import {
+  apiEndpoints,
+  getCORSProxyVideoUrl,
+  getDirectDownloadVideoUrl,
+} from "../lib/api";
 
 interface DriftFrameExtractorProps {
   videoUrl: string;
@@ -74,7 +78,7 @@ export function DriftFrameExtractor({
   const [hasMetadata, setHasMetadata] = useState(false);
   const [hasVideoError, setHasVideoError] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
-  const [isDownloadingVideo, setIsDownloadingVideo] = useState(false);
+  const [isStartingDownload, setIsStartingDownload] = useState(false);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [sourceCandidates, setSourceCandidates] = useState<string[]>(() =>
     buildVideoSourceCandidates(videoUrl),
@@ -119,32 +123,23 @@ export function DriftFrameExtractor({
     }
   };
 
-  const handleDownloadVideo = async () => {
+  const handleDownloadVideo = () => {
     if (!activeVideoUrl) return;
-    try {
-      setIsDownloadingVideo(true);
-      const downloadSource =
-        sourceCandidates.find((candidate) => isProxyVideoUrl(candidate)) ||
-        getCORSProxyVideoUrl(normalizedVideoUrl || activeVideoUrl);
-      const response = await fetch(downloadSource);
-      if (!response.ok) {
-        throw new Error(`Download failed with status ${response.status}`);
-      }
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.style.display = "none";
-      a.href = url;
-      a.download = "drift_video.mp4";
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Failed to download video", err);
-      alert("Video download failed. Please try again.");
-    } finally {
-      setIsDownloadingVideo(false);
-    }
+    const sourceUrl = normalizedVideoUrl || activeVideoUrl;
+    const downloadUrl = getDirectDownloadVideoUrl(sourceUrl, "drift_video.mp4");
+    if (!downloadUrl) return;
+
+    setIsStartingDownload(true);
+    const a = document.createElement("a");
+    a.style.display = "none";
+    a.href = downloadUrl;
+    a.rel = "noopener";
+    a.download = "drift_video.mp4";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    window.setTimeout(() => setIsStartingDownload(false), 1200);
   };
 
   // Pause while scrubbing for precision
@@ -432,10 +427,10 @@ export function DriftFrameExtractor({
 
           <button
             onClick={handleDownloadVideo}
-            disabled={isDownloadingVideo}
+            disabled={isStartingDownload}
             className="px-6 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-xl text-white font-semibold text-center flex items-center justify-center gap-2 text-sm transition-colors cursor-pointer"
           >
-            {isDownloadingVideo ? "Downloading..." : "Download Video"}
+            {isStartingDownload ? "Starting Download..." : "Download Video"}
           </button>
 
           <button

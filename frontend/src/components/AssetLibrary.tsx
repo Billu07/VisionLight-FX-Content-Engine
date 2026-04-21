@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
+import { apiEndpoints, getCORSProxyUrl, getDirectDownloadImageUrl } from "../lib/api";
 import { confirmAction, notify } from "../lib/notifications";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
@@ -159,23 +159,22 @@ export function AssetLibrary({
   const handleDirectDownload = async (asset: Asset) => {
     try {
       setIsDownloading(true);
-      const response = await fetch(getCORSProxyUrl(asset.url));
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
       const ext = asset.url.split('.').pop()?.split('?')[0] || 'jpg';
-      link.setAttribute('download', `visionlight-${asset.id}.${ext}`);
+      const filename = `visionlight-${asset.id}.${ext}`;
+      const downloadUrl = getDirectDownloadImageUrl(asset.url, filename) || asset.url;
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(url);
+      window.setTimeout(() => setIsDownloading(false), 900);
+      return;
     } catch (error) {
       console.error("Direct download failed", error);
       notify.error("Download failed. Please try again.");
-    } finally {
-      setIsDownloading(false);
     }
+    setIsDownloading(false);
   };
 
   const handleFullscreen = () => {

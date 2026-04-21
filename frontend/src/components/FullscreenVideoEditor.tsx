@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
+import { apiEndpoints, getCORSProxyUrl, getDirectDownloadVideoUrl } from "../lib/api";
 import { confirmAction } from "../lib/notifications";
 import { videoEngine } from "../lib/videoEngine";
 import { LoadingSpinner } from "./LoadingSpinner";
@@ -905,7 +905,7 @@ export function FullscreenVideoEditor({
                                             <div className="aspect-video relative bg-black"><video src={getCORSProxyUrl(asset.url)} className="w-full h-full object-contain" controls /></div>
                                             <div className="p-3 flex items-center justify-between">
                                                 <div className="text-[10px] text-gray-400 font-mono">{new Date(asset.createdAt).toLocaleDateString()}</div>
-                                                <a href={getCORSProxyUrl(asset.url)} download target="_blank" className="text-xs font-bold text-cyan-400 hover:text-cyan-300">Download</a>
+                                                <a href={getDirectDownloadVideoUrl(asset.url, `visionlight-export-${asset.id}.mp4`)} download className="text-xs font-bold text-cyan-400 hover:text-cyan-300">Download</a>
                                             </div>
                                         </div>
                                     ))}

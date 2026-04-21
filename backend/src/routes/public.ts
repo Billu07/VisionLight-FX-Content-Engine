@@ -14,7 +14,7 @@ router.get("/", (req, res) => {
 });
 
 router.get("/api/proxy-image", async (req, res) => {
-  const { url, w, q } = req.query;
+  const { url, w, q, download, filename } = req.query;
   if (!url || typeof url !== "string") {
     return res.status(400).json({ error: "URL required" });
   }
@@ -47,6 +47,16 @@ router.get("/api/proxy-image", async (req, res) => {
       responseType: width || q !== undefined ? "arraybuffer" : "stream",
       timeout: 15000,
     });
+
+    const shouldDownload = download === "1" || download === "true";
+    if (shouldDownload) {
+      const rawName =
+        typeof filename === "string" && filename.trim().length > 0
+          ? filename.trim()
+          : "image.jpg";
+      const safeName = rawName.replace(/[^\w.\- ]+/g, "_");
+      res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+    }
 
     if (width || q !== undefined) {
       let imageBuffer = response.data;
@@ -81,7 +91,7 @@ router.get("/api/proxy-image", async (req, res) => {
 });
 
 router.get("/api/proxy-video", async (req, res) => {
-  const { url } = req.query;
+  const { url, download, filename } = req.query;
   if (!url || typeof url !== "string") {
     return res.status(400).json({ error: "URL required" });
   }
@@ -120,6 +130,16 @@ router.get("/api/proxy-video", async (req, res) => {
 
     if (!upstream.headers["accept-ranges"]) {
       res.setHeader("accept-ranges", "bytes");
+    }
+
+    const shouldDownload = download === "1" || download === "true";
+    if (shouldDownload) {
+      const rawName =
+        typeof filename === "string" && filename.trim().length > 0
+          ? filename.trim()
+          : "video.mp4";
+      const safeName = rawName.replace(/[^\w.\- ]+/g, "_");
+      res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
     }
 
     res.setHeader("Access-Control-Allow-Origin", "*");

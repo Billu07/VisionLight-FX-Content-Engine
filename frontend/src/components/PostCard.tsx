@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { LoadingSpinner } from "./LoadingSpinner";
-import { apiEndpoints, api, getCORSProxyUrl } from "../lib/api";
+import {
+  apiEndpoints,
+  api,
+  getCORSProxyUrl,
+  getDirectDownloadImageUrl,
+  getDirectDownloadVideoUrl,
+} from "../lib/api";
 import { notify } from "../lib/notifications";
 
 interface PostCardProps {
@@ -35,6 +41,17 @@ const getCleanUrl = (url: string) => {
     }
   }
   return trimmed;
+};
+
+const triggerNativeDownload = (downloadUrl: string, filename: string) => {
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = filename;
+  link.rel = "noopener";
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 };
 
 export function PostCard({
@@ -157,40 +174,39 @@ export function PostCard({
     if (!post.mediaUrl) return;
     try {
       setIsDownloadingVideo(true);
-      const response = await api.get(`/api/posts/${post.id}/download`, {
-        responseType: "blob",
-      });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      const contentDisposition = response.headers["content-disposition"];
+      const sourceUrl = getCleanUrl(post.mediaUrl);
+      const titleBase = `${post.title || `picdrift-${post.id}`}`
+        .replace(/[\\/:*?"<>|]/g, "_")
+        .trim();
+      const filenameBase = titleBase || `picdrift-${post.id}`;
 
-      // ✅ CHANGED: Prefix from 'visionlight-' to 'picdrift-'
-      let filename = `picdrift-${post.id}`;
-
-      if (contentDisposition) {
-        const matches = /filename="([^"]*)"/.exec(contentDisposition);
-        if (matches != null && matches[1]) filename = matches[1];
+      if (post.mediaType === "CAROUSEL") {
+        const response = await api.get(`/api/posts/${post.id}/download`, {
+          responseType: "blob",
+        });
+        const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+        triggerNativeDownload(blobUrl, `${filenameBase}.zip`);
+        window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2000);
+      } else if (post.mediaType === "VIDEO" || isVideoPost) {
+        const downloadUrl = getDirectDownloadVideoUrl(
+          sourceUrl,
+          `${filenameBase}.mp4`,
+        );
+        triggerNativeDownload(downloadUrl || sourceUrl, `${filenameBase}.mp4`);
       } else {
-        const ext =
-          post.mediaType === "CAROUSEL"
-            ? "zip"
-            : post.mediaType === "VIDEO"
-              ? "mp4"
-              : "jpg";
-        filename = `${filename}.${ext}`;
+        const downloadUrl = getDirectDownloadImageUrl(
+          sourceUrl,
+          `${filenameBase}.jpg`,
+        );
+        triggerNativeDownload(downloadUrl || sourceUrl, `${filenameBase}.jpg`);
       }
-      link.setAttribute("download", filename);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      window.setTimeout(() => setIsDownloadingVideo(false), 900);
+      return;
     } catch (error) {
       console.error("Video download failed:", error);
       notify.error("Video download failed. Please try again.");
-    } finally {
-      setIsDownloadingVideo(false);
     }
+    setIsDownloadingVideo(false);
   };
 
   // --- DOWNLOAD END FRAME HANDLER ---
