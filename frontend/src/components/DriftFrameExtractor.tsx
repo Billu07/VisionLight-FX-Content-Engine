@@ -8,6 +8,57 @@ interface DriftFrameExtractorProps {
 }
 
 const END_FRAME_EPSILON_SECONDS = 0.08; // ~2 frames @ 24-30fps
+const METADATA_TIMEOUT_MS = 30000;
+
+const parseFirstVideoUrl = (raw: string): string => {
+  const trimmed = (raw || "").trim();
+  if (!trimmed) return "";
+  if (!trimmed.startsWith("[")) return trimmed;
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed) && typeof parsed[0] === "string") {
+      return parsed[0].trim();
+    }
+  } catch {
+    return "";
+  }
+  return "";
+};
+
+const isProxyVideoUrl = (url: string) => url.includes("/api/proxy-video?url=");
+
+const buildVideoSourceCandidates = (rawUrl: string): string[] => {
+  const normalized = parseFirstVideoUrl(rawUrl);
+  if (!normalized) return [];
+
+  const candidates: string[] = [];
+  const pushUnique = (url: string) => {
+    if (!url) return;
+    if (!candidates.includes(url)) candidates.push(url);
+  };
+
+  if (isProxyVideoUrl(normalized)) {
+    pushUnique(normalized);
+    try {
+      const parsed = new URL(normalized);
+      const direct = parsed.searchParams.get("url") || "";
+      if (direct) pushUnique(direct);
+    } catch {
+      // Keep proxy candidate only.
+    }
+    return candidates;
+  }
+
+  const proxied = getCORSProxyVideoUrl(normalized);
+  if (proxied !== normalized) {
+    pushUnique(proxied);
+    pushUnique(normalized);
+  } else {
+    pushUnique(normalized);
+  }
+  return candidates;
+};
 
 export function DriftFrameExtractor({
   videoUrl,
@@ -23,29 +74,33 @@ export function DriftFrameExtractor({
   const [hasMetadata, setHasMetadata] = useState(false);
   const [hasVideoError, setHasVideoError] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [isDownloadingVideo, setIsDownloadingVideo] = useState(false);
   const [isScrubbing, setIsScrubbing] = useState(false);
-  const initialVideoUrl = getCORSProxyVideoUrl(videoUrl);
-  const [activeVideoUrl, setActiveVideoUrl] = useState(initialVideoUrl);
-  const [triedDirectFallback, setTriedDirectFallback] = useState(false);
-  const controlsReady = hasMetadata && !hasVideoError;
+  const [sourceCandidates, setSourceCandidates] = useState<string[]>(() =>
+    buildVideoSourceCandidates(videoUrl),
+  );
+  const [activeSourceIndex, setActiveSourceIndex] = useState(0);
+  const activeVideoUrl = sourceCandidates[activeSourceIndex] || "";
+  const normalizedVideoUrl = parseFirstVideoUrl(videoUrl);
+  const controlsReady = !!activeVideoUrl && hasMetadata && !hasVideoError;
 
   useEffect(() => {
-    setActiveVideoUrl(initialVideoUrl);
-    setTriedDirectFallback(false);
+    setSourceCandidates(buildVideoSourceCandidates(videoUrl));
+    setActiveSourceIndex(0);
     setHasMetadata(false);
     setHasVideoError(false);
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
-  }, [initialVideoUrl]);
+  }, [videoUrl]);
 
   useEffect(() => {
     if (hasMetadata || hasVideoError) return;
     const timeout = setTimeout(() => {
       setHasVideoError(true);
-    }, 12000);
+    }, METADATA_TIMEOUT_MS);
     return () => clearTimeout(timeout);
-  }, [hasMetadata, hasVideoError, initialVideoUrl]);
+  }, [hasMetadata, hasVideoError, activeVideoUrl]);
 
   // Sync slider with video time
   const handleTimeUpdate = () => {
@@ -65,8 +120,16 @@ export function DriftFrameExtractor({
   };
 
   const handleDownloadVideo = async () => {
+    if (!activeVideoUrl) return;
     try {
-      const response = await fetch(getCORSProxyVideoUrl(videoUrl));
+      setIsDownloadingVideo(true);
+      const downloadSource =
+        sourceCandidates.find((candidate) => isProxyVideoUrl(candidate)) ||
+        getCORSProxyVideoUrl(normalizedVideoUrl || activeVideoUrl);
+      const response = await fetch(downloadSource);
+      if (!response.ok) {
+        throw new Error(`Download failed with status ${response.status}`);
+      }
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -79,6 +142,8 @@ export function DriftFrameExtractor({
     } catch (err) {
       console.error("Failed to download video", err);
       alert("Video download failed. Please try again.");
+    } finally {
+      setIsDownloadingVideo(false);
     }
   };
 
@@ -214,7 +279,7 @@ export function DriftFrameExtractor({
     setIsExtracting(true);
     let frameBlob: Blob;
     try {
-      const response = await apiEndpoints.extractLastFrame(videoUrl);
+      const response = await apiEndpoints.extractLastFrame(normalizedVideoUrl);
       frameBlob =
         response.data instanceof Blob
           ? response.data
@@ -263,13 +328,12 @@ export function DriftFrameExtractor({
             if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
           }}
           onError={() => {
-            if (!triedDirectFallback && activeVideoUrl !== videoUrl) {
-              setTriedDirectFallback(true);
+            if (activeSourceIndex < sourceCandidates.length - 1) {
               setHasMetadata(false);
               setHasVideoError(false);
               setDuration(0);
               setCurrentTime(0);
-              setActiveVideoUrl(videoUrl);
+              setActiveSourceIndex((prev) => prev + 1);
               return;
             }
             setHasVideoError(true);
@@ -368,9 +432,10 @@ export function DriftFrameExtractor({
 
           <button
             onClick={handleDownloadVideo}
+            disabled={isDownloadingVideo}
             className="px-6 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-xl text-white font-semibold text-center flex items-center justify-center gap-2 text-sm transition-colors cursor-pointer"
           >
-            Download Video
+            {isDownloadingVideo ? "Downloading..." : "Download Video"}
           </button>
 
           <button
