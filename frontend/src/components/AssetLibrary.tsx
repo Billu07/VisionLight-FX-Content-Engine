@@ -737,7 +737,7 @@ export function AssetLibrary({
                     {asset.type === "VIDEO" ? (
                       <div className="w-full h-full relative aspect-square bg-black/20">
                         <video
-                          src={asset.hlsUrl || asset.proxyUrl || asset.url}
+                          src={asset.proxyUrl || asset.url || asset.hlsUrl}
                           className="w-full h-full object-contain opacity-80"
                           preload="metadata"
                           playsInline
@@ -983,9 +983,10 @@ export function AssetLibrary({
             </div>
             <DriftFrameExtractor
               videoUrl={
-                viewingVideoAsset.hlsUrl ||
                 viewingVideoAsset.proxyUrl ||
-                viewingVideoAsset.url
+                viewingVideoAsset.url ||
+                viewingVideoAsset.hlsUrl ||
+                ""
               }
               onExtract={async (blob) => {
                 const file = new File([blob], "extracted_frame.jpg", {
