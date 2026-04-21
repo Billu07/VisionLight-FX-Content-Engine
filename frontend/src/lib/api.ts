@@ -147,6 +147,12 @@ export const apiEndpoints = {
   // Check Status
   checkToolStatus: (statusUrl: string) =>
     api.post("/api/tools/status", { statusUrl }),
+  extractLastFrame: (videoUrl: string) =>
+    api.post(
+      "/api/tools/extract-last-frame",
+      { videoUrl },
+      { responseType: "blob", timeout: 60000 },
+    ),
 
   saveAssetUrl: (data: {
     url: string;

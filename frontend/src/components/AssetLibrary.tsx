@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
-import { confirmAction } from "../lib/notifications";
+import { confirmAction, notify } from "../lib/notifications";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
 import { EditAssetModal } from "./EditAssetModal";
@@ -120,6 +120,8 @@ export function AssetLibrary({
     null,
   );
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+  const isLibraryFocusMode =
+    selectedAsset !== null || editingAsset !== null || viewingVideoAsset !== null;
 
   const handleDownloadZip = async () => {
     const storyboardAssets = storyboardIds
@@ -169,8 +171,8 @@ export function AssetLibrary({
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Direct download failed, falling back to window.open", error);
-      window.open(getCORSProxyUrl(asset.url), "_blank");
+      console.error("Direct download failed", error);
+      notify.error("Download failed. Please try again.");
     } finally {
       setIsDownloading(false);
     }
@@ -210,8 +212,10 @@ export function AssetLibrary({
       return res.data.assets;
     },
     enabled: !!user,
-    refetchInterval: 3000,
-    refetchIntervalInBackground: true,
+    refetchInterval: isLibraryFocusMode ? false : 3000,
+    refetchIntervalInBackground: !isLibraryFocusMode,
+    refetchOnWindowFocus: !isLibraryFocusMode,
+    refetchOnReconnect: !isLibraryFocusMode,
   });
 
   const { data: timelinePosts = [] } = useQuery({
@@ -220,7 +224,7 @@ export function AssetLibrary({
       const res = await apiEndpoints.getPosts(activeProject);
       return Array.isArray(res.data.posts) ? res.data.posts : [];
     },
-    enabled: !!user,
+    enabled: !!user && !isLibraryFocusMode,
     staleTime: 10000,
   });
 
@@ -337,9 +341,10 @@ export function AssetLibrary({
       setActiveDriftIds(found);
     };
     checkDrifts();
+    if (isLibraryFocusMode) return;
     const interval = setInterval(checkDrifts, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isLibraryFocusMode]);
 
   // Polling Cleanup
   useEffect(() => {

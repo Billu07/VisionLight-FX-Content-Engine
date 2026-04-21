@@ -250,6 +250,12 @@ function Dashboard() {
   const [extractingVideoUrl, setExtractingVideoUrl] = useState<string | null>(
     null,
   );
+  const isUiFocusMode =
+    activeLibrarySlot !== null ||
+    extractingVideoUrl !== null ||
+    showEditorModal ||
+    !!editingAsset ||
+    previewMedia !== null;
 
   const queryClient = useQueryClient();
   const { user, isLoading: authLoading, logout } = useAuth();
@@ -385,6 +391,7 @@ function Dashboard() {
     },
     enabled: !!user,
     refetchInterval: (query) => {
+      if (isUiFocusMode) return false;
       const currentPosts = query.state.data;
       if (!currentPosts || !Array.isArray(currentPosts)) return false;
       const hasProcessing = currentPosts.some(
@@ -444,6 +451,7 @@ function Dashboard() {
   useQuery({
     queryKey: ["check-jobs"],
     queryFn: async () => {
+      if (isUiFocusMode) return true;
       const hasActive = posts.some(
         (p: any) => p.status === "PROCESSING" || p.status === "NEW",
       );
@@ -453,12 +461,13 @@ function Dashboard() {
       return true;
     },
     refetchInterval: () => {
+      if (isUiFocusMode) return false;
       const hasActive = posts.some(
         (p: any) => p.status === "PROCESSING" || p.status === "NEW",
       );
       return hasActive ? 5000 : false;
     },
-    enabled: !!user && posts.length > 0,
+    enabled: !!user && posts.length > 0 && !isUiFocusMode,
   });
 
   // === ACTIONS ===

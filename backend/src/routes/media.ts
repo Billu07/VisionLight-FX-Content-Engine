@@ -5,6 +5,7 @@ import { getCost, getTargetPool } from "../config/pricing";
 import { authenticateToken, AuthenticatedRequest } from "../middleware/auth";
 import { dbService as airtableService, prisma, CreditPool } from "../services/database";
 import { contentEngine } from "../services/engine";
+import { extractLastFrameAsJpeg } from "../services/frameExtractor";
 import { upload, uploadToCloudinary } from "../utils/fileUpload";
 import {
   getTenantApiKeys,
@@ -16,6 +17,23 @@ import {
 
 const router = express.Router();
 const MAX_GENERATION_REFERENCE_IMAGES = 14;
+
+const extractFirstMediaUrl = (raw: unknown): string => {
+  if (typeof raw !== "string") return "";
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+
+  if (!trimmed.startsWith("[")) return trimmed;
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed) && typeof parsed[0] === "string") {
+      return parsed[0];
+    }
+  } catch {
+    return "";
+  }
+  return "";
+};
 
 // ==================== ASSET MANAGEMENT ====================
 router.post(
@@ -412,6 +430,52 @@ router.post(
         );
       }
       res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.post(
+  "/api/tools/extract-last-frame",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { videoUrl } = req.body;
+      if (!videoUrl || typeof videoUrl !== "string") {
+        return res.status(400).json({ error: "Video URL is required" });
+      }
+      if (!isSafeExternalUrl(videoUrl)) {
+        return res.status(400).json({ error: "Invalid or unsafe video URL" });
+      }
+
+      const targetUrl = normalizeAssetUrl(videoUrl);
+      const [userAssets, userPosts] = await Promise.all([
+        airtableService.getUserAssets(req.user!.id),
+        airtableService.getUserPosts(req.user!.id),
+      ]);
+
+      const allowedUrls = new Set<string>();
+      for (const asset of userAssets as any[]) {
+        if (typeof asset?.url === "string") {
+          allowedUrls.add(normalizeAssetUrl(asset.url));
+        }
+      }
+      for (const post of userPosts as any[]) {
+        const mediaUrl = extractFirstMediaUrl(post?.mediaUrl);
+        if (mediaUrl) {
+          allowedUrls.add(normalizeAssetUrl(mediaUrl));
+        }
+      }
+
+      if (!allowedUrls.has(targetUrl)) {
+        return res.status(403).json({ error: "Video is not accessible" });
+      }
+
+      const frameBuffer = await extractLastFrameAsJpeg(videoUrl);
+      res.setHeader("Content-Type", "image/jpeg");
+      res.setHeader("Cache-Control", "no-store");
+      return res.send(frameBuffer);
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message || "Failed to extract end frame" });
     }
   },
 );

@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from "react";
-import { getCORSProxyVideoUrl } from "../lib/api";
+import { apiEndpoints, getCORSProxyVideoUrl } from "../lib/api";
 
 interface DriftFrameExtractorProps {
   videoUrl: string;
   onExtract: (blob: Blob) => void;
   onCancel: () => void;
 }
+
+const END_FRAME_EPSILON_SECONDS = 0.08; // ~2 frames @ 24-30fps
 
 export function DriftFrameExtractor({
   videoUrl,
@@ -62,10 +64,9 @@ export function DriftFrameExtractor({
     }
   };
 
-  const handleDownloadVideo = async (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
+  const handleDownloadVideo = async () => {
     try {
-      const response = await fetch(activeVideoUrl);
+      const response = await fetch(getCORSProxyVideoUrl(videoUrl));
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -77,8 +78,7 @@ export function DriftFrameExtractor({
       window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Failed to download video", err);
-      // Fallback
-      window.open(videoUrl, "_blank");
+      alert("Video download failed. Please try again.");
     }
   };
 
@@ -99,8 +99,17 @@ export function DriftFrameExtractor({
     const needsSeek = Math.abs(video.currentTime - target) > 0.02;
     if (needsSeek) {
       await new Promise<void>((resolve) => {
-        const handleSeeked = () => resolve();
-        video.addEventListener("seeked", handleSeeked, { once: true });
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(fallbackTimer);
+          video.removeEventListener("seeked", handleSeeked);
+          resolve();
+        };
+        const handleSeeked = () => finish();
+        const fallbackTimer = window.setTimeout(finish, 1200);
+        video.addEventListener("seeked", handleSeeked);
         video.currentTime = target;
       });
     } else {
@@ -112,7 +121,15 @@ export function DriftFrameExtractor({
   const waitForRenderableFrame = async (video: HTMLVideoElement) => {
     if ("requestVideoFrameCallback" in video) {
       await new Promise<void>((resolve) => {
-        (video as any).requestVideoFrameCallback(() => resolve());
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(fallbackTimer);
+          resolve();
+        };
+        const fallbackTimer = window.setTimeout(finish, 450);
+        (video as any).requestVideoFrameCallback(() => finish());
       });
       return;
     }
@@ -184,7 +201,38 @@ export function DriftFrameExtractor({
   };
 
   const extractSpecificFrame = (time: number) => {
-    void extractAtTime(time, true);
+    const safeTime =
+      duration > 0 && time >= duration
+        ? Math.max(0, duration - END_FRAME_EPSILON_SECONDS)
+        : time;
+    void extractAtTime(safeTime, true);
+  };
+
+  const captureEndFrame = async () => {
+    if (!controlsReady || isExtracting) return;
+
+    setIsExtracting(true);
+    let frameBlob: Blob;
+    try {
+      const response = await apiEndpoints.extractLastFrame(videoUrl);
+      frameBlob =
+        response.data instanceof Blob
+          ? response.data
+          : new Blob([response.data], { type: "image/jpeg" });
+    } catch (error) {
+      console.error("Server-side end frame extraction failed:", error);
+      const fallbackTime =
+        duration > 0 ? Math.max(0, duration - END_FRAME_EPSILON_SECONDS) : duration;
+      setIsExtracting(false);
+      void extractAtTime(fallbackTime, true);
+      return;
+    }
+
+    try {
+      await onExtract(frameBlob);
+    } finally {
+      setIsExtracting(false);
+    }
   };
 
   return (
@@ -259,7 +307,7 @@ export function DriftFrameExtractor({
             Capture Start Frame
           </button>
           <button 
-            onClick={() => extractSpecificFrame(duration)}
+            onClick={captureEndFrame}
             disabled={!controlsReady || isExtracting}
             className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-bold transition-all border border-white/5 disabled:opacity-50"
           >
@@ -318,13 +366,12 @@ export function DriftFrameExtractor({
             {isExtracting ? "Capturing..." : "Capture 3DX Frame"}
           </button>
 
-          <a
-            href={videoUrl}
+          <button
             onClick={handleDownloadVideo}
             className="px-6 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-xl text-white font-semibold text-center flex items-center justify-center gap-2 text-sm transition-colors cursor-pointer"
           >
             Download Video
-          </a>
+          </button>
 
           <button
             onClick={onCancel}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { apiEndpoints, api, getCORSProxyUrl } from "../lib/api";
+import { notify } from "../lib/notifications";
 
 interface PostCardProps {
   post: any;
@@ -60,6 +61,10 @@ export function PostCard({
 
   const [slideIndex, setSlideIndex] = useState(0);
   const videoContainerRef = useRef<HTMLDivElement | null>(null);
+  const isVideoPost =
+    post.mediaType === "VIDEO" ||
+    post.mediaProvider === "sora" ||
+    post.mediaProvider?.includes("kling");
 
   // Helper to handle clicks in minimal mode
   const handleCardClick = () => {
@@ -73,7 +78,6 @@ export function PostCard({
   }, [post.title]);
 
   useEffect(() => {
-    const isVideoPost = post.mediaType === "VIDEO" || post.mediaProvider === "sora";
     if (!isVideoPost) return;
     if (!compact) {
       setShouldLoadVideo(true);
@@ -100,7 +104,7 @@ export function PostCard({
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [post.id, post.mediaType, post.mediaProvider, compact]);
+  }, [post.id, isVideoPost, compact]);
 
   useEffect(() => {
     if (post.mediaType === "VIDEO" || post.mediaProvider === "sora") {
@@ -182,8 +186,8 @@ export function PostCard({
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Download fallback:", error);
-      window.open(getCleanUrl(post.mediaUrl), "_blank");
+      console.error("Video download failed:", error);
+      notify.error("Video download failed. Please try again.");
     } finally {
       setIsDownloadingVideo(false);
     }
@@ -193,25 +197,34 @@ export function PostCard({
   const handleDownloadEndFrame = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!post.generatedEndFrame) return;
+    const videoSourceUrl = getCleanUrl(post.mediaUrl || "");
+    if (!videoSourceUrl && !post.generatedEndFrame) return;
 
     try {
       setIsDownloadingEndFrame(true);
-      const response = await fetch(post.generatedEndFrame);
-      const blob = await response.blob();
+      let blob: Blob;
+      if (videoSourceUrl) {
+        const response = await apiEndpoints.extractLastFrame(videoSourceUrl);
+        blob =
+          response.data instanceof Blob
+            ? response.data
+            : new Blob([response.data], { type: "image/jpeg" });
+      } else {
+        const fallbackResponse = await fetch(post.generatedEndFrame);
+        blob = await fallbackResponse.blob();
+      }
       const url = window.URL.createObjectURL(blob);
 
       const link = document.createElement("a");
       link.href = url;
-      // ✅ CHANGED: Consistent naming
       link.setAttribute("download", `picdrift-end-frame-${post.id}.jpg`);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("End frame download failed, falling back to tab:", error);
-      window.open(post.generatedEndFrame, "_blank");
+      console.error("End frame capture failed:", error);
+      notify.error("End frame download failed. Please try again.");
     } finally {
       setIsDownloadingEndFrame(false);
     }
@@ -568,9 +581,7 @@ export function PostCard({
                 )}
               </button>
 
-              {(post.mediaType === "VIDEO" ||
-                post.mediaProvider?.includes("kling")) &&
-                onDrift && (
+              {isVideoPost && onDrift && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -632,7 +643,7 @@ export function PostCard({
             </div>
 
             {/* ✅ BRIGHT "DOWNLOADING FRAME..." BUTTON */}
-            {post.generatedEndFrame && (
+            {isVideoPost && hasMedia && (
               <button
                 onClick={handleDownloadEndFrame}
                 disabled={isDownloadingEndFrame}
@@ -641,11 +652,11 @@ export function PostCard({
                     ? "bg-purple-600/20 text-purple-300 border-purple-500 animate-pulse font-bold shadow-[0_0_10px_rgba(168,85,247,0.4)]"
                     : "bg-purple-500/10 hover:bg-purple-500/20 border-purple-500/30 text-purple-300"
                 }`}
-                title="Use this as the Start Frame for your next clip"
+                title="Capture the final frame from this rendered video"
               >
                 {isDownloadingEndFrame
-                  ? "Downloading Frame..."
-                  : "Download End Frame"}
+                  ? "Capturing Frame..."
+                  : "Capture End Frame"}
               </button>
             )}
           </div>
