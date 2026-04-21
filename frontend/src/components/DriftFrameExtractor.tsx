@@ -87,58 +87,52 @@ export function DriftFrameExtractor({
     }
   };
 
-  const captureFrame = () => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
-
-    try {
-      if (video.readyState < 2) {
-        alert("Video is still loading, please wait a moment.");
-        return;
-      }
-
-      setIsExtracting(true);
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        setIsExtracting(false);
-        return;
-      }
-
-      // Draw current video frame to canvas
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      // Convert to Blob
-      canvas.toBlob(
-        async (blob) => {
-          if (blob) {
-            try {
-              await onExtract(blob);
-            } catch (err) {
-              console.error("onExtract Error:", err);
-            } finally {
-              setIsExtracting(false);
-            }
-          } else {
-            setIsExtracting(false);
-            throw new Error("Canvas extraction failed (Empty Blob).");
-          }
-        },
-        "image/jpeg",
-        0.95,
-      );
-    } catch (e: any) {
-      setIsExtracting(false);
-      console.error("Frame Extraction Error:", e);
-      alert(
-        "Security Error: The browser blocked frame extraction. \n\nEnsure your Cloudinary settings allow 'Access-Control-Allow-Origin: *'"
-      );
+  const seekToTime = async (video: HTMLVideoElement, time: number) => {
+    const target = Math.max(
+      0,
+      Math.min(time, Number.isFinite(video.duration) ? video.duration : time),
+    );
+    const needsSeek = Math.abs(video.currentTime - target) > 0.02;
+    if (needsSeek) {
+      await new Promise<void>((resolve) => {
+        const handleSeeked = () => resolve();
+        video.addEventListener("seeked", handleSeeked, { once: true });
+        video.currentTime = target;
+      });
+    } else {
+      video.currentTime = target;
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     }
   };
 
-  const extractSpecificFrame = (time: number) => {
+  const waitForRenderableFrame = async (video: HTMLVideoElement) => {
+    if ("requestVideoFrameCallback" in video) {
+      await new Promise<void>((resolve) => {
+        (video as any).requestVideoFrameCallback(() => resolve());
+      });
+      return;
+    }
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  };
+
+  const captureVideoToBlob = async (
+    video: HTMLVideoElement,
+    canvas: HTMLCanvasElement,
+  ) => {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas context unavailable");
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.95),
+    );
+    if (!blob) throw new Error("Canvas extraction failed (Empty Blob).");
+    return blob;
+  };
+
+  const extractAtTime = async (time: number, restoreAfterCapture: boolean) => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
@@ -150,50 +144,41 @@ export function DriftFrameExtractor({
       }
 
       setIsExtracting(true);
+      const wasPlaying = !video.paused;
       const originalTime = video.currentTime;
-      video.currentTime = time;
+      video.pause();
 
-      const capture = () => {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          setIsExtracting(false);
-          return;
-        }
+      await seekToTime(video, time);
+      await waitForRenderableFrame(video);
+      setCurrentTime(video.currentTime);
 
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(
-          async (blob) => {
-            if (blob) {
-              try {
-                await onExtract(blob);
-              } catch (err) {
-                console.error("onExtract Error:", err);
-              } finally {
-                setIsExtracting(false);
-              }
-            } else {
-              setIsExtracting(false);
-              throw new Error("Canvas extraction failed (Empty Blob).");
-            }
-            // Restore video time
-            video.currentTime = originalTime;
-            video.removeEventListener('seeked', capture);
-          },
-          "image/jpeg",
-          0.95,
-        );
-      };
+      const blob = await captureVideoToBlob(video, canvas);
+      await onExtract(blob);
 
-      video.addEventListener('seeked', capture);
+      if (restoreAfterCapture) {
+        await seekToTime(video, originalTime);
+        setCurrentTime(video.currentTime);
+      }
+
+      if (wasPlaying) {
+        void video.play();
+      }
     } catch (e: any) {
-      setIsExtracting(false);
       console.error("Frame Extraction Error:", e);
       alert(
         "Security Error: The browser blocked frame extraction. \n\nEnsure your Cloudinary settings allow 'Access-Control-Allow-Origin: *'"
       );
+    } finally {
+      setIsExtracting(false);
     }
+  };
+
+  const captureFrame = () => {
+    void extractAtTime(currentTime, false);
+  };
+
+  const extractSpecificFrame = (time: number) => {
+    void extractAtTime(time, true);
   };
 
   return (
@@ -214,6 +199,9 @@ export function DriftFrameExtractor({
           onLoadedMetadata={() => {
             setDuration(videoRef.current?.duration || 0);
             setHasMetadata(true);
+          }}
+          onSeeked={() => {
+            if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
           }}
           onCanPlay={() => setCanPlay(true)}
           onPlay={() => setIsPlaying(true)}

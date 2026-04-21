@@ -982,7 +982,11 @@ export function AssetLibrary({
               </h3>
             </div>
             <DriftFrameExtractor
-              videoUrl={viewingVideoAsset.url}
+              videoUrl={
+                viewingVideoAsset.hlsUrl ||
+                viewingVideoAsset.proxyUrl ||
+                viewingVideoAsset.url
+              }
               onExtract={async (blob) => {
                 const file = new File([blob], "extracted_frame.jpg", {
                   type: "image/jpeg",

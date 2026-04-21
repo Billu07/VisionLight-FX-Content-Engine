@@ -705,28 +705,45 @@ export function EditAssetModal({
 
   if (isMinimized) {
     return (
-      <div 
-        className="fixed right-4 z-[140] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-gray-800 transition-colors animate-in slide-in-from-bottom-5"
+      <div
+        className="fixed right-4 z-[140] group cursor-pointer animate-in slide-in-from-bottom-5"
         style={{
           bottom: `${16 + dockIndex * 88}px`,
           zIndex: 140 + dockIndex,
         }}
         onClick={() => setIsMinimized(false)}
       >
-        <div className="flex flex-col">
-          <span className="text-white font-bold text-sm">Editor Running</span>
-          <span className="text-purple-400 text-xs font-mono tracking-widest animate-pulse">
-            {activeJobsCount > 0 ? `${activeJobsCount} Jobs Running` : "Idle"}
-          </span>
+        <div className="relative overflow-hidden rounded-2xl border border-white/15 bg-gray-950/90 backdrop-blur-xl shadow-[0_14px_42px_rgba(0,0,0,0.55)] px-4 py-3 flex items-center gap-3 transition-all duration-300 group-hover:border-cyan-400/40 group-hover:shadow-[0_18px_55px_rgba(6,182,212,0.2)]">
+          <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-cyan-500/8 via-transparent to-fuchsia-500/8" />
+
+          <div className="relative flex items-center justify-center w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-400/30">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+          </div>
+
+          <div className="relative flex flex-col leading-tight min-w-[150px]">
+            <span className="text-gray-100 font-semibold text-sm tracking-wide">
+              Editor Running
+            </span>
+            <span className="text-cyan-300/90 text-[11px] font-mono tracking-[0.18em] uppercase">
+              {activeJobsCount > 0 ? `${activeJobsCount} active task${activeJobsCount > 1 ? "s" : ""}` : "Idle"}
+            </span>
+          </div>
+
+          <div className="relative flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded-full border border-white/10 bg-white/5 text-[10px] font-bold text-gray-200">
+              {activeJobsCount}
+            </span>
+          </div>
         </div>
-        <button 
-          onClick={(e) => { 
-            e.stopPropagation(); 
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
             handleForceClose(); 
-          }} 
-          className="text-gray-400 hover:text-red-500 font-bold ml-2 p-2"
+          }}
+          className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-gray-900/95 border border-white/15 text-gray-300 hover:text-red-300 hover:border-red-400/40 hover:bg-red-950/40 transition-all duration-200 flex items-center justify-center shadow-lg"
         >
-          x
+          ×
         </button>
       </div>
     );
