@@ -1004,9 +1004,20 @@ export const videoLogic = {
         status: "PROCESSING",
       });
     } catch (error: any) {
+      const providerErrorPayload =
+        typeof error?.response?.data === "string"
+          ? error.response.data
+          : error?.response?.data
+            ? JSON.stringify(error.response.data)
+            : "";
+      if (providerErrorPayload) {
+        console.error("Provider Error Payload:", providerErrorPayload);
+      }
       await airtableService.updatePost(postId, {
         status: "FAILED",
-        error: error.message,
+        error: providerErrorPayload
+          ? `${error.message} | ${providerErrorPayload}`
+          : error.message,
         progress: 0,
       });
       await refundChargedPool(params.userId, params);
@@ -1078,8 +1089,21 @@ export const videoLogic = {
             progress = Math.min(90, progress + 5);
           }
         } catch (pollErr: any) {
-          console.error("Poll Error:", pollErr.message);
-          // If 404, maybe it's gone? But safer to just log for now.
+          const pollStatus = pollErr?.response?.status;
+          const pollPayload =
+            typeof pollErr?.response?.data === "string"
+              ? pollErr.response.data
+              : JSON.stringify(pollErr?.response?.data || {});
+          console.error(
+            `Poll Error (${pollStatus || "unknown"}) on ${checkUrl}: ${pollErr.message}`,
+            pollPayload,
+          );
+          // 422 usually means invalid request/task id or malformed poll URL for this job.
+          // Mark failed to stop infinite poll loops and issue refund path consistently.
+          if (pollStatus === 422) {
+            isFailed = true;
+            errorMessage = `Fal poll rejected (422): ${pollPayload || "Unprocessable Entity"}`;
+          }
         }
       }
 

@@ -484,7 +484,11 @@ function Dashboard() {
       setDriftParams({ horizontal: 0, vertical: 0, zoom: 0 });
     },
     onError: (err: any) => {
-      if (err.response?.status === 403) {
+      if (err?.status === 413) {
+        alert(
+          "Upload too large. Increase VPS upload limit (for nginx: client_max_body_size) or use smaller references.",
+        );
+      } else if (err?.status === 403) {
         setShowNoCreditsModal(true);
       } else {
         alert("3DX Generation Failed: " + err.message);
@@ -518,7 +522,13 @@ function Dashboard() {
       }
     },
     onError: (err: any) => {
-      if (err.response?.status === 403) {
+      if (err?.status === 413) {
+        setGenerationState({
+          status: "error",
+          error:
+            "Upload too large for server limit. Increase VPS upload limit (e.g. nginx client_max_body_size) or reduce reference file sizes.",
+        });
+      } else if (err?.status === 403) {
         setShowNoCreditsModal(true);
       } else {
         setGenerationState({ status: "error", error: err.message });
@@ -1715,15 +1725,15 @@ function Dashboard() {
 
         {/* EXTRACTOR MODAL */}
         {extractingVideoUrl && (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 p-4 animate-in fade-in">
-            <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-4xl p-6 relative flex flex-col items-center">
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 p-4 overflow-y-auto animate-in fade-in">
+            <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-4xl max-h-[95vh] overflow-y-auto p-4 sm:p-6 relative flex flex-col items-center">
               <button
                 onClick={() => setExtractingVideoUrl(null)}
                 className="absolute top-4 right-4 text-gray-400 hover:text-white z-10"
               >
-                ✕
+                x
               </button>
-              <div className="w-full flex justify-between items-center mb-4 pr-6">
+              <div className="w-full flex justify-between items-center mb-4 pr-6 shrink-0">
                 <img
                   src="/drift_icon.png"
                   alt="Drift"

@@ -1,10 +1,16 @@
 import ffmpeg from 'fluent-ffmpeg';
+import ffmpegStatic from 'ffmpeg-static';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
 import { uploadToCloudinary, uploadFileToR2 } from './utils';
 import { prisma } from '../database';
+
+// Ensure ffmpeg binary is available in environments where system ffmpeg is missing.
+if (ffmpegStatic) {
+    ffmpeg.setFfmpegPath(ffmpegStatic);
+}
 
 /**
  * Background worker to generate lightweight proxies and timeline sprite sheets

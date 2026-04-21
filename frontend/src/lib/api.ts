@@ -28,7 +28,10 @@ api.interceptors.response.use(
         status: error.response?.status,
       });
     }
-    return Promise.reject(new Error(message));
+    const wrappedError: any = new Error(message);
+    wrappedError.status = error.response?.status;
+    wrappedError.url = error.config?.url;
+    return Promise.reject(wrappedError);
   },
 );
 
