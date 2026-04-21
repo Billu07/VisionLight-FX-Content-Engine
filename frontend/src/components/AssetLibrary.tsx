@@ -745,7 +745,7 @@ export function AssetLibrary({
                     {asset.type === "VIDEO" ? (
                       <div className="w-full h-full relative aspect-square bg-black/20">
                         <video
-                          src={asset.proxyUrl || asset.url || asset.hlsUrl}
+                          src={asset.url || asset.proxyUrl || asset.hlsUrl}
                           className="w-full h-full object-contain opacity-80"
                           preload="metadata"
                           playsInline
@@ -994,8 +994,8 @@ export function AssetLibrary({
             </div>
             <DriftFrameExtractor
               videoUrl={
-                viewingVideoAsset.proxyUrl ||
                 viewingVideoAsset.url ||
+                viewingVideoAsset.proxyUrl ||
                 viewingVideoAsset.hlsUrl ||
                 ""
               }

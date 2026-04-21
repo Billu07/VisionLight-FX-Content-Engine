@@ -18,17 +18,27 @@ export function DriftFrameExtractor({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [hasMetadata, setHasMetadata] = useState(false);
+  const [hasVideoError, setHasVideoError] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const directVideoUrl = videoUrl;
-  const controlsReady = hasMetadata && duration > 0;
+  const controlsReady = hasMetadata && !hasVideoError;
 
   useEffect(() => {
     setHasMetadata(false);
+    setHasVideoError(false);
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
   }, [directVideoUrl]);
+
+  useEffect(() => {
+    if (hasMetadata || hasVideoError) return;
+    const timeout = setTimeout(() => {
+      setHasVideoError(true);
+    }, 12000);
+    return () => clearTimeout(timeout);
+  }, [hasMetadata, hasVideoError, directVideoUrl]);
 
   // Sync slider with video time
   const handleTimeUpdate = () => {
@@ -190,9 +200,17 @@ export function DriftFrameExtractor({
           onLoadedMetadata={() => {
             setDuration(videoRef.current?.duration || 0);
             setHasMetadata(true);
+            setHasVideoError(false);
+          }}
+          onLoadedData={() => {
+            setHasMetadata(true);
+            setHasVideoError(false);
           }}
           onSeeked={() => {
             if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
+          }}
+          onError={() => {
+            setHasVideoError(true);
           }}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
@@ -201,9 +219,16 @@ export function DriftFrameExtractor({
           preload="metadata"
           crossOrigin="anonymous"
         />
-        {!controlsReady && (
+        {!controlsReady && !hasVideoError && (
           <div className="absolute top-3 left-3 px-2.5 py-1 rounded-md bg-black/55 border border-white/10 text-[10px] tracking-wider text-gray-300 pointer-events-none">
             Loading metadata...
+          </div>
+        )}
+        {hasVideoError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/55 pointer-events-none">
+            <div className="px-3 py-2 rounded-lg border border-red-400/30 bg-red-950/60 text-red-200 text-xs">
+              Video failed to load. Try another source.
+            </div>
           </div>
         )}
       </div>
