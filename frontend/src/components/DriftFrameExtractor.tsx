@@ -20,16 +20,26 @@ export function DriftFrameExtractor({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isReady, setIsReady] = useState(false);
+  const [hasMetadata, setHasMetadata] = useState(false);
+  const [canPlay, setCanPlay] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const proxiedVideoUrl = getCORSProxyUrl(videoUrl);
 
   useEffect(() => {
     setIsReady(false);
+    setHasMetadata(false);
+    setCanPlay(false);
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
   }, [proxiedVideoUrl]);
+
+  useEffect(() => {
+    if (!hasMetadata || !canPlay) return;
+    const timer = setTimeout(() => setIsReady(true), 180);
+    return () => clearTimeout(timer);
+  }, [hasMetadata, canPlay]);
 
   // Sync slider with video time
   const handleTimeUpdate = () => {
@@ -203,19 +213,22 @@ export function DriftFrameExtractor({
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={() => {
             setDuration(videoRef.current?.duration || 0);
-            setIsReady(true);
+            setHasMetadata(true);
           }}
+          onCanPlay={() => setCanPlay(true)}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
           loop
           playsInline
-          preload="metadata"
+          preload="auto"
           crossOrigin="anonymous"
         />
         {!isReady && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 backdrop-blur-sm">
             <LoadingSpinner size="lg" />
-            <p className="text-gray-300 text-xs font-mono tracking-widest animate-pulse">LOADING VIDEO...</p>
+            <p className="text-gray-300 text-xs font-mono tracking-widest animate-pulse">
+              PREPARING VIDEO...
+            </p>
           </div>
         )}
       </div>

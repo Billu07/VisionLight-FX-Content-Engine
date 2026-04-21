@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
 import { LoadingSpinner } from "./LoadingSpinner";
@@ -18,12 +18,23 @@ interface Asset {
   createdAt: string;
   originalAssetId?: string | null;
   variations?: Asset[];
+  source?: "asset" | "timeline";
 }
 
 interface AssetLibraryProps {
   onSelect?: (file: File, url: string, aspectRatio?: string) => void;
   onClose: () => void;
   initialAspectRatio?: string;
+  initialTab?:
+    | "16:9"
+    | "9:16"
+    | "1:1"
+    | "original"
+    | "custom"
+    | "VIDEO"
+    | "STORYBOARD"
+    | "3DX_FRAME"
+    | "TIMELINE";
   isSequencerMode?: boolean;
   onEditAsset?: (asset: Asset) => void;
 }
@@ -32,6 +43,7 @@ export function AssetLibrary({
   onSelect,
   onClose,
   initialAspectRatio,
+  initialTab,
   isSequencerMode,
   onEditAsset,
 }: AssetLibraryProps) {
@@ -40,11 +52,15 @@ export function AssetLibrary({
   const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<
-    "16:9" | "9:16" | "1:1" | "original" | "custom" | "VIDEO" | "STORYBOARD" | "3DX_FRAME"
+    "16:9" | "9:16" | "1:1" | "original" | "custom" | "VIDEO" | "STORYBOARD" | "3DX_FRAME" | "TIMELINE"
   >("original");
 
   // Auto-switch tab based on Dashboard context
   useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+      return;
+    }
     if (!initialAspectRatio) {
       setActiveTab("original");
       return;
@@ -54,8 +70,9 @@ export function AssetLibrary({
     if (ratio === "portrait" || ratio === "9:16") setActiveTab("9:16");
     else if (ratio === "landscape" || ratio === "16:9") setActiveTab("16:9");
     else if (ratio === "square" || ratio === "1:1") setActiveTab("1:1");
+    else if (ratio === "3dx_frame") setActiveTab("3DX_FRAME");
     else setActiveTab("original");
-  }, [initialAspectRatio]);
+  }, [initialAspectRatio, initialTab]);
 
   // Storyboard State
   const activeProject = localStorage.getItem("visionlight_active_project") || undefined;
@@ -194,11 +211,57 @@ export function AssetLibrary({
     refetchIntervalInBackground: true,
   });
 
+  const { data: timelinePosts = [] } = useQuery({
+    queryKey: ["library-timeline-videos", activeProject],
+    queryFn: async () => {
+      const res = await apiEndpoints.getPosts(activeProject);
+      return Array.isArray(res.data.posts) ? res.data.posts : [];
+    },
+    enabled: !!user,
+    staleTime: 10000,
+  });
+
+  const timelineVideoAssets = useMemo(() => {
+    const extractMediaUrl = (raw: unknown): string => {
+      if (typeof raw !== "string") return "";
+      const trimmed = raw.trim();
+      if (!trimmed.startsWith("[")) return trimmed;
+
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed) && typeof parsed[0] === "string") {
+          return parsed[0];
+        }
+      } catch {
+        return "";
+      }
+      return "";
+    };
+
+    return (timelinePosts as any[])
+      .filter((post) => {
+        const isVideo =
+          post?.mediaType === "VIDEO" || post?.mediaProvider?.includes("kling");
+        const mediaUrl = extractMediaUrl(post?.mediaUrl);
+        const isDone = post?.status === "READY" || post?.status === "COMPLETED";
+        return isVideo && isDone && mediaUrl.length > 0;
+      })
+      .map((post) => ({
+        id: `timeline_${post.id}`,
+        url: extractMediaUrl(post.mediaUrl),
+        aspectRatio: "custom" as const,
+        type: "VIDEO" as const,
+        createdAt: post.createdAt || new Date().toISOString(),
+        source: "timeline" as const,
+      }));
+  }, [timelinePosts]);
+
   // ✅ REFINED FILTER LOGIC
   let filteredAssets = Array.isArray(assets)
     ? assets.filter((a: Asset) => {
       if (activeTab === "STORYBOARD") return false; // Handled below
       if (activeTab === "VIDEO") return a.type === "VIDEO";
+      if (activeTab === "TIMELINE") return false;
 
       // Originals Tab: STRICTLY raw uploads (no parent)
       if (activeTab === "original") {
@@ -230,6 +293,8 @@ export function AssetLibrary({
     filteredAssets = storyboardIds
       .map((id) => assets.find((a: Asset) => a.id === id))
       .filter(Boolean) as Asset[];
+  } else if (activeTab === "TIMELINE") {
+    filteredAssets = timelineVideoAssets;
   }
 
   const getAssetImageSrc = (asset: Asset) => {
@@ -315,7 +380,8 @@ export function AssetLibrary({
         if (
           activeTab !== "original" &&
           activeTab !== "VIDEO" &&
-          activeTab !== "custom"
+          activeTab !== "custom" &&
+          activeTab !== "TIMELINE"
         ) {
           const processFormData = new FormData();
           processFormData.append("image", file);
@@ -476,6 +542,7 @@ export function AssetLibrary({
               { id: "1:1", label: "Square" },
               { id: "STORYBOARD", label: "Storyboard" },
               { id: "custom", label: "Edited" },
+              { id: "TIMELINE", label: "Timeline" },
               { id: "VIDEO", label: "3DX Paths" },
               { id: "3DX_FRAME", label: "3DX Frames" },
             ].map((tab) => (
@@ -578,7 +645,8 @@ export function AssetLibrary({
                       Generating{" "}
                       {activeTab !== "original" &&
                         activeTab !== "VIDEO" &&
-                        activeTab !== "custom"
+                        activeTab !== "custom" &&
+                        activeTab !== "TIMELINE"
                         ? activeTab
                         : "Asset"}
                       ...
@@ -589,17 +657,25 @@ export function AssetLibrary({
               {filteredAssets.length === 0 && pollingUntil === 0 ? (
                 <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-500 opacity-60">
                   <span className="text-6xl mb-4">
-                    {activeTab === "VIDEO" ? "🎬" : "🖼️"}
+                    {activeTab === "VIDEO" || activeTab === "TIMELINE" ? "🎬" : "🖼️"}
                   </span>
-                  <p>No {activeTab === "VIDEO" ? "videos" : "images"} found.</p>
+                  <p>
+                    No{" "}
+                    {activeTab === "VIDEO"
+                      ? "videos"
+                      : activeTab === "TIMELINE"
+                        ? "timeline videos"
+                        : "images"}{" "}
+                    found.
+                  </p>
                 </div>
               ) : (
                 filteredAssets.map((asset: Asset, index: number) => (
                   <div
                     key={asset.id}
                     onClick={() => {
-                      if (onSelect && isSequencerMode) {
-                        // If in picker mode, immediately use it!
+                      if (onSelect && (isSequencerMode || activeTab === "TIMELINE")) {
+                        // In picker flow, use immediately.
                         handleUseImage(asset);
                       } else if (asset.type === "VIDEO") {
                         setViewingVideoAsset(asset);
@@ -659,8 +735,10 @@ export function AssetLibrary({
                     {asset.type === "VIDEO" ? (
                       <div className="w-full h-full relative aspect-square bg-black/20">
                         <video
-                          src={asset.url}
+                          src={asset.hlsUrl || asset.proxyUrl || asset.url}
                           className="w-full h-full object-contain opacity-80"
+                          preload="metadata"
+                          playsInline
                           muted
                         />
                         <div className="absolute inset-0 flex items-center justify-center">
@@ -709,6 +787,7 @@ export function AssetLibrary({
                       activeTab === "16:9" ? "Landscape FX" :
                         activeTab === "1:1" ? "Square FX" :
                           activeTab === "3DX_FRAME" ? "3DX Drift Frames" :
+                            activeTab === "TIMELINE" ? "Timeline Videos" :
                             activeTab === "VIDEO" ? "3DX Paths" :
                               activeTab === "custom" ? "Edited Assets" :
                                 "Original Assets"}

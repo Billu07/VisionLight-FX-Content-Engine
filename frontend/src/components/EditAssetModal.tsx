@@ -162,7 +162,7 @@ export function EditAssetModal({
     initialVideoUrl || null,
   );
   const previewAssetUrl = currentAsset?.url
-    ? getCORSProxyUrl(currentAsset.url, 2048, 82)
+    ? getCORSProxyUrl(currentAsset.url, isCropping ? 2048 : 1440, isCropping ? 82 : 76)
     : undefined;
 
   const { data: allAssets = [] } = useQuery({
@@ -910,6 +910,7 @@ export function EditAssetModal({
                     className="max-h-[80vh] object-contain rounded-lg border border-gray-700 shadow-2xl"
                     crossOrigin="anonymous"
                     loading="eager"
+                    fetchPriority="high"
                     decoding="async"
                     onLoad={() => setIsImageLoading(false)}
                     onError={() => setIsImageLoading(false)}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { apiEndpoints, api, getCORSProxyUrl } from "../lib/api";
 
@@ -49,6 +49,7 @@ export function PostCard({
 }: PostCardProps) {
   const [mediaError, setMediaError] = useState(false);
   const [videoLoading, setVideoLoading] = useState(true);
+  const [shouldLoadVideo, setShouldLoadVideo] = useState(!compact);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(post.title || "");
   const [isPossiblyStuck, setIsPossiblyStuck] = useState(false);
@@ -58,6 +59,7 @@ export function PostCard({
   const [isDownloadingEndFrame, setIsDownloadingEndFrame] = useState(false);
 
   const [slideIndex, setSlideIndex] = useState(0);
+  const videoContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Helper to handle clicks in minimal mode
   const handleCardClick = () => {
@@ -69,6 +71,42 @@ export function PostCard({
   useEffect(() => {
     setEditedTitle(post.title || "");
   }, [post.title]);
+
+  useEffect(() => {
+    const isVideoPost = post.mediaType === "VIDEO" || post.mediaProvider === "sora";
+    if (!isVideoPost) return;
+    if (!compact) {
+      setShouldLoadVideo(true);
+      return;
+    }
+    if (typeof IntersectionObserver === "undefined") {
+      setShouldLoadVideo(true);
+      return;
+    }
+
+    setShouldLoadVideo(false);
+    const node = videoContainerRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.some((entry) => entry.isIntersecting);
+        if (visible) {
+          setShouldLoadVideo(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "240px 0px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [post.id, post.mediaType, post.mediaProvider, compact]);
+
+  useEffect(() => {
+    if (post.mediaType === "VIDEO" || post.mediaProvider === "sora") {
+      setVideoLoading(true);
+    }
+  }, [post.id, post.mediaUrl, post.mediaType, post.mediaProvider]);
 
   useEffect(() => {
     if (
@@ -308,7 +346,7 @@ export function PostCard({
             <img
               src={getCORSProxyUrl(slides[slideIndex], 400, 75)}
               alt="Carousel"
-              className="w-full h-full object-cover"
+              className={`w-full h-full ${compact ? "object-contain bg-black" : "object-cover"}`}
             />
           )}
           {!minimal && (
@@ -329,6 +367,7 @@ export function PostCard({
     if (post.mediaType === "VIDEO" || post.mediaProvider === "sora") {
       return (
         <div
+          ref={videoContainerRef}
           className={`${
             minimal
               ? "w-full h-full relative"
@@ -341,18 +380,25 @@ export function PostCard({
               <LoadingSpinner size="md" variant="neon" />
             </div>
           )}
-          <video
-            muted={true}
-            loop
-            className="w-full h-full object-cover"
-            onLoadedData={handleVideoLoad}
-            onError={handleMediaError}
-            playsInline
-            onMouseOver={(e) => minimal && e.currentTarget.play()}
-            onMouseOut={(e) => minimal && e.currentTarget.pause()}
-          >
-            <source src={getCORSProxyUrl(getCleanUrl(post.mediaUrl))} type="video/mp4" />
-          </video>
+          {shouldLoadVideo ? (
+            <video
+              muted={true}
+              loop
+              className={`w-full h-full ${compact ? "object-contain bg-black" : "object-cover"}`}
+              onLoadedData={handleVideoLoad}
+              onError={handleMediaError}
+              playsInline
+              preload={compact ? "metadata" : "auto"}
+              onMouseOver={(e) => minimal && e.currentTarget.play()}
+              onMouseOut={(e) => minimal && e.currentTarget.pause()}
+            >
+              <source src={getCORSProxyUrl(getCleanUrl(post.mediaUrl))} type="video/mp4" />
+            </video>
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80">
+              <LoadingSpinner size="sm" variant="neon" />
+            </div>
+          )}
 
           {!minimal && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/30 transition-all duration-300">
@@ -378,7 +424,7 @@ export function PostCard({
         <img
           src={getCORSProxyUrl(getCleanUrl(post.mediaUrl), 400, 75)}
           alt={post.title}
-          className="w-full h-full object-cover transition-transform hover:scale-105"
+          className={`w-full h-full ${compact ? "object-contain bg-black" : "object-cover transition-transform hover:scale-105"}`}
           onError={handleMediaError}
           loading="lazy"
         />
@@ -407,7 +453,7 @@ export function PostCard({
         onClick={handleCardClick}
       >
         <div className="w-full h-full aspect-square bg-black">
-          <div className="w-full h-full [&_video]:object-cover [&_img]:object-cover [&_div]:h-full [&_div]:rounded-none">
+          <div className="w-full h-full [&_video]:object-contain [&_img]:object-contain [&_div]:h-full [&_div]:rounded-none">
             {renderMedia()}
           </div>
         </div>

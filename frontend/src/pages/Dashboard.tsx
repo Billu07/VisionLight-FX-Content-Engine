@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
@@ -70,6 +70,17 @@ function Dashboard() {
     "start" | "end" | "generic" | "sequencer" | null
   >(null);
   const [librarySource, setLibrarySource] = useState<"top" | "field">("top");
+  const [libraryInitialTab, setLibraryInitialTab] = useState<
+    | "16:9"
+    | "9:16"
+    | "1:1"
+    | "original"
+    | "custom"
+    | "VIDEO"
+    | "STORYBOARD"
+    | "3DX_FRAME"
+    | null
+  >(null);
 
   // Engine Selection
   const [activeEngine, setActiveEngine] = useState<EngineType>("kie");
@@ -277,6 +288,12 @@ function Dashboard() {
     setVeoReferenceFiles([]);
     setVeoReferenceUrls([]);
   }, [activeEngine, studioMode, videoFxMode]);
+
+  useEffect(() => {
+    if (activeLibrarySlot === null) {
+      setLibraryInitialTab(null);
+    }
+  }, [activeLibrarySlot]);
 
   useEffect(() => {
     if (!(activeEngine === "kie" && videoFxMode === "video")) return;
@@ -1649,6 +1666,21 @@ function Dashboard() {
     ((activeEngine === "kie" && videoFxMode === "video") ||
       activeEngine === "openai");
 
+  const timelinePosts = useMemo(() => {
+    if (!Array.isArray(posts)) return [];
+    return posts
+      .filter((post: any) => post.status !== "CANCELLED")
+      .sort(
+        (a: any, b: any) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+  }, [posts]);
+
+  const compactTimelinePosts = useMemo(
+    () => timelinePosts.slice(0, 40),
+    [timelinePosts],
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 via-purple-950 to-violet-950 text-gray-200 relative overflow-hidden pb-24 lg:pb-0">
       {/* TREDNY STUDIO BACKGROUND EFFECTS */}
@@ -1665,6 +1697,7 @@ function Dashboard() {
             onClose={() => setActiveLibrarySlot(null)}
             onSelect={handleAssetSelect}
             isSequencerMode={activeLibrarySlot === "sequencer"}
+            initialTab={libraryInitialTab || undefined}
             initialAspectRatio={
               librarySource === "top" ? "original" : getCurrentRatioForLibrary()
             }
@@ -1725,7 +1758,7 @@ function Dashboard() {
 
         {/* EXTRACTOR MODAL */}
         {extractingVideoUrl && (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 p-4 overflow-y-auto animate-in fade-in">
+          <div className="fixed inset-0 z-[70] flex items-start sm:items-center justify-center bg-black/95 p-4 sm:py-6 overflow-y-auto animate-in fade-in">
             <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-4xl max-h-[95vh] overflow-y-auto p-4 sm:p-6 relative flex flex-col items-center">
               <button
                 onClick={() => setExtractingVideoUrl(null)}
@@ -1760,9 +1793,12 @@ function Dashboard() {
                     formData.append("projectId", activeProject);
 
                   await apiEndpoints.uploadAssetSync(formData);
-                  alert("✅ Frame Saved to Asset Library!");
+                  alert("Frame saved to Asset Library.");
                   queryClient.invalidateQueries({ queryKey: ["assets"] });
                   setExtractingVideoUrl(null);
+                  setLibrarySource("top");
+                  setLibraryInitialTab("3DX_FRAME");
+                  setActiveLibrarySlot("generic");
                 }}
                 onCancel={() => setExtractingVideoUrl(null)}
               />
@@ -4119,15 +4155,8 @@ function Dashboard() {
                   {postsLoading && <LoadingSpinner size="sm" variant="neon" />}
                 </div>
                 <div className="space-y-3 max-h-[500px] sm:max-h-[600px] overflow-y-auto custom-scrollbar">
-                  {posts && Array.isArray(posts) && posts.length > 0 ? (
-                    posts
-                      .filter((post: any) => post.status !== "CANCELLED")
-                      .sort(
-                        (a: any, b: any) =>
-                          new Date(b.createdAt).getTime() -
-                          new Date(a.createdAt).getTime(),
-                      )
-                      .map((post: any) => (
+                  {compactTimelinePosts.length > 0 ? (
+                    compactTimelinePosts.map((post: any) => (
                         <PostCard
                           key={post.id}
                           post={post}
@@ -4215,7 +4244,7 @@ function Dashboard() {
           {/* ✅ ADD THIS BLOCK */}
           {showFullTimeline && (
             <TimelineExpander
-              posts={posts}
+              posts={timelinePosts}
               onClose={() => setShowFullTimeline(false)}
               userCredits={userCredits}
               brandConfig={brandConfig}
@@ -4249,6 +4278,7 @@ function Dashboard() {
 }
 
 export default Dashboard;
+
 
 
 
