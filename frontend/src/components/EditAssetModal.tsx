@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import ReactCrop, { type Crop, type PixelCrop, makeAspectCrop, centerCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
+import { confirmAction } from "../lib/notifications";
 import { useAuth } from "../hooks/useAuth";
 import { DriftFrameExtractor } from "./DriftFrameExtractor";
 import { LoadingSpinner } from "./LoadingSpinner";
@@ -137,8 +138,8 @@ export function EditAssetModal({
     savePromptFxMutation.mutate(newList);
   };
 
-  const handleRemovePromptFx = (indexToRemove: number) => {
-    if (window.confirm("Are you sure you want to delete this prompt preset?")) {
+  const handleRemovePromptFx = async (indexToRemove: number) => {
+    if (await confirmAction("Are you sure you want to delete this prompt preset?", { confirmLabel: "Delete" })) {
       const newList = promptFxList.filter((_: any, idx: number) => idx !== indexToRemove);
       savePromptFxMutation.mutate(newList);
     }
@@ -692,10 +693,10 @@ export function EditAssetModal({
     onClose();
   };
 
-  const handleForceClose = () => {
+  const handleForceClose = async () => {
     if (
       hasRunningJobs &&
-      !window.confirm("You still have running tasks. Closing will hide this editor task list. Continue?")
+      !(await confirmAction("You still have running tasks. Closing will hide this editor task list. Continue?", { confirmLabel: "Close anyway" }))
     ) {
       return;
     }
@@ -939,8 +940,8 @@ export function EditAssetModal({
                       : "bg-gray-800 text-gray-500 border-gray-700"
                   }`}
                 >
-                  {jobs.some(j => j.status === 'processing') ? <LoadingSpinner size="sm" variant="neon" /> : "List"}
-                  Tasks ({jobs.length})
+                  {jobs.some(j => j.status === 'processing') ? <LoadingSpinner size="sm" variant="neon" /> : "Tasks"}
+                  ({jobs.length})
                 </button>
 
                 {/* JOBS DROPDOWN MENU */}

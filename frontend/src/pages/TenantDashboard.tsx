@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
+import { confirmAction } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
 
@@ -321,7 +322,11 @@ export default function TenantDashboard() {
                           <button onClick={() => setEditingUser(u)} className="text-cyan-400 hover:text-cyan-300 text-[9px] font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded">Manage</button>
                           <button
                             className="text-red-500/50 hover:text-red-400 text-[9px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all"
-                            onClick={() => { if (window.confirm("Remove user?")) apiEndpoints.tenantDeleteUser(u.id).then(fetchData); }}
+                            onClick={async () => {
+                              if (await confirmAction("Remove user?", { confirmLabel: "Remove" })) {
+                                apiEndpoints.tenantDeleteUser(u.id).then(fetchData);
+                              }
+                            }}
                           >
                             Remove
                           </button>

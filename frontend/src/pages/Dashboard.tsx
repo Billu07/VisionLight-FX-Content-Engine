@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
+import { confirmAction } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { ErrorAlert } from "../components/ErrorAlert";
 import { PostCard } from "../components/PostCard";
@@ -558,7 +559,7 @@ function Dashboard() {
   };
 
   const handleMoveToAssets = async (postId: string) => {
-    if (!confirm("Save this content to your Asset Library?")) return;
+    if (!(await confirmAction("Save this content to your Asset Library?", { confirmLabel: "Save" }))) return;
     try {
       await apiEndpoints.movePostToAsset(postId);
       alert("✅ Saved! Check your Asset Library.");
@@ -570,7 +571,7 @@ function Dashboard() {
 
   const handleRequestCredits = async () => {
     if (isRequesting) return;
-    if (!confirm("Request more Render Reserve to Admin?")) return;
+    if (!(await confirmAction("Request more Render Reserve to Admin?", { confirmLabel: "Request" }))) return;
     const rendersUrl = "https://picdrift.com/renders";
     const openedTab = window.open(rendersUrl, "_blank", "noopener,noreferrer");
     setIsRequesting(true);
@@ -4189,13 +4190,16 @@ function Dashboard() {
                               : undefined
                           }
                           onDelete={() => {
-                            if (
-                              confirm(
-                                "Are you sure you want to delete this post?",
-                              )
-                            ) {
-                              deletePostMutation.mutate(post.id);
-                            }
+                            (async () => {
+                              if (
+                                await confirmAction(
+                                  "Are you sure you want to delete this post?",
+                                  { confirmLabel: "Delete" },
+                                )
+                              ) {
+                                deletePostMutation.mutate(post.id);
+                              }
+                            })();
                           }}
                           onAddToSequence={() => handleAddToSequence(post)}
                         />
@@ -4266,7 +4270,11 @@ function Dashboard() {
               }}
               onMoveToAsset={(id) => handleMoveToAssets(id)}
               onDelete={(id) => {
-                if (confirm("Delete this post?")) deletePostMutation.mutate(id);
+                (async () => {
+                  if (await confirmAction("Delete this post?", { confirmLabel: "Delete" })) {
+                    deletePostMutation.mutate(id);
+                  }
+                })();
               }}
               onAddToSequence={(post) => handleAddToSequence(post)}
             />

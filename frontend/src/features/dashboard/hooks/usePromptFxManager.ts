@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiEndpoints } from "../../../lib/api";
+import { confirmAction } from "../../../lib/notifications";
 
 type PromptFxItem = {
   name: string;
@@ -54,8 +55,8 @@ export function usePromptFxManager() {
     savePromptFxMutation.mutate(newList);
   };
 
-  const handleRemovePromptFx = (indexToRemove: number) => {
-    if (!window.confirm("Are you sure you want to delete this prompt preset?")) return;
+  const handleRemovePromptFx = async (indexToRemove: number) => {
+    if (!(await confirmAction("Are you sure you want to delete this prompt preset?", { confirmLabel: "Delete" }))) return;
     const newList = promptFxList.filter((_: any, idx: number) => idx !== indexToRemove);
     savePromptFxMutation.mutate(newList);
   };

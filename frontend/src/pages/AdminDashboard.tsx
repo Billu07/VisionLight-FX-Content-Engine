@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
+import { confirmAction } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
 
@@ -168,7 +169,7 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteUser = async (user: User) => {
-    if (!window.confirm(`Delete ${user.email}?`)) return;
+    if (!(await confirmAction(`Delete ${user.email}?`, { confirmLabel: "Delete" }))) return;
     setActionLoading(true);
     try {
       await apiEndpoints.adminDeleteUser(user.id);

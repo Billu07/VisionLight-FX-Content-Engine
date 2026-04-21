@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
+import { confirmAction } from "../lib/notifications";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
 import { EditAssetModal } from "./EditAssetModal";
@@ -574,10 +575,11 @@ export function AssetLibrary({
                   )}
                 </button>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (
-                      window.confirm(
+                      await confirmAction(
                         "Clear all items from your Storyboard sequence?",
+                        { confirmLabel: "Clear" },
                       )
                     ) {
                       setStoryboardIds([]);
@@ -950,8 +952,8 @@ export function AssetLibrary({
                 </button>
 
                 <button
-                  onClick={() => {
-                    if (window.confirm("Delete this asset?"))
+                  onClick={async () => {
+                    if (await confirmAction("Delete this asset?", { confirmLabel: "Delete" }))
                       deleteMutation.mutate(selectedAsset.id);
                   }}
                   className="flex-1 sm:w-full py-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg text-xs sm:text-sm"

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
+import { confirmAction } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
 
@@ -195,7 +196,7 @@ export default function SuperAdminDashboard() {
   };
 
   const handleDeletePreset = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this global preset?")) return;
+    if (!(await confirmAction("Are you sure you want to delete this global preset?", { confirmLabel: "Delete" }))) return;
     try {
       await apiEndpoints.superadminDeletePreset(id);
       fetchInitialData();
@@ -230,7 +231,7 @@ export default function SuperAdminDashboard() {
   };
 
   const handleDeleteTenant = async (id: string) => {
-    if (!confirm("Are you sure? This will delete the organization and ALL its users forever.")) return;
+    if (!(await confirmAction("Are you sure? This will delete the organization and ALL its users forever.", { confirmLabel: "Delete" }))) return;
     setActionLoading(true);
     try {
       await apiEndpoints.superadminDeleteOrganization(id);
@@ -638,7 +639,11 @@ export default function SuperAdminDashboard() {
                           <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className="text-cyan-400 hover:text-cyan-300 text-[10px] font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded">Manage</button>
                           <button
                             className="text-red-500/50 hover:text-red-400 text-[10px] font-bold uppercase tracking-widest"
-                            onClick={() => { if (window.confirm("Remove user?")) apiEndpoints.tenantDeleteUser(u.id).then(fetchInitialData); }}
+                            onClick={async () => {
+                              if (await confirmAction("Remove user?", { confirmLabel: "Remove" })) {
+                                apiEndpoints.tenantDeleteUser(u.id).then(fetchInitialData);
+                              }
+                            }}
                           >
                             Remove
                           </button>

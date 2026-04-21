@@ -7,6 +7,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "sonner";
 
 // --- EXISTING IMPORTS ---
 import { MarketingSite } from "./pages/MarketingSite";
@@ -18,6 +19,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { BrandProvider } from "./contexts/BrandContext";
 import { useAuth } from "./hooks/useAuth";
 import { LoadingSpinner } from "./components/LoadingSpinner";
+import { installAlertBridge } from "./lib/notifications";
 
 // --- NEW IMPORTS (Add these) ---
 import { Terms } from "./pages/Terms";
@@ -98,9 +100,23 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 function App() {
+  useEffect(() => {
+    const restore = installAlertBridge();
+    return restore;
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrandProvider>
+        <Toaster
+          position="top-right"
+          richColors
+          closeButton
+          duration={5000}
+          toastOptions={{
+            className: "!bg-gray-900 !text-gray-100 !border !border-white/10",
+          }}
+        />
         <Router>
           <Routes>
             {/* Public Routes */}

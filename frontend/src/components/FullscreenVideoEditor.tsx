@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
+import { confirmAction } from "../lib/notifications";
 import { videoEngine } from "../lib/videoEngine";
 import { LoadingSpinner } from "./LoadingSpinner";
 import Hls from "hls.js";
@@ -518,8 +519,8 @@ export function FullscreenVideoEditor({
         setSelectedItemId(secondHalf.id);
     };
 
-    const handleDeleteSelected = () => {
-        if (window.confirm("Are you sure you want to remove this clip from the timeline?")) {
+    const handleDeleteSelected = async () => {
+        if (await confirmAction("Are you sure you want to remove this clip from the timeline?", { confirmLabel: "Remove" })) {
             if (selectedItemId) {
                 setSequence(prev => prev.filter(item => item.id !== selectedItemId));
                 setSelectedItemId(null);
@@ -926,8 +927,23 @@ export function FullscreenVideoEditor({
                     </div>
                     <div className="relative w-full h-full flex flex-col items-center justify-center pt-8">
                         <div className="relative bg-[#050505] rounded-lg overflow-hidden border border-white/5 shadow-2xl flex items-center justify-center group"
-                             style={{ width: viewportRatio === "16:9" ? "100%" : "auto", height: viewportRatio === "16:9" ? "auto" : "100%", aspectRatio: viewportRatio === "16:9" ? "16/9" : viewportRatio === "9:16" ? "9/16" : "1/1", maxHeight: "100%", maxWidth: "100%" }}>
-                            <canvas ref={canvasRef} width={1920} height={1080} className="w-full h-full object-contain" />
+                             style={{ width: "100%", height: "100%" }}>
+                            <div
+                                className="relative"
+                                style={{
+                                    width: "100%",
+                                    maxWidth: "100%",
+                                    maxHeight: "100%",
+                                    aspectRatio:
+                                        viewportRatio === "16:9"
+                                            ? "16/9"
+                                            : viewportRatio === "9:16"
+                                                ? "9/16"
+                                                : "1/1",
+                                }}
+                            >
+                                <canvas ref={canvasRef} width={1920} height={1080} className="w-full h-full object-contain" />
+                            </div>
                             <button onClick={handleSnapshot} disabled={isCapturingFrame} className="absolute bottom-4 right-4 z-20 w-10 h-10 bg-black/50 hover:bg-cyan-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-xl">
                                 {isCapturingFrame ? <LoadingSpinner size="sm" /> : "📸"}
                             </button>
