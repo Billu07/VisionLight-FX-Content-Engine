@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import { getCORSProxyUrl } from "../lib/api";
 import { LoadingSpinner } from "./LoadingSpinner";
 
 interface DriftFrameExtractorProps {
@@ -21,25 +20,23 @@ export function DriftFrameExtractor({
   const [duration, setDuration] = useState(0);
   const [isReady, setIsReady] = useState(false);
   const [hasMetadata, setHasMetadata] = useState(false);
-  const [canPlay, setCanPlay] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isScrubbing, setIsScrubbing] = useState(false);
-  const proxiedVideoUrl = getCORSProxyUrl(videoUrl);
+  const directVideoUrl = videoUrl;
 
   useEffect(() => {
     setIsReady(false);
     setHasMetadata(false);
-    setCanPlay(false);
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
-  }, [proxiedVideoUrl]);
+  }, [directVideoUrl]);
 
   useEffect(() => {
-    if (!hasMetadata || !canPlay) return;
-    const timer = setTimeout(() => setIsReady(true), 180);
+    if (!hasMetadata) return;
+    const timer = setTimeout(() => setIsReady(true), 80);
     return () => clearTimeout(timer);
-  }, [hasMetadata, canPlay]);
+  }, [hasMetadata]);
 
   // Sync slider with video time
   const handleTimeUpdate = () => {
@@ -174,7 +171,9 @@ export function DriftFrameExtractor({
   };
 
   const captureFrame = () => {
-    void extractAtTime(currentTime, false);
+    const video = videoRef.current;
+    if (!video) return;
+    void extractAtTime(video.currentTime, false);
   };
 
   const extractSpecificFrame = (time: number) => {
@@ -191,9 +190,9 @@ export function DriftFrameExtractor({
         <canvas ref={canvasRef} className="hidden" />
 
         <video
-          key={proxiedVideoUrl}
+          key={directVideoUrl}
           ref={videoRef}
-          src={proxiedVideoUrl}
+          src={directVideoUrl}
           className="w-full h-full object-contain max-h-[60vh]"
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={() => {
@@ -203,12 +202,11 @@ export function DriftFrameExtractor({
           onSeeked={() => {
             if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
           }}
-          onCanPlay={() => setCanPlay(true)}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
           loop
           playsInline
-          preload="auto"
+          preload="metadata"
           crossOrigin="anonymous"
         />
         {!isReady && (
@@ -272,6 +270,9 @@ export function DriftFrameExtractor({
               value={currentTime}
               disabled={!isReady}
               onChange={handleSliderChange}
+              onInput={(e) =>
+                handleSliderChange(e as React.ChangeEvent<HTMLInputElement>)
+              }
               onPointerDown={() => setIsScrubbing(true)}
               onPointerUp={() => setIsScrubbing(false)}
               className="w-full accent-rose-500 cursor-pointer disabled:opacity-50 h-2 bg-gray-700 rounded-lg"
