@@ -814,6 +814,11 @@ function Dashboard() {
           return;
         }
       } else {
+        if (isVideoFile(file)) {
+          alert("PicDrift start frame must be an image.");
+          setActiveLibrarySlot(null);
+          return;
+        }
         setPicDriftFrames((prev) => ({ ...prev, start: file }));
         setPicDriftUrls((prev) => ({ ...prev, start: url }));
       }
@@ -836,6 +841,11 @@ function Dashboard() {
           return;
         }
       } else {
+        if (isVideoFile(file)) {
+          alert("PicDrift end frame must be an image.");
+          setActiveLibrarySlot(null);
+          return;
+        }
         setPicDriftFrames((prev) => ({ ...prev, end: file }));
         setPicDriftUrls((prev) => ({ ...prev, end: url }));
       }
@@ -1698,6 +1708,9 @@ function Dashboard() {
             onClose={() => setActiveLibrarySlot(null)}
             onSelect={handleAssetSelect}
             isSequencerMode={activeLibrarySlot === "sequencer"}
+            isPickerMode={
+              librarySource === "field" || activeLibrarySlot === "sequencer"
+            }
             initialTab={libraryInitialTab || undefined}
             initialAspectRatio={
               librarySource === "top" ? "original" : getCurrentRatioForLibrary()
@@ -2301,13 +2314,7 @@ function Dashboard() {
                       type="button"
                       onClick={() => {
                         setLibrarySource("top");
-                        if (currentVisualTab === "picdrift") {
-                          setActiveLibrarySlot("start");
-                        } else if (activeEngine === "veo" && veoMode === "first_last_frame") {
-                          setActiveLibrarySlot("start");
-                        } else {
-                          setActiveLibrarySlot("generic");
-                        }
+                        setActiveLibrarySlot("generic");
                       }}
                       className={`text-xs px-4 py-2 rounded-lg border flex items-center gap-2 transition-all font-semibold shadow-lg ${currentVisualTab === "picdrift"
                         ? "bg-rose-900/50 text-rose-300 border-rose-700/50 hover:bg-rose-800 hover:border-rose-500"

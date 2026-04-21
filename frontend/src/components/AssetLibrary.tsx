@@ -37,6 +37,7 @@ interface AssetLibraryProps {
     | "3DX_FRAME"
     | "TIMELINE";
   isSequencerMode?: boolean;
+  isPickerMode?: boolean;
   onEditAsset?: (asset: Asset) => void;
 }
 
@@ -46,6 +47,7 @@ export function AssetLibrary({
   initialAspectRatio,
   initialTab,
   isSequencerMode,
+  isPickerMode = false,
   onEditAsset,
 }: AssetLibraryProps) {
   const queryClient = useQueryClient();
@@ -676,12 +678,18 @@ export function AssetLibrary({
                   <div
                     key={asset.id}
                     onClick={() => {
-                      if (onSelect && (isSequencerMode || activeTab === "TIMELINE")) {
-                        // In picker flow, use immediately.
-                        handleUseImage(asset);
-                      } else if (asset.type === "VIDEO") {
+                      if (asset.type === "VIDEO") {
+                        if (onSelect && (isPickerMode || isSequencerMode)) {
+                          // In picker flow, import video directly to the target slot.
+                          handleUseImage(asset);
+                          return;
+                        }
                         setViewingVideoAsset(asset);
                       } else {
+                        if (onSelect && isSequencerMode) {
+                          handleUseImage(asset);
+                          return;
+                        }
                         setSelectedAsset(asset);
                       }
                     }}
