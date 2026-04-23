@@ -710,6 +710,45 @@ export default function SuperAdminDashboard() {
               <p className="text-xs text-gray-400 italic">These prices are used as defaults for all new organizations unless overridden.</p>
             </div>
 
+            <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Experimental Video Editor Rollout</h4>
+                <p className="text-xs text-gray-500">
+                  Keep editor restricted to SuperAdmin during testing, then switch once ready.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  const nextValue = !Boolean(globalSettings.featureVideoEditorForAll);
+                  try {
+                    const res = await apiEndpoints.superadminUpdateGlobalSettings({
+                      featureVideoEditorForAll: nextValue,
+                    });
+                    if (res.data?.success) {
+                      setGlobalSettings(res.data.settings);
+                      setMsg(
+                        nextValue
+                          ? "Video Editor rollout enabled for all users."
+                          : "Video Editor restricted to SuperAdmin.",
+                      );
+                    }
+                  } catch (err: any) {
+                    setMsg("Error: " + err.message);
+                  }
+                }}
+                className={`px-4 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest border transition-colors ${
+                  globalSettings.featureVideoEditorForAll
+                    ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30"
+                    : "bg-gray-950 border-gray-700 text-gray-300 hover:bg-gray-800"
+                }`}
+              >
+                {globalSettings.featureVideoEditorForAll
+                  ? "Enabled For All Users"
+                  : "SuperAdmin Only"}
+              </button>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
                 <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">PicDrift Engine</h4>

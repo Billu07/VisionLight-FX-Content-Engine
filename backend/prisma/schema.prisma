@@ -141,6 +141,7 @@ model GlobalSettings {
   priceVideoFX3_8s Float @default(6)
 
   priceAsset_DriftPath Float @default(2)
+  featureVideoEditorForAll Boolean @default(false)
 
   updatedAt DateTime @updatedAt
 }

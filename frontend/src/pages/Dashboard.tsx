@@ -9,7 +9,6 @@ import { ErrorAlert } from "../components/ErrorAlert";
 import { PostCard } from "../components/PostCard";
 import { BrandConfigModal } from "../components/BrandConfigModal";
 import { AssetLibrary } from "../components/AssetLibrary";
-import { TimelineExpander } from "../components/TimelineExpander";
 import { WelcomeTour } from "../components/WelcomeTour";
 import { MediaPreview } from "../components/MediaPreview";
 import { EditAssetModal } from "../components/EditAssetModal";
@@ -68,7 +67,7 @@ function Dashboard() {
   } = usePromptFxManager();
 
   const [activeLibrarySlot, setActiveLibrarySlot] = useState<
-    "start" | "end" | "generic" | "sequencer" | null
+    "start" | "end" | "generic" | "sequencer" | "storyline" | null
   >(null);
   const [librarySource, setLibrarySource] = useState<"top" | "field">("top");
   const [libraryInitialTab, setLibraryInitialTab] = useState<
@@ -217,7 +216,7 @@ function Dashboard() {
   const [showStockModal, setShowStockModal] = useState(false);
   const [showPromptInfo, setShowPromptInfo] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
-  const [showFullTimeline, setShowFullTimeline] = useState(false);
+  const [timelinePanelMode, setTimelinePanelMode] = useState<"timeline" | "storyline">("timeline");
 
   // === NEW PREVIEW STATE ===
   const [previewMedia, setPreviewMedia] = useState<{
@@ -260,6 +259,8 @@ function Dashboard() {
   const queryClient = useQueryClient();
   const { user, isLoading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
+  const canUseVideoEditor =
+    user?.role === "SUPERADMIN" || user?.videoEditorEnabledForAll === true;
 
   // Helper to determine the current "Visual Tab"
   const currentVisualTab: VisualTab =
@@ -353,6 +354,12 @@ function Dashboard() {
   useEffect(() => {
     if (!authLoading && !user) navigate("/");
   }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (!canUseVideoEditor && viewMode === "sequencer") {
+      setViewMode("create");
+    }
+  }, [canUseVideoEditor, viewMode]);
 
   useEffect(() => {
     if (user && !localStorage.getItem("visionlight_welcome_shown")) {
@@ -859,7 +866,7 @@ function Dashboard() {
         setPicDriftUrls((prev) => ({ ...prev, end: url }));
       }
     } else if (activeLibrarySlot === "sequencer") {
-      // ✅ Add to Bin
+      // Add to editor bin for full Video Editor flow
       const isVideo = file.type.startsWith("video");
       const newItem: SequenceItem = {
         id: crypto.randomUUID(),
@@ -870,7 +877,20 @@ function Dashboard() {
         originalDuration: isVideo ? 15000 : 3000,
       };
       setBinItems((prev) => [...prev, newItem]);
-      alert("✅ Added to Editor Bin");
+      alert("Added to Editor Bin");
+    } else if (activeLibrarySlot === "storyline") {
+      const isVideo = file.type.startsWith("video");
+      const newItem: SequenceItem = {
+        id: crypto.randomUUID(),
+        url,
+        type: isVideo ? "VIDEO" : "IMAGE",
+        title: file.name,
+        duration: isVideo ? 5000 : 3000,
+        originalDuration: isVideo ? 15000 : 3000,
+      };
+      setSequence((prev) => [...prev, newItem]);
+      setTimelinePanelMode("storyline");
+      alert("Added to Storyline");
     } else {
       if (activeEngine === "studio") {
         if (file.type.startsWith("video")) {
@@ -1268,14 +1288,19 @@ function Dashboard() {
 
   // ✅ NEW: Add to Sequence Logic
   const handleAddToSequence = (post: any) => {
-    // Extract URL
     let url = post.mediaUrl;
-    // Handle array or JSON weirdness
     if (url && url.startsWith("[") && url.includes("]")) {
       try {
         const parsed = JSON.parse(url);
         if (Array.isArray(parsed) && parsed.length > 0) url = parsed[0];
-      } catch (e) { }
+      } catch {
+        // Keep original URL when parsing fails.
+      }
+    }
+
+    if (!url) {
+      alert("Unable to add this item to Storyline.");
+      return;
     }
 
     const item: SequenceItem = {
@@ -1287,7 +1312,39 @@ function Dashboard() {
     };
 
     setSequence((prev) => [...prev, item]);
-    alert("✅ Added to Sequence Merger");
+    setTimelinePanelMode("storyline");
+    alert("Added to Storyline");
+  };
+
+  const moveStorylineItem = (index: number, direction: -1 | 1) => {
+    setSequence((prev) => {
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
+      const updated = [...prev];
+      const temp = updated[index];
+      updated[index] = updated[targetIndex];
+      updated[targetIndex] = temp;
+      return updated;
+    });
+  };
+
+  const removeStorylineItem = (index: number) => {
+    setSequence((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateStorylineDuration = (index: number, seconds: number) => {
+    if (!Number.isFinite(seconds)) return;
+    const normalized = Math.max(1, Math.min(60, Math.round(seconds)));
+    setSequence((prev) =>
+      prev.map((item, i) =>
+        i === index
+          ? {
+              ...item,
+              duration: normalized * 1000,
+            }
+          : item,
+      ),
+    );
   };
 
   const handleMagicEditUpload = async (
@@ -1716,9 +1773,14 @@ function Dashboard() {
           <AssetLibrary
             onClose={() => setActiveLibrarySlot(null)}
             onSelect={handleAssetSelect}
-            isSequencerMode={activeLibrarySlot === "sequencer"}
+            isSequencerMode={
+              activeLibrarySlot === "sequencer" ||
+              activeLibrarySlot === "storyline"
+            }
             isPickerMode={
-              librarySource === "field" || activeLibrarySlot === "sequencer"
+              librarySource === "field" ||
+              activeLibrarySlot === "sequencer" ||
+              activeLibrarySlot === "storyline"
             }
             initialTab={libraryInitialTab || undefined}
             initialAspectRatio={
@@ -1734,7 +1796,7 @@ function Dashboard() {
         )}
 
         {/* ✅ FULLSCREEN SEQUENCE EDITOR */}
-        {viewMode === "sequencer" && (
+        {canUseVideoEditor && viewMode === "sequencer" && (
           <FullscreenVideoEditor
             projectId={localStorage.getItem("visionlight_active_project") || undefined}
             sequence={sequence}
@@ -1765,6 +1827,9 @@ function Dashboard() {
             } else if (tab === "projects") {
               localStorage.removeItem("visionlight_active_project");
               navigate("/projects");
+            } else if (tab === "sequencer" && !canUseVideoEditor) {
+              setTimelinePanelMode("storyline");
+              setViewMode("history");
             } else {
               setViewMode(tab);
             }
@@ -1777,6 +1842,7 @@ function Dashboard() {
             localStorage.removeItem("visionlight_active_project");
             navigate("/projects");
           }}
+          showSequencerTab={canUseVideoEditor}
         />
 
         {/* EXTRACTOR MODAL */}
@@ -2294,22 +2360,24 @@ function Dashboard() {
 
                   {/* ✅ GLOBAL HEADER BUTTONS (HIDDEN ON MOBILE) */}
                   <div className="hidden sm:flex gap-3 ml-auto">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setViewMode(
-                          viewMode === "create" ? "sequencer" : "create",
-                        )
-                      }
-                      className={`text-xs px-4 py-2 rounded-lg border font-semibold transition-colors flex items-center gap-2 ${viewMode === "sequencer"
-                        ? "bg-purple-600 text-white border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]"
-                        : "bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700 hover:text-white"
-                        }`}
-                    >
-                      {viewMode === "sequencer"
-                        ? "Back to Create"
-                        : "Video Editor"}
-                    </button>
+                    {canUseVideoEditor && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setViewMode(
+                            viewMode === "create" ? "sequencer" : "create",
+                          )
+                        }
+                        className={`text-xs px-4 py-2 rounded-lg border font-semibold transition-colors flex items-center gap-2 ${viewMode === "sequencer"
+                          ? "bg-purple-600 text-white border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]"
+                          : "bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700 hover:text-white"
+                          }`}
+                      >
+                        {viewMode === "sequencer"
+                          ? "Back to Create"
+                          : "Video Editor"}
+                      </button>
+                    )}
 
                     <button
                       type="button"
@@ -4147,97 +4215,207 @@ function Dashboard() {
               <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 shadow-2xl sticky top-4">
                 <div className="flex items-center justify-between mb-4 sm:mb-6">
                   <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
-                    <span></span> Timeline
+                    <span></span> {timelinePanelMode === "timeline" ? "Timeline" : "Storyline"}
                   </h2>
-                  {/* EXPAND BUTTON */}
-                  <button
-                    onClick={() => setShowFullTimeline(true)}
-                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-cyan-400 transition-colors border border-transparent hover:border-cyan-500/30"
-                    title="Expand Timeline"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-                      />
-                    </svg>
-                  </button>
-                  {postsLoading && <LoadingSpinner size="sm" variant="neon" />}
-                </div>
-                <div className="space-y-3 max-h-[500px] sm:max-h-[600px] overflow-y-auto custom-scrollbar">
-                  {compactTimelinePosts.length > 0 ? (
-                    compactTimelinePosts.map((post: any) => (
-                        <PostCard
-                          key={post.id}
-                          post={post}
-                          onPublishPost={() =>
-                            handleShowPromptInfo(post.prompt)
-                          }
-                          userCredits={userCredits}
-                          publishingPost={null}
-                          primaryColor={brandConfig?.primaryColor}
-                          compact={true}
-                          onUseAsStartFrame={handleUseAsStartFrame}
-                          onDrift={() => handleDriftFromPost(post)}
-                          onPreview={() => {
-                            let type = "image";
-                            if (post.mediaType === "VIDEO") type = "video";
-                            if (post.mediaType === "CAROUSEL")
-                              type = "carousel";
-                            let url = post.mediaUrl;
-                            if (type === "carousel") {
-                              try {
-                                url = JSON.parse(post.mediaUrl);
-                              } catch (e) { }
-                            }
-                            setPreviewMedia({ type: type as any, url });
-                          }}
-                          onMoveToAsset={
-                            post.mediaType === "IMAGE" ||
-                              post.mediaType === "CAROUSEL"
-                              ? () => handleMoveToAssets(post.id)
-                              : undefined
-                          }
-                          onDelete={() => {
-                            (async () => {
-                              if (
-                                await confirmAction(
-                                  "Are you sure you want to delete this post?",
-                                  { confirmLabel: "Delete" },
-                                )
-                              ) {
-                                deletePostMutation.mutate(post.id);
-                              }
-                            })();
-                          }}
-                          onAddToSequence={() => handleAddToSequence(post)}
-                        />
-                      ))
-                  ) : !postsLoading ? (
-                    <div className="text-center py-8">
-                      <div className="text-purple-300 text-sm mb-3">
-                        No content yet
-                      </div>
-                      <div className="text-4xl mb-2"></div>
-                    </div>
-                  ) : null}
-                </div>
-                {postsError && (
-                  <div className="text-center py-6">
-                    <ErrorAlert
-                      message="Failed to load your content"
-                      onRetry={() =>
-                        queryClient.invalidateQueries({ queryKey: ["posts"] })
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setTimelinePanelMode((prev) =>
+                          prev === "timeline" ? "storyline" : "timeline",
+                        )
                       }
-                      type="error"
-                    />
+                      className="text-[11px] px-3 py-1.5 rounded-lg border font-semibold transition-colors bg-white/5 hover:bg-white/10 text-gray-300 hover:text-cyan-300 border-white/10 hover:border-cyan-500/30"
+                    >
+                      {timelinePanelMode === "timeline" ? "Storyline" : "Timeline"}
+                    </button>
+                    {postsLoading && timelinePanelMode === "timeline" && (
+                      <LoadingSpinner size="sm" variant="neon" />
+                    )}
+                  </div>
+                </div>
+                {timelinePanelMode === "timeline" ? (
+                  <>
+                    <div className="space-y-3 max-h-[500px] sm:max-h-[600px] overflow-y-auto custom-scrollbar">
+                      {compactTimelinePosts.length > 0 ? (
+                        compactTimelinePosts.map((post: any) => (
+                            <PostCard
+                              key={post.id}
+                              post={post}
+                              onPublishPost={() =>
+                                handleShowPromptInfo(post.prompt)
+                              }
+                              userCredits={userCredits}
+                              publishingPost={null}
+                              primaryColor={brandConfig?.primaryColor}
+                              compact={true}
+                              onUseAsStartFrame={handleUseAsStartFrame}
+                              onDrift={() => handleDriftFromPost(post)}
+                              onPreview={() => {
+                                let type = "image";
+                                if (post.mediaType === "VIDEO") type = "video";
+                                if (post.mediaType === "CAROUSEL")
+                                  type = "carousel";
+                                let url = post.mediaUrl;
+                                if (type === "carousel") {
+                                  try {
+                                    url = JSON.parse(post.mediaUrl);
+                                  } catch (e) { }
+                                }
+                                setPreviewMedia({ type: type as any, url });
+                              }}
+                              onMoveToAsset={
+                                post.mediaType === "IMAGE" ||
+                                  post.mediaType === "CAROUSEL"
+                                  ? () => handleMoveToAssets(post.id)
+                                  : undefined
+                              }
+                              onDelete={() => {
+                                (async () => {
+                                  if (
+                                    await confirmAction(
+                                      "Are you sure you want to delete this post?",
+                                      { confirmLabel: "Delete" },
+                                    )
+                                  ) {
+                                    deletePostMutation.mutate(post.id);
+                                  }
+                                })();
+                              }}
+                              onAddToSequence={() => handleAddToSequence(post)}
+                            />
+                          ))
+                      ) : !postsLoading ? (
+                        <div className="text-center py-8">
+                          <div className="text-purple-300 text-sm mb-3">
+                            No content yet
+                          </div>
+                          <div className="text-4xl mb-2"></div>
+                        </div>
+                      ) : null}
+                    </div>
+                    {postsError && (
+                      <div className="text-center py-6">
+                        <ErrorAlert
+                          message="Failed to load your content"
+                          onRetry={() =>
+                            queryClient.invalidateQueries({ queryKey: ["posts"] })
+                          }
+                          type="error"
+                        />
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-3 max-h-[500px] sm:max-h-[600px] overflow-y-auto custom-scrollbar">
+                    {sequence.length > 0 ? (
+                      sequence.map((item, index) => (
+                        <div
+                          key={`${item.id}-${index}`}
+                          className="bg-gray-800/40 backdrop-blur-sm rounded-xl border border-white/10 p-3 hover:border-cyan-500/30 transition-colors"
+                        >
+                          <div className="flex gap-3">
+                            <div className="w-16 h-12 rounded-lg bg-black border border-white/10 overflow-hidden flex-shrink-0">
+                              {item.type === "VIDEO" ? (
+                                <video
+                                  src={getCORSProxyUrl(item.url)}
+                                  className="w-full h-full object-cover"
+                                  muted
+                                />
+                              ) : (
+                                <img
+                                  src={getCORSProxyUrl(item.url, 320, 75)}
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p
+                                className="text-xs text-white font-semibold truncate"
+                                title={item.title || `Scene ${index + 1}`}
+                              >
+                                {item.title || `Scene ${index + 1}`}
+                              </p>
+                              <div className="text-[10px] text-gray-400 mt-1 flex items-center gap-2">
+                                <span>{item.type}</span>
+                                {item.type !== "VIDEO" && (
+                                  <>
+                                    <span>Duration</span>
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={60}
+                                      value={Math.max(1, Math.round((item.duration || 3000) / 1000))}
+                                      onChange={(e) =>
+                                        updateStorylineDuration(index, Number(e.target.value))
+                                      }
+                                      className="w-12 px-1 py-0.5 rounded bg-gray-900 border border-white/10 text-center text-[10px] text-cyan-300 outline-none"
+                                    />
+                                    <span>s</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <button
+                                type="button"
+                                onClick={() => moveStorylineItem(index, -1)}
+                                disabled={index === 0}
+                                className="w-6 h-6 text-[10px] rounded bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                                title="Move Up"
+                              >
+                                ^
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveStorylineItem(index, 1)}
+                                disabled={index === sequence.length - 1}
+                                className="w-6 h-6 text-[10px] rounded bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                                title="Move Down"
+                              >
+                                v
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeStorylineItem(index)}
+                                className="w-6 h-6 text-[10px] rounded bg-red-500/15 hover:bg-red-500/30 border border-red-500/30 text-red-300"
+                                title="Remove"
+                              >
+                                x
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-10">
+                        <div className="text-cyan-300 text-sm mb-2">
+                          Storyline is empty
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Use Timeline + button to add clips here.
+                        </div>
+                      </div>
+                    )}
+                    <div className="pt-2 border-t border-white/10 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLibrarySource("field");
+                          setActiveLibrarySlot("storyline");
+                        }}
+                        className="flex-1 text-xs px-3 py-2 rounded-lg border border-cyan-500/40 text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 font-semibold transition-colors"
+                      >
+                        + Add Media
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSequence([])}
+                        className="px-3 py-2 text-xs rounded-lg border border-red-500/30 text-red-300 bg-red-500/10 hover:bg-red-500/20 font-semibold transition-colors"
+                      >
+                        Clear
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -4261,49 +4439,11 @@ function Dashboard() {
               }}
             />
           )}
-          {/* ✅ ADD THIS BLOCK */}
-          {showFullTimeline && (
-            <TimelineExpander
-              posts={timelinePosts}
-              onClose={() => setShowFullTimeline(false)}
-              userCredits={userCredits}
-              brandConfig={brandConfig}
-              onPublishPost={(t) => handleShowPromptInfo(t)}
-              onUseAsStartFrame={handleUseAsStartFrame}
-              onDrift={(p) => handleDriftFromPost(p)}
-              onPreview={(media) => {
-                // Re-use your preview logic
-                let type = "image";
-                if (media.mediaType === "VIDEO") type = "video";
-                if (media.mediaType === "CAROUSEL") type = "carousel";
-                let url = media.mediaUrl;
-                if (type === "carousel") {
-                  try {
-                    url = JSON.parse(media.mediaUrl);
-                  } catch (e) { }
-                }
-                setPreviewMedia({ type: type as any, url });
-              }}
-              onMoveToAsset={(id) => handleMoveToAssets(id)}
-              onDelete={(id) => {
-                (async () => {
-                  if (await confirmAction("Delete this post?", { confirmLabel: "Delete" })) {
-                    deletePostMutation.mutate(id);
-                  }
-                })();
-              }}
-              onAddToSequence={(post) => handleAddToSequence(post)}
-            />
-          )}
-        </div>
+          </div>
       </div>
     </div>
   );
 }
 
 export default Dashboard;
-
-
-
-
 

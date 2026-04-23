@@ -30,8 +30,22 @@ const getAllocatedProjectQuota = async (orgId: string, excludeUserId?: string) =
   return allocation._sum.maxProjects || 0;
 };
 
+const parseBoolean = (value: any) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true" || normalized === "1") return true;
+    if (normalized === "false" || normalized === "0") return false;
+  }
+  if (typeof value === "number") {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+  return null;
+};
+
 const sanitizePricingUpdate = (payload: any) => {
-  const updates: Record<string, number> = {};
+  const updates: Record<string, number | boolean> = {};
   for (const key of PRICE_KEYS) {
     if (payload?.[key] === undefined) continue;
     const parsed = toNonNegativeInt(payload[key]);
@@ -40,6 +54,15 @@ const sanitizePricingUpdate = (payload: any) => {
     }
     updates[key] = parsed;
   }
+
+  if (payload?.featureVideoEditorForAll !== undefined) {
+    const enabled = parseBoolean(payload.featureVideoEditorForAll);
+    if (enabled === null) {
+      throw new Error("INVALID_PRICING_VALUE:featureVideoEditorForAll");
+    }
+    updates.featureVideoEditorForAll = enabled;
+  }
+
   return updates;
 };
 

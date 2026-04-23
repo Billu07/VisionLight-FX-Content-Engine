@@ -618,7 +618,7 @@ export function PostCard({
                     onAddToSequence();
                   }}
                   className="w-8 h-8 flex items-center justify-center bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/30 rounded-lg text-cyan-300 transition-colors"
-                  title="Add to Merger Sequence"
+                  title="Add to Storyline"
                 >
                   ➕
                 </button>

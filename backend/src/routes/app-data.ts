@@ -29,10 +29,13 @@ router.get(
         }
       }
 
-      const systemPresets = await prisma.presetPrompt.findMany({
-        where: { isActive: true },
-        select: { id: true, name: true, prompt: true },
-      });
+      const [systemPresets, globalSettings] = await Promise.all([
+        prisma.presetPrompt.findMany({
+          where: { isActive: true },
+          select: { id: true, name: true, prompt: true },
+        }),
+        airtableService.getGlobalSettings(),
+      ]);
 
       res.json({
         success: true,
@@ -42,6 +45,8 @@ router.get(
           isOrgActive,
           needsActivation,
           organizationName: org?.name,
+          videoEditorEnabledForAll:
+            globalSettings?.featureVideoEditorForAll === true,
         },
       });
     } catch (error: any) {

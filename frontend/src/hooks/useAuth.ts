@@ -13,6 +13,7 @@ interface User {
   organizationName?: string | null;
   isOrgActive?: boolean;
   needsActivation?: boolean;
+  videoEditorEnabledForAll?: boolean;
   view?: "VISIONLIGHT" | "PICDRIFT";
   maxProjects?: number;
 }
