@@ -221,6 +221,9 @@ export default function TenantDashboard() {
     return item.message || "Unavailable";
   };
 
+  const showFalBillingFallback =
+    providerBalances?.balances?.fal?.status === "insufficient_scope";
+
   const handleResolveCreditRequest = async (requestId: string) => {
     try {
       await apiEndpoints.tenantResolveRequest(requestId);
@@ -548,7 +551,7 @@ export default function TenantDashboard() {
                   {providerBalanceLoading ? "Refreshing..." : "Refresh Provider Balance"}
                 </button>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className={`grid grid-cols-1 ${adminUser?.view !== "PICDRIFT" ? "sm:grid-cols-2" : ""} gap-3`}>
                 <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
                   <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
                     Fal Balance
@@ -562,21 +565,33 @@ export default function TenantDashboard() {
                       },
                     )}
                   </p>
+                  {showFalBillingFallback && (
+                    <a
+                      href="https://fal.ai/dashboard/usage-billing/credits"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-block px-3 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300"
+                    >
+                      Open Fal Billing
+                    </a>
+                  )}
                 </div>
-                <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    KIE Credits
-                  </p>
-                  <p className="text-sm font-semibold text-white">
-                    {renderProviderBalanceValue(
-                      "kie",
-                      providerBalances?.balances?.kie || {
-                        status: "error",
-                        message: "Not checked yet",
-                      },
-                    )}
-                  </p>
-                </div>
+                {adminUser?.view !== "PICDRIFT" && (
+                  <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                      KIE Credits
+                    </p>
+                    <p className="text-sm font-semibold text-white">
+                      {renderProviderBalanceValue(
+                        "kie",
+                        providerBalances?.balances?.kie || {
+                          status: "error",
+                          message: "Not checked yet",
+                        },
+                      )}
+                    </p>
+                  </div>
+                )}
               </div>
               {providerBalances?.checkedAt && (
                 <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-4">

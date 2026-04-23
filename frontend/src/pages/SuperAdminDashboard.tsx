@@ -231,6 +231,9 @@ export default function SuperAdminDashboard() {
     return item.message || "Unavailable";
   };
 
+  const showFalBillingFallback =
+    providerBalances?.balances?.fal?.status === "insufficient_scope";
+
   const handleResolveCreditRequest = async (requestId: string) => {
     try {
       await apiEndpoints.superadminResolveRequest(requestId);
@@ -566,6 +569,16 @@ export default function SuperAdminDashboard() {
                       },
                     )}
                   </p>
+                  {showFalBillingFallback && (
+                    <a
+                      href="https://fal.ai/dashboard/usage-billing/credits"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 inline-block px-3 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300"
+                    >
+                      Open Fal Billing
+                    </a>
+                  )}
                 </div>
                 <div className="bg-gray-950 border border-gray-800 rounded-lg p-5">
                   <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
