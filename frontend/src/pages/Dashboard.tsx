@@ -1404,17 +1404,56 @@ function Dashboard() {
     );
   };
 
-  const buildStorylinePost = (item: SequenceItem, index: number) => ({
-    id: item.id,
-    mediaUrl: item.sourceMediaUrl || item.url,
-    mediaType: item.type,
-    mediaProvider: item.type === "VIDEO" ? "storyline" : undefined,
-    title: item.title || `Scene ${index + 1}`,
-    prompt: item.prompt || item.title || "",
-    createdAt: item.createdAt || new Date().toISOString(),
-    status: "COMPLETED",
-    progress: 100,
-  });
+  const buildStorylinePost = (item: SequenceItem, index: number) => {
+    const itemUrls = [item.sourceMediaUrl, item.url]
+      .filter(Boolean)
+      .flatMap((value) => {
+        if (!value) return [];
+        if (value.startsWith("[") && value.includes("]")) {
+          try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed : [value];
+          } catch {
+            return [value];
+          }
+        }
+        return [value];
+      });
+
+    const matchedPost = posts.find((post: any) => {
+      const postUrls = [post.mediaUrl]
+        .filter(Boolean)
+        .flatMap((value: string) => {
+          if (value.startsWith("[") && value.includes("]")) {
+            try {
+              const parsed = JSON.parse(value);
+              return Array.isArray(parsed) ? parsed : [value];
+            } catch {
+              return [value];
+            }
+          }
+          return [value];
+        });
+
+      return postUrls.some((postUrl: string) => itemUrls.includes(postUrl));
+    });
+
+    return {
+      id: item.id,
+      mediaUrl: matchedPost?.mediaUrl || item.sourceMediaUrl || item.url,
+      mediaType: matchedPost?.mediaType || item.type,
+      mediaProvider: matchedPost?.mediaProvider,
+      title: matchedPost?.title || item.title || `Scene ${index + 1}`,
+      prompt:
+        matchedPost?.prompt ||
+        item.prompt ||
+        "",
+      createdAt:
+        matchedPost?.createdAt || item.createdAt || new Date().toISOString(),
+      status: "COMPLETED",
+      progress: 100,
+    };
+  };
 
   const handleUseStorylineInPanel = async (item: SequenceItem) => {
     try {
@@ -4485,13 +4524,15 @@ function Dashboard() {
                 ) : (
                   <div className="space-y-3 max-h-[720px] sm:max-h-[780px] overflow-y-auto custom-scrollbar">
                     {storylineSequence.length > 0 ? (
-                      storylineSequence.map((item, index) => (
+                      storylineSequence.map((item, index) => {
+                        const storylinePost = buildStorylinePost(item, index);
+                        return (
                         <div key={`${item.id}-${index}`} className="space-y-2">
                           <PostCard
-                            post={buildStorylinePost(item, index)}
+                            post={storylinePost}
                             onPublishPost={() =>
                               handleShowPromptInfo(
-                                item.prompt || item.title || "No prompt available.",
+                                storylinePost.prompt || "No prompt available.",
                               )
                             }
                             userCredits={userCredits}
@@ -4501,20 +4542,20 @@ function Dashboard() {
                             onPrimaryAction={() => handleUseStorylineInPanel(item)}
                             primaryActionLabel="Use In Panel"
                             onDrift={
-                              item.type === "VIDEO"
+                              storylinePost.mediaType === "VIDEO"
                                 ? () =>
                                     setExtractingVideoUrl(
-                                      item.sourceMediaUrl || item.url,
+                                      storylinePost.mediaUrl || item.sourceMediaUrl || item.url,
                                     )
                                 : undefined
                             }
                             onPreview={() => {
                               let previewType: "image" | "video" | "carousel" =
                                 "image";
-                              if (item.type === "VIDEO") previewType = "video";
-                              if (item.type === "CAROUSEL") previewType = "carousel";
+                              if (storylinePost.mediaType === "VIDEO") previewType = "video";
+                              if (storylinePost.mediaType === "CAROUSEL") previewType = "carousel";
                               let previewUrl: string | string[] =
-                                item.sourceMediaUrl || item.url;
+                                storylinePost.mediaUrl || item.sourceMediaUrl || item.url;
                               if (
                                 previewType === "carousel" &&
                                 typeof previewUrl === "string"
@@ -4569,7 +4610,8 @@ function Dashboard() {
                             </div>
                           </div>
                         </div>
-                      ))
+                        );
+                      })
                     ) : (
                       <div className="text-center py-10">
                         <div className="text-cyan-300 text-sm mb-2">

@@ -86,7 +86,8 @@ export function PostCard({
   const isVideoPost =
     post.mediaType === "VIDEO" ||
     post.mediaProvider === "sora" ||
-    post.mediaProvider?.includes("kling");
+    post.mediaProvider?.includes("kling") ||
+    /\.(mp4|webm|mov|m4v)(\?|$)/i.test(getCleanUrl(post.mediaUrl || ""));
 
   // Helper to handle clicks in minimal mode
   const handleCardClick = () => {
@@ -129,10 +130,10 @@ export function PostCard({
   }, [post.id, isVideoPost, compact]);
 
   useEffect(() => {
-    if (post.mediaType === "VIDEO" || post.mediaProvider === "sora") {
+    if (isVideoPost) {
       setVideoLoading(true);
     }
-  }, [post.id, post.mediaUrl, post.mediaType, post.mediaProvider]);
+  }, [post.id, post.mediaUrl, post.mediaType, post.mediaProvider, isVideoPost]);
 
   useEffect(() => {
     if (
@@ -398,7 +399,7 @@ export function PostCard({
     }
 
     // VIDEO
-    if (post.mediaType === "VIDEO" || post.mediaProvider === "sora") {
+    if (isVideoPost) {
       return (
         <div
           ref={videoContainerRef}
