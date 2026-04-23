@@ -29,13 +29,22 @@ router.get(
         }
       }
 
-      const [systemPresets, globalSettings] = await Promise.all([
-        prisma.presetPrompt.findMany({
-          where: { isActive: true },
-          select: { id: true, name: true, prompt: true },
-        }),
-        airtableService.getGlobalSettings(),
-      ]);
+      const systemPresets = await prisma.presetPrompt.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true, prompt: true },
+      });
+
+      let videoEditorEnabledForAll = false;
+      try {
+        const globalSettings = await airtableService.getGlobalSettings();
+        videoEditorEnabledForAll =
+          globalSettings?.featureVideoEditorForAll === true;
+      } catch (settingsError: any) {
+        console.warn(
+          "[auth/me] Global settings unavailable; defaulting Video Editor rollout to superadmin-only.",
+          settingsError?.message || settingsError,
+        );
+      }
 
       res.json({
         success: true,
@@ -45,8 +54,7 @@ router.get(
           isOrgActive,
           needsActivation,
           organizationName: org?.name,
-          videoEditorEnabledForAll:
-            globalSettings?.featureVideoEditorForAll === true,
+          videoEditorEnabledForAll,
         },
       });
     } catch (error: any) {
