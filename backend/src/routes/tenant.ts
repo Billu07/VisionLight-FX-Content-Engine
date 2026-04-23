@@ -1,4 +1,5 @@
 import express from "express";
+import axios from "axios";
 import { dbService, prisma } from "../services/database";
 import { AuthService } from "../services/auth";
 import { authenticateToken, requireAdmin, AuthenticatedRequest } from "../middleware/auth";
@@ -24,6 +25,104 @@ const sanitizePricingUpdate = (pricing: any) => {
     updates[key] = parsed;
   }
   return updates;
+};
+
+type ProviderBalanceStatus = "ok" | "missing_key" | "insufficient_scope" | "error";
+
+const getErrorMessage = (error: any, fallback: string) =>
+  error?.response?.data?.error ||
+  error?.response?.data?.msg ||
+  error?.message ||
+  fallback;
+
+const fetchFalBalance = async (falApiKey: string | null) => {
+  if (!falApiKey) {
+    return {
+      status: "missing_key" as ProviderBalanceStatus,
+      message: "Fal key is not configured.",
+    };
+  }
+
+  try {
+    const response = await axios.get("https://api.fal.ai/v1/account/billing", {
+      headers: { Authorization: `Key ${falApiKey}` },
+      params: { expand: "credits" },
+      timeout: 15000,
+    });
+    const balance = Number(response.data?.credits?.current_balance);
+    const currency = response.data?.credits?.currency || "USD";
+    if (!Number.isFinite(balance)) {
+      return {
+        status: "error" as ProviderBalanceStatus,
+        message: "Unexpected Fal billing response.",
+      };
+    }
+    return {
+      status: "ok" as ProviderBalanceStatus,
+      balance,
+      currency,
+    };
+  } catch (error: any) {
+    const status = error?.response?.status;
+    if (status === 401 || status === 403) {
+      return {
+        status: "insufficient_scope" as ProviderBalanceStatus,
+        message:
+          "Fal balance unavailable for this key scope. Use an admin/billing-capable key.",
+      };
+    }
+    return {
+      status: "error" as ProviderBalanceStatus,
+      message: getErrorMessage(error, "Failed to fetch Fal balance."),
+    };
+  }
+};
+
+const fetchKieBalance = async (kieApiKey: string | null) => {
+  if (!kieApiKey) {
+    return {
+      status: "missing_key" as ProviderBalanceStatus,
+      message: "KIE key is not configured.",
+    };
+  }
+
+  try {
+    const response = await axios.get("https://api.kie.ai/api/v1/chat/credit", {
+      headers: { Authorization: `Bearer ${kieApiKey}` },
+      timeout: 15000,
+    });
+    const code = Number(response.data?.code);
+    const credits = Number(response.data?.data);
+    if (code === 200 && Number.isFinite(credits)) {
+      return {
+        status: "ok" as ProviderBalanceStatus,
+        credits,
+      };
+    }
+    return {
+      status: "error" as ProviderBalanceStatus,
+      message:
+        response.data?.msg || "Unexpected KIE credit response.",
+    };
+  } catch (error: any) {
+    const status = error?.response?.status;
+    if (status === 401 || status === 403) {
+      return {
+        status: "error" as ProviderBalanceStatus,
+        message: "KIE key is invalid or unauthorized.",
+      };
+    }
+    if (status === 402) {
+      return {
+        status: "ok" as ProviderBalanceStatus,
+        credits: 0,
+      };
+    }
+    return {
+      status: "error" as ProviderBalanceStatus,
+      message: getErrorMessage(error, "Failed to fetch KIE balance."),
+    };
+  }
 };
 
 // Apply middleware
@@ -237,6 +336,28 @@ router.get("/requests", async (req: AuthenticatedRequest, res) => {
     res.json({ success: true, requests });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Get live provider balances for this organization's configured keys
+router.get("/provider-balances", async (req: AuthenticatedRequest, res) => {
+  try {
+    const org = await getOrg(req);
+    const falApiKey = encryptionUtils.decrypt(org.falApiKey);
+    const kieApiKey = encryptionUtils.decrypt(org.kieApiKey);
+
+    const [fal, kie] = await Promise.all([
+      fetchFalBalance(falApiKey),
+      fetchKieBalance(kieApiKey),
+    ]);
+
+    res.json({
+      success: true,
+      checkedAt: new Date().toISOString(),
+      balances: { fal, kie },
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to fetch provider balances." });
   }
 });
 

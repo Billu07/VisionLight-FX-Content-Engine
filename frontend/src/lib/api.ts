@@ -75,6 +75,7 @@ export const apiEndpoints = {
   tenantResolveRequest: (id: string) => api.put(`/api/tenant/requests/${id}/resolve`),
   tenantGetConfig: () => api.get("/api/tenant/config"),
   tenantUpdateConfig: (data: any) => api.put("/api/tenant/config", data),
+  tenantGetProviderBalances: () => api.get("/api/tenant/provider-balances"),
 
   // === Admin Organization (Tenant Control - Legacy) ===
   adminGetOrganization: () => api.get("/api/admin/organization"),

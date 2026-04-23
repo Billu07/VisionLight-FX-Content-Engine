@@ -26,6 +26,22 @@ interface Config {
   pricing: any;
 }
 
+interface ProviderBalanceItem {
+  status: "ok" | "missing_key" | "insufficient_scope" | "error";
+  message?: string;
+  balance?: number;
+  currency?: string;
+  credits?: number;
+}
+
+interface ProviderBalancesResponse {
+  checkedAt: string;
+  balances: {
+    fal: ProviderBalanceItem;
+    kie: ProviderBalanceItem;
+  };
+}
+
 interface CreditRequest {
   id: string;
   email: string;
@@ -46,6 +62,9 @@ export default function TenantDashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [creditRequests, setCreditRequests] = useState<CreditRequest[]>([]);
   const [config, setConfig] = useState<Config | null>(null);
+  const [providerBalances, setProviderBalances] =
+    useState<ProviderBalancesResponse | null>(null);
+  const [providerBalanceLoading, setProviderBalanceLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [msg, setMsg] = useState("");
@@ -92,6 +111,12 @@ export default function TenantDashboard() {
     }, 10000);
 
     return () => clearInterval(interval);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === "integrations") {
+      fetchProviderBalances();
+    }
   }, [activeTab]);
 
   const fetchData = async () => {
@@ -153,6 +178,47 @@ export default function TenantDashboard() {
     } catch (err: any) {
       alert(err.message);
     }
+  };
+
+  const fetchProviderBalances = async () => {
+    setProviderBalanceLoading(true);
+    try {
+      const res = await apiEndpoints.tenantGetProviderBalances();
+      if (res.data.success) {
+        setProviderBalances({
+          checkedAt: res.data.checkedAt,
+          balances: res.data.balances,
+        });
+      }
+    } catch (err: any) {
+      setMsg("Error: " + err.message);
+    } finally {
+      setProviderBalanceLoading(false);
+    }
+  };
+
+  const renderProviderBalanceValue = (
+    provider: "fal" | "kie",
+    item: ProviderBalanceItem,
+  ) => {
+    if (item.status === "ok") {
+      if (provider === "fal") {
+        const value =
+          typeof item.balance === "number"
+            ? item.balance.toFixed(2)
+            : "0.00";
+        return `${value} ${item.currency || "USD"}`;
+      }
+      const value =
+        typeof item.credits === "number"
+          ? item.credits.toLocaleString()
+          : "0";
+      return `${value} credits`;
+    }
+    if (item.status === "missing_key") return "Not configured";
+    if (item.status === "insufficient_scope")
+      return item.message || "Unavailable for this key scope";
+    return item.message || "Unavailable";
   };
 
   const handleResolveCreditRequest = async (requestId: string) => {
@@ -452,6 +518,56 @@ export default function TenantDashboard() {
                       </>
                     )}
                   </div>
+                </div>
+                <div className="border-t border-gray-800 pt-6 mt-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                      Provider Balances
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={fetchProviderBalances}
+                      disabled={providerBalanceLoading}
+                      className="px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 disabled:opacity-50"
+                    >
+                      {providerBalanceLoading ? "Refreshing..." : "Refresh Provider Balance"}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                        Fal Balance
+                      </p>
+                      <p className="text-sm font-semibold text-white">
+                        {renderProviderBalanceValue(
+                          "fal",
+                          providerBalances?.balances?.fal || {
+                            status: "error",
+                            message: "Not checked yet",
+                          },
+                        )}
+                      </p>
+                    </div>
+                    <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                        KIE Credits
+                      </p>
+                      <p className="text-sm font-semibold text-white">
+                        {renderProviderBalanceValue(
+                          "kie",
+                          providerBalances?.balances?.kie || {
+                            status: "error",
+                            message: "Not checked yet",
+                          },
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  {providerBalances?.checkedAt && (
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest">
+                      Last checked: {new Date(providerBalances.checkedAt).toLocaleString()}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="submit"
