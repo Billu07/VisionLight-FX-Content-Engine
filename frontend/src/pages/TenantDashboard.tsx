@@ -58,7 +58,7 @@ export default function TenantDashboard() {
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<"team" | "pricing" | "integrations">("team");
+  const [activeTab, setActiveTab] = useState<"team" | "pricing" | "integrations" | "balances">("team");
   const [users, setUsers] = useState<User[]>([]);
   const [creditRequests, setCreditRequests] = useState<CreditRequest[]>([]);
   const [config, setConfig] = useState<Config | null>(null);
@@ -114,7 +114,7 @@ export default function TenantDashboard() {
   }, [activeTab]);
 
   useEffect(() => {
-    if (activeTab === "integrations") {
+    if (activeTab === "balances") {
       fetchProviderBalances();
     }
   }, [activeTab]);
@@ -129,7 +129,7 @@ export default function TenantDashboard() {
         ]);
         if (teamRes.data.success) setUsers(teamRes.data.users);
         if (requestsRes.data.success) setCreditRequests(requestsRes.data.requests || []);
-      } else {
+      } else if (activeTab === "pricing" || activeTab === "integrations") {
         const res = await apiEndpoints.tenantGetConfig();
         if (res.data.success) setConfig(res.data.config);
       }
@@ -261,7 +261,7 @@ export default function TenantDashboard() {
             >
               Back to App
             </button>
-            {["team", "pricing", "integrations"].map(tab => (
+            {["team", "pricing", "integrations", "balances"].map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
@@ -519,56 +519,6 @@ export default function TenantDashboard() {
                     )}
                   </div>
                 </div>
-                <div className="border-t border-gray-800 pt-6 mt-6 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                      Provider Balances
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={fetchProviderBalances}
-                      disabled={providerBalanceLoading}
-                      className="px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 disabled:opacity-50"
-                    >
-                      {providerBalanceLoading ? "Refreshing..." : "Refresh Provider Balance"}
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                        Fal Balance
-                      </p>
-                      <p className="text-sm font-semibold text-white">
-                        {renderProviderBalanceValue(
-                          "fal",
-                          providerBalances?.balances?.fal || {
-                            status: "error",
-                            message: "Not checked yet",
-                          },
-                        )}
-                      </p>
-                    </div>
-                    <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                        KIE Credits
-                      </p>
-                      <p className="text-sm font-semibold text-white">
-                        {renderProviderBalanceValue(
-                          "kie",
-                          providerBalances?.balances?.kie || {
-                            status: "error",
-                            message: "Not checked yet",
-                          },
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  {providerBalances?.checkedAt && (
-                    <p className="text-[10px] text-gray-500 uppercase tracking-widest">
-                      Last checked: {new Date(providerBalances.checkedAt).toLocaleString()}
-                    </p>
-                  )}
-                </div>
                 <button
                   type="submit"
                   disabled={actionLoading}
@@ -577,6 +527,62 @@ export default function TenantDashboard() {
                   {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : "Save Configuration"}
                 </button>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* BALANCES TAB */}
+        {activeTab === "balances" && (
+          <div className="max-w-xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 shadow-xl">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-bold text-white uppercase tracking-tight">
+                  Provider Balances
+                </h2>
+                <button
+                  type="button"
+                  onClick={fetchProviderBalances}
+                  disabled={providerBalanceLoading}
+                  className="px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 disabled:opacity-50"
+                >
+                  {providerBalanceLoading ? "Refreshing..." : "Refresh Provider Balance"}
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                    Fal Balance
+                  </p>
+                  <p className="text-sm font-semibold text-white">
+                    {renderProviderBalanceValue(
+                      "fal",
+                      providerBalances?.balances?.fal || {
+                        status: "error",
+                        message: "Not checked yet",
+                      },
+                    )}
+                  </p>
+                </div>
+                <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                    KIE Credits
+                  </p>
+                  <p className="text-sm font-semibold text-white">
+                    {renderProviderBalanceValue(
+                      "kie",
+                      providerBalances?.balances?.kie || {
+                        status: "error",
+                        message: "Not checked yet",
+                      },
+                    )}
+                  </p>
+                </div>
+              </div>
+              {providerBalances?.checkedAt && (
+                <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-4">
+                  Last checked: {new Date(providerBalances.checkedAt).toLocaleString()}
+                </p>
+              )}
             </div>
           </div>
         )}

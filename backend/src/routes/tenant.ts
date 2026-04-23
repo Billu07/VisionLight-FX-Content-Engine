@@ -357,6 +357,9 @@ router.get("/provider-balances", async (req: AuthenticatedRequest, res) => {
       balances: { fal, kie },
     });
   } catch (error: any) {
+    if (error?.message === "No organization associated with this account.") {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: error.message || "Failed to fetch provider balances." });
   }
 });

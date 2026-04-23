@@ -48,16 +48,35 @@ interface CreditRequest {
   } | null;
 }
 
+interface ProviderBalanceItem {
+  status: "ok" | "missing_key" | "insufficient_scope" | "error";
+  message?: string;
+  balance?: number;
+  currency?: string;
+  credits?: number;
+}
+
+interface ProviderBalancesResponse {
+  checkedAt: string;
+  balances: {
+    fal: ProviderBalanceItem;
+    kie: ProviderBalanceItem;
+  };
+}
+
 export default function SuperAdminDashboard() {
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<"platform" | "my-agency" | "demo-leads" | "global-settings" | "global-presets">("platform");
+  const [activeTab, setActiveTab] = useState<"platform" | "my-agency" | "provider-balances" | "demo-leads" | "global-settings" | "global-presets">("platform");
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [creditRequests, setCreditRequests] = useState<CreditRequest[]>([]);
   const [globalSettings, setGlobalSettings] = useState<any>(null);
   const [presets, setPresets] = useState<any[]>([]);
+  const [providerBalances, setProviderBalances] =
+    useState<ProviderBalancesResponse | null>(null);
+  const [providerBalanceLoading, setProviderBalanceLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [msg, setMsg] = useState("");
@@ -142,6 +161,12 @@ export default function SuperAdminDashboard() {
     return () => clearInterval(interval);
   }, [activeTab]);
 
+  useEffect(() => {
+    if (activeTab === "provider-balances") {
+      fetchProviderBalances();
+    }
+  }, [activeTab]);
+
   const fetchInitialData = async () => {
     setLoading(true);
     try {
@@ -163,6 +188,47 @@ export default function SuperAdminDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchProviderBalances = async () => {
+    setProviderBalanceLoading(true);
+    try {
+      const res = await apiEndpoints.tenantGetProviderBalances();
+      if (res.data.success) {
+        setProviderBalances({
+          checkedAt: res.data.checkedAt,
+          balances: res.data.balances,
+        });
+      }
+    } catch (err: any) {
+      setMsg("Error loading balances: " + err.message);
+    } finally {
+      setProviderBalanceLoading(false);
+    }
+  };
+
+  const renderProviderBalanceValue = (
+    provider: "fal" | "kie",
+    item: ProviderBalanceItem,
+  ) => {
+    if (item.status === "ok") {
+      if (provider === "fal") {
+        const value =
+          typeof item.balance === "number"
+            ? item.balance.toFixed(2)
+            : "0.00";
+        return `${value} ${item.currency || "USD"}`;
+      }
+      const value =
+        typeof item.credits === "number"
+          ? item.credits.toLocaleString()
+          : "0";
+      return `${value} credits`;
+    }
+    if (item.status === "missing_key") return "Not configured";
+    if (item.status === "insufficient_scope")
+      return item.message || "Unavailable for this key scope";
+    return item.message || "Unavailable";
   };
 
   const handleResolveCreditRequest = async (requestId: string) => {
@@ -369,7 +435,7 @@ export default function SuperAdminDashboard() {
             >
               Back to App
             </button>
-            {["platform", "my-agency", "demo-leads", "global-settings", "global-presets"].map((tab) => (
+            {["platform", "my-agency", "provider-balances", "demo-leads", "global-settings", "global-presets"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
@@ -460,6 +526,67 @@ export default function SuperAdminDashboard() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB CONTENT: PROVIDER BALANCES */}
+        {activeTab === "provider-balances" && (
+          <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-8">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">
+                    Default Organization Provider Balances
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Uses the API keys saved for your current organization.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchProviderBalances}
+                  disabled={providerBalanceLoading}
+                  className="px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 disabled:opacity-50"
+                >
+                  {providerBalanceLoading ? "Refreshing..." : "Refresh Provider Balance"}
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-gray-950 border border-gray-800 rounded-lg p-5">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                    Fal Balance
+                  </p>
+                  <p className="text-base font-semibold text-white">
+                    {renderProviderBalanceValue(
+                      "fal",
+                      providerBalances?.balances?.fal || {
+                        status: "error",
+                        message: "Not checked yet",
+                      },
+                    )}
+                  </p>
+                </div>
+                <div className="bg-gray-950 border border-gray-800 rounded-lg p-5">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+                    KIE Credits
+                  </p>
+                  <p className="text-base font-semibold text-white">
+                    {renderProviderBalanceValue(
+                      "kie",
+                      providerBalances?.balances?.kie || {
+                        status: "error",
+                        message: "Not checked yet",
+                      },
+                    )}
+                  </p>
+                </div>
+              </div>
+              {providerBalances?.checkedAt && (
+                <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-4">
+                  Last checked: {new Date(providerBalances.checkedAt).toLocaleString()}
+                </p>
+              )}
             </div>
           </div>
         )}
