@@ -4451,7 +4451,7 @@ function Dashboard() {
                 </div>
                 {timelinePanelMode === "timeline" ? (
                   <>
-                    <div className="space-y-3 max-h-[720px] sm:max-h-[780px] overflow-y-auto custom-scrollbar">
+                    <div className="space-y-3 max-h-[980px] sm:max-h-[1040px] overflow-y-auto custom-scrollbar">
                       {compactTimelinePosts.length > 0 ? (
                         compactTimelinePosts.map((post: any) => (
                             <PostCard
@@ -4522,7 +4522,7 @@ function Dashboard() {
                     )}
                   </>
                 ) : (
-                  <div className="space-y-3 max-h-[720px] sm:max-h-[780px] overflow-y-auto custom-scrollbar">
+                  <div className="space-y-3 max-h-[980px] sm:max-h-[1040px] overflow-y-auto custom-scrollbar">
                     {storylineSequence.length > 0 ? (
                       storylineSequence.map((item, index) => {
                         const storylinePost = buildStorylinePost(item, index);
