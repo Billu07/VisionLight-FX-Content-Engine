@@ -4,6 +4,7 @@ import {
   apiEndpoints,
   api,
   getCORSProxyUrl,
+  getCORSProxyVideoUrl,
   getDirectDownloadImageUrl,
   getDirectDownloadVideoUrl,
 } from "../lib/api";
@@ -421,7 +422,7 @@ export function PostCard({
               onMouseOver={(e) => minimal && e.currentTarget.play()}
               onMouseOut={(e) => minimal && e.currentTarget.pause()}
             >
-              <source src={getCORSProxyUrl(getCleanUrl(post.mediaUrl))} type="video/mp4" />
+              <source src={getCORSProxyVideoUrl(getCleanUrl(post.mediaUrl))} type="video/mp4" />
             </video>
           ) : (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80">

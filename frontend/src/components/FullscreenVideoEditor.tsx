@@ -26,11 +26,14 @@ export interface AudioItem {
 export interface SequenceItem {
     id: string;
     url: string;
+    sourceMediaUrl?: string;
     proxyUrl?: string;
     hlsUrl?: string;
     spriteSheetUrl?: string;
     type: "IMAGE" | "VIDEO" | "CAROUSEL";
     title?: string;
+    prompt?: string;
+    createdAt?: string;
     duration?: number; // In milliseconds
     originalDuration?: number; // Max possible duration for video
     thumbnail?: string;

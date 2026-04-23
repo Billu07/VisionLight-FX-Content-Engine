@@ -2,7 +2,11 @@ import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { apiEndpoints, getCORSProxyUrl } from "../lib/api";
+import {
+  apiEndpoints,
+  getCORSProxyUrl,
+  getCORSProxyVideoUrl,
+} from "../lib/api";
 import { confirmAction } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { ErrorAlert } from "../components/ErrorAlert";
@@ -907,8 +911,10 @@ function Dashboard() {
       const newItem: SequenceItem = {
         id: crypto.randomUUID(),
         url,
+        sourceMediaUrl: url,
         type: isVideo ? "VIDEO" : "IMAGE",
         title: file.name,
+        createdAt: new Date().toISOString(),
         duration: isVideo ? 5000 : 3000,
         originalDuration: isVideo ? 15000 : 3000,
       };
@@ -1330,8 +1336,11 @@ function Dashboard() {
     const item: SequenceItem = {
       id: crypto.randomUUID(),
       url,
+      sourceMediaUrl: post.mediaUrl,
       type: post.mediaType,
       title: post.title || "Untitled",
+      prompt: post.prompt,
+      createdAt: post.createdAt || new Date().toISOString(),
       duration: post.mediaType === "IMAGE" ? 3000 : undefined,
     };
 
@@ -1372,7 +1381,24 @@ function Dashboard() {
   };
 
   const loadStorylineItemFile = async (item: SequenceItem) => {
-    const response = await fetch(item.url);
+    const rawUrl =
+      item.type === "CAROUSEL" && item.sourceMediaUrl?.startsWith("[")
+        ? (() => {
+            try {
+              const parsed = JSON.parse(item.sourceMediaUrl);
+              return Array.isArray(parsed) && parsed.length > 0
+                ? parsed[0]
+                : item.url;
+            } catch {
+              return item.url;
+            }
+          })()
+        : (item.sourceMediaUrl || item.url);
+    const response = await fetch(
+      item.type === "VIDEO"
+        ? getCORSProxyVideoUrl(rawUrl)
+        : getCORSProxyUrl(rawUrl),
+    );
     if (!response.ok) {
       throw new Error("Failed to load Storyline media.");
     }
@@ -1392,6 +1418,18 @@ function Dashboard() {
       { type: mimeType },
     );
   };
+
+  const buildStorylinePost = (item: SequenceItem, index: number) => ({
+    id: item.id,
+    mediaUrl: item.sourceMediaUrl || item.url,
+    mediaType: item.type,
+    mediaProvider: item.type === "VIDEO" ? "storyline" : undefined,
+    title: item.title || `Scene ${index + 1}`,
+    prompt: item.prompt || item.title || "",
+    createdAt: item.createdAt || new Date().toISOString(),
+    status: "COMPLETED",
+    progress: 100,
+  });
 
   const handleUseStorylineInPanel = async (item: SequenceItem) => {
     try {
@@ -4463,87 +4501,114 @@ function Dashboard() {
                   <div className="space-y-3 max-h-[500px] sm:max-h-[600px] overflow-y-auto custom-scrollbar">
                     {storylineSequence.length > 0 ? (
                       storylineSequence.map((item, index) => (
-                        <div
-                          key={`${item.id}-${index}`}
-                          className="bg-gray-800/40 backdrop-blur-sm rounded-xl border border-white/10 p-3 hover:border-cyan-500/30 transition-colors"
-                        >
-                          <div className="flex gap-3">
-                            <div className="w-16 h-12 rounded-lg bg-black border border-white/10 overflow-hidden flex-shrink-0">
-                              {item.type === "VIDEO" ? (
-                                <video
-                                  src={getCORSProxyUrl(item.url)}
-                                  className="w-full h-full object-cover"
-                                  muted
-                                />
-                              ) : (
-                                <img
-                                  src={getCORSProxyUrl(item.url, 320, 75)}
-                                  className="w-full h-full object-cover"
-                                />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p
-                                className="text-xs text-white font-semibold truncate"
-                                title={item.title || `Scene ${index + 1}`}
-                              >
-                                {item.title || `Scene ${index + 1}`}
-                              </p>
-                              <div className="text-[10px] text-gray-400 mt-1 flex items-center gap-2">
-                                <span>{item.type}</span>
+                        <div key={`${item.id}-${index}`} className="space-y-2">
+                          <PostCard
+                            post={buildStorylinePost(item, index)}
+                            onPublishPost={() =>
+                              handleShowPromptInfo(
+                                item.prompt || item.title || "No prompt available.",
+                              )
+                            }
+                            userCredits={userCredits}
+                            publishingPost={null}
+                            primaryColor={brandConfig?.primaryColor}
+                            compact={true}
+                            onDrift={
+                              item.type === "VIDEO"
+                                ? () =>
+                                    setExtractingVideoUrl(
+                                      item.sourceMediaUrl || item.url,
+                                    )
+                                : undefined
+                            }
+                            onPreview={() => {
+                              let previewType: "image" | "video" | "carousel" =
+                                "image";
+                              if (item.type === "VIDEO") previewType = "video";
+                              if (item.type === "CAROUSEL") previewType = "carousel";
+                              let previewUrl: string | string[] =
+                                item.sourceMediaUrl || item.url;
+                              if (
+                                previewType === "carousel" &&
+                                typeof previewUrl === "string"
+                              ) {
+                                try {
+                                  previewUrl = JSON.parse(previewUrl);
+                                } catch {
+                                  previewUrl = item.url;
+                                }
+                              }
+                              setPreviewMedia({
+                                type: previewType,
+                                url: previewUrl,
+                              });
+                            }}
+                          />
+                          <div className="bg-gray-800/30 backdrop-blur-sm rounded-xl border border-white/10 px-3 py-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex flex-wrap items-center gap-2 text-[10px] text-gray-400">
+                                <span className="uppercase tracking-wider">
+                                  Position {index + 1}
+                                </span>
                                 {item.type !== "VIDEO" && (
-                                  <>
+                                  <div className="flex items-center gap-2">
                                     <span>Duration</span>
                                     <input
                                       type="number"
                                       min={1}
                                       max={60}
-                                      value={Math.max(1, Math.round((item.duration || 3000) / 1000))}
+                                      value={Math.max(
+                                        1,
+                                        Math.round((item.duration || 3000) / 1000),
+                                      )}
                                       onChange={(e) =>
-                                        updateStorylineDuration(index, Number(e.target.value))
+                                        updateStorylineDuration(
+                                          index,
+                                          Number(e.target.value),
+                                        )
                                       }
-                                      className="w-12 px-1 py-0.5 rounded bg-gray-900 border border-white/10 text-center text-[10px] text-cyan-300 outline-none"
+                                      className="w-14 px-2 py-1 rounded bg-gray-900 border border-white/10 text-center text-[10px] text-cyan-300 outline-none"
                                     />
                                     <span>s</span>
-                                  </>
+                                  </div>
                                 )}
                               </div>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleUseStorylineInPanel(item)}
-                                className="px-2 h-6 text-[10px] rounded bg-cyan-500/15 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-300"
-                                title="Use In Panel"
-                              >
-                                Use
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => moveStorylineItem(index, -1)}
-                                disabled={index === 0}
-                                className="w-6 h-6 text-[10px] rounded bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
-                                title="Move Up"
-                              >
-                                ^
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => moveStorylineItem(index, 1)}
-                                disabled={index === storylineSequence.length - 1}
-                                className="w-6 h-6 text-[10px] rounded bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
-                                title="Move Down"
-                              >
-                                v
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => removeStorylineItem(index)}
-                                className="w-6 h-6 text-[10px] rounded bg-red-500/15 hover:bg-red-500/30 border border-red-500/30 text-red-300"
-                                title="Remove"
-                              >
-                                x
-                              </button>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUseStorylineInPanel(item)}
+                                  className="px-3 h-8 text-[11px] rounded-lg bg-cyan-500/15 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-300"
+                                  title="Use this Storyline item in the active reference panel"
+                                >
+                                  Use In Panel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveStorylineItem(index, -1)}
+                                  disabled={index === 0}
+                                  className="px-3 h-8 text-[11px] rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                                  title="Move Up"
+                                >
+                                  Move Up
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveStorylineItem(index, 1)}
+                                  disabled={index === storylineSequence.length - 1}
+                                  className="px-3 h-8 text-[11px] rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                                  title="Move Down"
+                                >
+                                  Move Down
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeStorylineItem(index)}
+                                  className="px-3 h-8 text-[11px] rounded-lg bg-red-500/15 hover:bg-red-500/30 border border-red-500/30 text-red-300"
+                                  title="Remove"
+                                >
+                                  Remove
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
