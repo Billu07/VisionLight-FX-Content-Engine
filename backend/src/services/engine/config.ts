@@ -1,11 +1,7 @@
 import dotenv from "dotenv";
 import { v2 as cloudinary } from "cloudinary";
-import OpenAI from "openai";
 
 dotenv.config();
-
-// AI Clients
-export const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Cloudinary Config
 cloudinary.config({

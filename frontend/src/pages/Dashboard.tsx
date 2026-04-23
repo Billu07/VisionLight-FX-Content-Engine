@@ -226,6 +226,17 @@ function Dashboard() {
 
   // === SEQUENCER STATE ===
   const [viewMode, setViewMode] = useState<"create" | "sequencer" | "history">("create");
+  const activeProjectId =
+    localStorage.getItem("visionlight_active_project") || "default";
+  const storylineKey = `visionlight_storyline_${activeProjectId}`;
+  const [storylineSequence, setStorylineSequence] = useState<SequenceItem[]>(() => {
+    try {
+      const stored = localStorage.getItem(storylineKey);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const {
     sequence,
@@ -354,6 +365,19 @@ function Dashboard() {
   useEffect(() => {
     if (!authLoading && !user) navigate("/");
   }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(storylineKey);
+      setStorylineSequence(stored ? JSON.parse(stored) : []);
+    } catch {
+      setStorylineSequence([]);
+    }
+  }, [storylineKey]);
+
+  useEffect(() => {
+    localStorage.setItem(storylineKey, JSON.stringify(storylineSequence));
+  }, [storylineKey, storylineSequence]);
 
   useEffect(() => {
     if (!canUseVideoEditor && viewMode === "sequencer") {
@@ -888,7 +912,7 @@ function Dashboard() {
         duration: isVideo ? 5000 : 3000,
         originalDuration: isVideo ? 15000 : 3000,
       };
-      setSequence((prev) => [...prev, newItem]);
+      setStorylineSequence((prev) => [...prev, newItem]);
       setTimelinePanelMode("storyline");
       alert("Added to Storyline");
     } else {
@@ -1311,13 +1335,13 @@ function Dashboard() {
       duration: post.mediaType === "IMAGE" ? 3000 : undefined,
     };
 
-    setSequence((prev) => [...prev, item]);
+    setStorylineSequence((prev) => [...prev, item]);
     setTimelinePanelMode("storyline");
     alert("Added to Storyline");
   };
 
   const moveStorylineItem = (index: number, direction: -1 | 1) => {
-    setSequence((prev) => {
+    setStorylineSequence((prev) => {
       const targetIndex = index + direction;
       if (targetIndex < 0 || targetIndex >= prev.length) return prev;
       const updated = [...prev];
@@ -1329,13 +1353,13 @@ function Dashboard() {
   };
 
   const removeStorylineItem = (index: number) => {
-    setSequence((prev) => prev.filter((_, i) => i !== index));
+    setStorylineSequence((prev) => prev.filter((_, i) => i !== index));
   };
 
   const updateStorylineDuration = (index: number, seconds: number) => {
     if (!Number.isFinite(seconds)) return;
     const normalized = Math.max(1, Math.min(60, Math.round(seconds)));
-    setSequence((prev) =>
+    setStorylineSequence((prev) =>
       prev.map((item, i) =>
         i === index
           ? {
@@ -1345,6 +1369,135 @@ function Dashboard() {
           : item,
       ),
     );
+  };
+
+  const loadStorylineItemFile = async (item: SequenceItem) => {
+    const response = await fetch(item.url);
+    if (!response.ok) {
+      throw new Error("Failed to load Storyline media.");
+    }
+    const blob = await response.blob();
+    const extension =
+      item.type === "VIDEO"
+        ? "mp4"
+        : blob.type.includes("png")
+          ? "png"
+          : "jpg";
+    const mimeType =
+      blob.type ||
+      (item.type === "VIDEO" ? "video/mp4" : "image/jpeg");
+    return new File(
+      [blob],
+      `${item.title || "storyline-item"}.${extension}`,
+      { type: mimeType },
+    );
+  };
+
+  const handleUseStorylineInPanel = async (item: SequenceItem) => {
+    try {
+      const file = await loadStorylineItemFile(item);
+      const previewUrl = URL.createObjectURL(file);
+
+      if (activeEngine === "kie" && videoFxMode === "picdrift") {
+        if (item.type === "VIDEO") {
+          alert("PicDrift slots accept images only.");
+          return;
+        }
+        if (!picDriftFrames.start) {
+          setPicDriftFrames((prev) => ({ ...prev, start: file }));
+          setPicDriftUrls((prev) => ({ ...prev, start: previewUrl }));
+        } else {
+          setPicDriftFrames((prev) => ({ ...prev, end: file }));
+          setPicDriftUrls((prev) => ({ ...prev, end: previewUrl }));
+        }
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
+      if (isVideoFxSlotEngine()) {
+        const mode = getCurrentVideoFxMode();
+        if (mode === "frames") {
+          if (item.type === "VIDEO") {
+            alert("Frame mode accepts images only.");
+            return;
+          }
+          if (!videoFxFrames.start) {
+            setVideoFxFrame("start", file, previewUrl);
+          } else if (!videoFxFrames.end) {
+            setVideoFxFrame("end", file, previewUrl);
+          } else {
+            setVideoFxFrame("start", file, previewUrl);
+          }
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+        if (mode === "references") {
+          addVideoFxExtraReference(file, previewUrl);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+      }
+
+      if (activeEngine === "veo") {
+        if (veoMode === "first_last_frame") {
+          if (item.type === "VIDEO") {
+            alert("First/Last frame mode accepts images only.");
+            return;
+          }
+          if (!veoFrames.first) {
+            setVeoFrame("first", file, previewUrl);
+          } else if (!veoFrames.last) {
+            setVeoFrame("last", file, previewUrl);
+          } else {
+            setVeoFrame("first", file, previewUrl);
+          }
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+        if (veoMode === "reference_to_video") {
+          if (item.type === "VIDEO") {
+            alert("Reference-to-video accepts images only.");
+            return;
+          }
+          addVeoReference(file, previewUrl);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+        if (veoMode === "extend_video") {
+          if (item.type !== "VIDEO") {
+            alert("Extend mode accepts videos only.");
+            return;
+          }
+          setVeoSingleSource(file, previewUrl);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+        if (veoMode === "image_to_video") {
+          if (item.type === "VIDEO") {
+            alert("Image-to-video accepts images only.");
+            return;
+          }
+          setVeoSingleSource(file, previewUrl);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+      }
+
+      if (activeEngine === "studio") {
+        if (item.type === "VIDEO") {
+          alert("Pic FX references accept images only.");
+          return;
+        }
+        setReferenceImages((prev) => [...prev, file]);
+        setReferenceImageUrls((prev) => [...prev, previewUrl]);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
+      alert("This mode does not accept Storyline media right now.");
+    } catch (error: any) {
+      alert(error?.message || "Failed to apply Storyline media.");
+    }
   };
 
   const handleMagicEditUpload = async (
@@ -4308,8 +4461,8 @@ function Dashboard() {
                   </>
                 ) : (
                   <div className="space-y-3 max-h-[500px] sm:max-h-[600px] overflow-y-auto custom-scrollbar">
-                    {sequence.length > 0 ? (
-                      sequence.map((item, index) => (
+                    {storylineSequence.length > 0 ? (
+                      storylineSequence.map((item, index) => (
                         <div
                           key={`${item.id}-${index}`}
                           className="bg-gray-800/40 backdrop-blur-sm rounded-xl border border-white/10 p-3 hover:border-cyan-500/30 transition-colors"
@@ -4359,6 +4512,14 @@ function Dashboard() {
                             <div className="flex flex-col gap-1">
                               <button
                                 type="button"
+                                onClick={() => handleUseStorylineInPanel(item)}
+                                className="px-2 h-6 text-[10px] rounded bg-cyan-500/15 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-300"
+                                title="Use In Panel"
+                              >
+                                Use
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => moveStorylineItem(index, -1)}
                                 disabled={index === 0}
                                 className="w-6 h-6 text-[10px] rounded bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -4369,7 +4530,7 @@ function Dashboard() {
                               <button
                                 type="button"
                                 onClick={() => moveStorylineItem(index, 1)}
-                                disabled={index === sequence.length - 1}
+                                disabled={index === storylineSequence.length - 1}
                                 className="w-6 h-6 text-[10px] rounded bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed"
                                 title="Move Down"
                               >
@@ -4410,7 +4571,7 @@ function Dashboard() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setSequence([])}
+                        onClick={() => setStorylineSequence([])}
                         className="px-3 py-2 text-xs rounded-lg border border-red-500/30 text-red-300 bg-red-500/10 hover:bg-red-500/20 font-semibold transition-colors"
                       >
                         Clear
