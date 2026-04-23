@@ -1124,7 +1124,6 @@ export default function SuperAdminDashboard() {
               >
                 <option value="USER">Standard User</option>
                 <option value="MANAGER">Team Manager</option>
-                <option value="SUPERADMIN">System Admin</option>
               </select>
               <div className="flex gap-4 pt-4">
                 <button type="button" onClick={() => setShowAddTeamModal(false)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>

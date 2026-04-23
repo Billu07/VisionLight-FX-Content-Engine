@@ -7,10 +7,10 @@ export interface AuthenticatedRequest extends Request {
 }
 
 // Global SuperAdmin emails for safety net
-const ADMIN_EMAILS_RAW = process.env.ADMIN_EMAILS || "snowfix07@gmail.com";
+const ADMIN_EMAILS_RAW = process.env.ADMIN_EMAILS || "";
 const ADMIN_EMAILS = ADMIN_EMAILS_RAW.split(",").map((email) =>
   email.trim().toLowerCase(),
-);
+).filter(Boolean);
 
 export const authenticateToken = async (
   req: AuthenticatedRequest,

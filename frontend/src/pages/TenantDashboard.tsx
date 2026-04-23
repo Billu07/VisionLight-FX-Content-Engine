@@ -544,6 +544,24 @@ export default function TenantDashboard() {
                 <option value="USER">Standard User</option>
                 <option value="MANAGER">Team Manager</option>
               </select>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  Project Limit
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
+                  value={newUser.maxProjects}
+                  onChange={(e) =>
+                    setNewUser({
+                      ...newUser,
+                      maxProjects: Math.max(1, toInt(e.target.value, 3)),
+                    })
+                  }
+                />
+              </div>
               <div className="flex gap-4 pt-4">
                 <button type="button" onClick={() => setShowAddUserModal(false)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500">Cancel</button>
                 <button type="submit" disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest">

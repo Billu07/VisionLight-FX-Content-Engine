@@ -307,12 +307,36 @@ router.put("/config", async (req: AuthenticatedRequest, res) => {
   const { falApiKey, kieApiKey, name, pricing } = req.body;
   try {
     const orgId = req.user!.organizationId!;
-    
+
+    if (
+      falApiKey !== undefined &&
+      falApiKey !== null &&
+      typeof falApiKey !== "string"
+    ) {
+      return res.status(400).json({ error: "Invalid Fal API key value." });
+    }
+    if (
+      kieApiKey !== undefined &&
+      kieApiKey !== null &&
+      typeof kieApiKey !== "string"
+    ) {
+      return res.status(400).json({ error: "Invalid KIE API key value." });
+    }
+
     const updates: any = {
       name: name || undefined,
-      falApiKey: falApiKey ? encryptionUtils.encrypt(falApiKey) : undefined,
-      kieApiKey: kieApiKey ? encryptionUtils.encrypt(kieApiKey) : undefined,
     };
+
+    // Explicit key clearing support:
+    // undefined => leave unchanged, ""/null => clear, non-empty string => encrypt and save.
+    if (falApiKey !== undefined) {
+      const trimmed = typeof falApiKey === "string" ? falApiKey.trim() : "";
+      updates.falApiKey = trimmed ? encryptionUtils.encrypt(trimmed) : null;
+    }
+    if (kieApiKey !== undefined) {
+      const trimmed = typeof kieApiKey === "string" ? kieApiKey.trim() : "";
+      updates.kieApiKey = trimmed ? encryptionUtils.encrypt(trimmed) : null;
+    }
 
     // Apply pricing overrides if provided
     if (pricing) {

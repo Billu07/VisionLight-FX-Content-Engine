@@ -61,19 +61,6 @@ const requiresKieForRequest = (mediaType: unknown, model: unknown): boolean => {
   return normalizeModel(model).includes("kie");
 };
 
-const requiresOpenAIForRequest = (mediaType: unknown, model: unknown): boolean => {
-  const normalizedMediaType =
-    typeof mediaType === "string" ? mediaType.toLowerCase() : "";
-  if (normalizedMediaType !== "video") return false;
-
-  const normalizedModel = normalizeModel(model);
-  if (!normalizedModel) return false;
-  const isKie = normalizedModel.includes("kie");
-  const isFal = normalizedModel.includes("kling") || normalizedModel.includes("seedance-fal");
-  const isVeo = normalizedModel === "veo-3";
-  return !isKie && !isFal && !isVeo;
-};
-
 // ==================== ASSET MANAGEMENT ====================
 router.post(
   "/api/posts/:postId/to-asset",
@@ -965,12 +952,6 @@ router.post(
         return res.status(403).json({
           error:
             "Missing KIE API key. Configure it in the Admin Panel before generating this content.",
-        });
-      }
-      if (requiresOpenAIForRequest(mediaType, model) && !tenantApiKeys.openaiApiKey) {
-        return res.status(403).json({
-          error:
-            "Missing OpenAI API key. Configure it in the Admin Panel before generating this content.",
         });
       }
 

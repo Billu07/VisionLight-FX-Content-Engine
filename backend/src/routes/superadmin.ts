@@ -13,6 +13,23 @@ const toNonNegativeInt = (value: any) => {
   return Math.max(0, Math.round(n));
 };
 
+const toPositiveInt = (value: any) => {
+  const n = toNonNegativeInt(value);
+  if (n === null || n < 1) return null;
+  return n;
+};
+
+const getAllocatedProjectQuota = async (orgId: string, excludeUserId?: string) => {
+  const allocation = await prisma.user.aggregate({
+    where: {
+      organizationId: orgId,
+      ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+    },
+    _sum: { maxProjects: true },
+  });
+  return allocation._sum.maxProjects || 0;
+};
+
 const sanitizePricingUpdate = (payload: any) => {
   const updates: Record<string, number> = {};
   for (const key of PRICE_KEYS) {
@@ -61,9 +78,19 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
   const userView = view === "PICDRIFT" ? "PICDRIFT" : "VISIONLIGHT";
 
   try {
-    const parsedMaxUsers = toNonNegativeInt(maxUsers);
-    const parsedMaxProjectsTotal = toNonNegativeInt(maxProjectsTotal);
+    const parsedMaxUsers =
+      maxUsers !== undefined ? toPositiveInt(maxUsers) : undefined;
+    const parsedMaxProjectsTotal =
+      maxProjectsTotal !== undefined ? toPositiveInt(maxProjectsTotal) : undefined;
     const parsedMaxStorageMb = toNonNegativeInt(maxStorageMb);
+
+    if (
+      (maxUsers !== undefined && parsedMaxUsers === null) ||
+      (maxProjectsTotal !== undefined && parsedMaxProjectsTotal === null) ||
+      (maxStorageMb !== undefined && parsedMaxStorageMb === null)
+    ) {
+      return res.status(400).json({ error: "Invalid tenant limits." });
+    }
 
     // 1. Create Organization
     const org = await dbService.createOrganization({
@@ -73,6 +100,7 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
       maxStorageMb: parsedMaxStorageMb ?? 500,
       isDefault: false
     });
+    const initialAdminMaxProjects = Math.max(1, Math.min(3, org.maxProjectsTotal));
     // 2. Check if User already exists
     const existingUser = await dbService.findUserByEmail(adminEmail);
     let adminUser;
@@ -91,7 +119,9 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
         organizationId: org.id,
         role: "ADMIN",
         view: userView,
+        isDemo: false,
         name: adminName || existingUser.name,
+        maxProjects: initialAdminMaxProjects,
         // Reset credits to 0 - Tenant must add credits or configure keys
         creditsPicDrift: 0,
         creditsPicDriftPlus: 0,
@@ -148,7 +178,7 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
         adminPassword,
         adminName || `${orgName} Admin`,
         userView,
-        3,
+        initialAdminMaxProjects,
         org.id,
         "ADMIN"
       );
@@ -211,8 +241,8 @@ router.put("/organizations/:id/status", async (req: AuthenticatedRequest, res) =
 router.put("/organizations/:id/limits", async (req: AuthenticatedRequest, res) => {
   const { maxUsers, maxProjectsTotal, maxStorageMb, name, view } = req.body;
   try {
-    const parsedMaxUsers = maxUsers !== undefined ? toNonNegativeInt(maxUsers) : undefined;
-    const parsedMaxProjectsTotal = maxProjectsTotal !== undefined ? toNonNegativeInt(maxProjectsTotal) : undefined;
+    const parsedMaxUsers = maxUsers !== undefined ? toPositiveInt(maxUsers) : undefined;
+    const parsedMaxProjectsTotal = maxProjectsTotal !== undefined ? toPositiveInt(maxProjectsTotal) : undefined;
     const parsedMaxStorageMb = maxStorageMb !== undefined ? toNonNegativeInt(maxStorageMb) : undefined;
 
     if (
@@ -221,6 +251,24 @@ router.put("/organizations/:id/limits", async (req: AuthenticatedRequest, res) =
       (maxStorageMb !== undefined && parsedMaxStorageMb === null)
     ) {
       return res.status(400).json({ error: "Invalid organization limit values." });
+    }
+
+    if (parsedMaxUsers !== undefined && parsedMaxUsers !== null) {
+      const userCount = await prisma.user.count({ where: { organizationId: req.params.id } });
+      if (parsedMaxUsers < userCount) {
+        return res.status(400).json({
+          error: `Cannot set maxUsers below current user count (${userCount}).`,
+        });
+      }
+    }
+
+    if (parsedMaxProjectsTotal !== undefined && parsedMaxProjectsTotal !== null) {
+      const allocated = await getAllocatedProjectQuota(req.params.id);
+      if (parsedMaxProjectsTotal < allocated) {
+        return res.status(400).json({
+          error: `Cannot set maxProjectsTotal below current allocated quota (${allocated}).`,
+        });
+      }
     }
 
     const orgUpdates: any = {
@@ -263,11 +311,39 @@ router.put("/users/:userId", async (req: AuthenticatedRequest, res) => {
   const { name, role, view, maxProjects } = req.body;
 
   try {
+    const parsedMaxProjects =
+      maxProjects !== undefined ? toPositiveInt(maxProjects) : undefined;
+    if (maxProjects !== undefined && parsedMaxProjects === null) {
+      return res.status(400).json({ error: "Invalid maxProjects value." });
+    }
+
+    const targetUser = await dbService.findUserById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    if (
+      parsedMaxProjects !== undefined &&
+      parsedMaxProjects !== null &&
+      targetUser.organizationId
+    ) {
+      const org = await dbService.getOrganization(targetUser.organizationId);
+      if (org) {
+        const allocatedWithoutTarget = await getAllocatedProjectQuota(org.id, targetUser.id);
+        const remaining = Math.max(0, org.maxProjectsTotal - allocatedWithoutTarget);
+        if (parsedMaxProjects > remaining) {
+          return res.status(400).json({
+            error: `Project quota exceeded for organization. Remaining allocatable projects: ${remaining}.`,
+          });
+        }
+      }
+    }
+
     const updates: any = {};
     if (name) updates.name = name;
     if (role) updates.role = role;
     if (view) updates.view = view;
-    if (maxProjects !== undefined) updates.maxProjects = Number(maxProjects);
+    if (parsedMaxProjects !== undefined) updates.maxProjects = parsedMaxProjects;
 
     const updatedUser = await dbService.adminUpdateUser(userId, updates);
     res.json({ success: true, user: updatedUser });

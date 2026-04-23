@@ -1,6 +1,5 @@
 import axios from "axios";
 import sharp from "sharp";
-import FormData from "form-data";
 import { dbService as airtableService, Post, CreditPool } from "../database";
 import { ROIService } from "../roi";
 import { processVideoAssetBackground } from "./processor";
@@ -16,7 +15,6 @@ import {
   KIE_API_KEY,
   FAL_BASE_PATH,
   FAL_KEY,
-  VIDEO_UPLOAD_TIMEOUT,
 } from "./config";
 
 export interface TenantApiKeys {
@@ -307,7 +305,7 @@ export const videoLogic = {
     // Check for Veo
     const isVeo = model === "veo-3";
 
-    const isOpenAI = !isKie && !isKling && !isVeo && !isSeedanceFal;
+    const isUnsupported = !isKie && !isKling && !isVeo && !isSeedanceFal;
     const isPro = model.includes("pro") || model.includes("Pro");
     const videoGenerationMode =
       typeof params.videoGenerationMode === "string"
@@ -315,6 +313,12 @@ export const videoLogic = {
         : undefined;
 
     try {
+      if (isUnsupported) {
+        throw new Error(
+          `Unsupported video model "${model}". Use a Fal or KIE-backed model.`,
+        );
+      }
+
       let targetWidth = 1280;
       let targetHeight = 720;
       let targetRatioString = "16:9";
@@ -965,37 +969,6 @@ export const videoLogic = {
         });
         externalId = submitRes.data.request_id;
         statusUrl = submitRes.data.status_url;
-      } else if (isOpenAI) {
-        provider = "openai";
-        const form = new FormData();
-        form.append("prompt", finalPrompt);
-        form.append("model", params.model || "sora-2-pro");
-        form.append(
-          "seconds",
-          parseInt(params.duration?.toString().replace("s", "") || "4"),
-        );
-        form.append("size", `${targetWidth}x${targetHeight}`);
-        if (finalInputImageBuffer) {
-          form.append("input_reference", finalInputImageBuffer, {
-            filename: "ref.jpg",
-            contentType: "image/jpeg",
-          });
-        }
-        const openAIKey = apiKeys?.openaiApiKey;
-        if (!openAIKey) throw new Error("API Key is missing. Please configure your OpenAI API key in the Admin Panel.");
-
-        const genResponse = await axios.post(
-          "https://api.openai.com/v1/videos",
-          form,
-          {
-            headers: {
-              ...form.getHeaders(),
-              Authorization: `Bearer ${openAIKey}`,
-            },
-            timeout: VIDEO_UPLOAD_TIMEOUT,
-          },
-        );
-        externalId = genResponse.data.id;
       }
 
       await airtableService.updatePost(postId, {
@@ -1028,7 +1001,7 @@ export const videoLogic = {
     const params = post.generationParams as any;
     if (post.status !== "PROCESSING" || !params?.externalId) return;
     const externalId = params.externalId;
-    const provider = post.mediaProvider || "openai";
+    const provider = post.mediaProvider || "";
     const userId = post.userId;
 
     try {
@@ -1105,6 +1078,10 @@ export const videoLogic = {
             errorMessage = `Fal poll rejected (422): ${pollPayload || "Unprocessable Entity"}`;
           }
         }
+      } else if (provider.includes("openai")) {
+        isFailed = true;
+        errorMessage =
+          "OpenAI video provider is no longer supported for new processing. Regenerate with a Fal/KIE model.";
       }
 
       if (isComplete && finalUrl) {

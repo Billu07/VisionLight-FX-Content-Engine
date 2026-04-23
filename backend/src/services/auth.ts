@@ -18,7 +18,7 @@ const supabase = createClient(
 const ADMIN_EMAILS_RAW = process.env.ADMIN_EMAILS || "";
 const ADMIN_EMAILS = ADMIN_EMAILS_RAW.split(",").map((email) =>
   email.trim().toLowerCase(),
-);
+).filter(Boolean);
 
 export class AuthService {
   /**
@@ -87,6 +87,7 @@ export class AuthService {
         view,
         name,
         maxProjects,
+        isDemo: isDemo === true,
       });
     }
 
@@ -189,6 +190,8 @@ export class AuthService {
         finalRole = "SUPERADMIN";
       } else if (dbRole === "ADMIN") {
         finalRole = "ADMIN";
+      } else if (dbRole === "MANAGER") {
+        finalRole = "MANAGER";
       }
 
       // 4. Enforce Organization Active Status
