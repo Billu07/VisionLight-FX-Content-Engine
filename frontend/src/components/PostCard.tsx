@@ -9,6 +9,7 @@ import {
   getDirectDownloadVideoUrl,
 } from "../lib/api";
 import { notify } from "../lib/notifications";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface PostCardProps {
   post: any;
@@ -27,6 +28,8 @@ interface PostCardProps {
   onAddToSequence?: () => void; // ✅ NEW
   onPrimaryAction?: () => void;
   primaryActionLabel?: string;
+  onTitleUpdated?: (title: string) => Promise<void> | void;
+  canEditTitle?: boolean;
 
   // ✅ MINIMAL PROP (For Expanded Gallery)
   minimal?: boolean;
@@ -68,13 +71,17 @@ export function PostCard({
   onAddToSequence,
   onPrimaryAction,
   primaryActionLabel,
+  onTitleUpdated,
+  canEditTitle = true,
   minimal = false,
 }: PostCardProps) {
+  const queryClient = useQueryClient();
   const [mediaError, setMediaError] = useState(false);
   const [videoLoading, setVideoLoading] = useState(true);
   const [shouldLoadVideo, setShouldLoadVideo] = useState(!compact);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(post.title || "");
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
   const [isPossiblyStuck, setIsPossiblyStuck] = useState(false);
 
   // Separate loading states for the two download buttons
@@ -157,11 +164,34 @@ export function PostCard({
   };
 
   const handleTitleSave = async () => {
+    const nextTitle = editedTitle.trim();
+    if (!nextTitle || isSavingTitle) return;
+
+    const previousTitle = post.title || "";
+    const previousPosts = queryClient.getQueryData(["posts"]);
+    queryClient.setQueryData(["posts"], (old: any) =>
+      Array.isArray(old)
+        ? old.map((entry: any) =>
+            entry?.id === post.id ? { ...entry, title: nextTitle } : entry,
+          )
+        : old,
+    );
+
+    setIsSavingTitle(true);
     try {
-      await apiEndpoints.updatePostTitle(post.id, editedTitle);
+      if (onTitleUpdated) {
+        await onTitleUpdated(nextTitle);
+      } else {
+        await apiEndpoints.updatePostTitle(post.id, nextTitle);
+      }
       setIsEditingTitle(false);
     } catch (error) {
+      queryClient.setQueryData(["posts"], previousPosts);
+      setEditedTitle(previousTitle);
       console.error("Error updating title:", error);
+      notify.error("Title update failed. Please try again.");
+    } finally {
+      setIsSavingTitle(false);
     }
   };
 
@@ -552,34 +582,61 @@ export function PostCard({
             <input
               value={editedTitle}
               onChange={(e) => setEditedTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void handleTitleSave();
+                }
+                if (e.key === "Escape") {
+                  setEditedTitle(post.title || "");
+                  setIsEditingTitle(false);
+                }
+              }}
               className="flex-1 p-1.5 bg-gray-900 border border-cyan-500/50 rounded text-white text-xs focus:outline-none"
               autoFocus
+              disabled={isSavingTitle}
             />
-            <button onClick={handleTitleSave} className="text-cyan-400 px-1">
-              ✅
+            <button
+              onClick={() => void handleTitleSave()}
+              disabled={isSavingTitle || !editedTitle.trim()}
+              className={`px-2 min-w-10 rounded text-xs font-semibold transition-all ${
+                isSavingTitle
+                  ? "bg-cyan-500/20 text-cyan-200 border border-cyan-500/40"
+                  : "bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30"
+              }`}
+            >
+              {isSavingTitle ? "..." : "Save"}
             </button>
             <button
-              onClick={() => setIsEditingTitle(false)}
-              className="text-gray-500 px-1"
+              onClick={() => {
+                setEditedTitle(post.title || "");
+                setIsEditingTitle(false);
+              }}
+              disabled={isSavingTitle}
+              className="text-gray-500 px-2 disabled:opacity-50"
             >
-              ❌
+              Cancel
             </button>
           </div>
         ) : (
           <div className="group relative pr-6">
             <h3
-              className="text-white font-bold text-sm truncate cursor-pointer hover:text-cyan-400"
-              onClick={() => setIsEditingTitle(true)}
+              className={`text-white font-bold text-sm truncate ${canEditTitle ? "cursor-pointer hover:text-cyan-400" : ""}`}
+              onClick={() => {
+                if (canEditTitle) setIsEditingTitle(true);
+              }}
               title={post.title}
             >
               {displayTitle}
             </h3>
-            <button
-              onClick={() => setIsEditingTitle(true)}
-              className="absolute right-0 top-0 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100"
-            >
-              ✏️
-            </button>
+            {canEditTitle && (
+              <button
+                onClick={() => setIsEditingTitle(true)}
+                className="absolute right-0 top-0 text-gray-500 hover:text-white opacity-0 group-hover:opacity-100"
+              >
+                Edit
+              </button>
+            )}
           </div>
         )}
 

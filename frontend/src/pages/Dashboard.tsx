@@ -67,6 +67,8 @@ function Dashboard() {
     setEditingPromptFxIndex,
     handleAddPromptFx,
     handleRemovePromptFx,
+    markPromptFxUsed,
+    getPromptFxOriginalIndex,
     isSavingPromptFx,
   } = usePromptFxManager();
 
@@ -600,6 +602,52 @@ function Dashboard() {
 
   const handleShowPromptInfo = (promptText: string) => {
     setShowPromptInfo(promptText);
+  };
+
+  const updateCachedPostTitle = (postId: string, title: string) => {
+    queryClient.setQueryData(["posts"], (old: any) =>
+      Array.isArray(old)
+        ? old.map((entry: any) =>
+            entry?.id === postId ? { ...entry, title } : entry,
+          )
+        : old,
+    );
+  };
+
+  const handleTimelineTitleUpdate = async (postId: string, title: string) => {
+    const previousPosts = queryClient.getQueryData(["posts"]);
+    updateCachedPostTitle(postId, title);
+    try {
+      await apiEndpoints.updatePostTitle(postId, title);
+    } catch (error) {
+      queryClient.setQueryData(["posts"], previousPosts);
+      throw error;
+    }
+  };
+
+  const handleStorylineTitleUpdate = async (
+    itemId: string,
+    sourcePostId: string | undefined,
+    title: string,
+  ) => {
+    const previousStoryline = storylineSequence;
+    setStorylineSequence((prev) =>
+      prev.map((entry) =>
+        entry.id === itemId ? { ...entry, title } : entry,
+      ),
+    );
+
+    if (!sourcePostId) return;
+
+    const previousPosts = queryClient.getQueryData(["posts"]);
+    updateCachedPostTitle(sourcePostId, title);
+    try {
+      await apiEndpoints.updatePostTitle(sourcePostId, title);
+    } catch (error) {
+      setStorylineSequence(previousStoryline);
+      queryClient.setQueryData(["posts"], previousPosts);
+      throw error;
+    }
   };
 
   const handleMoveToAssets = async (postId: string) => {
@@ -1439,7 +1487,8 @@ function Dashboard() {
     });
 
     return {
-      id: item.id,
+      id: matchedPost?.id || item.id,
+      sourcePostId: matchedPost?.id,
       mediaUrl: matchedPost?.mediaUrl || item.sourceMediaUrl || item.url,
       mediaType: matchedPost?.mediaType || item.type,
       mediaProvider: matchedPost?.mediaProvider,
@@ -3143,6 +3192,10 @@ function Dashboard() {
                                                 <button
                                                   type="button"
                                                   onClick={() => {
+                                                    markPromptFxUsed({
+                                                      name: pf.name,
+                                                      prompt: pf.prompt,
+                                                    });
                                                     setPrompt(pf.prompt);
                                                     setShowPromptFxMenu(false);
                                                   }}
@@ -3169,6 +3222,10 @@ function Dashboard() {
                                               <button
                                                 type="button"
                                                 onClick={() => {
+                                                  markPromptFxUsed({
+                                                    name: pf.name,
+                                                    prompt: pf.prompt,
+                                                  });
                                                   setPrompt(pf.prompt);
                                                   setShowPromptFxMenu(false);
                                                 }}
@@ -3184,7 +3241,9 @@ function Dashboard() {
                                                     e.stopPropagation();
                                                     setNewPromptFxName(pf.name);
                                                     setNewPromptFxText(pf.prompt);
-                                                    setEditingPromptFxIndex(idx);
+                                                    setEditingPromptFxIndex(
+                                                      getPromptFxOriginalIndex(pf),
+                                                    );
                                                     setIsAddingPromptFx(true);
                                                   }}
                                                   className="w-7 h-7 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded flex items-center justify-center text-xs"
@@ -3196,7 +3255,9 @@ function Dashboard() {
                                                   type="button"
                                                   onClick={(e) => {
                                                     e.stopPropagation();
-                                                    handleRemovePromptFx(idx);
+                                                    handleRemovePromptFx(
+                                                      getPromptFxOriginalIndex(pf),
+                                                    );
                                                   }}
                                                   className="w-7 h-7 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded flex items-center justify-center text-xs"
                                                   title="Delete"
@@ -4464,6 +4525,9 @@ function Dashboard() {
                               publishingPost={null}
                               primaryColor={brandConfig?.primaryColor}
                               compact={true}
+                              onTitleUpdated={(title) =>
+                                handleTimelineTitleUpdate(post.id, title)
+                              }
                               onUseAsStartFrame={handleUseAsStartFrame}
                               onDrift={() => handleDriftFromPost(post)}
                               onPreview={() => {
@@ -4539,6 +4603,13 @@ function Dashboard() {
                             publishingPost={null}
                             primaryColor={brandConfig?.primaryColor}
                             compact={true}
+                            onTitleUpdated={(title) =>
+                              handleStorylineTitleUpdate(
+                                item.id,
+                                storylinePost.sourcePostId,
+                                title,
+                              )
+                            }
                             onPrimaryAction={() => handleUseStorylineInPanel(item)}
                             primaryActionLabel="Use In Panel"
                             onDrift={

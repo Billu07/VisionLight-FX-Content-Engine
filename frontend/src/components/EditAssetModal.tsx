@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import ReactCrop, { type Crop, type PixelCrop, makeAspectCrop, centerCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
@@ -8,6 +8,12 @@ import { useAuth } from "../hooks/useAuth";
 import { DriftFrameExtractor } from "./DriftFrameExtractor";
 import { LoadingSpinner } from "./LoadingSpinner";
 import drift_icon from "../assets/drift_icon.png";
+import {
+  getPromptFxKey,
+  getRecentPromptFxKeys,
+  markPromptFxUsed as storePromptFxUsage,
+  orderPromptFxByRecent,
+} from "../features/dashboard/lib/promptFxRecent";
 
 export interface BackgroundJob {
   id: string;
@@ -100,6 +106,9 @@ export function EditAssetModal({
   const [newPromptFxText, setNewPromptFxText] = useState("");
   const [isAddingPromptFx, setIsAddingPromptFx] = useState(false);
   const [editingPromptFxIndex, setEditingPromptFxIndex] = useState<number | null>(null);
+  const [recentPromptFxKeys, setRecentPromptFxKeys] = useState<string[]>(() =>
+    getRecentPromptFxKeys(),
+  );
   const [isUploadingInitial, setIsUploadingInitial] = useState(false);
 
   const { systemPresets } = useAuth();
@@ -171,6 +180,17 @@ export function EditAssetModal({
     queryFn: async () => (await apiEndpoints.getAssets()).data.assets,
     enabled: showRefSelector || !currentAsset,
   });
+
+  const orderedPromptFxList = useMemo(
+    () => orderPromptFxByRecent(promptFxList, recentPromptFxKeys),
+    [promptFxList, recentPromptFxKeys],
+  );
+
+  const getPromptFxOriginalIndex = (item: { name: string; prompt: string }) =>
+    promptFxList.findIndex(
+      (entry: { name: string; prompt: string }) =>
+        getPromptFxKey(entry) === getPromptFxKey(item),
+    );
   const imageAssets = Array.isArray(allAssets)
     ? allAssets.filter((asset: Asset) => asset.type !== "VIDEO")
     : [];
@@ -1430,11 +1450,17 @@ export function EditAssetModal({
                                 No saved prompts.
                               </div>
                             ) : (
-                              promptFxList.map((pfx: any, idx: number) => (
+                              orderedPromptFxList.map((pfx: any, idx: number) => (
                                 <div
                                   key={idx}
                                   className="group flex flex-col p-3 border-b border-gray-800 hover:bg-gray-800 cursor-pointer transition-colors"
                                   onClick={() => {
+                                    setRecentPromptFxKeys(
+                                      storePromptFxUsage({
+                                        name: pfx.name,
+                                        prompt: pfx.prompt,
+                                      }),
+                                    );
                                     setPrompt(pfx.prompt);
                                     setShowPromptFxMenu(false);
                                   }}
@@ -1449,7 +1475,9 @@ export function EditAssetModal({
                                           e.stopPropagation();
                                           setNewPromptFxName(pfx.name);
                                           setNewPromptFxText(pfx.prompt);
-                                          setEditingPromptFxIndex(idx);
+                                          setEditingPromptFxIndex(
+                                            getPromptFxOriginalIndex(pfx),
+                                          );
                                           setIsAddingPromptFx(true);
                                         }}
                                         className="text-blue-400 hover:text-blue-300 text-xs"
@@ -1459,7 +1487,9 @@ export function EditAssetModal({
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          handleRemovePromptFx(idx);
+                                          handleRemovePromptFx(
+                                            getPromptFxOriginalIndex(pfx),
+                                          );
                                         }}
                                         className="text-red-500 hover:text-red-400 text-xs"
                                       >

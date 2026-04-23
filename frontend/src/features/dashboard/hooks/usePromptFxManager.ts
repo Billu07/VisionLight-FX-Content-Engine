@@ -1,7 +1,13 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiEndpoints } from "../../../lib/api";
 import { confirmAction } from "../../../lib/notifications";
+import {
+  getPromptFxKey,
+  getRecentPromptFxKeys,
+  markPromptFxUsed as storePromptFxUsage,
+  orderPromptFxByRecent,
+} from "../lib/promptFxRecent";
 
 type PromptFxItem = {
   name: string;
@@ -17,6 +23,9 @@ export function usePromptFxManager() {
   const [isAddingPromptFx, setIsAddingPromptFx] = useState(false);
   const [editingPromptFxIndex, setEditingPromptFxIndex] = useState<number | null>(
     null,
+  );
+  const [recentPromptFxKeys, setRecentPromptFxKeys] = useState<string[]>(() =>
+    getRecentPromptFxKeys(),
   );
 
   const { data: promptFxList = [] } = useQuery({
@@ -37,6 +46,20 @@ export function usePromptFxManager() {
       setEditingPromptFxIndex(null);
     },
   });
+
+  const orderedPromptFxList = useMemo(
+    () => orderPromptFxByRecent(promptFxList, recentPromptFxKeys),
+    [promptFxList, recentPromptFxKeys],
+  );
+
+  const markPromptFxUsed = (item: PromptFxItem) => {
+    setRecentPromptFxKeys(storePromptFxUsage(item));
+  };
+
+  const getPromptFxOriginalIndex = (item: PromptFxItem) =>
+    promptFxList.findIndex(
+      (entry: PromptFxItem) => getPromptFxKey(entry) === getPromptFxKey(item),
+    );
 
   const handleAddPromptFx = (e: FormEvent) => {
     e.preventDefault();
@@ -62,7 +85,7 @@ export function usePromptFxManager() {
   };
 
   return {
-    promptFxList,
+    promptFxList: orderedPromptFxList,
     showPromptFxMenu,
     setShowPromptFxMenu,
     newPromptFxName,
@@ -75,6 +98,8 @@ export function usePromptFxManager() {
     setEditingPromptFxIndex,
     handleAddPromptFx,
     handleRemovePromptFx,
+    markPromptFxUsed,
+    getPromptFxOriginalIndex,
     isSavingPromptFx: savePromptFxMutation.isPending,
   };
 }
