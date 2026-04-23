@@ -15,7 +15,7 @@ export async function getTenantApiKeys(userId: string) {
   const openAIKey = encryptionUtils.decrypt(org?.openaiApiKey);
 
   if (!isDefaultOrg && !noOrg) {
-    if (!falKey && !kieKey && !openAIKey) {
+    if (!falKey && !kieKey) {
       throw new Error(
         "Your platform is not active. Please configure your API keys in the Admin Panel.",
       );

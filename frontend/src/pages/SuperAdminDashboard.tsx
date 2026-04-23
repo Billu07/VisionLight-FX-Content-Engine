@@ -21,6 +21,7 @@ interface User {
   name: string;
   role: string;
   view: string;
+  isDemo?: boolean;
   organizationId: string;
   creditsPicDrift: number;
   creditsPicDriftPlus: number;
@@ -338,7 +339,7 @@ export default function SuperAdminDashboard() {
   }, [users, adminUser]);
 
   const demoUsers = useMemo(() => {
-    return users.filter(u => u.view === "PICDRIFT");
+    return users.filter(u => u.isDemo === true);
   }, [users]);
 
   if (loading) return (

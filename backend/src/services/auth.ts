@@ -32,6 +32,7 @@ export class AuthService {
     maxProjects: number = 3,
     organizationId?: string,
     role?: string,
+    isDemo?: boolean,
   ) {
     // 1. Attempt to create in Supabase
     let supabaseUser;
@@ -76,6 +77,7 @@ export class AuthService {
         maxProjects,
         organizationId,
         role,
+        isDemo,
       });
     } else {
       // If they exist in DB, update them to the new Org/Role
@@ -83,7 +85,8 @@ export class AuthService {
         organizationId,
         role,
         view,
-        name
+        name,
+        maxProjects,
       });
     }
 
@@ -202,6 +205,7 @@ export class AuthService {
         email: user.email,
         name: user.name,
         creditSystem: user.creditSystem,
+        isDemo: (user as any).isDemo === true,
         role: finalRole,
         organizationId: user.organizationId,
         view: (user as any).view || "VISIONLIGHT",

@@ -30,6 +30,7 @@ const normalizeCost = (value: any) => {
 };
 
 const isDemoPicdriftUser = (user: any) =>
+  user?.isDemo === true &&
   user?.view === "PICDRIFT" &&
   user?.creditSystem === "INTERNAL" &&
   (user?.organization?.isDefault === true || !user?.organizationId);

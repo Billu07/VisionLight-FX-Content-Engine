@@ -121,6 +121,7 @@ export const dbService = {
     maxProjects?: number;
     organizationId?: string;
     role?: string;
+    isDemo?: boolean;
     // Allow explicit override of credits during creation
     creditsPicDrift?: number;
     creditsPicDriftPlus?: number;
@@ -130,7 +131,7 @@ export const dbService = {
     creditsVideoFX3?: number;
     creditBalance?: number;
   }) {
-    const isDemo = data.view === "PICDRIFT";
+    const isDemo = data.isDemo === true;
     // Users in a Tenant Organization start with 0 credits unless specified.
     const hasOrg = !!data.organizationId;
 
@@ -142,14 +143,15 @@ export const dbService = {
         view: data.view || "VISIONLIGHT",
         maxProjects: data.maxProjects || 3,
         organizationId: data.organizationId,
-        creditBalance: data.creditBalance !== undefined ? data.creditBalance : ((isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 20)),
-        creditsPicDrift: data.creditsPicDrift !== undefined ? data.creditsPicDrift : ((isDemo && !hasOrg) ? 5 : (hasOrg ? 0 : 10)),
-        creditsPicDriftPlus: data.creditsPicDriftPlus !== undefined ? data.creditsPicDriftPlus : ((isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 10)),
-        creditsImageFX: data.creditsImageFX !== undefined ? data.creditsImageFX : ((isDemo && !hasOrg) ? 15 : (hasOrg ? 0 : 10)),
-        creditsVideoFX1: data.creditsVideoFX1 !== undefined ? data.creditsVideoFX1 : ((isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 10)),
-        creditsVideoFX2: data.creditsVideoFX2 !== undefined ? data.creditsVideoFX2 : ((isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 10)),
-        creditsVideoFX3: data.creditsVideoFX3 !== undefined ? data.creditsVideoFX3 : ((isDemo && !hasOrg) ? 0 : (hasOrg ? 0 : 10)),
+        creditBalance: data.creditBalance !== undefined ? data.creditBalance : (isDemo ? 0 : (hasOrg ? 0 : 20)),
+        creditsPicDrift: data.creditsPicDrift !== undefined ? data.creditsPicDrift : (isDemo ? 5 : (hasOrg ? 0 : 10)),
+        creditsPicDriftPlus: data.creditsPicDriftPlus !== undefined ? data.creditsPicDriftPlus : (isDemo ? 0 : (hasOrg ? 0 : 10)),
+        creditsImageFX: data.creditsImageFX !== undefined ? data.creditsImageFX : (isDemo ? 15 : (hasOrg ? 0 : 10)),
+        creditsVideoFX1: data.creditsVideoFX1 !== undefined ? data.creditsVideoFX1 : (isDemo ? 0 : (hasOrg ? 0 : 10)),
+        creditsVideoFX2: data.creditsVideoFX2 !== undefined ? data.creditsVideoFX2 : (isDemo ? 0 : (hasOrg ? 0 : 10)),
+        creditsVideoFX3: data.creditsVideoFX3 !== undefined ? data.creditsVideoFX3 : (isDemo ? 0 : (hasOrg ? 0 : 10)),
         creditSystem: isDemo ? "INTERNAL" : "COMMERCIAL",
+        isDemo,
         role: data.role || "USER",
       },
       include: { organization: true },

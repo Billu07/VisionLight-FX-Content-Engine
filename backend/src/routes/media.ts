@@ -35,6 +35,45 @@ const extractFirstMediaUrl = (raw: unknown): string => {
   return "";
 };
 
+const normalizeModel = (raw: unknown): string =>
+  typeof raw === "string" ? raw.toLowerCase() : "";
+
+const requiresFalForRequest = (mediaType: unknown, model: unknown): boolean => {
+  const normalizedMediaType =
+    typeof mediaType === "string" ? mediaType.toLowerCase() : "";
+  if (normalizedMediaType === "image" || normalizedMediaType === "carousel") {
+    return true;
+  }
+  if (normalizedMediaType !== "video") return false;
+
+  const normalizedModel = normalizeModel(model);
+  return (
+    normalizedModel.includes("kling") ||
+    normalizedModel.includes("seedance-fal") ||
+    normalizedModel === "veo-3"
+  );
+};
+
+const requiresKieForRequest = (mediaType: unknown, model: unknown): boolean => {
+  const normalizedMediaType =
+    typeof mediaType === "string" ? mediaType.toLowerCase() : "";
+  if (normalizedMediaType !== "video") return false;
+  return normalizeModel(model).includes("kie");
+};
+
+const requiresOpenAIForRequest = (mediaType: unknown, model: unknown): boolean => {
+  const normalizedMediaType =
+    typeof mediaType === "string" ? mediaType.toLowerCase() : "";
+  if (normalizedMediaType !== "video") return false;
+
+  const normalizedModel = normalizeModel(model);
+  if (!normalizedModel) return false;
+  const isKie = normalizedModel.includes("kie");
+  const isFal = normalizedModel.includes("kling") || normalizedModel.includes("seedance-fal");
+  const isVeo = normalizedModel === "veo-3";
+  return !isKie && !isFal && !isVeo;
+};
+
 // ==================== ASSET MANAGEMENT ====================
 router.post(
   "/api/posts/:postId/to-asset",
@@ -915,6 +954,26 @@ router.post(
         return res.status(404).json({ error: "User not found" });
       }
 
+      const tenantApiKeys = await getTenantApiKeys(req.user!.id);
+      if (requiresFalForRequest(mediaType, model) && !tenantApiKeys.falApiKey) {
+        return res.status(403).json({
+          error:
+            "Missing Fal API key. Configure it in the Admin Panel before generating this content.",
+        });
+      }
+      if (requiresKieForRequest(mediaType, model) && !tenantApiKeys.kieApiKey) {
+        return res.status(403).json({
+          error:
+            "Missing KIE API key. Configure it in the Admin Panel before generating this content.",
+        });
+      }
+      if (requiresOpenAIForRequest(mediaType, model) && !tenantApiKeys.openaiApiKey) {
+        return res.status(403).json({
+          error:
+            "Missing OpenAI API key. Configure it in the Admin Panel before generating this content.",
+        });
+      }
+
       const pool = getTargetPool(user, mediaType, model);
       const cost = getCost(
         user,
@@ -1003,28 +1062,25 @@ router.post(
       (async () => {
         try {
           if (mediaType === "carousel") {
-            const apiKeys = await getTenantApiKeys(req.user!.id);
             await contentEngine.startCarouselGeneration(
               post.id,
               prompt,
               generationParams,
-              apiKeys,
+              tenantApiKeys,
             );
           } else if (mediaType === "image") {
-            const apiKeys = await getTenantApiKeys(req.user!.id);
             await contentEngine.startImageGeneration(
               post.id,
               prompt,
               generationParams,
-              apiKeys,
+              tenantApiKeys,
             );
           } else {
-            const apiKeys = await getTenantApiKeys(req.user!.id);
             contentEngine.startVideoGeneration(
               post.id,
               prompt,
               generationParams,
-              apiKeys,
+              tenantApiKeys,
             );
           }
         } catch (err: any) {
@@ -1045,8 +1101,14 @@ router.post(
         );
       }
       console.error("API Error in /api/generate-media:", error);
-      res.status(500).json({
-        error: error.message || "Internal server error during generation request",
+      const message = error?.message || "Internal server error during generation request";
+      const lowerMessage =
+        typeof message === "string" ? message.toLowerCase() : "";
+      const isActivationOrProviderError =
+        lowerMessage.includes("not active") || lowerMessage.includes("api key");
+      const status = isActivationOrProviderError ? 403 : 500;
+      res.status(status).json({
+        error: message,
       });
     }
   },

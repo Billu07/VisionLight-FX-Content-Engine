@@ -74,7 +74,6 @@ export default function AdminDashboard() {
   const [orgKeys, setOrgKeys] = useState({
     falApiKey: "",
     kieApiKey: "",
-    openaiApiKey: "",
     name: "",
   });
 
@@ -114,7 +113,6 @@ export default function AdminDashboard() {
         setOrgKeys({
           falApiKey: res.data.organization.falApiKey || "",
           kieApiKey: res.data.organization.kieApiKey || "",
-          openaiApiKey: res.data.organization.openaiApiKey || "",
           name: res.data.organization.name || "",
         });
       }
@@ -741,21 +739,6 @@ export default function AdminDashboard() {
                   value={orgKeys.kieApiKey}
                   onChange={(e) =>
                     setOrgKeys({ ...orgKeys, kieApiKey: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                  OpenAI Key (For VideoFX 2)
-                </label>
-                <input
-                  type="password"
-                  className="w-full p-4 bg-gray-950 border border-gray-800 rounded-xl text-sm outline-none focus:border-brand-accent transition-colors text-white placeholder-gray-700 font-mono"
-                  placeholder="sk-xxxxxxxxxxxxxxxx"
-                  value={orgKeys.openaiApiKey}
-                  onChange={(e) =>
-                    setOrgKeys({ ...orgKeys, openaiApiKey: e.target.value })
                   }
                 />
               </div>

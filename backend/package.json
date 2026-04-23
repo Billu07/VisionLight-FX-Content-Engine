@@ -8,6 +8,7 @@
     "build": "prisma generate && tsc",
     "start": "node dist/index.js",
     "db:seed": "tsx src/scripts/seed-airtable.ts",
+    "db:backfill-demo-users": "tsx src/scripts/backfill-demo-users.ts",
     "vercel-build": "npm run build"
   },
   "dependencies": {

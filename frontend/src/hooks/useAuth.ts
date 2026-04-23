@@ -7,6 +7,7 @@ interface User {
   email: string;
   name: string;
   creditSystem?: "COMMERCIAL" | "INTERNAL";
+  isDemo?: boolean;
   role?: "ADMIN" | "USER" | "MANAGER" | "SUPERADMIN";
   organizationId?: string | null;
   organizationName?: string | null;

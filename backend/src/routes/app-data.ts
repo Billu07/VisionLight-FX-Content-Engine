@@ -22,7 +22,7 @@ router.get(
       let needsActivation = false;
 
       if (org && !isDefaultOrg) {
-        const hasKeys = !!(org.falApiKey || org.kieApiKey || org.openaiApiKey);
+        const hasKeys = !!(org.falApiKey || org.kieApiKey);
         if (!hasKeys) {
           isOrgActive = false;
           needsActivation = true;
@@ -287,6 +287,11 @@ router.post(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
+      const user = await airtableService.findUserById(req.user!.id);
+      if (!user || (user as any).isDemo !== true) {
+        return res.status(403).json({ error: "Demo-only action" });
+      }
+
       await airtableService.adminUpdateUser(req.user!.id, {
         creditsPicDrift: 5,
         creditsPicDriftPlus: 0,

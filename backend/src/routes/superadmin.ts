@@ -295,7 +295,8 @@ router.post("/users/demo", async (req: AuthenticatedRequest, res) => {
       "PICDRIFT",
       1, // Demo users get 1 project
       defaultOrg?.id, // Assign to default org if exists
-      "USER"
+      "USER",
+      true
     );
 
     // Explicitly set demo credits (as per vision: 5 Picdrift, 15 PicFX)

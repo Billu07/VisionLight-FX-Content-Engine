@@ -39,6 +39,30 @@ const getOrg = async (req: AuthenticatedRequest) => {
   return org;
 };
 
+const getAllocatedProjectQuota = async (orgId: string, excludeUserId?: string) => {
+  const allocation = await prisma.user.aggregate({
+    where: {
+      organizationId: orgId,
+      ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+    },
+    _sum: { maxProjects: true },
+  });
+  return allocation._sum.maxProjects || 0;
+};
+
+const ensureProjectQuotaAllocation = async (
+  orgId: string,
+  orgMaxProjectsTotal: number,
+  requestedUserMaxProjects: number,
+  excludeUserId?: string,
+) => {
+  const allocatedWithoutTarget = await getAllocatedProjectQuota(orgId, excludeUserId);
+  const remaining = Math.max(0, orgMaxProjectsTotal - allocatedWithoutTarget);
+  if (requestedUserMaxProjects > remaining) {
+    throw new Error(`ORG_PROJECT_ALLOCATION_EXCEEDED:${remaining}`);
+  }
+};
+
 // === TEAM MANAGEMENT ===
 
 // Get all team members
@@ -77,6 +101,13 @@ router.post("/team/user", async (req: AuthenticatedRequest, res) => {
       return res.status(403).json({ error: `User limit reached (${org.maxUsers}). Please contact support to upgrade.` });
     }
 
+    const requestedMaxProjects = Math.max(1, parsedMaxProjects);
+    await ensureProjectQuotaAllocation(
+      org.id,
+      org.maxProjectsTotal,
+      requestedMaxProjects,
+    );
+
     // 2. Create User
     // Security: Tenants can only create USER or MANAGER roles.
     const finalRole = (role === "MANAGER") ? "MANAGER" : "USER";
@@ -90,12 +121,22 @@ router.post("/team/user", async (req: AuthenticatedRequest, res) => {
       password,
       name || "Team Member",
       finalView,
-      Math.max(1, parsedMaxProjects),
+      requestedMaxProjects,
       org.id,
       finalRole
     );
     res.json({ success: true, user: newUser });
   } catch (error: any) {
+    if (
+      typeof error?.message === "string" &&
+      error.message.startsWith("ORG_PROJECT_ALLOCATION_EXCEEDED:")
+    ) {
+      const remainingRaw = Number(error.message.split(":")[1]);
+      const remaining = Number.isFinite(remainingRaw) ? remainingRaw : 0;
+      return res.status(403).json({
+        error: `Project quota exceeded. Remaining allocatable projects in your organization: ${remaining}.`,
+      });
+    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -106,7 +147,8 @@ router.put("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
   const { addCredits, creditType, role, maxProjects, name } = req.body;
 
   try {
-    const orgId = req.user!.organizationId;
+    const org = await getOrg(req);
+    const orgId = org.id;
     
     // Ensure the target user belongs to the same org
     const targetUser = await dbService.findUserById(userId);
@@ -122,7 +164,14 @@ router.put("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
       if (parsedMaxProjects === null) {
         return res.status(400).json({ error: "Invalid maxProjects value." });
       }
-      updates.maxProjects = Math.max(1, parsedMaxProjects);
+      const requestedMaxProjects = Math.max(1, parsedMaxProjects);
+      await ensureProjectQuotaAllocation(
+        org.id,
+        org.maxProjectsTotal,
+        requestedMaxProjects,
+        targetUser.id,
+      );
+      updates.maxProjects = requestedMaxProjects;
     }
     if (role === "USER" || role === "MANAGER") updates.role = role;
 
@@ -135,6 +184,16 @@ router.put("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
     const updatedUser = await dbService.adminUpdateUser(userId, updates);
     res.json({ success: true, user: updatedUser });
   } catch (error: any) {
+    if (
+      typeof error?.message === "string" &&
+      error.message.startsWith("ORG_PROJECT_ALLOCATION_EXCEEDED:")
+    ) {
+      const remainingRaw = Number(error.message.split(":")[1]);
+      const remaining = Number.isFinite(remainingRaw) ? remainingRaw : 0;
+      return res.status(403).json({
+        error: `Project quota exceeded. Remaining allocatable projects in your organization: ${remaining}.`,
+      });
+    }
     if (error?.message === "INVALID_CREDIT_POOL" || error?.message === "INVALID_CREDIT_AMOUNT") {
       return res.status(400).json({ error: "Invalid credit update payload." });
     }
@@ -215,7 +274,6 @@ router.get("/config", async (req: AuthenticatedRequest, res) => {
         isActive: org.isActive,
         falApiKey: encryptionUtils.decrypt(org.falApiKey),
         kieApiKey: encryptionUtils.decrypt(org.kieApiKey),
-        openaiApiKey: encryptionUtils.decrypt(org.openaiApiKey),
         pricing: {
           pricePicDrift_5s: org.pricePicDrift_5s,
           pricePicDrift_10s: org.pricePicDrift_10s,
@@ -246,7 +304,7 @@ router.get("/config", async (req: AuthenticatedRequest, res) => {
 
 // Update Organization Config (API Keys & Pricing Overrides)
 router.put("/config", async (req: AuthenticatedRequest, res) => {
-  const { falApiKey, kieApiKey, openaiApiKey, name, pricing } = req.body;
+  const { falApiKey, kieApiKey, name, pricing } = req.body;
   try {
     const orgId = req.user!.organizationId!;
     
@@ -254,7 +312,6 @@ router.put("/config", async (req: AuthenticatedRequest, res) => {
       name: name || undefined,
       falApiKey: falApiKey ? encryptionUtils.encrypt(falApiKey) : undefined,
       kieApiKey: kieApiKey ? encryptionUtils.encrypt(kieApiKey) : undefined,
-      openaiApiKey: openaiApiKey ? encryptionUtils.encrypt(openaiApiKey) : undefined,
     };
 
     // Apply pricing overrides if provided
