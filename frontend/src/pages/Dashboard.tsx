@@ -1365,21 +1365,6 @@ function Dashboard() {
     setStorylineSequence((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const updateStorylineDuration = (index: number, seconds: number) => {
-    if (!Number.isFinite(seconds)) return;
-    const normalized = Math.max(1, Math.min(60, Math.round(seconds)));
-    setStorylineSequence((prev) =>
-      prev.map((item, i) =>
-        i === index
-          ? {
-              ...item,
-              duration: normalized * 1000,
-            }
-          : item,
-      ),
-    );
-  };
-
   const loadStorylineItemFile = async (item: SequenceItem) => {
     const rawUrl =
       item.type === "CAROUSEL" && item.sourceMediaUrl?.startsWith("[")
@@ -4427,7 +4412,7 @@ function Dashboard() {
                 </div>
                 {timelinePanelMode === "timeline" ? (
                   <>
-                    <div className="space-y-3 max-h-[500px] sm:max-h-[600px] overflow-y-auto custom-scrollbar">
+                    <div className="space-y-3 max-h-[720px] sm:max-h-[780px] overflow-y-auto custom-scrollbar">
                       {compactTimelinePosts.length > 0 ? (
                         compactTimelinePosts.map((post: any) => (
                             <PostCard
@@ -4498,7 +4483,7 @@ function Dashboard() {
                     )}
                   </>
                 ) : (
-                  <div className="space-y-3 max-h-[500px] sm:max-h-[600px] overflow-y-auto custom-scrollbar">
+                  <div className="space-y-3 max-h-[720px] sm:max-h-[780px] overflow-y-auto custom-scrollbar">
                     {storylineSequence.length > 0 ? (
                       storylineSequence.map((item, index) => (
                         <div key={`${item.id}-${index}`} className="space-y-2">
@@ -4513,6 +4498,8 @@ function Dashboard() {
                             publishingPost={null}
                             primaryColor={brandConfig?.primaryColor}
                             compact={true}
+                            onPrimaryAction={() => handleUseStorylineInPanel(item)}
+                            primaryActionLabel="Use In Panel"
                             onDrift={
                               item.type === "VIDEO"
                                 ? () =>
@@ -4550,38 +4537,8 @@ function Dashboard() {
                                 <span className="uppercase tracking-wider">
                                   Position {index + 1}
                                 </span>
-                                {item.type !== "VIDEO" && (
-                                  <div className="flex items-center gap-2">
-                                    <span>Duration</span>
-                                    <input
-                                      type="number"
-                                      min={1}
-                                      max={60}
-                                      value={Math.max(
-                                        1,
-                                        Math.round((item.duration || 3000) / 1000),
-                                      )}
-                                      onChange={(e) =>
-                                        updateStorylineDuration(
-                                          index,
-                                          Number(e.target.value),
-                                        )
-                                      }
-                                      className="w-14 px-2 py-1 rounded bg-gray-900 border border-white/10 text-center text-[10px] text-cyan-300 outline-none"
-                                    />
-                                    <span>s</span>
-                                  </div>
-                                )}
                               </div>
                               <div className="flex flex-wrap items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleUseStorylineInPanel(item)}
-                                  className="px-3 h-8 text-[11px] rounded-lg bg-cyan-500/15 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-300"
-                                  title="Use this Storyline item in the active reference panel"
-                                >
-                                  Use In Panel
-                                </button>
                                 <button
                                   type="button"
                                   onClick={() => moveStorylineItem(index, -1)}

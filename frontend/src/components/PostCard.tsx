@@ -25,6 +25,8 @@ interface PostCardProps {
   onDrift?: () => void;
   onDelete?: () => void;
   onAddToSequence?: () => void; // ✅ NEW
+  onPrimaryAction?: () => void;
+  primaryActionLabel?: string;
 
   // ✅ MINIMAL PROP (For Expanded Gallery)
   minimal?: boolean;
@@ -64,6 +66,8 @@ export function PostCard({
   onDrift,
   onDelete,
   onAddToSequence,
+  onPrimaryAction,
+  primaryActionLabel,
   minimal = false,
 }: PostCardProps) {
   const [mediaError, setMediaError] = useState(false);
@@ -597,6 +601,19 @@ export function PostCard({
                   <span>Download</span>
                 )}
               </button>
+
+              {onPrimaryAction && primaryActionLabel && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPrimaryAction();
+                  }}
+                  className="px-3 h-8 text-[11px] rounded-lg bg-cyan-500/15 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-300 transition-colors whitespace-nowrap"
+                  title={primaryActionLabel}
+                >
+                  {primaryActionLabel}
+                </button>
+              )}
 
               {isVideoPost && onDrift && (
                   <button
