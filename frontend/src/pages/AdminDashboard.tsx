@@ -489,8 +489,8 @@ export default function AdminDashboard() {
                     <th className="p-6 border-b border-gray-800 text-center">PD Standard</th>
                     <th className="p-6 border-b border-gray-800 text-center">PD Plus</th>
                     <th className="p-6 border-b border-gray-800 text-center">PicFX</th>
-                    <th className="p-6 border-b border-gray-800 text-center">Video FX 1</th>
-                    <th className="p-6 border-b border-gray-800 text-center">Video FX 2</th>
+                    <th className="p-6 border-b border-gray-800 text-center">Seedance 2.0 - Kie</th>
+                    <th className="p-6 border-b border-gray-800 text-center">Seedance 2.0 FAL</th>
                     <th className="p-6 border-b border-gray-800 text-center">Video FX 3</th>
                     <th className="p-6 border-b border-gray-800 text-right">Operations</th>
                   </tr>
@@ -730,7 +730,7 @@ export default function AdminDashboard() {
 
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                  KIE API Key (For VideoFX 1)
+                  KIE API Key (For Seedance 2.0 - Kie)
                 </label>
                 <input
                   type="password"
@@ -880,8 +880,8 @@ export default function AdminDashboard() {
                         { id: "creditsPicDrift", label: "PD Standard" },
                         { id: "creditsPicDriftPlus", label: "PD Plus" },
                         { id: "creditsImageFX", label: "Pic FX" },
-                        { id: "creditsVideoFX1", label: "Video FX 1" },
-                        { id: "creditsVideoFX2", label: "Video FX 2" },
+                        { id: "creditsVideoFX1", label: "Seedance 2.0 - Kie" },
+                        { id: "creditsVideoFX2", label: "Seedance 2.0 FAL" },
                         { id: "creditsVideoFX3", label: "Video FX 3" },
                       ].map((pool) => (
                         <div key={pool.id} className="flex flex-col gap-3">
@@ -928,8 +928,8 @@ export default function AdminDashboard() {
                           <option value="creditsPicDrift">PicDrift Standard</option>
                           <option value="creditsPicDriftPlus">PicDrift Plus</option>
                           <option value="creditsImageFX">PicFX</option>
-                          <option value="creditsVideoFX1">Video FX 1</option>
-                          <option value="creditsVideoFX2">Video FX 2</option>
+                          <option value="creditsVideoFX1">Seedance 2.0 - Kie</option>
+                          <option value="creditsVideoFX2">Seedance 2.0 FAL</option>
                           <option value="creditsVideoFX3">Video FX 3</option>
                         </select>
                       </div>

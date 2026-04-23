@@ -597,7 +597,7 @@ export default function SuperAdminDashboard() {
                     <th className="p-6 text-center">View</th>
                     <th className="p-6 text-center">PicDrift / +</th>
                     <th className="p-6 text-center">PicFX</th>
-                    <th className="p-6 text-center">VidFX 1 / 2 / 3</th>
+                    <th className="p-6 text-center">Seedance Kie / FAL / VFX3</th>
                     <th className="p-6 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -630,8 +630,8 @@ export default function SuperAdminDashboard() {
                       </td>
                       <td className="p-6 text-center">
                         <div className="flex gap-2 justify-center">
-                          <input type="number" step="1" min="0" title="VidFX 1" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1, creditType: "creditsVideoFX1" })} />
-                          <input type="number" step="1" min="0" title="VidFX 2" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2, creditType: "creditsVideoFX2" })} />
+                          <input type="number" step="1" min="0" title="Seedance 2.0 - Kie" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1, creditType: "creditsVideoFX1" })} />
+                          <input type="number" step="1" min="0" title="Seedance 2.0 FAL" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2, creditType: "creditsVideoFX2" })} />
                           <input type="number" step="1" min="0" title="VidFX 3" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3, creditType: "creditsVideoFX3" })} />
                         </div>
                       </td>
