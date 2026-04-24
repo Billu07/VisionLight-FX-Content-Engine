@@ -2895,7 +2895,7 @@ function Dashboard() {
                         {/* VIDEO FX SUB-MENU */}
                         {currentVisualTab === "videofx" && (
                           <div className="mb-6 animate-in fade-in space-y-4">
-                            <div className="flex bg-gray-900/50 p-1 rounded-xl w-full sm:max-w-sm mx-auto border border-white/5">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 bg-gray-900/50 p-1.5 rounded-2xl w-full max-w-3xl mx-auto border border-white/5">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -2903,32 +2903,32 @@ function Dashboard() {
                                   setVideoFxMode("video");
                                   setVideoFx1Duration(10);
                                 }}
-                                className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeEngine === "kie"
+                                className={`w-full px-3 py-2.5 text-[11px] sm:text-xs font-semibold rounded-xl transition-all leading-tight whitespace-nowrap ${activeEngine === "kie"
                                   ? "bg-cyan-600 text-white shadow-lg"
                                   : "text-gray-400 hover:text-white"
                                   }`}
                               >
-                                Seedance 2.0 - Kie
+                                Seedance 2.0 Kie
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setActiveEngine("openai")}
-                                className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeEngine === "openai"
+                                className={`w-full px-3 py-2.5 text-[11px] sm:text-xs font-semibold rounded-xl transition-all leading-tight whitespace-nowrap ${activeEngine === "openai"
                                   ? "bg-cyan-600 text-white shadow-lg"
                                   : "text-gray-400 hover:text-white"
                                   }`}
                               >
-                                Seedance 2.0 FAL
+                                Seedance 2.0 Fal
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setActiveEngine("veo")}
-                                className={`flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${activeEngine === "veo"
+                                className={`w-full px-3 py-2.5 text-[11px] sm:text-xs font-semibold rounded-xl transition-all leading-tight whitespace-nowrap ${activeEngine === "veo"
                                   ? "bg-cyan-600 text-white shadow-lg"
                                   : "text-gray-400 hover:text-white"
                                   }`}
                               >
-                                Video FX 3
+                                Veo 3
                               </button>
                             </div>
                           </div>
