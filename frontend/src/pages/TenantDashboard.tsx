@@ -68,6 +68,7 @@ type CoverageVariantId = (typeof COVERAGE_VARIANTS)[number]["id"];
 export default function TenantDashboard() {
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
+  const isPicdriftTenant = adminUser?.view === "PICDRIFT";
 
   const [activeTab, setActiveTab] = useState<"team" | "pricing" | "integrations">(
     "team",
@@ -223,7 +224,23 @@ export default function TenantDashboard() {
     </div>
   );
 
-  const variantRows = COVERAGE_VARIANTS.map((variant) => {
+  const allowedCoverageWalletKeys: CoverageWalletKey[] = isPicdriftTenant
+    ? ["creditsPicDrift", "creditsPicDriftPlus"]
+    : [
+        "creditsPicDrift",
+        "creditsPicDriftPlus",
+        "creditsVideoFX1",
+        "creditsVideoFX2",
+        "creditsVideoFX3",
+      ];
+  const visibleCoverageWallets = COVERAGE_WALLETS.filter((wallet) =>
+    allowedCoverageWalletKeys.includes(wallet.key),
+  );
+  const visibleCoverageVariants = COVERAGE_VARIANTS.filter((variant) =>
+    allowedCoverageWalletKeys.includes(variant.wallet),
+  );
+
+  const variantRows = visibleCoverageVariants.map((variant) => {
     const deductionCredits = Math.max(
       0,
       Number(config?.pricing?.[variant.deductionKey]) || 0,
@@ -242,16 +259,16 @@ export default function TenantDashboard() {
     };
   });
 
-  const walletUsdPerCredit = COVERAGE_WALLETS.reduce((acc, wallet) => {
+  const walletUsdPerCredit = visibleCoverageWallets.reduce((acc, wallet) => {
     const rates = variantRows
       .filter((row) => row.wallet === wallet.key)
       .map((row) => row.impliedUsdPerCredit)
       .filter((value) => Number.isFinite(value) && value > 0);
     acc[wallet.key] = rates.length ? Math.max(...rates) : 0;
     return acc;
-  }, {} as Record<CoverageWalletKey, number>);
+  }, {} as Record<string, number>);
 
-  const walletCoverageRows = COVERAGE_WALLETS.map((wallet) => {
+  const walletCoverageRows = visibleCoverageWallets.map((wallet) => {
     const allocatedCredits = users.reduce(
       (sum, user) => sum + (Number(user[wallet.key]) || 0),
       0,
@@ -404,14 +421,20 @@ export default function TenantDashboard() {
             </div>
 
             <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto shadow-xl">
-              <table className="w-full text-left min-w-[1000px]">
+              <table
+                className={`w-full text-left ${
+                  isPicdriftTenant ? "min-w-[860px]" : "min-w-[1000px]"
+                }`}
+              >
                 <thead className="bg-gray-950/50 text-[9px] uppercase tracking-widest text-gray-500 font-bold">
                   <tr>
                     <th className="p-5">User</th>
                     <th className="p-5 text-center">Role</th>
                     <th className="p-5 text-center">PicDrift / +</th>
                     <th className="p-5 text-center">PicFX</th>
-                    <th className="p-5 text-center">Seedance Kie / FAL / VFX3</th>
+                    {!isPicdriftTenant && (
+                      <th className="p-5 text-center">Seedance Kie / FAL / VFX3</th>
+                    )}
                     <th className="p-5 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -442,13 +465,15 @@ export default function TenantDashboard() {
                       <td className="p-5 text-center">
                         <input type="number" step="1" min="0" className="w-16 bg-gray-950 border border-gray-800 rounded p-1 text-center text-xs" defaultValue={u.creditsImageFX} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsImageFX", (toInt(e.target.value, u.creditsImageFX) - u.creditsImageFX).toString())} />
                       </td>
-                      <td className="p-5 text-center">
-                        <div className="flex gap-1 justify-center">
-                          <input type="number" step="1" min="0" title="Seedance 2.0 - Kie" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX1", (toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1).toString())} />
-                          <input type="number" step="1" min="0" title="Seedance 2.0 FAL" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX2", (toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2).toString())} />
-                          <input type="number" step="1" min="0" title="VidFX 3" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX3", (toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3).toString())} />
-                        </div>
-                      </td>
+                      {!isPicdriftTenant && (
+                        <td className="p-5 text-center">
+                          <div className="flex gap-1 justify-center">
+                            <input type="number" step="1" min="0" title="Seedance 2.0 - Kie" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX1", (toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1).toString())} />
+                            <input type="number" step="1" min="0" title="Seedance 2.0 FAL" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX2", (toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2).toString())} />
+                            <input type="number" step="1" min="0" title="VidFX 3" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX3", (toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3).toString())} />
+                          </div>
+                        </td>
+                      )}
                       <td className="p-5 text-right">
                         <div className="flex gap-2 justify-end">
                           <button onClick={() => setEditingUser(u)} className="text-cyan-400 hover:text-cyan-300 text-[9px] font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded">Manage</button>
@@ -482,7 +507,11 @@ export default function TenantDashboard() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div
+              className={`grid grid-cols-1 gap-4 ${
+                isPicdriftTenant ? "sm:grid-cols-2" : "sm:grid-cols-3"
+              }`}
+            >
               <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
                 <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
                   Fal Coverage Needed
@@ -491,14 +520,16 @@ export default function TenantDashboard() {
                   {formatUsd(coverageTotals.fal)}
                 </p>
               </div>
-              <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
-                  Kie Coverage Needed
-                </p>
-                <p className="text-xl font-bold text-cyan-400 mt-2">
-                  {formatUsd(coverageTotals.kie)}
-                </p>
-              </div>
+              {!isPicdriftTenant && (
+                <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                  <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+                    Kie Coverage Needed
+                  </p>
+                  <p className="text-xl font-bold text-cyan-400 mt-2">
+                    {formatUsd(coverageTotals.kie)}
+                  </p>
+                </div>
+              )}
               <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
                 <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
                   Total Coverage Needed
@@ -682,46 +713,48 @@ export default function TenantDashboard() {
                     </div>
                   </div>
 
-                  <div>
-                    <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">
-                      Video FX
-                    </h5>
-                    <div className="space-y-4">
-                      {[
-                        "priceVideoFX1_10s",
-                        "priceVideoFX1_15s",
-                        "priceVideoFX2_4s",
-                        "priceVideoFX2_8s",
-                        "priceVideoFX2_12s",
-                        "priceVideoFX3_4s",
-                        "priceVideoFX3_6s",
-                        "priceVideoFX3_8s",
-                      ].map((key) => (
-                        <div key={key} className="flex justify-between items-center">
-                          <span className="text-[10px] text-gray-400 uppercase font-bold">
-                            {key.replace("price", "").replace(/_/g, " ")}
-                          </span>
-                          <input
-                            type="number"
-                            step="1"
-                            min="0"
-                            className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
-                            value={config.pricing[key]}
-                            onChange={(e) =>
-                              setConfig({
-                                ...config,
-                                pricing: {
-                                  ...config.pricing,
-                                  [key]: toInt(e.target.value, config.pricing[key]),
-                                },
-                              })
-                            }
-                            onBlur={() => handleUpdateConfig()}
-                          />
-                        </div>
-                      ))}
+                  {!isPicdriftTenant && (
+                    <div>
+                      <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">
+                        Video FX
+                      </h5>
+                      <div className="space-y-4">
+                        {[
+                          "priceVideoFX1_10s",
+                          "priceVideoFX1_15s",
+                          "priceVideoFX2_4s",
+                          "priceVideoFX2_8s",
+                          "priceVideoFX2_12s",
+                          "priceVideoFX3_4s",
+                          "priceVideoFX3_6s",
+                          "priceVideoFX3_8s",
+                        ].map((key) => (
+                          <div key={key} className="flex justify-between items-center">
+                            <span className="text-[10px] text-gray-400 uppercase font-bold">
+                              {key.replace("price", "").replace(/_/g, " ")}
+                            </span>
+                            <input
+                              type="number"
+                              step="1"
+                              min="0"
+                              className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
+                              value={config.pricing[key]}
+                              onChange={(e) =>
+                                setConfig({
+                                  ...config,
+                                  pricing: {
+                                    ...config.pricing,
+                                    [key]: toInt(e.target.value, config.pricing[key]),
+                                  },
+                                })
+                              }
+                              onBlur={() => handleUpdateConfig()}
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>

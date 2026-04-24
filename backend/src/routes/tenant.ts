@@ -27,6 +27,26 @@ const sanitizePricingUpdate = (pricing: any) => {
   return updates;
 };
 
+const VIDEO_FX_PRICE_KEYS = new Set([
+  "priceVideoFX1_10s",
+  "priceVideoFX1_15s",
+  "priceVideoFX2_4s",
+  "priceVideoFX2_8s",
+  "priceVideoFX2_12s",
+  "priceVideoFX3_4s",
+  "priceVideoFX3_6s",
+  "priceVideoFX3_8s",
+]);
+
+const PICDRIFT_ALLOWED_CREDIT_POOLS = new Set([
+  "creditsPicDrift",
+  "creditsPicDriftPlus",
+  "creditsImageFX",
+]);
+
+const normalizeView = (raw: unknown): "PICDRIFT" | "VISIONLIGHT" =>
+  raw === "PICDRIFT" ? "PICDRIFT" : "VISIONLIGHT";
+
 type ProviderBalanceStatus = "ok" | "missing_key" | "insufficient_scope" | "error";
 
 const getErrorMessage = (error: any, fallback: string) =>
@@ -211,9 +231,13 @@ router.post("/team/user", async (req: AuthenticatedRequest, res) => {
     // Security: Tenants can only create USER or MANAGER roles.
     const finalRole = (role === "MANAGER") ? "MANAGER" : "USER";
 
-    // Enforce View Inheritance
+    // Enforce strict tenant-view inheritance for tenant admins.
+    // Superadmins (while operating inside their org) can choose either view.
     const requestingUser = await dbService.findUserById(req.user!.id);
-    const finalView = (requestingUser?.view === "PICDRIFT") ? "PICDRIFT" : (view || "VISIONLIGHT");
+    const isSuperAdminRequester = requestingUser?.role === "SUPERADMIN";
+    const finalView = isSuperAdminRequester
+      ? normalizeView(view)
+      : normalizeView(requestingUser?.view);
 
     const newUser = await AuthService.createSystemUser(
       email,
@@ -276,8 +300,24 @@ router.put("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
 
     // Handle credits
     if (addCredits !== undefined && creditType) {
+      const requestingUser = await dbService.findUserById(req.user!.id);
+      const requesterView = normalizeView(requestingUser?.view);
+      const isSuperAdminRequester = requestingUser?.role === "SUPERADMIN";
+      const creditPool = String(creditType);
+
+      if (
+        !isSuperAdminRequester &&
+        requesterView === "PICDRIFT" &&
+        !PICDRIFT_ALLOWED_CREDIT_POOLS.has(creditPool)
+      ) {
+        return res.status(403).json({
+          error:
+            "Credit pool is not available for PICDRIFT organizations.",
+        });
+      }
+
       updates.addCredits = addCredits;
-      updates.creditType = creditType;
+      updates.creditType = creditPool;
     }
 
     const updatedUser = await dbService.adminUpdateUser(userId, updates);
@@ -431,6 +471,9 @@ router.put("/config", async (req: AuthenticatedRequest, res) => {
   const { falApiKey, kieApiKey, name, pricing } = req.body;
   try {
     const orgId = req.user!.organizationId!;
+    const requestingUser = await dbService.findUserById(req.user!.id);
+    const requesterView = normalizeView(requestingUser?.view);
+    const isSuperAdminRequester = requestingUser?.role === "SUPERADMIN";
 
     if (
       falApiKey !== undefined &&
@@ -445,6 +488,15 @@ router.put("/config", async (req: AuthenticatedRequest, res) => {
       typeof kieApiKey !== "string"
     ) {
       return res.status(400).json({ error: "Invalid KIE API key value." });
+    }
+    if (
+      !isSuperAdminRequester &&
+      requesterView === "PICDRIFT" &&
+      kieApiKey !== undefined
+    ) {
+      return res.status(403).json({
+        error: "KIE API key is not available for PICDRIFT organizations.",
+      });
     }
 
     const updates: any = {
@@ -464,7 +516,19 @@ router.put("/config", async (req: AuthenticatedRequest, res) => {
 
     // Apply pricing overrides if provided
     if (pricing) {
-      Object.assign(updates, sanitizePricingUpdate(pricing));
+      const sanitizedPricing = sanitizePricingUpdate(pricing);
+      if (!isSuperAdminRequester && requesterView === "PICDRIFT") {
+        const hasVideoFxPricingUpdate = Object.keys(sanitizedPricing).some((key) =>
+          VIDEO_FX_PRICE_KEYS.has(key),
+        );
+        if (hasVideoFxPricingUpdate) {
+          return res.status(403).json({
+            error:
+              "Video FX pricing is not available for PICDRIFT organizations.",
+          });
+        }
+      }
+      Object.assign(updates, sanitizedPricing);
     }
 
     await dbService.updateOrganization(orgId, updates);

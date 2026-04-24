@@ -214,7 +214,8 @@ export default function SuperAdminDashboard() {
     email: "",
     password: "",
     name: "",
-    role: "USER"
+    role: "USER",
+    view: "VISIONLIGHT",
   });
   const [variantCostUsd, setVariantCostUsd] = useState<
     Record<CoverageVariantId, number>
@@ -1486,6 +1487,14 @@ export default function SuperAdminDashboard() {
               >
                 <option value="USER">Standard User</option>
                 <option value="MANAGER">Team Manager</option>
+              </select>
+              <select
+                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-gray-300"
+                value={newTeamMember.view}
+                onChange={e => setNewTeamMember({ ...newTeamMember, view: e.target.value })}
+              >
+                <option value="VISIONLIGHT">VisionLight View (Full)</option>
+                <option value="PICDRIFT">PicDrift View (Limited)</option>
               </select>
               <div className="flex gap-4 pt-4">
                 <button type="button" onClick={() => setShowAddTeamModal(false)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
