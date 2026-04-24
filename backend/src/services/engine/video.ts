@@ -839,8 +839,28 @@ export const videoLogic = {
           kiePayload,
           { headers: { Authorization: `Bearer ${kieKey}` } },
         );
-        if (kieRes.data.code !== 200) throw new Error("Kie Error");
-        externalId = kieRes.data.data.taskId;
+        const kieResponseCode = kieRes?.data?.code;
+        const kieCodeNumeric = Number(kieResponseCode);
+        const isKieAccepted =
+          (Number.isFinite(kieCodeNumeric) && kieCodeNumeric === 200) ||
+          kieResponseCode === "200";
+        const kieTaskId =
+          kieRes?.data?.data?.taskId || kieRes?.data?.data?.task_id;
+        const kieMessage =
+          kieRes?.data?.msg || kieRes?.data?.message || "Unknown KIE error";
+        if (!isKieAccepted || !kieTaskId) {
+          console.error(
+            "KIE createTask rejected:",
+            typeof kieRes?.data === "string"
+              ? kieRes.data
+              : JSON.stringify(kieRes?.data || {}),
+          );
+          const reason = !isKieAccepted
+            ? `response code ${String(kieResponseCode)}`
+            : "missing taskId";
+          throw new Error(`KIE request rejected: ${kieMessage} (${reason})`);
+        }
+        externalId = kieTaskId;
       } else if (isSeedanceFal) {
         provider = "seedance-fal";
         const imageRefs = imageRefUrls.map((url: string) => getOptimizedUrl(url));
@@ -977,6 +997,10 @@ export const videoLogic = {
         status: "PROCESSING",
       });
     } catch (error: any) {
+      console.error(
+        `Video generation provider failure (${postId}):`,
+        error?.message || error,
+      );
       const providerErrorPayload =
         typeof error?.response?.data === "string"
           ? error.response.data
@@ -1017,9 +1041,41 @@ export const videoLogic = {
           `${KIE_BASE_URL}/jobs/recordInfo?taskId=${externalId}`,
           { headers: { Authorization: `Bearer ${kieKey}` } },
         );
-        if (checkRes.data.data.state === "success") {
-          finalUrl = JSON.parse(checkRes.data.data.resultJson).resultUrls?.[0];
-          isComplete = true;
+        const kieCheckCode = checkRes?.data?.code;
+        const kieCheckCodeNumeric = Number(kieCheckCode);
+        const isKieCheckAccepted =
+          (Number.isFinite(kieCheckCodeNumeric) && kieCheckCodeNumeric === 200) ||
+          kieCheckCode === "200";
+        if (!isKieCheckAccepted) {
+          isFailed = true;
+          errorMessage =
+            checkRes?.data?.msg ||
+            checkRes?.data?.message ||
+            `KIE status check rejected (${String(kieCheckCode)})`;
+        } else if (checkRes.data.data.state === "success") {
+          const rawResult = checkRes?.data?.data?.resultJson;
+          let parsedResult: any = null;
+          if (typeof rawResult === "string" && rawResult.trim()) {
+            try {
+              parsedResult = JSON.parse(rawResult);
+            } catch {
+              parsedResult = null;
+            }
+          } else if (rawResult && typeof rawResult === "object") {
+            parsedResult = rawResult;
+          }
+          finalUrl =
+            parsedResult?.resultUrls?.[0] ||
+            parsedResult?.result_urls?.[0] ||
+            checkRes?.data?.data?.resultUrls?.[0] ||
+            checkRes?.data?.data?.result_urls?.[0] ||
+            "";
+          if (finalUrl) {
+            isComplete = true;
+          } else {
+            isFailed = true;
+            errorMessage = "KIE marked success but returned no result URL.";
+          }
         } else if (checkRes.data.data.state === "fail") {
           isFailed = true;
           errorMessage = checkRes.data.data.failMsg;
