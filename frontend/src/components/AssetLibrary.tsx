@@ -716,11 +716,8 @@ export function AssetLibrary({
                 </button>
               </div>
             )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto justify-start lg:justify-end">
             {activeTab === "STORYBOARD" && storyboardIds.length > 0 && (
-              <>
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={handleDownloadZip}
                   disabled={isDownloadingZip}
@@ -729,7 +726,7 @@ export function AssetLibrary({
                   {isDownloadingZip ? (
                     <LoadingSpinner size="sm" />
                   ) : (
-                    <>📥 Download ZIP</>
+                    <>Download ZIP</>
                   )}
                 </button>
                 <button
@@ -745,10 +742,13 @@ export function AssetLibrary({
                   }}
                   className="px-3 sm:px-4 py-2 text-xs font-bold rounded-lg bg-red-900/50 text-red-400 hover:bg-red-900 hover:text-red-300 border border-red-500/30 transition-colors whitespace-nowrap"
                 >
-                  🗑️ Clear Sequence
+                  Clear Sequence
                 </button>
-              </>
+              </div>
             )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto justify-start lg:justify-end">
             <input
               type="file"
               multiple
@@ -1229,4 +1229,5 @@ export function AssetLibrary({
     </div>
   );
 }
+
 
