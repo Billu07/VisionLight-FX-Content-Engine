@@ -26,22 +26,6 @@ interface Config {
   pricing: any;
 }
 
-interface ProviderBalanceItem {
-  status: "ok" | "missing_key" | "insufficient_scope" | "error";
-  message?: string;
-  balance?: number;
-  currency?: string;
-  credits?: number;
-}
-
-interface ProviderBalancesResponse {
-  checkedAt: string;
-  balances: {
-    fal: ProviderBalanceItem;
-    kie: ProviderBalanceItem;
-  };
-}
-
 interface CreditRequest {
   id: string;
   email: string;
@@ -54,6 +38,27 @@ interface CreditRequest {
   };
 }
 
+type CreditPoolCostKey =
+  | "creditsPicDrift"
+  | "creditsPicDriftPlus"
+  | "creditsImageFX"
+  | "creditsVideoFX1"
+  | "creditsVideoFX2"
+  | "creditsVideoFX3";
+
+const COVERAGE_COST_ROWS: {
+  key: CreditPoolCostKey;
+  label: string;
+  provider: "fal" | "kie";
+}[] = [
+  { key: "creditsPicDrift", label: "PicDrift", provider: "fal" },
+  { key: "creditsPicDriftPlus", label: "PicDrift Plus", provider: "fal" },
+  { key: "creditsImageFX", label: "PicFX", provider: "fal" },
+  { key: "creditsVideoFX1", label: "Seedance 2.0 Kie", provider: "kie" },
+  { key: "creditsVideoFX2", label: "Seedance 2.0 Fal", provider: "fal" },
+  { key: "creditsVideoFX3", label: "Veo 3", provider: "fal" },
+];
+
 export default function TenantDashboard() {
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
@@ -62,14 +67,21 @@ export default function TenantDashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [creditRequests, setCreditRequests] = useState<CreditRequest[]>([]);
   const [config, setConfig] = useState<Config | null>(null);
-  const [providerBalances, setProviderBalances] =
-    useState<ProviderBalancesResponse | null>(null);
-  const [providerBalanceLoading, setProviderBalanceLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
   const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [poolCostUsd, setPoolCostUsd] = useState<
+    Record<CreditPoolCostKey, number>
+  >({
+    creditsPicDrift: 0.05,
+    creditsPicDriftPlus: 0.07,
+    creditsImageFX: 0.03,
+    creditsVideoFX1: 0.12,
+    creditsVideoFX2: 0.08,
+    creditsVideoFX3: 0.09,
+  });
   const [newUser, setNewUser] = useState({
     email: "",
     password: "",
@@ -113,12 +125,6 @@ export default function TenantDashboard() {
     return () => clearInterval(interval);
   }, [activeTab]);
 
-  useEffect(() => {
-    if (activeTab === "balances") {
-      fetchProviderBalances();
-    }
-  }, [activeTab]);
-
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -129,7 +135,14 @@ export default function TenantDashboard() {
         ]);
         if (teamRes.data.success) setUsers(teamRes.data.users);
         if (requestsRes.data.success) setCreditRequests(requestsRes.data.requests || []);
-      } else if (activeTab === "pricing" || activeTab === "integrations") {
+      } else if (activeTab === "pricing") {
+        const [configRes, teamRes] = await Promise.all([
+          apiEndpoints.tenantGetConfig(),
+          apiEndpoints.tenantGetTeam(),
+        ]);
+        if (configRes.data.success) setConfig(configRes.data.config);
+        if (teamRes.data.success) setUsers(teamRes.data.users);
+      } else if (activeTab === "integrations") {
         const res = await apiEndpoints.tenantGetConfig();
         if (res.data.success) setConfig(res.data.config);
       }
@@ -180,51 +193,6 @@ export default function TenantDashboard() {
     }
   };
 
-  const fetchProviderBalances = async () => {
-    setProviderBalanceLoading(true);
-    try {
-      const res = await apiEndpoints.tenantGetProviderBalances();
-      if (res.data.success) {
-        setProviderBalances({
-          checkedAt: res.data.checkedAt,
-          balances: res.data.balances,
-        });
-      }
-    } catch (err: any) {
-      setMsg("Error: " + err.message);
-    } finally {
-      setProviderBalanceLoading(false);
-    }
-  };
-
-  const renderProviderBalanceValue = (
-    provider: "fal" | "kie",
-    item: ProviderBalanceItem,
-  ) => {
-    if (item.status === "ok") {
-      if (provider === "fal") {
-        const value =
-          typeof item.balance === "number"
-            ? item.balance.toFixed(2)
-            : "0.00";
-        return `${value} ${item.currency || "USD"}`;
-      }
-      const value =
-        typeof item.credits === "number"
-          ? item.credits.toLocaleString()
-          : "0";
-      return `${value} credits`;
-    }
-    if (item.status === "missing_key") return "Not configured";
-    if (item.status === "insufficient_scope")
-      return item.message || "Unavailable for this key scope";
-    return item.message || "Unavailable";
-  };
-
-  const falBalanceStatus = providerBalances?.balances?.fal?.status;
-  const showFalBillingFallback =
-    !!falBalanceStatus && falBalanceStatus !== "ok";
-
   const handleResolveCreditRequest = async (requestId: string) => {
     try {
       await apiEndpoints.tenantResolveRequest(requestId);
@@ -240,6 +208,46 @@ export default function TenantDashboard() {
       <LoadingSpinner size="lg" variant="neon" />
     </div>
   );
+
+  const coverageRows = COVERAGE_COST_ROWS.map((entry) => {
+    const allocatedCredits = users.reduce(
+      (sum, user) => sum + (Number(user[entry.key]) || 0),
+      0,
+    );
+    const unitUsd = Number(poolCostUsd[entry.key]) || 0;
+    return {
+      ...entry,
+      allocatedCredits,
+      unitUsd,
+      requiredUsd: allocatedCredits * unitUsd,
+    };
+  });
+
+  const coverageTotals = coverageRows.reduce(
+    (acc, row) => {
+      if (row.provider === "kie") acc.kie += row.requiredUsd;
+      else acc.fal += row.requiredUsd;
+      acc.total += row.requiredUsd;
+      return acc;
+    },
+    { fal: 0, kie: 0, total: 0 },
+  );
+
+  const formatUsd = (value: number) =>
+    value.toLocaleString("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+  const handlePoolCostChange = (key: CreditPoolCostKey, raw: string) => {
+    const parsed = Number(raw);
+    setPoolCostUsd((prev) => ({
+      ...prev,
+      [key]: Number.isFinite(parsed) && parsed >= 0 ? parsed : 0,
+    }));
+  };
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-200 p-6 sm:p-10 font-sans">
@@ -539,66 +547,98 @@ export default function TenantDashboard() {
         {activeTab === "balances" && (
           <div className="max-w-xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4">
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 shadow-xl">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-bold text-white uppercase tracking-tight">
-                  Provider Balances
-                </h2>
-                <button
-                  type="button"
-                  onClick={fetchProviderBalances}
-                  disabled={providerBalanceLoading}
-                  className="px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 disabled:opacity-50"
+              <h2 className="text-lg font-bold text-white uppercase tracking-tight">
+                Credit Check
+              </h2>
+              <p className="text-xs text-gray-400 mt-2 mb-6">
+                Open your provider portal and verify available credit instantly.
+              </p>
+              <div className="flex justify-start">
+                <a
+                  href="https://fal.ai/dashboard/usage-billing/credits"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-5 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-pink-600 hover:bg-pink-500 border border-pink-400/40 text-white transition-colors"
                 >
-                  {providerBalanceLoading ? "Refreshing..." : "Refresh Provider Balance"}
-                </button>
+                  Check Your Credit
+                </a>
               </div>
-              <div className={`grid grid-cols-1 ${adminUser?.view !== "PICDRIFT" ? "sm:grid-cols-2" : ""} gap-3`}>
-                <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                    Fal Balance
-                  </p>
-                  <p className="text-sm font-semibold text-white">
-                    {renderProviderBalanceValue(
-                      "fal",
-                      providerBalances?.balances?.fal || {
-                        status: "error",
-                        message: "Not checked yet",
-                      },
-                    )}
-                  </p>
-                  {showFalBillingFallback && (
-                    <a
-                      href="https://fal.ai/dashboard/usage-billing/credits"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-3 inline-block px-3 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300"
-                    >
-                      Open Fal Billing
-                    </a>
-                  )}
-                </div>
-                {adminUser?.view !== "PICDRIFT" && (
-                  <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">
-                      KIE Credits
-                    </p>
-                    <p className="text-sm font-semibold text-white">
-                      {renderProviderBalanceValue(
-                        "kie",
-                        providerBalances?.balances?.kie || {
-                          status: "error",
-                          message: "Not checked yet",
-                        },
-                      )}
-                    </p>
-                  </div>
-                )}
-              </div>
-              {providerBalances?.checkedAt && (
-                <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-4">
-                  Last checked: {new Date(providerBalances.checkedAt).toLocaleString()}
+            </div>
+
+            <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
+              <div className="mb-6">
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  Provider Coverage Planner
+                </h4>
+                <p className="text-xs text-gray-500 mt-2">
+                  Set actual USD cost per credit type and see how much Fal/Kie balance your user allocations require.
                 </p>
-              )}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[820px]">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
+                      <th className="py-3 text-left">Generation</th>
+                      <th className="py-3 text-left">Provider</th>
+                      <th className="py-3 text-right">Allocated Credits</th>
+                      <th className="py-3 text-right">Actual Cost / Credit ($)</th>
+                      <th className="py-3 text-right">Required Coverage ($)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {coverageRows.map((row) => (
+                      <tr key={row.key} className="border-b border-gray-900/60">
+                        <td className="py-3 text-sm text-gray-200">{row.label}</td>
+                        <td className="py-3 text-xs uppercase tracking-widest text-gray-400">
+                          {row.provider}
+                        </td>
+                        <td className="py-3 text-sm text-right text-gray-200">
+                          {row.allocatedCredits.toFixed(0)}
+                        </td>
+                        <td className="py-3 text-right">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={row.unitUsd}
+                            onChange={(e) => handlePoolCostChange(row.key, e.target.value)}
+                            className="w-24 bg-gray-950 border border-gray-700 rounded p-2 text-right text-xs text-white outline-none focus:border-brand-accent"
+                          />
+                        </td>
+                        <td className="py-3 text-sm text-right font-semibold text-brand-accent">
+                          {formatUsd(row.requiredUsd)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                  <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+                    Fal Coverage Needed
+                  </p>
+                  <p className="text-xl font-bold text-pink-400 mt-2">
+                    {formatUsd(coverageTotals.fal)}
+                  </p>
+                </div>
+                <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                  <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+                    Kie Coverage Needed
+                  </p>
+                  <p className="text-xl font-bold text-cyan-400 mt-2">
+                    {formatUsd(coverageTotals.kie)}
+                  </p>
+                </div>
+                <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                  <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+                    Total Coverage Needed
+                  </p>
+                  <p className="text-xl font-bold text-white mt-2">
+                    {formatUsd(coverageTotals.total)}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         )}

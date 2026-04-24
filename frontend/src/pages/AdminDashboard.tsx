@@ -44,6 +44,27 @@ interface GlobalSettings {
   priceAsset_DriftPath: number;
 }
 
+type CreditPoolCostKey =
+  | "creditsPicDrift"
+  | "creditsPicDriftPlus"
+  | "creditsImageFX"
+  | "creditsVideoFX1"
+  | "creditsVideoFX2"
+  | "creditsVideoFX3";
+
+const COVERAGE_COST_ROWS: {
+  key: CreditPoolCostKey;
+  label: string;
+  provider: "fal" | "kie";
+}[] = [
+  { key: "creditsPicDrift", label: "PicDrift", provider: "fal" },
+  { key: "creditsPicDriftPlus", label: "PicDrift Plus", provider: "fal" },
+  { key: "creditsImageFX", label: "PicFX", provider: "fal" },
+  { key: "creditsVideoFX1", label: "Seedance 2.0 Kie", provider: "kie" },
+  { key: "creditsVideoFX2", label: "Seedance 2.0 Fal", provider: "fal" },
+  { key: "creditsVideoFX3", label: "Veo 3", provider: "fal" },
+];
+
 export default function AdminDashboard() {
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
@@ -99,7 +120,16 @@ export default function AdminDashboard() {
     useState<string>("creditsPicDrift");
   const [actionLoading, setActionLoading] = useState(false);
   const [msg, setMsg] = useState("");
-  const [baseBudgetRate, setBaseBudgetRate] = useState<number>(0.1);
+  const [poolCostUsd, setPoolCostUsd] = useState<
+    Record<CreditPoolCostKey, number>
+  >({
+    creditsPicDrift: 0.05,
+    creditsPicDriftPlus: 0.07,
+    creditsImageFX: 0.03,
+    creditsVideoFX1: 0.12,
+    creditsVideoFX2: 0.08,
+    creditsVideoFX3: 0.09,
+  });
 
   useEffect(() => {
     fetchData();
@@ -290,23 +320,46 @@ export default function AdminDashboard() {
     }
   };
 
-  const totalRenderBudget = useMemo(() => {
-    const totalCredits = users.reduce(
-      (acc, u) =>
-        acc +
-        (u.creditsPicDrift || 0) +
-        (u.creditsPicDriftPlus || 0) +
-        (u.creditsImageFX || 0) +
-        (u.creditsVideoFX1 || 0) +
-        (u.creditsVideoFX2 || 0) +
-        (u.creditsVideoFX3 || 0),
-      0,
+  const ownedOrgUsers = useMemo(() => {
+    if (adminUser?.role === "SUPERADMIN") return myTeamUsers;
+    return users;
+  }, [adminUser, myTeamUsers, users]);
+
+  const coverageRows = useMemo(() => {
+    return COVERAGE_COST_ROWS.map((entry) => {
+      const allocatedCredits = ownedOrgUsers.reduce(
+        (sum, u) => sum + (Number(u[entry.key]) || 0),
+        0,
+      );
+      const unitUsd = Number(poolCostUsd[entry.key]) || 0;
+      return {
+        ...entry,
+        allocatedCredits,
+        unitUsd,
+        requiredUsd: allocatedCredits * unitUsd,
+      };
+    });
+  }, [ownedOrgUsers, poolCostUsd]);
+
+  const coverageTotals = useMemo(() => {
+    return coverageRows.reduce(
+      (acc, row) => {
+        if (row.provider === "kie") acc.kie += row.requiredUsd;
+        else acc.fal += row.requiredUsd;
+        acc.total += row.requiredUsd;
+        return acc;
+      },
+      { fal: 0, kie: 0, total: 0 },
     );
-    return (totalCredits * baseBudgetRate).toLocaleString("en-US", {
+  }, [coverageRows]);
+
+  const formatUsd = (value: number) =>
+    value.toLocaleString("en-US", {
       style: "currency",
       currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     });
-  }, [users, baseBudgetRate]);
 
   const filteredUsers = useMemo(() => {
     return displayUsers.filter(
@@ -315,6 +368,14 @@ export default function AdminDashboard() {
         u.name?.toLowerCase().includes(searchTerm.toLowerCase()),
     );
   }, [displayUsers, searchTerm]);
+
+  const handlePoolCostChange = (key: CreditPoolCostKey, raw: string) => {
+    const parsed = Number(raw);
+    setPoolCostUsd((prev) => ({
+      ...prev,
+      [key]: Number.isFinite(parsed) && parsed >= 0 ? parsed : 0,
+    }));
+  };
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-200 p-6 sm:p-10 font-sans">
@@ -666,33 +727,78 @@ export default function AdminDashboard() {
               ))}
             </div>
 
-            {/* BUDGET CALCULATOR */}
-            <div className="fixed bottom-10 right-10 bg-gray-900 border border-gray-800 p-6 rounded-xl shadow-2xl max-w-sm z-50">
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between border-b border-gray-800 pb-4 gap-8">
-                  <span className="text-[10px] font-bold uppercase text-gray-400 tracking-widest">
-                    Yield Valuation
-                  </span>
-                  <div className="flex items-center gap-2 bg-gray-950 px-3 py-2 rounded-md border border-gray-800">
-                    <span className="text-xs text-gray-500 font-bold">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="w-16 bg-transparent text-xs font-bold outline-none text-white text-right"
-                      value={baseBudgetRate}
-                      onChange={(e) =>
-                        setBaseBudgetRate(parseFloat(e.target.value))
-                      }
-                    />
-                  </div>
+            <div className="mt-8 bg-gray-900 p-8 rounded-xl border border-gray-800 shadow-sm">
+              <div className="mb-6">
+                <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  Provider Coverage Planner
+                </h3>
+                <p className="text-xs text-gray-500 mt-2">
+                  Set actual USD cost per credit type and track how much Fal/Kie balance your current user allocations require.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[820px]">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
+                      <th className="py-3 text-left">Generation</th>
+                      <th className="py-3 text-left">Provider</th>
+                      <th className="py-3 text-right">Allocated Credits</th>
+                      <th className="py-3 text-right">Actual Cost / Credit ($)</th>
+                      <th className="py-3 text-right">Required Coverage ($)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {coverageRows.map((row) => (
+                      <tr key={row.key} className="border-b border-gray-900/60">
+                        <td className="py-3 text-sm text-gray-200">{row.label}</td>
+                        <td className="py-3 text-xs uppercase tracking-widest text-gray-400">
+                          {row.provider}
+                        </td>
+                        <td className="py-3 text-sm text-right text-gray-200">
+                          {row.allocatedCredits.toFixed(0)}
+                        </td>
+                        <td className="py-3 text-right">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={row.unitUsd}
+                            onChange={(e) => handlePoolCostChange(row.key, e.target.value)}
+                            className="w-24 bg-gray-950 border border-gray-700 rounded-md p-2 text-right text-xs font-semibold text-white outline-none focus:border-brand-accent transition-colors"
+                          />
+                        </td>
+                        <td className="py-3 text-sm text-right font-semibold text-brand-accent">
+                          {formatUsd(row.requiredUsd)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                  <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+                    Fal Coverage Needed
+                  </p>
+                  <p className="text-xl font-bold text-pink-400 mt-2">
+                    {formatUsd(coverageTotals.fal)}
+                  </p>
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-2xl font-bold text-brand-accent tracking-tight">
-                    {totalRenderBudget}
-                  </span>
-                  <span className="text-[10px] text-gray-500 uppercase font-bold mt-1 tracking-widest">
-                    Aggregate Resource Value
-                  </span>
+                <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                  <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+                    Kie Coverage Needed
+                  </p>
+                  <p className="text-xl font-bold text-cyan-400 mt-2">
+                    {formatUsd(coverageTotals.kie)}
+                  </p>
+                </div>
+                <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                  <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+                    Total Coverage Needed
+                  </p>
+                  <p className="text-xl font-bold text-white mt-2">
+                    {formatUsd(coverageTotals.total)}
+                  </p>
                 </div>
               </div>
             </div>
