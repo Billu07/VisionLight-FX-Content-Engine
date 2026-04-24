@@ -224,8 +224,6 @@ export function AssetLibrary({
   const {
     data: assets = [],
     isLoading,
-    isRefetching,
-    refetch,
   } = useQuery({
     queryKey: ["assets"],
     queryFn: async () => {
@@ -760,14 +758,6 @@ export function AssetLibrary({
               onChange={handleFileChange}
             />
             <button
-              onClick={() => refetch()}
-              className="p-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white border border-gray-700 transition-colors"
-              disabled={isRefetching}
-              title="Refresh Library"
-            >
-              <div className={isRefetching ? "animate-spin" : ""}>🔄</div>
-            </button>
-            <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading || pollingUntil > 0}
               className="px-4 sm:px-5 py-2.5 font-bold rounded-lg bg-purple-600 text-white hover:bg-purple-500 flex items-center justify-center transition-colors min-w-[124px] whitespace-nowrap"
@@ -806,7 +796,7 @@ export function AssetLibrary({
         <div
           className={`flex-1 overflow-y-auto p-8 custom-scrollbar ${activeTab === "STORYBOARD" ? "bg-black relative before:content-[''] before:absolute before:inset-0 before:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iNSIgeT0iNSIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiLz48cmVjdCB4PSI1IiB5PSIyNSIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiLz48L3N2Zz4=')] before:bg-repeat-y before:bg-[length:20px_auto] before:opacity-30 before:pointer-events-none after:content-[''] after:absolute after:inset-y-0 after:right-0 after:w-5 after:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iNSIgeT0iNSIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiLz48cmVjdCB4PSI1IiB5PSIyNSIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMSkiLz48L3N2Zz4=')] after:bg-repeat-y after:bg-[length:20px_auto] after:opacity-30 after:pointer-events-none px-12" : "bg-black/40"}`}
         >
-          {isLoading && !isRefetching ? (
+          {isLoading ? (
             <div className="flex justify-center items-center h-full">
               <LoadingSpinner size="lg" variant="neon" />
             </div>
@@ -1080,7 +1070,13 @@ export function AssetLibrary({
                     <p className="text-gray-300 text-sm font-medium">
                       {selectedAsset.aspectRatio === "original"
                         ? "Raw Original"
-                        : selectedAsset.aspectRatio}
+                        : selectedAsset.aspectRatio === "16:9"
+                          ? "Landscape 16:9"
+                          : selectedAsset.aspectRatio === "9:16"
+                            ? "Portrait 9:16"
+                            : selectedAsset.aspectRatio === "1:1"
+                              ? "Square 1:1"
+                              : selectedAsset.aspectRatio}
                     </p>
                   </div>
                 </div>
