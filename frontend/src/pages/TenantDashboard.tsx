@@ -221,8 +221,9 @@ export default function TenantDashboard() {
     return item.message || "Unavailable";
   };
 
+  const falBalanceStatus = providerBalances?.balances?.fal?.status;
   const showFalBillingFallback =
-    providerBalances?.balances?.fal?.status === "insufficient_scope";
+    !!falBalanceStatus && falBalanceStatus !== "ok";
 
   const handleResolveCreditRequest = async (requestId: string) => {
     try {
@@ -257,10 +258,10 @@ export default function TenantDashboard() {
             </p>
           </div>
 
-          <div className="flex bg-gray-900 p-1 rounded-lg border border-gray-800 gap-1">
+          <div className="flex flex-nowrap overflow-x-auto w-full md:w-auto bg-gray-900 p-1 rounded-lg border border-gray-800 gap-1">
             <button
               onClick={() => navigate("/app")}
-              className="px-6 py-2 rounded-md text-[10px] font-black uppercase tracking-widest text-brand-accent hover:bg-brand-accent/10 transition-all border border-brand-accent/20 mr-2"
+              className="shrink-0 whitespace-nowrap px-4 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest text-brand-accent hover:bg-brand-accent/10 transition-all border border-brand-accent/20 mr-1"
             >
               Back to App
             </button>
@@ -268,7 +269,7 @@ export default function TenantDashboard() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab as any)}
-                className={`px-6 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors ${activeTab === tab ? "bg-gray-800 text-brand-accent" : "text-gray-400 hover:text-white"
+                className={`shrink-0 whitespace-nowrap px-4 py-1.5 rounded-md text-[9px] font-bold uppercase tracking-widest transition-colors ${activeTab === tab ? "bg-gray-800 text-brand-accent" : "text-gray-400 hover:text-white"
                   }`}
               >
                 {tab}

@@ -331,16 +331,16 @@ export default function AdminDashboard() {
           </div>
 
           <div className="flex flex-col lg:flex-row gap-6 w-full xl:w-auto items-start lg:items-center">
-            <div className="flex flex-wrap bg-gray-900 p-1.5 rounded-lg border border-gray-800 shadow-sm w-full lg:w-fit gap-1">
+            <div className="flex flex-nowrap overflow-x-auto bg-gray-900 p-1 rounded-lg border border-gray-800 shadow-sm w-full lg:w-fit gap-1">
               <button
                 onClick={() => navigate("/app")}
-                className="px-4 sm:px-6 py-2.5 rounded-md text-[10px] sm:text-[11px] font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition-colors uppercase tracking-widest"
+                className="shrink-0 whitespace-nowrap px-3 sm:px-4 py-2 rounded-md text-[10px] font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition-colors uppercase tracking-widest"
               >
                 App
               </button>
               <button
                 onClick={() => setActiveTab("my-team")}
-                className={`px-4 sm:px-6 py-2.5 rounded-md text-[10px] sm:text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors ${
                   activeTab === "my-team"
                     ? "bg-gray-800 text-brand-accent shadow-sm"
                     : "text-gray-400 hover:text-white hover:bg-gray-800/50"
@@ -351,7 +351,7 @@ export default function AdminDashboard() {
               {adminUser?.role === "SUPERADMIN" && (
                 <button
                   onClick={() => setActiveTab("subscribers")}
-                  className={`px-4 sm:px-6 py-2.5 rounded-md text-[10px] sm:text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                  className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors ${
                     activeTab === "subscribers"
                       ? "bg-gray-800 text-brand-accent shadow-sm"
                       : "text-gray-400 hover:text-white hover:bg-gray-800/50"
@@ -362,7 +362,7 @@ export default function AdminDashboard() {
               )}
               <button
                 onClick={() => setActiveTab("controls")}
-                className={`px-4 sm:px-6 py-2.5 rounded-md text-[10px] sm:text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors ${
                   activeTab === "controls"
                     ? "bg-gray-800 text-brand-accent shadow-sm"
                     : "text-gray-400 hover:text-white hover:bg-gray-800/50"
@@ -372,7 +372,7 @@ export default function AdminDashboard() {
               </button>
               <button
                 onClick={() => setActiveTab("keys")}
-                className={`px-4 sm:px-6 py-2.5 rounded-md text-[10px] sm:text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors ${
                   activeTab === "keys"
                     ? "bg-gray-800 text-brand-accent shadow-sm"
                     : "text-gray-400 hover:text-white hover:bg-gray-800/50"
@@ -383,7 +383,7 @@ export default function AdminDashboard() {
               {adminUser?.role === "SUPERADMIN" && (
                 <button
                   onClick={() => setActiveTab("orgs")}
-                  className={`px-4 sm:px-6 py-2.5 rounded-md text-[10px] sm:text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                  className={`shrink-0 whitespace-nowrap px-3 sm:px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors ${
                     activeTab === "orgs"
                       ? "bg-gray-800 text-brand-accent shadow-sm"
                       : "text-gray-400 hover:text-white hover:bg-gray-800/50"
