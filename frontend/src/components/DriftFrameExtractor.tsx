@@ -87,6 +87,18 @@ export function DriftFrameExtractor({
   const activeVideoUrl = sourceCandidates[activeSourceIndex] || "";
   const normalizedVideoUrl = parseFirstVideoUrl(videoUrl);
   const controlsReady = !!activeVideoUrl && hasMetadata && !hasVideoError;
+  const getResolvedVideoDuration = (videoEl?: HTMLVideoElement | null): number => {
+    const targetVideo = videoEl || videoRef.current;
+    if (!targetVideo) return duration;
+    if (Number.isFinite(targetVideo.duration) && targetVideo.duration > 0) {
+      return targetVideo.duration;
+    }
+    if (targetVideo.seekable.length > 0) {
+      const end = targetVideo.seekable.end(targetVideo.seekable.length - 1);
+      if (Number.isFinite(end) && end > 0) return end;
+    }
+    return duration;
+  };
 
   useEffect(() => {
     setSourceCandidates(buildVideoSourceCandidates(videoUrl));
@@ -281,8 +293,11 @@ export function DriftFrameExtractor({
           : new Blob([response.data], { type: "image/jpeg" });
     } catch (error) {
       console.error("Server-side end frame extraction failed:", error);
+      const resolvedDuration = getResolvedVideoDuration(videoRef.current);
       const fallbackTime =
-        duration > 0 ? Math.max(0, duration - END_FRAME_EPSILON_SECONDS) : duration;
+        resolvedDuration > 0
+          ? Math.max(0, resolvedDuration - END_FRAME_EPSILON_SECONDS)
+          : Math.max(0, videoRef.current?.currentTime || 0);
       setIsExtracting(false);
       void extractAtTime(fallbackTime, true);
       return;
@@ -311,7 +326,7 @@ export function DriftFrameExtractor({
           className="w-full h-full object-contain max-h-[60vh]"
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={() => {
-            setDuration(videoRef.current?.duration || 0);
+            setDuration(getResolvedVideoDuration(videoRef.current));
             setHasMetadata(true);
             setHasVideoError(false);
           }}

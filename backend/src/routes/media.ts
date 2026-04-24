@@ -35,6 +35,21 @@ const extractFirstMediaUrl = (raw: unknown): string => {
   return "";
 };
 
+const resolveExtractorVideoUrl = (rawUrl: string): string => {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.pathname.endsWith("/api/proxy-video")) {
+      const embedded = parsed.searchParams.get("url");
+      if (embedded && isSafeExternalUrl(embedded)) {
+        return embedded;
+      }
+    }
+  } catch {
+    return rawUrl;
+  }
+  return rawUrl;
+};
+
 const normalizeModel = (raw: unknown): string =>
   typeof raw === "string" ? raw.toLowerCase() : "";
 
@@ -476,11 +491,12 @@ router.post(
       if (!videoUrl || typeof videoUrl !== "string") {
         return res.status(400).json({ error: "Video URL is required" });
       }
-      if (!isSafeExternalUrl(videoUrl)) {
+      const resolvedVideoUrl = resolveExtractorVideoUrl(videoUrl);
+      if (!isSafeExternalUrl(resolvedVideoUrl)) {
         return res.status(400).json({ error: "Invalid or unsafe video URL" });
       }
 
-      const targetUrl = normalizeAssetUrl(videoUrl);
+      const targetUrl = normalizeAssetUrl(resolvedVideoUrl);
       const [userAssets, userPosts] = await Promise.all([
         airtableService.getUserAssets(req.user!.id),
         airtableService.getUserPosts(req.user!.id),
@@ -503,11 +519,12 @@ router.post(
         return res.status(403).json({ error: "Video is not accessible" });
       }
 
-      const frameBuffer = await extractLastFrameAsJpeg(videoUrl);
+      const frameBuffer = await extractLastFrameAsJpeg(resolvedVideoUrl);
       res.setHeader("Content-Type", "image/jpeg");
       res.setHeader("Cache-Control", "no-store");
       return res.send(frameBuffer);
     } catch (error: any) {
+      console.error("[extract-last-frame] Failed:", error?.message || error);
       return res.status(500).json({ error: error.message || "Failed to extract end frame" });
     }
   },
