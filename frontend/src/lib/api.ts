@@ -1,4 +1,5 @@
 import axios from "axios";
+import type { AxiosProgressEvent } from "axios";
 
 const RAW_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const API_BASE_URL = RAW_URL.replace(/\/api\/?$/, "").replace(/\/$/, "");
@@ -112,9 +113,13 @@ export const apiEndpoints = {
     }),
 
   // ✅ Sync Upload
-  uploadAssetSync: (formData: FormData) =>
+  uploadAssetSync: (
+    formData: FormData,
+    options?: { onUploadProgress?: (progressEvent: AxiosProgressEvent) => void },
+  ) =>
     api.post("/api/assets/upload-sync", formData, {
       headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: options?.onUploadProgress,
     }),
 
   // ✅ Video Export

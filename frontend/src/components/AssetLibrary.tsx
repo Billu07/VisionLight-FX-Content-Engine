@@ -135,6 +135,8 @@ export function AssetLibrary({
 
   // UI States
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgressPercent, setUploadProgressPercent] = useState(0);
+  const [uploadingFileName, setUploadingFileName] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
@@ -402,10 +404,28 @@ export function AssetLibrary({
     }
   }, [filteredAssets.length, targetAssetCount]);
 
+  const requiresProcessedVariant = (file: File) => {
+    if (file.type.startsWith("video/")) return false;
+    return (
+      activeTab !== "original" &&
+      activeTab !== "VIDEO" &&
+      activeTab !== "custom" &&
+      activeTab !== "TIMELINE"
+    );
+  };
+
   // Upload Logic
   const uploadMutation = useMutation({
     mutationFn: async (files: FileList) => {
-      const uploadPromises = Array.from(files).map(async (file) => {
+      const selectedFiles = Array.from(files);
+      const totalBytes = selectedFiles.reduce(
+        (sum, file) => sum + Math.max(file.size, 0),
+        0,
+      );
+      let uploadedBytes = 0;
+      const uploadedAssets: any[] = [];
+
+      for (const file of selectedFiles) {
         const isVideo = file.type.startsWith("video/");
         const formData = new FormData();
         formData.append("image", file);
@@ -416,20 +436,50 @@ export function AssetLibrary({
         );
         if (activeProject) formData.append("projectId", activeProject);
 
-        const rawRes = await apiEndpoints.uploadAssetSync(formData);
+        setUploadingFileName(file.name);
+        let uploadedBytesForCurrentFile = 0;
+        const rawRes = await apiEndpoints.uploadAssetSync(formData, {
+          onUploadProgress: (progressEvent) => {
+            const loadedFromEvent =
+              typeof progressEvent.loaded === "number"
+                ? progressEvent.loaded
+                : 0;
+            const loadedForCurrentFile = Math.min(loadedFromEvent, file.size);
+            const delta = Math.max(
+              0,
+              loadedForCurrentFile - uploadedBytesForCurrentFile,
+            );
+            if (!delta) return;
+            uploadedBytesForCurrentFile = loadedForCurrentFile;
+            uploadedBytes = Math.min(totalBytes, uploadedBytes + delta);
+            if (totalBytes > 0) {
+              setUploadProgressPercent(
+                Math.min(100, Math.round((uploadedBytes / totalBytes) * 100)),
+              );
+            }
+          },
+        });
+
+        if (file.size > uploadedBytesForCurrentFile) {
+          uploadedBytes = Math.min(
+            totalBytes,
+            uploadedBytes + (file.size - uploadedBytesForCurrentFile),
+          );
+          if (totalBytes > 0) {
+            setUploadProgressPercent(
+              Math.min(100, Math.round((uploadedBytes / totalBytes) * 100)),
+            );
+          }
+        }
         const originalAsset = rawRes.data.asset;
 
         // User-uploaded videos are always stored under Originals > Videos.
         if (isVideo) {
-          return originalAsset;
+          uploadedAssets.push(originalAsset);
+          continue;
         }
 
-        if (
-          activeTab !== "original" &&
-          activeTab !== "VIDEO" &&
-          activeTab !== "custom" &&
-          activeTab !== "TIMELINE"
-        ) {
+        if (requiresProcessedVariant(file)) {
           const processFormData = new FormData();
           processFormData.append("image", file);
           processFormData.append("raw", "false");
@@ -438,16 +488,30 @@ export function AssetLibrary({
           if (activeProject) processFormData.append("projectId", activeProject);
           await apiEndpoints.uploadAssetSync(processFormData);
         }
-        return originalAsset;
-      });
+        uploadedAssets.push(originalAsset);
+      }
 
-      return Promise.all(uploadPromises);
+      setUploadProgressPercent(100);
+      return uploadedAssets;
     },
     onMutate: (files) => {
+      const selectedFiles = Array.from(files);
+      const processingFiles = selectedFiles.filter((file) =>
+        requiresProcessedVariant(file),
+      );
       setIsUploading(true);
-      setTargetAssetCount(filteredAssets.length + files.length);
-      setProcessingCount(files.length);
-      setPollingUntil(Date.now() + files.length * 40000);
+      setUploadProgressPercent(0);
+      setUploadingFileName(selectedFiles[0]?.name || "");
+
+      if (processingFiles.length > 0) {
+        setTargetAssetCount(filteredAssets.length + processingFiles.length);
+        setProcessingCount(processingFiles.length);
+        setPollingUntil(Date.now() + processingFiles.length * 40000);
+      } else {
+        setTargetAssetCount(0);
+        setProcessingCount(0);
+        setPollingUntil(0);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
@@ -458,7 +522,11 @@ export function AssetLibrary({
       setProcessingCount(0);
       setTargetAssetCount(0);
     },
-    onSettled: () => setIsUploading(false),
+    onSettled: () => {
+      setIsUploading(false);
+      setUploadingFileName("");
+      setUploadProgressPercent(0);
+    },
   });
 
   const deleteMutation = useMutation({
@@ -499,6 +567,7 @@ export function AssetLibrary({
         }
         uploadMutation.mutate(validFiles.files);
       }
+      e.target.value = "";
     }
   };
 
@@ -704,7 +773,14 @@ export function AssetLibrary({
               className="px-6 py-2.5 font-bold rounded-lg bg-purple-600 text-white hover:bg-purple-500 flex flex-col items-center justify-center transition-colors min-w-[140px]"
             >
               {isUploading ? (
-                <LoadingSpinner size="sm" variant="default" />
+                <div className="flex flex-col items-center leading-tight">
+                  <span className="text-[11px] uppercase tracking-wide">
+                    Uploading
+                  </span>
+                  <span className="text-sm font-extrabold">
+                    {uploadProgressPercent}%
+                  </span>
+                </div>
               ) : (
                 <>
                   <div className="flex items-center gap-2">
@@ -715,6 +791,24 @@ export function AssetLibrary({
             </button>
           </div>
         </div>
+        {isUploading && (
+          <div className="px-4 sm:px-6 pb-3 bg-gray-800/50 border-b border-gray-800">
+            <div className="w-full md:max-w-md md:ml-auto">
+              <div className="flex items-center justify-between text-[11px] text-cyan-300 mb-1">
+                <span className="truncate pr-3">
+                  Uploading {uploadingFileName || "media"}
+                </span>
+                <span>{uploadProgressPercent}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-gray-700/90 overflow-hidden">
+                <div
+                  className="h-full bg-cyan-500 transition-[width] duration-200"
+                  style={{ width: `${uploadProgressPercent}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* GRID VIEW */}
         <div
