@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
@@ -217,6 +217,7 @@ function Dashboard() {
   const [showBrandModal, setShowBrandModal] = useState(false);
   const [showWelcomeTour, setShowWelcomeTour] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
   const [showQueuedModal, setShowQueuedModal] = useState(false);
   const [showNoCreditsModal, setShowNoCreditsModal] = useState(false);
   const [showReserveModal, setShowReserveModal] = useState(false);
@@ -236,6 +237,32 @@ function Dashboard() {
     type: "image" | "video" | "carousel";
     url: string | string[];
   } | null>(null);
+
+  useEffect(() => {
+    if (!showUserMenu) return;
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowUserMenu(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowUserMenu(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [showUserMenu]);
 
   // === SEQUENCER STATE ===
   const [viewMode, setViewMode] = useState<"create" | "sequencer" | "history">("create");
@@ -2513,7 +2540,7 @@ function Dashboard() {
               </div>
 
               {!isMobile && (
-                <div className="relative">
+                <div className="relative" ref={userMenuRef}>
                   <button
                     onClick={() => setShowUserMenu(!showUserMenu)}
                     className="flex items-center gap-2 px-4 py-2.5 bg-gray-800/40 backdrop-blur-xl border border-white/10 rounded-2xl text-sm font-bold text-gray-300 hover:text-white hover:bg-white/10 transition-all h-full"
@@ -2524,27 +2551,25 @@ function Dashboard() {
                       stroke="currentColor"
                       viewBox="0 0 24 24"
                     >
-                      {showUserMenu ? (
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M6 6l12 12M18 6L6 18"
-                        />
-                      ) : (
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M4 6h16M4 12h16M4 18h16"
-                        />
-                      )}
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 6h16M4 12h16M4 18h16"
+                      />
                     </svg>
-                    {showUserMenu ? "Close" : "Menu"}
+                    Menu
                   </button>
 
                   {showUserMenu && (
                     <div className="absolute right-0 top-full mt-2 w-56 bg-gray-900 border border-gray-700/80 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                      <button
+                        onClick={() => setShowUserMenu(false)}
+                        className="absolute top-2 right-2 w-7 h-7 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center"
+                        aria-label="Close menu"
+                      >
+                        ×
+                      </button>
                       <div className="px-4 py-2 border-b border-gray-800/80 mb-2">
                         <div className="text-xs text-gray-400 uppercase tracking-widest font-bold">Options</div>
                       </div>
