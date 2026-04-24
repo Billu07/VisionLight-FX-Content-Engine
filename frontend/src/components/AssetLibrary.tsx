@@ -665,9 +665,9 @@ export function AssetLibrary({
         </div>
 
         {/* CONTROLS */}
-        <div className="p-4 sm:p-6 bg-gray-800/50 flex flex-col md:flex-row gap-4 items-center justify-between border-b border-gray-800">
-          <div className="flex flex-col gap-2 w-full md:w-auto">
-            <div className="flex flex-wrap sm:flex-nowrap bg-gray-950 p-1 rounded-lg border border-gray-700 sm:overflow-x-auto justify-center sm:justify-start gap-1 w-full md:w-auto">
+        <div className="p-4 sm:p-6 bg-gray-800/50 flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between border-b border-gray-800">
+          <div className="flex flex-col gap-2 w-full lg:w-auto">
+            <div className="flex flex-wrap sm:flex-nowrap bg-gray-950 p-1 rounded-lg border border-gray-700 sm:overflow-x-auto justify-center sm:justify-start gap-1 w-full lg:w-auto">
               {[
                 { id: "original", label: "Originals" },
                 { id: "16:9", label: "Landscape" },
@@ -720,13 +720,13 @@ export function AssetLibrary({
             )}
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto justify-between md:justify-end">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto justify-start lg:justify-end">
             {activeTab === "STORYBOARD" && storyboardIds.length > 0 && (
               <>
                 <button
                   onClick={handleDownloadZip}
                   disabled={isDownloadingZip}
-                  className="px-4 py-2 text-xs font-bold rounded-lg bg-cyan-600/20 text-cyan-400 hover:bg-cyan-600 hover:text-white border border-cyan-500/30 transition-all flex items-center gap-2"
+                  className="px-3 sm:px-4 py-2 text-xs font-bold rounded-lg bg-cyan-600/20 text-cyan-400 hover:bg-cyan-600 hover:text-white border border-cyan-500/30 transition-all flex items-center gap-2 whitespace-nowrap"
                 >
                   {isDownloadingZip ? (
                     <LoadingSpinner size="sm" />
@@ -745,7 +745,7 @@ export function AssetLibrary({
                       setStoryboardIds([]);
                     }
                   }}
-                  className="px-4 py-2 text-xs font-bold rounded-lg bg-red-900/50 text-red-400 hover:bg-red-900 hover:text-red-300 border border-red-500/30 transition-colors"
+                  className="px-3 sm:px-4 py-2 text-xs font-bold rounded-lg bg-red-900/50 text-red-400 hover:bg-red-900 hover:text-red-300 border border-red-500/30 transition-colors whitespace-nowrap"
                 >
                   🗑️ Clear Sequence
                 </button>
@@ -770,23 +770,15 @@ export function AssetLibrary({
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading || pollingUntil > 0}
-              className="px-6 py-2.5 font-bold rounded-lg bg-purple-600 text-white hover:bg-purple-500 flex flex-col items-center justify-center transition-colors min-w-[140px]"
+              className="px-4 sm:px-5 py-2.5 font-bold rounded-lg bg-purple-600 text-white hover:bg-purple-500 flex items-center justify-center transition-colors min-w-[124px] whitespace-nowrap"
             >
               {isUploading ? (
-                <div className="flex flex-col items-center leading-tight">
-                  <span className="text-[11px] uppercase tracking-wide">
-                    Uploading
-                  </span>
-                  <span className="text-sm font-extrabold">
-                    {uploadProgressPercent}%
-                  </span>
+                <div className="flex items-center gap-2 leading-tight">
+                  <span className="text-[11px] uppercase tracking-wide">Uploading</span>
+                  <span className="text-sm font-extrabold">{uploadProgressPercent}%</span>
                 </div>
               ) : (
-                <>
-                  <div className="flex items-center gap-2">
-                    Upload Media
-                  </div>
-                </>
+                <span>Upload Media</span>
               )}
             </button>
           </div>
