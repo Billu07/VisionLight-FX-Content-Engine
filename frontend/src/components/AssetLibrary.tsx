@@ -1,20 +1,34 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiEndpoints, getCORSProxyUrl, getDirectDownloadImageUrl } from "../lib/api";
+import {
+  apiEndpoints,
+  getCORSProxyUrl,
+  getCORSProxyVideoUrl,
+  getDirectDownloadImageUrl,
+} from "../lib/api";
 import { confirmAction, notify } from "../lib/notifications";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
 import { EditAssetModal } from "./EditAssetModal";
 import { DriftFrameExtractor } from "./DriftFrameExtractor";
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB Limit
+const MAX_IMAGE_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_VIDEO_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+const ASSET_PAGE_SIZE = 24;
 interface Asset {
   id: string;
   url: string;
   proxyUrl?: string;
   hlsUrl?: string;
   spriteSheetUrl?: string;
-  aspectRatio: "16:9" | "9:16" | "1:1" | "original" | "custom" | "3DX_FRAME";
+  aspectRatio:
+    | "16:9"
+    | "9:16"
+    | "1:1"
+    | "original"
+    | "custom"
+    | "3DX_FRAME"
+    | "VIDEO";
   type: "IMAGE" | "VIDEO";
   createdAt: string;
   originalAssetId?: string | null;
@@ -57,6 +71,10 @@ export function AssetLibrary({
   const [activeTab, setActiveTab] = useState<
     "16:9" | "9:16" | "1:1" | "original" | "custom" | "VIDEO" | "STORYBOARD" | "3DX_FRAME" | "TIMELINE"
   >("original");
+  const [originalMediaTab, setOriginalMediaTab] = useState<"images" | "videos">(
+    "images",
+  );
+  const [visibleCount, setVisibleCount] = useState(ASSET_PAGE_SIZE);
 
   // Auto-switch tab based on Dashboard context
   useEffect(() => {
@@ -76,6 +94,10 @@ export function AssetLibrary({
     else if (ratio === "3dx_frame") setActiveTab("3DX_FRAME");
     else setActiveTab("original");
   }, [initialAspectRatio, initialTab]);
+
+  useEffect(() => {
+    setVisibleCount(ASSET_PAGE_SIZE);
+  }, [activeTab, originalMediaTab]);
 
   // Storyboard State
   const activeProject = localStorage.getItem("visionlight_active_project") || undefined;
@@ -266,15 +288,24 @@ export function AssetLibrary({
   let filteredAssets = Array.isArray(assets)
     ? assets.filter((a: Asset) => {
       if (activeTab === "STORYBOARD") return false; // Handled below
-      if (activeTab === "VIDEO") return a.type === "VIDEO";
+      if (activeTab === "VIDEO") {
+        return a.type === "VIDEO" && a.aspectRatio === "VIDEO";
+      }
       if (activeTab === "TIMELINE") return false;
 
       // Originals Tab: STRICTLY raw uploads (no parent)
       if (activeTab === "original") {
+        if (originalMediaTab === "images") {
+          return (
+            a.type === "IMAGE" &&
+            a.aspectRatio === "original" &&
+            !a.originalAssetId
+          );
+        }
         return (
-          a.type === "IMAGE" &&
+          a.type === "VIDEO" &&
           a.aspectRatio === "original" &&
-          !a.originalAssetId // Must be a root asset
+          !a.originalAssetId
         );
       }
 
@@ -302,6 +333,9 @@ export function AssetLibrary({
   } else if (activeTab === "TIMELINE") {
     filteredAssets = timelineVideoAssets;
   }
+
+  const displayedAssets = filteredAssets.slice(0, visibleCount);
+  const hasMoreAssets = filteredAssets.length > displayedAssets.length;
 
   const getAssetImageSrc = (asset: Asset) => {
     const proxyUrl = getCORSProxyUrl(asset.url, 400, 75);
@@ -372,6 +406,7 @@ export function AssetLibrary({
   const uploadMutation = useMutation({
     mutationFn: async (files: FileList) => {
       const uploadPromises = Array.from(files).map(async (file) => {
+        const isVideo = file.type.startsWith("video/");
         const formData = new FormData();
         formData.append("image", file);
         formData.append("raw", "true");
@@ -383,6 +418,11 @@ export function AssetLibrary({
 
         const rawRes = await apiEndpoints.uploadAssetSync(formData);
         const originalAsset = rawRes.data.asset;
+
+        // User-uploaded videos are always stored under Originals > Videos.
+        if (isVideo) {
+          return originalAsset;
+        }
 
         if (
           activeTab !== "original" &&
@@ -434,13 +474,29 @@ export function AssetLibrary({
     if (e.target.files && e.target.files.length > 0) {
       const validFiles = new DataTransfer();
       Array.from(e.target.files).forEach((file) => {
-        if (file.size > MAX_FILE_SIZE) {
-          alert(`Skipped "${file.name}": Exceeds 10MB limit.`);
+        const isVideo = file.type.startsWith("video/");
+        const maxSize = isVideo ? MAX_VIDEO_FILE_SIZE : MAX_IMAGE_FILE_SIZE;
+        if (!file.type.startsWith("image/") && !isVideo) {
+          alert(`Skipped "${file.name}": only image and video files are supported.`);
+          return;
+        }
+        if (file.size > maxSize) {
+          alert(
+            `Skipped "${file.name}": exceeds ${
+              isVideo ? "25MB video" : "10MB image"
+            } limit.`,
+          );
         } else {
           validFiles.items.add(file);
         }
       });
       if (validFiles.files.length > 0) {
+        const allVideos = Array.from(validFiles.files).every((file) =>
+          file.type.startsWith("video/"),
+        );
+        if (activeTab === "original" && allVideos) {
+          setOriginalMediaTab("videos");
+        }
         uploadMutation.mutate(validFiles.files);
       }
     }
@@ -541,29 +597,58 @@ export function AssetLibrary({
 
         {/* CONTROLS */}
         <div className="p-4 sm:p-6 bg-gray-800/50 flex flex-col md:flex-row gap-4 items-center justify-between border-b border-gray-800">
-          <div className="flex flex-wrap sm:flex-nowrap bg-gray-950 p-1 rounded-lg border border-gray-700 sm:overflow-x-auto justify-center sm:justify-start gap-1 w-full md:w-auto">
-            {[
-              { id: "original", label: "Originals" },
-              { id: "16:9", label: "Landscape" },
-              { id: "9:16", label: "Portrait" },
-              { id: "1:1", label: "Square" },
-              { id: "STORYBOARD", label: "Storyboard" },
-              { id: "custom", label: "Edited" },
-              { id: "TIMELINE", label: "Timeline" },
-              { id: "VIDEO", label: "3DX Paths" },
-              { id: "3DX_FRAME", label: "3DX Frames" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-md text-[10px] sm:text-xs md:text-sm font-bold whitespace-nowrap transition-all flex-1 sm:flex-none text-center ${activeTab === tab.id
-                  ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg"
-                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+          <div className="flex flex-col gap-2 w-full md:w-auto">
+            <div className="flex flex-wrap sm:flex-nowrap bg-gray-950 p-1 rounded-lg border border-gray-700 sm:overflow-x-auto justify-center sm:justify-start gap-1 w-full md:w-auto">
+              {[
+                { id: "original", label: "Originals" },
+                { id: "16:9", label: "Landscape" },
+                { id: "9:16", label: "Portrait" },
+                { id: "1:1", label: "Square" },
+                { id: "STORYBOARD", label: "Storyboard" },
+                { id: "custom", label: "Edited" },
+                { id: "TIMELINE", label: "Timeline" },
+                { id: "VIDEO", label: "3DX Paths" },
+                { id: "3DX_FRAME", label: "3DX Frames" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-md text-[10px] sm:text-xs md:text-sm font-bold whitespace-nowrap transition-all flex-1 sm:flex-none text-center ${
+                    activeTab === tab.id
+                      ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg"
+                      : "text-gray-400 hover:text-white hover:bg-gray-800"
                   }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            {activeTab === "original" && (
+              <div className="flex w-full bg-gray-950/80 border border-gray-700 rounded-lg p-1 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setOriginalMediaTab("images")}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                    originalMediaTab === "images"
+                      ? "bg-cyan-600 text-white"
+                      : "text-gray-400 hover:text-white hover:bg-gray-800"
+                  }`}
+                >
+                  Images
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOriginalMediaTab("videos")}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                    originalMediaTab === "videos"
+                      ? "bg-cyan-600 text-white"
+                      : "text-gray-400 hover:text-white hover:bg-gray-800"
+                  }`}
+                >
+                  Videos
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto justify-between md:justify-end">
@@ -600,7 +685,7 @@ export function AssetLibrary({
             <input
               type="file"
               multiple
-              accept="image/*"
+              accept="image/*,video/*"
               ref={fileInputRef}
               className="hidden"
               onChange={handleFileChange}
@@ -623,7 +708,7 @@ export function AssetLibrary({
               ) : (
                 <>
                   <div className="flex items-center gap-2">
-                    Upload
+                    Upload Media
                   </div>
                 </>
               )}
@@ -670,15 +755,17 @@ export function AssetLibrary({
                   <p>
                     No{" "}
                     {activeTab === "VIDEO"
-                      ? "videos"
+                      ? "3DX path videos"
                       : activeTab === "TIMELINE"
                         ? "timeline videos"
+                        : activeTab === "original" && originalMediaTab === "videos"
+                          ? "original videos"
                         : "images"}{" "}
                     found.
                   </p>
                 </div>
               ) : (
-                filteredAssets.map((asset: Asset, index: number) => (
+                displayedAssets.map((asset: Asset, index: number) => (
                   <div
                     key={asset.id}
                     onClick={() => {
@@ -749,7 +836,7 @@ export function AssetLibrary({
                     {asset.type === "VIDEO" ? (
                       <div className="w-full h-full relative aspect-square bg-black/20">
                         <video
-                          src={asset.url || asset.proxyUrl || asset.hlsUrl}
+                          src={getCORSProxyVideoUrl(asset.url || asset.proxyUrl || asset.hlsUrl || "")}
                           className="w-full h-full object-contain opacity-80"
                           preload="metadata"
                           playsInline
@@ -777,6 +864,17 @@ export function AssetLibrary({
                     )}
                   </div>
                 ))
+              )}
+              {hasMoreAssets && (
+                <div className="col-span-full flex justify-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount((prev) => prev + ASSET_PAGE_SIZE)}
+                    className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 text-xs font-bold uppercase tracking-widest transition-colors"
+                  >
+                    Load More
+                  </button>
+                </div>
               )}
             </div>
           )}
@@ -1049,3 +1147,4 @@ export function AssetLibrary({
     </div>
   );
 }
+

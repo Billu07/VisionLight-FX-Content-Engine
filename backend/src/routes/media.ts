@@ -144,7 +144,7 @@ router.post(
     let conversionDeducted = false;
     let conversionCost = 0;
     try {
-      if (!req.file) return res.status(400).json({ error: "No image provided" });
+      if (!req.file) return res.status(400).json({ error: "No media file provided" });
 
       const { aspectRatio, raw, originalAssetId, projectId } = req.body;
       const fileSizeBytes = req.file.size;
@@ -186,8 +186,15 @@ router.post(
           projectId,
           aspectRatio,
           fileSizeBytes,
+          req.file.mimetype,
         );
         return res.json({ success: true, asset });
+      }
+
+      if (req.file.mimetype?.startsWith("video/")) {
+        return res
+          .status(400)
+          .json({ error: "Video uploads are stored as originals only." });
       }
 
       const [settings, user] = await Promise.all([

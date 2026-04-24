@@ -33,7 +33,14 @@ export interface BackgroundJob {
 interface Asset {
   id: string;
   url: string;
-  aspectRatio: "16:9" | "9:16" | "original" | "1:1" | "custom" | "3DX_FRAME";
+  aspectRatio:
+    | "16:9"
+    | "9:16"
+    | "original"
+    | "1:1"
+    | "custom"
+    | "3DX_FRAME"
+    | "VIDEO";
   type?: "IMAGE" | "VIDEO";
   originalAssetId?: string | null;
 }
@@ -99,6 +106,8 @@ export function EditAssetModal({
   const [referenceAssets, setReferenceAssets] = useState<Asset[]>([]);
   const [showRefSelector, setShowRefSelector] = useState(false);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
+  const [fullscreenReferenceAsset, setFullscreenReferenceAsset] =
+    useState<Asset | null>(null);
 
   // PromptFX State
   const [showPromptFxMenu, setShowPromptFxMenu] = useState(false);
@@ -172,8 +181,13 @@ export function EditAssetModal({
     initialVideoUrl || null,
   );
   const previewAssetUrl = currentAsset?.url
-    ? getCORSProxyUrl(currentAsset.url, isCropping ? 2048 : 1440, isCropping ? 82 : 76)
+    ? getCORSProxyUrl(
+        currentAsset.url,
+        isCropping ? 1800 : 1200,
+        isCropping ? 76 : 68,
+      )
     : undefined;
+  const getReferenceThumbnailUrl = (url: string) => getCORSProxyUrl(url, 280, 58);
 
   const { data: allAssets = [] } = useQuery({
     queryKey: ["assets"],
@@ -891,9 +905,19 @@ export function EditAssetModal({
                             className="relative aspect-square overflow-hidden rounded"
                           >
                             <img
-                              src={getCORSProxyUrl(referenceAsset.url, 720, 80)}
+                              src={getReferenceThumbnailUrl(referenceAsset.url)}
                               className="w-full h-full object-cover opacity-90"
                               crossOrigin="anonymous"
+                              loading="lazy"
+                              decoding="async"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setFullscreenReferenceAsset(referenceAsset);
+                              }}
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                setFullscreenReferenceAsset(referenceAsset);
+                              }}
                             />
                             <button
                               onClick={() =>
@@ -1266,14 +1290,20 @@ export function EditAssetModal({
                           return (
                             <img
                               key={a.id}
-                              src={getCORSProxyUrl(a.url)}
+                              src={getReferenceThumbnailUrl(a.url)}
                               className={`w-full h-12 object-cover rounded cursor-pointer border ${
                                 isSelected
                                   ? "border-purple-500 ring-1 ring-purple-400"
                                   : "border-transparent hover:border-purple-500"
                               }`}
                               crossOrigin="anonymous"
+                              loading="lazy"
+                              decoding="async"
                               onClick={() => toggleReferenceAsset(a)}
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                setFullscreenReferenceAsset(a);
+                              }}
                             />
                           );
                         })}
@@ -1605,6 +1635,25 @@ export function EditAssetModal({
           </div>
         </div>
       </div>
+      {fullscreenReferenceAsset && (
+        <div className="fixed inset-0 z-[170] bg-black/95 flex items-center justify-center p-4">
+          <button
+            type="button"
+            onClick={() => setFullscreenReferenceAsset(null)}
+            className="absolute top-4 right-4 text-white/80 hover:text-white text-2xl"
+            aria-label="Close fullscreen reference"
+          >
+            ×
+          </button>
+          <img
+            src={getCORSProxyUrl(fullscreenReferenceAsset.url, 1800, 78)}
+            className="max-w-full max-h-full object-contain rounded-xl border border-white/10"
+            crossOrigin="anonymous"
+            loading="eager"
+            decoding="async"
+          />
+        </div>
+      )}
     </div>
   );
 }

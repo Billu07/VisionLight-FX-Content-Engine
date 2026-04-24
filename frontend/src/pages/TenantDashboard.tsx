@@ -69,7 +69,9 @@ export default function TenantDashboard() {
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<"team" | "pricing" | "integrations" | "balances">("team");
+  const [activeTab, setActiveTab] = useState<"team" | "pricing" | "integrations">(
+    "team",
+  );
   const [users, setUsers] = useState<User[]>([]);
   const [creditRequests, setCreditRequests] = useState<CreditRequest[]>([]);
   const [config, setConfig] = useState<Config | null>(null);
@@ -306,23 +308,36 @@ export default function TenantDashboard() {
             </p>
           </div>
 
-          <div className="flex flex-nowrap overflow-x-auto w-full md:w-auto bg-gray-900 p-1 rounded-lg border border-gray-800 gap-1">
-            <button
-              onClick={() => navigate("/app")}
-              className="shrink-0 whitespace-nowrap px-4 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest text-brand-accent hover:bg-brand-accent/10 transition-all border border-brand-accent/20 mr-1"
-            >
-              Back to App
-            </button>
-            {["team", "pricing", "integrations", "balances"].map(tab => (
+          <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto md:items-center">
+            <div className="flex flex-nowrap overflow-x-auto w-full md:w-auto bg-gray-900 p-1 rounded-lg border border-gray-800 gap-1">
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab as any)}
-                className={`shrink-0 whitespace-nowrap px-4 py-1.5 rounded-md text-[9px] font-bold uppercase tracking-widest transition-colors ${activeTab === tab ? "bg-gray-800 text-brand-accent" : "text-gray-400 hover:text-white"
-                  }`}
+                onClick={() => navigate("/app")}
+                className="shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest text-brand-accent hover:bg-brand-accent/10 transition-all border border-brand-accent/20 mr-1"
               >
-                {tab}
+                Back to App
               </button>
-            ))}
+              {["team", "pricing", "integrations"].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab as any)}
+                  className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md text-[9px] font-bold uppercase tracking-widest transition-colors ${
+                    activeTab === tab
+                      ? "bg-gray-800 text-brand-accent"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+            <a
+              href="https://fal.ai/dashboard/usage-billing/credits"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-pink-600 hover:bg-pink-500 border border-pink-400/40 text-white transition-colors whitespace-nowrap"
+            >
+              Check Your Credit
+            </a>
           </div>
         </div>
 
@@ -462,67 +477,251 @@ export default function TenantDashboard() {
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
             <div className="bg-brand-accent/5 border border-brand-accent/20 p-6 rounded-xl">
               <h3 className="text-brand-accent font-bold uppercase text-[10px] tracking-[0.2em] mb-2">Cost Configuration</h3>
-              <p className="text-xs text-gray-500 italic">Set how many credits each generation type deducts from your users' balance.</p>
+              <p className="text-xs text-gray-500 italic">
+                Enter actual provider cost per render and keep your platform deductions aligned.
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+                  Fal Coverage Needed
+                </p>
+                <p className="text-xl font-bold text-pink-400 mt-2">
+                  {formatUsd(coverageTotals.fal)}
+                </p>
+              </div>
+              <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+                  Kie Coverage Needed
+                </p>
+                <p className="text-xl font-bold text-cyan-400 mt-2">
+                  {formatUsd(coverageTotals.kie)}
+                </p>
+              </div>
+              <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+                  Total Coverage Needed
+                </p>
+                <p className="text-xl font-bold text-white mt-2">
+                  {formatUsd(coverageTotals.total)}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
               <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">PicDrift Credits</h4>
-                <div className="space-y-4">
-                  {["pricePicDrift_5s", "pricePicDrift_10s", "pricePicDrift_Plus_5s", "pricePicDrift_Plus_10s"].map(key => (
-                    <div key={key} className="flex justify-between items-center">
-                      <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
-                      <input
-                        type="number"
-                        step="1"
-                        min="0"
-                        className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
-                        value={config.pricing[key]}
-                        onChange={(e) => setConfig({ ...config, pricing: { ...config.pricing, [key]: toInt(e.target.value, config.pricing[key]) } })}
-                        onBlur={() => handleUpdateConfig()}
-                      />
-                    </div>
-                  ))}
+                <div className="mb-6">
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    Actual Provider Cost
+                  </h4>
+                  <p className="text-xs text-gray-500 mt-2">
+                    USD per render. Implied USD/credit is auto-calculated from your platform deductions.
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px]">
+                    <thead>
+                      <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
+                        <th className="py-3 text-left">Generation Variant</th>
+                        <th className="py-3 text-left">Provider</th>
+                        <th className="py-3 text-right">Credit / Render</th>
+                        <th className="py-3 text-right">Cost / Render ($)</th>
+                        <th className="py-3 text-right">Implied / Credit ($)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {variantRows.map((row) => (
+                        <tr key={row.id} className="border-b border-gray-900/60">
+                          <td className="py-3 text-sm text-gray-200">{row.label}</td>
+                          <td className="py-3 text-xs uppercase tracking-widest text-gray-400">
+                            {row.provider}
+                          </td>
+                          <td className="py-3 text-sm text-right text-gray-200">
+                            {row.deductionCredits.toFixed(0)}
+                          </td>
+                          <td className="py-3 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={row.providerCostPerRender}
+                              onChange={(e) =>
+                                handleVariantCostChange(row.id, e.target.value)
+                              }
+                              className="w-24 bg-gray-950 border border-gray-700 rounded p-2 text-right text-xs text-white outline-none focus:border-brand-accent"
+                            />
+                          </td>
+                          <td className="py-3 text-sm text-right font-semibold text-brand-accent">
+                            {formatUsd(row.impliedUsdPerCredit)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-4">
+                  Wallet USD/credit uses the highest implied variant rate per wallet (conservative mode).
+                </p>
+                <div className="overflow-x-auto mt-3">
+                  <table className="w-full min-w-[760px]">
+                    <thead>
+                      <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
+                        <th className="py-3 text-left">Wallet</th>
+                        <th className="py-3 text-left">Provider</th>
+                        <th className="py-3 text-right">Allocated Credits</th>
+                        <th className="py-3 text-right">Derived / Credit ($)</th>
+                        <th className="py-3 text-right">Coverage ($)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {walletCoverageRows.map((row) => (
+                        <tr key={row.key} className="border-b border-gray-900/60">
+                          <td className="py-3 text-sm text-gray-200">{row.label}</td>
+                          <td className="py-3 text-xs uppercase tracking-widest text-gray-400">
+                            {row.provider}
+                          </td>
+                          <td className="py-3 text-sm text-right text-gray-200">
+                            {row.allocatedCredits.toFixed(0)}
+                          </td>
+                          <td className="py-3 text-sm text-right text-gray-200">
+                            {formatUsd(row.usdPerCredit)}
+                          </td>
+                          <td className="py-3 text-sm text-right font-semibold text-brand-accent">
+                            {formatUsd(row.requiredUsd)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
               <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Pic FX & Editor</h4>
-                <div className="space-y-4">
-                  {["pricePicFX_Standard", "pricePicFX_Carousel", "pricePicFX_Batch", "priceEditor_Pro", "priceEditor_Enhance", "priceEditor_Convert", "priceAsset_DriftPath"].map(key => (
-                    <div key={key} className="flex justify-between items-center">
-                      <span className="text-[10px] text-gray-400 uppercase font-bold truncate max-w-[100px]" title={key}>{key.replace('price', '').replace(/_/g, ' ')}</span>
-                      <input
-                        type="number"
-                        step="1"
-                        min="0"
-                        className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
-                        value={config.pricing[key]}
-                        onChange={(e) => setConfig({ ...config, pricing: { ...config.pricing, [key]: toInt(e.target.value, config.pricing[key]) } })}
-                        onBlur={() => handleUpdateConfig()}
-                      />
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">
+                  Platform Render Credit Cost
+                </h4>
+                <div className="space-y-8">
+                  <div>
+                    <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">
+                      PicDrift Credits
+                    </h5>
+                    <div className="space-y-4">
+                      {[
+                        "pricePicDrift_5s",
+                        "pricePicDrift_10s",
+                        "pricePicDrift_Plus_5s",
+                        "pricePicDrift_Plus_10s",
+                      ].map((key) => (
+                        <div key={key} className="flex justify-between items-center">
+                          <span className="text-[10px] text-gray-400 uppercase font-bold">
+                            {key.replace("price", "").replace(/_/g, " ")}
+                          </span>
+                          <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
+                            value={config.pricing[key]}
+                            onChange={(e) =>
+                              setConfig({
+                                ...config,
+                                pricing: {
+                                  ...config.pricing,
+                                  [key]: toInt(e.target.value, config.pricing[key]),
+                                },
+                              })
+                            }
+                            onBlur={() => handleUpdateConfig()}
+                          />
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
 
-              <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Video FX</h4>
-                <div className="space-y-4">
-                  {["priceVideoFX1_10s", "priceVideoFX1_15s", "priceVideoFX2_4s", "priceVideoFX2_8s", "priceVideoFX2_12s", "priceVideoFX3_4s", "priceVideoFX3_6s", "priceVideoFX3_8s"].map(key => (
-                    <div key={key} className="flex justify-between items-center">
-                      <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
-                      <input
-                        type="number"
-                        step="1"
-                        min="0"
-                        className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
-                        value={config.pricing[key]}
-                        onChange={(e) => setConfig({ ...config, pricing: { ...config.pricing, [key]: toInt(e.target.value, config.pricing[key]) } })}
-                        onBlur={() => handleUpdateConfig()}
-                      />
+                  <div>
+                    <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">
+                      Pic FX & Editor
+                    </h5>
+                    <div className="space-y-4">
+                      {[
+                        "pricePicFX_Standard",
+                        "pricePicFX_Carousel",
+                        "pricePicFX_Batch",
+                        "priceEditor_Pro",
+                        "priceEditor_Enhance",
+                        "priceEditor_Convert",
+                        "priceAsset_DriftPath",
+                      ].map((key) => (
+                        <div key={key} className="flex justify-between items-center">
+                          <span
+                            className="text-[10px] text-gray-400 uppercase font-bold truncate max-w-[120px]"
+                            title={key}
+                          >
+                            {key.replace("price", "").replace(/_/g, " ")}
+                          </span>
+                          <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
+                            value={config.pricing[key]}
+                            onChange={(e) =>
+                              setConfig({
+                                ...config,
+                                pricing: {
+                                  ...config.pricing,
+                                  [key]: toInt(e.target.value, config.pricing[key]),
+                                },
+                              })
+                            }
+                            onBlur={() => handleUpdateConfig()}
+                          />
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+
+                  <div>
+                    <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">
+                      Video FX
+                    </h5>
+                    <div className="space-y-4">
+                      {[
+                        "priceVideoFX1_10s",
+                        "priceVideoFX1_15s",
+                        "priceVideoFX2_4s",
+                        "priceVideoFX2_8s",
+                        "priceVideoFX2_12s",
+                        "priceVideoFX3_4s",
+                        "priceVideoFX3_6s",
+                        "priceVideoFX3_8s",
+                      ].map((key) => (
+                        <div key={key} className="flex justify-between items-center">
+                          <span className="text-[10px] text-gray-400 uppercase font-bold">
+                            {key.replace("price", "").replace(/_/g, " ")}
+                          </span>
+                          <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
+                            value={config.pricing[key]}
+                            onChange={(e) =>
+                              setConfig({
+                                ...config,
+                                pricing: {
+                                  ...config.pricing,
+                                  [key]: toInt(e.target.value, config.pricing[key]),
+                                },
+                              })
+                            }
+                            onBlur={() => handleUpdateConfig()}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -583,146 +782,12 @@ export default function TenantDashboard() {
           </div>
         )}
 
-        {/* BALANCES TAB */}
-        {activeTab === "balances" && (
-          <div className="max-w-xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 shadow-xl">
-              <h2 className="text-lg font-bold text-white uppercase tracking-tight">
-                Credit Check
-              </h2>
-              <p className="text-xs text-gray-400 mt-2 mb-6">
-                Open your provider portal and verify available credit instantly.
-              </p>
-              <div className="flex justify-start">
-                <a
-                  href="https://fal.ai/dashboard/usage-billing/credits"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center px-5 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-pink-600 hover:bg-pink-500 border border-pink-400/40 text-white transition-colors"
-                >
-                  Check Your Credit
-                </a>
-              </div>
-            </div>
-
-            <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-              <div className="mb-6">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                  Variant Cost Mapper
-                </h4>
-                <p className="text-xs text-gray-500 mt-2">
-                  Enter actual provider USD per render. We auto-convert to USD/credit using configured credit deductions, then calculate Fal/Kie liability from allocated user credits.
-                </p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[980px]">
-                  <thead>
-                    <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
-                      <th className="py-3 text-left">Generation Variant</th>
-                      <th className="py-3 text-left">Provider</th>
-                      <th className="py-3 text-right">Credit Deduction / Render</th>
-                      <th className="py-3 text-right">Actual Cost / Render ($)</th>
-                      <th className="py-3 text-right">Implied Cost / Credit ($)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {variantRows.map((row) => (
-                      <tr key={row.id} className="border-b border-gray-900/60">
-                        <td className="py-3 text-sm text-gray-200">{row.label}</td>
-                        <td className="py-3 text-xs uppercase tracking-widest text-gray-400">
-                          {row.provider}
-                        </td>
-                        <td className="py-3 text-sm text-right text-gray-200">
-                          {row.deductionCredits.toFixed(0)}
-                        </td>
-                        <td className="py-3 text-right">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={row.providerCostPerRender}
-                            onChange={(e) => handleVariantCostChange(row.id, e.target.value)}
-                            className="w-24 bg-gray-950 border border-gray-700 rounded p-2 text-right text-xs text-white outline-none focus:border-brand-accent"
-                          />
-                        </td>
-                        <td className="py-3 text-sm text-right font-semibold text-brand-accent">
-                          {formatUsd(row.impliedUsdPerCredit)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-4">
-                Wallet USD/credit uses the highest implied variant rate per wallet (conservative mode).
-              </p>
-              <div className="overflow-x-auto mt-4">
-                <table className="w-full min-w-[820px]">
-                  <thead>
-                    <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
-                      <th className="py-3 text-left">Wallet</th>
-                      <th className="py-3 text-left">Provider</th>
-                      <th className="py-3 text-right">Allocated Credits</th>
-                      <th className="py-3 text-right">Derived USD / Credit</th>
-                      <th className="py-3 text-right">Required Coverage ($)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {walletCoverageRows.map((row) => (
-                      <tr key={row.key} className="border-b border-gray-900/60">
-                        <td className="py-3 text-sm text-gray-200">{row.label}</td>
-                        <td className="py-3 text-xs uppercase tracking-widest text-gray-400">
-                          {row.provider}
-                        </td>
-                        <td className="py-3 text-sm text-right text-gray-200">
-                          {row.allocatedCredits.toFixed(0)}
-                        </td>
-                        <td className="py-3 text-sm text-right text-gray-200">
-                          {formatUsd(row.usdPerCredit)}
-                        </td>
-                        <td className="py-3 text-sm text-right font-semibold text-brand-accent">
-                          {formatUsd(row.requiredUsd)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                  <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
-                    Fal Coverage Needed
-                  </p>
-                  <p className="text-xl font-bold text-pink-400 mt-2">
-                    {formatUsd(coverageTotals.fal)}
-                  </p>
-                </div>
-                <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                  <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
-                    Kie Coverage Needed
-                  </p>
-                  <p className="text-xl font-bold text-cyan-400 mt-2">
-                    {formatUsd(coverageTotals.kie)}
-                  </p>
-                </div>
-                <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                  <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
-                    Total Coverage Needed
-                  </p>
-                  <p className="text-xl font-bold text-white mt-2">
-                    {formatUsd(coverageTotals.total)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* MODAL: MANAGE USER (TENANT) */}
       {editingUser && (
         <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl max-h-[92vh] overflow-y-auto">
             <div className="p-8 border-b border-gray-800">
               <h3 className="text-xl font-bold text-white uppercase tracking-tight">Manage Team Member</h3>
               <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">{editingUser.email}</p>
@@ -765,7 +830,7 @@ export default function TenantDashboard() {
       {/* MODAL: ADD USER */}
       {showAddUserModal && (
         <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl max-h-[92vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-800">
               <h3 className="text-lg font-bold text-white uppercase tracking-tight">New Team Member</h3>
             </div>

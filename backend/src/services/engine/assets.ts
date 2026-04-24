@@ -11,8 +11,37 @@ import {
 export const assetsLogic = {
   // ✅ Upload Raw
   // ✅ Upload Raw (Forced "original" tag)
-  async uploadRawAsset(fileBuffer: Buffer, userId: string, projectId?: string, requestedRatio?: string, fileSizeBytes?: number) {
+  async uploadRawAsset(
+    fileBuffer: Buffer,
+    userId: string,
+    projectId?: string,
+    requestedRatio?: string,
+    fileSizeBytes?: number,
+    mimeType?: string,
+  ) {
     try {
+      const isVideo = typeof mimeType === "string" && mimeType.startsWith("video/");
+      if (isVideo) {
+        const videoUrl = await uploadToCloudinary(
+          fileBuffer,
+          `raw_${userId}_${Date.now()}`,
+          userId,
+          "Raw Upload",
+          "video",
+        );
+
+        const videoRatio = requestedRatio === "VIDEO" ? "VIDEO" : "original";
+        return await airtableService.createAsset(
+          userId,
+          videoUrl,
+          videoRatio,
+          "VIDEO",
+          undefined,
+          projectId,
+          fileSizeBytes,
+        );
+      }
+
       const metadata = await sharp(fileBuffer).metadata();
       const width = metadata.width || 1000;
       const height = metadata.height || 1000;
@@ -171,3 +200,4 @@ export const assetsLogic = {
     return newAsset;
   },
 };
+

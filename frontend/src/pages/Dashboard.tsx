@@ -38,6 +38,7 @@ const MAX_VEO_REFERENCE_IMAGES = 5;
 const MAX_VIDEOFX1_REFERENCES = 2;
 const MAX_VIDEOFX2_REFERENCES = 12;
 const MAX_VIDEOFX_ADV_REFERENCES = 12;
+const TIMELINE_PAGE_SIZE = 15;
 type VeoMode =
   | "image_to_video"
   | "first_last_frame"
@@ -223,6 +224,12 @@ function Dashboard() {
   const [showPromptInfo, setShowPromptInfo] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [timelinePanelMode, setTimelinePanelMode] = useState<"timeline" | "storyline">("timeline");
+  const [timelineVisibleCount, setTimelineVisibleCount] = useState(
+    TIMELINE_PAGE_SIZE,
+  );
+  const [storylineVisibleCount, setStorylineVisibleCount] = useState(
+    TIMELINE_PAGE_SIZE,
+  );
 
   // === NEW PREVIEW STATE ===
   const [previewMedia, setPreviewMedia] = useState<{
@@ -319,6 +326,11 @@ function Dashboard() {
       setLibraryInitialTab(null);
     }
   }, [activeLibrarySlot]);
+
+  useEffect(() => {
+    setTimelineVisibleCount(TIMELINE_PAGE_SIZE);
+    setStorylineVisibleCount(TIMELINE_PAGE_SIZE);
+  }, [timelinePanelMode]);
 
   useEffect(() => {
     if (!(activeEngine === "kie" && videoFxMode === "video")) return;
@@ -2017,9 +2029,14 @@ function Dashboard() {
       );
   }, [posts]);
 
-  const compactTimelinePosts = useMemo(
-    () => timelinePosts.slice(0, 40),
-    [timelinePosts],
+  const displayedTimelinePosts = useMemo(
+    () => timelinePosts.slice(0, timelineVisibleCount),
+    [timelinePosts, timelineVisibleCount],
+  );
+
+  const displayedStorylineItems = useMemo(
+    () => storylineSequence.slice(0, storylineVisibleCount),
+    [storylineSequence, storylineVisibleCount],
   );
 
   return (
@@ -2507,9 +2524,23 @@ function Dashboard() {
                       stroke="currentColor"
                       viewBox="0 0 24 24"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                      {showUserMenu ? (
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 6l12 12M18 6L6 18"
+                        />
+                      ) : (
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 6h16M4 12h16M4 18h16"
+                        />
+                      )}
                     </svg>
-                    Menu
+                    {showUserMenu ? "Close" : "Menu"}
                   </button>
 
                   {showUserMenu && (
@@ -4513,8 +4544,8 @@ function Dashboard() {
                 {timelinePanelMode === "timeline" ? (
                   <>
                     <div className="space-y-3 max-h-[980px] sm:max-h-[1040px] overflow-y-auto custom-scrollbar">
-                      {compactTimelinePosts.length > 0 ? (
-                        compactTimelinePosts.map((post: any) => (
+                      {displayedTimelinePosts.length > 0 ? (
+                        displayedTimelinePosts.map((post: any) => (
                             <PostCard
                               key={post.id}
                               post={post}
@@ -4573,6 +4604,21 @@ function Dashboard() {
                         </div>
                       ) : null}
                     </div>
+                    {timelinePosts.length > displayedTimelinePosts.length && (
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setTimelineVisibleCount(
+                              (prev) => prev + TIMELINE_PAGE_SIZE,
+                            )
+                          }
+                          className="w-full py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-[11px] font-bold uppercase tracking-widest text-gray-200 transition-colors"
+                        >
+                          Load More
+                        </button>
+                      </div>
+                    )}
                     {postsError && (
                       <div className="text-center py-6">
                         <ErrorAlert
@@ -4587,8 +4633,8 @@ function Dashboard() {
                   </>
                 ) : (
                   <div className="space-y-3 max-h-[980px] sm:max-h-[1040px] overflow-y-auto custom-scrollbar">
-                    {storylineSequence.length > 0 ? (
-                      storylineSequence.map((item, index) => {
+                    {displayedStorylineItems.length > 0 ? (
+                      displayedStorylineItems.map((item, index) => {
                         const storylinePost = buildStorylinePost(item, index);
                         return (
                         <div key={`${item.id}-${index}`} className="space-y-2">
@@ -4691,6 +4737,21 @@ function Dashboard() {
                         <div className="text-xs text-gray-500">
                           Use Timeline + button to add clips here.
                         </div>
+                      </div>
+                    )}
+                    {storylineSequence.length > displayedStorylineItems.length && (
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setStorylineVisibleCount(
+                              (prev) => prev + TIMELINE_PAGE_SIZE,
+                            )
+                          }
+                          className="w-full py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-[11px] font-bold uppercase tracking-widest text-gray-200 transition-colors"
+                        >
+                          Load More
+                        </button>
                       </div>
                     )}
                     <div className="pt-2 border-t border-white/10 flex gap-2">

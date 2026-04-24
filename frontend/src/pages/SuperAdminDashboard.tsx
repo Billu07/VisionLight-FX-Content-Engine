@@ -151,7 +151,9 @@ export default function SuperAdminDashboard() {
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<"platform" | "my-agency" | "provider-balances" | "demo-leads" | "global-settings" | "global-presets">("platform");
+  const [activeTab, setActiveTab] = useState<
+    "platform" | "my-agency" | "demo-leads" | "global-settings" | "global-presets"
+  >("platform");
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [creditRequests, setCreditRequests] = useState<CreditRequest[]>([]);
@@ -554,23 +556,33 @@ export default function SuperAdminDashboard() {
             </p>
           </div>
 
-          <div className="flex flex-nowrap overflow-x-auto items-center bg-gray-900 p-1 rounded-lg border border-gray-800 gap-1 w-full xl:w-auto">
-            <button
-              onClick={() => navigate("/app")}
-              className="shrink-0 whitespace-nowrap px-4 py-2 rounded-md text-[10px] font-black uppercase tracking-widest text-brand-accent hover:bg-brand-accent/10 transition-all border border-brand-accent/20 mr-1"
-            >
-              Back to App
-            </button>
-            {["platform", "my-agency", "provider-balances", "demo-leads", "global-settings", "global-presets"].map((tab) => (
+          <div className="flex flex-col xl:flex-row gap-3 w-full xl:w-auto xl:items-center">
+            <div className="flex flex-nowrap overflow-x-auto items-center bg-gray-900 p-1 rounded-lg border border-gray-800 gap-1 w-full xl:w-auto">
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab as any)}
-                className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors ${activeTab === tab ? "bg-gray-800 text-brand-accent" : "text-gray-400 hover:text-white"
-                  }`}
+                onClick={() => navigate("/app")}
+                className="shrink-0 whitespace-nowrap px-3 py-2 rounded-md text-[10px] font-black uppercase tracking-widest text-brand-accent hover:bg-brand-accent/10 transition-all border border-brand-accent/20 mr-1"
               >
-                {tab.replace("-", " ")}
+                Back to App
               </button>
-            ))}
+              {["platform", "my-agency", "demo-leads", "global-settings", "global-presets"].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab as any)}
+                  className={`shrink-0 whitespace-nowrap px-3 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors ${activeTab === tab ? "bg-gray-800 text-brand-accent" : "text-gray-400 hover:text-white"
+                    }`}
+                >
+                  {tab.replace("-", " ")}
+                </button>
+              ))}
+            </div>
+            <a
+              href="https://fal.ai/dashboard/usage-billing/credits"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-pink-600 hover:bg-pink-500 border border-pink-400/40 text-white transition-colors whitespace-nowrap"
+            >
+              Check Your Credit
+            </a>
           </div>
         </div>
 
@@ -652,30 +664,6 @@ export default function SuperAdminDashboard() {
                   ))}
                 </tbody>
               </table>
-            </div>
-          </div>
-        )}
-
-        {/* TAB CONTENT: PROVIDER BALANCES */}
-        {activeTab === "provider-balances" && (
-          <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-8">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">
-                Credit Check
-              </h2>
-              <p className="text-xs text-gray-500 mt-2 mb-6">
-                Open your provider portal and verify available credit for your default organization.
-              </p>
-              <div className="flex justify-start">
-                <a
-                  href="https://fal.ai/dashboard/usage-billing/credits"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center px-5 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest bg-pink-600 hover:bg-pink-500 border border-pink-400/40 text-white transition-colors"
-                >
-                  Check Your Credit
-                </a>
-              </div>
             </div>
           </div>
         )}
@@ -965,172 +953,180 @@ export default function SuperAdminDashboard() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">PicDrift Engine</h4>
-                <div className="space-y-4">
-                  {["pricePicDrift_5s", "pricePicDrift_10s", "pricePicDrift_Plus_5s", "pricePicDrift_Plus_10s"].map(key => (
-                    <div key={key} className="flex justify-between items-center">
-                      <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
-                      <input
-                        type="number"
-                        step="1"
-                        min="0"
-                        className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
-                        defaultValue={globalSettings[key]}
-                        onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: toInt(e.target.value, globalSettings[key]) })}
-                      />
-                    </div>
-                  ))}
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+                  Fal Coverage Needed
+                </p>
+                <p className="text-xl font-bold text-pink-400 mt-2">
+                  {formatUsd(coverageTotals.fal)}
+                </p>
               </div>
-
-              <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Studio & Editor</h4>
-                <div className="space-y-4">
-                  {["pricePicFX_Standard", "pricePicFX_Carousel", "pricePicFX_Batch", "priceEditor_Pro", "priceEditor_Enhance", "priceEditor_Convert", "priceAsset_DriftPath"].map(key => (
-                    <div key={key} className="flex justify-between items-center">
-                      <span className="text-[10px] text-gray-400 uppercase font-bold truncate max-w-[100px]" title={key}>{key.replace('price', '').replace(/_/g, ' ')}</span>
-                      <input
-                        type="number"
-                        step="1"
-                        min="0"
-                        className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
-                        defaultValue={globalSettings[key]}
-                        onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: toInt(e.target.value, globalSettings[key]) })}
-                      />
-                    </div>
-                  ))}
-                </div>
+              <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+                  Kie Coverage Needed
+                </p>
+                <p className="text-xl font-bold text-cyan-400 mt-2">
+                  {formatUsd(coverageTotals.kie)}
+                </p>
               </div>
-
-              <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">Video FX Engines</h4>
-                <div className="space-y-4">
-                  {["priceVideoFX1_10s", "priceVideoFX1_15s", "priceVideoFX2_4s", "priceVideoFX2_8s", "priceVideoFX2_12s", "priceVideoFX3_4s", "priceVideoFX3_6s", "priceVideoFX3_8s"].map(key => (
-                    <div key={key} className="flex justify-between items-center">
-                      <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
-                      <input
-                        type="number"
-                        step="1"
-                        min="0"
-                        className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
-                        defaultValue={globalSettings[key]}
-                        onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: toInt(e.target.value, globalSettings[key]) })}
-                      />
-                    </div>
-                  ))}
-                </div>
+              <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+                <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+                  Total Coverage Needed
+                </p>
+                <p className="text-xl font-bold text-white mt-2">
+                  {formatUsd(coverageTotals.total)}
+                </p>
               </div>
             </div>
 
-            <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-              <div className="mb-6">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                  Variant Cost Mapper
-                </h4>
-                <p className="text-xs text-gray-500 mt-2">
-                  Enter actual provider USD per render. We auto-convert to USD/credit using configured credit deductions, then calculate Fal/Kie liability from allocated user credits.
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+              <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
+                <div className="mb-6">
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    Actual Provider Cost
+                  </h4>
+                  <p className="text-xs text-gray-500 mt-2">
+                    USD per render. Implied USD/credit is auto-calculated from configured platform deductions.
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[760px]">
+                    <thead>
+                      <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
+                        <th className="py-3 text-left">Generation Variant</th>
+                        <th className="py-3 text-left">Provider</th>
+                        <th className="py-3 text-right">Credit / Render</th>
+                        <th className="py-3 text-right">Cost / Render ($)</th>
+                        <th className="py-3 text-right">Implied / Credit ($)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {variantRows.map((row) => (
+                        <tr key={row.id} className="border-b border-gray-900/60">
+                          <td className="py-3 text-sm text-gray-200">{row.label}</td>
+                          <td className="py-3 text-xs uppercase tracking-widest text-gray-400">
+                            {row.provider}
+                          </td>
+                          <td className="py-3 text-sm text-right text-gray-200">
+                            {row.deductionCredits.toFixed(0)}
+                          </td>
+                          <td className="py-3 text-right">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={row.providerCostPerRender}
+                              onChange={(e) => handleVariantCostChange(row.id, e.target.value)}
+                              className="w-24 bg-gray-950 border border-gray-700 rounded p-2 text-right text-xs text-white outline-none focus:border-brand-accent"
+                            />
+                          </td>
+                          <td className="py-3 text-sm text-right font-semibold text-brand-accent">
+                            {formatUsd(row.impliedUsdPerCredit)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-4">
+                  Wallet USD/credit uses the highest implied variant rate per wallet (conservative mode).
                 </p>
+                <div className="overflow-x-auto mt-3">
+                  <table className="w-full min-w-[760px]">
+                    <thead>
+                      <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
+                        <th className="py-3 text-left">Wallet</th>
+                        <th className="py-3 text-left">Provider</th>
+                        <th className="py-3 text-right">Allocated Credits</th>
+                        <th className="py-3 text-right">Derived / Credit ($)</th>
+                        <th className="py-3 text-right">Coverage ($)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {walletCoverageRows.map((row) => (
+                        <tr key={row.key} className="border-b border-gray-900/60">
+                          <td className="py-3 text-sm text-gray-200">{row.label}</td>
+                          <td className="py-3 text-xs uppercase tracking-widest text-gray-400">
+                            {row.provider}
+                          </td>
+                          <td className="py-3 text-sm text-right text-gray-200">
+                            {row.allocatedCredits.toFixed(0)}
+                          </td>
+                          <td className="py-3 text-sm text-right text-gray-200">
+                            {formatUsd(row.usdPerCredit)}
+                          </td>
+                          <td className="py-3 text-sm text-right font-semibold text-brand-accent">
+                            {formatUsd(row.requiredUsd)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[980px]">
-                  <thead>
-                    <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
-                      <th className="py-3 text-left">Generation Variant</th>
-                      <th className="py-3 text-left">Provider</th>
-                      <th className="py-3 text-right">Credit Deduction / Render</th>
-                      <th className="py-3 text-right">Actual Cost / Render ($)</th>
-                      <th className="py-3 text-right">Implied Cost / Credit ($)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {variantRows.map((row) => (
-                      <tr key={row.id} className="border-b border-gray-900/60">
-                        <td className="py-3 text-sm text-gray-200">{row.label}</td>
-                        <td className="py-3 text-xs uppercase tracking-widest text-gray-400">
-                          {row.provider}
-                        </td>
-                        <td className="py-3 text-sm text-right text-gray-200">
-                          {row.deductionCredits.toFixed(0)}
-                        </td>
-                        <td className="py-3 text-right">
+
+              <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">
+                  Platform Render Credit Cost
+                </h4>
+                <div className="grid grid-cols-1 gap-6">
+                  <div className="bg-gray-950 border border-gray-800 rounded-lg p-6">
+                    <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">PicDrift Engine</h5>
+                    <div className="space-y-4">
+                      {["pricePicDrift_5s", "pricePicDrift_10s", "pricePicDrift_Plus_5s", "pricePicDrift_Plus_10s"].map(key => (
+                        <div key={key} className="flex justify-between items-center">
+                          <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
                           <input
                             type="number"
-                            step="0.01"
+                            step="1"
                             min="0"
-                            value={row.providerCostPerRender}
-                            onChange={(e) => handleVariantCostChange(row.id, e.target.value)}
-                            className="w-24 bg-gray-950 border border-gray-700 rounded p-2 text-right text-xs text-white outline-none focus:border-brand-accent"
+                            className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center text-xs text-white"
+                            defaultValue={globalSettings[key]}
+                            onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: toInt(e.target.value, globalSettings[key]) })}
                           />
-                        </td>
-                        <td className="py-3 text-sm text-right font-semibold text-brand-accent">
-                          {formatUsd(row.impliedUsdPerCredit)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-4">
-                Wallet USD/credit uses the highest implied variant rate per wallet (conservative mode).
-              </p>
-              <div className="overflow-x-auto mt-4">
-                <table className="w-full min-w-[820px]">
-                  <thead>
-                    <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
-                      <th className="py-3 text-left">Wallet</th>
-                      <th className="py-3 text-left">Provider</th>
-                      <th className="py-3 text-right">Allocated Credits</th>
-                      <th className="py-3 text-right">Derived USD / Credit</th>
-                      <th className="py-3 text-right">Required Coverage ($)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {walletCoverageRows.map((row) => (
-                      <tr key={row.key} className="border-b border-gray-900/60">
-                        <td className="py-3 text-sm text-gray-200">{row.label}</td>
-                        <td className="py-3 text-xs uppercase tracking-widest text-gray-400">
-                          {row.provider}
-                        </td>
-                        <td className="py-3 text-sm text-right text-gray-200">
-                          {row.allocatedCredits.toFixed(0)}
-                        </td>
-                        <td className="py-3 text-sm text-right text-gray-200">
-                          {formatUsd(row.usdPerCredit)}
-                        </td>
-                        <td className="py-3 text-sm text-right font-semibold text-brand-accent">
-                          {formatUsd(row.requiredUsd)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                  <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
-                    Fal Coverage Needed
-                  </p>
-                  <p className="text-xl font-bold text-pink-400 mt-2">
-                    {formatUsd(coverageTotals.fal)}
-                  </p>
-                </div>
-                <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                  <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
-                    Kie Coverage Needed
-                  </p>
-                  <p className="text-xl font-bold text-cyan-400 mt-2">
-                    {formatUsd(coverageTotals.kie)}
-                  </p>
-                </div>
-                <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                  <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
-                    Total Coverage Needed
-                  </p>
-                  <p className="text-xl font-bold text-white mt-2">
-                    {formatUsd(coverageTotals.total)}
-                  </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-950 border border-gray-800 rounded-lg p-6">
+                    <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Studio & Editor</h5>
+                    <div className="space-y-4">
+                      {["pricePicFX_Standard", "pricePicFX_Carousel", "pricePicFX_Batch", "priceEditor_Pro", "priceEditor_Enhance", "priceEditor_Convert", "priceAsset_DriftPath"].map(key => (
+                        <div key={key} className="flex justify-between items-center">
+                          <span className="text-[10px] text-gray-400 uppercase font-bold truncate max-w-[120px]" title={key}>{key.replace('price', '').replace(/_/g, ' ')}</span>
+                          <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center text-xs text-white"
+                            defaultValue={globalSettings[key]}
+                            onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: toInt(e.target.value, globalSettings[key]) })}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-950 border border-gray-800 rounded-lg p-6">
+                    <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Video FX Engines</h5>
+                    <div className="space-y-4">
+                      {["priceVideoFX1_10s", "priceVideoFX1_15s", "priceVideoFX2_4s", "priceVideoFX2_8s", "priceVideoFX2_12s", "priceVideoFX3_4s", "priceVideoFX3_6s", "priceVideoFX3_8s"].map(key => (
+                        <div key={key} className="flex justify-between items-center">
+                          <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
+                          <input
+                            type="number"
+                            step="1"
+                            min="0"
+                            className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center text-xs text-white"
+                            defaultValue={globalSettings[key]}
+                            onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: toInt(e.target.value, globalSettings[key]) })}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1141,7 +1137,7 @@ export default function SuperAdminDashboard() {
       {/* MODAL: NEW TENANT */}
       {showTenantModal && (
         <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg shadow-2xl max-h-[92vh] overflow-y-auto">
             <div className="p-8 border-b border-gray-800">
               <h3 className="text-xl font-bold text-white uppercase tracking-tight">Provision New Tenant</h3>
               <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Create Organization & Admin Account</p>
@@ -1214,7 +1210,7 @@ export default function SuperAdminDashboard() {
       {/* MODAL: EDIT TENANT */}
       {editingTenant && (
         <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg shadow-2xl max-h-[92vh] overflow-y-auto">
             <div className="p-8 border-b border-gray-800 flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-bold text-white uppercase tracking-tight">Configure Tenant</h3>
@@ -1313,7 +1309,7 @@ export default function SuperAdminDashboard() {
       {/* MODAL: EDIT USER (Manage View/Role) */}
       {editingUser && (
         <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl max-h-[92vh] overflow-y-auto">
             <div className="p-8 border-b border-gray-800">
               <h3 className="text-xl font-bold text-white uppercase tracking-tight">Manage User</h3>
               <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">{editingUser.email}</p>
@@ -1359,7 +1355,7 @@ export default function SuperAdminDashboard() {
       {/* MODAL: NEW DEMO */}
       {showDemoModal && (
         <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl max-h-[92vh] overflow-y-auto">
             <div className="p-8 border-b border-gray-800">
               <h3 className="text-xl font-bold text-white uppercase tracking-tight">New Demo Account</h3>
               <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Locked to PicDrift View</p>
@@ -1399,7 +1395,7 @@ export default function SuperAdminDashboard() {
       {/* MODAL: GLOBAL PRESET */}
       {showPresetModal && (
         <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg shadow-2xl max-h-[92vh] overflow-y-auto">
             <div className="p-8 border-b border-gray-800 flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-bold text-white uppercase tracking-tight">
@@ -1459,7 +1455,7 @@ export default function SuperAdminDashboard() {
       {/* MODAL: ADD TEAM MEMBER */}
       {showAddTeamModal && (
         <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl max-h-[92vh] overflow-y-auto">
             <div className="p-8 border-b border-gray-800">
               <h3 className="text-xl font-bold text-white uppercase tracking-tight">New Agency Member</h3>
             </div>
@@ -1504,3 +1500,4 @@ export default function SuperAdminDashboard() {
     </div>
   );
 }
+
