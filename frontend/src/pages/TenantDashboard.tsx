@@ -38,26 +38,32 @@ interface CreditRequest {
   };
 }
 
-type CreditPoolCostKey =
-  | "creditsPicDrift"
-  | "creditsPicDriftPlus"
-  | "creditsImageFX"
-  | "creditsVideoFX1"
-  | "creditsVideoFX2"
-  | "creditsVideoFX3";
-
-const COVERAGE_COST_ROWS: {
-  key: CreditPoolCostKey;
-  label: string;
-  provider: "fal" | "kie";
-}[] = [
-  { key: "creditsPicDrift", label: "PicDrift", provider: "fal" },
+const COVERAGE_WALLETS = [
+  { key: "creditsPicDrift", label: "PicDrift (Standard)", provider: "fal" },
   { key: "creditsPicDriftPlus", label: "PicDrift Plus", provider: "fal" },
-  { key: "creditsImageFX", label: "PicFX", provider: "fal" },
   { key: "creditsVideoFX1", label: "Seedance 2.0 Kie", provider: "kie" },
   { key: "creditsVideoFX2", label: "Seedance 2.0 Fal", provider: "fal" },
   { key: "creditsVideoFX3", label: "Veo 3", provider: "fal" },
-];
+] as const;
+
+type CoverageWalletKey = (typeof COVERAGE_WALLETS)[number]["key"];
+
+const COVERAGE_VARIANTS = [
+  { id: "picdrift_5s", label: "PicDrift 5s", provider: "fal", wallet: "creditsPicDrift", deductionKey: "pricePicDrift_5s" },
+  { id: "picdrift_10s", label: "PicDrift 10s", provider: "fal", wallet: "creditsPicDrift", deductionKey: "pricePicDrift_10s" },
+  { id: "picdrift_plus_5s", label: "PicDrift Plus 5s", provider: "fal", wallet: "creditsPicDriftPlus", deductionKey: "pricePicDrift_Plus_5s" },
+  { id: "picdrift_plus_10s", label: "PicDrift Plus 10s", provider: "fal", wallet: "creditsPicDriftPlus", deductionKey: "pricePicDrift_Plus_10s" },
+  { id: "seedance_kie_10s", label: "Seedance 2.0 Kie 10s", provider: "kie", wallet: "creditsVideoFX1", deductionKey: "priceVideoFX1_10s" },
+  { id: "seedance_kie_15s", label: "Seedance 2.0 Kie 15s", provider: "kie", wallet: "creditsVideoFX1", deductionKey: "priceVideoFX1_15s" },
+  { id: "seedance_fal_4s", label: "Seedance 2.0 Fal 4s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_4s" },
+  { id: "seedance_fal_8s", label: "Seedance 2.0 Fal 8s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_8s" },
+  { id: "seedance_fal_12s", label: "Seedance 2.0 Fal 12s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_12s" },
+  { id: "veo3_4s", label: "Veo 3 4s", provider: "fal", wallet: "creditsVideoFX3", deductionKey: "priceVideoFX3_4s" },
+  { id: "veo3_6s", label: "Veo 3 6s", provider: "fal", wallet: "creditsVideoFX3", deductionKey: "priceVideoFX3_6s" },
+  { id: "veo3_8s", label: "Veo 3 8s", provider: "fal", wallet: "creditsVideoFX3", deductionKey: "priceVideoFX3_8s" },
+] as const;
+
+type CoverageVariantId = (typeof COVERAGE_VARIANTS)[number]["id"];
 
 export default function TenantDashboard() {
   const { user: adminUser } = useAuth();
@@ -72,15 +78,21 @@ export default function TenantDashboard() {
   const [msg, setMsg] = useState("");
 
   const [showAddUserModal, setShowAddUserModal] = useState(false);
-  const [poolCostUsd, setPoolCostUsd] = useState<
-    Record<CreditPoolCostKey, number>
+  const [variantCostUsd, setVariantCostUsd] = useState<
+    Record<CoverageVariantId, number>
   >({
-    creditsPicDrift: 0.05,
-    creditsPicDriftPlus: 0.07,
-    creditsImageFX: 0.03,
-    creditsVideoFX1: 0.12,
-    creditsVideoFX2: 0.08,
-    creditsVideoFX3: 0.09,
+    picdrift_5s: 0.1,
+    picdrift_10s: 0.2,
+    picdrift_plus_5s: 0.2,
+    picdrift_plus_10s: 0.3,
+    seedance_kie_10s: 0.45,
+    seedance_kie_15s: 0.7,
+    seedance_fal_4s: 0.2,
+    seedance_fal_8s: 0.35,
+    seedance_fal_12s: 0.5,
+    veo3_4s: 0.25,
+    veo3_6s: 0.38,
+    veo3_8s: 0.5,
   });
   const [newUser, setNewUser] = useState({
     email: "",
@@ -209,21 +221,49 @@ export default function TenantDashboard() {
     </div>
   );
 
-  const coverageRows = COVERAGE_COST_ROWS.map((entry) => {
-    const allocatedCredits = users.reduce(
-      (sum, user) => sum + (Number(user[entry.key]) || 0),
+  const variantRows = COVERAGE_VARIANTS.map((variant) => {
+    const deductionCredits = Math.max(
       0,
+      Number(config?.pricing?.[variant.deductionKey]) || 0,
     );
-    const unitUsd = Number(poolCostUsd[entry.key]) || 0;
+    const providerCostPerRender = Math.max(
+      0,
+      Number(variantCostUsd[variant.id]) || 0,
+    );
+    const impliedUsdPerCredit =
+      deductionCredits > 0 ? providerCostPerRender / deductionCredits : 0;
     return {
-      ...entry,
-      allocatedCredits,
-      unitUsd,
-      requiredUsd: allocatedCredits * unitUsd,
+      ...variant,
+      deductionCredits,
+      providerCostPerRender,
+      impliedUsdPerCredit,
     };
   });
 
-  const coverageTotals = coverageRows.reduce(
+  const walletUsdPerCredit = COVERAGE_WALLETS.reduce((acc, wallet) => {
+    const rates = variantRows
+      .filter((row) => row.wallet === wallet.key)
+      .map((row) => row.impliedUsdPerCredit)
+      .filter((value) => Number.isFinite(value) && value > 0);
+    acc[wallet.key] = rates.length ? Math.max(...rates) : 0;
+    return acc;
+  }, {} as Record<CoverageWalletKey, number>);
+
+  const walletCoverageRows = COVERAGE_WALLETS.map((wallet) => {
+    const allocatedCredits = users.reduce(
+      (sum, user) => sum + (Number(user[wallet.key]) || 0),
+      0,
+    );
+    const usdPerCredit = walletUsdPerCredit[wallet.key] || 0;
+    return {
+      ...wallet,
+      allocatedCredits,
+      usdPerCredit,
+      requiredUsd: allocatedCredits * usdPerCredit,
+    };
+  });
+
+  const coverageTotals = walletCoverageRows.reduce(
     (acc, row) => {
       if (row.provider === "kie") acc.kie += row.requiredUsd;
       else acc.fal += row.requiredUsd;
@@ -241,9 +281,9 @@ export default function TenantDashboard() {
       maximumFractionDigits: 2,
     });
 
-  const handlePoolCostChange = (key: CreditPoolCostKey, raw: string) => {
+  const handleVariantCostChange = (key: CoverageVariantId, raw: string) => {
     const parsed = Number(raw);
-    setPoolCostUsd((prev) => ({
+    setVariantCostUsd((prev) => ({
       ...prev,
       [key]: Number.isFinite(parsed) && parsed >= 0 ? parsed : 0,
     }));
@@ -568,25 +608,67 @@ export default function TenantDashboard() {
             <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
               <div className="mb-6">
                 <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                  Provider Coverage Planner
+                  Variant Cost Mapper
                 </h4>
                 <p className="text-xs text-gray-500 mt-2">
-                  Set actual USD cost per credit type and see how much Fal/Kie balance your user allocations require.
+                  Enter actual provider USD per render. We auto-convert to USD/credit using configured credit deductions, then calculate Fal/Kie liability from allocated user credits.
                 </p>
               </div>
               <div className="overflow-x-auto">
+                <table className="w-full min-w-[980px]">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
+                      <th className="py-3 text-left">Generation Variant</th>
+                      <th className="py-3 text-left">Provider</th>
+                      <th className="py-3 text-right">Credit Deduction / Render</th>
+                      <th className="py-3 text-right">Actual Cost / Render ($)</th>
+                      <th className="py-3 text-right">Implied Cost / Credit ($)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {variantRows.map((row) => (
+                      <tr key={row.id} className="border-b border-gray-900/60">
+                        <td className="py-3 text-sm text-gray-200">{row.label}</td>
+                        <td className="py-3 text-xs uppercase tracking-widest text-gray-400">
+                          {row.provider}
+                        </td>
+                        <td className="py-3 text-sm text-right text-gray-200">
+                          {row.deductionCredits.toFixed(0)}
+                        </td>
+                        <td className="py-3 text-right">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={row.providerCostPerRender}
+                            onChange={(e) => handleVariantCostChange(row.id, e.target.value)}
+                            className="w-24 bg-gray-950 border border-gray-700 rounded p-2 text-right text-xs text-white outline-none focus:border-brand-accent"
+                          />
+                        </td>
+                        <td className="py-3 text-sm text-right font-semibold text-brand-accent">
+                          {formatUsd(row.impliedUsdPerCredit)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-4">
+                Wallet USD/credit uses the highest implied variant rate per wallet (conservative mode).
+              </p>
+              <div className="overflow-x-auto mt-4">
                 <table className="w-full min-w-[820px]">
                   <thead>
                     <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
-                      <th className="py-3 text-left">Generation</th>
+                      <th className="py-3 text-left">Wallet</th>
                       <th className="py-3 text-left">Provider</th>
                       <th className="py-3 text-right">Allocated Credits</th>
-                      <th className="py-3 text-right">Actual Cost / Credit ($)</th>
+                      <th className="py-3 text-right">Derived USD / Credit</th>
                       <th className="py-3 text-right">Required Coverage ($)</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {coverageRows.map((row) => (
+                    {walletCoverageRows.map((row) => (
                       <tr key={row.key} className="border-b border-gray-900/60">
                         <td className="py-3 text-sm text-gray-200">{row.label}</td>
                         <td className="py-3 text-xs uppercase tracking-widest text-gray-400">
@@ -595,15 +677,8 @@ export default function TenantDashboard() {
                         <td className="py-3 text-sm text-right text-gray-200">
                           {row.allocatedCredits.toFixed(0)}
                         </td>
-                        <td className="py-3 text-right">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={row.unitUsd}
-                            onChange={(e) => handlePoolCostChange(row.key, e.target.value)}
-                            className="w-24 bg-gray-950 border border-gray-700 rounded p-2 text-right text-xs text-white outline-none focus:border-brand-accent"
-                          />
+                        <td className="py-3 text-sm text-right text-gray-200">
+                          {formatUsd(row.usdPerCredit)}
                         </td>
                         <td className="py-3 text-sm text-right font-semibold text-brand-accent">
                           {formatUsd(row.requiredUsd)}
