@@ -1004,10 +1004,11 @@ export const videoLogic = {
           }
         } catch (pollErr: any) {
           const pollStatus = pollErr?.response?.status;
+          const pollData = pollErr?.response?.data;
           const pollPayload =
-            typeof pollErr?.response?.data === "string"
-              ? pollErr.response.data
-              : JSON.stringify(pollErr?.response?.data || {});
+            typeof pollData === "string"
+              ? pollData
+              : JSON.stringify(pollData || {});
           console.error(
             `Poll Error (${pollStatus || "unknown"}) on ${checkUrl}: ${pollErr.message}`,
             pollPayload,
@@ -1015,8 +1016,20 @@ export const videoLogic = {
           // 422 usually means invalid request/task id or malformed poll URL for this job.
           // Mark failed to stop infinite poll loops and issue refund path consistently.
           if (pollStatus === 422) {
+            const normalizedPayload = pollPayload.toLowerCase();
+            const isSeedanceAudioPolicyViolation =
+              provider.includes("seedance-fal") &&
+              toBoolean(params.generateAudio, true) &&
+              normalizedPayload.includes("content_policy_violation") &&
+              normalizedPayload.includes("audio") &&
+              (normalizedPayload.includes("output audio has sensitive content") ||
+                normalizedPayload.includes("partner_validation_failed") ||
+                normalizedPayload.includes("generated_video"));
+
             isFailed = true;
-            errorMessage = `Fal poll rejected (422): ${pollPayload || "Unprocessable Entity"}`;
+            errorMessage = isSeedanceAudioPolicyViolation
+              ? "Seedance rejected generated audio for this prompt. Disable Generate Audio and retry."
+              : `Fal poll rejected (422): ${pollPayload || "Unprocessable Entity"}`;
           }
         }
       } else if (provider.includes("openai")) {

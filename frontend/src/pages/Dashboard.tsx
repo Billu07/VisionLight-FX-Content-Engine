@@ -255,8 +255,9 @@ function Dashboard() {
 
   // === SEQUENCER STATE ===
   const [viewMode, setViewMode] = useState<"create" | "sequencer" | "history">("create");
-  const activeProjectId =
-    localStorage.getItem("visionlight_active_project") || "default";
+  const activeProject =
+    localStorage.getItem("visionlight_active_project") || undefined;
+  const activeProjectId = activeProject || "default";
   const storylineKey = `visionlight_storyline_${activeProjectId}`;
   const [storylineSequence, setStorylineSequence] = useState<SequenceItem[]>(() => {
     try {
@@ -436,11 +437,9 @@ function Dashboard() {
     isLoading: postsLoading,
     error: postsError,
   } = useQuery({
-    queryKey: ["posts"],
+    queryKey: ["posts", activeProjectId],
     queryFn: async () => {
       try {
-        const activeProject =
-          localStorage.getItem("visionlight_active_project") || undefined;
         const response = await apiEndpoints.getPosts(activeProject);
         return Array.isArray(response.data.posts) ? response.data.posts : [];
       } catch (e) {
@@ -453,9 +452,7 @@ function Dashboard() {
       const currentPosts = query.state.data;
       if (!currentPosts || !Array.isArray(currentPosts)) return false;
       const hasProcessing = currentPosts.some(
-        (p: any) =>
-          (p.status === "PROCESSING" || p.status === "NEW") &&
-          (p.progress || 0) < 100,
+        (p: any) => p.status === "PROCESSING" || p.status === "NEW",
       );
       return hasProcessing ? 5000 : false;
     },
@@ -507,7 +504,7 @@ function Dashboard() {
 
   // 5. Background job polling
   useQuery({
-    queryKey: ["check-jobs"],
+    queryKey: ["check-jobs", activeProjectId],
     queryFn: async () => {
       if (isUiFocusMode) return true;
       const hasActive = posts.some(
@@ -515,6 +512,7 @@ function Dashboard() {
       );
       if (hasActive) {
         await apiEndpoints.checkActiveJobs();
+        await queryClient.invalidateQueries({ queryKey: ["posts"] });
       }
       return true;
     },
