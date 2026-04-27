@@ -27,10 +27,21 @@ export const imageLogic = {
       `🎨 PicFX Gen for Post ${postId} | Model: ${selectedModel} | AR: ${params.aspectRatio}`,
     );
     try {
+      await airtableService.updatePost(postId, {
+        status: "PROCESSING",
+        progress: 10,
+        generationStep: "PREPARING_INPUTS",
+      });
+
       const refUrls =
         params.imageReferences ||
         (params.imageReference ? [params.imageReference] : []);
       const refBuffers = await downloadAndOptimizeImages(refUrls);
+
+      await airtableService.updatePost(postId, {
+        progress: 25,
+        generationStep: "PROMPTING_MODEL",
+      });
 
       let targetRatio: "16:9" | "9:16" | "1:1" = "16:9";
       const ar = params.aspectRatio;
@@ -48,6 +59,11 @@ export const imageLogic = {
         useGrounding: true,
         model: selectedModel,
         apiKey: apiKeys?.falApiKey,
+      });
+
+      await airtableService.updatePost(postId, {
+        progress: 80,
+        generationStep: "UPLOADING_RESULT",
       });
 
       const cloudUrl = await uploadToCloudinary(
@@ -88,6 +104,12 @@ export const imageLogic = {
       params?.model === "gpt-image-2" ? "gpt-image-2" : "nano-banana-2";
     console.log(`🎠 PicFX Carousel for Post ${postId} | Model: ${selectedModel}`);
     try {
+      await airtableService.updatePost(postId, {
+        status: "PROCESSING",
+        progress: 10,
+        generationStep: "PREPARING_INPUTS",
+      });
+
       const imageUrls: string[] = [];
       const userRefBuffers = await downloadAndOptimizeImages(
         params.imageReferences || [],
@@ -106,6 +128,12 @@ export const imageLogic = {
         "Image 3: Conclusion.",
       ];
       for (let i = 0; i < steps.length; i++) {
+        const stepProgress = 25 + i * 20;
+        await airtableService.updatePost(postId, {
+          progress: stepProgress,
+          generationStep: `GENERATING_SLIDE_${i + 1}`,
+        });
+
         const stepPrompt = `PROJECT: Carousel. SLIDE: ${
           i + 1
         }/3. THEME: ${finalPrompt}. FOCUS: ${
@@ -129,6 +157,10 @@ export const imageLogic = {
         );
         imageUrls.push(url);
       }
+      await airtableService.updatePost(postId, {
+        progress: 90,
+        generationStep: "FINALIZING_CAROUSEL",
+      });
       await airtableService.updatePost(postId, {
         mediaUrl: JSON.stringify(imageUrls),
         mediaProvider:
