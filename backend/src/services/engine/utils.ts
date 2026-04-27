@@ -67,7 +67,7 @@ export const resizeWithBlurFill = async (
         fit: "contain",
         background: { r: 0, g: 0, b: 0, alpha: 0 },
       })
-      .png() // 👈 CRITICAL: Must be PNG to preserve alpha for the composite step
+      .png() // Critical: must be PNG to preserve alpha for composite.
       .toBuffer();
 
     return await sharp(background)
@@ -79,7 +79,7 @@ export const resizeWithBlurFill = async (
   }
 };
 
-// ✅ HELPER: Direct Prompting (No Canvas Hacks)
+// Helper: direct prompting (no canvas hacks)
 // We rely on Gemini 3's native ability to uncrop/resize based on instructions.
 export const resizeWithGemini = async (
   originalBuffer: Buffer,
@@ -89,7 +89,7 @@ export const resizeWithGemini = async (
   apiKeys?: any,
 ): Promise<Buffer> => {
   try {
-    console.log(`✨ Gemini Direct Outpaint: Target ${targetRatioString}`);
+    console.log(`Gemini Direct Outpaint: Target ${targetRatioString}`);
 
     let instruction = "";
 
@@ -141,7 +141,7 @@ export const resizeWithGemini = async (
       apiKey: apiKeys?.falApiKey,
     });
   } catch (error: any) {
-    console.error("❌ FAL Direct Error:", error.message);
+    console.error("FAL Direct Error:", error.message);
     throw error;
   }
 };
@@ -154,34 +154,19 @@ export const resizeWithGptImage2 = async (
   apiKeys?: any,
 ): Promise<Buffer> => {
   try {
-    console.log(`✨ GPT-Image-2 Outpaint: Target ${targetRatioString}`);
+    console.log(`GPT-Image-2 Outpaint: Target ${targetRatioString}`);
 
-    let instruction = "";
+    let prompt = "";
     if (targetRatioString === "9:16" || targetRatioString === "portrait") {
-      instruction = `
-      Expand this image vertically to 9:16 while preserving the original subject and details exactly.
-      Add natural scene continuation above and below with consistent lighting and perspective.
-      `;
+      prompt = `9:16 portrait
+Add to the top and bottom of the image to make it 9:16. Do not change anything inside the original image.`;
     } else if (targetRatioString === "1:1" || targetRatioString === "square") {
-      instruction = `
-      Expand this image to a square 1:1 canvas while preserving the original subject and details exactly.
-      Extend surroundings naturally on all sides.
-      `;
+      prompt = `1:1 square
+Add to the sides of the image to make it 1:1 square. Do not change the original image.`;
     } else {
-      instruction = `
-      Expand this image horizontally to 16:9 while preserving the original subject and details exactly.
-      Add natural scene continuation on left and right with matching lighting and perspective.
-      `;
+      prompt = `16:9 landscape
+Add to the sides of the image to make it 16:9. Do not change anything inside the original image.`;
     }
-
-    const prompt = `
-    TASK: Outpaint and resize to ${targetRatioString}.
-    ${instruction}
-    STRICT:
-    - Keep the original image content intact and centered.
-    - No distortion, warping, or style changes.
-    - No text, watermark, borders, or split layouts.
-    `;
 
     return await FalService.generateOrEditImage({
       prompt,
@@ -191,7 +176,7 @@ export const resizeWithGptImage2 = async (
       apiKey: apiKeys?.falApiKey,
     });
   } catch (error: any) {
-    console.error("❌ GPT-Image-2 Outpaint Error:", error.message);
+    console.error("GPT-Image-2 Outpaint Error:", error.message);
     throw error;
   }
 };
@@ -268,7 +253,7 @@ export const uploadToCloudinary = async (
     await r2Client.send(command);
     
     const finalUrl = `${publicUrl}/${fileKey}`;
-    console.log(`✅ Uploaded ${r} to R2:`, finalUrl);
+    console.log(`Uploaded ${r} to R2:`, finalUrl);
     return finalUrl;
   } catch (error) {
     console.error("Error uploading to R2:", error);

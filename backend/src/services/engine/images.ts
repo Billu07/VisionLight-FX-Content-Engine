@@ -214,9 +214,9 @@ export const imageLogic = {
       if (model === "gpt-image-2") {
         const preserveInstruction =
           refBuffers.length > 0
-            ? "EDIT TASK: Modify INPUT 1 only. Preserve the original subject identity, composition, framing, camera angle, and key visual details unless explicitly changed by TASK. Treat INPUT 2+ as style/detail references only."
-            : "EDIT TASK: Modify INPUT 1 only. Preserve the original subject identity, composition, framing, camera angle, and key visual details unless explicitly changed by TASK.";
-        finalPrompt = `${preserveInstruction}\nTASK: ${prompt}`;
+            ? "INPUT 1 is the base image to edit. INPUT 2+ are reference images for style/details only. Modify INPUT 1 while preserving subject identity, composition, framing, camera angle, and key visual details unless TASK explicitly asks otherwise."
+            : "INPUT 1 is the base image to edit. Modify INPUT 1 while preserving subject identity, composition, framing, camera angle, and key visual details unless TASK explicitly asks otherwise.";
+        finalPrompt = `${preserveInstruction}\nTASK: ${prompt}\nSTRICT: Do not generate a brand-new unrelated scene.`;
       }
 
       const editedBuffer = await FalService.generateOrEditImage({
