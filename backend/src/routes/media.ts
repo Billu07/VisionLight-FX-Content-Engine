@@ -398,7 +398,12 @@ router.post(
           chargedCost,
         );
       }
-      res.status(500).json({ error: error.message });
+      const upstreamStatus = Number(error?.status || error?.response?.status || 0);
+      const status =
+        Number.isFinite(upstreamStatus) && upstreamStatus >= 400 && upstreamStatus < 600
+          ? upstreamStatus
+          : 500;
+      res.status(status).json({ error: error.message || "Image edit failed" });
     }
   },
 );

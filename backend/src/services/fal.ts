@@ -5,6 +5,44 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const FalService = {
+  _extractErrorStatus(error: any): number | undefined {
+    const raw =
+      error?.status ??
+      error?.response?.status ??
+      error?.cause?.status ??
+      error?.cause?.response?.status;
+    const status = Number(raw);
+    if (!Number.isFinite(status) || status < 100 || status > 599) {
+      return undefined;
+    }
+    return status;
+  },
+
+  _extractErrorDetails(error: any): string {
+    const data =
+      error?.response?.data ??
+      error?.data ??
+      error?.body ??
+      error?.cause?.response?.data ??
+      error?.cause?.data;
+
+    if (typeof data === "string" && data.trim().length > 0) {
+      return data.trim();
+    }
+    if (data && typeof data === "object") {
+      try {
+        return JSON.stringify(data);
+      } catch {
+        // fall through
+      }
+    }
+
+    if (typeof error?.message === "string" && error.message.trim().length > 0) {
+      return error.message.trim();
+    }
+    return "Unknown upstream error";
+  },
+
   _detectMimeType(buffer: Buffer): string {
     if (buffer.length >= 12) {
       // PNG signature
@@ -124,6 +162,7 @@ export const FalService = {
         input.resolution = params.imageSize || "1K";
       }
 
+      let fallbackDataUriRefs: string[] | null = null;
       if (isEdit && params.referenceImages) {
         const limitedRefs =
           selectedModel === "gpt-image-2" &&
@@ -135,6 +174,9 @@ export const FalService = {
             : params.referenceImages;
 
         if (selectedModel === "gpt-image-2") {
+          fallbackDataUriRefs = limitedRefs.map((buffer) =>
+            this._bufferToDataUri(buffer),
+          );
           try {
             // Prefer hosted references. This avoids very large base64 payloads and
             // keeps GPT edit requests stable.
@@ -145,9 +187,7 @@ export const FalService = {
             console.warn(
               `FAL reference upload failed, using data URI fallback: ${uploadError?.message || "unknown error"}`,
             );
-            input.image_urls = limitedRefs.map((buffer) =>
-              this._bufferToDataUri(buffer),
-            );
+            input.image_urls = fallbackDataUriRefs;
           }
         } else {
           input.image_urls = limitedRefs.map((buffer) =>
@@ -176,10 +216,43 @@ export const FalService = {
         console.log(`GPT Image 2 references attached: ${input.image_urls.length}`);
       }
 
-      const result: any = await fal.subscribe(endpoint, {
-        input,
-        logs: true,
-      });
+      let result: any;
+      try {
+        result = await fal.subscribe(endpoint, {
+          input,
+          logs: true,
+        });
+      } catch (firstError: any) {
+        const status = this._extractErrorStatus(firstError);
+        const usesHostedRefs =
+          selectedModel === "gpt-image-2" &&
+          Array.isArray(input.image_urls) &&
+          input.image_urls.length > 0 &&
+          typeof input.image_urls[0] === "string" &&
+          !input.image_urls[0].startsWith("data:");
+
+        if (
+          status === 422 &&
+          usesHostedRefs &&
+          isEdit &&
+          Array.isArray(fallbackDataUriRefs) &&
+          fallbackDataUriRefs.length > 0
+        ) {
+          console.warn(
+            "GPT Image 2 returned 422 with hosted references. Retrying with data URI references.",
+          );
+          const retryInput = {
+            ...input,
+            image_urls: fallbackDataUriRefs,
+          };
+          result = await fal.subscribe(endpoint, {
+            input: retryInput,
+            logs: true,
+          });
+        } else {
+          throw firstError;
+        }
+      }
 
       if (result?.data?.images?.length) {
         const imageUrl = result.data.images[0].url;
@@ -191,8 +264,14 @@ export const FalService = {
 
       throw new Error("No image data returned from FAL.");
     } catch (error: any) {
-      console.error("FAL Service Error:", error.message);
-      throw error;
+      const status = this._extractErrorStatus(error);
+      const details = this._extractErrorDetails(error);
+      console.error(
+        `FAL Service Error${status ? ` (${status})` : ""}: ${details}`,
+      );
+      const wrapped: any = new Error(details);
+      if (status) wrapped.status = status;
+      throw wrapped;
     }
   },
 
