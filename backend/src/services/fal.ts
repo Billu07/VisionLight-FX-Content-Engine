@@ -176,10 +176,12 @@ export const FalService = {
       const input: any = { prompt: params.prompt };
 
       if (selectedModel === "gpt-image-2") {
-        input.image_size = await this._resolveGptImageSize(
-          params.aspectRatio,
-          params.referenceImages,
-        );
+        input.image_size = isEdit
+          ? "auto"
+          : await this._resolveGptImageSize(
+              params.aspectRatio,
+              params.referenceImages,
+            );
         input.quality = "high";
         input.num_images = 1;
         input.output_format = "jpeg";
@@ -203,6 +205,7 @@ export const FalService = {
       }
 
       let fallbackDataUriRefs: string[] | null = null;
+      let hostedRefs: string[] | null = null;
       if (isEdit && params.referenceImages) {
         const limitedRefs =
           selectedModel === "gpt-image-2" &&
@@ -220,18 +223,9 @@ export const FalService = {
           fallbackDataUriRefs = normalizedRefs.map((buffer) =>
             this._bufferToDataUri(buffer),
           );
-          try {
-            // Prefer hosted references. This avoids very large base64 payloads and
-            // keeps GPT edit requests stable.
-            input.image_urls = await Promise.all(
-              normalizedRefs.map((buffer) => this._uploadReferenceImage(buffer)),
-            );
-          } catch (uploadError: any) {
-            console.warn(
-              `FAL reference upload failed, using data URI fallback: ${uploadError?.message || "unknown error"}`,
-            );
-            input.image_urls = fallbackDataUriRefs;
-          }
+          // Data URI first guarantees the exact local source image is attached
+          // to the edit request (important for deterministic outpaint behavior).
+          input.image_urls = fallbackDataUriRefs;
         } else {
           input.image_urls = limitedRefs.map((buffer) =>
             this._bufferToDataUri(buffer),
@@ -273,6 +267,12 @@ export const FalService = {
           input.image_urls.length > 0 &&
           typeof input.image_urls[0] === "string" &&
           !input.image_urls[0].startsWith("data:");
+        const usesDataUriRefs =
+          selectedModel === "gpt-image-2" &&
+          Array.isArray(input.image_urls) &&
+          input.image_urls.length > 0 &&
+          typeof input.image_urls[0] === "string" &&
+          input.image_urls[0].startsWith("data:");
 
         if (
           status === 422 &&
@@ -287,6 +287,33 @@ export const FalService = {
           const retryInput = {
             ...input,
             image_urls: fallbackDataUriRefs,
+          };
+          result = await fal.subscribe(endpoint, {
+            input: retryInput,
+            logs: true,
+          });
+        } else if (
+          (status === 413 || status === 422) &&
+          usesDataUriRefs &&
+          isEdit &&
+          Array.isArray(params.referenceImages) &&
+          params.referenceImages.length > 0
+        ) {
+          // Fallback for payload-size/validation issues: upload refs and retry.
+          console.warn(
+            "GPT Image 2 rejected data URI references. Retrying with hosted references.",
+          );
+          const normalizedRefs = await Promise.all(
+            params.referenceImages
+              .slice(0, GPT_IMAGE_MAX_REFS)
+              .map((buffer) => this._normalizeReferenceBuffer(buffer)),
+          );
+          hostedRefs = await Promise.all(
+            normalizedRefs.map((buffer) => this._uploadReferenceImage(buffer)),
+          );
+          const retryInput = {
+            ...input,
+            image_urls: hostedRefs,
           };
           result = await fal.subscribe(endpoint, {
             input: retryInput,
