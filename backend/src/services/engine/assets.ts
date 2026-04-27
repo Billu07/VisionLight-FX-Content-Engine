@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { dbService as airtableService, Asset } from "../database"; // Fixed import path
+import { dbService as airtableService, Asset } from "../database";
 import { processVideoAssetBackground } from "./processor";
 import {
   uploadToCloudinary,
@@ -8,8 +8,6 @@ import {
 } from "./utils";
 
 export const assetsLogic = {
-  // ✅ Upload Raw
-  // ✅ Upload Raw (Forced "original" tag)
   async uploadRawAsset(
     fileBuffer: Buffer,
     userId: string,
@@ -19,7 +17,8 @@ export const assetsLogic = {
     mimeType?: string,
   ) {
     try {
-      const isVideo = typeof mimeType === "string" && mimeType.startsWith("video/");
+      const isVideo =
+        typeof mimeType === "string" && mimeType.startsWith("video/");
       if (isVideo) {
         const videoUrl = await uploadToCloudinary(
           fileBuffer,
@@ -45,8 +44,9 @@ export const assetsLogic = {
       const width = metadata.width || 1000;
       const height = metadata.height || 1000;
 
-      // We log the ratio but we SAVE it as "original" so it goes to the correct tab, UNLESS it's a special type like 3DX_FRAME or VIDEO
-      console.log(`🚀 Uploading Raw Asset: ${width}x${height}, Requested Ratio: ${requestedRatio}`);
+      console.log(
+        `Uploading raw asset: ${width}x${height}, requested ratio: ${requestedRatio}`,
+      );
 
       const url = await uploadToCloudinary(
         fileBuffer,
@@ -56,68 +56,74 @@ export const assetsLogic = {
         "image",
       );
 
-      const finalRatio = (requestedRatio === "3DX_FRAME" || requestedRatio === "VIDEO") ? requestedRatio : "original";
+      const finalRatio =
+        requestedRatio === "3DX_FRAME" || requestedRatio === "VIDEO"
+          ? requestedRatio
+          : "original";
 
       return await airtableService.createAsset(
         userId,
         url,
-        finalRatio, // We force original so it lands in Media Pool specifically, unless it's a special system frame
+        finalRatio,
         "IMAGE",
         undefined,
         projectId,
-        fileSizeBytes
+        fileSizeBytes,
       );
     } catch (e: any) {
-      console.error("Raw Upload Failed:", e.message);
+      console.error("Raw upload failed:", e.message);
       throw e;
     }
   },
 
-  // ✅ Updated
   async processAndSaveAsset(
     fileBuffer: Buffer,
     userId: string,
     targetAspectRatio: "16:9" | "9:16" | "1:1",
-    originalAssetId?: string, // 👈 NEW PARAMETER
-    projectId?: string, // 👈 NEW PARAMETER
-    apiKeys?: any // 👈 NEW PARAMETER
+    originalAssetId?: string,
+    projectId?: string,
+    apiKeys?: any,
   ) {
     try {
+      // Normalize EXIF orientation so AR detection and GPT outpaint reference
+      // match what users see in browser previews.
+      const normalizedBuffer = await sharp(fileBuffer).rotate().toBuffer();
+
       let targetWidth = 1280;
       let targetHeight = 720;
 
-      // Determine Target Dimensions
       if (targetAspectRatio === "9:16") {
         targetWidth = 720;
         targetHeight = 1280;
       } else if (targetAspectRatio === "1:1") {
         targetWidth = 1024;
-        targetHeight = 1024; // Standard Square
+        targetHeight = 1024;
       }
 
-      const metadata = await sharp(fileBuffer).metadata();
+      const metadata = await sharp(normalizedBuffer).metadata();
       const sourceAR = (metadata.width || 1) / (metadata.height || 1);
       const targetRatioNum = targetWidth / targetHeight;
-
-      // 5% Tolerance
       const isMatch = Math.abs(sourceAR - targetRatioNum) < 0.05;
 
-      console.log(`🖼️ Asset Processing: Source AR: ${sourceAR.toFixed(2)} | Target AR: ${targetRatioNum.toFixed(2)} | Match: ${isMatch}`);
+      console.log(
+        `Asset processing AR check: source=${sourceAR.toFixed(2)} target=${targetRatioNum.toFixed(2)} match=${isMatch}`,
+      );
 
       let processedBuffer: Buffer;
       if (isMatch) {
-        console.log("📏 Ratios match (within tolerance). Performing strict resize.");
+        console.log("Asset ratios aligned; performing strict resize.");
         processedBuffer = await resizeStrict(
-          fileBuffer,
+          normalizedBuffer,
           targetWidth,
           targetHeight,
         );
       } else {
-        console.log(`✨ Ratios differ. Triggering AI Outpainting for ${targetAspectRatio}...`);
-        // Use GPT-Image-2 for outpainting. If it fails, bubble the error so
-        // credits are refunded instead of returning a blur fallback silently.
+        console.log(
+          `Asset ratio mismatch; triggering GPT outpaint for ${targetAspectRatio}.`,
+        );
+        // If GPT outpaint fails, bubble the error so route-level refund logic runs.
         processedBuffer = await resizeWithGptImage2(
-          fileBuffer,
+          normalizedBuffer,
           targetWidth,
           targetHeight,
           targetAspectRatio,
@@ -133,22 +139,20 @@ export const assetsLogic = {
         "image",
       );
 
-      // ✅ Pass originalAssetId to DB service
       return await airtableService.createAsset(
         userId,
         url,
         targetAspectRatio,
         "IMAGE",
-        originalAssetId, // 👈 Pass it here
-        projectId // 👈 Pass it here
+        originalAssetId,
+        projectId,
       );
     } catch (e: any) {
-      console.error("Asset Processing Failed:", e.message);
+      console.error("Asset processing failed:", e.message);
       throw e;
     }
   },
 
-  // ✅ Updated: Maps "Square" to DB correctly
   async copyPostMediaToAsset(postId: string, userId: string): Promise<Asset> {
     const post = await airtableService.getPostById(postId);
     if (!post || !post.mediaUrl) throw new Error("Post has no media");
@@ -158,15 +162,14 @@ export const assetsLogic = {
     try {
       const parsed = JSON.parse(post.mediaUrl);
       if (Array.isArray(parsed)) targetUrl = parsed[0];
-    } catch (e) {}
+    } catch {}
 
     const params = post.generationParams as any;
     const rawRatio = params?.aspectRatio;
     let dbAspectRatio = "16:9";
 
     if (rawRatio === "landscape" || rawRatio === "16:9") dbAspectRatio = "16:9";
-    else if (rawRatio === "portrait" || rawRatio === "9:16")
-      dbAspectRatio = "9:16";
+    else if (rawRatio === "portrait" || rawRatio === "9:16") dbAspectRatio = "9:16";
     else if (rawRatio === "square" || rawRatio === "1:1") dbAspectRatio = "1:1";
     else if (rawRatio === "original") dbAspectRatio = "original";
 
@@ -181,14 +184,15 @@ export const assetsLogic = {
       dbAspectRatio,
       type,
       undefined,
-      post.projectId || undefined
+      post.projectId || undefined,
     );
 
     if (type === "VIDEO") {
-      processVideoAssetBackground(newAsset.id, targetUrl, userId).catch(e => console.error("Processor failure", e));
+      processVideoAssetBackground(newAsset.id, targetUrl, userId).catch((e) =>
+        console.error("Processor failure", e),
+      );
     }
 
     return newAsset;
   },
 };
-
