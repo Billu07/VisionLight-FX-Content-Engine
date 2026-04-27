@@ -67,6 +67,12 @@ export function EditAssetModal({
 }: EditAssetModalProps) {
   const queryClient = useQueryClient();
   const refFileInput = useRef<HTMLInputElement>(null);
+  const editorSessionKey = useMemo(() => {
+    if (initialAsset?.id) return `visionlight_editor_session_${initialAsset.id}`;
+    if (initialVideoUrl)
+      return `visionlight_editor_session_video_${initialVideoUrl}`;
+    return "visionlight_editor_session_generic";
+  }, [initialAsset?.id, initialVideoUrl]);
   const [history, setHistory] = useState<Asset[]>(initialAsset ? [initialAsset] : []);
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentAsset = history[currentIndex];
@@ -78,6 +84,7 @@ export function EditAssetModal({
   const [jobs, setJobs] = useState<BackgroundJob[]>([]);
   const [showJobsMenu, setShowJobsMenu] = useState(false);
   const [lastJobId, setLastJobId] = useState<string | null>(null);
+  const [isMinimized, setIsMinimized] = useState(false);
 
   const triggerJobAdded = (job: BackgroundJob) => {
     const enrichedJob: BackgroundJob = {
@@ -93,9 +100,41 @@ export function EditAssetModal({
     setTimeout(() => setLastJobId(null), 2000);
   };
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(editorSessionKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        jobs?: BackgroundJob[];
+        isMinimized?: boolean;
+      };
+      if (Array.isArray(parsed.jobs) && parsed.jobs.length > 0) {
+        setJobs(parsed.jobs);
+      }
+      if (typeof parsed.isMinimized === "boolean") {
+        setIsMinimized(parsed.isMinimized);
+      }
+    } catch (e) {
+      console.warn("Failed to restore editor session:", e);
+    }
+  }, [editorSessionKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        editorSessionKey,
+        JSON.stringify({
+          jobs,
+          isMinimized,
+        }),
+      );
+    } catch (e) {
+      console.warn("Failed to persist editor session:", e);
+    }
+  }, [editorSessionKey, jobs, isMinimized]);
+
   const [isImageLoading, setIsImageLoading] = useState(false);
   const [isCropping, setIsCropping] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
   const [cropAspect, setCropAspect] = useState<number | undefined>(undefined);
@@ -728,6 +767,7 @@ export function EditAssetModal({
       setIsMinimized(true);
       return;
     }
+    localStorage.removeItem(editorSessionKey);
     onClose();
   };
 
@@ -738,6 +778,7 @@ export function EditAssetModal({
     ) {
       return;
     }
+    localStorage.removeItem(editorSessionKey);
     onClose();
   };
 
@@ -1690,4 +1731,3 @@ export function EditAssetModal({
     </div>
   );
 }
-
