@@ -176,12 +176,10 @@ export const FalService = {
       const input: any = { prompt: params.prompt };
 
       if (selectedModel === "gpt-image-2") {
-        input.image_size = isEdit
-          ? "auto"
-          : await this._resolveGptImageSize(
-              params.aspectRatio,
-              params.referenceImages,
-            );
+        input.image_size = await this._resolveGptImageSize(
+          params.aspectRatio,
+          params.referenceImages,
+        );
         input.quality = "high";
         input.num_images = 1;
         input.output_format = "jpeg";
