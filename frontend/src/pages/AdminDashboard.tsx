@@ -503,7 +503,7 @@ export default function AdminDashboard() {
               VISIONLIGHT <span className="text-brand-accent">ADMIN</span>
             </h1>
             <p className="text-[11px] text-gray-400 uppercase tracking-widest font-semibold">
-              Systems Control â€” Operator: {adminUser?.email}
+              Systems Control - Operator: {adminUser?.email}
             </p>
           </div>
 
@@ -584,7 +584,7 @@ export default function AdminDashboard() {
                     onClick={() => setSearchTerm("")}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
                   >
-                    Ã—
+                    ×
                   </button>
                 )}
               </div>
@@ -605,7 +605,7 @@ export default function AdminDashboard() {
               onClick={() => setMsg("")}
               className="text-brand-accent hover:text-cyan-300 text-lg"
             >
-              Ã—
+              ×
             </button>
           </div>
         )}
@@ -1088,7 +1088,7 @@ export default function AdminDashboard() {
                 onClick={() => setEditingUser(null)}
                 className="absolute top-8 right-8 text-gray-500 hover:text-white transition-colors text-xl font-bold"
               >
-                Ã—
+                ×
               </button>
 
               <div className="mb-10 pb-6 border-b border-gray-800">
@@ -1382,7 +1382,7 @@ export default function AdminDashboard() {
                 onClick={() => setShowInviteModal(false)}
                 className="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors text-xl font-bold"
               >
-                Ã—
+                ×
               </button>
               <h3 className="text-lg font-bold text-white mb-8 uppercase tracking-widest">
                 User Provisioning
@@ -1501,7 +1501,7 @@ export default function AdminDashboard() {
                 onClick={() => setShowOrgModal(false)}
                 className="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors text-xl font-bold"
               >
-                Ã—
+                ×
               </button>
               <h3 className="text-lg font-bold text-white mb-8 uppercase tracking-widest">
                 Register New Tenant

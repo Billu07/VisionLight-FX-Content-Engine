@@ -4,7 +4,7 @@ import type { AxiosProgressEvent } from "axios";
 const RAW_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const API_BASE_URL = RAW_URL.replace(/\/api\/?$/, "").replace(/\/$/, "");
 
-console.log("🔧 API Base URL:", API_BASE_URL);
+console.log("API Base URL:", API_BASE_URL);
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -112,7 +112,7 @@ export const apiEndpoints = {
       headers: { "Content-Type": "multipart/form-data" },
     }),
 
-  // ✅ Sync Upload
+  // Sync upload
   uploadAssetSync: (
     formData: FormData,
     options?: { onUploadProgress?: (progressEvent: AxiosProgressEvent) => void },
@@ -120,9 +120,10 @@ export const apiEndpoints = {
     api.post("/api/assets/upload-sync", formData, {
       headers: { "Content-Type": "multipart/form-data" },
       onUploadProgress: options?.onUploadProgress,
+      timeout: 600000,
     }),
 
-  // ✅ Video Export
+  // Video export
   exportVideo: (data: { editorState: any; projectId?: string; fps?: number }) =>
     api.post("/api/export/video", data),
   // === Asset Library ===
@@ -132,7 +133,7 @@ export const apiEndpoints = {
 
   deleteAsset: (id: string) => api.delete(`/api/assets/${id}`),
 
-  // ✅ Download Multiple Assets as ZIP
+  // Download multiple assets as ZIP
   downloadZip: (data: { assetUrls: string[]; filename?: string }) =>
     api.post("/api/assets/download-zip", data, { responseType: "blob" }),
 
@@ -166,10 +167,10 @@ export const apiEndpoints = {
     type: "IMAGE" | "VIDEO";
     projectId?: string;
   }) => api.post("/api/assets/save-url", data),
-  // ✅ UPDATED: Edit Asset supports 'mode'
+  // Updated: edit asset supports "mode"
   editAsset: (data: {
     assetId: string;
-    originalAssetId?: string; // 👈 Added this
+    originalAssetId?: string; // Added this
     assetUrl: string;
     prompt: string;
     aspectRatio: string;
@@ -177,9 +178,9 @@ export const apiEndpoints = {
     referenceUrls?: string[];
     mode?: "standard" | "pro";
     model?: "nano-banana-2" | "gpt-image-2";
-  }) => api.post("/api/assets/edit", data),
+  }) => api.post("/api/assets/edit", data, { timeout: 600000 }),
 
-  // ✅ NEW: Drift Asset (FAL Flux)
+  // New: Drift asset (FAL Flux)
   driftAsset: (data: {
     assetUrl: string;
     prompt?: string;

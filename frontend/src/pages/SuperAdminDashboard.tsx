@@ -552,7 +552,7 @@ export default function SuperAdminDashboard() {
               Platform <span className="text-brand-accent">Control</span>
             </h1>
             <p className="text-[11px] text-gray-400 uppercase tracking-widest font-semibold">
-              Super Admin Interface â€” {adminUser?.email}
+              Super Admin Interface - {adminUser?.email}
             </p>
           </div>
 
@@ -589,7 +589,7 @@ export default function SuperAdminDashboard() {
         {msg && (
           <div className="mb-8 p-4 rounded-lg bg-brand-accent/10 border border-brand-accent/20 text-brand-accent text-sm font-semibold flex justify-between items-center">
             {msg}
-            <button onClick={() => setMsg("")} className="text-lg">Ã—</button>
+            <button onClick={() => setMsg("")} className="text-lg">×</button>
           </div>
         )}
 
@@ -1208,7 +1208,7 @@ export default function SuperAdminDashboard() {
                 <h3 className="text-xl font-bold text-white uppercase tracking-tight">Configure Tenant</h3>
                 <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">{editingTenant.name}</p>
               </div>
-              <button onClick={() => setEditingTenant(null)} className="text-gray-500 hover:text-white font-bold text-xl">Ã—</button>
+              <button onClick={() => setEditingTenant(null)} className="text-gray-500 hover:text-white font-bold text-xl">×</button>
             </div>
             <div className="p-8 space-y-6">
               <div className="space-y-2">
@@ -1395,7 +1395,7 @@ export default function SuperAdminDashboard() {
                 </h3>
                 <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Appears for every user</p>
               </div>
-              <button onClick={() => setShowPresetModal(false)} className="text-gray-500 hover:text-white font-bold text-xl">Ã—</button>
+              <button onClick={() => setShowPresetModal(false)} className="text-gray-500 hover:text-white font-bold text-xl">×</button>
             </div>
             <form onSubmit={handleSavePreset} className="p-8 space-y-6">
               <div className="space-y-2">

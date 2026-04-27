@@ -284,7 +284,7 @@ export function AssetLibrary({
       }));
   }, [timelinePosts]);
 
-  // ✅ REFINED FILTER LOGIC
+  // Refined filter logic
   let filteredAssets = Array.isArray(assets)
     ? assets.filter((a: Asset) => {
       if (activeTab === "STORYBOARD") return false; // Handled below
@@ -422,6 +422,7 @@ export function AssetLibrary({
       );
       let uploadedBytes = 0;
       const uploadedAssets: any[] = [];
+      const processingTasks: Promise<unknown>[] = [];
 
       for (const file of selectedFiles) {
         const isVideo = file.type.startsWith("video/");
@@ -484,12 +485,30 @@ export function AssetLibrary({
           processFormData.append("aspectRatio", activeTab);
           processFormData.append("originalAssetId", originalAsset.id);
           if (activeProject) processFormData.append("projectId", activeProject);
-          await apiEndpoints.uploadAssetSync(processFormData);
+          const processTask = apiEndpoints
+            .uploadAssetSync(processFormData)
+            .catch((err: any) => {
+              console.error("Auto processing failed:", err);
+              const reason =
+                typeof err?.message === "string" && err.message.trim().length > 0
+                  ? err.message
+                  : "Unknown error";
+              notify.error(`Auto processing failed for "${file.name}": ${reason}`);
+            });
+          processingTasks.push(processTask);
         }
         uploadedAssets.push(originalAsset);
       }
 
       setUploadProgressPercent(100);
+      if (processingTasks.length > 0) {
+        void Promise.allSettled(processingTasks).then(() => {
+          queryClient.invalidateQueries({ queryKey: ["assets"] });
+          setPollingUntil(0);
+          setProcessingCount(0);
+          setTargetAssetCount(0);
+        });
+      }
       return uploadedAssets;
     },
     onMutate: (files) => {
@@ -647,7 +666,7 @@ export function AssetLibrary({
         <div className="p-4 sm:p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900 z-10 shrink-0">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-              📚 Asset Library
+              Asset Library
             </h2>
             <p className="text-[10px] sm:text-sm text-gray-400">
               Manage your assets
@@ -658,7 +677,7 @@ export function AssetLibrary({
             className="text-gray-400 hover:text-red-500 text-xl p-2 transition-colors"
             title="Close"
           >
-            ✕
+            ×
           </button>
         </div>
 
@@ -826,7 +845,7 @@ export function AssetLibrary({
               {filteredAssets.length === 0 && pollingUntil === 0 ? (
                 <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-500 opacity-60">
                   <span className="text-6xl mb-4">
-                    {activeTab === "VIDEO" || activeTab === "TIMELINE" ? "🎬" : "🖼️"}
+                    {activeTab === "VIDEO" || activeTab === "TIMELINE" ? "Video" : "Image"}
                   </span>
                   <p>
                     No{" "}
@@ -935,7 +954,7 @@ export function AssetLibrary({
 
                     {activeDriftIds.has(asset.id) && (
                       <div className="absolute top-2 right-2 bg-rose-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg z-10 animate-pulse">
-                        🌀 Drift Ready
+                        Drift Ready
                       </div>
                     )}
                   </div>
@@ -995,7 +1014,7 @@ export function AssetLibrary({
                       }`}
                     title="Go to Original (v1)"
                   >
-                    ↩️
+                    ←
                   </button>
                   <span className="bg-black/50 text-white px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-mono backdrop-blur-md flex items-center border border-white/10 select-none">
                     {selectedAsset.originalAssetId ? "v2" : "v1"}
@@ -1013,7 +1032,7 @@ export function AssetLibrary({
                       }`}
                     title="Go to Processed (v2)"
                   >
-                    ↪️
+                    →
                   </button>
                 </div>
 
@@ -1050,7 +1069,7 @@ export function AssetLibrary({
                   onClick={() => setSelectedAsset(null)}
                   className="absolute top-4 left-4 bg-black/50 text-white p-2 rounded-full hover:bg-white/20 z-10"
                 >
-                  ✕
+                  ×
                 </button>
               </div>
             </div>
@@ -1100,8 +1119,8 @@ export function AssetLibrary({
                       }`}
                   >
                     {storyboardIds.includes(selectedAsset.id)
-                      ? "➖ Remove From Storyboard"
-                      : "➕ Add to Storyboard"}
+                      ? "Remove From Storyboard"
+                      : "Add to Storyboard"}
                   </button>
 
                   {onSelect && (
@@ -1125,7 +1144,7 @@ export function AssetLibrary({
                   >
                     <span>
                       {activeDriftIds.has(selectedAsset.id)
-                        ? "🌀 Resume Drift"
+                        ? "Resume Drift"
                         : "Edit"}
                     </span>
                   </button>
@@ -1168,7 +1187,7 @@ export function AssetLibrary({
               onClick={() => setViewingVideoAsset(null)}
               className="absolute top-4 right-4 text-gray-400 hover:text-white z-10"
             >
-              ✕
+              ×
             </button>
             <div className="w-full flex justify-between items-center mb-4 pr-6 shrink-0">
               <img src="/drift_icon.png" alt="Drift" className="w-16 h-16 sm:w-24 sm:h-24 object-contain" />
@@ -1229,5 +1248,6 @@ export function AssetLibrary({
     </div>
   );
 }
+
 
 

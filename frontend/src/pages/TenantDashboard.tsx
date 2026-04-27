@@ -320,7 +320,7 @@ export default function TenantDashboard() {
 
             </div>
             <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">
-              {adminUser?.organizationName || "Your Organization"} â€” Admin Panel
+              {adminUser?.organizationName || "Your Organization"} - Admin Panel
             </p>
           </div>
 
@@ -360,7 +360,7 @@ export default function TenantDashboard() {
         {msg && (
           <div className="mb-8 p-4 rounded-lg bg-brand-accent/5 border border-brand-accent/20 text-brand-accent text-[10px] font-bold uppercase tracking-widest flex justify-between items-center">
             {msg}
-            <button onClick={() => setMsg("")} className="text-lg">Ã—</button>
+            <button onClick={() => setMsg("")} className="text-lg">×</button>
           </div>
         )}
 

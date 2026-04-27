@@ -96,12 +96,12 @@ function Dashboard() {
   );
 
   // Video FX 1 / PicDrift Engine
-  // âœ… UPDATED DEFAULT: 10s (Matches PicDrift Standard)
+  // Updated default: 10s (matches PicDrift standard)
   const [kieDuration, setKieDuration] = useState<5 | 10 | 15>(10);
-  // âœ… UPDATED DEFAULT: 1080p
+  // Updated default: 1080p
   const [kieResolution] = useState<"720p" | "1080p">("1080p");
 
-  // âœ… UPDATED DEFAULT: Portrait
+  // Updated default: Portrait
   const [kieAspect, setKieAspect] = useState<
     "landscape" | "portrait" | "square"
   >("portrait");
@@ -152,7 +152,7 @@ function Dashboard() {
 
   // Video FX 2 Engine
   const [videoDuration, setVideoDuration] = useState<number>(12);
-  // âœ… UPDATED DEFAULT: Pro Model
+  // Updated default: Pro model
   const videoModel = "seedance-fal-2.0" as const;
   const [videoFx2Mode, setVideoFx2Mode] = useState<
     "text" | "frames" | "references"
@@ -482,11 +482,11 @@ function Dashboard() {
     enabled: !!user,
   });
 
-  // âœ… 2. CORE LOGIC & PERMISSIONS
+  // 2. Core logic and permissions
   const isCommercial = user?.creditSystem !== "INTERNAL";
   const isAdmin = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
 
-  // âœ… 3. VIRTUAL SUM (Fixes Timeline Build Errors)
+  // 3. Virtual sum (fixes timeline build errors)
   const userCredits =
     (credits?.creditsPicDrift || 0) +
     (credits?.creditsImageFX || 0) +
@@ -494,7 +494,7 @@ function Dashboard() {
     (credits?.creditsVideoFX2 || 0) +
     (credits?.creditsVideoFX3 || 0);
 
-  // âœ… 4. UI HELPERS
+  // 4. UI helpers
   const formatBal = (val: number) => {
     if (user?.view === "PICDRIFT") return `${Math.floor(val)}`;
     return isCommercial ? `$${val.toFixed(2)}` : `${val}`;
@@ -505,7 +505,7 @@ function Dashboard() {
     : "https://picdrift.com/renders";
   const creditBtnText = isCommercial ? "Buy Credit" : "Request Render";
 
-  // âœ… 5. BACKGROUND JOB POLLING
+  // 5. Background job polling
   useQuery({
     queryKey: ["check-jobs"],
     queryFn: async () => {
@@ -675,7 +675,7 @@ function Dashboard() {
     if (!(await confirmAction("Save this content to your Asset Library?", { confirmLabel: "Save" }))) return;
     try {
       await apiEndpoints.movePostToAsset(postId);
-      alert("âœ… Saved! Check your Asset Library.");
+      alert("Saved! Check your Asset Library.");
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     } catch (e: any) {
       alert("Failed to save: " + e.message);
@@ -1084,7 +1084,7 @@ function Dashboard() {
       }
     }
 
-    // 2. âœ… NEW: Auto-Update Aspect Ratio based on Selection
+    // 2. New: auto-update aspect ratio based on selection
     if (ratio && ratio !== "original") {
       console.log(`Auto-setting ratio to: ${ratio}`);
 
@@ -1260,7 +1260,9 @@ function Dashboard() {
 
     let maxFiles = 1;
     if (activeEngine === "studio") {
-      maxFiles = studioMode === "carousel" ? 14 : MAX_PICFX_REFERENCE_IMAGES;
+      const isGptCarousel =
+        studioMode === "carousel" && picFxModel === "gpt-image-2";
+      maxFiles = isGptCarousel ? MAX_PICFX_REFERENCE_IMAGES : studioMode === "carousel" ? 14 : MAX_PICFX_REFERENCE_IMAGES;
     }
     if (activeEngine === "veo") {
       maxFiles =
@@ -1272,7 +1274,7 @@ function Dashboard() {
     }
 
     if (newFiles.length + referenceImages.length > maxFiles) {
-      alert(`âŒ Only ${maxFiles} file(s) allowed for this mode.`);
+      alert(`Only ${maxFiles} file(s) allowed for this mode.`);
       return;
     }
     setReferenceImages((prev) => [...prev, ...newFiles]);
@@ -1315,7 +1317,7 @@ function Dashboard() {
     e.target.value = "";
   };
 
-  // âœ… NEW: Add to Sequence Logic
+  // New: add to sequence logic
   const handleAddToSequence = (post: any) => {
     let url = post.mediaUrl;
     if (url && url.startsWith("[") && url.includes("]")) {
@@ -1916,7 +1918,7 @@ function Dashboard() {
     );
   if (!user) return null;
 
-  // âœ… HELPER: Get currently selected aspect ratio string for context-aware library
+  // Helper: get currently selected aspect ratio string for context-aware library
   const getCurrentRatioForLibrary = () => {
     if (activeEngine === "kie") {
       return kieAspect;
@@ -1926,7 +1928,7 @@ function Dashboard() {
     return undefined;
   };
 
-  // âœ… HELPER: Header Logic
+  // Helper: header logic
   const getHeaderContent = () => {
     if (currentVisualTab === "3dx")
       return { logo: "/drift_icon.png", text: "Drift Path Generation" };
@@ -2008,7 +2010,7 @@ function Dashboard() {
           />
         )}
 
-        {/* âœ… FULLSCREEN SEQUENCE EDITOR */}
+        {/* Fullscreen sequence editor */}
         {canUseVideoEditor && viewMode === "sequencer" && (
           <FullscreenVideoEditor
             projectId={localStorage.getItem("visionlight_active_project") || undefined}
@@ -2159,7 +2161,7 @@ function Dashboard() {
                 }}
                 className="absolute top-6 right-6 bg-white/10 hover:bg-white/20 text-white w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md border border-white/10 transition-colors z-[80]"
               >
-                âœ•
+                ×
               </button>
             </div>
           </div>
@@ -2188,7 +2190,7 @@ function Dashboard() {
         {showNoCreditsModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
             <div className="bg-gray-800 rounded-2xl border border-red-500/30 shadow-2xl max-w-sm w-full p-6 text-center">
-              <div className="text-4xl mb-3">ðŸ’Ž</div>
+              <div className="text-4xl mb-3">!</div>
               <h3 className="text-xl font-bold text-white mb-2">
                 Insufficient Credits
               </h3>
@@ -2263,12 +2265,12 @@ function Dashboard() {
           <WelcomeTour onClose={() => setShowWelcomeTour(false)} />
         )}
 
-        {/* ðŸš¨ ACTIVATION OVERLAY (FOR INACTIVE TENANTS) */}
+        {/* Activation overlay (for inactive tenants) */}
         {user?.needsActivation && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-gray-950/90 backdrop-blur-xl p-4">
             <div className="bg-gray-900 border border-white/10 rounded-[2.5rem] p-8 sm:p-12 max-w-xl w-full shadow-[0_0_50px_rgba(0,0,0,0.5)] text-center animate-in zoom-in-95 duration-300">
               <div className="w-24 h-24 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-8 border border-rose-500/20">
-                <span className="text-5xl animate-pulse">âš¡</span>
+                <span className="text-5xl animate-pulse">!</span>
               </div>
               <h2 className="text-3xl font-black text-white mb-4 uppercase tracking-[0.2em]">
                 Platform Inactive
@@ -2473,7 +2475,7 @@ function Dashboard() {
                         className="absolute top-2 right-2 w-7 h-7 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center"
                         aria-label="Close menu"
                       >
-                        Ã—
+                        ×
                       </button>
                       <div className="px-4 py-2 border-b border-gray-800/80 mb-2">
                         <div className="text-xs text-gray-400 uppercase tracking-widest font-bold">Options</div>
@@ -2486,7 +2488,7 @@ function Dashboard() {
                         }}
                         className="w-full text-left px-4 py-2 text-yellow-400 hover:bg-yellow-500/10 text-sm font-medium transition-colors flex items-center gap-2"
                       >
-                        <span>ðŸ’³</span>
+                        <span>Balance</span>
                         <span>Render Reserve</span>
                       </button>
 
@@ -2521,7 +2523,7 @@ function Dashboard() {
                           disabled={isRequesting}
                           className="w-full text-left px-4 py-2 text-purple-400 hover:bg-purple-500/10 text-sm font-medium transition-colors"
                         >
-                          {isRequesting ? "Sending..." : "Request Renders ðŸ””"}
+                          {isRequesting ? "Sending..." : "Request Renders"}
                         </button>
                       )}
 
@@ -2566,7 +2568,7 @@ function Dashboard() {
           <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
             <div className={`flex-1 ${(viewMode !== "create" && isMobile) ? 'hidden' : 'block'}`}>
               <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 lg:p-8 shadow-2xl">
-                {/* âœ… UPDATED HEADER: Logo Left, Library Button Right */}
+                {/* Updated header: logo left, library button right */}
                 <div className="mb-6 sm:mb-8 flex justify-between items-start">
                   <div className="hidden sm:block">
                     <div className="flex items-center gap-3 mb-2">
@@ -2583,7 +2585,7 @@ function Dashboard() {
                     </p>
                   </div>
 
-                  {/* âœ… GLOBAL HEADER BUTTONS (HIDDEN ON MOBILE) */}
+                  {/* Global header buttons (hidden on mobile) */}
                   <div className="hidden sm:flex gap-3 ml-auto">
                     {canUseVideoEditor && (
                       <button
@@ -2753,7 +2755,7 @@ function Dashboard() {
                             rel="noreferrer"
                             className="flex flex-col items-center bg-gray-900/80 backdrop-blur-md border border-cyan-500/50 p-8 rounded-3xl shadow-[0_0_30px_rgba(6,182,212,0.2)] hover:border-cyan-400 hover:shadow-[0_0_40px_rgba(6,182,212,0.4)] hover:scale-105 transition-all duration-300 cursor-pointer"
                           >
-                            <span className="text-5xl mb-4">ðŸ”’</span>
+                            <span className="text-5xl mb-4">!</span>
                             <h3 className="text-2xl font-bold text-white mb-2">Video FX is Locked</h3>
                             <p className="text-cyan-300 font-medium">Click here to upgrade & unlock</p>
                           </a>
@@ -2923,7 +2925,7 @@ function Dashboard() {
                               </div>
                               <label className="block w-full max-w-sm mx-auto cursor-pointer group">
                                 <div className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl text-white font-bold group-hover:shadow-lg group-hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
-                                  <span>ðŸ“¤ Upload to Start</span>
+                                  <span>Upload to Start</span>
                                 </div>
                                 <input
                                   type="file"
@@ -2973,7 +2975,7 @@ function Dashboard() {
                                             }
                                             className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
                                           >
-                                            âœ•
+                                            ×
                                           </button>
                                         </>
                                       ) : (
@@ -3037,7 +3039,7 @@ function Dashboard() {
                                             }
                                             className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
                                           >
-                                            âœ•
+                                            ×
                                           </button>
                                         </>
                                       ) : (
@@ -3117,7 +3119,7 @@ function Dashboard() {
                                             onClick={() => setShowPromptFxMenu(false)}
                                             className="text-[10px] text-gray-400 hover:text-white hover:bg-gray-700 px-2 py-1 rounded transition-colors"
                                           >
-                                            âœ•
+                                            ×
                                           </button>
                                         </div>
                                       </div>
@@ -3215,7 +3217,7 @@ function Dashboard() {
                                                   className="w-7 h-7 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded flex items-center justify-center text-xs"
                                                   title="Edit"
                                                 >
-                                                  âœŽ
+                                                  Edit
                                                 </button>
                                                 <button
                                                   type="button"
@@ -3228,7 +3230,7 @@ function Dashboard() {
                                                   className="w-7 h-7 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded flex items-center justify-center text-xs"
                                                   title="Delete"
                                                 >
-                                                  âœ•
+                                                  ×
                                                 </button>
                                               </div>
                                             </div>
@@ -3249,7 +3251,7 @@ function Dashboard() {
                               </div>
 
                               <div>
-                                {/* âœ… FLEX CONTAINER FOR LABEL + BUTTON */}
+                                {/* Flex container for label + button */}
                                 <div className="flex justify-between items-center mb-2">
                                   <label className="block text-sm font-semibold text-white">
                                     Title
@@ -3296,7 +3298,7 @@ function Dashboard() {
                                         Aspect Ratio
                                       </label>
                                       <div className="flex gap-2">
-                                        {/* âœ… ADDED SQUARE OPTION HERE */}
+                                        {/* Added square option here */}
                                         {[
                                           { id: "landscape", label: "Landscape" },
                                           { id: "portrait", label: "Portrait" },
@@ -4241,7 +4243,9 @@ function Dashboard() {
                                         <p className="absolute bottom-2 text-[10px] text-gray-600">
                                           {activeEngine === "studio" &&
                                             studioMode === "carousel"
-                                            ? "Up to 14 images"
+                                            ? picFxModel === "gpt-image-2"
+                                              ? `Up to ${MAX_PICFX_REFERENCE_IMAGES} images (GPT 2)`
+                                              : "Up to 14 images"
                                             : activeEngine === "studio"
                                               ? `Up to ${MAX_PICFX_REFERENCE_IMAGES} reference images`
                                               : activeEngine === "topaz"
@@ -4284,7 +4288,7 @@ function Dashboard() {
                                                 }
                                                 className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs"
                                               >
-                                                âœ•
+                                                ×
                                               </button>
                                             </div>
                                           ))}
@@ -4295,7 +4299,7 @@ function Dashboard() {
                                 </div>
                               ) : null}
 
-                              {/* âœ… UPDATED GENERATE BUTTON */}
+                              {/* Updated generate button */}
                               <button
                                 type="submit"
                                 disabled={

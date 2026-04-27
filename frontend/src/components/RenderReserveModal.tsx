@@ -121,44 +121,44 @@ export function RenderReserveModal({
 
   const videoEngines: ReserveItem[] = [
     {
-      label: "Topaz Upscale Â· 2x",
+      label: "Topaz Upscale · 2x",
       key: "priceVideoFX1_10s",
       wallet: "Topaz Upscale",
       note: "Current UI default: 1080p.",
     },
     {
-      label: "Topaz Upscale Â· 4x",
+      label: "Topaz Upscale · 4x",
       key: "priceVideoFX1_15s",
       wallet: "Topaz Upscale",
     },
     {
-      label: "Seedance 2.0 FAL Â· 4s",
+      label: "Seedance 2.0 FAL · 4s",
       key: "priceVideoFX2_4s",
       wallet: "Seedance 2.0 FAL",
       note: "Resolution support in UI: 480p, 720p.",
     },
     {
-      label: "Seedance 2.0 FAL Â· 8s",
+      label: "Seedance 2.0 FAL · 8s",
       key: "priceVideoFX2_8s",
       wallet: "Seedance 2.0 FAL",
     },
     {
-      label: "Seedance 2.0 FAL Â· 12s",
+      label: "Seedance 2.0 FAL · 12s",
       key: "priceVideoFX2_12s",
       wallet: "Seedance 2.0 FAL",
     },
     {
-      label: "Video FX 3 Â· 4s",
+      label: "Video FX 3 · 4s",
       key: "priceVideoFX3_4s",
       wallet: "Video FX 3",
     },
     {
-      label: "Video FX 3 Â· 6s",
+      label: "Video FX 3 · 6s",
       key: "priceVideoFX3_6s",
       wallet: "Video FX 3",
     },
     {
-      label: "Video FX 3 Â· 8s",
+      label: "Video FX 3 · 8s",
       key: "priceVideoFX3_8s",
       wallet: "Video FX 3",
     },
