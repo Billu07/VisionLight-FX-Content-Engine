@@ -203,7 +203,6 @@ export const FalService = {
       }
 
       let fallbackDataUriRefs: string[] | null = null;
-      let hostedRefs: string[] | null = null;
       if (isEdit && params.referenceImages) {
         const limitedRefs =
           selectedModel === "gpt-image-2" &&
@@ -221,9 +220,17 @@ export const FalService = {
           fallbackDataUriRefs = normalizedRefs.map((buffer) =>
             this._bufferToDataUri(buffer),
           );
-          // Data URI first guarantees the exact local source image is attached
-          // to the edit request (important for deterministic outpaint behavior).
-          input.image_urls = fallbackDataUriRefs;
+          try {
+            // Hosted refs are typically more stable for GPT edit requests on Fal.
+            input.image_urls = await Promise.all(
+              normalizedRefs.map((buffer) => this._uploadReferenceImage(buffer)),
+            );
+          } catch (uploadError: any) {
+            console.warn(
+              `FAL reference upload failed, using data URI fallback: ${uploadError?.message || "unknown error"}`,
+            );
+            input.image_urls = fallbackDataUriRefs;
+          }
         } else {
           input.image_urls = limitedRefs.map((buffer) =>
             this._bufferToDataUri(buffer),
@@ -306,7 +313,7 @@ export const FalService = {
               .slice(0, GPT_IMAGE_MAX_REFS)
               .map((buffer) => this._normalizeReferenceBuffer(buffer)),
           );
-          hostedRefs = await Promise.all(
+          const hostedRefs = await Promise.all(
             normalizedRefs.map((buffer) => this._uploadReferenceImage(buffer)),
           );
           const retryInput = {
