@@ -29,6 +29,7 @@ export const FalService = {
   }): Promise<Buffer> {
     this._configureClient(params.apiKey);
     try {
+      const GPT_IMAGE_MAX_REFS = 5;
       const selectedModel = params.model || "nano-banana-2";
       const isEdit = params.referenceImages && params.referenceImages.length > 0;
       const endpoint =
@@ -48,6 +49,7 @@ export const FalService = {
 
       if (selectedModel === "gpt-image-2") {
         const ratioToSize = (ratio?: string) => {
+          if (ratio === "auto" || ratio === "original") return "auto";
           if (ratio === "1:1" || ratio === "square") return "square_hd";
           if (ratio === "9:16" || ratio === "portrait") return "portrait_16_9";
           return "landscape_16_9";
@@ -77,9 +79,14 @@ export const FalService = {
       }
 
       if (isEdit && params.referenceImages) {
-        input.image_urls = params.referenceImages.map(
+        let imageUrls = params.referenceImages.map(
           (buf) => `data:image/jpeg;base64,${buf.toString("base64")}`
         );
+        if (selectedModel === "gpt-image-2" && imageUrls.length > GPT_IMAGE_MAX_REFS) {
+          // Keep source image as the first anchor and retain the most recent refs.
+          imageUrls = [imageUrls[0], ...imageUrls.slice(-(GPT_IMAGE_MAX_REFS - 1))];
+        }
+        input.image_urls = imageUrls;
       }
 
       console.log("📤 FAL Request Input (Keys Omitted):", { ...input, image_urls: input.image_urls ? `[${input.image_urls.length} images]` : undefined });

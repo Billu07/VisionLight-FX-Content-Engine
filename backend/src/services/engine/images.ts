@@ -173,19 +173,25 @@ export const imageLogic = {
       let targetSize: "1K" | "2K" | "4K" = "1K";
 
       if (aspectRatio === "original") {
-        const metadata = await sharp(buffer).metadata();
-        if (metadata.width && metadata.height) {
-          targetConfigRatio = getClosestAspectRatio(
-            metadata.width,
-            metadata.height,
-          ) as any;
-          const maxDim = Math.max(metadata.width, metadata.height);
-          if (maxDim > 2500) targetSize = "4K";
-          else if (maxDim > 1500) targetSize = "2K";
-          else targetSize = "1K";
-        } else {
-          targetConfigRatio = "16:9";
+        if (model === "gpt-image-2") {
+          // Keep GPT-2 edits anchored to INPUT 1 native canvas.
+          targetConfigRatio = "original";
           targetSize = "2K";
+        } else {
+          const metadata = await sharp(buffer).metadata();
+          if (metadata.width && metadata.height) {
+            targetConfigRatio = getClosestAspectRatio(
+              metadata.width,
+              metadata.height,
+            ) as any;
+            const maxDim = Math.max(metadata.width, metadata.height);
+            if (maxDim > 2500) targetSize = "4K";
+            else if (maxDim > 1500) targetSize = "2K";
+            else targetSize = "1K";
+          } else {
+            targetConfigRatio = "16:9";
+            targetSize = "2K";
+          }
         }
       } else {
         targetSize = "2K";
@@ -203,6 +209,14 @@ export const imageLogic = {
               ? `TASK: ${prompt}\nINPUT 2 is a reference image. Maintain the identity of INPUT 1.`
               : `TASK: ${prompt}\nINPUT 2-${refBuffers.length + 1} are reference images. Use them for style, composition, and detail guidance while preserving the identity of INPUT 1.`;
         }
+      }
+
+      if (model === "gpt-image-2") {
+        const preserveInstruction =
+          refBuffers.length > 0
+            ? "EDIT TASK: Modify INPUT 1 only. Preserve the original subject identity, composition, framing, camera angle, and key visual details unless explicitly changed by TASK. Treat INPUT 2+ as style/detail references only."
+            : "EDIT TASK: Modify INPUT 1 only. Preserve the original subject identity, composition, framing, camera angle, and key visual details unless explicitly changed by TASK.";
+        finalPrompt = `${preserveInstruction}\nTASK: ${prompt}`;
       }
 
       const editedBuffer = await FalService.generateOrEditImage({

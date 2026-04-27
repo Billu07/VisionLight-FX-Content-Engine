@@ -92,7 +92,7 @@ function Dashboard() {
   const [activeEngine, setActiveEngine] = useState<EngineType>("kie");
   const [studioMode, setStudioMode] = useState<StudioMode>("image");
   const [picFxModel, setPicFxModel] = useState<"nano-banana-2" | "gpt-image-2">(
-    "gpt-image-2",
+    "nano-banana-2",
   );
 
   // Video FX 1 / PicDrift Engine
@@ -1731,6 +1731,7 @@ function Dashboard() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const isPromptRequired = activeEngine !== "topaz";
     if (currentVisualTab === "3dx") {
       if (!referenceImageUrls.length) {
         alert("Please select a reference image for 3DX Path extraction.");
@@ -1838,7 +1839,7 @@ function Dashboard() {
       }
     }
 
-    if (!prompt.trim()) return;
+    if (isPromptRequired && !prompt.trim()) return;
 
     const toRequiredInt = (value: any, fallback = 1) => {
       const n = Number(value);
@@ -3095,7 +3096,7 @@ function Dashboard() {
                                         : "bg-cyan-900/40 border-cyan-500/50 text-cyan-300 hover:bg-cyan-800/60"
                                       }`}
                                   >
-                                    âœ¨ PromptFX
+                                    PromptFX
                                   </button>
 
                                   {/* PromptFX Popover Menu */}
@@ -4298,7 +4299,10 @@ function Dashboard() {
                               <button
                                 type="submit"
                                 disabled={
-                                  (currentVisualTab === "3dx" ? driftStartMutation.isPending : generateMediaMutation.isPending) || !prompt.trim()
+                                  (currentVisualTab === "3dx"
+                                    ? driftStartMutation.isPending
+                                    : generateMediaMutation.isPending) ||
+                                  (activeEngine !== "topaz" && !prompt.trim())
                                 }
                                 className={`w-full py-4 sm:py-5 px-6 sm:px-8 rounded-2xl transition-all disabled:opacity-50 font-bold text-base sm:text-lg flex flex-col items-center justify-center gap-1 ${activeEngine === "veo"
                                   ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg"
@@ -4347,7 +4351,7 @@ function Dashboard() {
                       <ErrorAlert
                         message={generationState.error || "Generation failed"}
                         onRetry={() => {
-                          if (!prompt.trim()) return;
+                          if (activeEngine !== "topaz" && !prompt.trim()) return;
                           generateMediaMutation.mutate(buildFormData());
                         }}
                         type="error"

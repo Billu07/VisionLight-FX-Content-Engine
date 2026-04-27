@@ -105,7 +105,7 @@ export function EditAssetModal({
   const [prompt, setPrompt] = useState("");
   const [picFxEditModel, setPicFxEditModel] = useState<
     "nano-banana-2" | "gpt-image-2"
-  >("gpt-image-2");
+  >("nano-banana-2");
   const [referenceAssets, setReferenceAssets] = useState<Asset[]>([]);
   const [showRefSelector, setShowRefSelector] = useState(false);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
