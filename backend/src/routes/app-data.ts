@@ -6,6 +6,36 @@ import { getTenantSettings } from "../lib/app-runtime";
 
 const router = express.Router();
 
+const sanitizeDomain = (raw?: string | null): string | null => {
+  if (!raw) return null;
+  const trimmed = raw.trim().toLowerCase();
+  if (!trimmed) return null;
+
+  const withoutProtocol = trimmed.replace(/^https?:\/\//, "");
+  const host = withoutProtocol.split("/")[0]?.replace(/:\d+$/, "").replace(/\.$/, "");
+  return host || null;
+};
+
+const resolveIncomingHost = (req: AuthenticatedRequest): string | null => {
+  const forwarded = req.headers["x-forwarded-host"];
+  const forwardedHost = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  const candidate = forwardedHost || req.headers.host || "";
+  const firstHost = candidate.toString().split(",")[0];
+  return sanitizeDomain(firstHost);
+};
+
+const DOMAIN_ROUTING_ENABLED =
+  (process.env.DOMAIN_ROUTING_ENABLED ?? "true").toLowerCase() !== "false";
+const PICDRIFT_CANONICAL_DOMAIN =
+  sanitizeDomain(process.env.PICDRIFT_CANONICAL_DOMAIN || process.env.PICDRIFT_DOMAIN) ||
+  "picdrift.studio";
+const VISIONLIGHT_CANONICAL_DOMAIN =
+  sanitizeDomain(
+    process.env.VISIONLIGHT_CANONICAL_DOMAIN ||
+      process.env.VISUALFX_CANONICAL_DOMAIN ||
+      process.env.VISUALFX_DOMAIN,
+  ) || "visualfx.studio";
+
 // ==================== AUTH ROUTES ====================
 router.get(
   "/api/auth/me",
@@ -17,6 +47,10 @@ router.get(
 
       const org = user.organization;
       const isDefaultOrg = org?.isDefault;
+      const orgViewType = ((user as any).view || req.user?.view || "VISIONLIGHT") as
+        | "VISIONLIGHT"
+        | "PICDRIFT";
+      const isSuperAdmin = req.user?.role === "SUPERADMIN";
 
       let isOrgActive = true;
       let needsActivation = false;
@@ -46,15 +80,32 @@ router.get(
         );
       }
 
+      const canonicalDomain =
+        !DOMAIN_ROUTING_ENABLED || isSuperAdmin
+          ? null
+          : orgViewType === "PICDRIFT"
+            ? PICDRIFT_CANONICAL_DOMAIN
+            : VISIONLIGHT_CANONICAL_DOMAIN;
+      const incomingHost = resolveIncomingHost(req);
+      const domainRedirectRequired = Boolean(
+        canonicalDomain && incomingHost && incomingHost !== canonicalDomain,
+      );
+
       res.json({
         success: true,
         systemPresets,
         user: {
           ...req.user,
+          view: orgViewType,
+          orgViewType,
+          isSuperAdmin,
           isOrgActive,
           needsActivation,
           organizationName: org?.name,
           videoEditorEnabledForAll,
+          canonicalDomain,
+          domainRoutingEnabled: DOMAIN_ROUTING_ENABLED,
+          domainRedirectRequired,
         },
       });
     } catch (error: any) {

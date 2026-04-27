@@ -20,6 +20,7 @@ import { BrandProvider } from "./contexts/BrandContext";
 import { useAuth } from "./hooks/useAuth";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import { installAlertBridge } from "./lib/notifications";
+import { getCanonicalDomainRedirectUrl } from "./lib/domain-routing";
 
 // --- NEW IMPORTS (Add these) ---
 import { Terms } from "./pages/Terms";
@@ -45,10 +46,17 @@ const AdminDashboardSwitcher = () => {
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading, checkAuth } = useAuth();
   const location = useLocation();
+  const redirectUrl = getCanonicalDomainRedirectUrl(user);
 
   useEffect(() => {
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (!isLoading && user && redirectUrl) {
+      window.location.replace(redirectUrl);
+    }
+  }, [isLoading, user, redirectUrl]);
 
   if (isLoading)
     return (
@@ -57,6 +65,14 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       </div>
     );
   if (!user) return <Navigate to="/" state={{ from: location }} replace />;
+
+  if (redirectUrl) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <LoadingSpinner size="lg" variant="neon" />
+      </div>
+    );
+  }
 
   return <>{children}</>;
 };
@@ -75,10 +91,17 @@ const ProjectRoute = ({ children }: { children: React.ReactNode }) => {
 // --- 🔒 Admin Only Route ---
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading, checkAuth } = useAuth();
+  const redirectUrl = getCanonicalDomainRedirectUrl(user);
 
   useEffect(() => {
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (!isLoading && user && redirectUrl) {
+      window.location.replace(redirectUrl);
+    }
+  }, [isLoading, user, redirectUrl]);
 
   if (isLoading)
     return (
@@ -89,6 +112,14 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 
   // 1. Must be logged in
   if (!user) return <Navigate to="/" replace />;
+
+  if (redirectUrl) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <LoadingSpinner size="lg" variant="neon" />
+      </div>
+    );
+  }
 
   // 2. Must be an Admin or SuperAdmin
   const isAdmin = user.role === "ADMIN" || user.role === "SUPERADMIN";

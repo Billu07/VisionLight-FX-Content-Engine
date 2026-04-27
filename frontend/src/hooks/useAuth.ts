@@ -15,7 +15,12 @@ interface User {
   needsActivation?: boolean;
   videoEditorEnabledForAll?: boolean;
   view?: "VISIONLIGHT" | "PICDRIFT";
+  orgViewType?: "VISIONLIGHT" | "PICDRIFT";
   maxProjects?: number;
+  isSuperAdmin?: boolean;
+  canonicalDomain?: string | null;
+  domainRoutingEnabled?: boolean;
+  domainRedirectRequired?: boolean;
 }
 
 interface AuthState {
