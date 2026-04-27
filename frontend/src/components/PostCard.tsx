@@ -134,7 +134,7 @@ export function PostCard({
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [post.id, isVideoPost, compact]);
+  }, [post.id, post.status, post.mediaUrl, isVideoPost, compact]);
 
   useEffect(() => {
     if (isVideoPost) {
@@ -168,8 +168,10 @@ export function PostCard({
     if (!nextTitle || isSavingTitle) return;
 
     const previousTitle = post.title || "";
-    const previousPosts = queryClient.getQueryData(["posts"]);
-    queryClient.setQueryData(["posts"], (old: any) =>
+    const previousPostsQueries = queryClient.getQueriesData({
+      queryKey: ["posts"],
+    });
+    queryClient.setQueriesData({ queryKey: ["posts"] }, (old: any) =>
       Array.isArray(old)
         ? old.map((entry: any) =>
             entry?.id === post.id ? { ...entry, title: nextTitle } : entry,
@@ -186,7 +188,9 @@ export function PostCard({
       }
       setIsEditingTitle(false);
     } catch (error) {
-      queryClient.setQueryData(["posts"], previousPosts);
+      previousPostsQueries.forEach(([queryKey, data]) => {
+        queryClient.setQueryData(queryKey, data);
+      });
       setEditedTitle(previousTitle);
       console.error("Error updating title:", error);
       notify.error("Title update failed. Please try again.");
