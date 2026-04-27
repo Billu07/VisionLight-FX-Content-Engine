@@ -64,14 +64,12 @@ export const calculateGranularCost = (
   if (mediaType === "carousel") return settings.pricePicFX_Carousel;
   if (mode === "batch") return settings.pricePicFX_Batch;
 
-  // 3. VIDEO FX 1 (Seedance Kie)
-  if (
-    mediaType === "video" &&
-    (model === "kie-seedance-2" ||
-      model === "kie-sora-2" ||
-      model === "kie-sora-2-pro")
-  ) {
-    if (duration === 15) return settings.priceVideoFX1_15s;
+  // 3. VIDEO FX 1 (Topaz Upscale)
+  if (mediaType === "video" && model === "topaz-upscale-video") {
+    const upscaleFactor = Number((params as any)?.upscaleFactor);
+    if (Number.isFinite(upscaleFactor) && upscaleFactor >= 4) {
+      return settings.priceVideoFX1_15s;
+    }
     return settings.priceVideoFX1_10s;
   }
 
@@ -82,9 +80,10 @@ export const calculateGranularCost = (
       model === "sora-2" ||
       model === "sora-2-pro")
   ) {
-    if (duration === 8) return settings.priceVideoFX2_8s;
-    if (duration === 12) return settings.priceVideoFX2_12s;
-    return settings.priceVideoFX2_4s;
+    const normalizedDuration = Number(duration || 4);
+    if (normalizedDuration <= 4) return settings.priceVideoFX2_4s;
+    if (normalizedDuration <= 8) return settings.priceVideoFX2_8s;
+    return settings.priceVideoFX2_12s;
   }
 
   // 5. VIDEO FX 3 (Veo)
@@ -136,7 +135,7 @@ export const getTargetPool = (
   if (model === "kling-2.5") return "creditsPicDrift";
   if (mediaType === "image" || mediaType === "carousel")
     return "creditsImageFX";
-  if (model?.includes("kie-seedance") || model?.includes("kie-sora"))
+  if (model === "topaz-upscale-video")
     return "creditsVideoFX1";
   if (model?.includes("seedance-fal") || model?.includes("sora-2"))
     return "creditsVideoFX2";

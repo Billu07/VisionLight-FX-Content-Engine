@@ -103,6 +103,9 @@ export function EditAssetModal({
 
   // Text Edit State
   const [prompt, setPrompt] = useState("");
+  const [picFxEditModel, setPicFxEditModel] = useState<
+    "nano-banana-2" | "gpt-image-2"
+  >("gpt-image-2");
   const [referenceAssets, setReferenceAssets] = useState<Asset[]>([]);
   const [showRefSelector, setShowRefSelector] = useState(false);
   const [isUploadingRef, setIsUploadingRef] = useState(false);
@@ -368,6 +371,7 @@ export function EditAssetModal({
         aspectRatio: customRatio || "original",
         referenceUrls: referenceAssets.map((asset) => asset.url),
         mode: activeTab as "standard" | "pro",
+        model: picFxEditModel,
       });
     },
     onMutate: (variables) => {
@@ -1220,6 +1224,35 @@ export function EditAssetModal({
             {/* PRO UI */}
             {activeTab === "pro" && (
               <>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
+                    PicFX Model
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: "gpt-image-2", label: "GPT 2 Image" },
+                      { id: "nano-banana-2", label: "Nano Banana 2" },
+                    ].map((model) => (
+                      <button
+                        key={model.id}
+                        type="button"
+                        onClick={() =>
+                          setPicFxEditModel(
+                            model.id as "gpt-image-2" | "nano-banana-2",
+                          )
+                        }
+                        className={`py-2 rounded-lg border text-xs font-bold transition-all ${
+                          picFxEditModel === model.id
+                            ? "bg-fuchsia-600 border-fuchsia-500 text-white"
+                            : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
+                        }`}
+                      >
+                        {model.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-bold text-purple-300 uppercase tracking-wider">

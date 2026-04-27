@@ -56,8 +56,8 @@ router.get(
       let needsActivation = false;
 
       if (org && !isDefaultOrg) {
-        const hasKeys = !!(org.falApiKey || org.kieApiKey);
-        if (!hasKeys) {
+        const hasFalKey = !!org.falApiKey;
+        if (!hasFalKey) {
           isOrgActive = false;
           needsActivation = true;
         }

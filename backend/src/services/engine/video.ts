@@ -295,9 +295,8 @@ export const videoLogic = {
       `🎬 Video Gen for ${postId} | Model: ${params.model} | AR: ${params.aspectRatio}`,
     );
     const model = typeof params.model === "string" ? params.model : "";
-    const isKie = model.includes("kie");
-    const isSeedanceKie = model.includes("kie-seedance");
     const isSeedanceFal = model.includes("seedance-fal");
+    const isTopazUpscale = model === "topaz-upscale-video";
     // Check for Kling variants
     const isKling = model.includes("kling");
     const isKling3 = model === "kling-3";
@@ -305,7 +304,8 @@ export const videoLogic = {
     // Check for Veo
     const isVeo = model === "veo-3";
 
-    const isUnsupported = !isKie && !isKling && !isVeo && !isSeedanceFal;
+    const isUnsupported =
+      !isKling && !isVeo && !isSeedanceFal && !isTopazUpscale;
     const isPro = model.includes("pro") || model.includes("Pro");
     const videoGenerationMode =
       typeof params.videoGenerationMode === "string"
@@ -315,7 +315,7 @@ export const videoLogic = {
     try {
       if (isUnsupported) {
         throw new Error(
-          `Unsupported video model "${model}". Use a Fal or KIE-backed model.`,
+          `Unsupported video model "${model}". Use a Fal-backed model.`,
         );
       }
 
@@ -399,7 +399,6 @@ export const videoLogic = {
         rawRefUrl &&
         params.hasReferenceImage &&
         !isVeo &&
-        !isSeedanceKie &&
         !isSeedanceFal;
 
       if (shouldPreprocessReference) {
@@ -690,177 +689,60 @@ export const videoLogic = {
         });
         externalId = submitRes.data.request_id;
         statusUrl = submitRes.data.status_url;
-      } else if (isKie) {
-        provider = "kie";
-        const imageRefs = imageRefUrls;
-        const videoRefs = videoRefUrls;
-        const audioRefs = audioRefUrls;
-        const seedanceMode = isSeedanceKie
-          ? videoGenerationMode === "text" ||
-            videoGenerationMode === "frames" ||
-            videoGenerationMode === "references"
-            ? videoGenerationMode
-            : audioRefs.length > 0 || videoRefs.length > 0
-              ? "references"
-              : imageRefs.length > 0
-                ? "frames"
-                : "text"
-          : undefined;
-        const normalizedImageRefs = imageRefs.map((url: string) => getOptimizedUrl(url));
+      } else if (isTopazUpscale) {
+        provider = "topaz-upscale";
 
-        let kieInputUrl = "";
-        let isImageToVideo = false;
-        if (isSeedanceKie && seedanceMode === "frames" && finalInputImageBuffer) {
-          kieInputUrl = await uploadToCloudinary(
-            finalInputImageBuffer,
-            `${postId}_input`,
-            params.userId,
-            "Kie Input",
-            "image",
-          );
-          isImageToVideo = true;
-        } else if (
-          (isSeedanceKie && seedanceMode === "frames" && params.imageReference) ||
-          (!isSeedanceKie && params.imageReference)
-        ) {
-          // Fallback: if preprocessing is skipped/failed, still pass original first frame.
-          kieInputUrl = getOptimizedUrl(params.imageReference);
-          isImageToVideo = true;
-        }
-        const seedanceDuration = Math.max(
-          4,
-          Math.min(15, Number(params.duration) || 10),
+        const normalizedVideoRefs = videoRefUrls.map((url: string) =>
+          getOptimizedUrl(url),
         );
-        const seedanceResolution =
-          params.resolution === "480p" ||
-          params.resolution === "720p" ||
-          params.resolution === "1080p"
-            ? params.resolution
-            : "720p";
-        const seedanceAspectRatio =
-          params.aspectRatio === "auto" || params.aspectRatio === "adaptive"
-            ? "adaptive"
-            : params.aspectRatio === "1:1" ||
-                params.aspectRatio === "4:3" ||
-                params.aspectRatio === "3:4" ||
-                params.aspectRatio === "16:9" ||
-                params.aspectRatio === "9:16" ||
-                params.aspectRatio === "21:9"
-              ? params.aspectRatio
-              : targetRatioString === "4:3" ||
-                  targetRatioString === "3:4" ||
-                  targetRatioString === "21:9"
-                ? targetRatioString
-                : targetRatioString === "9:16"
-                  ? "9:16"
-                  : targetRatioString === "1:1"
-                    ? "1:1"
-                    : "16:9";
-        const kiePayload: any = isSeedanceKie
-          ? {
-              model: "bytedance/seedance-2",
-              input: {
-                prompt: finalPrompt,
-                aspect_ratio: seedanceAspectRatio,
-                duration: seedanceDuration,
-                resolution: seedanceResolution,
-                generate_audio: toBoolean(params.generateAudio, true),
-                web_search: false,
-                nsfw_checker: false,
-              },
-            }
-          : {
-              model: `${isPro ? "sora-2-pro" : "sora-2"}-${
-                isImageToVideo ? "image-to-video" : "text-to-video"
-              }`,
-              input: {
-                prompt: finalPrompt,
-                aspect_ratio:
-                  targetRatioString === "9:16" ? "portrait" : "landscape",
-                n_frames: params.duration
-                  ? params.duration.toString().replace("s", "")
-                  : "10",
-                remove_watermark: true,
-              },
-            };
-
-        if (isSeedanceKie) {
-          if (seedanceMode === "frames") {
-            const firstFrameUrl = kieInputUrl || normalizedImageRefs[0];
-            if (!firstFrameUrl) {
-              throw new Error("Frame mode requires at least one image reference.");
-            }
-            kiePayload.input.first_frame_url = firstFrameUrl;
-            if (normalizedImageRefs[1]) {
-              kiePayload.input.last_frame_url = normalizedImageRefs[1];
-            }
-          } else if (seedanceMode === "references") {
-            const normalizedVideoRefs = videoRefs.map((url: string) =>
-              getOptimizedUrl(url),
-            );
-            const normalizedAudioRefs = audioRefs.map((url: string) =>
-              getOptimizedUrl(url),
-            );
-            if (
-              normalizedAudioRefs.length > 0 &&
-              normalizedImageRefs.length === 0 &&
-              normalizedVideoRefs.length === 0
-            ) {
-              throw new Error(
-                "Audio references require at least one image or video reference.",
-              );
-            }
-            if (normalizedImageRefs.length > 0) {
-              kiePayload.input.reference_image_urls = normalizedImageRefs.slice(0, 9);
-            }
-            if (normalizedVideoRefs.length > 0) {
-              kiePayload.input.reference_video_urls = normalizedVideoRefs.slice(0, 3);
-            }
-            if (normalizedAudioRefs.length > 0) {
-              kiePayload.input.reference_audio_urls = normalizedAudioRefs.slice(0, 3);
-            }
-          }
-        } else if (isImageToVideo) {
-          kiePayload.input.image_urls = [kieInputUrl];
+        const fallbackVideoRef = isLikelyVideoUrl(params.imageReference)
+          ? getOptimizedUrl(params.imageReference)
+          : "";
+        const sourceVideoUrl = normalizedVideoRefs[0] || fallbackVideoRef;
+        if (!sourceVideoUrl) {
+          throw new Error("Topaz Upscale requires a source video reference.");
         }
 
-        if (isSeedanceKie) {
-          console.log(
-            "Seedance Kie Request:",
-            JSON.stringify(kiePayload, null, 2),
+        const upscaleFactorRaw = Number(params.upscaleFactor);
+        const upscaleFactor =
+          Number.isFinite(upscaleFactorRaw) && upscaleFactorRaw >= 1
+            ? Math.min(8, Math.max(1, upscaleFactorRaw))
+            : 2;
+        const targetFpsRaw = Number(params.targetFps);
+        const targetFps =
+          Number.isFinite(targetFpsRaw) && targetFpsRaw > 0
+            ? Math.min(120, Math.round(targetFpsRaw))
+            : undefined;
+
+        const payload: any = {
+          video_url: sourceVideoUrl,
+          model: "Proteus",
+          upscale_factor: upscaleFactor,
+        };
+        if (targetFps) payload.target_fps = targetFps;
+
+        console.log("Topaz Upscale Request:", JSON.stringify(payload, null, 2));
+
+        const falKey = apiKeys?.falApiKey;
+        if (!falKey) {
+          throw new Error(
+            "API Key is missing. Please configure your Fal AI key in the Admin Panel.",
           );
         }
 
-        const kieKey = apiKeys?.kieApiKey;
-        if (!kieKey) throw new Error("API Key is missing. Please configure your KIE API key in the Admin Panel.");
-
-        const kieRes = await axios.post(
-          `${KIE_BASE_URL}/jobs/createTask`,
-          kiePayload,
-          { headers: { Authorization: `Bearer ${kieKey}` } },
+        const submitRes = await axios.post(
+          "https://queue.fal.run/fal-ai/topaz/upscale/video",
+          payload,
+          {
+            headers: {
+              Authorization: `Key ${falKey}`,
+              "Content-Type": "application/json",
+            },
+          },
         );
-        const kieResponseCode = kieRes?.data?.code;
-        const kieCodeNumeric = Number(kieResponseCode);
-        const isKieAccepted =
-          (Number.isFinite(kieCodeNumeric) && kieCodeNumeric === 200) ||
-          kieResponseCode === "200";
-        const kieTaskId =
-          kieRes?.data?.data?.taskId || kieRes?.data?.data?.task_id;
-        const kieMessage =
-          kieRes?.data?.msg || kieRes?.data?.message || "Unknown KIE error";
-        if (!isKieAccepted || !kieTaskId) {
-          console.error(
-            "KIE createTask rejected:",
-            typeof kieRes?.data === "string"
-              ? kieRes.data
-              : JSON.stringify(kieRes?.data || {}),
-          );
-          const reason = !isKieAccepted
-            ? `response code ${String(kieResponseCode)}`
-            : "missing taskId";
-          throw new Error(`KIE request rejected: ${kieMessage} (${reason})`);
-        }
-        externalId = kieTaskId;
+
+        externalId = submitRes.data.request_id;
+        statusUrl = submitRes.data.status_url;
       } else if (isSeedanceFal) {
         provider = "seedance-fal";
         const imageRefs = imageRefUrls.map((url: string) => getOptimizedUrl(url));
@@ -903,7 +785,9 @@ export const videoLogic = {
         const payload: any = {
           prompt: finalPrompt,
           resolution:
-            params.resolution === "480p" || params.resolution === "720p"
+            params.resolution === "480p" ||
+            params.resolution === "720p" ||
+            params.resolution === "1080p"
               ? params.resolution
               : "720p",
           duration: parsedDuration,
@@ -1083,7 +967,8 @@ export const videoLogic = {
       } else if (
         provider.includes("kling") ||
         provider.includes("veo") ||
-        provider.includes("seedance-fal")
+        provider.includes("seedance-fal") ||
+        provider.includes("topaz-upscale")
       ) {
         const falKey = apiKeys?.falApiKey || FAL_KEY;
         const checkUrl =
@@ -1137,7 +1022,7 @@ export const videoLogic = {
       } else if (provider.includes("openai")) {
         isFailed = true;
         errorMessage =
-          "OpenAI video provider is no longer supported for new processing. Regenerate with a Fal/KIE model.";
+          "OpenAI video provider is no longer supported for new processing. Regenerate with a Fal model.";
       }
 
       if (isComplete && finalUrl) {

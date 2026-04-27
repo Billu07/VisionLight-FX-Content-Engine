@@ -24,33 +24,57 @@ export const FalService = {
     modelType?: "speed" | "quality";
     useGrounding?: boolean;
     imageSize?: string;
+    model?: "nano-banana-2" | "gpt-image-2";
     apiKey?: string; // <--- NEW
   }): Promise<Buffer> {
     this._configureClient(params.apiKey);
     try {
+      const selectedModel = params.model || "nano-banana-2";
       const isEdit = params.referenceImages && params.referenceImages.length > 0;
-      const endpoint = isEdit ? "fal-ai/nano-banana-2/edit" : "fal-ai/nano-banana-2";
+      const endpoint =
+        selectedModel === "gpt-image-2"
+          ? "openai/gpt-image-2"
+          : isEdit
+            ? "fal-ai/nano-banana-2/edit"
+            : "fal-ai/nano-banana-2";
 
       console.log(
-        `🍌 FAL Engine: ${endpoint} | Ratio: ${params.aspectRatio || "auto"} | Size: ${
-          params.imageSize || "Default"
-        }`
+        `🍌 FAL Engine: ${endpoint} | Model: ${selectedModel} | Ratio: ${
+          params.aspectRatio || "auto"
+        } | Size: ${params.imageSize || "Default"}`
       );
 
-      const input: any = {
-        prompt: params.prompt,
-        // Disable web search for edits to drastically improve speed, keep true for fresh 4K generations
-        enable_web_search: isEdit ? false : true,
-        safety_tolerance: "6", // Maximum creativity (least strict)
-        output_format: "jpeg", // Force JPEG to compress 4K under Cloudinary's 10MB limit
-      };
+      const input: any = { prompt: params.prompt };
 
-      if (params.aspectRatio && params.aspectRatio !== "original") {
+      if (selectedModel === "gpt-image-2") {
+        const ratioToSize = (ratio?: string) => {
+          if (ratio === "1:1" || ratio === "square") return "square_hd";
+          if (ratio === "9:16" || ratio === "portrait") return "portrait_16_9";
+          return "landscape_16_9";
+        };
+        input.image_size = ratioToSize(params.aspectRatio);
+        input.quality = "high";
+        input.num_images = 1;
+        input.output_format = "jpeg";
+      } else {
+        // Disable web search for edits to drastically improve speed, keep true for fresh generations.
+        input.enable_web_search = isEdit ? false : true;
+        input.safety_tolerance = "6";
+        input.output_format = "jpeg";
+      }
+
+      if (
+        selectedModel !== "gpt-image-2" &&
+        params.aspectRatio &&
+        params.aspectRatio !== "original"
+      ) {
         input.aspect_ratio = params.aspectRatio;
       }
 
-      // Default to 1K resolution for both PicFX (generation) and Editor for maximum speed
-      input.resolution = params.imageSize || "1K";
+      if (selectedModel !== "gpt-image-2") {
+        // Default to 1K resolution for Nano Banana paths for speed.
+        input.resolution = params.imageSize || "1K";
+      }
 
       if (isEdit && params.referenceImages) {
         input.image_urls = params.referenceImages.map(

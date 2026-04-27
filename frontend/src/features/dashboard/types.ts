@@ -1,4 +1,4 @@
-export type EngineType = "kie" | "studio" | "openai" | "veo" | "3dx";
+export type EngineType = "kie" | "studio" | "openai" | "veo" | "topaz" | "3dx";
 export type StudioMode = "image" | "carousel" | "edit";
 export type VisualTab = "picdrift" | "studio" | "videofx" | "3dx";
 

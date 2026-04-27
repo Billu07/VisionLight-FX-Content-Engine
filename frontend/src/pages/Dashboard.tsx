@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+﻿import { useState, useEffect, useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
@@ -35,9 +35,8 @@ const { picdriftLogo, fxLogo, driftLogo } = dashboardAssets;
 const MAX_PICFX_REFERENCE_IMAGES = 5;
 const MAX_VEO_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_VEO_REFERENCE_IMAGES = 5;
-const MAX_VIDEOFX1_REFERENCES = 2;
 const MAX_VIDEOFX2_REFERENCES = 12;
-const MAX_VIDEOFX_ADV_REFERENCES = 12;
+const MAX_TOPAZ_REFERENCES = 1;
 const TIMELINE_PAGE_SIZE = 15;
 type VeoMode =
   | "image_to_video"
@@ -92,14 +91,17 @@ function Dashboard() {
   // Engine Selection
   const [activeEngine, setActiveEngine] = useState<EngineType>("kie");
   const [studioMode, setStudioMode] = useState<StudioMode>("image");
+  const [picFxModel, setPicFxModel] = useState<"nano-banana-2" | "gpt-image-2">(
+    "gpt-image-2",
+  );
 
   // Video FX 1 / PicDrift Engine
-  // ✅ UPDATED DEFAULT: 10s (Matches PicDrift Standard)
+  // âœ… UPDATED DEFAULT: 10s (Matches PicDrift Standard)
   const [kieDuration, setKieDuration] = useState<5 | 10 | 15>(10);
-  // ✅ UPDATED DEFAULT: 1080p
+  // âœ… UPDATED DEFAULT: 1080p
   const [kieResolution] = useState<"720p" | "1080p">("1080p");
 
-  // ✅ UPDATED DEFAULT: Portrait
+  // âœ… UPDATED DEFAULT: Portrait
   const [kieAspect, setKieAspect] = useState<
     "landscape" | "portrait" | "square"
   >("portrait");
@@ -112,20 +114,6 @@ function Dashboard() {
 
   // Drift State for 3DX
   const [driftParams, setDriftParams] = useState({ horizontal: 0, vertical: 0, zoom: 0 });
-
-  // ✅ UPDATED DEFAULT: Pro Model
-  const kieModel = "kie-seedance-2" as const;
-  const [videoFx1Mode, setVideoFx1Mode] = useState<
-    "text" | "frames" | "references"
-  >("frames");
-  const [videoFx1Duration, setVideoFx1Duration] = useState<10 | 15>(10);
-  const [videoFx1Resolution, setVideoFx1Resolution] = useState<
-    "480p" | "720p" | "1080p"
-  >("1080p");
-  const [videoFx1Aspect, setVideoFx1Aspect] = useState<
-    "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "21:9" | "auto"
-  >("9:16");
-  const [videoFx1GenerateAudio, setVideoFx1GenerateAudio] = useState(true);
 
   // Video FX Sub-mode (Video vs PicDrift)
   const [videoFxMode, setVideoFxMode] = useState<"video" | "picdrift">(
@@ -157,11 +145,14 @@ function Dashboard() {
   });
   const [veoReferenceFiles, setVeoReferenceFiles] = useState<File[]>([]);
   const [veoReferenceUrls, setVeoReferenceUrls] = useState<string[]>([]);
+  const [topazUpscaleFactor, setTopazUpscaleFactor] = useState<2 | 4>(2);
+  const [topazTargetFps, setTopazTargetFps] = useState<30 | 60 | "source">(
+    "source",
+  );
 
   // Video FX 2 Engine
-  // ✅ UPDATED DEFAULT: 12s
-  const [videoDuration, setVideoDuration] = useState<4 | 8 | 12>(12);
-  // ✅ UPDATED DEFAULT: Pro Model
+  const [videoDuration, setVideoDuration] = useState<number>(12);
+  // âœ… UPDATED DEFAULT: Pro Model
   const videoModel = "seedance-fal-2.0" as const;
   const [videoFx2Mode, setVideoFx2Mode] = useState<
     "text" | "frames" | "references"
@@ -170,11 +161,9 @@ function Dashboard() {
     "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "21:9" | "auto"
   >("9:16");
   const [videoFx2GenerateAudio, setVideoFx2GenerateAudio] = useState(true);
-  // ✅ UPDATED DEFAULT: 9:16 (Portrait)
   const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16">("9:16");
-  // ✅ UPDATED DEFAULT: Portrait Resolution
   const [videoFx2Resolution, setVideoFx2Resolution] = useState<
-    "480p" | "720p"
+    "480p" | "720p" | "1080p"
   >(
     "720p",
   );
@@ -319,7 +308,9 @@ function Dashboard() {
       ? "3dx"
       : activeEngine === "studio"
         ? "studio"
-        : activeEngine === "kie" && videoFxMode === "picdrift"
+        : activeEngine === "kie" &&
+            videoFxMode === "picdrift" &&
+            picDriftMode === "standard"
           ? "picdrift"
           : "videofx";
 
@@ -358,15 +349,6 @@ function Dashboard() {
     setTimelineVisibleCount(TIMELINE_PAGE_SIZE);
     setStorylineVisibleCount(TIMELINE_PAGE_SIZE);
   }, [timelinePanelMode]);
-
-  useEffect(() => {
-    if (!(activeEngine === "kie" && videoFxMode === "video")) return;
-    setVideoFxFrames({ start: null, end: null });
-    setVideoFxFrameUrls({ start: null, end: null });
-    setVideoFxExtraRefs([]);
-    setVideoFxExtraUrls([]);
-    setVideoFxExtraNames([]);
-  }, [activeEngine, videoFxMode, videoFx1Mode]);
 
   useEffect(() => {
     if (activeEngine !== "openai") return;
@@ -500,11 +482,11 @@ function Dashboard() {
     enabled: !!user,
   });
 
-  // ✅ 2. CORE LOGIC & PERMISSIONS
+  // âœ… 2. CORE LOGIC & PERMISSIONS
   const isCommercial = user?.creditSystem !== "INTERNAL";
   const isAdmin = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
 
-  // ✅ 3. VIRTUAL SUM (Fixes Timeline Build Errors)
+  // âœ… 3. VIRTUAL SUM (Fixes Timeline Build Errors)
   const userCredits =
     (credits?.creditsPicDrift || 0) +
     (credits?.creditsImageFX || 0) +
@@ -512,7 +494,7 @@ function Dashboard() {
     (credits?.creditsVideoFX2 || 0) +
     (credits?.creditsVideoFX3 || 0);
 
-  // ✅ 4. UI HELPERS
+  // âœ… 4. UI HELPERS
   const formatBal = (val: number) => {
     if (user?.view === "PICDRIFT") return `${Math.floor(val)}`;
     return isCommercial ? `$${val.toFixed(2)}` : `${val}`;
@@ -523,7 +505,7 @@ function Dashboard() {
     : "https://picdrift.com/renders";
   const creditBtnText = isCommercial ? "Buy Credit" : "Request Render";
 
-  // ✅ 5. BACKGROUND JOB POLLING
+  // âœ… 5. BACKGROUND JOB POLLING
   useQuery({
     queryKey: ["check-jobs"],
     queryFn: async () => {
@@ -693,7 +675,7 @@ function Dashboard() {
     if (!(await confirmAction("Save this content to your Asset Library?", { confirmLabel: "Save" }))) return;
     try {
       await apiEndpoints.movePostToAsset(postId);
-      alert("✅ Saved! Check your Asset Library.");
+      alert("âœ… Saved! Check your Asset Library.");
       queryClient.invalidateQueries({ queryKey: ["assets"] });
     } catch (e: any) {
       alert("Failed to save: " + e.message);
@@ -780,21 +762,13 @@ function Dashboard() {
   };
 
   const getCurrentVideoFxMode = () => {
-    if (activeEngine === "kie" && videoFxMode === "video") return videoFx1Mode;
     if (activeEngine === "openai") return videoFx2Mode;
     return null;
   };
 
-  const isVideoFxSlotEngine = () =>
-    (activeEngine === "kie" && videoFxMode === "video") ||
-    activeEngine === "openai";
+  const isVideoFxSlotEngine = () => activeEngine === "openai";
 
-  const getVideoFxReferenceLimit = () => {
-    if (activeEngine === "kie" && videoFxMode === "video") {
-      return MAX_VIDEOFX_ADV_REFERENCES;
-    }
-    return MAX_VIDEOFX2_REFERENCES;
-  };
+  const getVideoFxReferenceLimit = () => MAX_VIDEOFX2_REFERENCES;
 
   const getVideoFxReferenceCount = () => {
     const mode = getCurrentVideoFxMode();
@@ -1078,30 +1052,6 @@ function Dashboard() {
           else if (!veoFrames.last) setVeoFrame("last", file, url);
           else setVeoFrame("first", file, url);
         }
-      } else if (activeEngine === "kie" && videoFxMode === "video") {
-        const mode = getCurrentVideoFxMode();
-        if (mode === "frames") {
-          if (isVideoFile(file) || isAudioFile(file)) {
-            alert("Frame mode requires image files only.");
-            setActiveLibrarySlot(null);
-            return;
-          }
-          if (videoFxFrameUrls.start === url || videoFxFrameUrls.end === url) {
-            setActiveLibrarySlot(null);
-            return;
-          }
-          if (!videoFxFrames.start) setVideoFxFrame("start", file, url);
-          else if (!videoFxFrames.end) setVideoFxFrame("end", file, url);
-          else {
-            alert(
-              `Only ${MAX_VIDEOFX1_REFERENCES} ordered frame(s) allowed in frame mode.`,
-            );
-            setActiveLibrarySlot(null);
-            return;
-          }
-        } else if (mode === "references") {
-          addVideoFxExtraReference(file, url);
-        }
       } else if (activeEngine === "openai") {
         const mode = getCurrentVideoFxMode();
         if (mode === "frames") {
@@ -1120,13 +1070,21 @@ function Dashboard() {
         } else if (mode === "references") {
           addVideoFxExtraReference(file, url);
         }
+      } else if (activeEngine === "topaz") {
+        if (!isVideoFile(file)) {
+          alert("Topaz Upscale requires a video source.");
+          setActiveLibrarySlot(null);
+          return;
+        }
+        setReferenceImages([file]);
+        setReferenceImageUrls([url]);
       } else {
         setReferenceImages([file]);
         setReferenceImageUrls([url]);
       }
     }
 
-    // 2. ✅ NEW: Auto-Update Aspect Ratio based on Selection
+    // 2. âœ… NEW: Auto-Update Aspect Ratio based on Selection
     if (ratio && ratio !== "original") {
       console.log(`Auto-setting ratio to: ${ratio}`);
 
@@ -1142,13 +1100,9 @@ function Dashboard() {
 
       // A. VIDEO FX 1 / PICDRIFT
       if (activeEngine === "kie") {
-        if (videoFxMode === "video") {
-          setVideoFx1Aspect(r);
-        } else {
-          if (r === "16:9") setKieAspect("landscape");
-          else if (r === "9:16") setKieAspect("portrait");
-          else if (r === "1:1") setKieAspect("square");
-        }
+        if (r === "16:9") setKieAspect("landscape");
+        else if (r === "9:16") setKieAspect("portrait");
+        else if (r === "1:1") setKieAspect("square");
       }
 
       // B. VIDEO FX 2
@@ -1196,62 +1150,6 @@ function Dashboard() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const newFiles = Array.from(files);
-
-    if (activeEngine === "kie" && videoFxMode === "video") {
-      const mode = getCurrentVideoFxMode();
-      if (mode === "frames") {
-        if (newFiles.some((file) => isVideoFile(file) || isAudioFile(file))) {
-          alert("Frame mode supports image files only.");
-          e.target.value = "";
-          return;
-        }
-
-        let hasStart = !!videoFxFrames.start;
-        let hasEnd = !!videoFxFrames.end;
-        for (const file of newFiles) {
-          const url = URL.createObjectURL(file);
-          if (!hasStart) {
-            setVideoFxFrame("start", file, url);
-            hasStart = true;
-            continue;
-          }
-          if (!hasEnd) {
-            setVideoFxFrame("end", file, url);
-            hasEnd = true;
-            continue;
-          }
-          alert(
-            `Only ${MAX_VIDEOFX1_REFERENCES} ordered frame(s) allowed in frame mode.`,
-          );
-          break;
-        }
-        e.target.value = "";
-        return;
-      }
-
-      if (mode === "references") {
-        const remainingSlots =
-          getVideoFxReferenceLimit() - getVideoFxReferenceCount();
-        if (remainingSlots <= 0) {
-          alert(
-            `Only ${getVideoFxReferenceLimit()} reference file(s) allowed for this mode.`,
-          );
-          e.target.value = "";
-          return;
-        }
-        const usableFiles = newFiles.slice(0, remainingSlots);
-        if (usableFiles.length < newFiles.length) {
-          alert(
-            `Only ${getVideoFxReferenceLimit()} reference file(s) allowed for this mode.`,
-          );
-        }
-        usableFiles.forEach((file) =>
-          addVideoFxExtraReference(file, URL.createObjectURL(file)),
-        );
-      }
-      e.target.value = "";
-      return;
-    }
 
     if (activeEngine === "openai") {
       const mode = getCurrentVideoFxMode();
@@ -1310,6 +1208,23 @@ function Dashboard() {
       return;
     }
 
+    if (activeEngine === "topaz") {
+      if (newFiles.some((file) => !isVideoFile(file))) {
+        alert("Topaz Upscale only accepts video files.");
+        e.target.value = "";
+        return;
+      }
+      const file = newFiles[0];
+      if (!file) {
+        e.target.value = "";
+        return;
+      }
+      setReferenceImages([file]);
+      setReferenceImageUrls([URL.createObjectURL(file)]);
+      e.target.value = "";
+      return;
+    }
+
     if (
       activeEngine === "studio" &&
       newFiles.some((file) => !file.type.startsWith("image/"))
@@ -1347,9 +1262,6 @@ function Dashboard() {
     if (activeEngine === "studio") {
       maxFiles = studioMode === "carousel" ? 14 : MAX_PICFX_REFERENCE_IMAGES;
     }
-    if (activeEngine === "kie" && videoFxMode === "video") {
-      maxFiles = MAX_VIDEOFX1_REFERENCES;
-    }
     if (activeEngine === "veo") {
       maxFiles =
         veoMode === "first_last_frame"
@@ -1360,7 +1272,7 @@ function Dashboard() {
     }
 
     if (newFiles.length + referenceImages.length > maxFiles) {
-      alert(`❌ Only ${maxFiles} file(s) allowed for this mode.`);
+      alert(`âŒ Only ${maxFiles} file(s) allowed for this mode.`);
       return;
     }
     setReferenceImages((prev) => [...prev, ...newFiles]);
@@ -1403,7 +1315,7 @@ function Dashboard() {
     e.target.value = "";
   };
 
-  // ✅ NEW: Add to Sequence Logic
+  // âœ… NEW: Add to Sequence Logic
   const handleAddToSequence = (post: any) => {
     let url = post.mediaUrl;
     if (url && url.startsWith("[") && url.includes("]")) {
@@ -1588,6 +1500,17 @@ function Dashboard() {
         }
       }
 
+      if (activeEngine === "topaz") {
+        if (item.type !== "VIDEO") {
+          alert("Topaz Upscale accepts video input only.");
+          return;
+        }
+        setReferenceImages([file]);
+        setReferenceImageUrls([previewUrl]);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
       if (activeEngine === "veo") {
         if (veoMode === "first_last_frame") {
           if (item.type === "VIDEO") {
@@ -1730,20 +1653,6 @@ function Dashboard() {
       formData.append("duration", kieDuration.toString());
       formData.append("aspectRatio", kieAspect);
       formData.append("resolution", kieResolution);
-    } else if (activeEngine === "kie" && videoFxMode === "video") {
-      formData.append("mediaType", "video");
-      formData.append("model", kieModel);
-      formData.append("videoGenerationMode", videoFx1Mode);
-      formData.append("duration", videoFx1Duration.toString());
-      formData.append("aspectRatio", videoFx1Aspect);
-      formData.append("resolution", videoFx1Resolution);
-      formData.append("generateAudio", videoFx1GenerateAudio.toString());
-      if (videoFx1Mode === "frames") {
-        if (videoFxFrames.start) formData.append("referenceImages", videoFxFrames.start);
-        if (videoFxFrames.end) formData.append("referenceImages", videoFxFrames.end);
-      } else if (videoFx1Mode === "references") {
-        videoFxExtraRefs.forEach((file) => formData.append("referenceImages", file));
-      }
     } else if (activeEngine === "openai") {
       formData.append("mediaType", "video");
       formData.append("model", videoModel);
@@ -1795,8 +1704,19 @@ function Dashboard() {
       } else if (veoSourceFile) {
         formData.append("referenceImages", veoSourceFile);
       }
+    } else if (activeEngine === "topaz") {
+      formData.append("mediaType", "video");
+      formData.append("model", "topaz-upscale-video");
+      formData.append("upscaleFactor", topazUpscaleFactor.toString());
+      if (topazTargetFps !== "source") {
+        formData.append("targetFps", topazTargetFps.toString());
+      }
+      referenceImages.forEach((file) =>
+        formData.append("referenceImages", file),
+      );
     } else {
       formData.append("mediaType", studioMode);
+      formData.append("model", picFxModel);
       let sizeStr = "1024x1024";
       if (geminiAspect === "16:9") sizeStr = "1792x1024";
       if (geminiAspect === "9:16") sizeStr = "1024x1792";
@@ -1871,38 +1791,6 @@ function Dashboard() {
       }
     }
 
-    if (activeEngine === "kie" && videoFxMode === "video") {
-      if (videoFx1Mode === "frames") {
-        if (!videoFxFrames.start) {
-          alert("Frame mode requires a Start Frame.");
-          return;
-        }
-        if (!videoFxFrames.start && videoFxFrames.end) {
-          alert("Please provide Start Frame before setting End Frame.");
-          return;
-        }
-      } else if (videoFx1Mode === "references") {
-        if (videoFxExtraRefs.length === 0) {
-          alert("Reference mode requires at least one reference file.");
-          return;
-        }
-        if (videoFxExtraRefs.length > MAX_VIDEOFX_ADV_REFERENCES) {
-          alert(
-            `Reference mode supports up to ${MAX_VIDEOFX_ADV_REFERENCES} files.`,
-          );
-          return;
-        }
-        const hasImageOrVideo = videoFxExtraRefs.some(
-          (file) => !isAudioFile(file),
-        );
-        const hasAudio = videoFxExtraRefs.some((file) => isAudioFile(file));
-        if (hasAudio && !hasImageOrVideo) {
-          alert("Audio references require at least one image or video reference.");
-          return;
-        }
-      }
-    }
-
     if (activeEngine === "openai") {
       if (videoFx2Mode === "frames") {
         if (!videoFxFrames.start) {
@@ -1932,6 +1820,21 @@ function Dashboard() {
           alert("Audio references require at least one image or video reference.");
           return;
         }
+      }
+    }
+
+    if (activeEngine === "topaz") {
+      if (referenceImages.length === 0) {
+        alert("Topaz Upscale requires one source video.");
+        return;
+      }
+      if (referenceImages.length > MAX_TOPAZ_REFERENCES) {
+        alert("Topaz Upscale accepts only one source video at a time.");
+        return;
+      }
+      if (referenceImages.some((file) => !isVideoFile(file))) {
+        alert("Topaz Upscale only accepts video input.");
+        return;
       }
     }
 
@@ -1972,12 +1875,21 @@ function Dashboard() {
         hasBalance = (credits.creditsPicDrift || 0) >= required;
       }
     }
+    else if (activeEngine === "kie" && videoFxMode === "picdrift" && picDriftMode === "plus") {
+      const required = getPicDriftRequiredCost();
+      hasBalance = (credits.creditsPicDriftPlus || 0) >= required;
+    }
     else if (currentVisualTab === "studio")
       hasBalance = credits.creditsImageFX > 0;
-    else if (activeEngine === "kie") hasBalance = credits.creditsVideoFX1 > 0;
+    else if (activeEngine === "kie")
+      hasBalance =
+        picDriftMode === "plus"
+          ? credits.creditsPicDriftPlus > 0
+          : credits.creditsPicDrift > 0;
     else if (activeEngine === "openai")
       hasBalance = credits.creditsVideoFX2 > 0;
     else if (activeEngine === "veo") hasBalance = credits.creditsVideoFX3 > 0;
+    else if (activeEngine === "topaz") hasBalance = credits.creditsVideoFX1 > 0;
 
     if (!hasBalance) {
       setShowNoCreditsModal(true);
@@ -2003,17 +1915,17 @@ function Dashboard() {
     );
   if (!user) return null;
 
-  // ✅ HELPER: Get currently selected aspect ratio string for context-aware library
+  // âœ… HELPER: Get currently selected aspect ratio string for context-aware library
   const getCurrentRatioForLibrary = () => {
     if (activeEngine === "kie") {
-      return videoFxMode === "video" ? videoFx1Aspect : kieAspect;
+      return kieAspect;
     }
     if (activeEngine === "openai") return videoFx2Aspect;
     if (activeEngine === "studio") return geminiAspect; // "1:1", "16:9", "9:16"
     return undefined;
   };
 
-  // ✅ HELPER: Header Logic
+  // âœ… HELPER: Header Logic
   const getHeaderContent = () => {
     if (currentVisualTab === "3dx")
       return { logo: "/drift_icon.png", text: "Drift Path Generation" };
@@ -2024,27 +1936,19 @@ function Dashboard() {
     return { logo: fxLogo, text: "Video Generation" }; // videofx
   };
   const { logo: currentLogo, text: currentHeaderText } = getHeaderContent();
-  const currentVideoFxMode =
-    activeEngine === "kie" && videoFxMode === "video"
-      ? videoFx1Mode
-      : activeEngine === "openai"
-        ? videoFx2Mode
-        : null;
+  const currentVideoFxMode = activeEngine === "openai" ? videoFx2Mode : null;
   const isVideoFxSlotMode =
     currentVisualTab === "videofx" &&
     currentVideoFxMode === "frames" &&
-    ((activeEngine === "kie" && videoFxMode === "video") ||
-      activeEngine === "openai");
+    activeEngine === "openai";
   const isVideoFxReferenceMode =
     currentVisualTab === "videofx" &&
     currentVideoFxMode === "references" &&
-    ((activeEngine === "kie" && videoFxMode === "video") ||
-      activeEngine === "openai");
+    activeEngine === "openai";
   const isVideoFxTextMode =
     currentVisualTab === "videofx" &&
     currentVideoFxMode === "text" &&
-    ((activeEngine === "kie" && videoFxMode === "video") ||
-      activeEngine === "openai");
+    activeEngine === "openai";
 
   const timelinePosts = useMemo(() => {
     if (!Array.isArray(posts)) return [];
@@ -2103,7 +2007,7 @@ function Dashboard() {
           />
         )}
 
-        {/* ✅ FULLSCREEN SEQUENCE EDITOR */}
+        {/* âœ… FULLSCREEN SEQUENCE EDITOR */}
         {canUseVideoEditor && viewMode === "sequencer" && (
           <FullscreenVideoEditor
             projectId={localStorage.getItem("visionlight_active_project") || undefined}
@@ -2254,7 +2158,7 @@ function Dashboard() {
                 }}
                 className="absolute top-6 right-6 bg-white/10 hover:bg-white/20 text-white w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md border border-white/10 transition-colors z-[80]"
               >
-                ✕
+                âœ•
               </button>
             </div>
           </div>
@@ -2283,7 +2187,7 @@ function Dashboard() {
         {showNoCreditsModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4">
             <div className="bg-gray-800 rounded-2xl border border-red-500/30 shadow-2xl max-w-sm w-full p-6 text-center">
-              <div className="text-4xl mb-3">💎</div>
+              <div className="text-4xl mb-3">ðŸ’Ž</div>
               <h3 className="text-xl font-bold text-white mb-2">
                 Insufficient Credits
               </h3>
@@ -2358,12 +2262,12 @@ function Dashboard() {
           <WelcomeTour onClose={() => setShowWelcomeTour(false)} />
         )}
 
-        {/* 🚨 ACTIVATION OVERLAY (FOR INACTIVE TENANTS) */}
+        {/* ðŸš¨ ACTIVATION OVERLAY (FOR INACTIVE TENANTS) */}
         {user?.needsActivation && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-gray-950/90 backdrop-blur-xl p-4">
             <div className="bg-gray-900 border border-white/10 rounded-[2.5rem] p-8 sm:p-12 max-w-xl w-full shadow-[0_0_50px_rgba(0,0,0,0.5)] text-center animate-in zoom-in-95 duration-300">
               <div className="w-24 h-24 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-8 border border-rose-500/20">
-                <span className="text-5xl animate-pulse">⚡</span>
+                <span className="text-5xl animate-pulse">âš¡</span>
               </div>
               <h2 className="text-3xl font-black text-white mb-4 uppercase tracking-[0.2em]">
                 Platform Inactive
@@ -2568,7 +2472,7 @@ function Dashboard() {
                         className="absolute top-2 right-2 w-7 h-7 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center"
                         aria-label="Close menu"
                       >
-                        ×
+                        Ã—
                       </button>
                       <div className="px-4 py-2 border-b border-gray-800/80 mb-2">
                         <div className="text-xs text-gray-400 uppercase tracking-widest font-bold">Options</div>
@@ -2581,7 +2485,7 @@ function Dashboard() {
                         }}
                         className="w-full text-left px-4 py-2 text-yellow-400 hover:bg-yellow-500/10 text-sm font-medium transition-colors flex items-center gap-2"
                       >
-                        <span>💳</span>
+                        <span>ðŸ’³</span>
                         <span>Render Reserve</span>
                       </button>
 
@@ -2616,7 +2520,7 @@ function Dashboard() {
                           disabled={isRequesting}
                           className="w-full text-left px-4 py-2 text-purple-400 hover:bg-purple-500/10 text-sm font-medium transition-colors"
                         >
-                          {isRequesting ? "Sending..." : "Request Renders 🔔"}
+                          {isRequesting ? "Sending..." : "Request Renders ðŸ””"}
                         </button>
                       )}
 
@@ -2661,7 +2565,7 @@ function Dashboard() {
           <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
             <div className={`flex-1 ${(viewMode !== "create" && isMobile) ? 'hidden' : 'block'}`}>
               <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 lg:p-8 shadow-2xl">
-                {/* ✅ UPDATED HEADER: Logo Left, Library Button Right */}
+                {/* âœ… UPDATED HEADER: Logo Left, Library Button Right */}
                 <div className="mb-6 sm:mb-8 flex justify-between items-start">
                   <div className="hidden sm:block">
                     <div className="flex items-center gap-3 mb-2">
@@ -2678,7 +2582,7 @@ function Dashboard() {
                     </p>
                   </div>
 
-                  {/* ✅ GLOBAL HEADER BUTTONS (HIDDEN ON MOBILE) */}
+                  {/* âœ… GLOBAL HEADER BUTTONS (HIDDEN ON MOBILE) */}
                   <div className="hidden sm:flex gap-3 ml-auto">
                     {canUseVideoEditor && (
                       <button
@@ -2753,8 +2657,8 @@ function Dashboard() {
                               onClick={() => {
                                 setActiveEngine("kie");
                                 setVideoFxMode("picdrift");
-                                if (picDriftMode === "standard") setKieDuration(10);
-                                else setKieDuration(5);
+                                setPicDriftMode("standard");
+                                setKieDuration(10);
                               }}
                               className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group flex flex-col items-center justify-center text-center sm:text-left sm:block sm:items-start ${currentVisualTab === "picdrift"
                                 ? "border-white/20 bg-gradient-to-br from-pink-500 to-rose-500 shadow-2xl scale-105"
@@ -2790,8 +2694,8 @@ function Dashboard() {
                               onClick={() => {
                                 setActiveEngine("kie");
                                 setVideoFxMode("picdrift");
-                                if (picDriftMode === "standard") setKieDuration(10);
-                                else setKieDuration(5);
+                                setPicDriftMode("standard");
+                                setKieDuration(10);
                               }}
                               className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-left group flex flex-col items-center justify-center text-center sm:text-left sm:block sm:items-start ${currentVisualTab === "picdrift"
                                 ? "border-white/20 bg-gradient-to-br from-pink-500 to-rose-500 shadow-2xl scale-105"
@@ -2821,9 +2725,8 @@ function Dashboard() {
                             <button
                               type="button"
                               onClick={() => {
-                                setActiveEngine("kie");
+                                setActiveEngine("openai");
                                 setVideoFxMode("video");
-                                setKieDuration(15);
                               }}
                               className={`p-3 sm:p-4 rounded-2xl border-2 transition-all duration-300 text-center sm:text-left group flex flex-col items-center justify-center sm:block sm:items-start ${currentVisualTab === "videofx"
                                 ? "border-white/20 bg-gradient-to-br from-cyan-600 to-blue-600 shadow-2xl scale-105"
@@ -2849,7 +2752,7 @@ function Dashboard() {
                             rel="noreferrer"
                             className="flex flex-col items-center bg-gray-900/80 backdrop-blur-md border border-cyan-500/50 p-8 rounded-3xl shadow-[0_0_30px_rgba(6,182,212,0.2)] hover:border-cyan-400 hover:shadow-[0_0_40px_rgba(6,182,212,0.4)] hover:scale-105 transition-all duration-300 cursor-pointer"
                           >
-                            <span className="text-5xl mb-4">🔒</span>
+                            <span className="text-5xl mb-4">ðŸ”’</span>
                             <h3 className="text-2xl font-bold text-white mb-2">Video FX is Locked</h3>
                             <p className="text-cyan-300 font-medium">Click here to upgrade & unlock</p>
                           </a>
@@ -2892,89 +2795,85 @@ function Dashboard() {
                               </button>
                             </div>
                             {studioMode !== "edit" && (
-                              <div className="flex justify-center gap-2 sm:gap-3">
-                                {[
-                                  { id: "16:9", label: "Landscape" },
-                                  { id: "9:16", label: "Portrait" },
-                                  { id: "1:1", label: "Square" },
-                                ].map((a) => (
-                                  <button
-                                    key={a.id}
-                                    onClick={() => setGeminiAspect(a.id as any)}
-                                    className={`px-3 py-2 sm:px-4 rounded-lg border text-xs font-bold transition-all ${geminiAspect === a.id
-                                      ? "bg-violet-600 border-violet-500 text-white"
-                                      : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
-                                      }`}
-                                  >
-                                    {a.label}
-                                  </button>
-                                ))}
+                              <div className="space-y-3">
+                                <div className="flex justify-center gap-2 sm:gap-3">
+                                  {[
+                                    { id: "16:9", label: "Landscape" },
+                                    { id: "9:16", label: "Portrait" },
+                                    { id: "1:1", label: "Square" },
+                                  ].map((a) => (
+                                    <button
+                                      key={a.id}
+                                      onClick={() => setGeminiAspect(a.id as any)}
+                                      className={`px-3 py-2 sm:px-4 rounded-lg border text-xs font-bold transition-all ${geminiAspect === a.id
+                                        ? "bg-violet-600 border-violet-500 text-white"
+                                        : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
+                                        }`}
+                                    >
+                                      {a.label}
+                                    </button>
+                                  ))}
+                                </div>
+                                <div className="flex justify-center gap-2 sm:gap-3">
+                                  {[
+                                    { id: "gpt-image-2", label: "GPT 2 Image" },
+                                    { id: "nano-banana-2", label: "Nano Banana 2" },
+                                  ].map((model) => (
+                                    <button
+                                      key={model.id}
+                                      type="button"
+                                      onClick={() =>
+                                        setPicFxModel(
+                                          model.id as "gpt-image-2" | "nano-banana-2",
+                                        )
+                                      }
+                                      className={`px-3 py-2 sm:px-4 rounded-lg border text-xs font-bold transition-all ${picFxModel === model.id
+                                        ? "bg-fuchsia-600 border-fuchsia-500 text-white"
+                                        : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
+                                        }`}
+                                    >
+                                      {model.label}
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
                             )}
-                          </div>
-                        )}
-
-                        {/* PICDRIFT SUB-MENU */}
-                        {currentVisualTab === "picdrift" && user?.view !== "PICDRIFT" && (
-                          <div className="mb-6 animate-in fade-in space-y-4">
-                            <div className="flex bg-gray-900/50 p-1 rounded-xl w-full sm:max-w-sm mx-auto border border-white/5">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setPicDriftMode("standard");
-                                  setKieDuration(10);
-                                }}
-                                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${picDriftMode === "standard"
-                                  ? "bg-rose-600 text-white shadow-lg"
-                                  : "text-gray-400 hover:text-white"
-                                  }`}
-                              >
-                                Standard
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setPicDriftMode("plus");
-                                  setKieDuration(5);
-                                }}
-                                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${picDriftMode === "plus"
-                                  ? "bg-rose-600 text-white shadow-lg"
-                                  : "text-gray-400 hover:text-white"
-                                  }`}
-                              >
-                                PicDrift Plus
-                              </button>
-                            </div>
                           </div>
                         )}
 
                         {/* VIDEO FX SUB-MENU */}
                         {currentVisualTab === "videofx" && (
                           <div className="mb-6 animate-in fade-in space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 bg-gray-900/50 p-1.5 rounded-2xl w-full max-w-3xl mx-auto border border-white/5">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-gray-900/50 p-1.5 rounded-2xl w-full max-w-4xl mx-auto border border-white/5">
                               <button
                                 type="button"
                                 onClick={() => {
                                   setActiveEngine("kie");
-                                  setVideoFxMode("video");
-                                  setVideoFx1Duration(10);
+                                  setVideoFxMode("picdrift");
+                                  setPicDriftMode("plus");
+                                  setKieDuration(5);
                                 }}
-                                className={`w-full px-3 py-2.5 text-[11px] sm:text-xs font-semibold rounded-xl transition-all leading-tight whitespace-nowrap ${activeEngine === "kie"
+                                className={`w-full px-3 py-2.5 text-[11px] sm:text-xs font-semibold rounded-xl transition-all leading-tight whitespace-nowrap ${activeEngine === "kie" &&
+                                  videoFxMode === "picdrift" &&
+                                  picDriftMode === "plus"
                                   ? "bg-cyan-600 text-white shadow-lg"
                                   : "text-gray-400 hover:text-white"
                                   }`}
                               >
-                                Seedance 2.0 Kie
+                                Kling 3.0
                               </button>
                               <button
                                 type="button"
-                                onClick={() => setActiveEngine("openai")}
+                                onClick={() => {
+                                  setActiveEngine("openai");
+                                  setVideoFxMode("video");
+                                }}
                                 className={`w-full px-3 py-2.5 text-[11px] sm:text-xs font-semibold rounded-xl transition-all leading-tight whitespace-nowrap ${activeEngine === "openai"
                                   ? "bg-cyan-600 text-white shadow-lg"
                                   : "text-gray-400 hover:text-white"
                                   }`}
                               >
-                                Seedance 2.0 Fal
+                                Seedance 2.0 FAL
                               </button>
                               <button
                                 type="button"
@@ -2985,6 +2884,16 @@ function Dashboard() {
                                   }`}
                               >
                                 Veo 3
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setActiveEngine("topaz")}
+                                className={`w-full px-3 py-2.5 text-[11px] sm:text-xs font-semibold rounded-xl transition-all leading-tight whitespace-nowrap ${activeEngine === "topaz"
+                                  ? "bg-cyan-600 text-white shadow-lg"
+                                  : "text-gray-400 hover:text-white"
+                                  }`}
+                              >
+                                Topaz Upscale
                               </button>
                             </div>
                           </div>
@@ -3013,7 +2922,7 @@ function Dashboard() {
                               </div>
                               <label className="block w-full max-w-sm mx-auto cursor-pointer group">
                                 <div className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl text-white font-bold group-hover:shadow-lg group-hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
-                                  <span>📤 Upload to Start</span>
+                                  <span>ðŸ“¤ Upload to Start</span>
                                 </div>
                                 <input
                                   type="file"
@@ -3039,7 +2948,7 @@ function Dashboard() {
                           ) : (
                             <>
                               {/* 1. PICDRIFT FRAMES (Always Top for PicDrift Mode) */}
-                              {currentVisualTab === "picdrift" && (
+                              {activeEngine === "kie" && videoFxMode === "picdrift" && (
                                 <div className="grid grid-cols-2 gap-4 mb-4 animate-in fade-in">
                                   {/* Start Frame */}
                                   <div className="flex flex-col gap-2">
@@ -3063,7 +2972,7 @@ function Dashboard() {
                                             }
                                             className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
                                           >
-                                            ✕
+                                            âœ•
                                           </button>
                                         </>
                                       ) : (
@@ -3127,7 +3036,7 @@ function Dashboard() {
                                             }
                                             className="absolute top-2 right-2 bg-red-600 text-white p-1 rounded-full text-xs"
                                           >
-                                            ✕
+                                            âœ•
                                           </button>
                                         </>
                                       ) : (
@@ -3186,7 +3095,7 @@ function Dashboard() {
                                         : "bg-cyan-900/40 border-cyan-500/50 text-cyan-300 hover:bg-cyan-800/60"
                                       }`}
                                   >
-                                    ✨ PromptFX
+                                    âœ¨ PromptFX
                                   </button>
 
                                   {/* PromptFX Popover Menu */}
@@ -3207,7 +3116,7 @@ function Dashboard() {
                                             onClick={() => setShowPromptFxMenu(false)}
                                             className="text-[10px] text-gray-400 hover:text-white hover:bg-gray-700 px-2 py-1 rounded transition-colors"
                                           >
-                                            ✕
+                                            âœ•
                                           </button>
                                         </div>
                                       </div>
@@ -3305,7 +3214,7 @@ function Dashboard() {
                                                   className="w-7 h-7 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded flex items-center justify-center text-xs"
                                                   title="Edit"
                                                 >
-                                                  ✎
+                                                  âœŽ
                                                 </button>
                                                 <button
                                                   type="button"
@@ -3318,7 +3227,7 @@ function Dashboard() {
                                                   className="w-7 h-7 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded flex items-center justify-center text-xs"
                                                   title="Delete"
                                                 >
-                                                  ✕
+                                                  âœ•
                                                 </button>
                                               </div>
                                             </div>
@@ -3339,7 +3248,7 @@ function Dashboard() {
                               </div>
 
                               <div>
-                                {/* ✅ FLEX CONTAINER FOR LABEL + BUTTON */}
+                                {/* âœ… FLEX CONTAINER FOR LABEL + BUTTON */}
                                 <div className="flex justify-between items-center mb-2">
                                   <label className="block text-sm font-semibold text-white">
                                     Title
@@ -3357,151 +3266,8 @@ function Dashboard() {
 
                               {/* 3. SETTINGS (Moved below Title) */}
 
-                              {/* VIDEO FX 1 SETTINGS */}
-                              {currentVisualTab === "videofx" &&
-                                activeEngine === "kie" && (
-                                  <div className="space-y-4 sm:space-y-6 animate-in fade-in">
-                                    <div className="space-y-3">
-                                      <label className="text-sm font-semibold text-white mb-2 block">
-                                        Generation Mode
-                                      </label>
-                                      <div className="grid grid-cols-3 gap-2">
-                                        {[
-                                          { id: "text", label: "Text" },
-                                          { id: "frames", label: "Frames" },
-                                          { id: "references", label: "References" },
-                                        ].map((mode) => (
-                                          <button
-                                            key={mode.id}
-                                            type="button"
-                                            onClick={() =>
-                                              setVideoFx1Mode(
-                                                mode.id as "text" | "frames" | "references",
-                                              )
-                                            }
-                                            className={`py-2 rounded-lg border text-sm font-medium transition-all ${videoFx1Mode === mode.id
-                                              ? "bg-cyan-600 border-cyan-600 text-white"
-                                              : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                              }`}
-                                          >
-                                            {mode.label}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                                      <div>
-                                        <label className="text-sm font-semibold text-white mb-2 block">
-                                          Duration
-                                        </label>
-                                        <div className="grid grid-cols-3 gap-2">
-                                          {[10, 15].map((d) => (
-                                            <button
-                                              key={d}
-                                              type="button"
-                                              onClick={() => setVideoFx1Duration(d as 10 | 15)}
-                                              className={`py-2 rounded-lg border text-sm font-medium ${videoFx1Duration === d
-                                                ? "bg-cyan-600 border-cyan-600 text-white"
-                                                : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                                }`}
-                                            >
-                                              {d}s
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </div>
-                                      <div>
-                                        <label className="text-sm font-semibold text-white mb-2 block">
-                                          Resolution
-                                        </label>
-                                        <div className="flex gap-2">
-                                          {[
-                                            { id: "480p", label: "480p" },
-                                            { id: "720p", label: "720p" },
-                                            { id: "1080p", label: "1080p" },
-                                          ].map((r) => (
-                                            <button
-                                              key={r.id}
-                                              type="button"
-                                              onClick={() =>
-                                                setVideoFx1Resolution(
-                                                  r.id as "480p" | "720p" | "1080p",
-                                                )
-                                              }
-                                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${videoFx1Resolution === r.id
-                                                ? "bg-cyan-600 border-cyan-600 text-white"
-                                                : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                                }`}
-                                            >
-                                              {r.label}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </div>
-                                      <div className="sm:col-span-2">
-                                        <label className="text-sm font-semibold text-white mb-2 block">
-                                          Aspect Ratio
-                                        </label>
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                          {[
-                                            { id: "16:9", label: "16:9" },
-                                            { id: "9:16", label: "9:16" },
-                                            { id: "1:1", label: "1:1" },
-                                            { id: "4:3", label: "4:3" },
-                                            { id: "3:4", label: "3:4" },
-                                            { id: "21:9", label: "21:9" },
-                                            { id: "auto", label: "Auto" },
-                                          ].map((a) => (
-                                            <button
-                                              key={a.id}
-                                              type="button"
-                                              onClick={() =>
-                                                setVideoFx1Aspect(
-                                                  a.id as
-                                                    | "16:9"
-                                                    | "9:16"
-                                                    | "1:1"
-                                                    | "4:3"
-                                                    | "3:4"
-                                                    | "21:9"
-                                                    | "auto",
-                                                )
-                                              }
-                                              className={`py-2 rounded-lg border text-sm font-medium ${videoFx1Aspect === a.id
-                                                ? "bg-cyan-600 border-cyan-600 text-white"
-                                                : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                                }`}
-                                            >
-                                              {a.label}
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </div>
-                                      <div className="sm:col-span-2">
-                                        <label className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-gray-800/50 cursor-pointer hover:bg-gray-800 transition-colors">
-                                          <input
-                                            type="checkbox"
-                                            checked={videoFx1GenerateAudio}
-                                            onChange={(e) => setVideoFx1GenerateAudio(e.target.checked)}
-                                            className="w-5 h-5 rounded border-gray-600 text-cyan-600 focus:ring-cyan-500 bg-gray-700"
-                                          />
-                                          <div>
-                                            <div className="font-semibold text-white text-sm">
-                                              Generate Audio
-                                            </div>
-                                            <div className="text-xs text-gray-400">
-                                              Include synchronized audio in output.
-                                            </div>
-                                          </div>
-                                        </label>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-
                               {/* PICDRIFT SETTINGS */}
-                              {currentVisualTab === "picdrift" && (
+                              {activeEngine === "kie" && videoFxMode === "picdrift" && (
                                 <div className="space-y-6 mb-6">
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                                     <div>
@@ -3529,7 +3295,7 @@ function Dashboard() {
                                         Aspect Ratio
                                       </label>
                                       <div className="flex gap-2">
-                                        {/* ✅ ADDED SQUARE OPTION HERE */}
+                                        {/* âœ… ADDED SQUARE OPTION HERE */}
                                         {[
                                           { id: "landscape", label: "Landscape" },
                                           { id: "portrait", label: "Portrait" },
@@ -3634,46 +3400,35 @@ function Dashboard() {
                                         <label className="text-sm font-semibold text-white mb-2 block">
                                           Duration
                                         </label>
-                                        <div className="grid grid-cols-3 gap-2">
-                                          {[4, 8, 12].map((sec) => (
-                                            <button
-                                              key={sec}
-                                              type="button"
-                                              onClick={() => setVideoDuration(sec as 4 | 8 | 12)}
-                                              className={`py-2 rounded-lg border text-sm font-medium ${videoDuration === sec
-                                                ? "bg-cyan-600 border-cyan-600 text-white"
-                                                : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                                }`}
-                                            >
+                                        <select
+                                          value={videoDuration}
+                                          onChange={(e) => setVideoDuration(Number(e.target.value))}
+                                          className="w-full py-2 px-3 rounded-lg border border-white/10 bg-gray-800/60 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/60"
+                                        >
+                                          {[4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((sec) => (
+                                            <option key={sec} value={sec}>
                                               {sec}s
-                                            </button>
+                                            </option>
                                           ))}
-                                        </div>
+                                        </select>
                                       </div>
                                       <div>
                                         <label className="text-sm font-semibold text-white mb-2 block">
                                           Resolution
                                         </label>
-                                        <div className="flex gap-2">
-                                          {[
-                                            { value: "480p", label: "480p" },
-                                            { value: "720p", label: "720p" },
-                                          ].map(({ value, label }) => (
-                                            <button
-                                              key={value}
-                                              type="button"
-                                              onClick={() =>
-                                                setVideoFx2Resolution(value as "480p" | "720p")
-                                              }
-                                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${videoFx2Resolution === value
-                                                ? "bg-cyan-600 border-cyan-600 text-white"
-                                                : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                                }`}
-                                            >
-                                              {label}
-                                            </button>
-                                          ))}
-                                        </div>
+                                        <select
+                                          value={videoFx2Resolution}
+                                          onChange={(e) =>
+                                            setVideoFx2Resolution(
+                                              e.target.value as "480p" | "720p" | "1080p",
+                                            )
+                                          }
+                                          className="w-full py-2 px-3 rounded-lg border border-white/10 bg-gray-800/60 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/60"
+                                        >
+                                          <option value="480p">480p</option>
+                                          <option value="720p">720p</option>
+                                          <option value="1080p">1080p</option>
+                                        </select>
                                       </div>
                                       <div className="sm:col-span-2">
                                         <label className="text-sm font-semibold text-white mb-2 block">
@@ -3733,6 +3488,69 @@ function Dashboard() {
                                         </label>
                                       </div>
                                     </div>
+                                  </div>
+                                )}
+
+                              {/* TOPAZ UPSCALE SETTINGS */}
+                              {currentVisualTab === "videofx" &&
+                                activeEngine === "topaz" && (
+                                  <div className="space-y-4 sm:space-y-6 animate-in fade-in">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                      <div>
+                                        <label className="text-sm font-semibold text-white mb-2 block">
+                                          Upscale Factor
+                                        </label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                          {[2, 4].map((factor) => (
+                                            <button
+                                              key={factor}
+                                              type="button"
+                                              onClick={() =>
+                                                setTopazUpscaleFactor(factor as 2 | 4)
+                                              }
+                                              className={`py-2 rounded-lg border text-sm font-medium ${topazUpscaleFactor === factor
+                                                ? "bg-cyan-600 border-cyan-600 text-white"
+                                                : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                                }`}
+                                            >
+                                              {factor}x
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <label className="text-sm font-semibold text-white mb-2 block">
+                                          Target FPS
+                                        </label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                          {[
+                                            { id: "source", label: "Source" },
+                                            { id: 30, label: "30" },
+                                            { id: 60, label: "60" },
+                                          ].map((fps) => (
+                                            <button
+                                              key={String(fps.id)}
+                                              type="button"
+                                              onClick={() =>
+                                                setTopazTargetFps(
+                                                  fps.id as 30 | 60 | "source",
+                                                )
+                                              }
+                                              className={`py-2 rounded-lg border text-sm font-medium ${topazTargetFps === fps.id
+                                                ? "bg-cyan-600 border-cyan-600 text-white"
+                                                : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                                }`}
+                                            >
+                                              {fps.label}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <p className="text-xs text-gray-400">
+                                      Upload or select one source video. Topaz will
+                                      upscale and optionally interpolate to the selected FPS.
+                                    </p>
                                   </div>
                                 )}
 
@@ -4390,15 +4208,13 @@ function Dashboard() {
                                               className="hidden"
                                               multiple={
                                                 activeEngine === "studio" ||
-                                                (activeEngine === "kie" &&
-                                                  videoFxMode === "video") ||
                                                 activeEngine === "openai"
                                               }
                                               accept={
-                                                activeEngine === "studio" ||
-                                                (activeEngine === "kie" &&
-                                                  videoFxMode === "video")
+                                                activeEngine === "studio"
                                                   ? "image/*"
+                                                  : activeEngine === "topaz"
+                                                    ? "video/*"
                                                   : "image/*,video/*"
                                               }
                                               onChange={handleGenericUpload}
@@ -4427,9 +4243,8 @@ function Dashboard() {
                                             ? "Up to 14 images"
                                             : activeEngine === "studio"
                                               ? `Up to ${MAX_PICFX_REFERENCE_IMAGES} reference images`
-                                              : activeEngine === "kie" &&
-                                                  videoFxMode === "video"
-                                                ? "Reference upload is managed by generation mode."
+                                              : activeEngine === "topaz"
+                                                ? "One source video"
                                               : activeEngine === "openai"
                                                 ? "Reference upload is managed by generation mode."
                                                 : "Single frame (PNG/JPG/MP4)"}
@@ -4468,7 +4283,7 @@ function Dashboard() {
                                                 }
                                                 className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 w-5 h-5 flex items-center justify-center text-xs"
                                               >
-                                                ✕
+                                                âœ•
                                               </button>
                                             </div>
                                           ))}
@@ -4479,7 +4294,7 @@ function Dashboard() {
                                 </div>
                               ) : null}
 
-                              {/* ✅ UPDATED GENERATE BUTTON */}
+                              {/* âœ… UPDATED GENERATE BUTTON */}
                               <button
                                 type="submit"
                                 disabled={
@@ -4828,4 +4643,5 @@ function Dashboard() {
 }
 
 export default Dashboard;
+
 

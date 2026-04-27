@@ -65,15 +65,9 @@ const requiresFalForRequest = (mediaType: unknown, model: unknown): boolean => {
   return (
     normalizedModel.includes("kling") ||
     normalizedModel.includes("seedance-fal") ||
-    normalizedModel === "veo-3"
+    normalizedModel === "veo-3" ||
+    normalizedModel === "topaz-upscale-video"
   );
-};
-
-const requiresKieForRequest = (mediaType: unknown, model: unknown): boolean => {
-  const normalizedMediaType =
-    typeof mediaType === "string" ? mediaType.toLowerCase() : "";
-  if (normalizedMediaType !== "video") return false;
-  return normalizeModel(model).includes("kie");
 };
 
 // ==================== ASSET MANAGEMENT ====================
@@ -343,6 +337,7 @@ router.post(
         referenceUrl,
         referenceUrls: rawReferenceUrls,
         mode,
+        model,
         originalAssetId,
       } = req.body;
       if (!assetUrl || !prompt) {
@@ -391,6 +386,7 @@ router.post(
         mode || "pro",
         originalAssetId,
         apiKeys,
+        model === "gpt-image-2" ? "gpt-image-2" : "nano-banana-2",
       );
 
       res.json({ success: true, asset: newAsset });
@@ -972,13 +968,6 @@ router.post(
             "Missing Fal API key. Configure it in the Admin Panel before generating this content.",
         });
       }
-      if (requiresKieForRequest(mediaType, model) && !tenantApiKeys.kieApiKey) {
-        return res.status(403).json({
-          error:
-            "Missing KIE API key. Configure it in the Admin Panel before generating this content.",
-        });
-      }
-
       const pool = getTargetPool(user, mediaType, model);
       const cost = getCost(
         user,
@@ -986,6 +975,10 @@ router.post(
           mediaType,
           duration: duration ? parseInt(duration) : undefined,
           model,
+          upscaleFactor:
+            req.body?.upscaleFactor !== undefined
+              ? Number(req.body.upscaleFactor)
+              : undefined,
         },
         settings,
       );

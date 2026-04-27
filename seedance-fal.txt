@@ -1,412 +1,6 @@
 About
-Text To Video
 
-1. Calling the API
-#
-Install the client
-#
-The client provides a convenient way to interact with the model API.
-
-npm
-yarn
-pnpm
-bun
-
-npm install --save @fal-ai/client
-Migrate to @fal-ai/client
-The @fal-ai/serverless-client package has been deprecated in favor of @fal-ai/client. Please check the migration guide for more information.
-
-Setup your API Key
-#
-Set FAL_KEY as an environment variable in your runtime.
-
-
-export FAL_KEY="YOUR_API_KEY"
-Submit a request
-#
-The client API handles the API submit protocol. It will handle the request status updates and return the result when the request is completed.
-
-
-import { fal } from "@fal-ai/client";
-
-const result = await fal.subscribe("bytedance/seedance-2.0/text-to-video", {
-  input: {
-    prompt: "An octopus finds a football in the ocean and excitedly calls its octopus friends to come and play. Cut scene to an octopus football game under the sea."
-  },
-  logs: true,
-  onQueueUpdate: (update) => {
-    if (update.status === "IN_PROGRESS") {
-      update.logs.map((log) => log.message).forEach(console.log);
-    }
-  },
-});
-console.log(result.data);
-console.log(result.requestId);
-2. Authentication
-#
-The API uses an API Key for authentication. It is recommended you set the FAL_KEY environment variable in your runtime when possible.
-
-API Key
-#
-In case your app is running in an environment where you cannot set environment variables, you can set the API Key manually as a client configuration.
-
-import { fal } from "@fal-ai/client";
-
-fal.config({
-  credentials: "YOUR_FAL_KEY"
-});
-Protect your API Key
-When running code on the client-side (e.g. in a browser, mobile app or GUI applications), make sure to not expose your FAL_KEY. Instead, use a server-side proxy to make requests to the API. For more information, check out our server-side integration guide.
-
-3. Queue
-#
-Long-running requests
-For long-running requests, such as training jobs or models with slower inference times, it is recommended to check the Queue status and rely on Webhooks instead of blocking while waiting for the result.
-
-Submit a request
-#
-The client API provides a convenient way to submit requests to the model.
-
-
-import { fal } from "@fal-ai/client";
-
-const { request_id } = await fal.queue.submit("bytedance/seedance-2.0/text-to-video", {
-  input: {
-    prompt: "An octopus finds a football in the ocean and excitedly calls its octopus friends to come and play. Cut scene to an octopus football game under the sea."
-  },
-  webhookUrl: "https://optional.webhook.url/for/results",
-});
-Fetch request status
-#
-You can fetch the status of a request to check if it is completed or still in progress.
-
-
-import { fal } from "@fal-ai/client";
-
-const status = await fal.queue.status("bytedance/seedance-2.0/text-to-video", {
-  requestId: "764cabcf-b745-4b3e-ae38-1200304cf45b",
-  logs: true,
-});
-Get the result
-#
-Once the request is completed, you can fetch the result. See the Output Schema for the expected result format.
-
-
-import { fal } from "@fal-ai/client";
-
-const result = await fal.queue.result("bytedance/seedance-2.0/text-to-video", {
-  requestId: "764cabcf-b745-4b3e-ae38-1200304cf45b"
-});
-console.log(result.data);
-console.log(result.requestId);
-4. Files
-#
-Some attributes in the API accept file URLs as input. Whenever that's the case you can pass your own URL or a Base64 data URI.
-
-Data URI (base64)
-#
-You can pass a Base64 data URI as a file input. The API will handle the file decoding for you. Keep in mind that for large files, this alternative although convenient can impact the request performance.
-
-Hosted files (URL)
-#
-You can also pass your own URLs as long as they are publicly accessible. Be aware that some hosts might block cross-site requests, rate-limit, or consider the request as a bot.
-
-Uploading files
-#
-We provide a convenient file storage that allows you to upload files and use them in your requests. You can upload files using the client API and use the returned URL in your requests.
-
-
-import { fal } from "@fal-ai/client";
-
-const file = new File(["Hello, World!"], "hello.txt", { type: "text/plain" });
-const url = await fal.storage.upload(file);
-Auto uploads
-The client will auto-upload the file for you if you pass a binary object (e.g. File, Data).
-
-Read more about file handling in our file upload guide.
-
-5. Schema
-#
-Input
-#
-prompt string
-The text prompt used to generate the video
-
-resolution ResolutionEnum
-Video resolution - 480p for faster generation, 720p for balance. Default value: "720p"
-
-Possible enum values: 480p, 720p
-
-duration DurationEnum
-Duration of the video in seconds. Supports 4 to 15 seconds, or auto to let the model decide based on the prompt. Default value: "auto"
-
-Possible enum values: auto, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
-
-aspect_ratio AspectRatioEnum
-The aspect ratio of the generated video. Use 16:9 for landscape, 9:16 for portrait/vertical, 1:1 for square, 21:9 for ultrawide cinematic, or auto to let the model decide. Default value: "auto"
-
-Possible enum values: auto, 21:9, 16:9, 4:3, 1:1, 3:4, 9:16
-
-generate_audio boolean
-Whether to generate synchronized audio for the video, including sound effects, ambient sounds, and lip-synced speech. The cost of video generation is the same regardless of whether audio is generated or not. Default value: true
-
-seed integer
-Random seed for reproducibility. Note that results may still vary slightly even with the same seed.
-
-end_user_id string
-The unique user ID of the end user.
-
-
-{
-  "prompt": "An octopus finds a football in the ocean and excitedly calls its octopus friends to come and play. Cut scene to an octopus football game under the sea.",
-  "resolution": "720p",
-  "duration": "auto",
-  "aspect_ratio": "auto",
-  "generate_audio": true
-}
-Output
-#
-video File
-The generated video file.
-
-seed integer
-The seed used for generation.
-
-
-{
-  "video": {
-    "url": "https://storage.googleapis.com/falserverless/example_outputs/bytedance/seedance_2/output.mp4"
-  },
-  "seed": 42
-}
-Other types
-#
-File
-#
-url string
-The URL where the file can be downloaded from.
-
-content_type string
-The mime type of the file.
-
-file_name string
-The name of the file. It will be auto-generated if not provided.
-
-file_size integer
-The size of the file in bytes.
-
-
-About
-Reference To Video
-
-1. Calling the API
-#
-Install the client
-#
-The client provides a convenient way to interact with the model API.
-
-npm
-yarn
-pnpm
-bun
-
-npm install --save @fal-ai/client
-Migrate to @fal-ai/client
-The @fal-ai/serverless-client package has been deprecated in favor of @fal-ai/client. Please check the migration guide for more information.
-
-Setup your API Key
-#
-Set FAL_KEY as an environment variable in your runtime.
-
-
-export FAL_KEY="YOUR_API_KEY"
-Submit a request
-#
-The client API handles the API submit protocol. It will handle the request status updates and return the result when the request is completed.
-
-
-import { fal } from "@fal-ai/client";
-
-const result = await fal.subscribe("bytedance/seedance-2.0/reference-to-video", {
-  input: {
-    prompt: "An octopus finds a football in the ocean and excitedly calls its octopus friends to come and play. Cut scene to an octopus football game under the sea."
-  },
-  logs: true,
-  onQueueUpdate: (update) => {
-    if (update.status === "IN_PROGRESS") {
-      update.logs.map((log) => log.message).forEach(console.log);
-    }
-  },
-});
-console.log(result.data);
-console.log(result.requestId);
-2. Authentication
-#
-The API uses an API Key for authentication. It is recommended you set the FAL_KEY environment variable in your runtime when possible.
-
-API Key
-#
-In case your app is running in an environment where you cannot set environment variables, you can set the API Key manually as a client configuration.
-
-import { fal } from "@fal-ai/client";
-
-fal.config({
-  credentials: "YOUR_FAL_KEY"
-});
-Protect your API Key
-When running code on the client-side (e.g. in a browser, mobile app or GUI applications), make sure to not expose your FAL_KEY. Instead, use a server-side proxy to make requests to the API. For more information, check out our server-side integration guide.
-
-3. Queue
-#
-Long-running requests
-For long-running requests, such as training jobs or models with slower inference times, it is recommended to check the Queue status and rely on Webhooks instead of blocking while waiting for the result.
-
-Submit a request
-#
-The client API provides a convenient way to submit requests to the model.
-
-
-import { fal } from "@fal-ai/client";
-
-const { request_id } = await fal.queue.submit("bytedance/seedance-2.0/reference-to-video", {
-  input: {
-    prompt: "An octopus finds a football in the ocean and excitedly calls its octopus friends to come and play. Cut scene to an octopus football game under the sea."
-  },
-  webhookUrl: "https://optional.webhook.url/for/results",
-});
-Fetch request status
-#
-You can fetch the status of a request to check if it is completed or still in progress.
-
-
-import { fal } from "@fal-ai/client";
-
-const status = await fal.queue.status("bytedance/seedance-2.0/reference-to-video", {
-  requestId: "764cabcf-b745-4b3e-ae38-1200304cf45b",
-  logs: true,
-});
-Get the result
-#
-Once the request is completed, you can fetch the result. See the Output Schema for the expected result format.
-
-
-import { fal } from "@fal-ai/client";
-
-const result = await fal.queue.result("bytedance/seedance-2.0/reference-to-video", {
-  requestId: "764cabcf-b745-4b3e-ae38-1200304cf45b"
-});
-console.log(result.data);
-console.log(result.requestId);
-4. Files
-#
-Some attributes in the API accept file URLs as input. Whenever that's the case you can pass your own URL or a Base64 data URI.
-
-Data URI (base64)
-#
-You can pass a Base64 data URI as a file input. The API will handle the file decoding for you. Keep in mind that for large files, this alternative although convenient can impact the request performance.
-
-Hosted files (URL)
-#
-You can also pass your own URLs as long as they are publicly accessible. Be aware that some hosts might block cross-site requests, rate-limit, or consider the request as a bot.
-
-Uploading files
-#
-We provide a convenient file storage that allows you to upload files and use them in your requests. You can upload files using the client API and use the returned URL in your requests.
-
-
-import { fal } from "@fal-ai/client";
-
-const file = new File(["Hello, World!"], "hello.txt", { type: "text/plain" });
-const url = await fal.storage.upload(file);
-Auto uploads
-The client will auto-upload the file for you if you pass a binary object (e.g. File, Data).
-
-Read more about file handling in our file upload guide.
-
-5. Schema
-#
-Input
-#
-prompt string
-The text prompt used to generate the video.
-
-image_urls list<string>
-Reference images to guide video generation. Refer to them in the prompt as @Image1, @Image2, etc. Supported formats: JPEG, PNG, WebP. Max 30 MB per image. Up to 9 images. Total files across all modalities must not exceed 12.
-
-video_urls list<string>
-Reference videos to guide video generation. Refer to them in the prompt as @Video1, @Video2, etc. Supported formats: MP4, MOV. Up to 3 videos, combined duration must be between 2 and 15 seconds, total size under 50 MB. Each video must be between ~480p (640x640) and ~720p (834x1112) in resolution.
-
-audio_urls list<string>
-Reference audio to guide video generation. Refer to them in the prompt as @Audio1, @Audio2, etc. Supported formats: MP3, WAV. Up to 3 files, combined duration must not exceed 15 seconds. Max 15 MB per file.If audio is provided, at least one reference image or video is required.
-
-resolution ResolutionEnum
-Video resolution - 480p for faster generation, 720p for balance. Default value: "720p"
-
-Possible enum values: 480p, 720p
-
-duration DurationEnum
-Duration of the video in seconds. Supports 4 to 15 seconds, or auto to let the model decide based on the prompt. Default value: "auto"
-
-Possible enum values: auto, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
-
-aspect_ratio AspectRatioEnum
-The aspect ratio of the generated video. Use 16:9 for landscape, 9:16 for portrait/vertical, 1:1 for square, 21:9 for ultrawide cinematic, or auto to let the model decide. Default value: "auto"
-
-Possible enum values: auto, 21:9, 16:9, 4:3, 1:1, 3:4, 9:16
-
-generate_audio boolean
-Whether to generate synchronized audio for the video, including sound effects, ambient sounds, and lip-synced speech. The cost of video generation is the same regardless of whether audio is generated or not. Default value: true
-
-seed integer
-Random seed for reproducibility. Note that results may still vary slightly even with the same seed.
-
-end_user_id string
-The unique user ID of the end user.
-
-
-{
-  "prompt": "An octopus finds a football in the ocean and excitedly calls its octopus friends to come and play. Cut scene to an octopus football game under the sea.",
-  "image_urls": [
-    "https://v3b.fal.media/files/b/0a8eba37/Cqg-4Uwzyz4DELfceT1CF_a17e588773ec45b1a9e6f100a787b80b.jpg"
-  ],
-  "resolution": "720p",
-  "duration": "auto",
-  "aspect_ratio": "auto",
-  "generate_audio": true
-}
-Output
-#
-video File
-The generated video file.
-
-seed integer
-The seed used for generation.
-
-
-{
-  "video": {
-    "url": "https://storage.googleapis.com/falserverless/example_outputs/bytedance/seedance_2/output.mp4"
-  },
-  "seed": 42
-}
-Other types
-#
-File
-#
-url string
-The URL where the file can be downloaded from.
-
-content_type string
-The mime type of the file.
-
-file_name string
-The name of the file. It will be auto-generated if not provided.
-
-file_size integer
-The size of the file in bytes.
-
-
-
+image to video:
 About
 Image To Video
 
@@ -550,9 +144,9 @@ end_image_url string
 The URL of the image to use as the last frame of the video. When provided, the generated video will transition from the starting image to this ending image. Supported formats: JPEG, PNG, WebP. Max 30 MB.
 
 resolution ResolutionEnum
-Video resolution - 480p for faster generation, 720p for balance. Default value: "720p"
+Video resolution - 480p for faster generation, 720p for balance, 1080p for highest quality. Default value: "720p"
 
-Possible enum values: 480p, 720p
+Possible enum values: 480p, 720p, 1080p
 
 duration DurationEnum
 Duration of the video in seconds. Supports 4 to 15 seconds, or auto to let the model decide based on the prompt. Default value: "auto"
@@ -577,6 +171,414 @@ The unique user ID of the end user.
 {
   "prompt": "An octopus finds a football in the ocean and excitedly calls its octopus friends to come and play. Cut scene to an octopus football game under the sea.",
   "image_url": "https://v3b.fal.media/files/b/0a8eba37/Cqg-4Uwzyz4DELfceT1CF_a17e588773ec45b1a9e6f100a787b80b.jpg",
+  "resolution": "720p",
+  "duration": "auto",
+  "aspect_ratio": "auto",
+  "generate_audio": true
+}
+Output
+#
+video File
+The generated video file.
+
+seed integer
+The seed used for generation.
+
+
+{
+  "video": {
+    "url": "https://storage.googleapis.com/falserverless/example_outputs/bytedance/seedance_2/output.mp4"
+  },
+  "seed": 42
+}
+Other types
+#
+File
+#
+url string
+The URL where the file can be downloaded from.
+
+content_type string
+The mime type of the file.
+
+file_name string
+The name of the file. It will be auto-generated if not provided.
+
+file_size integer
+The size of the file in bytes.
+
+
+
+Reference To Video
+
+1. Calling the API
+#
+Install the client
+#
+The client provides a convenient way to interact with the model API.
+
+npm
+yarn
+pnpm
+bun
+
+npm install --save @fal-ai/client
+Migrate to @fal-ai/client
+The @fal-ai/serverless-client package has been deprecated in favor of @fal-ai/client. Please check the migration guide for more information.
+
+Setup your API Key
+#
+Set FAL_KEY as an environment variable in your runtime.
+
+
+export FAL_KEY="YOUR_API_KEY"
+Submit a request
+#
+The client API handles the API submit protocol. It will handle the request status updates and return the result when the request is completed.
+
+
+import { fal } from "@fal-ai/client";
+
+const result = await fal.subscribe("bytedance/seedance-2.0/reference-to-video", {
+  input: {
+    prompt: "An octopus finds a football in the ocean and excitedly calls its octopus friends to come and play. Cut scene to an octopus football game under the sea."
+  },
+  logs: true,
+  onQueueUpdate: (update) => {
+    if (update.status === "IN_PROGRESS") {
+      update.logs.map((log) => log.message).forEach(console.log);
+    }
+  },
+});
+console.log(result.data);
+console.log(result.requestId);
+2. Authentication
+#
+The API uses an API Key for authentication. It is recommended you set the FAL_KEY environment variable in your runtime when possible.
+
+API Key
+#
+In case your app is running in an environment where you cannot set environment variables, you can set the API Key manually as a client configuration.
+
+import { fal } from "@fal-ai/client";
+
+fal.config({
+  credentials: "YOUR_FAL_KEY"
+});
+Protect your API Key
+When running code on the client-side (e.g. in a browser, mobile app or GUI applications), make sure to not expose your FAL_KEY. Instead, use a server-side proxy to make requests to the API. For more information, check out our server-side integration guide.
+
+3. Queue
+#
+Long-running requests
+For long-running requests, such as training jobs or models with slower inference times, it is recommended to check the Queue status and rely on Webhooks instead of blocking while waiting for the result.
+
+Submit a request
+#
+The client API provides a convenient way to submit requests to the model.
+
+
+import { fal } from "@fal-ai/client";
+
+const { request_id } = await fal.queue.submit("bytedance/seedance-2.0/reference-to-video", {
+  input: {
+    prompt: "An octopus finds a football in the ocean and excitedly calls its octopus friends to come and play. Cut scene to an octopus football game under the sea."
+  },
+  webhookUrl: "https://optional.webhook.url/for/results",
+});
+Fetch request status
+#
+You can fetch the status of a request to check if it is completed or still in progress.
+
+
+import { fal } from "@fal-ai/client";
+
+const status = await fal.queue.status("bytedance/seedance-2.0/reference-to-video", {
+  requestId: "764cabcf-b745-4b3e-ae38-1200304cf45b",
+  logs: true,
+});
+Get the result
+#
+Once the request is completed, you can fetch the result. See the Output Schema for the expected result format.
+
+
+import { fal } from "@fal-ai/client";
+
+const result = await fal.queue.result("bytedance/seedance-2.0/reference-to-video", {
+  requestId: "764cabcf-b745-4b3e-ae38-1200304cf45b"
+});
+console.log(result.data);
+console.log(result.requestId);
+4. Files
+#
+Some attributes in the API accept file URLs as input. Whenever that's the case you can pass your own URL or a Base64 data URI.
+
+Data URI (base64)
+#
+You can pass a Base64 data URI as a file input. The API will handle the file decoding for you. Keep in mind that for large files, this alternative although convenient can impact the request performance.
+
+Hosted files (URL)
+#
+You can also pass your own URLs as long as they are publicly accessible. Be aware that some hosts might block cross-site requests, rate-limit, or consider the request as a bot.
+
+Uploading files
+#
+We provide a convenient file storage that allows you to upload files and use them in your requests. You can upload files using the client API and use the returned URL in your requests.
+
+
+import { fal } from "@fal-ai/client";
+
+const file = new File(["Hello, World!"], "hello.txt", { type: "text/plain" });
+const url = await fal.storage.upload(file);
+Auto uploads
+The client will auto-upload the file for you if you pass a binary object (e.g. File, Data).
+
+Read more about file handling in our file upload guide.
+
+5. Schema
+#
+Input
+#
+prompt string
+The text prompt used to generate the video.
+
+image_urls list<string>
+Reference images to guide video generation. Refer to them in the prompt as @Image1, @Image2, etc. Supported formats: JPEG, PNG, WebP. Max 30 MB per image. Up to 9 images. Total files across all modalities must not exceed 12.
+
+video_urls list<string>
+Reference videos to guide video generation. Refer to them in the prompt as @Video1, @Video2, etc. Supported formats: MP4, MOV. Up to 3 videos, combined duration must be between 2 and 15 seconds, total size under 50 MB. Each video must be between ~480p (640x640) and ~720p (834x1112) in resolution.
+
+audio_urls list<string>
+Reference audio to guide video generation. Refer to them in the prompt as @Audio1, @Audio2, etc. Supported formats: MP3, WAV. Up to 3 files, combined duration must not exceed 15 seconds. Max 15 MB per file.If audio is provided, at least one reference image or video is required.
+
+resolution ResolutionEnum
+Video resolution - 480p for faster generation, 720p for balance, 1080p for highest quality. Default value: "720p"
+
+Possible enum values: 480p, 720p, 1080p
+
+duration DurationEnum
+Duration of the video in seconds. Supports 4 to 15 seconds, or auto to let the model decide based on the prompt. Default value: "auto"
+
+Possible enum values: auto, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+
+aspect_ratio AspectRatioEnum
+The aspect ratio of the generated video. Use 16:9 for landscape, 9:16 for portrait/vertical, 1:1 for square, 21:9 for ultrawide cinematic, or auto to let the model decide. Default value: "auto"
+
+Possible enum values: auto, 21:9, 16:9, 4:3, 1:1, 3:4, 9:16
+
+generate_audio boolean
+Whether to generate synchronized audio for the video, including sound effects, ambient sounds, and lip-synced speech. The cost of video generation is the same regardless of whether audio is generated or not. Default value: true
+
+seed integer
+Random seed for reproducibility. Note that results may still vary slightly even with the same seed.
+
+end_user_id string
+The unique user ID of the end user.
+
+
+{
+  "prompt": "An octopus finds a football in the ocean and excitedly calls its octopus friends to come and play. Cut scene to an octopus football game under the sea.",
+  "image_urls": [
+    "https://v3b.fal.media/files/b/0a8eba37/Cqg-4Uwzyz4DELfceT1CF_a17e588773ec45b1a9e6f100a787b80b.jpg"
+  ],
+  "resolution": "720p",
+  "duration": "auto",
+  "aspect_ratio": "auto",
+  "generate_audio": true
+}
+Output
+#
+video File
+The generated video file.
+
+seed integer
+The seed used for generation.
+
+
+{
+  "video": {
+    "url": "https://storage.googleapis.com/falserverless/example_outputs/bytedance/seedance_2/output.mp4"
+  },
+  "seed": 42
+}
+Other types
+#
+File
+#
+url string
+The URL where the file can be downloaded from.
+
+content_type string
+The mime type of the file.
+
+file_name string
+The name of the file. It will be auto-generated if not provided.
+
+file_size integer
+The size of the file in bytes.
+
+
+About
+Text To Video
+
+1. Calling the API
+#
+Install the client
+#
+The client provides a convenient way to interact with the model API.
+
+npm
+yarn
+pnpm
+bun
+
+npm install --save @fal-ai/client
+Migrate to @fal-ai/client
+The @fal-ai/serverless-client package has been deprecated in favor of @fal-ai/client. Please check the migration guide for more information.
+
+Setup your API Key
+#
+Set FAL_KEY as an environment variable in your runtime.
+
+
+export FAL_KEY="YOUR_API_KEY"
+Submit a request
+#
+The client API handles the API submit protocol. It will handle the request status updates and return the result when the request is completed.
+
+
+import { fal } from "@fal-ai/client";
+
+const result = await fal.subscribe("bytedance/seedance-2.0/text-to-video", {
+  input: {
+    prompt: "An octopus finds a football in the ocean and excitedly calls its octopus friends to come and play. Cut scene to an octopus football game under the sea."
+  },
+  logs: true,
+  onQueueUpdate: (update) => {
+    if (update.status === "IN_PROGRESS") {
+      update.logs.map((log) => log.message).forEach(console.log);
+    }
+  },
+});
+console.log(result.data);
+console.log(result.requestId);
+2. Authentication
+#
+The API uses an API Key for authentication. It is recommended you set the FAL_KEY environment variable in your runtime when possible.
+
+API Key
+#
+In case your app is running in an environment where you cannot set environment variables, you can set the API Key manually as a client configuration.
+
+import { fal } from "@fal-ai/client";
+
+fal.config({
+  credentials: "YOUR_FAL_KEY"
+});
+Protect your API Key
+When running code on the client-side (e.g. in a browser, mobile app or GUI applications), make sure to not expose your FAL_KEY. Instead, use a server-side proxy to make requests to the API. For more information, check out our server-side integration guide.
+
+3. Queue
+#
+Long-running requests
+For long-running requests, such as training jobs or models with slower inference times, it is recommended to check the Queue status and rely on Webhooks instead of blocking while waiting for the result.
+
+Submit a request
+#
+The client API provides a convenient way to submit requests to the model.
+
+
+import { fal } from "@fal-ai/client";
+
+const { request_id } = await fal.queue.submit("bytedance/seedance-2.0/text-to-video", {
+  input: {
+    prompt: "An octopus finds a football in the ocean and excitedly calls its octopus friends to come and play. Cut scene to an octopus football game under the sea."
+  },
+  webhookUrl: "https://optional.webhook.url/for/results",
+});
+Fetch request status
+#
+You can fetch the status of a request to check if it is completed or still in progress.
+
+
+import { fal } from "@fal-ai/client";
+
+const status = await fal.queue.status("bytedance/seedance-2.0/text-to-video", {
+  requestId: "764cabcf-b745-4b3e-ae38-1200304cf45b",
+  logs: true,
+});
+Get the result
+#
+Once the request is completed, you can fetch the result. See the Output Schema for the expected result format.
+
+
+import { fal } from "@fal-ai/client";
+
+const result = await fal.queue.result("bytedance/seedance-2.0/text-to-video", {
+  requestId: "764cabcf-b745-4b3e-ae38-1200304cf45b"
+});
+console.log(result.data);
+console.log(result.requestId);
+4. Files
+#
+Some attributes in the API accept file URLs as input. Whenever that's the case you can pass your own URL or a Base64 data URI.
+
+Data URI (base64)
+#
+You can pass a Base64 data URI as a file input. The API will handle the file decoding for you. Keep in mind that for large files, this alternative although convenient can impact the request performance.
+
+Hosted files (URL)
+#
+You can also pass your own URLs as long as they are publicly accessible. Be aware that some hosts might block cross-site requests, rate-limit, or consider the request as a bot.
+
+Uploading files
+#
+We provide a convenient file storage that allows you to upload files and use them in your requests. You can upload files using the client API and use the returned URL in your requests.
+
+
+import { fal } from "@fal-ai/client";
+
+const file = new File(["Hello, World!"], "hello.txt", { type: "text/plain" });
+const url = await fal.storage.upload(file);
+Auto uploads
+The client will auto-upload the file for you if you pass a binary object (e.g. File, Data).
+
+Read more about file handling in our file upload guide.
+
+5. Schema
+#
+Input
+#
+prompt string
+The text prompt used to generate the video
+
+resolution ResolutionEnum
+Video resolution - 480p for faster generation, 720p for balance, 1080p for highest quality. Default value: "720p"
+
+Possible enum values: 480p, 720p, 1080p
+
+duration DurationEnum
+Duration of the video in seconds. Supports 4 to 15 seconds, or auto to let the model decide based on the prompt. Default value: "auto"
+
+Possible enum values: auto, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+
+aspect_ratio AspectRatioEnum
+The aspect ratio of the generated video. Use 16:9 for landscape, 9:16 for portrait/vertical, 1:1 for square, 21:9 for ultrawide cinematic, or auto to let the model decide. Default value: "auto"
+
+Possible enum values: auto, 21:9, 16:9, 4:3, 1:1, 3:4, 9:16
+
+generate_audio boolean
+Whether to generate synchronized audio for the video, including sound effects, ambient sounds, and lip-synced speech. The cost of video generation is the same regardless of whether audio is generated or not. Default value: true
+
+seed integer
+Random seed for reproducibility. Note that results may still vary slightly even with the same seed.
+
+end_user_id string
+The unique user ID of the end user.
+
+
+{
+  "prompt": "An octopus finds a football in the ocean and excitedly calls its octopus friends to come and play. Cut scene to an octopus football game under the sea.",
   "resolution": "720p",
   "duration": "auto",
   "aspect_ratio": "auto",

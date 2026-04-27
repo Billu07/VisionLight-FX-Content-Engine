@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+﻿import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import { confirmAction } from "../lib/notifications";
@@ -46,9 +46,9 @@ interface GlobalSettings {
 
 const COVERAGE_WALLETS = [
   { key: "creditsPicDrift", label: "PicDrift (Standard)", provider: "fal" },
-  { key: "creditsPicDriftPlus", label: "PicDrift Plus", provider: "fal" },
-  { key: "creditsVideoFX1", label: "Seedance 2.0 Kie", provider: "kie" },
-  { key: "creditsVideoFX2", label: "Seedance 2.0 Fal", provider: "fal" },
+  { key: "creditsPicDriftPlus", label: "Kling 3.0", provider: "fal" },
+  { key: "creditsVideoFX1", label: "Topaz Upscale", provider: "fal" },
+  { key: "creditsVideoFX2", label: "Seedance 2.0 FAL", provider: "fal" },
   { key: "creditsVideoFX3", label: "Veo 3", provider: "fal" },
 ] as const;
 
@@ -71,49 +71,49 @@ const COVERAGE_VARIANTS = [
   },
   {
     id: "picdrift_plus_5s",
-    label: "PicDrift Plus 5s",
+    label: "Kling 3.0 5s",
     provider: "fal",
     wallet: "creditsPicDriftPlus",
     deductionKey: "pricePicDrift_Plus_5s",
   },
   {
     id: "picdrift_plus_10s",
-    label: "PicDrift Plus 10s",
+    label: "Kling 3.0 10s",
     provider: "fal",
     wallet: "creditsPicDriftPlus",
     deductionKey: "pricePicDrift_Plus_10s",
   },
   {
-    id: "seedance_kie_10s",
-    label: "Seedance 2.0 Kie 10s",
-    provider: "kie",
+    id: "topaz_upscale_2x",
+    label: "Topaz Upscale 2x",
+    provider: "fal",
     wallet: "creditsVideoFX1",
     deductionKey: "priceVideoFX1_10s",
   },
   {
-    id: "seedance_kie_15s",
-    label: "Seedance 2.0 Kie 15s",
-    provider: "kie",
+    id: "topaz_upscale_4x",
+    label: "Topaz Upscale 4x",
+    provider: "fal",
     wallet: "creditsVideoFX1",
     deductionKey: "priceVideoFX1_15s",
   },
   {
     id: "seedance_fal_4s",
-    label: "Seedance 2.0 Fal 4s",
+    label: "Seedance 2.0 FAL 4s",
     provider: "fal",
     wallet: "creditsVideoFX2",
     deductionKey: "priceVideoFX2_4s",
   },
   {
     id: "seedance_fal_8s",
-    label: "Seedance 2.0 Fal 8s",
+    label: "Seedance 2.0 FAL 8s",
     provider: "fal",
     wallet: "creditsVideoFX2",
     deductionKey: "priceVideoFX2_8s",
   },
   {
     id: "seedance_fal_12s",
-    label: "Seedance 2.0 Fal 12s",
+    label: "Seedance 2.0 FAL 12s",
     provider: "fal",
     wallet: "creditsVideoFX2",
     deductionKey: "priceVideoFX2_12s",
@@ -205,8 +205,8 @@ export default function AdminDashboard() {
     picdrift_10s: 0.2,
     picdrift_plus_5s: 0.2,
     picdrift_plus_10s: 0.3,
-    seedance_kie_10s: 0.45,
-    seedance_kie_15s: 0.7,
+    topaz_upscale_2x: 0.45,
+    topaz_upscale_4x: 0.7,
     seedance_fal_4s: 0.2,
     seedance_fal_8s: 0.35,
     seedance_fal_12s: 0.5,
@@ -461,12 +461,11 @@ export default function AdminDashboard() {
   const coverageTotals = useMemo(() => {
     return walletCoverageRows.reduce(
       (acc, row) => {
-        if (row.provider === "kie") acc.kie += row.requiredUsd;
-        else acc.fal += row.requiredUsd;
+        acc.fal += row.requiredUsd;
         acc.total += row.requiredUsd;
         return acc;
       },
-      { fal: 0, kie: 0, total: 0 },
+      { fal: 0, total: 0 },
     );
   }, [walletCoverageRows]);
 
@@ -504,7 +503,7 @@ export default function AdminDashboard() {
               VISIONLIGHT <span className="text-brand-accent">ADMIN</span>
             </h1>
             <p className="text-[11px] text-gray-400 uppercase tracking-widest font-semibold">
-              Systems Control — Operator: {adminUser?.email}
+              Systems Control â€” Operator: {adminUser?.email}
             </p>
           </div>
 
@@ -585,7 +584,7 @@ export default function AdminDashboard() {
                     onClick={() => setSearchTerm("")}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
                   >
-                    ×
+                    Ã—
                   </button>
                 )}
               </div>
@@ -606,7 +605,7 @@ export default function AdminDashboard() {
               onClick={() => setMsg("")}
               className="text-brand-accent hover:text-cyan-300 text-lg"
             >
-              ×
+              Ã—
             </button>
           </div>
         )}
@@ -667,7 +666,7 @@ export default function AdminDashboard() {
                     <th className="p-6 border-b border-gray-800 text-center">PD Standard</th>
                     <th className="p-6 border-b border-gray-800 text-center">PD Plus</th>
                     <th className="p-6 border-b border-gray-800 text-center">PicFX</th>
-                    <th className="p-6 border-b border-gray-800 text-center">Seedance 2.0 - Kie</th>
+                    <th className="p-6 border-b border-gray-800 text-center">Topaz Upscale</th>
                     <th className="p-6 border-b border-gray-800 text-center">Seedance 2.0 FAL</th>
                     <th className="p-6 border-b border-gray-800 text-center">Video FX 3</th>
                     <th className="p-6 border-b border-gray-800 text-right">Operations</th>
@@ -777,8 +776,8 @@ export default function AdminDashboard() {
                 {
                   title: "Video FX Engine 1",
                   items: [
-                    { label: "FX 1 - 10s", key: "priceVideoFX1_10s" },
-                    { label: "FX 1 - 15s", key: "priceVideoFX1_15s" },
+                    { label: "Topaz 2x", key: "priceVideoFX1_10s" },
+                    { label: "Topaz 4x", key: "priceVideoFX1_15s" },
                   ],
                 },
                 {
@@ -850,7 +849,7 @@ export default function AdminDashboard() {
                   Variant Cost Mapper
                 </h3>
                 <p className="text-xs text-gray-500 mt-2">
-                  Enter actual provider USD per render. We auto-convert to USD/credit using configured credit deductions, then calculate Fal/Kie liability from allocated user credits.
+                  Enter actual provider USD per render. We auto-convert to USD/credit using configured credit deductions, then calculate required Fal coverage from allocated user credits.
                 </p>
               </div>
               <div className="overflow-x-auto">
@@ -927,21 +926,13 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
-              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
                   <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
                     Fal Coverage Needed
                   </p>
                   <p className="text-xl font-bold text-pink-400 mt-2">
                     {formatUsd(coverageTotals.fal)}
-                  </p>
-                </div>
-                <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                  <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
-                    Kie Coverage Needed
-                  </p>
-                  <p className="text-xl font-bold text-cyan-400 mt-2">
-                    {formatUsd(coverageTotals.kie)}
                   </p>
                 </div>
                 <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
@@ -982,21 +973,6 @@ export default function AdminDashboard() {
                   value={orgKeys.falApiKey}
                   onChange={(e) =>
                     setOrgKeys({ ...orgKeys, falApiKey: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                  KIE API Key (For Seedance 2.0 - Kie)
-                </label>
-                <input
-                  type="password"
-                  className="w-full p-4 bg-gray-950 border border-gray-800 rounded-xl text-sm outline-none focus:border-brand-accent transition-colors text-white placeholder-gray-700 font-mono"
-                  placeholder="kie_xxxxxxxxxxxxxxxx"
-                  value={orgKeys.kieApiKey}
-                  onChange={(e) =>
-                    setOrgKeys({ ...orgKeys, kieApiKey: e.target.value })
                   }
                 />
               </div>
@@ -1112,7 +1088,7 @@ export default function AdminDashboard() {
                 onClick={() => setEditingUser(null)}
                 className="absolute top-8 right-8 text-gray-500 hover:text-white transition-colors text-xl font-bold"
               >
-                ×
+                Ã—
               </button>
 
               <div className="mb-10 pb-6 border-b border-gray-800">
@@ -1138,7 +1114,7 @@ export default function AdminDashboard() {
                         { id: "creditsPicDrift", label: "PD Standard" },
                         { id: "creditsPicDriftPlus", label: "PD Plus" },
                         { id: "creditsImageFX", label: "Pic FX" },
-                        { id: "creditsVideoFX1", label: "Seedance 2.0 - Kie" },
+                        { id: "creditsVideoFX1", label: "Topaz Upscale" },
                         { id: "creditsVideoFX2", label: "Seedance 2.0 FAL" },
                         { id: "creditsVideoFX3", label: "Video FX 3" },
                       ].map((pool) => (
@@ -1184,9 +1160,9 @@ export default function AdminDashboard() {
                           onChange={(e) => setTargetCreditPool(e.target.value)}
                         >
                           <option value="creditsPicDrift">PicDrift Standard</option>
-                          <option value="creditsPicDriftPlus">PicDrift Plus</option>
+                          <option value="creditsPicDriftPlus">Kling 3.0</option>
                           <option value="creditsImageFX">PicFX</option>
-                          <option value="creditsVideoFX1">Seedance 2.0 - Kie</option>
+                          <option value="creditsVideoFX1">Topaz Upscale</option>
                           <option value="creditsVideoFX2">Seedance 2.0 FAL</option>
                           <option value="creditsVideoFX3">Video FX 3</option>
                         </select>
@@ -1406,7 +1382,7 @@ export default function AdminDashboard() {
                 onClick={() => setShowInviteModal(false)}
                 className="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors text-xl font-bold"
               >
-                ×
+                Ã—
               </button>
               <h3 className="text-lg font-bold text-white mb-8 uppercase tracking-widest">
                 User Provisioning
@@ -1525,7 +1501,7 @@ export default function AdminDashboard() {
                 onClick={() => setShowOrgModal(false)}
                 className="absolute top-6 right-6 text-gray-500 hover:text-white transition-colors text-xl font-bold"
               >
-                ×
+                Ã—
               </button>
               <h3 className="text-lg font-bold text-white mb-8 uppercase tracking-widest">
                 Register New Tenant
@@ -1559,3 +1535,7 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+
+
+

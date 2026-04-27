@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+﻿import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import { confirmAction } from "../lib/notifications";
@@ -50,9 +50,9 @@ interface CreditRequest {
 
 const COVERAGE_WALLETS = [
   { key: "creditsPicDrift", label: "PicDrift (Standard)", provider: "fal" },
-  { key: "creditsPicDriftPlus", label: "PicDrift Plus", provider: "fal" },
-  { key: "creditsVideoFX1", label: "Seedance 2.0 Kie", provider: "kie" },
-  { key: "creditsVideoFX2", label: "Seedance 2.0 Fal", provider: "fal" },
+  { key: "creditsPicDriftPlus", label: "Kling 3.0", provider: "fal" },
+  { key: "creditsVideoFX1", label: "Topaz Upscale", provider: "fal" },
+  { key: "creditsVideoFX2", label: "Seedance 2.0 FAL", provider: "fal" },
   { key: "creditsVideoFX3", label: "Veo 3", provider: "fal" },
 ] as const;
 
@@ -75,49 +75,49 @@ const COVERAGE_VARIANTS = [
   },
   {
     id: "picdrift_plus_5s",
-    label: "PicDrift Plus 5s",
+    label: "Kling 3.0 5s",
     provider: "fal",
     wallet: "creditsPicDriftPlus",
     deductionKey: "pricePicDrift_Plus_5s",
   },
   {
     id: "picdrift_plus_10s",
-    label: "PicDrift Plus 10s",
+    label: "Kling 3.0 10s",
     provider: "fal",
     wallet: "creditsPicDriftPlus",
     deductionKey: "pricePicDrift_Plus_10s",
   },
   {
-    id: "seedance_kie_10s",
-    label: "Seedance 2.0 Kie 10s",
-    provider: "kie",
+    id: "topaz_upscale_2x",
+    label: "Topaz Upscale 2x",
+    provider: "fal",
     wallet: "creditsVideoFX1",
     deductionKey: "priceVideoFX1_10s",
   },
   {
-    id: "seedance_kie_15s",
-    label: "Seedance 2.0 Kie 15s",
-    provider: "kie",
+    id: "topaz_upscale_4x",
+    label: "Topaz Upscale 4x",
+    provider: "fal",
     wallet: "creditsVideoFX1",
     deductionKey: "priceVideoFX1_15s",
   },
   {
     id: "seedance_fal_4s",
-    label: "Seedance 2.0 Fal 4s",
+    label: "Seedance 2.0 FAL 4s",
     provider: "fal",
     wallet: "creditsVideoFX2",
     deductionKey: "priceVideoFX2_4s",
   },
   {
     id: "seedance_fal_8s",
-    label: "Seedance 2.0 Fal 8s",
+    label: "Seedance 2.0 FAL 8s",
     provider: "fal",
     wallet: "creditsVideoFX2",
     deductionKey: "priceVideoFX2_8s",
   },
   {
     id: "seedance_fal_12s",
-    label: "Seedance 2.0 Fal 12s",
+    label: "Seedance 2.0 FAL 12s",
     provider: "fal",
     wallet: "creditsVideoFX2",
     deductionKey: "priceVideoFX2_12s",
@@ -224,8 +224,8 @@ export default function SuperAdminDashboard() {
     picdrift_10s: 0.2,
     picdrift_plus_5s: 0.2,
     picdrift_plus_10s: 0.3,
-    seedance_kie_10s: 0.45,
-    seedance_kie_15s: 0.7,
+    topaz_upscale_2x: 0.45,
+    topaz_upscale_4x: 0.7,
     seedance_fal_4s: 0.2,
     seedance_fal_8s: 0.35,
     seedance_fal_12s: 0.5,
@@ -512,12 +512,11 @@ export default function SuperAdminDashboard() {
   const coverageTotals = useMemo(() => {
     return walletCoverageRows.reduce(
       (acc, row) => {
-        if (row.provider === "kie") acc.kie += row.requiredUsd;
-        else acc.fal += row.requiredUsd;
+        acc.fal += row.requiredUsd;
         acc.total += row.requiredUsd;
         return acc;
       },
-      { fal: 0, kie: 0, total: 0 },
+      { fal: 0, total: 0 },
     );
   }, [walletCoverageRows]);
 
@@ -553,7 +552,7 @@ export default function SuperAdminDashboard() {
               Platform <span className="text-brand-accent">Control</span>
             </h1>
             <p className="text-[11px] text-gray-400 uppercase tracking-widest font-semibold">
-              Super Admin Interface — {adminUser?.email}
+              Super Admin Interface â€” {adminUser?.email}
             </p>
           </div>
 
@@ -590,7 +589,7 @@ export default function SuperAdminDashboard() {
         {msg && (
           <div className="mb-8 p-4 rounded-lg bg-brand-accent/10 border border-brand-accent/20 text-brand-accent text-sm font-semibold flex justify-between items-center">
             {msg}
-            <button onClick={() => setMsg("")} className="text-lg">×</button>
+            <button onClick={() => setMsg("")} className="text-lg">Ã—</button>
           </div>
         )}
 
@@ -802,7 +801,7 @@ export default function SuperAdminDashboard() {
                     <th className="p-6 text-center">View</th>
                     <th className="p-6 text-center">PicDrift / +</th>
                     <th className="p-6 text-center">PicFX</th>
-                    <th className="p-6 text-center">Seedance Kie / FAL / VFX3</th>
+                    <th className="p-6 text-center">Topaz / FAL / VFX3</th>
                     <th className="p-6 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -835,7 +834,7 @@ export default function SuperAdminDashboard() {
                       </td>
                       <td className="p-6 text-center">
                         <div className="flex gap-2 justify-center">
-                          <input type="number" step="1" min="0" title="Seedance 2.0 - Kie" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1, creditType: "creditsVideoFX1" })} />
+                          <input type="number" step="1" min="0" title="Topaz Upscale" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1, creditType: "creditsVideoFX1" })} />
                           <input type="number" step="1" min="0" title="Seedance 2.0 FAL" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2, creditType: "creditsVideoFX2" })} />
                           <input type="number" step="1" min="0" title="VidFX 3" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3, creditType: "creditsVideoFX3" })} />
                         </div>
@@ -954,21 +953,13 @@ export default function SuperAdminDashboard() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
                 <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
                   Fal Coverage Needed
                 </p>
                 <p className="text-xl font-bold text-pink-400 mt-2">
                   {formatUsd(coverageTotals.fal)}
-                </p>
-              </div>
-              <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
-                  Kie Coverage Needed
-                </p>
-                <p className="text-xl font-bold text-cyan-400 mt-2">
-                  {formatUsd(coverageTotals.kie)}
                 </p>
               </div>
               <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
@@ -1217,7 +1208,7 @@ export default function SuperAdminDashboard() {
                 <h3 className="text-xl font-bold text-white uppercase tracking-tight">Configure Tenant</h3>
                 <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">{editingTenant.name}</p>
               </div>
-              <button onClick={() => setEditingTenant(null)} className="text-gray-500 hover:text-white font-bold text-xl">×</button>
+              <button onClick={() => setEditingTenant(null)} className="text-gray-500 hover:text-white font-bold text-xl">Ã—</button>
             </div>
             <div className="p-8 space-y-6">
               <div className="space-y-2">
@@ -1404,7 +1395,7 @@ export default function SuperAdminDashboard() {
                 </h3>
                 <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Appears for every user</p>
               </div>
-              <button onClick={() => setShowPresetModal(false)} className="text-gray-500 hover:text-white font-bold text-xl">×</button>
+              <button onClick={() => setShowPresetModal(false)} className="text-gray-500 hover:text-white font-bold text-xl">Ã—</button>
             </div>
             <form onSubmit={handleSavePreset} className="p-8 space-y-6">
               <div className="space-y-2">
@@ -1509,4 +1500,8 @@ export default function SuperAdminDashboard() {
     </div>
   );
 }
+
+
+
+
 

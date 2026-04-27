@@ -4,7 +4,7 @@ import { processVideoAssetBackground } from "./processor";
 import {
   uploadToCloudinary,
   resizeStrict,
-  resizeWithGemini,
+  resizeWithGptImage2,
   resizeWithBlurFill,
 } from "./utils";
 
@@ -116,8 +116,8 @@ export const assetsLogic = {
       } else {
         console.log(`✨ Ratios differ. Triggering AI Outpainting for ${targetAspectRatio}...`);
         try {
-          // Pass the target ratio string to Gemini logic
-          processedBuffer = await resizeWithGemini(
+          // Use GPT-Image-2 for higher-fidelity outpaint during asset preprocessing.
+          processedBuffer = await resizeWithGptImage2(
             fileBuffer,
             targetWidth,
             targetHeight,
@@ -125,7 +125,7 @@ export const assetsLogic = {
             apiKeys,
           );
         } catch (e: any) {
-          console.error("⚠️ resizeWithGemini failed, falling back to blur fill:", e.message);
+          console.error("⚠️ resizeWithGptImage2 failed, falling back to blur fill:", e.message);
           processedBuffer = await resizeWithBlurFill(
             fileBuffer,
             targetWidth,

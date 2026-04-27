@@ -176,6 +176,7 @@ export const apiEndpoints = {
     referenceUrl?: string;
     referenceUrls?: string[];
     mode?: "standard" | "pro";
+    model?: "nano-banana-2" | "gpt-image-2";
   }) => api.post("/api/assets/edit", data),
 
   // ✅ NEW: Drift Asset (FAL Flux)

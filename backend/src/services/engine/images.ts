@@ -21,8 +21,10 @@ async function refundChargedPool(params: any) {
 export const imageLogic = {
   // === GENERATION ===
   async startImageGeneration(postId: string, finalPrompt: string, params: any, apiKeys?: TenantApiKeys) {
+    const selectedModel: "nano-banana-2" | "gpt-image-2" =
+      params?.model === "gpt-image-2" ? "gpt-image-2" : "nano-banana-2";
     console.log(
-      `🎨 FAL Nano Banana Gen for Post ${postId} | AR: ${params.aspectRatio}`,
+      `🎨 PicFX Gen for Post ${postId} | Model: ${selectedModel} | AR: ${params.aspectRatio}`,
     );
     try {
       const refUrls =
@@ -42,6 +44,7 @@ export const imageLogic = {
         referenceImages: refBuffers,
         modelType: "quality",
         useGrounding: true,
+        model: selectedModel,
         apiKey: apiKeys?.falApiKey,
       });
 
@@ -54,7 +57,8 @@ export const imageLogic = {
       );
       await airtableService.updatePost(postId, {
         mediaUrl: cloudUrl,
-        mediaProvider: "fal-nano-banana",
+        mediaProvider:
+          selectedModel === "gpt-image-2" ? "fal-gpt-image-2" : "fal-nano-banana",
         status: "READY",
         progress: 100,
         generationStep: "COMPLETED",
@@ -78,7 +82,9 @@ export const imageLogic = {
     params: any,
     apiKeys?: TenantApiKeys
   ) {
-    console.log(`🎠 FAL Nano Banana Carousel for Post ${postId}`);
+    const selectedModel: "nano-banana-2" | "gpt-image-2" =
+      params?.model === "gpt-image-2" ? "gpt-image-2" : "nano-banana-2";
+    console.log(`🎠 PicFX Carousel for Post ${postId} | Model: ${selectedModel}`);
     try {
       const imageUrls: string[] = [];
       const userRefBuffers = await downloadAndOptimizeImages(
@@ -108,6 +114,7 @@ export const imageLogic = {
           aspectRatio: targetRatio,
           referenceImages: carouselHistory,
           modelType: "quality",
+          model: selectedModel,
           apiKey: apiKeys?.falApiKey,
         });
         carouselHistory.push(buf);
@@ -122,7 +129,10 @@ export const imageLogic = {
       }
       await airtableService.updatePost(postId, {
         mediaUrl: JSON.stringify(imageUrls),
-        mediaProvider: "fal-nano-banana-carousel",
+        mediaProvider:
+          selectedModel === "gpt-image-2"
+            ? "fal-gpt-image-2-carousel"
+            : "fal-nano-banana-carousel",
         status: "READY",
         progress: 100,
         generationStep: "COMPLETED",
@@ -148,10 +158,11 @@ export const imageLogic = {
     referenceUrls: string[] = [],
     mode: "standard" | "pro" = "pro",
     originalAssetId?: string, // 👈 ADDED PARAMETER
-    apiKeys?: TenantApiKeys
+    apiKeys?: TenantApiKeys,
+    model: "nano-banana-2" | "gpt-image-2" = "nano-banana-2"
   ): Promise<Asset> {
     try {
-      console.log(`🎨 Editing asset for ${userId} [${mode}]: "${prompt}"`);
+      console.log(`🎨 Editing asset for ${userId} [${mode}] [${model}]: "${prompt}"`);
       const imageResponse = await axios.get(originalAssetUrl, {
         responseType: "arraybuffer",
       });
@@ -201,6 +212,7 @@ export const imageLogic = {
         modelType: modelType,
         useGrounding: mode === "pro",
         imageSize: targetSize,
+        model,
         apiKey: apiKeys?.falApiKey,
       });
 

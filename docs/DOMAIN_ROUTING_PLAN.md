@@ -90,3 +90,48 @@ Phase 1 implemented (backend auth metadata + frontend protected-route redirect).
   - `VISIONLIGHT_CANONICAL_DOMAIN=visualfx.studio`
   - `DOMAIN_ROUTING_ENABLED=true`
 - Frontend currently consumes canonical host from `/api/auth/me` response, so no frontend domain env is required for routing.
+
+## Current Checkpoint (2026-04-27)
+### Completed in Code
+- Backend `/api/auth/me` now returns domain-routing metadata:
+  - `orgViewType`
+  - `canonicalDomain`
+  - `domainRoutingEnabled`
+  - `domainRedirectRequired`
+  - `isSuperAdmin`
+- Canonical host mapping is view-based:
+  - `PICDRIFT` -> `picdrift.studio`
+  - `VISIONLIGHT` -> `visualfx.studio`
+- Superadmin users are exempt from forced domain redirects.
+- Frontend protected/admin routes now enforce canonical-domain redirect for non-superadmins.
+- Redirect preserves deep links (`path + query + hash`).
+- Local/private hosts are excluded from redirect enforcement for safe dev/testing.
+
+### Infrastructure Status
+- DNS for `visualfx.studio` was requested and is pending client-side update.
+- Domain split rollout is intentionally paused until DNS + Nginx + TLS are confirmed.
+
+### Safe Pause Mode (Current)
+- Keep backend env as:
+  - `DOMAIN_ROUTING_ENABLED=false`
+- This keeps platform behavior stable on current domain and prevents dead-domain redirects.
+
+### Resume Checklist (When DNS Is Ready)
+1. Confirm DNS resolves to VPS:
+- `visualfx.studio` -> `72.61.0.117`
+- `www.visualfx.studio` -> `visualfx.studio` (or same VPS via A)
+2. Update Nginx `server_name` to include:
+- `picdrift.studio www.picdrift.studio visualfx.studio www.visualfx.studio`
+3. Validate and reload Nginx:
+- `nginx -t`
+- `systemctl reload nginx`
+4. Ensure SSL cert covers all four hosts (certbot).
+5. Set backend env and restart:
+- `PICDRIFT_CANONICAL_DOMAIN=picdrift.studio`
+- `VISIONLIGHT_CANONICAL_DOMAIN=visualfx.studio`
+- `DOMAIN_ROUTING_ENABLED=true`
+- `pm2 restart my-backend`
+6. Run role-based validation:
+- PicDrift tenant on `visualfx.studio` redirects to `picdrift.studio`
+- VisionLight tenant on `picdrift.studio` redirects to `visualfx.studio`
+- Superadmin works on either domain without forced redirect

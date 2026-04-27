@@ -146,6 +146,56 @@ export const resizeWithGemini = async (
   }
 };
 
+export const resizeWithGptImage2 = async (
+  originalBuffer: Buffer,
+  targetWidth: number, // Kept for signature compatibility
+  targetHeight: number, // Kept for signature compatibility
+  targetRatioString: string = "16:9",
+  apiKeys?: any,
+): Promise<Buffer> => {
+  try {
+    console.log(`✨ GPT-Image-2 Outpaint: Target ${targetRatioString}`);
+
+    let instruction = "";
+    if (targetRatioString === "9:16" || targetRatioString === "portrait") {
+      instruction = `
+      Expand this image vertically to 9:16 while preserving the original subject and details exactly.
+      Add natural scene continuation above and below with consistent lighting and perspective.
+      `;
+    } else if (targetRatioString === "1:1" || targetRatioString === "square") {
+      instruction = `
+      Expand this image to a square 1:1 canvas while preserving the original subject and details exactly.
+      Extend surroundings naturally on all sides.
+      `;
+    } else {
+      instruction = `
+      Expand this image horizontally to 16:9 while preserving the original subject and details exactly.
+      Add natural scene continuation on left and right with matching lighting and perspective.
+      `;
+    }
+
+    const prompt = `
+    TASK: Outpaint and resize to ${targetRatioString}.
+    ${instruction}
+    STRICT:
+    - Keep the original image content intact and centered.
+    - No distortion, warping, or style changes.
+    - No text, watermark, borders, or split layouts.
+    `;
+
+    return await FalService.generateOrEditImage({
+      prompt,
+      aspectRatio: targetRatioString,
+      referenceImages: [originalBuffer],
+      model: "gpt-image-2",
+      apiKey: apiKeys?.falApiKey,
+    });
+  } catch (error: any) {
+    console.error("❌ GPT-Image-2 Outpaint Error:", error.message);
+    throw error;
+  }
+};
+
 // Helper: Upload
 export const uploadFileToR2 = async (
   buffer: Buffer,
