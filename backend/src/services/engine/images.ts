@@ -257,7 +257,11 @@ export const imageLogic = {
         projectId
       );
     } catch (e: any) {
-      throw new Error(`Edit failed: ${e.message}`);
+      const wrapped: any = new Error(`Edit failed: ${e.message}`);
+      if (e?.status) {
+        wrapped.status = e.status;
+      }
+      throw wrapped;
     }
   },
 

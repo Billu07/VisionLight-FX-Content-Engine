@@ -1,5 +1,6 @@
 import { fal } from "@fal-ai/client";
 import axios from "axios";
+import sharp from "sharp";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -41,6 +42,40 @@ export const FalService = {
       return error.message.trim();
     }
     return "Unknown upstream error";
+  },
+
+  async _resolveGptImageSize(
+    aspectRatio?: string,
+    referenceImages?: Buffer[],
+  ): Promise<string> {
+    if (aspectRatio === "1:1" || aspectRatio === "square") return "square_hd";
+    if (aspectRatio === "9:16" || aspectRatio === "portrait") {
+      return "portrait_16_9";
+    }
+    if (aspectRatio === "16:9" || aspectRatio === "landscape") {
+      return "landscape_16_9";
+    }
+
+    const primaryRef = Array.isArray(referenceImages) ? referenceImages[0] : undefined;
+    if (!primaryRef) {
+      return "landscape_4_3";
+    }
+
+    try {
+      const meta = await sharp(primaryRef).metadata();
+      const width = meta.width || 0;
+      const height = meta.height || 0;
+      if (!width || !height) return "landscape_4_3";
+
+      const ratio = width / height;
+      if (ratio >= 1.55) return "landscape_16_9";
+      if (ratio >= 1.15) return "landscape_4_3";
+      if (ratio >= 0.87) return "square_hd";
+      if (ratio >= 0.65) return "portrait_4_3";
+      return "portrait_16_9";
+    } catch {
+      return "landscape_4_3";
+    }
   },
 
   _detectMimeType(buffer: Buffer): string {
@@ -132,14 +167,10 @@ export const FalService = {
       const input: any = { prompt: params.prompt };
 
       if (selectedModel === "gpt-image-2") {
-        const ratioToSize = (ratio?: string) => {
-          if (ratio === "auto" || ratio === "original") return "auto";
-          if (ratio === "1:1" || ratio === "square") return "square_hd";
-          if (ratio === "9:16" || ratio === "portrait") return "portrait_16_9";
-          return "landscape_16_9";
-        };
-
-        input.image_size = ratioToSize(params.aspectRatio);
+        input.image_size = await this._resolveGptImageSize(
+          params.aspectRatio,
+          params.referenceImages,
+        );
         input.quality = "high";
         input.num_images = 1;
         input.output_format = "jpeg";
