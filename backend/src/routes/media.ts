@@ -70,6 +70,24 @@ const requiresFalForRequest = (mediaType: unknown, model: unknown): boolean => {
   );
 };
 
+const normalizeAutoAspectRatio = (
+  raw: unknown,
+): "16:9" | "9:16" | "1:1" => {
+  if (raw === "9:16" || raw === "portrait") return "9:16";
+  if (raw === "1:1" || raw === "square") return "1:1";
+  return "16:9";
+};
+
+const buildAutoOutpaintPrompt = (ratio: "16:9" | "9:16" | "1:1"): string => {
+  if (ratio === "9:16") {
+    return "Extend this image to 9:16 by adding content only above and below. Keep all original image pixels unchanged.";
+  }
+  if (ratio === "1:1") {
+    return "Extend this image to 1:1 by adding content only on the sides. Keep all original image pixels unchanged.";
+  }
+  return "Extend this image to 16:9 by adding content only on the left and right. Keep all original image pixels unchanged.";
+};
+
 // ==================== ASSET MANAGEMENT ====================
 router.post(
   "/api/posts/:postId/to-asset",
@@ -228,10 +246,34 @@ router.post(
       await airtableService.deductGranularCredits(req.user!.id, "creditsImageFX", cost);
       conversionDeducted = true;
 
+      const normalizedAspectRatio = normalizeAutoAspectRatio(aspectRatio);
+
+      // Reuse the same edit pipeline as manual editor GPT edits whenever we have
+      // a source asset id. This keeps INPUT 1 handling consistent.
+      if (typeof originalAssetId === "string" && originalAssetId.trim().length > 0) {
+        const sourceAsset = await prisma.asset.findFirst({
+          where: { id: originalAssetId, userId: req.user!.id, type: "IMAGE" },
+        });
+        if (sourceAsset?.url) {
+          const asset = await contentEngine.editAsset(
+            sourceAsset.url,
+            buildAutoOutpaintPrompt(normalizedAspectRatio),
+            req.user!.id,
+            normalizedAspectRatio,
+            [],
+            "pro",
+            sourceAsset.id,
+            apiKeys,
+            "gpt-image-2",
+          );
+          return res.json({ success: true, asset });
+        }
+      }
+
       const asset = await contentEngine.processAndSaveAsset(
         req.file.buffer,
         req.user!.id,
-        aspectRatio || "16:9",
+        normalizedAspectRatio,
         originalAssetId,
         projectId,
         apiKeys,
