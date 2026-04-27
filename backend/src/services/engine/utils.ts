@@ -156,17 +156,25 @@ export const resizeWithGptImage2 = async (
   try {
     console.log(`GPT-Image-2 Outpaint: Target ${targetRatioString}`);
 
-    let prompt = "";
+    let resizeInstruction = "";
     if (targetRatioString === "9:16" || targetRatioString === "portrait") {
-      prompt = `9:16 portrait
-Add to the top and bottom of the image to make it 9:16. Do not change anything inside the original image.`;
+      resizeInstruction =
+        "Target ratio: 9:16 portrait. Expand only the top and bottom canvas.";
     } else if (targetRatioString === "1:1" || targetRatioString === "square") {
-      prompt = `1:1 square
-Add to the sides of the image to make it 1:1 square. Do not change the original image.`;
+      resizeInstruction =
+        "Target ratio: 1:1 square. Expand only the side canvas.";
     } else {
-      prompt = `16:9 landscape
-Add to the sides of the image to make it 16:9. Do not change anything inside the original image.`;
+      resizeInstruction =
+        "Target ratio: 16:9 landscape. Expand only the side canvas.";
     }
+
+    const prompt = `INPUT 1 is the source image.
+${resizeInstruction}
+STRICT RULES:
+- Keep INPUT 1 subject, identity, composition, framing, perspective, and lighting intact.
+- Preserve the original image content exactly; only outpaint new area outside the original frame.
+- Do not replace, redraw, restyle, or recompose the original scene.
+- Output one seamless image with no borders, panels, overlays, text, or watermarks.`;
 
     return await FalService.generateOrEditImage({
       prompt,

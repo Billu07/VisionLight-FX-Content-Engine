@@ -1022,6 +1022,7 @@ router.post(
         duration: duration ? parseInt(duration) : undefined,
         model,
         aspectRatio,
+        resolution,
         generateAudio,
         negativePrompt,
         seed,

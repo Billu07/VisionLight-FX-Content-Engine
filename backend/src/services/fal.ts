@@ -118,6 +118,15 @@ export const FalService = {
     return `data:${mimeType};base64,${buffer.toString("base64")}`;
   },
 
+  async _normalizeReferenceBuffer(buffer: Buffer): Promise<Buffer> {
+    try {
+      // Normalize EXIF orientation and output a stable JPEG payload for edit refs.
+      return await sharp(buffer).rotate().jpeg({ quality: 95 }).toBuffer();
+    } catch {
+      return buffer;
+    }
+  },
+
   async _uploadReferenceImage(buffer: Buffer): Promise<string> {
     const mimeType = this._detectMimeType(buffer);
     const blob = new Blob([buffer], { type: mimeType });
@@ -205,14 +214,17 @@ export const FalService = {
             : params.referenceImages;
 
         if (selectedModel === "gpt-image-2") {
-          fallbackDataUriRefs = limitedRefs.map((buffer) =>
+          const normalizedRefs = await Promise.all(
+            limitedRefs.map((buffer) => this._normalizeReferenceBuffer(buffer)),
+          );
+          fallbackDataUriRefs = normalizedRefs.map((buffer) =>
             this._bufferToDataUri(buffer),
           );
           try {
             // Prefer hosted references. This avoids very large base64 payloads and
             // keeps GPT edit requests stable.
             input.image_urls = await Promise.all(
-              limitedRefs.map((buffer) => this._uploadReferenceImage(buffer)),
+              normalizedRefs.map((buffer) => this._uploadReferenceImage(buffer)),
             );
           } catch (uploadError: any) {
             console.warn(
