@@ -210,6 +210,13 @@ router.post(
         getTenantSettings(req.user!.id),
         airtableService.findUserById(req.user!.id),
       ]);
+      const apiKeys = await getTenantApiKeys(req.user!.id);
+      if (!apiKeys.falApiKey) {
+        return res.status(403).json({
+          error:
+            "Missing Fal API key. Configure it in the Admin Panel before auto-processing images.",
+        });
+      }
 
       const cost = getCost(user, { mediaType: "image", mode: "convert" }, settings);
       conversionCost = cost;
@@ -221,7 +228,6 @@ router.post(
       await airtableService.deductGranularCredits(req.user!.id, "creditsImageFX", cost);
       conversionDeducted = true;
 
-      const apiKeys = await getTenantApiKeys(req.user!.id);
       const asset = await contentEngine.processAndSaveAsset(
         req.file.buffer,
         req.user!.id,
@@ -262,6 +268,13 @@ router.post(
         getTenantSettings(req.user!.id),
         airtableService.findUserById(req.user!.id),
       ]);
+      const apiKeys = await getTenantApiKeys(req.user!.id);
+      if (!apiKeys.falApiKey) {
+        return res.status(403).json({
+          error:
+            "Missing Fal API key. Configure it in the Admin Panel before batch auto-processing.",
+        });
+      }
 
       const costPerImg = getCost(
         user,
@@ -283,7 +296,6 @@ router.post(
       );
       totalDeducted = totalCost;
 
-      const apiKeys = await getTenantApiKeys(req.user!.id);
       res.json({
         success: true,
         message: `Processing batch of ${files.length}. Cost: ${totalCost} credits.`,

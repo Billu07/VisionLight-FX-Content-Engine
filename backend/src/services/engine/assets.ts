@@ -5,7 +5,6 @@ import {
   uploadToCloudinary,
   resizeStrict,
   resizeWithGptImage2,
-  resizeWithBlurFill,
 } from "./utils";
 
 export const assetsLogic = {
@@ -115,23 +114,15 @@ export const assetsLogic = {
         );
       } else {
         console.log(`✨ Ratios differ. Triggering AI Outpainting for ${targetAspectRatio}...`);
-        try {
-          // Use GPT-Image-2 for higher-fidelity outpaint during asset preprocessing.
-          processedBuffer = await resizeWithGptImage2(
-            fileBuffer,
-            targetWidth,
-            targetHeight,
-            targetAspectRatio,
-            apiKeys,
-          );
-        } catch (e: any) {
-          console.error("⚠️ resizeWithGptImage2 failed, falling back to blur fill:", e.message);
-          processedBuffer = await resizeWithBlurFill(
-            fileBuffer,
-            targetWidth,
-            targetHeight,
-          );
-        }
+        // Use GPT-Image-2 for outpainting. If it fails, bubble the error so
+        // credits are refunded instead of returning a blur fallback silently.
+        processedBuffer = await resizeWithGptImage2(
+          fileBuffer,
+          targetWidth,
+          targetHeight,
+          targetAspectRatio,
+          apiKeys,
+        );
       }
 
       const url = await uploadToCloudinary(
