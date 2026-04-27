@@ -2,6 +2,7 @@ import { fal } from "@fal-ai/client";
 import axios from "axios";
 import sharp from "sharp";
 import dotenv from "dotenv";
+import { Blob as NodeBlob } from "buffer";
 
 dotenv.config();
 
@@ -129,7 +130,7 @@ export const FalService = {
 
   async _uploadReferenceImage(buffer: Buffer): Promise<string> {
     const mimeType = this._detectMimeType(buffer);
-    const blob = new Blob([buffer], { type: mimeType });
+    const blob = new NodeBlob([buffer], { type: mimeType });
     return fal.storage.upload(blob);
   },
 
@@ -146,6 +147,7 @@ export const FalService = {
     prompt: string;
     aspectRatio?: string;
     referenceImages?: Buffer[];
+    referenceImageUrls?: string[];
     modelType?: "speed" | "quality";
     useGrounding?: boolean;
     imageSize?: string;
@@ -157,8 +159,14 @@ export const FalService = {
     try {
       const GPT_IMAGE_MAX_REFS = 5;
       const selectedModel = params.model || "nano-banana-2";
-      const isEdit =
+      const hasReferenceBuffers =
         Array.isArray(params.referenceImages) && params.referenceImages.length > 0;
+      const hasReferenceUrls =
+        Array.isArray(params.referenceImageUrls) &&
+        params.referenceImageUrls.some(
+          (url) => typeof url === "string" && url.trim().length > 0,
+        );
+      const isEdit = hasReferenceBuffers || hasReferenceUrls;
 
       const endpoint =
         selectedModel === "gpt-image-2"
@@ -203,36 +211,66 @@ export const FalService = {
       }
 
       let fallbackDataUriRefs: string[] | null = null;
-      if (isEdit && params.referenceImages) {
-        const limitedRefs =
+      if (isEdit) {
+        const rawBufferRefs = hasReferenceBuffers ? params.referenceImages! : [];
+        const rawUrlRefs = hasReferenceUrls
+          ? Array.from(
+              new Set(
+                (params.referenceImageUrls || [])
+                  .map((url) =>
+                    typeof url === "string" ? url.trim() : "",
+                  )
+                  .filter(
+                    (url) =>
+                      url.length > 0 &&
+                      (/^https?:\/\//i.test(url) || url.startsWith("data:")),
+                  ),
+              ),
+            )
+          : [];
+
+        const limitedBufferRefs =
           selectedModel === "gpt-image-2" &&
-          params.referenceImages.length > GPT_IMAGE_MAX_REFS
-            ? [
-                params.referenceImages[0],
-                ...params.referenceImages.slice(-(GPT_IMAGE_MAX_REFS - 1)),
-              ]
-            : params.referenceImages;
+          rawBufferRefs.length > GPT_IMAGE_MAX_REFS
+            ? [rawBufferRefs[0], ...rawBufferRefs.slice(-(GPT_IMAGE_MAX_REFS - 1))]
+            : rawBufferRefs;
+
+        const limitedUrlRefs =
+          selectedModel === "gpt-image-2" &&
+          rawUrlRefs.length > GPT_IMAGE_MAX_REFS
+            ? [rawUrlRefs[0], ...rawUrlRefs.slice(-(GPT_IMAGE_MAX_REFS - 1))]
+            : rawUrlRefs;
 
         if (selectedModel === "gpt-image-2") {
-          const normalizedRefs = await Promise.all(
-            limitedRefs.map((buffer) => this._normalizeReferenceBuffer(buffer)),
-          );
-          fallbackDataUriRefs = normalizedRefs.map((buffer) =>
-            this._bufferToDataUri(buffer),
-          );
-          try {
-            // Hosted refs are typically more stable for GPT edit requests on Fal.
-            input.image_urls = await Promise.all(
-              normalizedRefs.map((buffer) => this._uploadReferenceImage(buffer)),
+          let normalizedRefs: Buffer[] = [];
+          if (limitedBufferRefs.length > 0) {
+            normalizedRefs = await Promise.all(
+              limitedBufferRefs.map((buffer) => this._normalizeReferenceBuffer(buffer)),
             );
-          } catch (uploadError: any) {
-            console.warn(
-              `FAL reference upload failed, using data URI fallback: ${uploadError?.message || "unknown error"}`,
+            fallbackDataUriRefs = normalizedRefs.map((buffer) =>
+              this._bufferToDataUri(buffer),
             );
-            input.image_urls = fallbackDataUriRefs;
           }
-        } else {
-          input.image_urls = limitedRefs.map((buffer) =>
+
+          if (limitedUrlRefs.length > 0) {
+            // Prefer direct hosted URLs from the asset library to avoid
+            // re-upload failures or payload bloat from data URIs.
+            input.image_urls = limitedUrlRefs;
+          } else if (normalizedRefs.length > 0) {
+            try {
+              // Hosted refs are typically more stable for GPT edit requests on Fal.
+              input.image_urls = await Promise.all(
+                normalizedRefs.map((buffer) => this._uploadReferenceImage(buffer)),
+              );
+            } catch (uploadError: any) {
+              console.warn(
+                `FAL reference upload failed, using data URI fallback: ${uploadError?.message || "unknown error"}`,
+              );
+              input.image_urls = fallbackDataUriRefs;
+            }
+          }
+        } else if (limitedBufferRefs.length > 0) {
+          input.image_urls = limitedBufferRefs.map((buffer) =>
             this._bufferToDataUri(buffer),
           );
         }

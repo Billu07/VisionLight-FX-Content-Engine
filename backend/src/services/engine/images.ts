@@ -42,6 +42,8 @@ export const imageLogic = {
         prompt: finalPrompt,
         aspectRatio: targetRatio,
         referenceImages: refBuffers,
+        referenceImageUrls:
+          selectedModel === "gpt-image-2" ? refUrls : undefined,
         modelType: "quality",
         useGrounding: true,
         model: selectedModel,
@@ -223,6 +225,10 @@ export const imageLogic = {
         prompt: finalPrompt,
         aspectRatio: targetConfigRatio,
         referenceImages: inputBuffers,
+        referenceImageUrls:
+          model === "gpt-image-2"
+            ? [originalAssetUrl, ...referenceUrls]
+            : undefined,
         modelType: modelType,
         useGrounding: mode === "pro",
         imageSize: targetSize,
