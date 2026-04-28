@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -20,7 +20,10 @@ import { BrandProvider } from "./contexts/BrandContext";
 import { useAuth } from "./hooks/useAuth";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import { installAlertBridge } from "./lib/notifications";
-import { getCanonicalDomainRedirectUrl } from "./lib/domain-routing";
+import {
+  buildCanonicalDomainRelayUrl,
+  getCanonicalDomainRedirectUrl,
+} from "./lib/domain-routing";
 
 // --- NEW IMPORTS (Add these) ---
 import { Terms } from "./pages/Terms";
@@ -47,15 +50,28 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading, checkAuth } = useAuth();
   const location = useLocation();
   const redirectUrl = getCanonicalDomainRedirectUrl(user);
+  const hasRedirectedRef = useRef(false);
 
   useEffect(() => {
     checkAuth();
   }, []);
 
   useEffect(() => {
-    if (!isLoading && user && redirectUrl) {
-      window.location.replace(redirectUrl);
-    }
+    if (isLoading || !user || !redirectUrl || hasRedirectedRef.current) return;
+
+    hasRedirectedRef.current = true;
+    let isCancelled = false;
+
+    (async () => {
+      const relayUrl = await buildCanonicalDomainRelayUrl(user);
+      if (!isCancelled) {
+        window.location.replace(relayUrl || redirectUrl);
+      }
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [isLoading, user, redirectUrl]);
 
   if (isLoading)
@@ -92,15 +108,28 @@ const ProjectRoute = ({ children }: { children: React.ReactNode }) => {
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading, checkAuth } = useAuth();
   const redirectUrl = getCanonicalDomainRedirectUrl(user);
+  const hasRedirectedRef = useRef(false);
 
   useEffect(() => {
     checkAuth();
   }, []);
 
   useEffect(() => {
-    if (!isLoading && user && redirectUrl) {
-      window.location.replace(redirectUrl);
-    }
+    if (isLoading || !user || !redirectUrl || hasRedirectedRef.current) return;
+
+    hasRedirectedRef.current = true;
+    let isCancelled = false;
+
+    (async () => {
+      const relayUrl = await buildCanonicalDomainRelayUrl(user);
+      if (!isCancelled) {
+        window.location.replace(relayUrl || redirectUrl);
+      }
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [isLoading, user, redirectUrl]);
 
   if (isLoading)
