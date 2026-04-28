@@ -2748,7 +2748,7 @@ function Dashboard() {
                       {user?.view === "PICDRIFT" && currentVisualTab === "videofx" && (
                         <div className="absolute inset-0 z-50 flex items-center justify-center rounded-2xl">
                           <a
-                            href="http://picdrift.com/renders"
+                            href="https://picdrift.com/renders"
                             target="_blank"
                             rel="noreferrer"
                             className="flex flex-col items-center bg-gray-900/80 backdrop-blur-md border border-cyan-500/50 p-8 rounded-3xl shadow-[0_0_30px_rgba(6,182,212,0.2)] hover:border-cyan-400 hover:shadow-[0_0_40px_rgba(6,182,212,0.4)] hover:scale-105 transition-all duration-300 cursor-pointer"

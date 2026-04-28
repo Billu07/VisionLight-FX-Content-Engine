@@ -249,8 +249,8 @@ function Dashboard() {
   const isCommercial = user?.creditSystem !== "INTERNAL";
   const [isRequesting, setIsRequesting] = useState(false);
   const creditLink = isCommercial
-    ? "http://picdrift.com/fx-Credits"
-    : "http://PicDrift.com/fx-request";
+    ? "https://picdrift.com/fx-Credits"
+    : "https://picdrift.com/fx-request";
   const creditBtnText = isCommercial ? "Buy Credit" : "Request Credit";
   const isAdmin = user?.role === "ADMIN";
 
