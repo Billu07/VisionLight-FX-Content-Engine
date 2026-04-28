@@ -53,7 +53,7 @@ const COVERAGE_WALLETS = [
   { key: "creditsPicDriftPlus", label: "Kling 3.0", provider: "fal" },
   { key: "creditsImageFX", label: "Image FX (Nano/GPT 2)", provider: "fal" },
   { key: "creditsVideoFX1", label: "Topaz Upscale", provider: "fal" },
-  { key: "creditsVideoFX2", label: "Video FX 2", provider: "fal" },
+  { key: "creditsVideoFX2", label: "Seedance 2.0 FAL", provider: "fal" },
   { key: "creditsVideoFX3", label: "Veo 3", provider: "fal" },
 ] as const;
 
@@ -146,21 +146,21 @@ const COVERAGE_VARIANTS = [
   },
   {
     id: "seedance_fal_4s",
-    label: "Video FX 2 4s",
+    label: "Seedance 2.0 FAL 4s",
     provider: "fal",
     wallet: "creditsVideoFX2",
     deductionKey: "priceVideoFX2_4s",
   },
   {
     id: "seedance_fal_8s",
-    label: "Video FX 2 8s",
+    label: "Seedance 2.0 FAL 8s",
     provider: "fal",
     wallet: "creditsVideoFX2",
     deductionKey: "priceVideoFX2_8s",
   },
   {
     id: "seedance_fal_12s",
-    label: "Video FX 2 12s",
+    label: "Seedance 2.0 FAL 12s",
     provider: "fal",
     wallet: "creditsVideoFX2",
     deductionKey: "priceVideoFX2_12s",
@@ -884,7 +884,7 @@ export default function SuperAdminDashboard() {
                       <td className="p-6 text-center">
                         <div className="flex gap-2 justify-center">
                           <input type="number" step="1" min="0" title="Topaz Upscale" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1, creditType: "creditsVideoFX1" })} />
-                          <input type="number" step="1" min="0" title="Video FX 2" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2, creditType: "creditsVideoFX2" })} />
+                          <input type="number" step="1" min="0" title="Seedance 2.0 FAL" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2, creditType: "creditsVideoFX2" })} />
                           <input type="number" step="1" min="0" title="VidFX 3" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3, creditType: "creditsVideoFX3" })} />
                         </div>
                       </td>

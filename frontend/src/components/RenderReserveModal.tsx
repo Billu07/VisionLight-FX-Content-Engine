@@ -132,20 +132,20 @@ export function RenderReserveModal({
       wallet: "Topaz Upscale",
     },
     {
-      label: "Video FX 2 · 4s",
+      label: "Seedance 2.0 FAL · 4s",
       key: "priceVideoFX2_4s",
-      wallet: "Video FX 2",
+      wallet: "Seedance 2.0 FAL",
       note: "Resolution support in UI: 480p, 720p.",
     },
     {
-      label: "Video FX 2 · 8s",
+      label: "Seedance 2.0 FAL · 8s",
       key: "priceVideoFX2_8s",
-      wallet: "Video FX 2",
+      wallet: "Seedance 2.0 FAL",
     },
     {
-      label: "Video FX 2 · 12s",
+      label: "Seedance 2.0 FAL · 12s",
       key: "priceVideoFX2_12s",
-      wallet: "Video FX 2",
+      wallet: "Seedance 2.0 FAL",
     },
     {
       label: "Video FX 3 · 4s",
@@ -268,7 +268,7 @@ export function RenderReserveModal({
               />
               <Section
                 title="Video Engines"
-                subtitle="Topaz Upscale, Video FX 2, and Video FX 3 tiers."
+                subtitle="Topaz Upscale, Seedance 2.0 FAL, and Video FX 3 tiers."
                 items={videoEngines}
                 accent="bg-cyan-400"
               />

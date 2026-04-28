@@ -2418,7 +2418,7 @@ function Dashboard() {
                               {formatBal(credits.creditsVideoFX2)}
                             </span>
                             <span className="text-[10px] sm:text-[8px] md:text-[9px] text-gray-400 uppercase font-medium tracking-widest mt-1">
-                              Video FX 2
+                              Seedance FAL
                             </span>
                           </div>
                         </div>
@@ -2874,7 +2874,7 @@ function Dashboard() {
                                   : "text-gray-400 hover:text-white"
                                   }`}
                               >
-                                Video FX 2
+                                Seedance 2.0 FAL
                               </button>
                               <button
                                 type="button"
