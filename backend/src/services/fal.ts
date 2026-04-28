@@ -170,7 +170,9 @@ export const FalService = {
 
       const endpoint =
         selectedModel === "gpt-image-2"
-          ? "openai/gpt-image-2"
+          ? isEdit
+            ? "openai/gpt-image-2/edit"
+            : "openai/gpt-image-2"
           : isEdit
             ? "fal-ai/nano-banana-2/edit"
             : "fal-ai/nano-banana-2";
