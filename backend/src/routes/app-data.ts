@@ -81,7 +81,7 @@ router.get(
       }
 
       const canonicalDomain =
-        !DOMAIN_ROUTING_ENABLED || isSuperAdmin
+        !DOMAIN_ROUTING_ENABLED
           ? null
           : orgViewType === "PICDRIFT"
             ? PICDRIFT_CANONICAL_DOMAIN

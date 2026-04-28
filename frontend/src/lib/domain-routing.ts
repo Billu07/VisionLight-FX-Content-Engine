@@ -41,7 +41,7 @@ const isLocalOrPrivateHost = (host: string): boolean => {
 };
 
 export const getCanonicalDomainRedirectUrl = (user: DomainScopedUser | null): string | null => {
-  if (!user || user.role === "SUPERADMIN" || user.domainRoutingEnabled === false) {
+  if (!user || user.domainRoutingEnabled === false) {
     return null;
   }
 
