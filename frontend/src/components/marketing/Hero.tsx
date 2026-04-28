@@ -1,9 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LoginModal } from "../LoginModal";
 import picdriftLogo from "../../assets/picdrift.png";
 
 export const Hero = () => {
   const [showLogin, setShowLogin] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("login_email")) {
+      setShowLogin(true);
+    }
+  }, []);
 
   return (
     <>
