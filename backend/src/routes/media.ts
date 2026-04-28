@@ -18,6 +18,79 @@ import {
 const router = express.Router();
 const MAX_GENERATION_REFERENCE_IMAGES = 14;
 
+const forceHttpsUrl = (rawUrl: string): string => {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol === "http:") {
+      parsed.protocol = "https:";
+      return parsed.toString();
+    }
+    return rawUrl;
+  } catch {
+    return rawUrl;
+  }
+};
+
+const sanitizeMediaUrlPayload = (raw: unknown): unknown => {
+  if (typeof raw !== "string" || !raw.trim()) return raw;
+  const trimmed = raw.trim();
+
+  if (!trimmed.startsWith("[")) {
+    return forceHttpsUrl(trimmed);
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (!Array.isArray(parsed)) return raw;
+    const sanitized = parsed.map((item) =>
+      typeof item === "string" ? forceHttpsUrl(item) : item,
+    );
+    return JSON.stringify(sanitized);
+  } catch {
+    return raw;
+  }
+};
+
+const sanitizePostForResponse = (post: any) => ({
+  ...post,
+  mediaUrl: sanitizeMediaUrlPayload(post?.mediaUrl),
+  imageReference:
+    typeof post?.imageReference === "string"
+      ? forceHttpsUrl(post.imageReference)
+      : post?.imageReference,
+});
+
+const sanitizeAssetForResponse = (asset: any) => {
+  if (!asset || typeof asset !== "object") return asset;
+
+  const sanitized: any = {
+    ...asset,
+    url: typeof asset.url === "string" ? forceHttpsUrl(asset.url) : asset.url,
+  };
+
+  if (Array.isArray(asset.variations)) {
+    sanitized.variations = asset.variations.map((variation: any) => ({
+      ...variation,
+      url:
+        typeof variation?.url === "string"
+          ? forceHttpsUrl(variation.url)
+          : variation?.url,
+    }));
+  }
+
+  if (asset.originalAsset && typeof asset.originalAsset === "object") {
+    sanitized.originalAsset = {
+      ...asset.originalAsset,
+      url:
+        typeof asset.originalAsset.url === "string"
+          ? forceHttpsUrl(asset.originalAsset.url)
+          : asset.originalAsset.url,
+    };
+  }
+
+  return sanitized;
+};
+
 const extractFirstMediaUrl = (raw: unknown): string => {
   if (typeof raw !== "string") return "";
   const trimmed = raw.trim();
@@ -761,7 +834,12 @@ router.get(
     try {
       const projectId = req.query.projectId as string | undefined;
       const assets = await airtableService.getUserAssets(req.user!.id, projectId);
-      res.json({ success: true, assets });
+      res.json({
+        success: true,
+        assets: Array.isArray(assets)
+          ? assets.map((asset: any) => sanitizeAssetForResponse(asset))
+          : assets,
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -862,7 +940,12 @@ router.get(
     try {
       const projectId = req.query.projectId as string | undefined;
       const posts = await airtableService.getUserPosts(req.user!.id, projectId);
-      res.json({ success: true, posts });
+      res.json({
+        success: true,
+        posts: Array.isArray(posts)
+          ? posts.map((post: any) => sanitizePostForResponse(post))
+          : posts,
+      });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch posts" });
     }
@@ -921,6 +1004,7 @@ router.get(
         const parsed = JSON.parse(post.mediaUrl);
         if (Array.isArray(parsed) && parsed.length > 0) targetUrl = parsed[0];
       } catch {}
+      targetUrl = typeof targetUrl === "string" ? forceHttpsUrl(targetUrl) : targetUrl;
 
       const response = await axios({
         url: targetUrl,
@@ -1192,7 +1276,7 @@ router.get(
         success: true,
         status: post?.status,
         progress: post?.progress || 0,
-        mediaUrl: post?.mediaUrl,
+        mediaUrl: sanitizeMediaUrlPayload(post?.mediaUrl),
         error: post?.error,
       });
     } catch (error: any) {
@@ -1238,7 +1322,7 @@ router.get(
       if (!post || post.userId !== req.user!.id) {
         return res.status(403).json({ error: "Denied" });
       }
-      res.json({ success: true, post });
+      res.json({ success: true, post: sanitizePostForResponse(post) });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
