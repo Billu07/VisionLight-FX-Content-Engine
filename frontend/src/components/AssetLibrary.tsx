@@ -218,7 +218,26 @@ export function AssetLibrary({
   const [pollingUntil, setPollingUntil] = useState<number>(0);
   const [processingCount, setProcessingCount] = useState(0);
   const [targetAssetCount, setTargetAssetCount] = useState(0);
+  const [processingTab, setProcessingTab] = useState<
+    | "16:9"
+    | "9:16"
+    | "1:1"
+    | "original"
+    | "custom"
+    | "VIDEO"
+    | "STORYBOARD"
+    | "3DX_FRAME"
+    | "TIMELINE"
+    | null
+  >(null);
   const [activeDriftIds, setActiveDriftIds] = useState<Set<string>>(new Set());
+
+  const clearProcessingIndicators = () => {
+    setPollingUntil(0);
+    setProcessingCount(0);
+    setTargetAssetCount(0);
+    setProcessingTab(null);
+  };
 
   // 1. Fetch Assets
   const {
@@ -336,6 +355,28 @@ export function AssetLibrary({
 
   const displayedAssets = filteredAssets.slice(0, visibleCount);
   const hasMoreAssets = filteredAssets.length > displayedAssets.length;
+  const processingTabAssetCount = useMemo(() => {
+    if (!processingTab || !Array.isArray(assets)) return 0;
+
+    return assets.filter((asset: Asset) => {
+      if (processingTab === "16:9" || processingTab === "9:16" || processingTab === "1:1") {
+        return asset.type === "IMAGE" && asset.aspectRatio === processingTab;
+      }
+      if (processingTab === "custom") {
+        return asset.type === "IMAGE" && (asset.aspectRatio === "custom" || !!asset.originalAssetId);
+      }
+      if (processingTab === "3DX_FRAME") {
+        return asset.type === "IMAGE" && asset.aspectRatio === "3DX_FRAME";
+      }
+      if (processingTab === "VIDEO") {
+        return asset.type === "VIDEO" && asset.aspectRatio === "VIDEO";
+      }
+      if (processingTab === "original") {
+        return asset.aspectRatio === "original" && !asset.originalAssetId;
+      }
+      return false;
+    }).length;
+  }, [assets, processingTab]);
 
   const getAssetImageSrc = (asset: Asset) => {
     const proxyUrl = getCORSProxyUrl(asset.url, 400, 75);
@@ -384,9 +425,7 @@ export function AssetLibrary({
     if (pollingUntil > 0) {
       const checkInterval = setInterval(() => {
         if (Date.now() > pollingUntil) {
-          setPollingUntil(0);
-          setProcessingCount(0);
-          setTargetAssetCount(0);
+          clearProcessingIndicators();
           queryClient.invalidateQueries({ queryKey: ["assets"] });
         }
       }, 1000);
@@ -395,12 +434,10 @@ export function AssetLibrary({
   }, [pollingUntil, queryClient]);
 
   useEffect(() => {
-    if (targetAssetCount > 0 && filteredAssets.length >= targetAssetCount) {
-      setPollingUntil(0);
-      setProcessingCount(0);
-      setTargetAssetCount(0);
+    if (targetAssetCount > 0 && processingTabAssetCount >= targetAssetCount) {
+      clearProcessingIndicators();
     }
-  }, [filteredAssets.length, targetAssetCount]);
+  }, [processingTabAssetCount, targetAssetCount]);
 
   const requiresProcessedVariant = (file: File) => {
     if (file.type.startsWith("video/")) return false;
@@ -422,7 +459,7 @@ export function AssetLibrary({
       );
       let uploadedBytes = 0;
       const uploadedAssets: any[] = [];
-      const processingTasks: Promise<unknown>[] = [];
+      const processingTasks: Promise<{ ok: boolean }>[] = [];
 
       for (const file of selectedFiles) {
         const isVideo = file.type.startsWith("video/");
@@ -487,6 +524,7 @@ export function AssetLibrary({
           if (activeProject) processFormData.append("projectId", activeProject);
           const processTask = apiEndpoints
             .uploadAssetSync(processFormData)
+            .then(() => ({ ok: true as const }))
             .catch((err: any) => {
               console.error("Auto processing failed:", err);
               const reason =
@@ -494,6 +532,7 @@ export function AssetLibrary({
                   ? err.message
                   : "Unknown error";
               notify.error(`Auto processing failed for "${file.name}": ${reason}`);
+              return { ok: false as const };
             });
           processingTasks.push(processTask);
         }
@@ -502,11 +541,22 @@ export function AssetLibrary({
 
       setUploadProgressPercent(100);
       if (processingTasks.length > 0) {
-        void Promise.allSettled(processingTasks).then(() => {
+        void Promise.allSettled(processingTasks).then((results) => {
+          const failedCount = results.reduce((count, result) => {
+            if (result.status !== "fulfilled") return count + 1;
+            return result.value.ok ? count : count + 1;
+          }, 0);
+
+          if (failedCount > 0) {
+            setProcessingCount((prev) => Math.max(0, prev - failedCount));
+            setTargetAssetCount((prev) => Math.max(0, prev - failedCount));
+          }
+
+          if (failedCount >= processingTasks.length) {
+            clearProcessingIndicators();
+          }
+
           queryClient.invalidateQueries({ queryKey: ["assets"] });
-          setPollingUntil(0);
-          setProcessingCount(0);
-          setTargetAssetCount(0);
         });
       }
       return uploadedAssets;
@@ -521,13 +571,13 @@ export function AssetLibrary({
       setUploadingFileName(selectedFiles[0]?.name || "");
 
       if (processingFiles.length > 0) {
+        setProcessingTab(activeTab);
         setTargetAssetCount(filteredAssets.length + processingFiles.length);
         setProcessingCount(processingFiles.length);
-        setPollingUntil(Date.now() + processingFiles.length * 40000);
+        // Keep placeholders visible until assets actually appear in grid.
+        setPollingUntil(Date.now() + 10 * 60 * 1000);
       } else {
-        setTargetAssetCount(0);
-        setProcessingCount(0);
-        setPollingUntil(0);
+        clearProcessingIndicators();
       }
     },
     onSuccess: () => {
@@ -535,9 +585,7 @@ export function AssetLibrary({
     },
     onError: (err: any) => {
       alert("Upload failed: " + err.message);
-      setPollingUntil(0);
-      setProcessingCount(0);
-      setTargetAssetCount(0);
+      clearProcessingIndicators();
     },
     onSettled: () => {
       setIsUploading(false);
@@ -823,6 +871,7 @@ export function AssetLibrary({
             <div className="grid gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {/* SKELETON CARDS */}
               {pollingUntil > 0 &&
+                processingTab === activeTab &&
                 Array.from({ length: processingCount }).map((_, i) => (
                   <div
                     key={`skeleton-${i}`}

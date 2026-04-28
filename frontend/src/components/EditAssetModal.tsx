@@ -400,12 +400,20 @@ export function EditAssetModal({
 
   // === MUTATION 1: TEXT EDIT ===
   const textEditMutation = useMutation({
-    mutationFn: async ({ prompt: editPrompt, customRatio }: { prompt: string; customRatio?: string }) => {
-      const rootId = currentAsset.originalAssetId || currentAsset.id;
+    mutationFn: async ({
+      prompt: editPrompt,
+      customRatio,
+      sourceAsset,
+    }: {
+      prompt: string;
+      customRatio?: string;
+      sourceAsset: Asset;
+    }) => {
+      const rootId = sourceAsset.originalAssetId || sourceAsset.id;
       return apiEndpoints.editAsset({
-        assetId: currentAsset.id,
+        assetId: sourceAsset.id,
         originalAssetId: rootId,
-        assetUrl: currentAsset.url,
+        assetUrl: sourceAsset.url,
         prompt: editPrompt,
         aspectRatio: customRatio || "original",
         referenceUrls: referenceAssets.map((asset) => asset.url),
@@ -421,6 +429,8 @@ export function EditAssetModal({
         status: "processing",
         message: "Editing text...",
         promptPreview: variables.prompt,
+        sourceAssetId: variables.sourceAsset.id,
+        sourcePreviewUrl: variables.sourceAsset.url,
       });
       return { id };
     },
@@ -591,16 +601,22 @@ export function EditAssetModal({
     }
   };
 
-  const handleSuccess = (newAsset: Asset) => {
+  const handleSuccess = (newAsset: Asset, sourceAssetId?: string) => {
     setIsImageLoading(true);
-    // If the new asset is already in history, just jump to it
     const existingIndex = history.findIndex(a => a.id === newAsset.id);
     if (existingIndex !== -1) {
       setCurrentIndex(existingIndex);
       if (activeTab !== "drift") setPrompt("");
       return;
     }
-    const newHistory = [...history, newAsset];
+
+    const sourceIndex =
+      typeof sourceAssetId === "string"
+        ? history.findIndex((asset) => asset.id === sourceAssetId)
+        : currentIndex;
+    const branchIndex = sourceIndex >= 0 ? sourceIndex : currentIndex;
+    const baseHistory = history.slice(0, branchIndex + 1);
+    const newHistory = [...baseHistory, newAsset];
     setHistory(newHistory);
     setCurrentIndex(newHistory.length - 1);
     if (activeTab !== "drift") setPrompt("");
@@ -670,7 +686,12 @@ export function EditAssetModal({
       ratioMutation.mutate(convertTargetRatio);
     } else {
       if (!prompt.trim()) return alert("Please enter a prompt");
-      textEditMutation.mutate({ prompt: prompt.trim(), customRatio: convertTargetRatio });
+      if (!currentAsset) return;
+      textEditMutation.mutate({
+        prompt: prompt.trim(),
+        customRatio: convertTargetRatio,
+        sourceAsset: currentAsset,
+      });
     }
   };
 
@@ -1078,7 +1099,7 @@ export function EditAssetModal({
                                   if (job.type === "drift" && job.resultAsset.type === "VIDEO") {
                                     setDriftVideoUrl(job.resultAsset.url);
                                   } else {
-                                    handleSuccess(job.resultAsset);
+                                    handleSuccess(job.resultAsset, job.sourceAssetId);
                                   }
                                 }
                               }}
@@ -1401,7 +1422,12 @@ export function EditAssetModal({
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
-                        if (prompt.trim()) textEditMutation.mutate({ prompt: prompt.trim() });
+                        if (prompt.trim() && currentAsset) {
+                          textEditMutation.mutate({
+                            prompt: prompt.trim(),
+                            sourceAsset: currentAsset,
+                          });
+                        }
                       }
                     }}
                   />
@@ -1692,7 +1718,13 @@ export function EditAssetModal({
               null // Convert button is in the UI block above
             ) : (
               <button
-                onClick={() => textEditMutation.mutate({ prompt: prompt.trim() })}
+                onClick={() => {
+                  if (!currentAsset) return;
+                  textEditMutation.mutate({
+                    prompt: prompt.trim(),
+                    sourceAsset: currentAsset,
+                  });
+                }}
                 disabled={!prompt.trim()}
                 className="w-full py-4 bg-gradient-to-r from-purple-600 to-cyan-600 rounded-xl text-white font-bold hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
               >
