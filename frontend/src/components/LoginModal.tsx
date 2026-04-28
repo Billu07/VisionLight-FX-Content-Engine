@@ -10,6 +10,53 @@ interface LoginModalProps {
   onClose: () => void;
 }
 
+const DOMAIN_CACHE_STORAGE_KEY = "visionlight_login_domain_cache_v1";
+const DOMAIN_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+
+type DomainCacheEntry = {
+  domain: string;
+  updatedAt: number;
+};
+
+const readDomainCache = (): Record<string, DomainCacheEntry> => {
+  try {
+    const raw = localStorage.getItem(DOMAIN_CACHE_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as Record<string, DomainCacheEntry>;
+  } catch {
+    return {};
+  }
+};
+
+const getCachedDomainForEmail = (email: string): string | null => {
+  const cache = readDomainCache();
+  const entry = cache[email];
+  if (!entry || typeof entry.domain !== "string" || typeof entry.updatedAt !== "number") {
+    return null;
+  }
+  if (Date.now() - entry.updatedAt > DOMAIN_CACHE_TTL_MS) {
+    return null;
+  }
+  return sanitizeDomain(entry.domain);
+};
+
+const cacheEmailDomain = (email: string, domain: string) => {
+  const sanitizedDomain = sanitizeDomain(domain);
+  if (!sanitizedDomain) return;
+  const cache = readDomainCache();
+  cache[email] = {
+    domain: sanitizedDomain,
+    updatedAt: Date.now(),
+  };
+  try {
+    localStorage.setItem(DOMAIN_CACHE_STORAGE_KEY, JSON.stringify(cache));
+  } catch {
+    // Ignore storage failures; login flow should continue.
+  }
+};
+
 const sanitizeDomain = (raw?: string | null): string | null => {
   if (!raw) return null;
   const trimmed = raw.trim().toLowerCase();
@@ -50,10 +97,31 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
     setIsLoading(true);
     setError("");
 
+    const currentHost = sanitizeDomain(window.location.host);
+    const cachedDomain = getCachedDomainForEmail(normalizedEmail);
+    if (cachedDomain) {
+      if (currentHost && cachedDomain !== currentHost) {
+        const redirectUrl = new URL(window.location.href);
+        redirectUrl.hostname = cachedDomain;
+        redirectUrl.searchParams.set("login_email", normalizedEmail);
+        window.location.replace(redirectUrl.toString());
+        return;
+      }
+
+      const url = new URL(window.location.href);
+      url.searchParams.set("login_email", normalizedEmail);
+      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+      setStep("password");
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const response = await apiEndpoints.resolveAuthDomain(normalizedEmail);
       const canonicalDomain = sanitizeDomain(response?.data?.canonicalDomain);
-      const currentHost = sanitizeDomain(window.location.host);
+      if (canonicalDomain) {
+        cacheEmailDomain(normalizedEmail, canonicalDomain);
+      }
 
       if (canonicalDomain && currentHost && canonicalDomain !== currentHost) {
         const redirectUrl = new URL(window.location.href);
