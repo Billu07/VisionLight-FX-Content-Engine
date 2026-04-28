@@ -41,8 +41,9 @@ interface CreditRequest {
 const COVERAGE_WALLETS = [
   { key: "creditsPicDrift", label: "PicDrift (Standard)", provider: "fal" },
   { key: "creditsPicDriftPlus", label: "Kling 3.0", provider: "fal" },
+  { key: "creditsImageFX", label: "Image FX (Nano/GPT 2)", provider: "fal" },
   { key: "creditsVideoFX1", label: "Topaz Upscale", provider: "fal" },
-  { key: "creditsVideoFX2", label: "Seedance 2.0 FAL", provider: "fal" },
+  { key: "creditsVideoFX2", label: "Video FX 2", provider: "fal" },
   { key: "creditsVideoFX3", label: "Veo 3", provider: "fal" },
 ] as const;
 
@@ -53,11 +54,17 @@ const COVERAGE_VARIANTS = [
   { id: "picdrift_10s", label: "PicDrift 10s", provider: "fal", wallet: "creditsPicDrift", deductionKey: "pricePicDrift_10s" },
   { id: "picdrift_plus_5s", label: "Kling 3.0 5s", provider: "fal", wallet: "creditsPicDriftPlus", deductionKey: "pricePicDrift_Plus_5s" },
   { id: "picdrift_plus_10s", label: "Kling 3.0 10s", provider: "fal", wallet: "creditsPicDriftPlus", deductionKey: "pricePicDrift_Plus_10s" },
+  { id: "picfx_standard", label: "Pic FX Standard (Nano/GPT 2)", provider: "fal", wallet: "creditsImageFX", deductionKey: "pricePicFX_Standard" },
+  { id: "picfx_carousel", label: "Pic FX Carousel", provider: "fal", wallet: "creditsImageFX", deductionKey: "pricePicFX_Carousel" },
+  { id: "picfx_batch", label: "Pic FX Batch", provider: "fal", wallet: "creditsImageFX", deductionKey: "pricePicFX_Batch" },
+  { id: "editor_pro", label: "Pic FX Editor", provider: "fal", wallet: "creditsImageFX", deductionKey: "priceEditor_Pro" },
+  { id: "editor_enhance", label: "Image Enhance/Upscale", provider: "fal", wallet: "creditsImageFX", deductionKey: "priceEditor_Enhance" },
+  { id: "editor_convert", label: "Image Format Convert", provider: "fal", wallet: "creditsImageFX", deductionKey: "priceEditor_Convert" },
   { id: "topaz_upscale_2x", label: "Topaz Upscale 2x", provider: "fal", wallet: "creditsVideoFX1", deductionKey: "priceVideoFX1_10s" },
   { id: "topaz_upscale_4x", label: "Topaz Upscale 4x", provider: "fal", wallet: "creditsVideoFX1", deductionKey: "priceVideoFX1_15s" },
-  { id: "seedance_fal_4s", label: "Seedance 2.0 FAL 4s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_4s" },
-  { id: "seedance_fal_8s", label: "Seedance 2.0 FAL 8s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_8s" },
-  { id: "seedance_fal_12s", label: "Seedance 2.0 FAL 12s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_12s" },
+  { id: "seedance_fal_4s", label: "Video FX 2 4s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_4s" },
+  { id: "seedance_fal_8s", label: "Video FX 2 8s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_8s" },
+  { id: "seedance_fal_12s", label: "Video FX 2 12s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_12s" },
   { id: "veo3_4s", label: "Veo 3 4s", provider: "fal", wallet: "creditsVideoFX3", deductionKey: "priceVideoFX3_4s" },
   { id: "veo3_6s", label: "Veo 3 6s", provider: "fal", wallet: "creditsVideoFX3", deductionKey: "priceVideoFX3_6s" },
   { id: "veo3_8s", label: "Veo 3 8s", provider: "fal", wallet: "creditsVideoFX3", deductionKey: "priceVideoFX3_8s" },
@@ -88,6 +95,12 @@ export default function TenantDashboard() {
     picdrift_10s: 0.2,
     picdrift_plus_5s: 0.2,
     picdrift_plus_10s: 0.3,
+    picfx_standard: 0.08,
+    picfx_carousel: 0.2,
+    picfx_batch: 0.08,
+    editor_pro: 0.1,
+    editor_enhance: 0.12,
+    editor_convert: 0.08,
     topaz_upscale_2x: 0.45,
     topaz_upscale_4x: 0.7,
     seedance_fal_4s: 0.2,
@@ -225,10 +238,11 @@ export default function TenantDashboard() {
   );
 
   const allowedCoverageWalletKeys: CoverageWalletKey[] = isPicdriftTenant
-    ? ["creditsPicDrift", "creditsPicDriftPlus"]
+    ? ["creditsPicDrift", "creditsPicDriftPlus", "creditsImageFX"]
     : [
         "creditsPicDrift",
         "creditsPicDriftPlus",
+        "creditsImageFX",
         "creditsVideoFX1",
         "creditsVideoFX2",
         "creditsVideoFX3",
@@ -468,7 +482,7 @@ export default function TenantDashboard() {
                         <td className="p-5 text-center">
                           <div className="flex gap-1 justify-center">
                             <input type="number" step="1" min="0" title="Topaz Upscale" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX1", (toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1).toString())} />
-                            <input type="number" step="1" min="0" title="Seedance 2.0 FAL" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX2", (toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2).toString())} />
+                            <input type="number" step="1" min="0" title="Video FX 2" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX2", (toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2).toString())} />
                             <input type="number" step="1" min="0" title="VidFX 3" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX3", (toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3).toString())} />
                           </div>
                         </td>

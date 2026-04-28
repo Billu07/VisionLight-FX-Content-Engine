@@ -2406,7 +2406,7 @@ function Dashboard() {
                               {formatBal(credits.creditsVideoFX1)}
                             </span>
                             <span className="text-[10px] sm:text-[8px] md:text-[9px] text-gray-400 uppercase font-medium tracking-widest mt-1">
-                              Seedance Kie
+                              Topaz Upscale
                             </span>
                           </div>
                         </div>
@@ -2418,7 +2418,7 @@ function Dashboard() {
                               {formatBal(credits.creditsVideoFX2)}
                             </span>
                             <span className="text-[10px] sm:text-[8px] md:text-[9px] text-gray-400 uppercase font-medium tracking-widest mt-1">
-                              Seedance FAL
+                              Video FX 2
                             </span>
                           </div>
                         </div>
@@ -2874,7 +2874,7 @@ function Dashboard() {
                                   : "text-gray-400 hover:text-white"
                                   }`}
                               >
-                                Seedance 2.0 FAL
+                                Video FX 2
                               </button>
                               <button
                                 type="button"
