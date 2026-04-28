@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request } from "express";
 import { authenticateToken, AuthenticatedRequest } from "../middleware/auth";
 import { dbService as airtableService, prisma } from "../services/database";
 import { ROIService } from "../services/roi";
@@ -16,7 +16,7 @@ const sanitizeDomain = (raw?: string | null): string | null => {
   return host || null;
 };
 
-const resolveIncomingHost = (req: AuthenticatedRequest): string | null => {
+const resolveIncomingHost = (req: Request): string | null => {
   const forwarded = req.headers["x-forwarded-host"];
   const forwardedHost = Array.isArray(forwarded) ? forwarded[0] : forwarded;
   const candidate = forwardedHost || req.headers.host || "";
@@ -35,6 +35,45 @@ const VISIONLIGHT_CANONICAL_DOMAIN =
       process.env.VISUALFX_CANONICAL_DOMAIN ||
       process.env.VISUALFX_DOMAIN,
   ) || "visualfx.studio";
+
+router.post("/api/auth/resolve-domain", async (req, res) => {
+  try {
+    const rawEmail = req.body?.email;
+    if (typeof rawEmail !== "string" || !rawEmail.trim()) {
+      return res.status(400).json({ error: "Email required" });
+    }
+
+    const email = rawEmail.trim().toLowerCase();
+    const user = await airtableService.findUserByEmail(email);
+    const incomingHost = resolveIncomingHost(req);
+
+    const resolvedView = (user?.view || "VISIONLIGHT") as "VISIONLIGHT" | "PICDRIFT";
+    const canonicalFromView =
+      resolvedView === "PICDRIFT" ? PICDRIFT_CANONICAL_DOMAIN : VISIONLIGHT_CANONICAL_DOMAIN;
+
+    // Keep response generic to reduce account-enumeration signal.
+    // If user isn't known, stay on current host.
+    const canonicalDomain =
+      !DOMAIN_ROUTING_ENABLED
+        ? null
+        : user
+          ? canonicalFromView
+          : incomingHost || null;
+
+    const domainRedirectRequired = Boolean(
+      canonicalDomain && incomingHost && incomingHost !== canonicalDomain,
+    );
+
+    return res.json({
+      success: true,
+      domainRoutingEnabled: DOMAIN_ROUTING_ENABLED,
+      canonicalDomain,
+      domainRedirectRequired,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
 
 // ==================== AUTH ROUTES ====================
 router.get(

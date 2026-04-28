@@ -1,45 +1,112 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabase"; // Make sure this path is correct
+import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
 import { LoadingSpinner } from "./LoadingSpinner";
+import { apiEndpoints } from "../lib/api";
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // removed onSuccess because navigation happens here now
 }
+
+const sanitizeDomain = (raw?: string | null): string | null => {
+  if (!raw) return null;
+  const trimmed = raw.trim().toLowerCase();
+  if (!trimmed) return null;
+  const withoutProtocol = trimmed.replace(/^https?:\/\//, "");
+  const host = withoutProtocol.split("/")[0]?.replace(/:\d+$/, "").replace(/\.$/, "");
+  return host || null;
+};
 
 export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState(""); // Changed from 'name' to 'password'
+  const [password, setPassword] = useState("");
+  const [step, setStep] = useState<"email" | "password">("email");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
   const navigate = useNavigate();
-  const { checkAuth } = useAuth(); // We use checkAuth to sync, not login
+  const { checkAuth } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim() || !password.trim()) return;
+  useEffect(() => {
+    if (!isOpen) return;
+    const url = new URL(window.location.href);
+    const prefilledEmail = url.searchParams.get("login_email");
+    if (prefilledEmail) {
+      setEmail(prefilledEmail);
+      setStep("password");
+    } else {
+      setStep("email");
+      setPassword("");
+    }
+    setError("");
+  }, [isOpen]);
+
+  const handleContinue = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) return;
 
     setIsLoading(true);
     setError("");
 
     try {
-      // 1. Authenticate with Supabase directly
+      const response = await apiEndpoints.resolveAuthDomain(normalizedEmail);
+      const canonicalDomain = sanitizeDomain(response?.data?.canonicalDomain);
+      const currentHost = sanitizeDomain(window.location.host);
+
+      if (canonicalDomain && currentHost && canonicalDomain !== currentHost) {
+        const redirectUrl = new URL(window.location.href);
+        redirectUrl.hostname = canonicalDomain;
+        redirectUrl.searchParams.set("login_email", normalizedEmail);
+        window.location.replace(redirectUrl.toString());
+        return;
+      }
+
+      const url = new URL(window.location.href);
+      url.searchParams.set("login_email", normalizedEmail);
+      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+      setStep("password");
+    } catch {
+      // Keep a generic fallback to avoid account-enumeration hints.
+      setStep("password");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (step === "email") {
+      if (!normalizedEmail) return;
+      await handleContinue();
+      return;
+    }
+
+    if (!normalizedEmail || !password.trim()) return;
+
+    setIsLoading(true);
+    setError("");
+
+    try {
       const { error: authError } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password,
       });
 
       if (authError) throw authError;
 
-      // 2. Sync with Backend (Airtable)
       await checkAuth();
-
-      // 3. Navigate
       onClose();
+
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("login_email")) {
+        url.searchParams.delete("login_email");
+        window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+      }
+
       navigate("/app");
     } catch (err: any) {
       setError(err.message || "Invalid login credentials");
@@ -53,17 +120,17 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
       <div className="bg-gray-900 border border-white/10 rounded-2xl p-8 w-full max-w-md shadow-2xl relative overflow-hidden">
-        {/* Decorative background glow */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl -z-10"></div>
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl -z-10"></div>
 
         <h2 className="text-2xl font-bold text-white mb-2">Login to Studio</h2>
         <p className="text-purple-200/70 text-sm mb-6">
-          Enter your credentials to access PicDrift FX.
+          {step === "email"
+            ? "Enter your email to continue to the correct workspace."
+            : "Enter your password to continue."}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Email */}
           <div>
             <label className="block text-sm font-medium text-purple-200 mb-1.5">
               Email Address
@@ -75,23 +142,26 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
               placeholder="client@brand.com"
               className="w-full p-3 bg-gray-800/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-gray-500 transition-all outline-none"
               required
+              autoComplete="email"
             />
           </div>
 
-          {/* Password (Replaces 'Name Your Studio') */}
-          <div>
-            <label className="block text-sm font-medium text-purple-200 mb-1.5">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full p-3 bg-gray-800/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-gray-500 transition-all outline-none"
-              required
-            />
-          </div>
+          {step === "password" && (
+            <div>
+              <label className="block text-sm font-medium text-purple-200 mb-1.5">
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full p-3 bg-gray-800/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent text-white placeholder-gray-500 transition-all outline-none"
+                required
+                autoComplete="current-password"
+              />
+            </div>
+          )}
 
           {error && (
             <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-300 rounded-lg text-sm">
@@ -110,11 +180,11 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
             </button>
             <button
               type="submit"
-              disabled={isLoading || !email || !password}
+              disabled={isLoading || !email || (step === "password" && !password)}
               className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white py-3 px-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 font-bold shadow-lg hover:shadow-cyan-500/25"
             >
               {isLoading ? <LoadingSpinner size="sm" variant="light" /> : null}
-              Login
+              {step === "email" ? "Continue" : "Login"}
             </button>
           </div>
 

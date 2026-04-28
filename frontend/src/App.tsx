@@ -20,10 +20,7 @@ import { BrandProvider } from "./contexts/BrandContext";
 import { useAuth } from "./hooks/useAuth";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import { installAlertBridge } from "./lib/notifications";
-import {
-  buildCanonicalDomainRelayUrl,
-  getCanonicalDomainRedirectUrl,
-} from "./lib/domain-routing";
+import { getCanonicalDomainRedirectUrl } from "./lib/domain-routing";
 
 // --- NEW IMPORTS (Add these) ---
 import { Terms } from "./pages/Terms";
@@ -60,18 +57,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     if (isLoading || !user || !redirectUrl || hasRedirectedRef.current) return;
 
     hasRedirectedRef.current = true;
-    let isCancelled = false;
-
-    (async () => {
-      const relayUrl = await buildCanonicalDomainRelayUrl(user);
-      if (!isCancelled) {
-        window.location.replace(relayUrl || redirectUrl);
-      }
-    })();
-
-    return () => {
-      isCancelled = true;
-    };
+    window.location.replace(redirectUrl);
   }, [isLoading, user, redirectUrl]);
 
   if (isLoading)
@@ -118,18 +104,7 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
     if (isLoading || !user || !redirectUrl || hasRedirectedRef.current) return;
 
     hasRedirectedRef.current = true;
-    let isCancelled = false;
-
-    (async () => {
-      const relayUrl = await buildCanonicalDomainRelayUrl(user);
-      if (!isCancelled) {
-        window.location.replace(relayUrl || redirectUrl);
-      }
-    })();
-
-    return () => {
-      isCancelled = true;
-    };
+    window.location.replace(redirectUrl);
   }, [isLoading, user, redirectUrl]);
 
   if (isLoading)

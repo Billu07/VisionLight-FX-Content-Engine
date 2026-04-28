@@ -39,6 +39,8 @@ api.interceptors.response.use(
 export const apiEndpoints = {
   // === Auth ===
   getMe: () => api.get("/api/auth/me"),
+  resolveAuthDomain: (email: string) =>
+    api.post("/api/auth/resolve-domain", { email }),
   adminCreateUser: (data: any) => api.post("/api/admin/create-user", data),
   adminGetUsers: () => api.get("/api/admin/users"),
   adminUpdateUser: (userId: string, data: any) =>
