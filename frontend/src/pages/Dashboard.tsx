@@ -2716,7 +2716,7 @@ function Dashboard() {
           )}
           <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
             <div className={`flex-1 ${(viewMode !== "create" && isMobile) ? 'hidden' : 'block'}`}>
-              <div className="rounded-3xl border border-white/15 bg-gray-900/55 p-4 shadow-[0_24px_60px_rgba(2,8,23,0.45)] backdrop-blur-lg sm:p-6 lg:p-8">
+              <div className="rounded-3xl border border-white/15 bg-gray-800/30 p-4 shadow-[0_24px_60px_rgba(2,8,23,0.45)] backdrop-blur-lg sm:p-6 lg:p-8">
                 {/* Updated header: logo left, library button right */}
                 <div className="mb-6 sm:mb-8 flex justify-between items-start">
                   <div className="hidden sm:block">
@@ -4516,7 +4516,7 @@ function Dashboard() {
             </div>
 
             <div className={`lg:w-96 ${(viewMode !== "history" && isMobile) ? 'hidden' : 'block'}`}>
-              <div className="sticky top-4 rounded-3xl border border-white/15 bg-gray-900/55 p-4 shadow-[0_24px_60px_rgba(2,8,23,0.45)] backdrop-blur-lg sm:p-6">
+              <div className="sticky top-4 rounded-3xl border border-white/15 bg-gray-800/30 p-4 shadow-[0_24px_60px_rgba(2,8,23,0.45)] backdrop-blur-lg sm:p-6">
                 <div className="flex items-center justify-between mb-4 sm:mb-6">
                   <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
                     <span></span> {timelinePanelMode === "timeline" ? "Timeline" : "Storyline"}
