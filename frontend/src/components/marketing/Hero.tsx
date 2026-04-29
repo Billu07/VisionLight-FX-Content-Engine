@@ -483,8 +483,10 @@ export const Hero = () => {
           </section>
 
           <section className="mx-auto grid w-full max-w-7xl gap-8 px-4 pb-16 pt-5 sm:px-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:pt-0">
-            <div className="rounded-[2rem] border border-indigo-300/25 bg-[#070c2b]/85 p-4 shadow-[0_24px_70px_rgba(10,12,38,0.45)] backdrop-blur-sm sm:p-6">
-              <div className="rounded-[1.4rem] border border-white/10 bg-gradient-to-br from-[#090b24] to-[#07081c] p-4 sm:p-5">
+            <div className="relative [perspective:1800px]">
+              <div className="relative rounded-[2rem] border border-indigo-300/25 bg-[#070c2b]/85 p-4 shadow-[0_24px_70px_rgba(10,12,38,0.45)] backdrop-blur-sm transition-transform duration-700 lg:[transform:rotateY(-14deg)_rotateX(4deg)_translateX(-6px)] lg:[transform-origin:center_left] lg:[transform-style:preserve-3d] sm:p-6">
+                <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-gradient-to-br from-cyan-300/8 via-transparent to-indigo-500/10" />
+                <div className="relative rounded-[1.4rem] border border-white/10 bg-gradient-to-br from-[#090b24] to-[#07081c] p-4 sm:p-5">
                 <div className="mb-4 flex items-center justify-between text-xs text-slate-400">
                   <span className="font-semibold tracking-wide text-slate-200">
                     3DX Paths
@@ -525,6 +527,7 @@ export const Hero = () => {
                       />
                     </div>
                   ))}
+                </div>
                 </div>
               </div>
             </div>
