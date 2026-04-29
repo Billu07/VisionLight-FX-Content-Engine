@@ -24,9 +24,8 @@ type HeroPreviewCard = {
   x: string;
   y: string;
   chip: string;
-  preview: PreviewImageAsset;
+  preview?: PreviewImageAsset;
   stripPreviews: PreviewImageAsset[];
-  video?: PreviewVideoAsset;
 };
 
 const IMAGES = {
@@ -115,13 +114,13 @@ const VIDEOS = {
   },
 } satisfies Record<string, PreviewVideoAsset>;
 
-const cinematicSwapVideos: PreviewVideoAsset[] = [
-  VIDEOS.cinematic,
+const rightCanvasVideos: PreviewVideoAsset[] = [
   VIDEOS.d1,
   VIDEOS.d2,
   VIDEOS.d3,
   VIDEOS.d4,
   VIDEOS.d5,
+  VIDEOS.cinematic,
 ];
 
 const pathPreviewVideos: PreviewVideoAsset[] = [
@@ -155,7 +154,6 @@ const mockCards: HeroPreviewCard[] = [
     x: "2%",
     y: "15%",
     chip: "Portrait",
-    preview: portraitPreviews[0],
     stripPreviews: [portraitPreviews[0], portraitPreviews[1], portraitPreviews[2]],
   },
   {
@@ -165,7 +163,6 @@ const mockCards: HeroPreviewCard[] = [
     x: "27%",
     y: "7%",
     chip: "Landscape",
-    preview: scenePreviews[0],
     stripPreviews: [scenePreviews[0], scenePreviews[1], scenePreviews[2]],
   },
   {
@@ -175,7 +172,6 @@ const mockCards: HeroPreviewCard[] = [
     x: "51%",
     y: "2%",
     chip: "Story",
-    preview: IMAGES.abstract3,
     stripPreviews: [IMAGES.abstract1, IMAGES.abstract2, IMAGES.abstract3],
   },
   {
@@ -185,9 +181,7 @@ const mockCards: HeroPreviewCard[] = [
     x: "75%",
     y: "8%",
     chip: "Cinematic",
-    preview: scenePreviews[3],
     stripPreviews: [scenePreviews[3], scenePreviews[4], scenePreviews[5]],
-    video: VIDEOS.cinematic,
   },
 ];
 
@@ -206,21 +200,25 @@ const ResponsivePreviewImage = ({
   className,
   sizes = "(max-width: 640px) 50vw, 220px",
   loading = "lazy",
+  fetchPriority = "low",
 }: {
   asset: PreviewImageAsset;
   alt: string;
   className: string;
   sizes?: string;
   loading?: "lazy" | "eager";
+  fetchPriority?: "high" | "low" | "auto";
 }) => {
   return (
     <img
-      src={asset.md}
+      src={asset.sm}
       srcSet={`${asset.sm} 480w, ${asset.md} 960w`}
       sizes={sizes}
       alt={alt}
       className={className}
       loading={loading}
+      decoding="async"
+      fetchPriority={fetchPriority}
     />
   );
 };
@@ -229,10 +227,12 @@ const PreviewVideo = ({
   asset,
   className,
   preload = "metadata",
+  autoPlay = true,
 }: {
   asset: PreviewVideoAsset;
   className: string;
   preload?: "none" | "metadata" | "auto";
+  autoPlay?: boolean;
 }) => {
   return (
     <video
@@ -240,7 +240,7 @@ const PreviewVideo = ({
       className={className}
       src={asset.src}
       poster={asset.poster}
-      autoPlay
+      autoPlay={autoPlay}
       muted
       loop
       playsInline
@@ -343,10 +343,9 @@ const MarketingHeader = ({
 export const Hero = () => {
   const location = useLocation();
   const [showLogin, setShowLogin] = useState(false);
-  const [activeCinematicVideoIndex, setActiveCinematicVideoIndex] = useState(0);
+  const [activeRightCanvasVideoIndex, setActiveRightCanvasVideoIndex] = useState(-1);
   const siteBrand = useMemo(() => getSiteBrand(), []);
   const isVisualFxDomain = siteBrand === "visualfx";
-  const activeCinematicVideo = cinematicSwapVideos[activeCinematicVideoIndex];
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -356,8 +355,8 @@ export const Hero = () => {
   }, [location.search]);
 
   const handleSwapPreviewVideo = () => {
-    setActiveCinematicVideoIndex(
-      (prevIndex) => (prevIndex + 1) % cinematicSwapVideos.length,
+    setActiveRightCanvasVideoIndex(
+      (prevIndex) => (prevIndex + 1) % rightCanvasVideos.length,
     );
   };
 
@@ -406,9 +405,14 @@ export const Hero = () => {
             </div>
 
             <div className="relative h-[300px] sm:h-[340px] lg:h-[370px]">
-              {mockCards.map((card) => {
-                const cardVideo =
-                  card.title === "Cinematic FX" ? activeCinematicVideo : card.video;
+              {mockCards.map((card, cardIndex) => {
+                const hasSelectedVideo = activeRightCanvasVideoIndex >= 0;
+                const selectedVideo = hasSelectedVideo
+                  ? rightCanvasVideos[
+                      (activeRightCanvasVideoIndex + cardIndex) % rightCanvasVideos.length
+                    ]
+                  : null;
+                const posterAsset = rightCanvasVideos[cardIndex % rightCanvasVideos.length];
 
                 return (
                   <div
@@ -431,18 +435,21 @@ export const Hero = () => {
 
                         <div className="rounded-xl border border-white/20 bg-black/15 p-2 backdrop-blur-[1px]">
                           <div className="overflow-hidden rounded-lg border border-white/20">
-                            {cardVideo ? (
+                            {selectedVideo ? (
                               <PreviewVideo
-                                asset={cardVideo}
+                                asset={selectedVideo}
                                 className="h-24 w-full object-cover sm:h-28"
                                 preload="metadata"
+                                autoPlay
                               />
                             ) : (
-                              <ResponsivePreviewImage
-                                asset={card.preview}
-                                alt={`${card.title} preview`}
+                              <img
+                                src={posterAsset.poster}
+                                alt={`${card.title} video poster`}
                                 className="h-24 w-full object-cover sm:h-28"
-                                sizes="(max-width: 640px) 28vw, 180px"
+                                loading="eager"
+                                fetchPriority="high"
+                                decoding="async"
                               />
                             )}
                           </div>
@@ -471,8 +478,8 @@ export const Hero = () => {
               <button
                 type="button"
                 onClick={handleSwapPreviewVideo}
-                title="Swap preview video"
-                aria-label="Swap preview video"
+                title="Play next preview video"
+                aria-label="Play next preview video"
                 className="absolute left-[42%] top-[34%] flex h-20 w-20 items-center justify-center rounded-full border border-white/30 bg-white/20 backdrop-blur-xl shadow-[0_12px_30px_rgba(5,10,35,0.55)] transition hover:scale-[1.04] hover:bg-white/30"
               >
                 <div className="ml-1 h-0 w-0 border-y-[12px] border-l-[18px] border-y-transparent border-l-white" />
@@ -499,6 +506,7 @@ export const Hero = () => {
                         asset={video}
                         className="aspect-video w-full object-cover"
                         preload="none"
+                        autoPlay={idx === 0}
                       />
                     </div>
                   ))}
