@@ -228,11 +228,13 @@ const PreviewVideo = ({
   className,
   preload = "metadata",
   autoPlay = true,
+  loop = false,
 }: {
   asset: PreviewVideoAsset;
   className: string;
   preload?: "none" | "metadata" | "auto";
   autoPlay?: boolean;
+  loop?: boolean;
 }) => {
   return (
     <video
@@ -242,7 +244,7 @@ const PreviewVideo = ({
       poster={asset.poster}
       autoPlay={autoPlay}
       muted
-      loop
+      loop={loop}
       playsInline
       preload={preload}
       aria-label={asset.alt}
@@ -441,6 +443,7 @@ export const Hero = () => {
                                 className="h-24 w-full object-cover sm:h-28"
                                 preload="metadata"
                                 autoPlay
+                                loop={false}
                               />
                             ) : (
                               <img
@@ -507,6 +510,7 @@ export const Hero = () => {
                         className="aspect-video w-full object-cover"
                         preload="none"
                         autoPlay={idx === 0}
+                        loop={false}
                       />
                     </div>
                   ))}
