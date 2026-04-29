@@ -1,49 +1,49 @@
-// 1. Import Link from react-router-dom
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Hero } from "../components/marketing/Hero";
+import { getSiteBrand } from "../lib/branding";
 
 export const MarketingSite = () => {
+  const siteBrand = useMemo(() => getSiteBrand(), []);
+  const studioLabel = siteBrand === "visualfx" ? "VisualFX Studio" : "PicDrift Studio";
+
   return (
-    <div className="bg-gradient-to-b from-gray-900 via-purple-900 to-violet-900 min-h-screen">
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 via-purple-900 to-violet-900">
       <Hero />
 
-      {/* Enhanced Footer */}
       <footer className="bg-gray-900 py-12">
         <div className="container mx-auto px-6">
           <div className="text-center">
-            <h3 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent mb-4">
-              PicDrift Studio
+            <h3 className="mb-4 bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-2xl font-bold text-transparent">
+              {studioLabel}
             </h3>
-            <p className="text-purple-300 mb-6 max-w-md mx-auto">
-              Transform your content creation with AI-powered video, image, and
-              carousel generation.
+            <p className="mx-auto mb-6 max-w-md text-purple-300">
+              Transform your content creation with AI-powered image, and video generation.
             </p>
-            <div className="flex justify-center gap-6 mb-6">
-              {/* 2. Update these to Link components */}
+            <div className="mb-6 flex justify-center gap-6">
               <Link
                 to="/terms"
-                className="text-purple-400 hover:text-cyan-400 transition-colors"
+                className="text-purple-400 transition-colors hover:text-cyan-400"
               >
                 Terms
               </Link>
 
               <Link
                 to="/privacy"
-                className="text-purple-400 hover:text-cyan-400 transition-colors"
+                className="text-purple-400 transition-colors hover:text-cyan-400"
               >
                 Privacy
               </Link>
 
-              {/* 3. Update Contact to a mailto link */}
               <a
                 href="https://www.picdrift.com/contact"
-                className="text-purple-400 hover:text-cyan-400 transition-colors"
+                className="text-purple-400 transition-colors hover:text-cyan-400"
               >
                 Contact
               </a>
             </div>
-            <p className="text-purple-400 text-sm">
-              © 2026 PicDrift Studio | ALL RIGHTS RESERVED.
+            <p className="text-sm text-purple-400">
+              (c) 2026 {studioLabel} | ALL RIGHTS RESERVED.
             </p>
           </div>
         </div>

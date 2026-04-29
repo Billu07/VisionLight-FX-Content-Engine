@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { LoginModal } from "../LoginModal";
 import picdriftLogo from "../../assets/picdrift.png";
+import fxLogo from "../../assets/fx.png";
+import { getSiteBrand } from "../../lib/branding";
 
-type HeroVariant = "current" | "v1" | "v2" | "v3";
+type HeroVariant = "current" | "v2";
 
-const HERO_VARIANTS: HeroVariant[] = ["current", "v1", "v2", "v3"];
+const HERO_VARIANTS: HeroVariant[] = ["current", "v2"];
 
 const isHeroVariant = (value: string | null): value is HeroVariant => {
   if (!value) {
@@ -174,12 +176,6 @@ const mockCards = [
   },
 ];
 
-const v1RibbonRows = [
-  [scenePreviews[0], scenePreviews[2], scenePreviews[4]],
-  [scenePreviews[1], scenePreviews[3], scenePreviews[5]],
-  [scenePreviews[2], scenePreviews[0], scenePreviews[3]],
-];
-
 const libraryPosters = [
   portraitPreviews[0],
   scenePreviews[0],
@@ -198,14 +194,22 @@ const popularPosters = [
   portraitPreviews[1],
 ];
 
-const v2CollageCards = [
-  { preview: scenePreviews[2], top: "3%", left: "13%", rotate: "-11deg" },
-  { preview: portraitPreviews[0], top: "0%", left: "46%", rotate: "-8deg" },
-  { preview: portraitPreviews[1], top: "8%", left: "72%", rotate: "-12deg" },
-  { preview: IMAGES.abstract2, top: "34%", left: "0%", rotate: "-11deg" },
-  { preview: IMAGES.abstract1, top: "30%", left: "40%", rotate: "-7deg" },
-  { preview: scenePreviews[5], top: "62%", left: "25%", rotate: "-6deg" },
-  { preview: scenePreviews[1], top: "56%", left: "72%", rotate: "-9deg" },
+type V2CollageCard = {
+  top: string;
+  left: string;
+  rotate: string;
+  image?: PreviewImageAsset;
+  video?: PreviewVideoAsset;
+};
+
+const v2CollageCards: V2CollageCard[] = [
+  { video: VIDEOS.cinematic, top: "3%", left: "13%", rotate: "-11deg" },
+  { image: portraitPreviews[0], top: "0%", left: "46%", rotate: "-8deg" },
+  { image: portraitPreviews[1], top: "8%", left: "72%", rotate: "-12deg" },
+  { image: IMAGES.abstract2, top: "34%", left: "0%", rotate: "-11deg" },
+  { video: VIDEOS.tvAd, top: "30%", left: "40%", rotate: "-7deg" },
+  { image: scenePreviews[5], top: "62%", left: "25%", rotate: "-6deg" },
+  { image: scenePreviews[1], top: "56%", left: "72%", rotate: "-9deg" },
 ];
 
 const ResponsivePreviewImage = ({
@@ -258,9 +262,11 @@ const PreviewVideo = ({
 const MarketingHeader = ({
   onLogin,
   tint,
+  showFxLogo,
 }: {
   onLogin: () => void;
   tint: "soft" | "solid" | "ghost";
+  showFxLogo: boolean;
 }) => {
   const headerTone =
     tint === "ghost"
@@ -283,6 +289,16 @@ const MarketingHeader = ({
             alt="PicDrift"
             className="h-9 w-auto object-contain sm:h-10"
           />
+          {showFxLogo && (
+            <>
+              <span className="h-7 w-px bg-white/20" />
+              <img
+                src={fxLogo}
+                alt="FX"
+                className="h-7 w-auto object-contain opacity-95"
+              />
+            </>
+          )}
         </a>
 
         <div className="hidden items-center gap-5 text-sm text-slate-200/85 md:flex">
@@ -342,7 +358,13 @@ const MarketingHeader = ({
   );
 };
 
-const HeroCurrent = ({ onLogin }: { onLogin: () => void }) => {
+const HeroCurrent = ({
+  onLogin,
+  showFxLogo,
+}: {
+  onLogin: () => void;
+  showFxLogo: boolean;
+}) => {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#070a20] text-white">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.35),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.65),transparent_62%)]" />
@@ -352,7 +374,7 @@ const HeroCurrent = ({ onLogin }: { onLogin: () => void }) => {
         style={{ clipPath: "polygon(0 16%, 100% 0, 100% 100%, 0 100%)" }}
       />
 
-      <MarketingHeader onLogin={onLogin} tint="soft" />
+      <MarketingHeader onLogin={onLogin} tint="soft" showFxLogo={showFxLogo} />
 
       <main className="relative z-10">
         <section className="mx-auto grid w-full max-w-7xl gap-10 px-4 pb-10 pt-12 sm:px-6 lg:grid-cols-[1fr_1.2fr] lg:pt-14">
@@ -507,8 +529,8 @@ const HeroCurrent = ({ onLogin }: { onLogin: () => void }) => {
             </p>
 
             <p className="mt-6 text-sm leading-relaxed text-slate-200/90 sm:text-base">
-              Transform your content creation with AI-powered video, image, and
-              carousel generation.
+              Transform your content creation with AI-powered image, and video
+              generation.
             </p>
           </div>
         </section>
@@ -517,188 +539,25 @@ const HeroCurrent = ({ onLogin }: { onLogin: () => void }) => {
   );
 };
 
-const HeroV1 = ({ onLogin }: { onLogin: () => void }) => {
+const HeroV2 = ({
+  onLogin,
+  showFxLogo,
+}: {
+  onLogin: () => void;
+  showFxLogo: boolean;
+}) => {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#070a20] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.35),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.65),transparent_62%)]" />
-      <div className="absolute inset-x-0 top-0 h-[52%] bg-gradient-to-r from-[#170316] via-[#1a164f] to-[#0d2f59]" />
-      <div
-        className="absolute inset-x-0 bottom-[-140px] h-[68%] bg-gradient-to-r from-[#2f58df] via-[#5364f2] to-[#3f58dd]"
-        style={{ clipPath: "polygon(0 16%, 100% 0, 100% 100%, 0 100%)" }}
-      />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_17%_70%,rgba(124,64,255,0.18),transparent_44%),radial-gradient(circle_at_82%_20%,rgba(40,115,255,0.14),transparent_45%)]" />
-      <MarketingHeader onLogin={onLogin} tint="soft" />
+    <div className="relative min-h-screen overflow-hidden bg-[#050717] text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(90,52,214,0.34),transparent_38%),radial-gradient(circle_at_82%_26%,rgba(13,148,245,0.26),transparent_44%),radial-gradient(circle_at_56%_74%,rgba(12,18,56,0.72),transparent_64%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(17,24,69,0.45),rgba(7,9,34,0.82))]" />
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(118,108,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(118,108,255,0.05)_1px,transparent_1px)] bg-[size:140px_140px]" />
 
-      <main className="relative z-10 mx-auto grid w-full max-w-[1600px] gap-12 px-4 pb-14 pt-10 sm:px-8 lg:grid-cols-[1.12fr_0.88fr] lg:items-center lg:pb-20 lg:pt-16">
-        <section className="relative h-[420px] overflow-hidden rounded-[2.2rem] border border-white/10 bg-gradient-to-br from-[#0d1538]/75 to-[#080a26]/90 shadow-[0_35px_80px_rgba(4,6,18,0.6)] sm:h-[520px] lg:h-[700px]">
-          <div className="absolute left-[6%] top-[10%] h-[26%] w-[95%] rotate-[-15deg] rounded-[60px] border border-violet-300/25 bg-[#10173f]/65 p-4 shadow-[0_25px_70px_rgba(23,32,72,0.6)]">
-            <div className="grid h-full grid-cols-3 gap-3">
-              {v1RibbonRows[0].map((preview, idx) => (
-                <div
-                  key={`v1-r1-${idx}`}
-                  className="overflow-hidden rounded-2xl border border-white/15"
-                >
-                  <ResponsivePreviewImage
-                    asset={preview}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    sizes="(max-width: 640px) 25vw, 220px"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="absolute left-[12%] top-[38%] h-[26%] w-[95%] rotate-[-9deg] rounded-[60px] border border-fuchsia-300/20 bg-[#12173f]/70 p-4 shadow-[0_20px_65px_rgba(41,37,89,0.7)]">
-            <div className="grid h-full grid-cols-3 gap-3">
-              {v1RibbonRows[1].map((preview, idx) => (
-                <div
-                  key={`v1-r2-${idx}`}
-                  className="overflow-hidden rounded-2xl border border-white/15"
-                >
-                  <ResponsivePreviewImage
-                    asset={preview}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    sizes="(max-width: 640px) 25vw, 220px"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="absolute left-[20%] top-[66%] h-[26%] w-[95%] rotate-[-4deg] rounded-[60px] border border-cyan-300/20 bg-[#11173c]/70 p-4 shadow-[0_20px_60px_rgba(24,40,94,0.65)]">
-            <div className="grid h-full grid-cols-3 gap-3">
-              {v1RibbonRows[2].map((preview, idx) => (
-                <div
-                  key={`v1-r3-${idx}`}
-                  className="overflow-hidden rounded-2xl border border-white/15"
-                >
-                  <ResponsivePreviewImage
-                    asset={preview}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    sizes="(max-width: 640px) 25vw, 220px"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="absolute left-[2%] top-[58%] h-[115px] w-[96px] rotate-[-8deg] overflow-hidden rounded-2xl border border-fuchsia-300/35 bg-gradient-to-br from-[#4a348f]/70 to-[#23235d]/80 p-1 shadow-[0_10px_30px_rgba(84,62,179,0.45)]">
-            <PreviewVideo
-              asset={VIDEOS.dreamyCat}
-              className="h-full w-full rounded-xl object-cover"
-            />
-          </div>
-          <div className="absolute left-[66%] top-[14%] h-[120px] w-[110px] rotate-[9deg] overflow-hidden rounded-2xl border border-violet-300/30 bg-gradient-to-br from-[#5635aa]/60 to-[#22275d]/80 p-1">
-            <ResponsivePreviewImage
-              asset={scenePreviews[5]}
-              alt=""
-              className="h-full w-full rounded-xl object-cover"
-              sizes="110px"
-            />
-          </div>
-          <div className="absolute left-[74%] top-[72%] h-[120px] w-[220px] rotate-[-5deg] overflow-hidden rounded-2xl border border-cyan-300/25 bg-[#131945]/70 p-1 text-sm text-slate-200/80">
-            <div className="relative h-full w-full rounded-xl">
-              <ResponsivePreviewImage
-                asset={scenePreviews[3]}
-                alt=""
-                className="h-full w-full rounded-xl object-cover"
-                sizes="220px"
-              />
-              <span className="absolute bottom-2 left-2 rounded-md bg-black/45 px-2 py-0.5 text-xs font-semibold text-slate-100">
-                Cinematic Style
-              </span>
-            </div>
-          </div>
-          <div className="absolute left-[8%] top-[80%] h-[120px] w-[285px] rotate-[-3deg] rounded-2xl border border-violet-300/25 bg-[#13163f]/80 p-3 text-xs text-slate-300/85">
-            <div className="mb-2 flex items-center gap-2">
-              <ResponsivePreviewImage
-                asset={scenePreviews[0]}
-                alt=""
-                className="h-10 w-16 rounded-md object-cover"
-                sizes="64px"
-              />
-              <span>AI Prompt: A futuristic city at night, cinematic mood.</span>
-            </div>
-          </div>
-        </section>
-
-        <section className="max-w-[640px] lg:justify-self-end">
-          <h1 className="text-4xl font-black leading-[1.05] sm:text-6xl xl:text-[5.5rem]">
-            <span className="block text-white">Welcome to</span>
-            <span className="mt-2 block bg-gradient-to-r from-cyan-300 via-blue-300 to-violet-400 bg-clip-text text-transparent">
-              Your Creative Studio
-            </span>
-          </h1>
-
-          <p className="mt-6 text-2xl text-transparent bg-gradient-to-r from-violet-400 to-indigo-300 bg-clip-text sm:text-4xl">
-            Start Generating Cinematic Stories
-          </p>
-
-          <p className="mt-6 text-lg text-slate-300/85 sm:text-4xl sm:leading-[1.2]">
-            Imagine it. Create it.
-            <br className="hidden sm:block" />
-            <span className="text-slate-200/75"> All from one dashboard.</span>
-          </p>
-
-          <div className="mt-8 h-px w-full bg-gradient-to-r from-transparent via-violet-400/60 to-transparent" />
-
-          <div className="mt-7 flex flex-wrap gap-3">
-            <a
-              href="https://www.picdrift.com/studio-signup"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-2xl bg-gradient-to-r from-blue-500 to-violet-500 px-10 py-4 text-lg font-semibold text-white shadow-[0_12px_35px_rgba(83,105,255,0.45)] transition hover:brightness-110"
-            >
-              Sign Up Now
-            </a>
-            <button
-              onClick={onLogin}
-              className="rounded-2xl border border-white/35 bg-white/5 px-8 py-4 text-lg font-semibold text-slate-100 transition hover:bg-white/10"
-            >
-              Login
-            </button>
-          </div>
-
-          <div className="mt-10 grid grid-cols-2 gap-3 text-sm text-slate-300 sm:grid-cols-4">
-            {[
-              "AI-Powered Generation",
-              "Cinematic Quality",
-              "Endless Possibilities",
-              "Your Privacy Matters",
-            ].map((item) => (
-              <div
-                key={item}
-                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"
-              >
-                {item}
-              </div>
-            ))}
-          </div>
-        </section>
-      </main>
-    </div>
-  );
-};
-
-const HeroV2 = ({ onLogin }: { onLogin: () => void }) => {
-  return (
-    <div className="relative min-h-screen overflow-hidden bg-[#070a20] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.35),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.65),transparent_62%)]" />
-      <div className="absolute inset-x-0 top-0 h-[52%] bg-gradient-to-r from-[#170316] via-[#1a164f] to-[#0d2f59]" />
-      <div
-        className="absolute inset-x-0 bottom-[-140px] h-[68%] bg-gradient-to-r from-[#2f58df] via-[#5364f2] to-[#3f58dd]"
-        style={{ clipPath: "polygon(0 16%, 100% 0, 100% 100%, 0 100%)" }}
-      />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_40%,rgba(95,67,192,0.14),transparent_40%),radial-gradient(circle_at_84%_74%,rgba(44,100,210,0.14),transparent_36%)]" />
-      <MarketingHeader onLogin={onLogin} tint="soft" />
+      <MarketingHeader onLogin={onLogin} tint="ghost" showFxLogo={showFxLogo} />
 
       <main className="relative z-10">
-        <section className="mx-auto grid w-full max-w-[1700px] gap-10 px-4 pb-10 pt-10 sm:px-8 lg:min-h-[74vh] lg:grid-cols-[1fr_1.05fr] lg:items-center lg:pb-16 lg:pt-16">
+        <section className="mx-auto grid w-full max-w-[1700px] gap-10 px-4 pb-10 pt-10 sm:px-8 lg:min-h-[72vh] lg:grid-cols-[1fr_1.05fr] lg:items-center lg:pb-14 lg:pt-14">
           <div className="max-w-3xl">
-            <h1 className="text-4xl font-black leading-[1.06] sm:text-6xl xl:text-[6.4rem]">
+            <h1 className="text-4xl font-black leading-[1.06] sm:text-6xl xl:text-[6.2rem]">
               <span className="block text-white">Welcome to Your</span>
               <span className="mt-2 block bg-gradient-to-r from-[#b8a3ff] via-[#8f7aff] to-[#6058ff] bg-clip-text text-transparent">
                 Creative Studio
@@ -729,155 +588,60 @@ const HeroV2 = ({ onLogin }: { onLogin: () => void }) => {
             </div>
           </div>
 
-          <div className="relative h-[320px] overflow-visible sm:h-[430px] lg:h-[560px]">
+          <div className="relative h-[360px] overflow-visible sm:h-[430px] lg:h-[560px]">
             {v2CollageCards.map((card, idx) => (
               <div
                 key={`v2-${idx}`}
-                className="absolute h-[130px] w-[180px] overflow-hidden rounded-[1.3rem] border border-white/10 shadow-[0_14px_26px_rgba(0,0,0,0.35)] sm:h-[170px] sm:w-[240px] lg:h-[220px] lg:w-[300px]"
+                className="absolute h-[140px] w-[190px] overflow-hidden rounded-[1.3rem] border border-white/10 shadow-[0_16px_30px_rgba(0,0,0,0.4)] sm:h-[170px] sm:w-[240px] lg:h-[220px] lg:w-[300px]"
                 style={{
                   top: card.top,
                   left: card.left,
                   transform: `rotate(${card.rotate})`,
                 }}
               >
-                <ResponsivePreviewImage
-                  asset={card.preview}
-                  alt={`Preview ${idx + 1}`}
-                  className="h-full w-full object-cover"
-                  sizes="(max-width: 640px) 42vw, 300px"
-                />
+                {card.video ? (
+                  <PreviewVideo
+                    asset={card.video}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <ResponsivePreviewImage
+                    asset={card.image!}
+                    alt={`Preview ${idx + 1}`}
+                    className="h-full w-full object-cover"
+                    sizes="(max-width: 640px) 42vw, 300px"
+                  />
+                )}
               </div>
             ))}
           </div>
         </section>
 
-        <section className="border-t border-white/15 bg-gradient-to-b from-[#111635]/75 to-[#0d112a]/95">
-          <div className="mx-auto flex w-full max-w-5xl flex-col items-center px-4 py-14 text-center sm:px-8">
-            <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-400/40 bg-[#171d43]/70 text-2xl font-semibold text-violet-200">
-              AI
-            </div>
-            <h2 className="text-4xl font-bold leading-tight sm:text-6xl">
-              Transform your content creation
-            </h2>
-            <p className="mt-5 text-xl text-slate-300 sm:text-4xl">
-              with AI-powered video, image, and carousel generation.
-            </p>
-            <a
-              href="https://www.picdrift.com/studio-signup"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-10 rounded-2xl bg-gradient-to-r from-[#4e32e2] to-[#8562ff] px-12 py-4 text-2xl font-semibold text-white shadow-[0_12px_35px_rgba(90,70,255,0.45)] transition hover:brightness-110"
-            >
-              Sign Up Now
-            </a>
-          </div>
-        </section>
-      </main>
-    </div>
-  );
-};
-
-const HeroV3 = ({ onLogin }: { onLogin: () => void }) => {
-  return (
-    <div className="relative min-h-screen overflow-hidden bg-[#070a20] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.35),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.65),transparent_62%)]" />
-      <div className="absolute inset-x-0 top-0 h-[52%] bg-gradient-to-r from-[#170316] via-[#1a164f] to-[#0d2f59]" />
-      <div
-        className="absolute inset-x-0 bottom-[-140px] h-[68%] bg-gradient-to-r from-[#2f58df] via-[#5364f2] to-[#3f58dd]"
-        style={{ clipPath: "polygon(0 16%, 100% 0, 100% 100%, 0 100%)" }}
-      />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_14%_55%,rgba(69,63,178,0.22),transparent_42%),radial-gradient(circle_at_82%_50%,rgba(53,85,205,0.2),transparent_40%),radial-gradient(circle_at_50%_12%,rgba(111,79,220,0.16),transparent_34%)]" />
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(120,120,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(120,120,255,0.06)_1px,transparent_1px)] bg-[size:110px_110px]" />
-      <MarketingHeader onLogin={onLogin} tint="soft" />
-
-      <main className="relative z-10 mx-auto w-full max-w-[1750px] px-4 pb-16 pt-12 sm:px-8 lg:pt-16">
-        <section className="relative grid gap-8 lg:grid-cols-[1fr_0.9fr_1fr] lg:items-center">
-          <div className="rounded-[2rem] border border-violet-300/25 bg-[#11163d]/55 p-5 backdrop-blur-md">
-            <div className="mb-5 flex items-center gap-3">
-              <span className="text-sm font-semibold tracking-wide text-cyan-200">VID</span>
-              <h3 className="text-3xl font-semibold text-slate-100">AI Video</h3>
-            </div>
-            <p className="max-w-xs text-xl leading-relaxed text-slate-300/85">
-              Transform ideas into cinematic videos with AI.
-            </p>
-            <div className="mt-7 rounded-3xl border border-white/15 bg-[#161f4a] p-3">
-              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl">
-                <PreviewVideo asset={VIDEOS.tvAd} className="h-full w-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-                <div className="absolute inset-x-0 bottom-3 mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-black/35 text-[10px] font-semibold text-white">
-                  Play
-                </div>
-              </div>
-              <div className="mt-3 h-2 rounded-full bg-white/10">
-                <div className="h-full w-[34%] rounded-full bg-violet-300" />
-              </div>
-            </div>
-          </div>
-
-          <div className="text-center">
-            <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-[1.8rem] border border-cyan-300/35 bg-[#1a2454]/75 text-2xl font-semibold text-cyan-200 shadow-[0_0_26px_rgba(98,170,255,0.55)]">
-              FX
-            </div>
-            <h1 className="text-4xl font-black leading-[1.06] text-cyan-100 drop-shadow-[0_0_22px_rgba(91,152,255,0.72)] sm:text-6xl xl:text-[6.2rem]">
-              Welcome to Your
-              <span className="block">Creative Studio</span>
-            </h1>
-            <p className="mt-6 text-2xl text-slate-300 sm:text-5xl">Imagine it. Create it.</p>
-            <a
-              href="https://www.picdrift.com/studio-signup"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-10 inline-flex rounded-[1.8rem] border border-cyan-200/65 bg-gradient-to-r from-[#3874ff] to-[#6c48ff] px-12 py-4 text-3xl font-semibold text-white shadow-[0_0_30px_rgba(92,129,255,0.62)] transition hover:brightness-110"
-            >
-              Sign Up Now
-            </a>
-          </div>
-
-          <div className="space-y-5">
-            <div className="rounded-[2rem] border border-violet-300/25 bg-[#11163d]/55 p-5 backdrop-blur-md">
-              <div className="mb-5 flex items-center gap-3">
-                <span className="text-sm font-semibold tracking-wide text-violet-200">CRS</span>
-                <h3 className="text-3xl font-semibold text-slate-100">Carousel</h3>
-              </div>
-              <p className="max-w-sm text-xl leading-relaxed text-slate-300/85">
-                Create engaging carousel posts for any platform.
+        <section className="border-t border-white/15 bg-[#0f1433]/80 backdrop-blur-sm">
+          <div className="mx-auto grid w-full max-w-6xl gap-8 px-4 py-12 sm:px-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+            <div>
+              <h2 className="text-4xl font-bold leading-tight sm:text-6xl">
+                Transform your content creation
+              </h2>
+              <p className="mt-5 text-xl text-slate-300 sm:text-4xl">
+                with AI-powered image, and video generation.
               </p>
-              <div className="mt-6 flex h-[180px] items-end gap-3 rounded-3xl border border-white/15 bg-[#12183c] px-4 py-4">
-                {["h-[70%]", "h-[86%]", "h-[74%]"].map((height, idx) => (
-                  <div
-                    key={`v3-slide-${idx}`}
-                    className={`w-full ${height} overflow-hidden rounded-2xl border border-white/20`}
-                  >
-                    <ResponsivePreviewImage
-                      asset={scenePreviews[idx + 1]}
-                      alt={`Carousel slide ${idx + 1}`}
-                      className="h-full w-full object-cover"
-                      sizes="(max-width: 640px) 24vw, 140px"
-                    />
-                  </div>
-                ))}
-              </div>
             </div>
 
-            <div className="rounded-[1.6rem] border border-violet-300/25 bg-[#0f1436]/65 p-4">
-              <p className="text-lg text-slate-200">What will you create today?</p>
-              <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
-                {["Video", "Image", "Carousel"].map((label) => (
-                  <div
-                    key={label}
-                    className="rounded-xl border border-white/15 bg-[#1a2151]/70 px-3 py-2 text-center text-slate-100"
-                  >
-                    {label}
-                  </div>
-                ))}
+            <div className="rounded-3xl border border-white/15 bg-[#151c46]/70 p-3">
+              <div className="relative aspect-video overflow-hidden rounded-2xl">
+                <PreviewVideo
+                  asset={VIDEOS.dreamyCat}
+                  className="h-full w-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+                <span className="absolute left-3 top-3 rounded-md border border-white/30 bg-black/35 px-2 py-1 text-xs font-semibold text-white">
+                  Live Preview Reel
+                </span>
               </div>
             </div>
           </div>
         </section>
-
-        <div className="mx-auto mt-12 max-w-4xl border-t border-white/10 pt-8 text-center text-2xl text-slate-300/90 sm:text-4xl">
-          Start Generating Cinematic Stories
-        </div>
       </main>
     </div>
   );
@@ -927,6 +691,8 @@ export const Hero = () => {
   const [showLogin, setShowLogin] = useState(false);
 
   const variant = useMemo(() => readVariantFromSearch(location.search), [location.search]);
+  const siteBrand = useMemo(() => getSiteBrand(), []);
+  const isVisualFxDomain = siteBrand === "visualfx";
 
   const toVariantSearch = (variantName: HeroVariant) => {
     const params = new URLSearchParams(location.search);
@@ -943,10 +709,15 @@ export const Hero = () => {
 
   return (
     <>
-      {variant === "v1" && <HeroV1 onLogin={() => setShowLogin(true)} />}
-      {variant === "v2" && <HeroV2 onLogin={() => setShowLogin(true)} />}
-      {variant === "v3" && <HeroV3 onLogin={() => setShowLogin(true)} />}
-      {variant === "current" && <HeroCurrent onLogin={() => setShowLogin(true)} />}
+      {variant === "v2" && (
+        <HeroV2 onLogin={() => setShowLogin(true)} showFxLogo={isVisualFxDomain} />
+      )}
+      {variant === "current" && (
+        <HeroCurrent
+          onLogin={() => setShowLogin(true)}
+          showFxLogo={isVisualFxDomain}
+        />
+      )}
 
       <VariantPicker
         active={variant}
