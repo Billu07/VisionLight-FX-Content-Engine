@@ -32,19 +32,102 @@ const readVariantFromSearch = (search: string): HeroVariant => {
   return "current";
 };
 
-const scenePreviews = [
-  "/login-previews/scene-01.jpg",
-  "/login-previews/scene-02.jpg",
-  "/login-previews/scene-03.jpg",
-  "/login-previews/scene-04.jpg",
-  "/login-previews/scene-05.jpg",
-  "/login-previews/scene-06.jpg",
+type PreviewImageAsset = {
+  sm: string;
+  md: string;
+  alt: string;
+};
+
+type PreviewVideoAsset = {
+  src: string;
+  poster: string;
+  alt: string;
+};
+
+const IMAGES = {
+  abstract1: {
+    sm: "/login-previews/optimized/preview_abstract_1-sm.webp",
+    md: "/login-previews/optimized/preview_abstract_1-md.webp",
+    alt: "Abstract cinematic art",
+  },
+  abstract2: {
+    sm: "/login-previews/optimized/preview_abstract_2-sm.webp",
+    md: "/login-previews/optimized/preview_abstract_2-md.webp",
+    alt: "Abstract creative scene",
+  },
+  abstract3: {
+    sm: "/login-previews/optimized/preview_abstract_3-sm.webp",
+    md: "/login-previews/optimized/preview_abstract_3-md.webp",
+    alt: "Stylized abstract environment",
+  },
+  character1: {
+    sm: "/login-previews/optimized/preview_character_1-sm.webp",
+    md: "/login-previews/optimized/preview_character_1-md.webp",
+    alt: "Character portrait",
+  },
+  character2: {
+    sm: "/login-previews/optimized/preview_character_2-sm.webp",
+    md: "/login-previews/optimized/preview_character_2-md.webp",
+    alt: "Portrait concept art",
+  },
+  character3: {
+    sm: "/login-previews/optimized/preview_character_3-sm.webp",
+    md: "/login-previews/optimized/preview_character_3-md.webp",
+    alt: "Creative portrait close-up",
+  },
+  landscape1: {
+    sm: "/login-previews/optimized/preview_landscape_1-sm.webp",
+    md: "/login-previews/optimized/preview_landscape_1-md.webp",
+    alt: "Wide cinematic landscape",
+  },
+  landscape2: {
+    sm: "/login-previews/optimized/preview_landscape_2-sm.webp",
+    md: "/login-previews/optimized/preview_landscape_2-md.webp",
+    alt: "Mountain landscape",
+  },
+  landscape3: {
+    sm: "/login-previews/optimized/preview_landscape_3-sm.webp",
+    md: "/login-previews/optimized/preview_landscape_3-md.webp",
+    alt: "Dramatic scenic terrain",
+  },
+  nightStreet: {
+    sm: "/login-previews/optimized/preview_night_street-sm.webp",
+    md: "/login-previews/optimized/preview_night_street-md.webp",
+    alt: "Night street cinematic frame",
+  },
+} satisfies Record<string, PreviewImageAsset>;
+
+const VIDEOS = {
+  cinematic: {
+    src: "/login-previews/optimized/cinematic_futuristic-web.mp4",
+    poster: "/login-previews/optimized/cinematic_futuristic-poster.webp",
+    alt: "Futuristic cinematic clip",
+  },
+  dreamyCat: {
+    src: "/login-previews/optimized/preview_dreamy_cat-web.mp4",
+    poster: "/login-previews/optimized/preview_dreamy_cat-poster.webp",
+    alt: "Dreamy cat styled clip",
+  },
+  tvAd: {
+    src: "/login-previews/optimized/TV_ad_organic_product_influencer-web.mp4",
+    poster: "/login-previews/optimized/TV_ad_organic_product_influencer-poster.webp",
+    alt: "Ad style motion clip",
+  },
+} satisfies Record<string, PreviewVideoAsset>;
+
+const scenePreviews: PreviewImageAsset[] = [
+  IMAGES.landscape1,
+  IMAGES.landscape2,
+  IMAGES.landscape3,
+  IMAGES.nightStreet,
+  IMAGES.abstract1,
+  IMAGES.abstract2,
 ];
 
-const portraitPreviews = [
-  "/login-previews/portrait-01.jpg",
-  "/login-previews/portrait-02.jpg",
-  "/login-previews/portrait-03.jpg",
+const portraitPreviews: PreviewImageAsset[] = [
+  IMAGES.character1,
+  IMAGES.character2,
+  IMAGES.character3,
 ];
 
 const mockCards = [
@@ -56,6 +139,7 @@ const mockCards = [
     y: "15%",
     chip: "Portrait",
     preview: portraitPreviews[0],
+    stripPreviews: [portraitPreviews[0], portraitPreviews[1], portraitPreviews[2]],
   },
   {
     title: "Landscape FX",
@@ -65,6 +149,7 @@ const mockCards = [
     y: "7%",
     chip: "Landscape",
     preview: scenePreviews[0],
+    stripPreviews: [scenePreviews[0], scenePreviews[1], scenePreviews[2]],
   },
   {
     title: "Story FX",
@@ -73,7 +158,8 @@ const mockCards = [
     x: "51%",
     y: "2%",
     chip: "Story",
-    preview: scenePreviews[1],
+    preview: IMAGES.abstract3,
+    stripPreviews: [IMAGES.abstract1, IMAGES.abstract2, IMAGES.abstract3],
   },
   {
     title: "Cinematic FX",
@@ -82,7 +168,9 @@ const mockCards = [
     x: "75%",
     y: "8%",
     chip: "Cinematic",
-    preview: portraitPreviews[1],
+    preview: scenePreviews[3],
+    stripPreviews: [scenePreviews[3], scenePreviews[4], scenePreviews[5]],
+    video: VIDEOS.cinematic,
   },
 ];
 
@@ -96,7 +184,7 @@ const libraryPosters = [
   portraitPreviews[0],
   scenePreviews[0],
   portraitPreviews[1],
-  scenePreviews[2],
+  IMAGES.abstract1,
   portraitPreviews[2],
   scenePreviews[5],
 ];
@@ -104,9 +192,9 @@ const libraryPosters = [
 const popularPosters = [
   scenePreviews[1],
   portraitPreviews[2],
-  scenePreviews[3],
+  IMAGES.abstract2,
   portraitPreviews[0],
-  scenePreviews[4],
+  IMAGES.abstract3,
   portraitPreviews[1],
 ];
 
@@ -114,11 +202,58 @@ const v2CollageCards = [
   { preview: scenePreviews[2], top: "3%", left: "13%", rotate: "-11deg" },
   { preview: portraitPreviews[0], top: "0%", left: "46%", rotate: "-8deg" },
   { preview: portraitPreviews[1], top: "8%", left: "72%", rotate: "-12deg" },
-  { preview: scenePreviews[3], top: "34%", left: "0%", rotate: "-11deg" },
-  { preview: scenePreviews[4], top: "30%", left: "40%", rotate: "-7deg" },
+  { preview: IMAGES.abstract2, top: "34%", left: "0%", rotate: "-11deg" },
+  { preview: IMAGES.abstract1, top: "30%", left: "40%", rotate: "-7deg" },
   { preview: scenePreviews[5], top: "62%", left: "25%", rotate: "-6deg" },
   { preview: scenePreviews[1], top: "56%", left: "72%", rotate: "-9deg" },
 ];
+
+const ResponsivePreviewImage = ({
+  asset,
+  alt,
+  className,
+  sizes = "(max-width: 640px) 50vw, 220px",
+  loading = "lazy",
+}: {
+  asset: PreviewImageAsset;
+  alt: string;
+  className: string;
+  sizes?: string;
+  loading?: "lazy" | "eager";
+}) => {
+  return (
+    <img
+      src={asset.md}
+      srcSet={`${asset.sm} 480w, ${asset.md} 960w`}
+      sizes={sizes}
+      alt={alt}
+      className={className}
+      loading={loading}
+    />
+  );
+};
+
+const PreviewVideo = ({
+  asset,
+  className,
+}: {
+  asset: PreviewVideoAsset;
+  className: string;
+}) => {
+  return (
+    <video
+      className={className}
+      src={asset.src}
+      poster={asset.poster}
+      autoPlay
+      muted
+      loop
+      playsInline
+      preload="metadata"
+      aria-label={asset.alt}
+    />
+  );
+};
 
 const MarketingHeader = ({
   onLogin,
@@ -277,21 +412,28 @@ const HeroCurrent = ({ onLogin }: { onLogin: () => void }) => {
 
                     <div className="rounded-xl border border-white/20 bg-black/15 p-2 backdrop-blur-[1px]">
                       <div className="overflow-hidden rounded-lg border border-white/20">
-                        <img
-                          src={card.preview}
-                          alt={`${card.title} preview`}
-                          className="h-24 w-full object-cover sm:h-28"
-                          loading="lazy"
-                        />
+                        {card.video ? (
+                          <PreviewVideo
+                            asset={card.video}
+                            className="h-24 w-full object-cover sm:h-28"
+                          />
+                        ) : (
+                          <ResponsivePreviewImage
+                            asset={card.preview}
+                            alt={`${card.title} preview`}
+                            className="h-24 w-full object-cover sm:h-28"
+                            sizes="(max-width: 640px) 28vw, 180px"
+                          />
+                        )}
                       </div>
                       <div className="mt-2 grid grid-cols-3 gap-1.5">
-                        {scenePreviews.slice(0, 3).map((preview, idx) => (
-                          <img
+                        {card.stripPreviews.map((preview, idx) => (
+                          <ResponsivePreviewImage
                             key={`${card.title}-${idx}`}
-                            src={preview}
+                            asset={preview}
                             alt=""
                             className="aspect-[3/4] rounded-md border border-white/20 object-cover"
-                            loading="lazy"
+                            sizes="60px"
                           />
                         ))}
                       </div>
@@ -316,28 +458,28 @@ const HeroCurrent = ({ onLogin }: { onLogin: () => void }) => {
             <div className="rounded-[1.4rem] border border-white/10 bg-gradient-to-br from-[#090b24] to-[#07081c] p-4 sm:p-5">
               <div className="mb-4 flex items-center justify-between text-xs text-slate-400">
                 <span className="font-semibold tracking-wide text-slate-200">
-                  Continue Watching
+                  Recent Generations
                 </span>
                 <span className="rounded-full bg-slate-800/80 px-2.5 py-1">
-                  Library
+                  Asset Library
                 </span>
               </div>
 
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
                 {libraryPosters.map((poster, idx) => (
                   <div key={`poster-${idx}`} className="overflow-hidden rounded-lg border border-white/10">
-                    <img
-                      src={poster}
+                    <ResponsivePreviewImage
+                      asset={poster}
                       alt={`Library poster ${idx + 1}`}
                       className="aspect-[3/4] w-full object-cover"
-                      loading="lazy"
+                      sizes="(max-width: 640px) 30vw, 120px"
                     />
                   </div>
                 ))}
               </div>
 
               <div className="mt-6 text-xs font-semibold tracking-[0.15em] text-slate-400">
-                Popular Movies
+                Style Inspirations
               </div>
               <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-6">
                 {popularPosters.map((poster, idx) => (
@@ -345,11 +487,11 @@ const HeroCurrent = ({ onLogin }: { onLogin: () => void }) => {
                     key={`poster-bottom-${idx}`}
                     className="overflow-hidden rounded-lg border border-white/10"
                   >
-                    <img
-                      src={poster}
+                    <ResponsivePreviewImage
+                      asset={poster}
                       alt={`Popular poster ${idx + 1}`}
                       className="aspect-[3/4] w-full object-cover"
-                      loading="lazy"
+                      sizes="(max-width: 640px) 30vw, 120px"
                     />
                   </div>
                 ))}
@@ -377,9 +519,15 @@ const HeroCurrent = ({ onLogin }: { onLogin: () => void }) => {
 
 const HeroV1 = ({ onLogin }: { onLogin: () => void }) => {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#040617] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_17%_70%,rgba(124,64,255,0.26),transparent_44%),radial-gradient(circle_at_82%_20%,rgba(40,115,255,0.25),transparent_45%),radial-gradient(circle_at_55%_52%,rgba(18,18,48,0.8),transparent_70%)]" />
-      <MarketingHeader onLogin={onLogin} tint="ghost" />
+    <div className="relative min-h-screen overflow-hidden bg-[#070a20] text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.35),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.65),transparent_62%)]" />
+      <div className="absolute inset-x-0 top-0 h-[52%] bg-gradient-to-r from-[#170316] via-[#1a164f] to-[#0d2f59]" />
+      <div
+        className="absolute inset-x-0 bottom-[-140px] h-[68%] bg-gradient-to-r from-[#2f58df] via-[#5364f2] to-[#3f58dd]"
+        style={{ clipPath: "polygon(0 16%, 100% 0, 100% 100%, 0 100%)" }}
+      />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_17%_70%,rgba(124,64,255,0.18),transparent_44%),radial-gradient(circle_at_82%_20%,rgba(40,115,255,0.14),transparent_45%)]" />
+      <MarketingHeader onLogin={onLogin} tint="soft" />
 
       <main className="relative z-10 mx-auto grid w-full max-w-[1600px] gap-12 px-4 pb-14 pt-10 sm:px-8 lg:grid-cols-[1.12fr_0.88fr] lg:items-center lg:pb-20 lg:pt-16">
         <section className="relative h-[420px] overflow-hidden rounded-[2.2rem] border border-white/10 bg-gradient-to-br from-[#0d1538]/75 to-[#080a26]/90 shadow-[0_35px_80px_rgba(4,6,18,0.6)] sm:h-[520px] lg:h-[700px]">
@@ -390,11 +538,11 @@ const HeroV1 = ({ onLogin }: { onLogin: () => void }) => {
                   key={`v1-r1-${idx}`}
                   className="overflow-hidden rounded-2xl border border-white/15"
                 >
-                  <img
-                    src={preview}
+                  <ResponsivePreviewImage
+                    asset={preview}
                     alt=""
                     className="h-full w-full object-cover"
-                    loading="lazy"
+                    sizes="(max-width: 640px) 25vw, 220px"
                   />
                 </div>
               ))}
@@ -408,11 +556,11 @@ const HeroV1 = ({ onLogin }: { onLogin: () => void }) => {
                   key={`v1-r2-${idx}`}
                   className="overflow-hidden rounded-2xl border border-white/15"
                 >
-                  <img
-                    src={preview}
+                  <ResponsivePreviewImage
+                    asset={preview}
                     alt=""
                     className="h-full w-full object-cover"
-                    loading="lazy"
+                    sizes="(max-width: 640px) 25vw, 220px"
                   />
                 </div>
               ))}
@@ -426,11 +574,11 @@ const HeroV1 = ({ onLogin }: { onLogin: () => void }) => {
                   key={`v1-r3-${idx}`}
                   className="overflow-hidden rounded-2xl border border-white/15"
                 >
-                  <img
-                    src={preview}
+                  <ResponsivePreviewImage
+                    asset={preview}
                     alt=""
                     className="h-full w-full object-cover"
-                    loading="lazy"
+                    sizes="(max-width: 640px) 25vw, 220px"
                   />
                 </div>
               ))}
@@ -438,28 +586,26 @@ const HeroV1 = ({ onLogin }: { onLogin: () => void }) => {
           </div>
 
           <div className="absolute left-[2%] top-[58%] h-[115px] w-[96px] rotate-[-8deg] overflow-hidden rounded-2xl border border-fuchsia-300/35 bg-gradient-to-br from-[#4a348f]/70 to-[#23235d]/80 p-1 shadow-[0_10px_30px_rgba(84,62,179,0.45)]">
-            <img
-              src={portraitPreviews[2]}
-              alt=""
+            <PreviewVideo
+              asset={VIDEOS.dreamyCat}
               className="h-full w-full rounded-xl object-cover"
-              loading="lazy"
             />
           </div>
           <div className="absolute left-[66%] top-[14%] h-[120px] w-[110px] rotate-[9deg] overflow-hidden rounded-2xl border border-violet-300/30 bg-gradient-to-br from-[#5635aa]/60 to-[#22275d]/80 p-1">
-            <img
-              src={scenePreviews[5]}
+            <ResponsivePreviewImage
+              asset={scenePreviews[5]}
               alt=""
               className="h-full w-full rounded-xl object-cover"
-              loading="lazy"
+              sizes="110px"
             />
           </div>
           <div className="absolute left-[74%] top-[72%] h-[120px] w-[220px] rotate-[-5deg] overflow-hidden rounded-2xl border border-cyan-300/25 bg-[#131945]/70 p-1 text-sm text-slate-200/80">
             <div className="relative h-full w-full rounded-xl">
-              <img
-                src={scenePreviews[3]}
+              <ResponsivePreviewImage
+                asset={scenePreviews[3]}
                 alt=""
                 className="h-full w-full rounded-xl object-cover"
-                loading="lazy"
+                sizes="220px"
               />
               <span className="absolute bottom-2 left-2 rounded-md bg-black/45 px-2 py-0.5 text-xs font-semibold text-slate-100">
                 Cinematic Style
@@ -468,11 +614,11 @@ const HeroV1 = ({ onLogin }: { onLogin: () => void }) => {
           </div>
           <div className="absolute left-[8%] top-[80%] h-[120px] w-[285px] rotate-[-3deg] rounded-2xl border border-violet-300/25 bg-[#13163f]/80 p-3 text-xs text-slate-300/85">
             <div className="mb-2 flex items-center gap-2">
-              <img
-                src={scenePreviews[0]}
+              <ResponsivePreviewImage
+                asset={scenePreviews[0]}
                 alt=""
                 className="h-10 w-16 rounded-md object-cover"
-                loading="lazy"
+                sizes="64px"
               />
               <span>AI Prompt: A futuristic city at night, cinematic mood.</span>
             </div>
@@ -539,9 +685,15 @@ const HeroV1 = ({ onLogin }: { onLogin: () => void }) => {
 
 const HeroV2 = ({ onLogin }: { onLogin: () => void }) => {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#060817] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_40%,rgba(95,67,192,0.18),transparent_40%),radial-gradient(circle_at_84%_74%,rgba(44,100,210,0.14),transparent_36%)]" />
-      <MarketingHeader onLogin={onLogin} tint="solid" />
+    <div className="relative min-h-screen overflow-hidden bg-[#070a20] text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.35),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.65),transparent_62%)]" />
+      <div className="absolute inset-x-0 top-0 h-[52%] bg-gradient-to-r from-[#170316] via-[#1a164f] to-[#0d2f59]" />
+      <div
+        className="absolute inset-x-0 bottom-[-140px] h-[68%] bg-gradient-to-r from-[#2f58df] via-[#5364f2] to-[#3f58dd]"
+        style={{ clipPath: "polygon(0 16%, 100% 0, 100% 100%, 0 100%)" }}
+      />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_40%,rgba(95,67,192,0.14),transparent_40%),radial-gradient(circle_at_84%_74%,rgba(44,100,210,0.14),transparent_36%)]" />
+      <MarketingHeader onLogin={onLogin} tint="soft" />
 
       <main className="relative z-10">
         <section className="mx-auto grid w-full max-w-[1700px] gap-10 px-4 pb-10 pt-10 sm:px-8 lg:min-h-[74vh] lg:grid-cols-[1fr_1.05fr] lg:items-center lg:pb-16 lg:pt-16">
@@ -588,11 +740,11 @@ const HeroV2 = ({ onLogin }: { onLogin: () => void }) => {
                   transform: `rotate(${card.rotate})`,
                 }}
               >
-                <img
-                  src={card.preview}
+                <ResponsivePreviewImage
+                  asset={card.preview}
                   alt={`Preview ${idx + 1}`}
                   className="h-full w-full object-cover"
-                  loading="lazy"
+                  sizes="(max-width: 640px) 42vw, 300px"
                 />
               </div>
             ))}
@@ -627,10 +779,16 @@ const HeroV2 = ({ onLogin }: { onLogin: () => void }) => {
 
 const HeroV3 = ({ onLogin }: { onLogin: () => void }) => {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#04071f] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_14%_55%,rgba(69,63,178,0.4),transparent_42%),radial-gradient(circle_at_82%_50%,rgba(53,85,205,0.32),transparent_40%),radial-gradient(circle_at_50%_12%,rgba(111,79,220,0.28),transparent_34%)]" />
+    <div className="relative min-h-screen overflow-hidden bg-[#070a20] text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.35),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.65),transparent_62%)]" />
+      <div className="absolute inset-x-0 top-0 h-[52%] bg-gradient-to-r from-[#170316] via-[#1a164f] to-[#0d2f59]" />
+      <div
+        className="absolute inset-x-0 bottom-[-140px] h-[68%] bg-gradient-to-r from-[#2f58df] via-[#5364f2] to-[#3f58dd]"
+        style={{ clipPath: "polygon(0 16%, 100% 0, 100% 100%, 0 100%)" }}
+      />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_14%_55%,rgba(69,63,178,0.22),transparent_42%),radial-gradient(circle_at_82%_50%,rgba(53,85,205,0.2),transparent_40%),radial-gradient(circle_at_50%_12%,rgba(111,79,220,0.16),transparent_34%)]" />
       <div className="absolute inset-0 bg-[linear-gradient(rgba(120,120,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(120,120,255,0.06)_1px,transparent_1px)] bg-[size:110px_110px]" />
-      <MarketingHeader onLogin={onLogin} tint="ghost" />
+      <MarketingHeader onLogin={onLogin} tint="soft" />
 
       <main className="relative z-10 mx-auto w-full max-w-[1750px] px-4 pb-16 pt-12 sm:px-8 lg:pt-16">
         <section className="relative grid gap-8 lg:grid-cols-[1fr_0.9fr_1fr] lg:items-center">
@@ -644,15 +802,10 @@ const HeroV3 = ({ onLogin }: { onLogin: () => void }) => {
             </p>
             <div className="mt-7 rounded-3xl border border-white/15 bg-[#161f4a] p-3">
               <div className="relative aspect-[4/3] overflow-hidden rounded-2xl">
-                <img
-                  src={scenePreviews[4]}
-                  alt="AI video preview"
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                />
+                <PreviewVideo asset={VIDEOS.tvAd} className="h-full w-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-                <div className="absolute inset-x-0 bottom-3 mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-black/35 text-white">
-                  ▶
+                <div className="absolute inset-x-0 bottom-3 mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-black/35 text-[10px] font-semibold text-white">
+                  Play
                 </div>
               </div>
               <div className="mt-3 h-2 rounded-full bg-white/10">
@@ -695,11 +848,11 @@ const HeroV3 = ({ onLogin }: { onLogin: () => void }) => {
                     key={`v3-slide-${idx}`}
                     className={`w-full ${height} overflow-hidden rounded-2xl border border-white/20`}
                   >
-                    <img
-                      src={scenePreviews[idx + 1]}
+                    <ResponsivePreviewImage
+                      asset={scenePreviews[idx + 1]}
                       alt={`Carousel slide ${idx + 1}`}
                       className="h-full w-full object-cover"
-                      loading="lazy"
+                      sizes="(max-width: 640px) 24vw, 140px"
                     />
                   </div>
                 ))}
