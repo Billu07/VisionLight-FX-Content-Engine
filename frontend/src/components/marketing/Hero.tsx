@@ -446,13 +446,13 @@ export const Hero = () => {
                           <div className="rounded-xl border border-white/20 bg-black/15 p-2 backdrop-blur-[1px]">
                             <div className="overflow-hidden rounded-lg border border-white/20">
                               {selectedVideo ? (
-                                <PreviewVideo
-                                  asset={selectedVideo}
-                                  className="h-24 w-full object-cover sm:h-28"
-                                  preload="metadata"
-                                  autoPlay
-                                  loop={false}
-                                />
+                              <PreviewVideo
+                                asset={selectedVideo}
+                                className="h-24 w-full object-cover sm:h-28"
+                                preload="metadata"
+                                autoPlay
+                                loop
+                              />
                               ) : (
                                 <img
                                   src={posterAsset.poster}
