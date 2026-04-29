@@ -850,8 +850,8 @@ export function EditAssetModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/95 p-4 backdrop-blur-md">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-6xl flex flex-col md:flex-row overflow-hidden shadow-2xl h-[90vh] relative">
+    <div className="fixed inset-0 z-[140] flex items-start justify-center bg-black/95 p-2 sm:p-4 md:items-center backdrop-blur-md">
+      <div className="relative flex h-[96dvh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-gray-700 bg-gray-900 shadow-2xl md:h-[90vh] md:flex-row">
         {/* CLOSE BUTTON */}
         <div className="absolute top-4 left-4 z-50 flex gap-2">
           <button
@@ -869,7 +869,7 @@ export function EditAssetModal({
         </div>
 
         {/* LEFT: CANVAS */}
-        <div className="flex-1 bg-black flex flex-col border-r border-gray-800 relative group overflow-hidden">
+        <div className="relative flex min-h-[38vh] flex-1 flex-col overflow-hidden border-b border-gray-800 bg-black md:min-h-0 md:border-b-0 md:border-r group">
           {/* EDITOR TITLE BAR */}
           <div className="w-full bg-black border-b border-gray-800 p-3 sm:p-4 flex justify-center items-center z-30 shadow-md shrink-0">
             <div className="text-white px-6 py-1.5 rounded-full font-bold tracking-widest text-xs sm:text-sm border border-white/10 bg-gray-800/80 shadow-inner flex items-center gap-2">
@@ -884,7 +884,7 @@ export function EditAssetModal({
             </div>
           </div>
 
-          <div className="flex-1 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+          <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden p-2 sm:p-4">
             {driftVideoUrl ? (
               <div className="w-full h-full flex flex-col items-center justify-center">
                 <DriftFrameExtractor
@@ -1022,12 +1022,12 @@ export function EditAssetModal({
                     onChange={(_, percentCrop) => setCrop(percentCrop)}
                     onComplete={(c) => setCompletedCrop(c)}
                     aspect={cropAspect}
-                    className="max-h-[80vh] flex items-center justify-center"
+                    className="flex max-h-[42vh] items-center justify-center sm:max-h-[60vh] md:max-h-[80vh]"
                   >
                     <img
                       ref={imgRef}
                       src={previewAssetUrl || currentAsset.url}
-                      className="max-h-[80vh] object-contain rounded-lg border border-gray-700 shadow-2xl"
+                      className="max-h-[42vh] object-contain rounded-lg border border-gray-700 shadow-2xl sm:max-h-[60vh] md:max-h-[80vh]"
                       crossOrigin="anonymous"
                       onLoad={onImageLoad}
                     />
@@ -1035,7 +1035,7 @@ export function EditAssetModal({
                 ) : (
                   <img
                     src={previewAssetUrl || currentAsset.url}
-                    className="max-h-[80vh] object-contain rounded-lg border border-gray-700 shadow-2xl"
+                    className="max-h-[42vh] object-contain rounded-lg border border-gray-700 shadow-2xl sm:max-h-[60vh] md:max-h-[80vh]"
                     crossOrigin="anonymous"
                     loading="eager"
                     fetchPriority="high"
@@ -1050,7 +1050,7 @@ export function EditAssetModal({
         </div>
 
         {/* RIGHT: CONTROLS */}
-        <div className="w-full md:w-96 flex flex-col bg-gray-900 relative">
+        <div className="relative flex w-full max-h-[58vh] flex-col border-t border-gray-800 bg-gray-900 md:w-96 md:max-h-none md:border-t-0">
           <div className="p-4 border-b border-gray-800 bg-gray-950 flex flex-col gap-3">
             <div className="flex justify-between items-center">
               <span className="text-white font-bold text-xs uppercase tracking-widest text-gray-500">Editor Controls</span>
@@ -1073,7 +1073,7 @@ export function EditAssetModal({
 
                 {/* JOBS DROPDOWN MENU */}
                 {showJobsMenu && (
-                  <div className="absolute right-0 top-full mt-2 w-80 bg-gray-950 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden animate-in slide-in-from-top-2">
+                  <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2.5rem)] max-w-sm sm:w-80 bg-gray-950 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden animate-in slide-in-from-top-2">
                     <div className="p-3 border-b border-gray-800 flex justify-between items-center bg-gray-900">
                       <span className="text-xs font-bold text-white">Active Tasks</span>
                       <button onClick={() => setShowJobsMenu(false)} className="text-gray-500 hover:text-white">x</button>
@@ -1188,7 +1188,7 @@ export function EditAssetModal({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6">
             {/* ACTIONS: Crop / Enhance */}
             {activeTab !== "drift" && activeTab !== "convert" && (
               <div className="flex gap-2">
@@ -1656,7 +1656,7 @@ export function EditAssetModal({
           </div>
 
           {/* FOOTER */}
-          <div className="p-6 border-t border-gray-800 bg-gray-900/50 flex flex-col gap-3">
+          <div className="p-4 sm:p-6 border-t border-gray-800 bg-gray-900/50 flex flex-col gap-3">
             {isCropping ? (
               <>
                 <div className="flex gap-2 mb-2 bg-gray-950 p-1 rounded-lg border border-gray-700 overflow-x-auto custom-scrollbar">

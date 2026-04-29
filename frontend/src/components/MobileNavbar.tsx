@@ -5,6 +5,7 @@ interface MobileNavbarProps {
   ) => void;
   onOpenLibrary: () => void;
   onOpenProjects: () => void;
+  onOpenMenu?: () => void;
   showSequencerTab?: boolean;
 }
 
@@ -13,14 +14,15 @@ export function MobileNavbar({
   onTabChange,
   onOpenLibrary,
   onOpenProjects,
+  onOpenMenu,
   showSequencerTab = true,
 }: MobileNavbarProps) {
   return (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-[60] bg-gray-900/80 backdrop-blur-xl border-t border-white/10 px-4 pb-6 pt-2 safe-area-bottom">
-      <div className="flex items-center justify-around">
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-[60] bg-gray-900/85 backdrop-blur-xl border-t border-white/10 px-3 pb-6 pt-2 safe-area-bottom">
+      <div className="flex items-center justify-between gap-1">
         <button
           onClick={() => onTabChange("create")}
-          className={`flex flex-col items-center gap-1 transition-all ${
+          className={`flex min-w-0 flex-1 flex-col items-center gap-1 transition-all ${
             activeTab === "create" ? "text-cyan-400 scale-110" : "text-gray-500"
           }`}
         >
@@ -44,7 +46,7 @@ export function MobileNavbar({
 
         <button
           onClick={() => onTabChange("history")}
-          className={`flex flex-col items-center gap-1 transition-all ${
+          className={`flex min-w-0 flex-1 flex-col items-center gap-1 transition-all ${
             activeTab === "history" ? "text-amber-400 scale-110" : "text-gray-500"
           }`}
         >
@@ -69,7 +71,7 @@ export function MobileNavbar({
         {showSequencerTab && (
           <button
             onClick={() => onTabChange("sequencer")}
-            className={`flex flex-col items-center gap-1 transition-all ${
+            className={`flex min-w-0 flex-1 flex-col items-center gap-1 transition-all ${
               activeTab === "sequencer"
                 ? "text-purple-400 scale-110"
                 : "text-gray-500"
@@ -96,7 +98,7 @@ export function MobileNavbar({
 
         <button
           onClick={onOpenLibrary}
-          className={`flex flex-col items-center gap-1 transition-all ${
+          className={`flex min-w-0 flex-1 flex-col items-center gap-1 transition-all ${
             activeTab === "library" ? "text-rose-400 scale-110" : "text-gray-500"
           }`}
         >
@@ -120,7 +122,7 @@ export function MobileNavbar({
 
         <button
           onClick={onOpenProjects}
-          className={`flex flex-col items-center gap-1 transition-all ${
+          className={`flex min-w-0 flex-1 flex-col items-center gap-1 transition-all ${
             activeTab === "projects" ? "text-blue-400 scale-110" : "text-gray-500"
           }`}
         >
@@ -141,6 +143,30 @@ export function MobileNavbar({
             Projects
           </span>
         </button>
+
+        {onOpenMenu && (
+          <button
+            onClick={onOpenMenu}
+            className="flex min-w-0 flex-1 flex-col items-center gap-1 text-gray-500 transition-all hover:text-gray-200"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 6h16M4 12h16M4 18h16"
+              />
+            </svg>
+            <span className="text-[10px] font-bold uppercase tracking-widest">
+              Menu
+            </span>
+          </button>
+        )}
       </div>
     </div>
   );

@@ -311,10 +311,10 @@ export function DriftFrameExtractor({
   };
 
   return (
-    <div className="flex flex-col items-center justify-center w-full h-full p-2 animate-in fade-in">
+    <div className="flex h-full w-full flex-col items-center justify-center p-2 sm:p-3 animate-in fade-in">
       {/* Video Container */}
       <div
-        className="bg-black rounded-xl overflow-hidden border border-gray-700 relative group w-full flex-1 min-h-0 flex items-center justify-center mb-4 cursor-pointer"
+        className="relative mb-3 flex w-full min-h-0 flex-1 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-gray-700 bg-black sm:mb-4"
         onClick={togglePlay} // Click video to toggle play, but no icon overlay
       >
         <canvas ref={canvasRef} className="hidden" />
@@ -323,7 +323,7 @@ export function DriftFrameExtractor({
           key={activeVideoUrl}
           ref={videoRef}
           src={activeVideoUrl}
-          className="w-full h-full object-contain max-h-[60vh]"
+          className="h-full max-h-[52vh] w-full object-contain sm:max-h-[60vh]"
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={() => {
             setDuration(getResolvedVideoDuration(videoRef.current));
@@ -370,32 +370,32 @@ export function DriftFrameExtractor({
       </div>
 
       {/* Controls Container */}
-      <div className="w-full max-w-3xl space-y-4 bg-gray-900/80 p-4 rounded-2xl border border-gray-700">
+      <div className="w-full max-w-3xl space-y-3 rounded-2xl border border-gray-700 bg-gray-900/80 p-3 sm:space-y-4 sm:p-4">
         
-        <div className="flex flex-wrap gap-2 justify-center pb-2 border-b border-gray-700/50">
+        <div className="grid grid-cols-1 gap-2 border-b border-gray-700/50 pb-2 sm:grid-cols-2">
           <button 
             onClick={() => extractSpecificFrame(0)}
             disabled={!controlsReady || isExtracting}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-bold transition-all border border-white/5 disabled:opacity-50"
+            className="h-10 rounded-lg border border-white/10 bg-gray-800 px-3 text-xs font-bold text-white transition-colors hover:bg-gray-700 disabled:opacity-50"
           >
             Capture Start Frame
           </button>
           <button 
             onClick={captureEndFrame}
             disabled={!controlsReady || isExtracting}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs font-bold transition-all border border-white/5 disabled:opacity-50"
+            className="h-10 rounded-lg border border-white/10 bg-gray-800 px-3 text-xs font-bold text-white transition-colors hover:bg-gray-700 disabled:opacity-50"
           >
             Capture End Frame
           </button>
         </div>
 
         {/* Scrubber Row */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           {/* Dedicated Play/Pause Button on toolbar */}
           <button
             onClick={togglePlay}
             disabled={!controlsReady}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
           >
             {isPlaying ? (
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
@@ -406,7 +406,7 @@ export function DriftFrameExtractor({
 
           {/* Timeline Slider */}
           <div className="flex-1 space-y-1">
-            <div className="flex justify-between text-[10px] text-gray-400 font-mono uppercase tracking-wider">
+            <div className="flex justify-between text-[10px] font-mono uppercase tracking-wider text-gray-400">
               <span>Frame: {((currentTime || 0) * 30).toFixed(0)}</span>
               <span>
                 {(currentTime || 0).toFixed(2)}s / {(duration || 0).toFixed(2)}s
@@ -431,11 +431,11 @@ export function DriftFrameExtractor({
         </div>
 
         {/* Action Buttons Row */}
-        <div className="flex gap-3 pt-2 border-t border-gray-700/50">
+        <div className="grid grid-cols-1 gap-2 border-t border-gray-700/50 pt-2 sm:grid-cols-[1fr_auto_auto] sm:gap-3">
           <button
             onClick={captureFrame}
             disabled={!controlsReady || isExtracting}
-            className="flex-1 py-3 bg-gradient-to-r from-rose-600 to-orange-600 rounded-xl text-white font-bold hover:shadow-lg hover:from-rose-500 hover:to-orange-500 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+            className="flex h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-orange-600 px-4 text-sm font-bold text-white transition-all hover:from-rose-500 hover:to-orange-500 hover:shadow-lg disabled:opacity-50"
           >
             {isExtracting ? "Capturing..." : "Capture 3DX Frame"}
           </button>
@@ -443,14 +443,14 @@ export function DriftFrameExtractor({
           <button
             onClick={handleDownloadVideo}
             disabled={isStartingDownload}
-            className="px-6 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded-xl text-white font-semibold text-center flex items-center justify-center gap-2 text-sm transition-colors cursor-pointer"
+            className="flex h-11 items-center justify-center gap-2 rounded-xl border border-gray-600 bg-gray-800 px-4 text-center text-sm font-semibold text-white transition-colors hover:bg-gray-700"
           >
             {isStartingDownload ? "Starting Download..." : "Download Video"}
           </button>
 
           <button
             onClick={onCancel}
-            className="px-6 py-3 bg-gray-800 text-gray-400 hover:text-white rounded-xl hover:bg-gray-700 text-sm transition-colors"
+            className="flex h-11 items-center justify-center rounded-xl bg-gray-800 px-4 text-sm text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
           >
             Cancel
           </button>
