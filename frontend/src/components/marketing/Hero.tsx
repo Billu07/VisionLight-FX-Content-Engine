@@ -646,15 +646,10 @@ export const Hero = () => {
   const [showLogin, setShowLogin] = useState(false);
 
   const variant = useMemo(() => readVariantFromSearch(location.search), [location.search]);
-  const showVariantPreview = useMemo(() => {
-    const params = new URLSearchParams(location.search);
-    return params.get("variantPreview") === "1";
-  }, [location.search]);
 
   const toVariantSearch = (variantName: HeroVariant) => {
     const params = new URLSearchParams(location.search);
     params.set("loginVariant", variantName);
-    params.set("variantPreview", "1");
     return `?${params.toString()}`;
   };
 
@@ -672,13 +667,11 @@ export const Hero = () => {
       {variant === "v3" && <HeroV3 onLogin={() => setShowLogin(true)} />}
       {variant === "current" && <HeroCurrent onLogin={() => setShowLogin(true)} />}
 
-      {showVariantPreview && (
-        <VariantPicker
-          active={variant}
-          toSearch={toVariantSearch}
-          pathname={location.pathname}
-        />
-      )}
+      <VariantPicker
+        active={variant}
+        toSearch={toVariantSearch}
+        pathname={location.pathname}
+      />
 
       <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
     </>
