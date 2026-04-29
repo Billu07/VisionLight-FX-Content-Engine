@@ -236,12 +236,14 @@ const PreviewVideo = ({
   preload = "metadata",
   autoPlay = true,
   loop = false,
+  playOnHover = false,
 }: {
   asset: PreviewVideoAsset;
   className: string;
   preload?: "none" | "metadata" | "auto";
   autoPlay?: boolean;
   loop?: boolean;
+  playOnHover?: boolean;
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -253,6 +255,24 @@ const PreviewVideo = ({
       // Keep poster fallback if autoplay is blocked by browser policy.
     });
   }, [asset.src, autoPlay]);
+
+  const handleHoverStart = () => {
+    if (!playOnHover) return;
+    const el = videoRef.current;
+    if (!el) return;
+    el.muted = true;
+    void el.play().catch(() => {
+      // Keep poster fallback if autoplay is blocked by browser policy.
+    });
+  };
+
+  const handleHoverEnd = () => {
+    if (!playOnHover) return;
+    const el = videoRef.current;
+    if (!el) return;
+    el.pause();
+    el.currentTime = 0;
+  };
 
   return (
     <video
@@ -266,6 +286,8 @@ const PreviewVideo = ({
       loop={loop}
       playsInline
       preload={preload}
+      onMouseEnter={handleHoverStart}
+      onMouseLeave={handleHoverEnd}
       aria-label={asset.alt}
     />
   );
@@ -336,6 +358,7 @@ export const Hero = () => {
   const location = useLocation();
   const [showLogin, setShowLogin] = useState(false);
   const [activeRightCanvasVideoIndex, setActiveRightCanvasVideoIndex] = useState(-1);
+  const [canHoverPreviews, setCanHoverPreviews] = useState(false);
   const siteBrand = useMemo(() => getSiteBrand(), []);
   const isVisualFxDomain = siteBrand === "visualfx";
 
@@ -345,6 +368,21 @@ export const Hero = () => {
       setShowLogin(true);
     }
   }, [location.search]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mediaQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const update = () => setCanHoverPreviews(mediaQuery.matches);
+    update();
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", update);
+      return () => mediaQuery.removeEventListener("change", update);
+    }
+
+    mediaQuery.addListener(update);
+    return () => mediaQuery.removeListener(update);
+  }, []);
 
   const handleSwapPreviewVideo = () => {
     setActiveRightCanvasVideoIndex(
@@ -502,9 +540,10 @@ export const Hero = () => {
                       <PreviewVideo
                         asset={video}
                         className="aspect-[3/4] w-full object-cover"
-                        preload="metadata"
-                        autoPlay
-                        loop
+                        preload={canHoverPreviews ? "metadata" : idx === 0 ? "metadata" : "none"}
+                        autoPlay={!canHoverPreviews && idx === 0}
+                        loop={!canHoverPreviews && idx === 0}
+                        playOnHover={canHoverPreviews}
                       />
                     </div>
                   ))}
