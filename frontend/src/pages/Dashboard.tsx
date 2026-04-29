@@ -207,6 +207,8 @@ function Dashboard() {
   const [showWelcomeTour, setShowWelcomeTour] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
+  const mainPanelRef = useRef<HTMLDivElement | null>(null);
+  const [mainPanelHeight, setMainPanelHeight] = useState(0);
   const [showQueuedModal, setShowQueuedModal] = useState(false);
   const [showNoCreditsModal, setShowNoCreditsModal] = useState(false);
   const [showReserveModal, setShowReserveModal] = useState(false);
@@ -389,6 +391,29 @@ function Dashboard() {
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  useEffect(() => {
+    if (isMobile) {
+      setMainPanelHeight(0);
+      return;
+    }
+    const panel = mainPanelRef.current;
+    if (!panel || typeof ResizeObserver === "undefined") return;
+
+    const syncHeight = () => {
+      setMainPanelHeight(panel.getBoundingClientRect().height);
+    };
+
+    syncHeight();
+    const observer = new ResizeObserver(() => syncHeight());
+    observer.observe(panel);
+    window.addEventListener("resize", syncHeight);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", syncHeight);
+    };
+  }, [isMobile]);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/");
@@ -2716,7 +2741,7 @@ function Dashboard() {
           )}
           <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
             <div className={`flex-1 ${(viewMode !== "create" && isMobile) ? 'hidden' : 'block'}`}>
-              <div className="rounded-3xl border border-white/15 bg-gray-800/30 p-4 shadow-[0_24px_60px_rgba(2,8,23,0.45)] backdrop-blur-lg sm:p-6 lg:p-8">
+              <div ref={mainPanelRef} className="rounded-3xl border border-white/15 bg-gray-800/30 p-4 shadow-[0_24px_60px_rgba(2,8,23,0.45)] backdrop-blur-lg sm:p-6 lg:p-8">
                 {/* Updated header: logo left, library button right */}
                 <div className="mb-6 sm:mb-8 flex justify-between items-start">
                   <div className="hidden sm:block">
@@ -4516,7 +4541,10 @@ function Dashboard() {
             </div>
 
             <div className={`lg:w-96 ${(viewMode !== "history" && isMobile) ? 'hidden' : 'block'}`}>
-              <div className="sticky top-4 rounded-3xl border border-white/15 bg-gray-800/30 p-4 shadow-[0_24px_60px_rgba(2,8,23,0.45)] backdrop-blur-lg sm:p-6">
+              <div
+                className="sticky top-4 flex flex-col rounded-3xl border border-white/15 bg-gray-800/30 p-4 shadow-[0_24px_60px_rgba(2,8,23,0.45)] backdrop-blur-lg sm:p-6"
+                style={!isMobile && mainPanelHeight > 0 ? { height: `${mainPanelHeight}px` } : undefined}
+              >
                 <div className="flex items-center justify-between mb-4 sm:mb-6">
                   <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
                     <span></span> {timelinePanelMode === "timeline" ? "Timeline" : "Storyline"}
@@ -4540,7 +4568,7 @@ function Dashboard() {
                 </div>
                 {timelinePanelMode === "timeline" ? (
                   <>
-                    <div className="space-y-3 max-h-[980px] sm:max-h-[1040px] overflow-y-auto custom-scrollbar">
+                    <div className="flex-1 min-h-0 space-y-3 overflow-y-auto custom-scrollbar pr-1">
                       {displayedTimelinePosts.length > 0 ? (
                         displayedTimelinePosts.map((post: any) => (
                             <PostCard
@@ -4629,7 +4657,7 @@ function Dashboard() {
                     )}
                   </>
                 ) : (
-                  <div className="space-y-3 max-h-[980px] sm:max-h-[1040px] overflow-y-auto custom-scrollbar">
+                  <div className="flex-1 min-h-0 space-y-3 overflow-y-auto custom-scrollbar pr-1">
                     {displayedStorylineItems.length > 0 ? (
                       displayedStorylineItems.map((item, index) => {
                         const storylinePost = buildStorylinePost(item, index);
