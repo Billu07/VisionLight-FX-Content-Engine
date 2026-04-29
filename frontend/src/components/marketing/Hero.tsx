@@ -305,9 +305,6 @@ const MarketingHeader = ({
         </a>
 
         <div className="hidden items-center gap-5 text-sm text-slate-200/85 md:flex">
-          <span className="border-b-2 border-cyan-400 pb-1 font-semibold text-white">
-            Home
-          </span>
           <Link to="/terms" className="transition-colors hover:text-white">
             Terms
           </Link>
@@ -330,32 +327,6 @@ const MarketingHeader = ({
         >
           Login
         </button>
-      </div>
-
-      <div className="mx-auto flex w-full max-w-7xl items-center gap-2 overflow-x-auto px-4 pb-3 text-xs text-slate-100/90 md:hidden">
-        <span className="rounded-full border border-cyan-300/40 bg-cyan-400/10 px-3 py-1 font-semibold text-cyan-100">
-          Home
-        </span>
-        <Link
-          to="/terms"
-          className="whitespace-nowrap rounded-full border border-white/20 bg-white/5 px-3 py-1 font-medium"
-        >
-          Terms
-        </Link>
-        <Link
-          to="/privacy"
-          className="whitespace-nowrap rounded-full border border-white/20 bg-white/5 px-3 py-1 font-medium"
-        >
-          Privacy
-        </Link>
-        <a
-          href="https://www.picdrift.com/contact"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="whitespace-nowrap rounded-full border border-white/20 bg-white/5 px-3 py-1 font-medium"
-        >
-          Contact
-        </a>
       </div>
     </header>
   );
