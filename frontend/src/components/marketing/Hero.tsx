@@ -334,7 +334,9 @@ export const Hero = () => {
             <div className="max-w-xl">
               <h1 className="text-4xl font-black leading-tight text-white sm:text-5xl lg:text-6xl">
                 <span className="block">Welcome to</span>
-                <span className="mt-1 block text-[#72cf06]">Your Creative Studio</span>
+                <span className="mt-1 block bg-gradient-to-r from-cyan-300 via-sky-300 to-blue-400 bg-clip-text text-transparent">
+                  Your Creative Studio
+                </span>
               </h1>
 
               <p className="mt-4 text-lg text-slate-200 sm:text-2xl">
@@ -346,7 +348,7 @@ export const Hero = () => {
                   href="https://www.picdrift.com/studio-signup"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-full bg-[#72cf06] px-7 py-3 text-sm font-black text-[#0b1205] transition hover:bg-[#83e30f]"
+                  className="rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 px-7 py-3 text-sm font-black text-white transition hover:from-cyan-400 hover:to-blue-400"
                 >
                   Sign Up Now
                 </a>
