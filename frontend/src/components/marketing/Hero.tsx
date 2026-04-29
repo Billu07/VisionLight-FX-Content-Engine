@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { LoginModal } from "../LoginModal";
 import picdriftLogo from "../../assets/picdrift.png";
@@ -243,8 +243,20 @@ const PreviewVideo = ({
   autoPlay?: boolean;
   loop?: boolean;
 }) => {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !autoPlay) return;
+    el.muted = true;
+    void el.play().catch(() => {
+      // Keep poster fallback if autoplay is blocked by browser policy.
+    });
+  }, [asset.src, autoPlay]);
+
   return (
     <video
+      ref={videoRef}
       key={asset.src}
       className={className}
       src={asset.src}
@@ -517,9 +529,9 @@ export const Hero = () => {
                       <PreviewVideo
                         asset={video}
                         className="aspect-[3/4] w-full object-cover"
-                        preload="none"
-                        autoPlay={idx === 0}
-                        loop={false}
+                        preload="metadata"
+                        autoPlay
+                        loop
                       />
                     </div>
                   ))}
