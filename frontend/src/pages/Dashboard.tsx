@@ -1972,13 +1972,8 @@ function Dashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-purple-950 to-violet-950 text-gray-200 relative overflow-hidden pb-24 lg:pb-0">
-      {/* TREDNY STUDIO BACKGROUND EFFECTS */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-        {/* Ambient colored glows */}
-        <div className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-cyan-500/10 rounded-full blur-[100px] mix-blend-screen animate-pulse-slow" />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[50vw] h-[50vw] bg-purple-600/10 rounded-full blur-[120px] mix-blend-screen" />
-      </div>
+    <div className="relative min-h-screen overflow-hidden bg-[#070a20] pb-24 text-gray-200 lg:pb-0">
+      <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_14%_10%,rgba(34,211,238,0.14),transparent_36%),radial-gradient(circle_at_82%_12%,rgba(56,189,248,0.16),transparent_44%)]" />
 
       <div className="relative z-10">
         {/* ... MODALS ... */}
@@ -2721,7 +2716,7 @@ function Dashboard() {
           )}
           <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
             <div className={`flex-1 ${(viewMode !== "create" && isMobile) ? 'hidden' : 'block'}`}>
-              <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 lg:p-8 shadow-2xl">
+              <div className="rounded-3xl border border-white/15 bg-gray-900/55 p-4 shadow-[0_24px_60px_rgba(2,8,23,0.45)] backdrop-blur-lg sm:p-6 lg:p-8">
                 {/* Updated header: logo left, library button right */}
                 <div className="mb-6 sm:mb-8 flex justify-between items-start">
                   <div className="hidden sm:block">
@@ -4521,7 +4516,7 @@ function Dashboard() {
             </div>
 
             <div className={`lg:w-96 ${(viewMode !== "history" && isMobile) ? 'hidden' : 'block'}`}>
-              <div className="bg-gray-800/30 backdrop-blur-lg rounded-3xl border border-white/10 p-4 sm:p-6 shadow-2xl sticky top-4">
+              <div className="sticky top-4 rounded-3xl border border-white/15 bg-gray-900/55 p-4 shadow-[0_24px_60px_rgba(2,8,23,0.45)] backdrop-blur-lg sm:p-6">
                 <div className="flex items-center justify-between mb-4 sm:mb-6">
                   <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
                     <span></span> {timelinePanelMode === "timeline" ? "Timeline" : "Storyline"}
