@@ -484,7 +484,7 @@ export const Hero = () => {
 
           <section className="mx-auto grid w-full max-w-7xl gap-8 px-4 pb-16 pt-5 sm:px-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:pt-0">
             <div className="relative lg:-mt-8 [perspective:1800px]">
-              <div className="relative rounded-[2rem] border border-indigo-300/25 bg-[#070c2b]/85 p-4 shadow-[0_24px_70px_rgba(10,12,38,0.45)] backdrop-blur-sm transition-transform duration-700 lg:[transform:rotateY(24deg)_rotateX(6deg)_translateX(10px)] lg:[transform-origin:center_right] lg:[transform-style:preserve-3d] sm:p-6">
+              <div className="relative rounded-[2rem] border border-indigo-300/25 bg-[#070c2b]/85 p-4 shadow-[0_24px_70px_rgba(10,12,38,0.45)] backdrop-blur-sm transition-transform duration-700 lg:[transform:rotateY(24deg)_rotateX(6deg)_translateX(-16px)] lg:[transform-origin:center_right] lg:[transform-style:preserve-3d] sm:p-6">
                 <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-gradient-to-br from-cyan-300/8 via-transparent to-indigo-500/10" />
                 <div className="relative rounded-[1.4rem] border border-white/10 bg-gradient-to-br from-[#090b24] to-[#07081c] p-4 sm:p-5">
                 <div className="mb-4 flex items-center justify-between text-xs text-slate-400">
