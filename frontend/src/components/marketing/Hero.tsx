@@ -2,6 +2,22 @@ import { useEffect, useState } from "react";
 import { LoginModal } from "../LoginModal";
 import picdriftLogo from "../../assets/picdrift.png";
 
+const mockCards = [
+  { title: "Portrait FX", tone: "from-fuchsia-500 to-purple-700", rotate: "-10deg", x: "2%", y: "15%" },
+  { title: "Landscape FX", tone: "from-orange-400 to-amber-600", rotate: "-4deg", x: "27%", y: "7%" },
+  { title: "Story FX", tone: "from-emerald-400 to-cyan-600", rotate: "4deg", x: "51%", y: "2%" },
+  { title: "Cinematic FX", tone: "from-cyan-300 to-sky-600", rotate: "10deg", x: "75%", y: "8%" },
+];
+
+const posterTones = [
+  "from-slate-300 to-slate-500",
+  "from-fuchsia-400 to-purple-600",
+  "from-orange-400 to-red-500",
+  "from-cyan-300 to-blue-600",
+  "from-emerald-300 to-teal-600",
+  "from-indigo-300 to-indigo-600",
+];
+
 export const Hero = () => {
   const [showLogin, setShowLogin] = useState(false);
 
@@ -14,91 +30,178 @@ export const Hero = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 text-white relative overflow-hidden">
-        {/* Enhanced Animated Background Elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-20 -right-20 sm:-top-40 sm:-right-40 w-40 h-40 sm:w-80 sm:h-80 bg-cyan-500/10 rounded-full blur-2xl sm:blur-3xl"></div>
-          <div className="absolute -bottom-20 -left-20 sm:-bottom-40 sm:-left-40 w-40 h-40 sm:w-80 sm:h-80 bg-purple-500/10 rounded-full blur-2xl sm:blur-3xl"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 h-48 sm:w-96 sm:h-96 bg-blue-500/5 rounded-full blur-2xl sm:blur-3xl"></div>
-        </div>
+      <div className="relative min-h-screen overflow-hidden bg-[#070a20] text-white">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.35),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.65),transparent_62%)]" />
+        <div className="absolute inset-x-0 top-0 h-[52%] bg-gradient-to-r from-[#170316] via-[#1a164f] to-[#0d2f59]" />
+        <div
+          className="absolute inset-x-0 bottom-[-140px] h-[68%] bg-gradient-to-r from-[#2f58df] via-[#5364f2] to-[#3f58dd]"
+          style={{ clipPath: "polygon(0 16%, 100% 0, 100% 100%, 0 100%)" }}
+        />
 
-        <div className="container mx-auto px-4 sm:px-6 pt-8 sm:pt-12 pb-6 sm:pb-8 relative z-10">
-          <div className="max-w-4xl mx-auto text-center">
-            {/* Enhanced Navigation Bar */}
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-12 sm:mb-16 gap-6 sm:gap-0">
-              {/* Logo Section - Linked to PicDrift.com */}
-              <div className="flex items-center gap-4 sm:gap-6">
-                <a
-                  href="https://picdrift.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block" // Ensures the link behaves correctly in the flex container
-                >
-                  <img
-                    src={picdriftLogo}
-                    alt="PicDrift"
-                    className="h-12 sm:h-16 w-auto object-contain transition-transform hover:scale-105"
-                  />
-                </a>
-              </div>
+        <header className="relative z-20 border-b border-white/10 bg-[#120f2b]/65 backdrop-blur-xl">
+          <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6">
+            <a
+              href="https://picdrift.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3"
+            >
+              <img
+                src={picdriftLogo}
+                alt="PicDrift"
+                className="h-9 w-auto object-contain sm:h-10"
+              />
+            </a>
 
-              {/* Login Button */}
-              <button
-                onClick={() => setShowLogin(true)}
-                className="px-6 sm:px-8 py-2 sm:py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl font-semibold transition-all duration-300 hover:shadow-lg backdrop-blur-sm text-sm sm:text-base w-full sm:w-auto"
+            <div className="hidden items-center gap-5 text-sm text-slate-200/85 md:flex">
+              <span className="border-b-2 border-cyan-400 pb-1 font-semibold text-white">
+                Home
+              </span>
+              <span className="hover:text-white transition-colors">Terms</span>
+              <span className="hover:text-white transition-colors">Privacy</span>
+              <a
+                href="https://www.picdrift.com/contact"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-white transition-colors"
               >
-                Login
-              </button>
+                Contact
+              </a>
             </div>
 
-            {/* Main Hero Content */}
-            <div className="mt-8 sm:mt-12">
-              <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
-                <span className="text-white">Welcome to</span>
-                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 mt-2">
+            <button
+              onClick={() => setShowLogin(true)}
+              className="rounded-full border border-white/35 bg-white/5 px-5 py-1.5 text-sm font-semibold text-white transition hover:bg-white/12"
+            >
+              Login
+            </button>
+          </div>
+        </header>
+
+        <main className="relative z-10">
+          <section className="mx-auto grid w-full max-w-7xl gap-10 px-4 pb-10 pt-12 sm:px-6 lg:grid-cols-[1fr_1.2fr] lg:pt-14">
+            <div className="max-w-xl">
+              <h1 className="text-4xl font-black leading-tight text-white sm:text-5xl lg:text-6xl">
+                <span className="block">Welcome to</span>
+                <span className="mt-1 block bg-gradient-to-r from-cyan-300 to-blue-300 bg-clip-text text-transparent">
                   Your Creative Studio
                 </span>
               </h1>
 
-              <p className="text-lg sm:text-xl md:text-2xl text-purple-200 mb-6 sm:mb-8 leading-relaxed px-2 sm:px-0">
+              <p className="mt-4 text-lg text-slate-200 sm:text-2xl">
                 Start Generating Cinematic Stories
               </p>
 
-              <div className="text-base sm:text-lg text-purple-200 mb-8 sm:mb-12 space-y-2">
-                <p>
-                  <strong>Imagine it.</strong> Create it.
-                </p>
-                <p className="text-white font-semibold">
-                  All from one dashboard.
-                </p>
-              </div>
+              <p className="mt-8 text-sm font-bold uppercase tracking-[0.16em] text-slate-300/75">
+                Download PicDrift Studio Beta Now
+              </p>
 
-              {/* Enhanced CTA Section */}
-              <div className="bg-gray-800/30 backdrop-blur-lg rounded-2xl p-4 sm:p-6 md:p-8 mb-8 sm:mb-12 border border-white/10 hover:border-cyan-400/30 transition-all duration-300">
-                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
-                  {/* Button 1: SignUp Now */}
-                  <a
-                    href="https://www.picdrift.com/studio-signup"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white px-4 sm:px-6 md:px-8 py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg transition-all duration-300 hover:shadow-2xl hover:scale-105 flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-center"
-                  >
-                    Sign Up Now
-                  </a>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <a
+                  href="https://www.picdrift.com/studio-signup"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full bg-[#72cf06] px-7 py-3 text-sm font-black text-[#0b1205] transition hover:bg-[#83e30f]"
+                >
+                  Sign Up Now
+                </a>
+                <button
+                  onClick={() => setShowLogin(true)}
+                  className="rounded-full border border-white/45 bg-white/5 px-7 py-3 text-sm font-bold text-white transition hover:bg-white/12"
+                >
+                  Login
+                </button>
+              </div>
+            </div>
+
+            <div className="relative h-[300px] sm:h-[340px] lg:h-[370px]">
+              {mockCards.map((card) => (
+                <div
+                  key={card.title}
+                  className={`absolute flex h-[255px] w-[150px] items-end rounded-3xl border border-white/20 bg-gradient-to-b ${card.tone} p-3 shadow-[0_22px_40px_rgba(0,0,0,0.45)] sm:h-[290px] sm:w-[175px]`}
+                  style={{
+                    left: card.x,
+                    top: card.y,
+                    transform: `rotate(${card.rotate})`,
+                  }}
+                >
+                  <span className="w-full rounded-xl bg-black/30 px-2 py-1 text-center text-xs font-bold text-white/90 backdrop-blur-sm">
+                    {card.title}
+                  </span>
+                </div>
+              ))}
+
+              <div className="absolute left-[42%] top-[34%] flex h-20 w-20 items-center justify-center rounded-full border border-white/30 bg-white/20 backdrop-blur-xl shadow-[0_12px_30px_rgba(5,10,35,0.55)]">
+                <div className="ml-1 h-0 w-0 border-y-[12px] border-l-[18px] border-y-transparent border-l-white" />
+              </div>
+            </div>
+          </section>
+
+          <section className="mx-auto grid w-full max-w-7xl gap-8 px-4 pb-16 pt-5 sm:px-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:pt-0">
+            <div className="rounded-[2rem] border border-indigo-300/25 bg-[#070c2b]/85 p-4 shadow-[0_24px_70px_rgba(10,12,38,0.45)] backdrop-blur-sm sm:p-6">
+              <div className="rounded-[1.4rem] border border-white/10 bg-gradient-to-br from-[#090b24] to-[#07081c] p-4 sm:p-5">
+                <div className="mb-4 flex items-center justify-between text-xs text-slate-400">
+                  <span className="font-semibold tracking-wide text-slate-200">
+                    Continue Watching
+                  </span>
+                  <span className="rounded-full bg-slate-800/80 px-2.5 py-1">
+                    Library
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+                  {posterTones.map((tone, idx) => (
+                    <div
+                      key={`poster-${idx}`}
+                      className={`aspect-[3/4] rounded-lg border border-white/10 bg-gradient-to-b ${tone}`}
+                    />
+                  ))}
+                </div>
+
+                <div className="mt-6 text-xs font-semibold tracking-[0.15em] text-slate-400">
+                  Popular Movies
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-6">
+                  {posterTones.slice().reverse().map((tone, idx) => (
+                    <div
+                      key={`poster-bottom-${idx}`}
+                      className={`aspect-[3/4] rounded-lg border border-white/10 bg-gradient-to-b ${tone}`}
+                    />
+                  ))}
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Enhanced Floating Elements */}
-        <div className="absolute bottom-10 sm:bottom-20 left-4 sm:left-10 w-3 h-3 sm:w-4 sm:h-4 bg-cyan-400 rounded-full opacity-40 animate-float"></div>
-        <div className="absolute top-20 sm:top-40 right-8 sm:right-20 w-4 h-4 sm:w-6 sm:h-6 bg-purple-400 rounded-full opacity-30 animate-pulse"></div>
-        <div className="absolute bottom-20 sm:bottom-40 right-12 sm:right-32 w-2 h-2 sm:w-3 sm:h-3 bg-blue-400 rounded-full opacity-50 animate-ping"></div>
+            <div className="max-w-xl text-slate-100">
+              <p className="text-xl leading-relaxed sm:text-3xl sm:leading-[1.45]">
+                Imagine it. Create it.
+                <br />
+                <span className="font-semibold text-white">All from one dashboard.</span>
+              </p>
 
-        {/* Additional Mobile-Only Floating Elements */}
-        <div className="sm:hidden absolute top-1/4 left-6 w-2 h-2 bg-cyan-300 rounded-full opacity-40 animate-bounce"></div>
-        <div className="sm:hidden absolute bottom-1/3 right-8 w-2 h-2 bg-purple-300 rounded-full opacity-30 animate-pulse"></div>
+              <p className="mt-6 text-sm leading-relaxed text-slate-200/90 sm:text-base">
+                Transform your content creation with AI-powered video, image, and
+                carousel generation.
+              </p>
+
+              <div className="mt-8 space-y-3">
+                <p className="text-xs font-black uppercase tracking-[0.15em] text-slate-300/85">
+                  Available On
+                </p>
+                <div className="flex flex-wrap gap-2 text-sm font-semibold text-slate-50/90">
+                  {["Android", "Windows", "MacOS", "Linux", "Web"].map((platform) => (
+                    <span
+                      key={platform}
+                      className="rounded-full border border-white/25 bg-white/10 px-3 py-1.5 backdrop-blur-sm"
+                    >
+                      {platform}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
       </div>
 
       <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
