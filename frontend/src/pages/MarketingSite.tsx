@@ -43,7 +43,7 @@ export const MarketingSite = () => {
               </a>
             </div>
             <p className="text-sm text-purple-400">
-              (c) 2026 {studioLabel} | ALL RIGHTS RESERVED.
+              {"\u00A9"} 2026 {studioLabel} | ALL RIGHTS RESERVED.
             </p>
           </div>
         </div>
