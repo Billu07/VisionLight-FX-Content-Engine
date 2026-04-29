@@ -13,7 +13,7 @@ type PreviewImageAsset = {
 
 type PreviewVideoAsset = {
   src: string;
-  poster: string;
+  poster?: string;
   alt: string;
 };
 
@@ -88,7 +88,49 @@ const VIDEOS = {
     poster: "/login-previews/optimized/cinematic_futuristic-poster.webp",
     alt: "Futuristic cinematic clip",
   },
+  d1: {
+    src: "/login-previews/optimized/d1-web.mp4",
+    poster: "/login-previews/optimized/d1-poster.webp",
+    alt: "3DX path preview 1",
+  },
+  d2: {
+    src: "/login-previews/optimized/d2-web.mp4",
+    poster: "/login-previews/optimized/d2-poster.webp",
+    alt: "3DX path preview 2",
+  },
+  d3: {
+    src: "/login-previews/optimized/d3-web.mp4",
+    poster: "/login-previews/optimized/d3-poster.webp",
+    alt: "3DX path preview 3",
+  },
+  d4: {
+    src: "/login-previews/optimized/d4-web.mp4",
+    poster: "/login-previews/optimized/d4-poster.webp",
+    alt: "3DX path preview 4",
+  },
+  d5: {
+    src: "/login-previews/optimized/d5-web.mp4",
+    poster: "/login-previews/optimized/d5-poster.webp",
+    alt: "3DX path preview 5",
+  },
 } satisfies Record<string, PreviewVideoAsset>;
+
+const cinematicSwapVideos: PreviewVideoAsset[] = [
+  VIDEOS.cinematic,
+  VIDEOS.d1,
+  VIDEOS.d2,
+  VIDEOS.d3,
+  VIDEOS.d4,
+  VIDEOS.d5,
+];
+
+const pathPreviewVideos: PreviewVideoAsset[] = [
+  VIDEOS.d1,
+  VIDEOS.d2,
+  VIDEOS.d3,
+  VIDEOS.d4,
+  VIDEOS.d5,
+];
 
 const scenePreviews: PreviewImageAsset[] = [
   IMAGES.landscape1,
@@ -149,15 +191,6 @@ const mockCards: HeroPreviewCard[] = [
   },
 ];
 
-const libraryPosters: PreviewImageAsset[] = [
-  portraitPreviews[0],
-  scenePreviews[0],
-  portraitPreviews[1],
-  IMAGES.abstract1,
-  portraitPreviews[2],
-  scenePreviews[5],
-];
-
 const popularPosters: PreviewImageAsset[] = [
   scenePreviews[1],
   portraitPreviews[2],
@@ -195,12 +228,15 @@ const ResponsivePreviewImage = ({
 const PreviewVideo = ({
   asset,
   className,
+  preload = "metadata",
 }: {
   asset: PreviewVideoAsset;
   className: string;
+  preload?: "none" | "metadata" | "auto";
 }) => {
   return (
     <video
+      key={asset.src}
       className={className}
       src={asset.src}
       poster={asset.poster}
@@ -208,7 +244,7 @@ const PreviewVideo = ({
       muted
       loop
       playsInline
-      preload="metadata"
+      preload={preload}
       aria-label={asset.alt}
     />
   );
@@ -307,8 +343,10 @@ const MarketingHeader = ({
 export const Hero = () => {
   const location = useLocation();
   const [showLogin, setShowLogin] = useState(false);
+  const [activeCinematicVideoIndex, setActiveCinematicVideoIndex] = useState(0);
   const siteBrand = useMemo(() => getSiteBrand(), []);
   const isVisualFxDomain = siteBrand === "visualfx";
+  const activeCinematicVideo = cinematicSwapVideos[activeCinematicVideoIndex];
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -316,6 +354,12 @@ export const Hero = () => {
       setShowLogin(true);
     }
   }, [location.search]);
+
+  const handleSwapPreviewVideo = () => {
+    setActiveCinematicVideoIndex(
+      (prevIndex) => (prevIndex + 1) % cinematicSwapVideos.length,
+    );
+  };
 
   return (
     <>
@@ -362,65 +406,77 @@ export const Hero = () => {
             </div>
 
             <div className="relative h-[300px] sm:h-[340px] lg:h-[370px]">
-              {mockCards.map((card) => (
-                <div
-                  key={card.title}
-                  className={`absolute h-[255px] w-[150px] rounded-3xl border border-white/20 bg-gradient-to-b ${card.tone} p-3 shadow-[0_22px_40px_rgba(0,0,0,0.45)] sm:h-[290px] sm:w-[175px]`}
-                  style={{
-                    left: card.x,
-                    top: card.y,
-                    transform: `rotate(${card.rotate})`,
-                  }}
-                >
-                  <div className="flex h-full flex-col justify-between">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="rounded-full border border-white/30 bg-black/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white/90 backdrop-blur-sm">
-                          {card.chip}
-                        </span>
-                        <span className="h-2 w-2 rounded-full bg-white/80 shadow-[0_0_14px_rgba(255,255,255,0.85)]" />
+              {mockCards.map((card) => {
+                const cardVideo =
+                  card.title === "Cinematic FX" ? activeCinematicVideo : card.video;
+
+                return (
+                  <div
+                    key={card.title}
+                    className={`absolute h-[255px] w-[150px] rounded-3xl border border-white/20 bg-gradient-to-b ${card.tone} p-3 shadow-[0_22px_40px_rgba(0,0,0,0.45)] sm:h-[290px] sm:w-[175px]`}
+                    style={{
+                      left: card.x,
+                      top: card.y,
+                      transform: `rotate(${card.rotate})`,
+                    }}
+                  >
+                    <div className="flex h-full flex-col justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="rounded-full border border-white/30 bg-black/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white/90 backdrop-blur-sm">
+                            {card.chip}
+                          </span>
+                          <span className="h-2 w-2 rounded-full bg-white/80 shadow-[0_0_14px_rgba(255,255,255,0.85)]" />
+                        </div>
+
+                        <div className="rounded-xl border border-white/20 bg-black/15 p-2 backdrop-blur-[1px]">
+                          <div className="overflow-hidden rounded-lg border border-white/20">
+                            {cardVideo ? (
+                              <PreviewVideo
+                                asset={cardVideo}
+                                className="h-24 w-full object-cover sm:h-28"
+                                preload="metadata"
+                              />
+                            ) : (
+                              <ResponsivePreviewImage
+                                asset={card.preview}
+                                alt={`${card.title} preview`}
+                                className="h-24 w-full object-cover sm:h-28"
+                                sizes="(max-width: 640px) 28vw, 180px"
+                              />
+                            )}
+                          </div>
+                          <div className="mt-2 grid grid-cols-3 gap-1.5">
+                            {card.stripPreviews.map((preview, idx) => (
+                              <ResponsivePreviewImage
+                                key={`${card.title}-${idx}`}
+                                asset={preview}
+                                alt=""
+                                className="aspect-[3/4] rounded-md border border-white/20 object-cover"
+                                sizes="60px"
+                              />
+                            ))}
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="rounded-xl border border-white/20 bg-black/15 p-2 backdrop-blur-[1px]">
-                        <div className="overflow-hidden rounded-lg border border-white/20">
-                          {card.video ? (
-                            <PreviewVideo
-                              asset={card.video}
-                              className="h-24 w-full object-cover sm:h-28"
-                            />
-                          ) : (
-                            <ResponsivePreviewImage
-                              asset={card.preview}
-                              alt={`${card.title} preview`}
-                              className="h-24 w-full object-cover sm:h-28"
-                              sizes="(max-width: 640px) 28vw, 180px"
-                            />
-                          )}
-                        </div>
-                        <div className="mt-2 grid grid-cols-3 gap-1.5">
-                          {card.stripPreviews.map((preview, idx) => (
-                            <ResponsivePreviewImage
-                              key={`${card.title}-${idx}`}
-                              asset={preview}
-                              alt=""
-                              className="aspect-[3/4] rounded-md border border-white/20 object-cover"
-                              sizes="60px"
-                            />
-                          ))}
-                        </div>
-                      </div>
+                      <span className="w-full rounded-xl bg-black/30 px-2 py-1 text-center text-xs font-bold text-white/90 backdrop-blur-sm">
+                        {card.title}
+                      </span>
                     </div>
-
-                    <span className="w-full rounded-xl bg-black/30 px-2 py-1 text-center text-xs font-bold text-white/90 backdrop-blur-sm">
-                      {card.title}
-                    </span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
-              <div className="absolute left-[42%] top-[34%] flex h-20 w-20 items-center justify-center rounded-full border border-white/30 bg-white/20 backdrop-blur-xl shadow-[0_12px_30px_rgba(5,10,35,0.55)]">
+              <button
+                type="button"
+                onClick={handleSwapPreviewVideo}
+                title="Swap preview video"
+                aria-label="Swap preview video"
+                className="absolute left-[42%] top-[34%] flex h-20 w-20 items-center justify-center rounded-full border border-white/30 bg-white/20 backdrop-blur-xl shadow-[0_12px_30px_rgba(5,10,35,0.55)] transition hover:scale-[1.04] hover:bg-white/30"
+              >
                 <div className="ml-1 h-0 w-0 border-y-[12px] border-l-[18px] border-y-transparent border-l-white" />
-              </div>
+              </button>
             </div>
           </section>
 
@@ -429,21 +485,20 @@ export const Hero = () => {
               <div className="rounded-[1.4rem] border border-white/10 bg-gradient-to-br from-[#090b24] to-[#07081c] p-4 sm:p-5">
                 <div className="mb-4 flex items-center justify-between text-xs text-slate-400">
                   <span className="font-semibold tracking-wide text-slate-200">
-                    Recent Generations
+                    3DX Paths
                   </span>
                   <span className="rounded-full bg-slate-800/80 px-2.5 py-1">
                     Asset Library
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-                  {libraryPosters.map((poster, idx) => (
-                    <div key={`poster-${idx}`} className="overflow-hidden rounded-lg border border-white/10">
-                      <ResponsivePreviewImage
-                        asset={poster}
-                        alt={`Library poster ${idx + 1}`}
-                        className="aspect-[3/4] w-full object-cover"
-                        sizes="(max-width: 640px) 30vw, 120px"
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                  {pathPreviewVideos.map((video, idx) => (
+                    <div key={`path-${idx}`} className="overflow-hidden rounded-lg border border-white/10">
+                      <PreviewVideo
+                        asset={video}
+                        className="aspect-video w-full object-cover"
+                        preload="none"
                       />
                     </div>
                   ))}
