@@ -112,6 +112,11 @@ const VIDEOS = {
     poster: "/login-previews/optimized/d5-poster.webp",
     alt: "3DX path preview 5",
   },
+  d6: {
+    src: "/login-previews/optimized/d6-web.mp4",
+    poster: "/login-previews/optimized/d6-poster.webp",
+    alt: "3DX path preview 6",
+  },
 } satisfies Record<string, PreviewVideoAsset>;
 
 const rightCanvasVideos: PreviewVideoAsset[] = [
@@ -120,6 +125,7 @@ const rightCanvasVideos: PreviewVideoAsset[] = [
   VIDEOS.d3,
   VIDEOS.d4,
   VIDEOS.d5,
+  VIDEOS.d6,
   VIDEOS.cinematic,
 ];
 
@@ -129,6 +135,7 @@ const pathPreviewVideos: PreviewVideoAsset[] = [
   VIDEOS.d3,
   VIDEOS.d4,
   VIDEOS.d5,
+  VIDEOS.d6,
 ];
 
 const scenePreviews: PreviewImageAsset[] = [
@@ -406,8 +413,9 @@ export const Hero = () => {
               </div>
             </div>
 
-            <div className="relative h-[300px] sm:h-[340px] lg:h-[370px]">
-              {mockCards.map((card, cardIndex) => {
+            <div className="relative h-[300px] overflow-hidden sm:h-[340px] sm:overflow-visible lg:h-[370px]">
+              <div className="absolute inset-0 origin-top-left scale-[0.76] sm:scale-100">
+                {mockCards.map((card, cardIndex) => {
                 const hasSelectedVideo = activeRightCanvasVideoIndex >= 0;
                 const selectedVideo = hasSelectedVideo
                   ? rightCanvasVideos[
@@ -416,74 +424,75 @@ export const Hero = () => {
                   : null;
                 const posterAsset = rightCanvasVideos[cardIndex % rightCanvasVideos.length];
 
-                return (
-                  <div
-                    key={card.title}
-                    className={`absolute h-[255px] w-[150px] rounded-3xl border border-white/20 bg-gradient-to-b ${card.tone} p-3 shadow-[0_22px_40px_rgba(0,0,0,0.45)] sm:h-[290px] sm:w-[175px]`}
-                    style={{
-                      left: card.x,
-                      top: card.y,
-                      transform: `rotate(${card.rotate})`,
-                    }}
-                  >
-                    <div className="flex h-full flex-col justify-between">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="rounded-full border border-white/30 bg-black/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white/90 backdrop-blur-sm">
-                            {card.chip}
-                          </span>
-                          <span className="h-2 w-2 rounded-full bg-white/80 shadow-[0_0_14px_rgba(255,255,255,0.85)]" />
+                  return (
+                    <div
+                      key={card.title}
+                      className={`absolute h-[255px] w-[150px] rounded-3xl border border-white/20 bg-gradient-to-b ${card.tone} p-3 shadow-[0_22px_40px_rgba(0,0,0,0.45)] sm:h-[290px] sm:w-[175px]`}
+                      style={{
+                        left: card.x,
+                        top: card.y,
+                        transform: `rotate(${card.rotate})`,
+                      }}
+                    >
+                      <div className="flex h-full flex-col justify-between">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="rounded-full border border-white/30 bg-black/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white/90 backdrop-blur-sm">
+                              {card.chip}
+                            </span>
+                            <span className="h-2 w-2 rounded-full bg-white/80 shadow-[0_0_14px_rgba(255,255,255,0.85)]" />
+                          </div>
+
+                          <div className="rounded-xl border border-white/20 bg-black/15 p-2 backdrop-blur-[1px]">
+                            <div className="overflow-hidden rounded-lg border border-white/20">
+                              {selectedVideo ? (
+                                <PreviewVideo
+                                  asset={selectedVideo}
+                                  className="h-24 w-full object-cover sm:h-28"
+                                  preload="metadata"
+                                  autoPlay
+                                  loop={false}
+                                />
+                              ) : (
+                                <img
+                                  src={posterAsset.poster}
+                                  alt={`${card.title} video poster`}
+                                  className="h-24 w-full object-cover sm:h-28"
+                                  loading="eager"
+                                  fetchPriority="high"
+                                  decoding="async"
+                                />
+                              )}
+                            </div>
+                            <div className="mt-2 grid grid-cols-3 gap-1.5">
+                              {card.stripPreviews.map((preview, idx) => (
+                                <ResponsivePreviewImage
+                                  key={`${card.title}-${idx}`}
+                                  asset={preview}
+                                  alt=""
+                                  className="aspect-[3/4] rounded-md border border-white/20 object-cover"
+                                  sizes="60px"
+                                />
+                              ))}
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="rounded-xl border border-white/20 bg-black/15 p-2 backdrop-blur-[1px]">
-                          <div className="overflow-hidden rounded-lg border border-white/20">
-                            {selectedVideo ? (
-                              <PreviewVideo
-                                asset={selectedVideo}
-                                className="h-24 w-full object-cover sm:h-28"
-                                preload="metadata"
-                                autoPlay
-                                loop={false}
-                              />
-                            ) : (
-                              <img
-                                src={posterAsset.poster}
-                                alt={`${card.title} video poster`}
-                                className="h-24 w-full object-cover sm:h-28"
-                                loading="eager"
-                                fetchPriority="high"
-                                decoding="async"
-                              />
-                            )}
-                          </div>
-                          <div className="mt-2 grid grid-cols-3 gap-1.5">
-                            {card.stripPreviews.map((preview, idx) => (
-                              <ResponsivePreviewImage
-                                key={`${card.title}-${idx}`}
-                                asset={preview}
-                                alt=""
-                                className="aspect-[3/4] rounded-md border border-white/20 object-cover"
-                                sizes="60px"
-                              />
-                            ))}
-                          </div>
-                        </div>
+                        <span className="w-full rounded-xl bg-black/30 px-2 py-1 text-center text-xs font-bold text-white/90 backdrop-blur-sm">
+                          {card.title}
+                        </span>
                       </div>
-
-                      <span className="w-full rounded-xl bg-black/30 px-2 py-1 text-center text-xs font-bold text-white/90 backdrop-blur-sm">
-                        {card.title}
-                      </span>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
 
               <button
                 type="button"
                 onClick={handleSwapPreviewVideo}
                 title="Play next preview video"
                 aria-label="Play next preview video"
-                className="absolute left-[42%] top-[34%] flex h-20 w-20 items-center justify-center rounded-full border border-white/30 bg-white/20 backdrop-blur-xl shadow-[0_12px_30px_rgba(5,10,35,0.55)] transition hover:scale-[1.04] hover:bg-white/30"
+                className="absolute left-1/2 top-[34%] flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border border-white/30 bg-white/20 backdrop-blur-xl shadow-[0_12px_30px_rgba(5,10,35,0.55)] transition hover:scale-[1.04] hover:bg-white/30 sm:h-20 sm:w-20"
               >
                 <div className="ml-1 h-0 w-0 border-y-[12px] border-l-[18px] border-y-transparent border-l-white" />
               </button>
@@ -502,12 +511,12 @@ export const Hero = () => {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
                   {pathPreviewVideos.map((video, idx) => (
                     <div key={`path-${idx}`} className="overflow-hidden rounded-lg border border-white/10">
                       <PreviewVideo
                         asset={video}
-                        className="aspect-video w-full object-cover"
+                        className="aspect-[3/4] w-full object-cover"
                         preload="none"
                         autoPlay={idx === 0}
                         loop={false}
