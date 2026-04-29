@@ -425,8 +425,8 @@ export const Hero = () => {
               </div>
             </div>
 
-            <div className="relative h-[314px] overflow-hidden sm:h-[340px] sm:overflow-visible lg:h-[370px]">
-              <div className="absolute inset-0 origin-top-left translate-y-2 scale-[0.76] sm:translate-y-0 sm:scale-100">
+            <div className="relative h-[300px] overflow-hidden sm:h-[340px] sm:overflow-visible lg:h-[370px]">
+              <div className="absolute inset-0 origin-top-left scale-[0.76] sm:scale-100">
                 {mockCards.map((card, cardIndex) => {
                 const hasSelectedVideo = activeRightCanvasVideoIndex >= 0;
                 const selectedVideo = hasSelectedVideo
@@ -439,7 +439,7 @@ export const Hero = () => {
                   return (
                     <div
                       key={card.title}
-                      className={`absolute h-[255px] w-[150px] rounded-3xl border border-white/20 bg-gradient-to-b ${card.tone} p-3 shadow-[0_22px_40px_rgba(0,0,0,0.45)] sm:h-[290px] sm:w-[175px]`}
+                      className={`absolute h-[255px] w-[150px] rounded-3xl border border-white/20 bg-gradient-to-b ${card.tone} p-3 shadow-[0_22px_40px_rgba(0,0,0,0.45)] ${cardIndex === 0 ? "ml-4 sm:ml-0" : ""} sm:h-[290px] sm:w-[175px]`}
                       style={{
                         left: card.x,
                         top: card.y,
