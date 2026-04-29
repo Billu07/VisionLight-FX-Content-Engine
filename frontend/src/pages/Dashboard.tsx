@@ -1972,12 +1972,10 @@ function Dashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-purple-950 to-violet-950 text-gray-200 relative overflow-hidden pb-24 lg:pb-0">
-      {/* TREDNY STUDIO BACKGROUND EFFECTS */}
+    <div className="min-h-screen bg-[#070a20] text-gray-200 relative overflow-hidden pb-24 lg:pb-0">
       <div className="absolute inset-0 z-0 pointer-events-none">
-        {/* Ambient colored glows */}
-        <div className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-cyan-500/10 rounded-full blur-[100px] mix-blend-screen animate-pulse-slow" />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[50vw] h-[50vw] bg-purple-600/10 rounded-full blur-[120px] mix-blend-screen" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.3),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.6),transparent_62%)]" />
+        <div className="absolute inset-x-0 top-0 h-[52%] bg-gradient-to-r from-[#170316] via-[#1a164f] to-[#0d2f59]" />
       </div>
 
       <div className="relative z-10">
