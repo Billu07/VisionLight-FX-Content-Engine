@@ -1,12 +1,41 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { LoginModal } from "../LoginModal";
 import picdriftLogo from "../../assets/picdrift.png";
 
 const mockCards = [
-  { title: "Portrait FX", tone: "from-fuchsia-500 to-purple-700", rotate: "-10deg", x: "2%", y: "15%" },
-  { title: "Landscape FX", tone: "from-orange-400 to-amber-600", rotate: "-4deg", x: "27%", y: "7%" },
-  { title: "Story FX", tone: "from-emerald-400 to-cyan-600", rotate: "4deg", x: "51%", y: "2%" },
-  { title: "Cinematic FX", tone: "from-cyan-300 to-sky-600", rotate: "10deg", x: "75%", y: "8%" },
+  {
+    title: "Portrait FX",
+    tone: "from-fuchsia-500 to-purple-700",
+    rotate: "-10deg",
+    x: "2%",
+    y: "15%",
+    chip: "Portrait",
+  },
+  {
+    title: "Landscape FX",
+    tone: "from-orange-400 to-amber-600",
+    rotate: "-4deg",
+    x: "27%",
+    y: "7%",
+    chip: "Landscape",
+  },
+  {
+    title: "Story FX",
+    tone: "from-emerald-400 to-cyan-600",
+    rotate: "4deg",
+    x: "51%",
+    y: "2%",
+    chip: "Story",
+  },
+  {
+    title: "Cinematic FX",
+    tone: "from-cyan-300 to-sky-600",
+    rotate: "10deg",
+    x: "75%",
+    y: "8%",
+    chip: "Cinematic",
+  },
 ];
 
 const posterTones = [
@@ -57,8 +86,12 @@ export const Hero = () => {
               <span className="border-b-2 border-cyan-400 pb-1 font-semibold text-white">
                 Home
               </span>
-              <span className="hover:text-white transition-colors">Terms</span>
-              <span className="hover:text-white transition-colors">Privacy</span>
+              <Link to="/terms" className="hover:text-white transition-colors">
+                Terms
+              </Link>
+              <Link to="/privacy" className="hover:text-white transition-colors">
+                Privacy
+              </Link>
               <a
                 href="https://www.picdrift.com/contact"
                 target="_blank"
@@ -75,6 +108,32 @@ export const Hero = () => {
             >
               Login
             </button>
+          </div>
+
+          <div className="mx-auto flex w-full max-w-7xl items-center gap-2 overflow-x-auto px-4 pb-3 text-xs text-slate-100/90 md:hidden">
+            <span className="rounded-full border border-cyan-300/40 bg-cyan-400/10 px-3 py-1 font-semibold text-cyan-100">
+              Home
+            </span>
+            <Link
+              to="/terms"
+              className="rounded-full border border-white/20 bg-white/5 px-3 py-1 font-medium whitespace-nowrap"
+            >
+              Terms
+            </Link>
+            <Link
+              to="/privacy"
+              className="rounded-full border border-white/20 bg-white/5 px-3 py-1 font-medium whitespace-nowrap"
+            >
+              Privacy
+            </Link>
+            <a
+              href="https://www.picdrift.com/contact"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full border border-white/20 bg-white/5 px-3 py-1 font-medium whitespace-nowrap"
+            >
+              Contact
+            </a>
           </div>
         </header>
 
@@ -118,16 +177,38 @@ export const Hero = () => {
               {mockCards.map((card) => (
                 <div
                   key={card.title}
-                  className={`absolute flex h-[255px] w-[150px] items-end rounded-3xl border border-white/20 bg-gradient-to-b ${card.tone} p-3 shadow-[0_22px_40px_rgba(0,0,0,0.45)] sm:h-[290px] sm:w-[175px]`}
+                  className={`absolute h-[255px] w-[150px] rounded-3xl border border-white/20 bg-gradient-to-b ${card.tone} p-3 shadow-[0_22px_40px_rgba(0,0,0,0.45)] sm:h-[290px] sm:w-[175px]`}
                   style={{
                     left: card.x,
                     top: card.y,
                     transform: `rotate(${card.rotate})`,
                   }}
                 >
-                  <span className="w-full rounded-xl bg-black/30 px-2 py-1 text-center text-xs font-bold text-white/90 backdrop-blur-sm">
-                    {card.title}
-                  </span>
+                  <div className="flex h-full flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="rounded-full border border-white/30 bg-black/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white/90 backdrop-blur-sm">
+                          {card.chip}
+                        </span>
+                        <span className="h-2 w-2 rounded-full bg-white/80 shadow-[0_0_14px_rgba(255,255,255,0.85)]" />
+                      </div>
+
+                      <div className="rounded-xl border border-white/20 bg-black/15 p-2 backdrop-blur-[1px]">
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {Array.from({ length: 6 }).map((_, idx) => (
+                            <div
+                              key={`${card.title}-${idx}`}
+                              className="aspect-[3/4] rounded-md border border-white/20 bg-gradient-to-b from-white/30 to-white/10"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <span className="w-full rounded-xl bg-black/30 px-2 py-1 text-center text-xs font-bold text-white/90 backdrop-blur-sm">
+                      {card.title}
+                    </span>
+                  </div>
                 </div>
               ))}
 
@@ -183,22 +264,6 @@ export const Hero = () => {
                 Transform your content creation with AI-powered video, image, and
                 carousel generation.
               </p>
-
-              <div className="mt-8 space-y-3">
-                <p className="text-xs font-black uppercase tracking-[0.15em] text-slate-300/85">
-                  Available On
-                </p>
-                <div className="flex flex-wrap gap-2 text-sm font-semibold text-slate-50/90">
-                  {["Android", "Windows", "MacOS", "Linux", "Web"].map((platform) => (
-                    <span
-                      key={platform}
-                      className="rounded-full border border-white/25 bg-white/10 px-3 py-1.5 backdrop-blur-sm"
-                    >
-                      {platform}
-                    </span>
-                  ))}
-                </div>
-              </div>
             </div>
           </section>
         </main>
