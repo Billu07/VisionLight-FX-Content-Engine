@@ -425,8 +425,8 @@ export const Hero = () => {
               </div>
             </div>
 
-            <div className="relative h-[300px] overflow-hidden sm:h-[340px] sm:overflow-visible lg:h-[370px]">
-              <div className="absolute inset-0 origin-top-left scale-[0.76] sm:scale-100">
+            <div className="relative h-[314px] overflow-hidden sm:h-[340px] sm:overflow-visible lg:h-[370px]">
+              <div className="absolute inset-0 origin-top-left translate-y-2 scale-[0.76] sm:translate-y-0 sm:scale-100">
                 {mockCards.map((card, cardIndex) => {
                 const hasSelectedVideo = activeRightCanvasVideoIndex >= 0;
                 const selectedVideo = hasSelectedVideo
