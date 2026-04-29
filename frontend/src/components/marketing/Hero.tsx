@@ -32,6 +32,21 @@ const readVariantFromSearch = (search: string): HeroVariant => {
   return "current";
 };
 
+const scenePreviews = [
+  "/login-previews/scene-01.jpg",
+  "/login-previews/scene-02.jpg",
+  "/login-previews/scene-03.jpg",
+  "/login-previews/scene-04.jpg",
+  "/login-previews/scene-05.jpg",
+  "/login-previews/scene-06.jpg",
+];
+
+const portraitPreviews = [
+  "/login-previews/portrait-01.jpg",
+  "/login-previews/portrait-02.jpg",
+  "/login-previews/portrait-03.jpg",
+];
+
 const mockCards = [
   {
     title: "Portrait FX",
@@ -40,6 +55,7 @@ const mockCards = [
     x: "2%",
     y: "15%",
     chip: "Portrait",
+    preview: portraitPreviews[0],
   },
   {
     title: "Landscape FX",
@@ -48,6 +64,7 @@ const mockCards = [
     x: "27%",
     y: "7%",
     chip: "Landscape",
+    preview: scenePreviews[0],
   },
   {
     title: "Story FX",
@@ -56,6 +73,7 @@ const mockCards = [
     x: "51%",
     y: "2%",
     chip: "Story",
+    preview: scenePreviews[1],
   },
   {
     title: "Cinematic FX",
@@ -64,32 +82,42 @@ const mockCards = [
     x: "75%",
     y: "8%",
     chip: "Cinematic",
+    preview: portraitPreviews[1],
   },
 ];
 
-const posterTones = [
-  "from-slate-300 to-slate-500",
-  "from-fuchsia-400 to-purple-600",
-  "from-orange-400 to-red-500",
-  "from-cyan-300 to-blue-600",
-  "from-emerald-300 to-teal-600",
-  "from-indigo-300 to-indigo-600",
+const v1RibbonRows = [
+  [scenePreviews[0], scenePreviews[2], scenePreviews[4]],
+  [scenePreviews[1], scenePreviews[3], scenePreviews[5]],
+  [scenePreviews[2], scenePreviews[0], scenePreviews[3]],
 ];
 
-const v1RibbonRows = [
-  ["from-[#182753] to-[#4376d9]", "from-[#5139ac] to-[#8c5cf5]", "from-[#243353] to-[#6f93dd]"],
-  ["from-[#2f244f] to-[#6f5dc8]", "from-[#2d3f6e] to-[#527ddb]", "from-[#5c367c] to-[#8753d8]"],
-  ["from-[#334374] to-[#5f92ff]", "from-[#543780] to-[#aa6fee]", "from-[#374c84] to-[#6282df]"],
+const libraryPosters = [
+  portraitPreviews[0],
+  scenePreviews[0],
+  portraitPreviews[1],
+  scenePreviews[2],
+  portraitPreviews[2],
+  scenePreviews[5],
+];
+
+const popularPosters = [
+  scenePreviews[1],
+  portraitPreviews[2],
+  scenePreviews[3],
+  portraitPreviews[0],
+  scenePreviews[4],
+  portraitPreviews[1],
 ];
 
 const v2CollageCards = [
-  { tone: "from-[#3b4f84] to-[#8ca4dc]", top: "3%", left: "13%", rotate: "-11deg" },
-  { tone: "from-[#746d88] to-[#b59f8a]", top: "0%", left: "46%", rotate: "-8deg" },
-  { tone: "from-[#58626f] to-[#aeb39d]", top: "8%", left: "72%", rotate: "-12deg" },
-  { tone: "from-[#7286a2] to-[#bfc8d6]", top: "34%", left: "0%", rotate: "-11deg" },
-  { tone: "from-[#4d5565] to-[#97a0b9]", top: "30%", left: "40%", rotate: "-7deg" },
-  { tone: "from-[#27304a] to-[#5c6f9b]", top: "62%", left: "25%", rotate: "-6deg" },
-  { tone: "from-[#61596b] to-[#b39f86]", top: "56%", left: "72%", rotate: "-9deg" },
+  { preview: scenePreviews[2], top: "3%", left: "13%", rotate: "-11deg" },
+  { preview: portraitPreviews[0], top: "0%", left: "46%", rotate: "-8deg" },
+  { preview: portraitPreviews[1], top: "8%", left: "72%", rotate: "-12deg" },
+  { preview: scenePreviews[3], top: "34%", left: "0%", rotate: "-11deg" },
+  { preview: scenePreviews[4], top: "30%", left: "40%", rotate: "-7deg" },
+  { preview: scenePreviews[5], top: "62%", left: "25%", rotate: "-6deg" },
+  { preview: scenePreviews[1], top: "56%", left: "72%", rotate: "-9deg" },
 ];
 
 const MarketingHeader = ({
@@ -248,11 +276,22 @@ const HeroCurrent = ({ onLogin }: { onLogin: () => void }) => {
                     </div>
 
                     <div className="rounded-xl border border-white/20 bg-black/15 p-2 backdrop-blur-[1px]">
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {Array.from({ length: 6 }).map((_, idx) => (
-                          <div
+                      <div className="overflow-hidden rounded-lg border border-white/20">
+                        <img
+                          src={card.preview}
+                          alt={`${card.title} preview`}
+                          className="h-24 w-full object-cover sm:h-28"
+                          loading="lazy"
+                        />
+                      </div>
+                      <div className="mt-2 grid grid-cols-3 gap-1.5">
+                        {scenePreviews.slice(0, 3).map((preview, idx) => (
+                          <img
                             key={`${card.title}-${idx}`}
-                            className="aspect-[3/4] rounded-md border border-white/20 bg-gradient-to-b from-white/30 to-white/10"
+                            src={preview}
+                            alt=""
+                            className="aspect-[3/4] rounded-md border border-white/20 object-cover"
+                            loading="lazy"
                           />
                         ))}
                       </div>
@@ -285,11 +324,15 @@ const HeroCurrent = ({ onLogin }: { onLogin: () => void }) => {
               </div>
 
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-                {posterTones.map((tone, idx) => (
-                  <div
-                    key={`poster-${idx}`}
-                    className={`aspect-[3/4] rounded-lg border border-white/10 bg-gradient-to-b ${tone}`}
-                  />
+                {libraryPosters.map((poster, idx) => (
+                  <div key={`poster-${idx}`} className="overflow-hidden rounded-lg border border-white/10">
+                    <img
+                      src={poster}
+                      alt={`Library poster ${idx + 1}`}
+                      className="aspect-[3/4] w-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
                 ))}
               </div>
 
@@ -297,11 +340,18 @@ const HeroCurrent = ({ onLogin }: { onLogin: () => void }) => {
                 Popular Movies
               </div>
               <div className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-6">
-                {posterTones.slice().reverse().map((tone, idx) => (
+                {popularPosters.map((poster, idx) => (
                   <div
                     key={`poster-bottom-${idx}`}
-                    className={`aspect-[3/4] rounded-lg border border-white/10 bg-gradient-to-b ${tone}`}
-                  />
+                    className="overflow-hidden rounded-lg border border-white/10"
+                  >
+                    <img
+                      src={poster}
+                      alt={`Popular poster ${idx + 1}`}
+                      className="aspect-[3/4] w-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
                 ))}
               </div>
             </div>
@@ -335,44 +385,97 @@ const HeroV1 = ({ onLogin }: { onLogin: () => void }) => {
         <section className="relative h-[420px] overflow-hidden rounded-[2.2rem] border border-white/10 bg-gradient-to-br from-[#0d1538]/75 to-[#080a26]/90 shadow-[0_35px_80px_rgba(4,6,18,0.6)] sm:h-[520px] lg:h-[700px]">
           <div className="absolute left-[6%] top-[10%] h-[26%] w-[95%] rotate-[-15deg] rounded-[60px] border border-violet-300/25 bg-[#10173f]/65 p-4 shadow-[0_25px_70px_rgba(23,32,72,0.6)]">
             <div className="grid h-full grid-cols-3 gap-3">
-              {v1RibbonRows[0].map((tone, idx) => (
+              {v1RibbonRows[0].map((preview, idx) => (
                 <div
                   key={`v1-r1-${idx}`}
-                  className={`rounded-2xl border border-white/15 bg-gradient-to-br ${tone}`}
-                />
+                  className="overflow-hidden rounded-2xl border border-white/15"
+                >
+                  <img
+                    src={preview}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
               ))}
             </div>
           </div>
 
           <div className="absolute left-[12%] top-[38%] h-[26%] w-[95%] rotate-[-9deg] rounded-[60px] border border-fuchsia-300/20 bg-[#12173f]/70 p-4 shadow-[0_20px_65px_rgba(41,37,89,0.7)]">
             <div className="grid h-full grid-cols-3 gap-3">
-              {v1RibbonRows[1].map((tone, idx) => (
+              {v1RibbonRows[1].map((preview, idx) => (
                 <div
                   key={`v1-r2-${idx}`}
-                  className={`rounded-2xl border border-white/15 bg-gradient-to-br ${tone}`}
-                />
+                  className="overflow-hidden rounded-2xl border border-white/15"
+                >
+                  <img
+                    src={preview}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
               ))}
             </div>
           </div>
 
           <div className="absolute left-[20%] top-[66%] h-[26%] w-[95%] rotate-[-4deg] rounded-[60px] border border-cyan-300/20 bg-[#11173c]/70 p-4 shadow-[0_20px_60px_rgba(24,40,94,0.65)]">
             <div className="grid h-full grid-cols-3 gap-3">
-              {v1RibbonRows[2].map((tone, idx) => (
+              {v1RibbonRows[2].map((preview, idx) => (
                 <div
                   key={`v1-r3-${idx}`}
-                  className={`rounded-2xl border border-white/15 bg-gradient-to-br ${tone}`}
-                />
+                  className="overflow-hidden rounded-2xl border border-white/15"
+                >
+                  <img
+                    src={preview}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
               ))}
             </div>
           </div>
 
-          <div className="absolute left-[2%] top-[58%] h-[115px] w-[96px] rotate-[-8deg] rounded-2xl border border-fuchsia-300/35 bg-gradient-to-br from-[#4a348f]/70 to-[#23235d]/80 p-3 shadow-[0_10px_30px_rgba(84,62,179,0.45)]" />
-          <div className="absolute left-[66%] top-[14%] h-[120px] w-[110px] rotate-[9deg] rounded-2xl border border-violet-300/30 bg-gradient-to-br from-[#5635aa]/60 to-[#22275d]/80 p-3" />
-          <div className="absolute left-[74%] top-[72%] h-[120px] w-[220px] rotate-[-5deg] rounded-2xl border border-cyan-300/25 bg-[#131945]/70 p-3 text-sm text-slate-200/80">
-            Cinematic Style
+          <div className="absolute left-[2%] top-[58%] h-[115px] w-[96px] rotate-[-8deg] overflow-hidden rounded-2xl border border-fuchsia-300/35 bg-gradient-to-br from-[#4a348f]/70 to-[#23235d]/80 p-1 shadow-[0_10px_30px_rgba(84,62,179,0.45)]">
+            <img
+              src={portraitPreviews[2]}
+              alt=""
+              className="h-full w-full rounded-xl object-cover"
+              loading="lazy"
+            />
+          </div>
+          <div className="absolute left-[66%] top-[14%] h-[120px] w-[110px] rotate-[9deg] overflow-hidden rounded-2xl border border-violet-300/30 bg-gradient-to-br from-[#5635aa]/60 to-[#22275d]/80 p-1">
+            <img
+              src={scenePreviews[5]}
+              alt=""
+              className="h-full w-full rounded-xl object-cover"
+              loading="lazy"
+            />
+          </div>
+          <div className="absolute left-[74%] top-[72%] h-[120px] w-[220px] rotate-[-5deg] overflow-hidden rounded-2xl border border-cyan-300/25 bg-[#131945]/70 p-1 text-sm text-slate-200/80">
+            <div className="relative h-full w-full rounded-xl">
+              <img
+                src={scenePreviews[3]}
+                alt=""
+                className="h-full w-full rounded-xl object-cover"
+                loading="lazy"
+              />
+              <span className="absolute bottom-2 left-2 rounded-md bg-black/45 px-2 py-0.5 text-xs font-semibold text-slate-100">
+                Cinematic Style
+              </span>
+            </div>
           </div>
           <div className="absolute left-[8%] top-[80%] h-[120px] w-[285px] rotate-[-3deg] rounded-2xl border border-violet-300/25 bg-[#13163f]/80 p-3 text-xs text-slate-300/85">
-            AI Prompt: A futuristic city at night, cinematic mood.
+            <div className="mb-2 flex items-center gap-2">
+              <img
+                src={scenePreviews[0]}
+                alt=""
+                className="h-10 w-16 rounded-md object-cover"
+                loading="lazy"
+              />
+              <span>AI Prompt: A futuristic city at night, cinematic mood.</span>
+            </div>
           </div>
         </section>
 
@@ -478,13 +581,20 @@ const HeroV2 = ({ onLogin }: { onLogin: () => void }) => {
             {v2CollageCards.map((card, idx) => (
               <div
                 key={`v2-${idx}`}
-                className={`absolute h-[130px] w-[180px] rounded-[1.3rem] border border-white/10 bg-gradient-to-br ${card.tone} shadow-[0_14px_26px_rgba(0,0,0,0.35)] sm:h-[170px] sm:w-[240px] lg:h-[220px] lg:w-[300px]`}
+                className="absolute h-[130px] w-[180px] overflow-hidden rounded-[1.3rem] border border-white/10 shadow-[0_14px_26px_rgba(0,0,0,0.35)] sm:h-[170px] sm:w-[240px] lg:h-[220px] lg:w-[300px]"
                 style={{
                   top: card.top,
                   left: card.left,
                   transform: `rotate(${card.rotate})`,
                 }}
-              />
+              >
+                <img
+                  src={card.preview}
+                  alt={`Preview ${idx + 1}`}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+              </div>
             ))}
           </div>
         </section>
@@ -532,8 +642,19 @@ const HeroV3 = ({ onLogin }: { onLogin: () => void }) => {
             <p className="max-w-xs text-xl leading-relaxed text-slate-300/85">
               Transform ideas into cinematic videos with AI.
             </p>
-            <div className="mt-7 rounded-3xl border border-white/15 bg-gradient-to-br from-[#354e8d] to-[#141f48] p-3">
-              <div className="aspect-[4/3] rounded-2xl bg-gradient-to-br from-[#5a70b0] to-[#232f61]" />
+            <div className="mt-7 rounded-3xl border border-white/15 bg-[#161f4a] p-3">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-2xl">
+                <img
+                  src={scenePreviews[4]}
+                  alt="AI video preview"
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                <div className="absolute inset-x-0 bottom-3 mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-black/35 text-white">
+                  ▶
+                </div>
+              </div>
               <div className="mt-3 h-2 rounded-full bg-white/10">
                 <div className="h-full w-[34%] rounded-full bg-violet-300" />
               </div>
@@ -572,8 +693,15 @@ const HeroV3 = ({ onLogin }: { onLogin: () => void }) => {
                 {["h-[70%]", "h-[86%]", "h-[74%]"].map((height, idx) => (
                   <div
                     key={`v3-slide-${idx}`}
-                    className={`w-full ${height} rounded-2xl border border-white/20 bg-gradient-to-b from-[#6c79b9] to-[#293267]`}
-                  />
+                    className={`w-full ${height} overflow-hidden rounded-2xl border border-white/20`}
+                  >
+                    <img
+                      src={scenePreviews[idx + 1]}
+                      alt={`Carousel slide ${idx + 1}`}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  </div>
                 ))}
               </div>
             </div>
