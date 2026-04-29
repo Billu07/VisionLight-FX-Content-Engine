@@ -2339,7 +2339,7 @@ function Dashboard() {
           onClose={() => setShowStockModal(false)}
         />
 
-        <div className="mx-auto w-full max-w-[2100px] px-[clamp(0.75rem,1.8vw,2.75rem)] py-4 sm:py-6">
+        <div className="mx-auto w-full max-w-[2100px] px-[clamp(1rem,2.4vw,4rem)] py-4 sm:py-6">
           {" "}
           {/* HEADER */}
           <div className="mb-6 sm:mb-8 flex flex-col gap-4">
