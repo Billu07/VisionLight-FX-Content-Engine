@@ -3350,19 +3350,23 @@ function Dashboard() {
                                   {/* PromptFX Popover Trigger */}
                                   <button
                                     type="button"
-                                    onClick={() => setShowPromptFxMenu(!showPromptFxMenu)}
+                                    onClick={() => {
+                                      if (activeEngine === "topaz") return;
+                                      setShowPromptFxMenu(!showPromptFxMenu);
+                                    }}
+                                    disabled={activeEngine === "topaz"}
                                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all shadow-sm ${currentVisualTab === "picdrift"
                                       ? "bg-rose-900/40 border-rose-500/50 text-rose-300 hover:bg-rose-800/60"
                                       : currentVisualTab === "studio"
                                         ? "bg-violet-900/40 border-violet-500/50 text-violet-300 hover:bg-violet-800/60"
                                         : "bg-cyan-900/40 border-cyan-500/50 text-cyan-300 hover:bg-cyan-800/60"
-                                      }`}
+                                      } ${activeEngine === "topaz" ? "cursor-not-allowed opacity-50" : ""}`}
                                   >
                                     PromptFX
                                   </button>
 
                                   {/* PromptFX Popover Menu */}
-                                  {showPromptFxMenu && (
+                                  {showPromptFxMenu && activeEngine !== "topaz" && (
                                     <div className="absolute top-full right-0 mt-2 w-72 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
                                       <div className="p-3 border-b border-gray-800 flex justify-between items-center bg-gray-800/30">
                                         <h4 className="text-xs font-bold text-gray-300 uppercase tracking-widest">Saved Prompts</h4>
@@ -3502,10 +3506,19 @@ function Dashboard() {
                                 </div>
 
                                 <textarea
-                                  value={prompt}
-                                  onChange={(e) => setPrompt(e.target.value)}
-                                  placeholder={currentVisualTab === "3dx" ? "Describe where you want the camera to move to create a path." : "Describe your vision with a prompt"}
-                                  className="w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base leading-relaxed"
+                                  value={activeEngine === "topaz" ? "" : prompt}
+                                  onChange={(e) => {
+                                    if (activeEngine !== "topaz") {
+                                      setPrompt(e.target.value);
+                                    }
+                                  }}
+                                  placeholder={activeEngine === "topaz"
+                                    ? "Prompt not needed for Topaz Upscale."
+                                    : currentVisualTab === "3dx"
+                                      ? "Describe where you want the camera to move to create a path."
+                                      : "Describe your vision with a prompt"}
+                                  disabled={activeEngine === "topaz"}
+                                  className={`w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base leading-relaxed ${activeEngine === "topaz" ? "cursor-not-allowed opacity-60" : ""}`}
                                   rows={3}
                                 />
                               </div>
