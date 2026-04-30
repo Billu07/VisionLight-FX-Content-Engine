@@ -38,6 +38,8 @@ const MAX_VEO_REFERENCE_IMAGES = 5;
 const MAX_VIDEOFX2_REFERENCES = 12;
 const MAX_TOPAZ_REFERENCES = 1;
 const TIMELINE_PAGE_SIZE = 15;
+const DASHBOARD_BG_MODE_KEY = "visionlight_dashboard_bg_mode";
+type DashboardBgMode = "current" | "original";
 type VeoMode =
   | "image_to_video"
   | "first_last_frame"
@@ -215,6 +217,13 @@ function Dashboard() {
   const [showStockModal, setShowStockModal] = useState(false);
   const [showPromptInfo, setShowPromptInfo] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [dashboardBgMode, setDashboardBgMode] = useState<DashboardBgMode>(() => {
+    const stored =
+      typeof window !== "undefined"
+        ? localStorage.getItem(DASHBOARD_BG_MODE_KEY)
+        : null;
+    return stored === "original" ? "original" : "current";
+  });
   const [timelinePanelMode, setTimelinePanelMode] = useState<"timeline" | "storyline">("timeline");
   const [timelineVisibleCount, setTimelineVisibleCount] = useState(
     TIMELINE_PAGE_SIZE,
@@ -391,6 +400,10 @@ function Dashboard() {
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(DASHBOARD_BG_MODE_KEY, dashboardBgMode);
+  }, [dashboardBgMode]);
 
   useEffect(() => {
     if (isMobile) {
@@ -1930,6 +1943,9 @@ function Dashboard() {
     logout();
     navigate("/");
   };
+  const toggleDashboardBackground = () => {
+    setDashboardBgMode((prev) => (prev === "current" ? "original" : "current"));
+  };
   const companyName =
     brandConfig?.companyName || user?.name || "Visionlight AI";
 
@@ -1995,10 +2011,23 @@ function Dashboard() {
     () => storylineSequence.slice(0, storylineVisibleCount),
     [storylineSequence, storylineVisibleCount],
   );
+  const isOriginalDashboardBg = dashboardBgMode === "original";
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#070a20] pb-24 text-gray-200 lg:pb-0">
-      <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_14%_10%,rgba(34,211,238,0.14),transparent_36%),radial-gradient(circle_at_82%_12%,rgba(56,189,248,0.16),transparent_44%)]" />
+    <div
+      className={`relative min-h-screen overflow-hidden pb-24 text-gray-200 lg:pb-0 ${isOriginalDashboardBg
+        ? "bg-gradient-to-br from-gray-950 via-purple-950 to-violet-950"
+        : "bg-[#070a20]"
+        }`}
+    >
+      {isOriginalDashboardBg ? (
+        <div className="absolute inset-0 z-0 pointer-events-none">
+          <div className="absolute top-[-10%] left-[-10%] h-[40vw] w-[40vw] rounded-full bg-cyan-500/10 blur-[100px] mix-blend-screen animate-pulse-slow" />
+          <div className="absolute bottom-[-10%] right-[-5%] h-[50vw] w-[50vw] rounded-full bg-purple-600/10 blur-[120px] mix-blend-screen" />
+        </div>
+      ) : (
+        <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(circle_at_14%_10%,rgba(34,211,238,0.14),transparent_36%),radial-gradient(circle_at_82%_12%,rgba(56,189,248,0.16),transparent_44%)]" />
+      )}
 
       <div className="relative z-10">
         {/* ... MODALS ... */}
@@ -2567,6 +2596,16 @@ function Dashboard() {
                         Edit Dashboard
                       </button>
 
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          toggleDashboardBackground();
+                        }}
+                        className="w-full text-left px-4 py-2 text-indigo-300 hover:bg-indigo-500/10 text-sm font-medium transition-colors"
+                      >
+                        Background: {isOriginalDashboardBg ? "Original" : "Current"}
+                      </button>
+
                       <div className="my-1 border-t border-gray-800/80"></div>
 
                       <button
@@ -2697,6 +2736,17 @@ function Dashboard() {
                     className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-300"
                   >
                     Edit Dashboard
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      toggleDashboardBackground();
+                    }}
+                    className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-xs font-semibold text-indigo-300"
+                  >
+                    BG: {isOriginalDashboardBg ? "Original" : "Current"}
                   </button>
 
                   {canUseVideoEditor && (
