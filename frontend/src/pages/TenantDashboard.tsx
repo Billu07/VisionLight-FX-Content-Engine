@@ -198,9 +198,16 @@ export default function TenantDashboard() {
 
   const handleUpdateConfig = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (!config) return;
     setActionLoading(true);
     try {
-      await apiEndpoints.tenantUpdateConfig(config);
+      if (isPicdriftTenant) {
+        const payload: Partial<Config> = { ...config };
+        delete payload.kieApiKey;
+        await apiEndpoints.tenantUpdateConfig(payload);
+      } else {
+        await apiEndpoints.tenantUpdateConfig(config);
+      }
       setMsg("Configuration saved.");
     } catch (err: any) {
       setMsg("Error: " + err.message);

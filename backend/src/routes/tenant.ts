@@ -47,7 +47,12 @@ const PICDRIFT_ALLOWED_CREDIT_POOLS = new Set([
 const normalizeView = (raw: unknown): "PICDRIFT" | "VISIONLIGHT" =>
   raw === "PICDRIFT" ? "PICDRIFT" : "VISIONLIGHT";
 
-type ProviderBalanceStatus = "ok" | "missing_key" | "insufficient_scope" | "error";
+type ProviderBalanceStatus =
+  | "ok"
+  | "missing_key"
+  | "insufficient_scope"
+  | "not_applicable"
+  | "error";
 
 const getErrorMessage = (error: any, fallback: string) =>
   error?.response?.data?.error ||
@@ -383,12 +388,24 @@ router.get("/requests", async (req: AuthenticatedRequest, res) => {
 router.get("/provider-balances", async (req: AuthenticatedRequest, res) => {
   try {
     const org = await getOrg(req);
+    const requestingUser = await dbService.findUserById(req.user!.id);
+    const requesterView = normalizeView(requestingUser?.view);
+    const isSuperAdminRequester = requestingUser?.role === "SUPERADMIN";
+    const isPicdriftTenantRequester =
+      !isSuperAdminRequester && requesterView === "PICDRIFT";
     const falApiKey = encryptionUtils.decrypt(org.falApiKey);
-    const kieApiKey = encryptionUtils.decrypt(org.kieApiKey);
+    const kieApiKey = isPicdriftTenantRequester
+      ? null
+      : encryptionUtils.decrypt(org.kieApiKey);
 
     const [fal, kie] = await Promise.all([
       fetchFalBalance(falApiKey),
-      fetchKieBalance(kieApiKey),
+      isPicdriftTenantRequester
+        ? Promise.resolve({
+            status: "not_applicable" as ProviderBalanceStatus,
+            message: "KIE is not used for PICDRIFT organizations.",
+          })
+        : fetchKieBalance(kieApiKey),
     ]);
 
     res.json({
@@ -428,6 +445,11 @@ router.put("/requests/:id/resolve", async (req: AuthenticatedRequest, res) => {
 router.get("/config", async (req: AuthenticatedRequest, res) => {
   try {
     const org = await getOrg(req);
+    const requestingUser = await dbService.findUserById(req.user!.id);
+    const requesterView = normalizeView(requestingUser?.view);
+    const isSuperAdminRequester = requestingUser?.role === "SUPERADMIN";
+    const canReadKieApiKey =
+      isSuperAdminRequester || requesterView !== "PICDRIFT";
     
     // Decrypt keys for the admin to see/edit
     res.json({
@@ -436,8 +458,10 @@ router.get("/config", async (req: AuthenticatedRequest, res) => {
         id: org.id,
         name: org.name,
         isActive: org.isActive,
-        falApiKey: encryptionUtils.decrypt(org.falApiKey),
-        kieApiKey: encryptionUtils.decrypt(org.kieApiKey),
+        falApiKey: encryptionUtils.decrypt(org.falApiKey) || "",
+        kieApiKey: canReadKieApiKey
+          ? encryptionUtils.decrypt(org.kieApiKey) || ""
+          : "",
         pricing: {
           pricePicDrift_5s: org.pricePicDrift_5s,
           pricePicDrift_10s: org.pricePicDrift_10s,
@@ -474,6 +498,8 @@ router.put("/config", async (req: AuthenticatedRequest, res) => {
     const requestingUser = await dbService.findUserById(req.user!.id);
     const requesterView = normalizeView(requestingUser?.view);
     const isSuperAdminRequester = requestingUser?.role === "SUPERADMIN";
+    const isPicdriftTenantRequester =
+      !isSuperAdminRequester && requesterView === "PICDRIFT";
 
     if (
       falApiKey !== undefined &&
@@ -483,20 +509,12 @@ router.put("/config", async (req: AuthenticatedRequest, res) => {
       return res.status(400).json({ error: "Invalid Fal API key value." });
     }
     if (
+      !isPicdriftTenantRequester &&
       kieApiKey !== undefined &&
       kieApiKey !== null &&
       typeof kieApiKey !== "string"
     ) {
       return res.status(400).json({ error: "Invalid KIE API key value." });
-    }
-    if (
-      !isSuperAdminRequester &&
-      requesterView === "PICDRIFT" &&
-      kieApiKey !== undefined
-    ) {
-      return res.status(403).json({
-        error: "KIE API key is not available for PICDRIFT organizations.",
-      });
     }
 
     const updates: any = {
@@ -509,7 +527,7 @@ router.put("/config", async (req: AuthenticatedRequest, res) => {
       const trimmed = typeof falApiKey === "string" ? falApiKey.trim() : "";
       updates.falApiKey = trimmed ? encryptionUtils.encrypt(trimmed) : null;
     }
-    if (kieApiKey !== undefined) {
+    if (!isPicdriftTenantRequester && kieApiKey !== undefined) {
       const trimmed = typeof kieApiKey === "string" ? kieApiKey.trim() : "";
       updates.kieApiKey = trimmed ? encryptionUtils.encrypt(trimmed) : null;
     }
@@ -517,7 +535,7 @@ router.put("/config", async (req: AuthenticatedRequest, res) => {
     // Apply pricing overrides if provided
     if (pricing) {
       const sanitizedPricing = sanitizePricingUpdate(pricing);
-      if (!isSuperAdminRequester && requesterView === "PICDRIFT") {
+      if (isPicdriftTenantRequester) {
         const hasVideoFxPricingUpdate = Object.keys(sanitizedPricing).some((key) =>
           VIDEO_FX_PRICE_KEYS.has(key),
         );
