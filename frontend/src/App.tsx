@@ -42,6 +42,39 @@ const AdminDashboardSwitcher = () => {
   return <TenantDashboard />;
 };
 
+const DeactivatedAccountScreen = () => {
+  const { user, logout } = useAuth();
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-950 p-4 text-gray-200">
+      <div className="w-full max-w-xl rounded-[2rem] border border-white/10 bg-gray-900 p-8 text-center shadow-[0_0_50px_rgba(0,0,0,0.5)] sm:p-12">
+        <div className="mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-full border border-rose-500/20 bg-rose-500/10">
+          <span className="text-5xl text-rose-300">!</span>
+        </div>
+        <h1 className="mb-4 text-3xl font-black uppercase tracking-[0.2em] text-white">
+          Account Deactivated
+        </h1>
+        <p className="mb-10 text-sm leading-relaxed text-gray-400 sm:text-base">
+          Your organization{" "}
+          <span className="font-bold text-white">
+            {user?.organizationName || "workspace"}
+          </span>{" "}
+          is currently deactivated.
+          <br />
+          <br />
+          Please contact your platform administrator to reactivate your account.
+        </p>
+        <button
+          onClick={logout}
+          className="w-full rounded-2xl border border-white/10 bg-gray-800 px-5 py-4 text-[10px] font-bold uppercase tracking-widest text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
+        >
+          Switch Account / Logout
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // --- Standard Protected Route ---
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading, checkAuth } = useAuth();
@@ -74,6 +107,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         <LoadingSpinner size="lg" variant="neon" />
       </div>
     );
+  }
+
+  if (user.orgLockReason === "DEACTIVATED") {
+    return <DeactivatedAccountScreen />;
   }
 
   return <>{children}</>;
@@ -123,6 +160,10 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
         <LoadingSpinner size="lg" variant="neon" />
       </div>
     );
+  }
+
+  if (user.orgLockReason === "DEACTIVATED") {
+    return <DeactivatedAccountScreen />;
   }
 
   // 2. Must be an Admin or SuperAdmin
