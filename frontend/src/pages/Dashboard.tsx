@@ -463,6 +463,8 @@ function Dashboard() {
     queryKey: ["brand-config"],
     queryFn: async () => (await apiEndpoints.getBrandConfig()).data.config,
     enabled: !!user,
+    staleTime: 60000,
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {
@@ -485,16 +487,9 @@ function Dashboard() {
       }
     },
     enabled: !!user,
-    refetchInterval: (query) => {
-      if (isUiFocusMode) return false;
-      const currentPosts = query.state.data;
-      if (!currentPosts || !Array.isArray(currentPosts)) return false;
-      const hasProcessing = currentPosts.some(
-        (p: any) => p.status === "PROCESSING" || p.status === "NEW",
-      );
-      return hasProcessing ? 5000 : false;
-    },
-    staleTime: 1000,
+    staleTime: 3000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
   });
 
   // === 1. DATA FETCHING (Credits & Status) ===
@@ -515,6 +510,9 @@ function Dashboard() {
       return res.data;
     },
     enabled: !!user,
+    staleTime: 15000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
   });
 
   // 2. Core logic and permissions

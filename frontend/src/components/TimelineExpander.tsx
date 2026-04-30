@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { PostCard } from "./PostCard";
 
 interface TimelineExpanderProps {
@@ -33,12 +33,16 @@ export const TimelineExpander = ({
   const [filter, setFilter] = useState<"ALL" | "VIDEO" | "IMAGE">("ALL");
   const [theme, setTheme] = useState<Theme>("VOID");
 
-  const filteredPosts = posts.filter((p) => {
-    if (filter === "ALL") return true;
-    if (filter === "VIDEO")
-      return p.mediaType === "VIDEO" || p.mediaProvider?.includes("kling");
-    return p.mediaType === "IMAGE" || p.mediaType === "CAROUSEL";
-  });
+  const filteredPosts = useMemo(
+    () =>
+      posts.filter((p) => {
+        if (filter === "ALL") return true;
+        if (filter === "VIDEO")
+          return p.mediaType === "VIDEO" || p.mediaProvider?.includes("kling");
+        return p.mediaType === "IMAGE" || p.mediaType === "CAROUSEL";
+      }),
+    [posts, filter],
+  );
 
   // --- THEME CONFIGURATION ---
   const themes = {

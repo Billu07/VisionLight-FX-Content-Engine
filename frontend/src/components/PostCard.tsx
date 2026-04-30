@@ -416,6 +416,8 @@ export function PostCard({
               src={getCORSProxyUrl(slides[slideIndex], 400, 75)}
               alt="Carousel"
               className={`w-full h-full ${compact ? "object-contain bg-black" : "object-cover"}`}
+              loading="lazy"
+              decoding="async"
             />
           )}
           {!minimal && (
@@ -453,11 +455,12 @@ export function PostCard({
             <video
               muted={true}
               loop
+              poster={post.generatedEndFrame || undefined}
               className={`w-full h-full ${compact ? "object-contain bg-black" : "object-cover"}`}
               onLoadedData={handleVideoLoad}
               onError={handleMediaError}
               playsInline
-              preload={compact ? "metadata" : "auto"}
+              preload="metadata"
               onMouseOver={(e) => minimal && e.currentTarget.play()}
               onMouseOut={(e) => minimal && e.currentTarget.pause()}
             >

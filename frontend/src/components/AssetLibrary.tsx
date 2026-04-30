@@ -244,18 +244,21 @@ export function AssetLibrary({
     data: assets = [],
     isLoading,
   } = useQuery({
-    queryKey: ["assets"],
+    queryKey: ["assets", activeProject],
     queryFn: async () => {
-      const activeProject =
-        localStorage.getItem("visionlight_active_project") || undefined;
       const res = await apiEndpoints.getAssets(activeProject);
       return res.data.assets;
     },
     enabled: !!user,
-    refetchInterval: isLibraryFocusMode ? false : 3000,
-    refetchIntervalInBackground: !isLibraryFocusMode,
-    refetchOnWindowFocus: !isLibraryFocusMode,
-    refetchOnReconnect: !isLibraryFocusMode,
+    staleTime: 15000,
+    refetchInterval: () => {
+      if (isLibraryFocusMode) return false;
+      return pollingUntil > Date.now() ? 2500 : false;
+    },
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    placeholderData: (previousData) => previousData,
   });
 
   const { data: timelinePosts = [] } = useQuery({
@@ -265,7 +268,13 @@ export function AssetLibrary({
       return Array.isArray(res.data.posts) ? res.data.posts : [];
     },
     enabled: !!user && !isLibraryFocusMode,
-    staleTime: 10000,
+    staleTime: 15000,
+    refetchInterval: () => {
+      if (isLibraryFocusMode || activeTab !== "TIMELINE") return false;
+      return 8000;
+    },
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
   });
 
   const timelineVideoAssets = useMemo(() => {
@@ -303,14 +312,30 @@ export function AssetLibrary({
       }));
   }, [timelinePosts]);
 
-  // Refined filter logic
-  let filteredAssets = Array.isArray(assets)
-    ? assets.filter((a: Asset) => {
-      if (activeTab === "STORYBOARD") return false; // Handled below
+  const assetById = useMemo(() => {
+    const map = new Map<string, Asset>();
+    if (!Array.isArray(assets)) return map;
+    for (const asset of assets as Asset[]) {
+      map.set(asset.id, asset);
+    }
+    return map;
+  }, [assets]);
+
+  const filteredAssets = useMemo(() => {
+    if (activeTab === "STORYBOARD") {
+      return storyboardIds
+        .map((id) => assetById.get(id))
+        .filter(Boolean) as Asset[];
+    }
+    if (activeTab === "TIMELINE") {
+      return timelineVideoAssets;
+    }
+    if (!Array.isArray(assets)) return [];
+
+    return (assets as Asset[]).filter((a: Asset) => {
       if (activeTab === "VIDEO") {
         return a.type === "VIDEO" && a.aspectRatio === "VIDEO";
       }
-      if (activeTab === "TIMELINE") return false;
 
       // Originals Tab: STRICTLY raw uploads (no parent)
       if (activeTab === "original") {
@@ -342,16 +367,15 @@ export function AssetLibrary({
 
       // Standard Ratios (16:9, 9:16, 1:1)
       return a.type === "IMAGE" && a.aspectRatio === activeTab;
-    })
-    : [];
-
-  if (activeTab === "STORYBOARD") {
-    filteredAssets = storyboardIds
-      .map((id) => assets.find((a: Asset) => a.id === id))
-      .filter(Boolean) as Asset[];
-  } else if (activeTab === "TIMELINE") {
-    filteredAssets = timelineVideoAssets;
-  }
+    });
+  }, [
+    activeTab,
+    originalMediaTab,
+    storyboardIds,
+    timelineVideoAssets,
+    assets,
+    assetById,
+  ]);
 
   const displayedAssets = filteredAssets.slice(0, visibleCount);
   const hasMoreAssets = filteredAssets.length > displayedAssets.length;
@@ -416,7 +440,7 @@ export function AssetLibrary({
     };
     checkDrifts();
     if (isLibraryFocusMode) return;
-    const interval = setInterval(checkDrifts, 3000);
+    const interval = setInterval(checkDrifts, 5000);
     return () => clearInterval(interval);
   }, [isLibraryFocusMode]);
 
@@ -665,9 +689,7 @@ export function AssetLibrary({
 
   const handleGoToOriginal = () => {
     if (!selectedAsset || !selectedAsset.originalAssetId) return;
-    const original = assets.find(
-      (a: Asset) => a.id === selectedAsset.originalAssetId,
-    );
+    const original = assetById.get(selectedAsset.originalAssetId);
 
     if (original) {
       setActiveTab("original");
@@ -981,8 +1003,13 @@ export function AssetLibrary({
                       <div className="w-full h-full relative aspect-square bg-black/20">
                         <video
                           src={getCORSProxyVideoUrl(asset.url || asset.proxyUrl || asset.hlsUrl || "")}
+                          poster={
+                            asset.spriteSheetUrl
+                              ? getCORSProxyUrl(asset.spriteSheetUrl, 400, 65)
+                              : undefined
+                          }
                           className="w-full h-full object-contain opacity-80"
-                          preload="metadata"
+                          preload="none"
                           playsInline
                           muted
                         />
@@ -997,6 +1024,7 @@ export function AssetLibrary({
                         src={getAssetImageSrc(asset)}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         loading="lazy"
+                        decoding="async"
                         crossOrigin="anonymous"
                       />
                     )}
