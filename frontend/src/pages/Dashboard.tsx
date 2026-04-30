@@ -2513,7 +2513,7 @@ function Dashboard() {
                         }`}
                     >
                       <span
-                        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.45)] transition-transform ${isOriginalDashboardBg
+                        className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.45)] transition-transform ${isOriginalDashboardBg
                           ? "translate-x-5"
                           : "translate-x-0.5"
                           }`}
