@@ -72,6 +72,18 @@ const COVERAGE_VARIANTS = [
 
 type CoverageVariantId = (typeof COVERAGE_VARIANTS)[number]["id"];
 
+const PICDRIFT_PRICING_KEYS = [
+  "pricePicDrift_5s",
+  "pricePicDrift_10s",
+  "pricePicFX_Standard",
+  "pricePicFX_Carousel",
+  "pricePicFX_Batch",
+  "priceEditor_Pro",
+  "priceEditor_Enhance",
+  "priceEditor_Convert",
+  "priceAsset_DriftPath",
+] as const;
+
 export default function TenantDashboard() {
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
@@ -213,12 +225,36 @@ export default function TenantDashboard() {
     if (!config) return;
     setActionLoading(true);
     try {
+      const isIntegrationSave = activeTab === "integrations";
+
       if (isPicdriftTenant) {
-        const payload: Partial<Config> = { ...config };
-        delete payload.kieApiKey;
+        const payload: Partial<Config> & { pricing?: Record<string, number> } = {
+          name: config.name,
+          falApiKey: config.falApiKey,
+        };
+
+        if (!isIntegrationSave && config.pricing) {
+          payload.pricing = PICDRIFT_PRICING_KEYS.reduce<Record<string, number>>(
+            (acc, key) => {
+              const value = Number(config.pricing[key]);
+              if (Number.isFinite(value)) acc[key] = value;
+              return acc;
+            },
+            {},
+          );
+        }
+
         await apiEndpoints.tenantUpdateConfig(payload);
       } else {
-        await apiEndpoints.tenantUpdateConfig(config);
+        if (isIntegrationSave) {
+          await apiEndpoints.tenantUpdateConfig({
+            name: config.name,
+            falApiKey: config.falApiKey,
+            kieApiKey: config.kieApiKey,
+          });
+        } else {
+          await apiEndpoints.tenantUpdateConfig(config);
+        }
       }
       setMsg("Configuration saved.");
     } catch (err: any) {

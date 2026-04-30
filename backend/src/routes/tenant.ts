@@ -38,6 +38,12 @@ const VIDEO_FX_PRICE_KEYS = new Set([
   "priceVideoFX3_8s",
 ]);
 
+const PICDRIFT_PRICING_DISALLOWED_KEYS = new Set([
+  "pricePicDrift_Plus_5s",
+  "pricePicDrift_Plus_10s",
+  ...Array.from(VIDEO_FX_PRICE_KEYS),
+]);
+
 const PICDRIFT_ALLOWED_CREDIT_POOLS = new Set([
   "creditsPicDrift",
   "creditsImageFX",
@@ -570,14 +576,10 @@ router.put("/config", async (req: AuthenticatedRequest, res) => {
     if (pricing) {
       const sanitizedPricing = sanitizePricingUpdate(pricing);
       if (isPicdriftTenantRequester) {
-        const hasVideoFxPricingUpdate = Object.keys(sanitizedPricing).some((key) =>
-          VIDEO_FX_PRICE_KEYS.has(key),
-        );
-        if (hasVideoFxPricingUpdate) {
-          return res.status(403).json({
-            error:
-              "Video FX pricing is not available for PICDRIFT organizations.",
-          });
+        for (const key of PICDRIFT_PRICING_DISALLOWED_KEYS) {
+          if (key in sanitizedPricing) {
+            delete sanitizedPricing[key];
+          }
         }
       }
       Object.assign(updates, sanitizedPricing);
