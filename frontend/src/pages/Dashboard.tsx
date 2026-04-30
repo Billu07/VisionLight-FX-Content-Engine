@@ -2495,7 +2495,32 @@ function Dashboard() {
               </div>
 
               {!isMobile && (
-                <div className="relative" ref={userMenuRef}>
+                <div className="relative flex items-center gap-2" ref={userMenuRef}>
+                  <button
+                    type="button"
+                    onClick={toggleDashboardBackground}
+                    className="flex items-center gap-2 rounded-2xl border border-white/10 bg-gray-800/35 px-3 py-2.5 backdrop-blur-xl transition-all hover:bg-white/10"
+                    title={`Switch to ${isOriginalDashboardBg ? "current" : "original"} background`}
+                    aria-label={`Switch to ${isOriginalDashboardBg ? "current" : "original"} background`}
+                  >
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-gray-300">
+                      BG
+                    </span>
+                    <span
+                      className={`relative h-5 w-10 rounded-full border transition-colors ${isOriginalDashboardBg
+                        ? "border-purple-300/50 bg-purple-500/30"
+                        : "border-cyan-300/50 bg-cyan-500/25"
+                        }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.45)] transition-transform ${isOriginalDashboardBg
+                          ? "translate-x-5"
+                          : "translate-x-0.5"
+                          }`}
+                      />
+                    </span>
+                  </button>
+
                   <button
                     onClick={() => setShowUserMenu(!showUserMenu)}
                     className="flex items-center gap-2 px-4 py-2.5 bg-gray-800/40 backdrop-blur-xl border border-white/10 rounded-2xl text-sm font-bold text-gray-300 hover:text-white hover:bg-white/10 transition-all h-full"
@@ -2594,16 +2619,6 @@ function Dashboard() {
                         className="w-full text-left px-4 py-2 text-cyan-400 hover:bg-cyan-500/10 text-sm font-medium transition-colors"
                       >
                         Edit Dashboard
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setShowUserMenu(false);
-                          toggleDashboardBackground();
-                        }}
-                        className="w-full text-left px-4 py-2 text-indigo-300 hover:bg-indigo-500/10 text-sm font-medium transition-colors"
-                      >
-                        Background: {isOriginalDashboardBg ? "Original" : "Current"}
                       </button>
 
                       <div className="my-1 border-t border-gray-800/80"></div>
