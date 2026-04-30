@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
-import { confirmAction } from "../lib/notifications";
+import { confirmAction, notify } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
 
@@ -75,6 +75,7 @@ type CoverageVariantId = (typeof COVERAGE_VARIANTS)[number]["id"];
 export default function TenantDashboard() {
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isPicdriftTenant = adminUser?.view === "PICDRIFT";
 
   const [activeTab, setActiveTab] = useState<"team" | "pricing" | "integrations">(
@@ -136,6 +137,17 @@ export default function TenantDashboard() {
   useEffect(() => {
     fetchData();
   }, [activeTab]);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get("tab");
+    if (
+      requestedTab === "team" ||
+      requestedTab === "pricing" ||
+      requestedTab === "integrations"
+    ) {
+      setActiveTab(requestedTab);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (activeTab !== "team") return;
@@ -222,9 +234,10 @@ export default function TenantDashboard() {
         addCredits: toSignedInt(amount),
         creditType: pool
       });
+      setMsg("Credit balance updated.");
       fetchData();
     } catch (err: any) {
-      alert(err.message);
+      setMsg("Error: " + (err?.message || "Failed to update credit balance."));
     }
   };
 
@@ -234,8 +247,19 @@ export default function TenantDashboard() {
       setMsg("Credit request resolved.");
       fetchData();
     } catch (err: any) {
-      alert(err.message);
+      setMsg("Error: " + (err?.message || "Failed to resolve request."));
     }
+  };
+
+  const handleTabChange = (tab: "team" | "pricing" | "integrations") => {
+    setActiveTab(tab);
+    const next = new URLSearchParams(searchParams);
+    if (tab === "team") {
+      next.delete("tab");
+    } else {
+      next.set("tab", tab);
+    }
+    setSearchParams(next, { replace: true });
   };
 
   if (loading && !users.length && !config) return (
@@ -245,7 +269,7 @@ export default function TenantDashboard() {
   );
 
   const allowedCoverageWalletKeys: CoverageWalletKey[] = isPicdriftTenant
-    ? ["creditsPicDrift", "creditsPicDriftPlus", "creditsImageFX"]
+    ? ["creditsPicDrift", "creditsImageFX"]
     : [
         "creditsPicDrift",
         "creditsPicDriftPlus",
@@ -356,7 +380,9 @@ export default function TenantDashboard() {
               {["team", "pricing", "integrations"].map((tab) => (
                 <button
                   key={tab}
-                  onClick={() => setActiveTab(tab as any)}
+                  onClick={() =>
+                    handleTabChange(tab as "team" | "pricing" | "integrations")
+                  }
                   className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md text-[9px] font-bold uppercase tracking-widest transition-colors ${
                     activeTab === tab
                       ? "bg-gray-800 text-brand-accent"
@@ -450,7 +476,9 @@ export default function TenantDashboard() {
                   <tr>
                     <th className="p-5">User</th>
                     <th className="p-5 text-center">Role</th>
-                    <th className="p-5 text-center">PicDrift / +</th>
+                    <th className="p-5 text-center">
+                      {isPicdriftTenant ? "PicDrift" : "PicDrift / +"}
+                    </th>
                     <th className="p-5 text-center">PicFX</th>
                     {!isPicdriftTenant && (
                       <th className="p-5 text-center">Topaz / FAL / VFX3</th>
@@ -476,10 +504,12 @@ export default function TenantDashboard() {
                             <span className="text-[9px] text-gray-500">Std:</span>
                             <input type="number" step="1" min="0" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDrift} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsPicDrift", (toInt(e.target.value, u.creditsPicDrift) - u.creditsPicDrift).toString())} />
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[9px] text-gray-500">Plus:</span>
-                            <input type="number" step="1" min="0" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsPicDriftPlus", (toInt(e.target.value, u.creditsPicDriftPlus) - u.creditsPicDriftPlus).toString())} />
-                          </div>
+                          {!isPicdriftTenant && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9px] text-gray-500">Plus:</span>
+                              <input type="number" step="1" min="0" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsPicDriftPlus", (toInt(e.target.value, u.creditsPicDriftPlus) - u.creditsPicDriftPlus).toString())} />
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td className="p-5 text-center">
@@ -497,16 +527,28 @@ export default function TenantDashboard() {
                       <td className="p-5 text-right">
                         <div className="flex gap-2 justify-end">
                           <button onClick={() => setEditingUser(u)} className="text-cyan-400 hover:text-cyan-300 text-[9px] font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded">Manage</button>
-                          <button
-                            className="text-red-500/50 hover:text-red-400 text-[9px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all"
-                            onClick={async () => {
-                              if (await confirmAction("Remove user?", { confirmLabel: "Remove" })) {
-                                apiEndpoints.tenantDeleteUser(u.id).then(fetchData);
-                              }
-                            }}
-                          >
-                            Remove
-                          </button>
+                          {u.id === adminUser?.id ? (
+                            <span className="text-gray-500 text-[9px] font-bold uppercase tracking-widest">
+                              Active Admin
+                            </span>
+                          ) : (
+                            <button
+                              className="text-red-500/50 hover:text-red-400 text-[9px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all"
+                              onClick={async () => {
+                                if (await confirmAction("Remove user?", { confirmLabel: "Remove" })) {
+                                  try {
+                                    await apiEndpoints.tenantDeleteUser(u.id);
+                                    setMsg("User removed from team.");
+                                    fetchData();
+                                  } catch (err: any) {
+                                    setMsg("Error: " + (err?.message || "Failed to remove user."));
+                                  }
+                                }
+                              }}
+                            >
+                              Remove
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -647,8 +689,9 @@ export default function TenantDashboard() {
                       {[
                         "pricePicDrift_5s",
                         "pricePicDrift_10s",
-                        "pricePicDrift_Plus_5s",
-                        "pricePicDrift_Plus_10s",
+                        ...(!isPicdriftTenant
+                          ? ["pricePicDrift_Plus_5s", "pricePicDrift_Plus_10s"]
+                          : []),
                       ].map((key) => (
                         <div key={key} className="flex justify-between items-center">
                           <span className="text-[10px] text-gray-400 uppercase font-bold">
@@ -825,7 +868,19 @@ export default function TenantDashboard() {
                   <select
                     className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
                     defaultValue={editingUser.role}
-                    onChange={e => apiEndpoints.tenantUpdateUser(editingUser.id, { role: e.target.value }).then(fetchData)}
+                    onChange={async (e) => {
+                      try {
+                        await apiEndpoints.tenantUpdateUser(editingUser.id, {
+                          role: e.target.value,
+                        });
+                        setMsg("User role updated.");
+                        fetchData();
+                      } catch (err: any) {
+                        notify.error(
+                          err?.message || "Failed to update user role.",
+                        );
+                      }
+                    }}
                   >
                     <option value="USER">Standard User</option>
                     <option value="MANAGER">Manager</option>
@@ -837,7 +892,19 @@ export default function TenantDashboard() {
                     type="number"
                     className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
                     defaultValue={editingUser.maxProjects}
-                    onBlur={e => apiEndpoints.tenantUpdateUser(editingUser.id, { maxProjects: parseInt(e.target.value) }).then(fetchData)}
+                    onBlur={async (e) => {
+                      try {
+                        await apiEndpoints.tenantUpdateUser(editingUser.id, {
+                          maxProjects: parseInt(e.target.value, 10),
+                        });
+                        setMsg("Project limit updated.");
+                        fetchData();
+                      } catch (err: any) {
+                        notify.error(
+                          err?.message || "Failed to update project limit.",
+                        );
+                      }
+                    }}
                   />
                 </div>
               </div>

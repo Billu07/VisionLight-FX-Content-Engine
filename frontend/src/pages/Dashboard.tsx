@@ -2334,7 +2334,7 @@ function Dashboard() {
               <div className="space-y-4">
                 {(user.role === 'ADMIN' || user.role === 'SUPERADMIN') && (
                   <button
-                    onClick={() => navigate('/admin')}
+                    onClick={() => navigate('/admin?tab=integrations')}
                     className="w-full py-5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-2xl font-black uppercase text-xs tracking-[0.15em] transition-all shadow-xl hover:shadow-cyan-500/20 active:scale-[0.98]"
                   >
                     Go to API Configuration

@@ -40,7 +40,6 @@ const VIDEO_FX_PRICE_KEYS = new Set([
 
 const PICDRIFT_ALLOWED_CREDIT_POOLS = new Set([
   "creditsPicDrift",
-  "creditsPicDriftPlus",
   "creditsImageFX",
 ]);
 
@@ -187,6 +186,16 @@ const ensureProjectQuotaAllocation = async (
   }
 };
 
+const countOrganizationAdmins = async (orgId: string, excludeUserId?: string) => {
+  return prisma.user.count({
+    where: {
+      organizationId: orgId,
+      role: { in: ["ADMIN", "SUPERADMIN"] },
+      ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+    },
+  });
+};
+
 // === TEAM MANAGEMENT ===
 
 // Get all team members
@@ -301,7 +310,20 @@ router.put("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
       );
       updates.maxProjects = requestedMaxProjects;
     }
-    if (role === "USER" || role === "MANAGER") updates.role = role;
+    if (role === "USER" || role === "MANAGER") {
+      const isTargetAdmin =
+        targetUser.role === "ADMIN" || targetUser.role === "SUPERADMIN";
+      if (isTargetAdmin) {
+        const remainingAdminCount = await countOrganizationAdmins(orgId, targetUser.id);
+        if (remainingAdminCount < 1) {
+          return res.status(400).json({
+            error:
+              "You cannot remove the last admin from this organization. Add another admin first.",
+          });
+        }
+      }
+      updates.role = role;
+    }
 
     // Handle credits
     if (addCredits !== undefined && creditType) {
@@ -362,6 +384,18 @@ router.delete("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
     // Cannot delete yourself
     if (targetUser.id === req.user!.id) {
       return res.status(400).json({ error: "You cannot delete your own account." });
+    }
+
+    const isTargetAdmin =
+      targetUser.role === "ADMIN" || targetUser.role === "SUPERADMIN";
+    if (isTargetAdmin) {
+      const remainingAdminCount = await countOrganizationAdmins(orgId!, targetUser.id);
+      if (remainingAdminCount < 1) {
+        return res.status(400).json({
+          error:
+            "You cannot remove the last admin from this organization. Add another admin first.",
+        });
+      }
     }
 
     await AuthService.deleteSupabaseUserByEmail(targetUser.email);
