@@ -745,6 +745,10 @@ function Dashboard() {
     /\.(mp3|wav|m4a|aac|ogg)(\?|$)/i.test(url);
   const isAudioName = (name?: string | null) =>
     !!name && /\.(mp3|wav|m4a|aac|ogg)$/i.test(name);
+  const isVideoPreviewSource = (url: string, file?: File) =>
+    (file ? isVideoFile(file) : false) ||
+    /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url) ||
+    url.includes("video");
 
   const removeVeoSource = () => {
     setVeoSourceFile(null);
@@ -4017,6 +4021,8 @@ function Dashboard() {
                                     >
                                       {activeEngine === "veo"
                                         ? "Generation Inputs"
+                                        : activeEngine === "topaz"
+                                          ? "Source Video"
                                         : "Reference Images"}
                                     </label>
                                     {activeEngine === "veo" && (
@@ -4477,7 +4483,7 @@ function Dashboard() {
                                               Upload
                                             </span>
                                             <span className="text-xs text-gray-400 font-bold group-hover:text-cyan-400">
-                                              Upload File
+                                              {activeEngine === "topaz" ? "Upload Video" : "Upload File"}
                                             </span>
                                             <input
                                               type="file"
@@ -4530,13 +4536,16 @@ function Dashboard() {
                                       </div>
                                       {referenceImageUrls.length > 0 && (
                                         <div className="grid grid-cols-5 gap-2 animate-in fade-in">
-                                          {referenceImageUrls.map((url, index) => (
-                                            <div
-                                              key={index}
-                                              className="relative aspect-square group"
-                                            >
-                                              {url.includes("video") ||
-                                                url.endsWith(".mp4") ? (
+                                          {referenceImageUrls.map((url, index) => {
+                                            const sourceFile = referenceImages[index];
+                                            const isVideoPreview = isVideoPreviewSource(url, sourceFile);
+
+                                            return (
+                                              <div
+                                                key={index}
+                                                className="relative aspect-square group"
+                                              >
+                                                {isVideoPreview ? (
                                                 <video
                                                   src={url}
                                                   className="w-full h-full object-cover rounded-lg border border-white/20"
@@ -4563,8 +4572,9 @@ function Dashboard() {
                                               >
                                                 ×
                                               </button>
-                                            </div>
-                                          ))}
+                                              </div>
+                                            );
+                                          })}
                                         </div>
                                       )}
                                     </div>
