@@ -2319,25 +2319,48 @@ function Dashboard() {
                 <span className="text-5xl animate-pulse">!</span>
               </div>
               <h2 className="text-3xl font-black text-white mb-4 uppercase tracking-[0.2em]">
-                Platform Inactive
+                {user.orgLockReason === "DEACTIVATED"
+                  ? "Account Deactivated"
+                  : "Platform Inactive"}
               </h2>
               <p className="text-gray-400 mb-10 leading-relaxed text-sm sm:text-base">
-                Your agency environment for <span className="text-white font-bold">{user.organizationName}</span> is not yet active.
-                <br /><br />
-                {user.role === 'ADMIN' || user.role === 'SUPERADMIN'
-                  ? "Connect your platform API credentials in the Admin Panel to unlock all generation tools."
-                  : "Please contact your system administrator to configure the required API credentials."
-                }
+                {user.orgLockReason === "DEACTIVATED" ? (
+                  <>
+                    Your organization{" "}
+                    <span className="text-white font-bold">
+                      {user.organizationName}
+                    </span>{" "}
+                    is currently deactivated.
+                    <br />
+                    <br />
+                    Please contact your platform administrator to reactivate
+                    your account.
+                  </>
+                ) : (
+                  <>
+                    Your agency environment for{" "}
+                    <span className="text-white font-bold">
+                      {user.organizationName}
+                    </span>{" "}
+                    is not yet active.
+                    <br />
+                    <br />
+                    {user.role === "ADMIN" || user.role === "SUPERADMIN"
+                      ? "Connect your platform API credentials in the Admin Panel to unlock all generation tools."
+                      : "Please contact your system administrator to configure the required API credentials."}
+                  </>
+                )}
               </p>
               <div className="space-y-4">
-                {(user.role === 'ADMIN' || user.role === 'SUPERADMIN') && (
+                {user.orgLockReason !== "DEACTIVATED" &&
+                  (user.role === "ADMIN" || user.role === "SUPERADMIN") && (
                   <button
                     onClick={() => navigate('/admin?tab=integrations')}
                     className="w-full py-5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white rounded-2xl font-black uppercase text-xs tracking-[0.15em] transition-all shadow-xl hover:shadow-cyan-500/20 active:scale-[0.98]"
                   >
                     Go to API Configuration
                   </button>
-                )}
+                  )}
                 <button
                   onClick={logout}
                   className="w-full py-4 text-gray-500 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors"

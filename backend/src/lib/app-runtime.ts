@@ -15,6 +15,11 @@ export async function getTenantApiKeys(userId: string) {
   const openAIKey = encryptionUtils.decrypt(org?.openaiApiKey);
 
   if (!isDefaultOrg && !noOrg) {
+    if (org?.isActive === false) {
+      throw new Error(
+        "Your organization is currently deactivated. Please contact your platform administrator.",
+      );
+    }
     if (!falKey) {
       throw new Error(
         "Your platform is not active. Please configure your Fal API key in the Admin Panel.",

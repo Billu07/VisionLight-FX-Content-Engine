@@ -13,6 +13,7 @@ interface User {
   organizationName?: string | null;
   isOrgActive?: boolean;
   needsActivation?: boolean;
+  orgLockReason?: "DEACTIVATED" | "MISSING_FAL_KEY" | null;
   videoEditorEnabledForAll?: boolean;
   view?: "VISIONLIGHT" | "PICDRIFT";
   orgViewType?: "VISIONLIGHT" | "PICDRIFT";

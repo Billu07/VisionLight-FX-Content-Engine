@@ -93,12 +93,19 @@ router.get(
 
       let isOrgActive = true;
       let needsActivation = false;
+      let orgLockReason: "DEACTIVATED" | "MISSING_FAL_KEY" | null = null;
 
       if (org && !isDefaultOrg) {
+        const isDeactivated = org.isActive === false;
         const hasFalKey = !!org.falApiKey;
-        if (!hasFalKey) {
+        if (isDeactivated) {
           isOrgActive = false;
           needsActivation = true;
+          orgLockReason = "DEACTIVATED";
+        } else if (!hasFalKey) {
+          isOrgActive = false;
+          needsActivation = true;
+          orgLockReason = "MISSING_FAL_KEY";
         }
       }
 
@@ -140,6 +147,7 @@ router.get(
           isSuperAdmin,
           isOrgActive,
           needsActivation,
+          orgLockReason,
           organizationName: org?.name,
           videoEditorEnabledForAll,
           canonicalDomain,

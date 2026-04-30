@@ -194,15 +194,6 @@ export class AuthService {
         finalRole = "MANAGER";
       }
 
-      // 4. Enforce Organization Active Status
-      if (finalRole !== "SUPERADMIN") {
-        const org = (user as any).organization;
-        if (org && org.isActive === false) {
-          console.log(`🚫 Rejecting session for ${user.email}: Organization is deactivated.`);
-          return null; // Deny access
-        }
-      }
-
       return {
         id: user.id,
         email: user.email,
