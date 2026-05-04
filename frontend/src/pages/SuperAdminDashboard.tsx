@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiEndpoints, startReadOnlyImpersonation } from "../lib/api";
+import { adminUi } from "../lib/adminUi";
 import { confirmAction } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
@@ -826,30 +827,31 @@ export default function SuperAdminDashboard() {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+    <div className={adminUi.loading}>
       <LoadingSpinner size="lg" variant="neon" />
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-200 p-6 sm:p-10 font-sans">
-      <div className="max-w-[1400px] mx-auto pb-24">
+    <div className={`${adminUi.page} font-sans`}>
+      <div className={adminUi.backdrop} />
+      <div className={adminUi.container}>
         {/* HEADER */}
-        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end mb-12 gap-8 border-b border-gray-800 pb-8">
+        <div className={adminUi.header}>
           <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight uppercase mb-2">
+            <h1 className={`${adminUi.title} mb-2 uppercase`}>
               Platform <span className="text-brand-accent">Control</span>
             </h1>
-            <p className="text-[11px] text-gray-400 uppercase tracking-widest font-semibold">
+            <p className={adminUi.eyebrow}>
               Super Admin Interface - {adminUser?.email}
             </p>
           </div>
 
           <div className="flex flex-col xl:flex-row gap-3 w-full xl:w-auto xl:items-center">
-            <div className="flex flex-nowrap overflow-x-auto items-center bg-gray-900 p-1 rounded-lg border border-gray-800 gap-1 w-full xl:w-auto">
+            <div className={adminUi.tabBar}>
               <button
                 onClick={() => navigate("/app")}
-                className="shrink-0 whitespace-nowrap px-3 py-2 rounded-md text-[10px] font-black uppercase tracking-widest text-brand-accent hover:bg-brand-accent/10 transition-all border border-brand-accent/20 mr-1"
+                className={`${adminUi.tab} border border-brand-accent/20 text-brand-accent hover:bg-brand-accent/10`}
               >
                 Back to App
               </button>
@@ -857,7 +859,7 @@ export default function SuperAdminDashboard() {
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab as any)}
-                  className={`shrink-0 whitespace-nowrap px-3 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-colors ${activeTab === tab ? "bg-gray-800 text-brand-accent" : "text-gray-400 hover:text-white"
+                  className={`${adminUi.tab} ${activeTab === tab ? adminUi.tabActive : adminUi.tabInactive
                     }`}
                 >
                   {tab.replace("-", " ")}
@@ -868,7 +870,7 @@ export default function SuperAdminDashboard() {
               href="https://fal.ai/dashboard/usage-billing/credits"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-pink-600 hover:bg-pink-500 border border-pink-400/40 text-white transition-colors whitespace-nowrap"
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-lg border border-pink-400/30 bg-pink-500/15 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-pink-100 transition-colors hover:bg-pink-500/25"
             >
               Check Your Credit
             </a>
@@ -876,7 +878,7 @@ export default function SuperAdminDashboard() {
         </div>
 
         {msg && (
-          <div className="mb-8 p-4 rounded-lg bg-brand-accent/10 border border-brand-accent/20 text-brand-accent text-sm font-semibold flex justify-between items-center">
+          <div className="mb-8 flex items-center justify-between rounded-xl border border-brand-accent/20 bg-brand-accent/10 p-4 text-sm font-semibold text-brand-accent">
             {msg}
             <button onClick={() => setMsg("")} className="text-lg">x</button>
           </div>
@@ -887,8 +889,8 @@ export default function SuperAdminDashboard() {
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
             <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">Global Prompt Presets</h2>
-                <p className="text-xs text-gray-500 mt-1">These presets automatically appear in every user's PromptFX menu.</p>
+                <h2 className={adminUi.sectionTitle}>Global Prompt Presets</h2>
+                <p className={adminUi.sectionCopy}>These presets automatically appear in every user's PromptFX menu.</p>
               </div>
               <button
                 onClick={() => {
@@ -896,15 +898,15 @@ export default function SuperAdminDashboard() {
                   setPresetForm({ name: "", prompt: "", isActive: true });
                   setShowPresetModal(true);
                 }}
-                className="bg-brand-accent hover:bg-cyan-300 text-gray-950 px-6 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest"
+                className={adminUi.primaryButton}
               >
                 Add New Preset
               </button>
             </div>
 
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className={adminUi.tablePanel}>
               <table className="w-full text-left">
-                <thead className="bg-gray-950 text-[10px] uppercase tracking-widest text-gray-500">
+                <thead className={adminUi.tableHead}>
                   <tr>
                     <th className="p-6">Preset Name</th>
                     <th className="p-6">Prompt Content</th>
@@ -912,11 +914,11 @@ export default function SuperAdminDashboard() {
                     <th className="p-6 text-right">Operations</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-800">
+                <tbody>
                   {presets.length === 0 ? (
                     <tr><td colSpan={4} className="p-10 text-center text-gray-500 italic">No global presets created yet.</td></tr>
                   ) : presets.map(p => (
-                    <tr key={p.id} className="hover:bg-gray-800/30 transition-colors">
+                    <tr key={p.id} className={adminUi.tableRow}>
                       <td className="p-6">
                         <div className="font-bold text-white">{p.name}</div>
                       </td>
@@ -936,13 +938,13 @@ export default function SuperAdminDashboard() {
                       <td className="p-6 text-right">
                         <div className="flex gap-2 justify-end">
                           <button
-                            className="text-gray-400 hover:text-white text-[10px] font-bold uppercase tracking-widest px-4 py-2 bg-gray-800 rounded-md border border-gray-700 hover:bg-gray-700 transition-colors"
+                            className={adminUi.softButton}
                             onClick={() => openEditPreset(p)}
                           >
                             Edit
                           </button>
                           <button
-                            className="text-red-500/50 hover:text-red-400 text-[10px] font-bold uppercase tracking-widest px-4 py-2 hover:bg-red-500/10 transition-colors rounded-md"
+                            className={adminUi.dangerButton}
                             onClick={() => handleDeletePreset(p.id)}
                           >
                             Delete
@@ -961,10 +963,10 @@ export default function SuperAdminDashboard() {
         {/* TAB CONTENT: PLATFORM (TENANTS) */}
         {activeTab === "platform" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-              <div className="p-6 border-b border-gray-800 flex justify-between items-center">
-                <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">Pending Render Requests</h2>
-                <span className="text-[11px] font-bold uppercase tracking-widest text-brand-accent">
+            <div className={adminUi.tablePanel}>
+              <div className={`${adminUi.panelHeader} flex items-center justify-between`}>
+                <h2 className={adminUi.sectionTitle}>Pending Render Requests</h2>
+                <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-accent">
                   {creditRequests.length} Pending
                 </span>
               </div>
@@ -973,7 +975,7 @@ export default function SuperAdminDashboard() {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left min-w-[900px]">
-                    <thead className="bg-gray-950 text-[10px] uppercase tracking-widest text-gray-500">
+                    <thead className={adminUi.tableHead}>
                       <tr>
                         <th className="p-6">Requester</th>
                         <th className="p-6">Email</th>
@@ -982,9 +984,9 @@ export default function SuperAdminDashboard() {
                         <th className="p-6 text-right">Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-800">
+                    <tbody>
                       {creditRequests.map((r) => (
-                        <tr key={r.id} className="hover:bg-gray-800/30 transition-colors">
+                        <tr key={r.id} className={adminUi.tableRow}>
                           <td className="p-6 text-sm text-white">{r.user?.name || r.name || "Unknown User"}</td>
                           <td className="p-6 text-xs text-gray-400 font-mono">{r.user?.email || r.email}</td>
                           <td className="p-6 text-xs text-gray-300">{r.organization?.name || "Unassigned"}</td>
@@ -992,7 +994,7 @@ export default function SuperAdminDashboard() {
                           <td className="p-6 text-right">
                             <button
                               onClick={() => handleResolveCreditRequest(r.id)}
-                              className="px-4 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest bg-brand-accent hover:bg-cyan-300 text-gray-950 transition-colors"
+                              className={adminUi.primaryButton}
                             >
                               Mark Resolved
                             </button>
@@ -1006,18 +1008,18 @@ export default function SuperAdminDashboard() {
             </div>
 
             <div className="flex justify-between items-center">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">Subscription Management</h2>
+              <h2 className={adminUi.sectionTitle}>Subscription Management</h2>
               <button
                 onClick={() => setShowTenantModal(true)}
-                className="bg-brand-accent hover:bg-cyan-300 text-gray-950 px-6 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest"
+                className={adminUi.primaryButton}
               >
                 Create New Tenant
               </button>
             </div>
 
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className={adminUi.tablePanel}>
               <table className="w-full text-left">
-                <thead className="bg-gray-950 text-[10px] uppercase tracking-widest text-gray-500">
+                <thead className={adminUi.tableHead}>
                   <tr>
                     <th className="p-6">Organization</th>
                     <th className="p-6 text-center">Status</th>
@@ -1025,22 +1027,24 @@ export default function SuperAdminDashboard() {
                     <th className="p-6 text-right">Operations</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-800">
+                <tbody>
                   {tenants.map((t) => {
                     const tenantAdmin =
                       users.find((u) => u.organizationId === t.id && u.role === "ADMIN") ||
                       users.find((u) => u.organizationId === t.id);
                     return (
-                      <tr key={t.id} className="hover:bg-gray-800/30 transition-colors">
+                      <tr key={t.id} className={adminUi.tableRow}>
                         <td className="p-6">
                           <div className="font-bold text-white">{t.name}</div>
-                          <div className="text-xs text-gray-500 font-mono mt-1">{t.id}</div>
+                          <div className="mt-1 text-xs text-cyan-200/80 font-mono">
+                            {tenantAdmin?.email || "No tenant admin email"}
+                          </div>
                           <div className="mt-2 flex flex-wrap gap-2">
-                            <span className="rounded border border-gray-700 bg-gray-950 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-gray-400">
+                            <span className={adminUi.pill}>
                               {t.tenantPlan === "DEMO" ? "Demo Tenant" : "Paid Tenant"}
                             </span>
                             {t.trialEndsAt && (
-                              <span className="rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-amber-300">
+                              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-amber-300">
                                 Ends {new Date(t.trialEndsAt).toLocaleDateString()}
                               </span>
                             )}
@@ -1057,27 +1061,26 @@ export default function SuperAdminDashboard() {
                           </span>
                         </td>
                         <td className="p-6 text-center">
-                          <div className="text-xs text-gray-300 font-semibold">
-                            Max Users: {t.maxUsers} | Max Projects: {t.maxProjectsTotal}
-                          </div>
+                          <div className="text-sm font-semibold text-gray-200">{t.maxUsers} users</div>
+                          <div className="mt-1 text-xs text-gray-500">{t.maxProjectsTotal} projects</div>
                         </td>
                         <td className="p-6 text-right">
                           <div className="flex gap-2 justify-end">
                             <button
-                              className="text-amber-300 hover:text-amber-200 text-[10px] font-bold uppercase tracking-widest px-4 py-2 bg-amber-400/10 rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                              className={adminUi.amberButton}
                               onClick={() => tenantAdmin && handleEnterReadOnlyDashboard(tenantAdmin)}
                               disabled={!tenantAdmin}
                             >
                               Enter Dashboard
                             </button>
                             <button
-                              className="text-gray-400 hover:text-white text-[10px] font-bold uppercase tracking-widest px-4 py-2 bg-gray-800 rounded-md border border-gray-700 hover:bg-gray-700 transition-colors"
+                              className={adminUi.softButton}
                               onClick={() => openEditTenant(t)}
                             >
                               Configure
                             </button>
                             <button
-                              className="text-red-500/50 hover:text-red-400 text-[10px] font-bold uppercase tracking-widest px-4 py-2 hover:bg-red-500/10 transition-colors rounded-md"
+                              className={adminUi.dangerButton}
                               onClick={() => handleDeleteTenant(t.id)}
                             >
                               Delete
@@ -1091,16 +1094,16 @@ export default function SuperAdminDashboard() {
               </table>
             </div>
 
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-              <div className="p-6 border-b border-gray-800">
-                <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">All Platform Users</h2>
-                <p className="mt-1 text-xs text-gray-500">
+            <div className={adminUi.tablePanel}>
+              <div className={adminUi.panelHeader}>
+                <h2 className={adminUi.sectionTitle}>All Platform Users</h2>
+                <p className={adminUi.sectionCopy}>
                   Use read-only entry for support/debugging. Passwords can be reset from Manage.
                 </p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[900px] text-left">
-                  <thead className="bg-gray-950 text-[10px] uppercase tracking-widest text-gray-500">
+                  <thead className={adminUi.tableHead}>
                     <tr>
                       <th className="p-5">User</th>
                       <th className="p-5">Organization</th>
@@ -1109,23 +1112,23 @@ export default function SuperAdminDashboard() {
                       <th className="p-5 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-800">
+                  <tbody>
                     {users.map((u) => {
                       const org = tenants.find((t) => t.id === u.organizationId);
                       return (
-                        <tr key={u.id} className="hover:bg-gray-800/30 transition-colors">
+                        <tr key={u.id} className={adminUi.tableRow}>
                           <td className="p-5">
                             <div className="font-bold text-white text-sm">{u.name || "Unnamed User"}</div>
                             <div className="text-[10px] text-gray-500 font-mono">{u.email}</div>
                           </td>
                           <td className="p-5 text-xs text-gray-400">{org?.name || "Default / Unassigned"}</td>
-                          <td className="p-5 text-center text-[10px] font-bold uppercase tracking-widest text-gray-300">{u.role}</td>
-                          <td className="p-5 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400">{u.view}</td>
+                          <td className="p-5 text-center text-[10px] font-bold uppercase tracking-[0.14em] text-gray-300">{u.role}</td>
+                          <td className="p-5 text-center text-[10px] font-bold uppercase tracking-[0.14em] text-gray-400">{u.view}</td>
                           <td className="p-5 text-right">
                             <div className="flex justify-end gap-2">
                               <button
                                 onClick={() => handleEnterReadOnlyDashboard(u)}
-                                className="rounded bg-amber-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-300 hover:text-amber-100"
+                                className={adminUi.amberButton}
                               >
                                 Enter Dashboard
                               </button>
@@ -1134,7 +1137,7 @@ export default function SuperAdminDashboard() {
                                   setEditingUser(u);
                                   setUserUpdates({ view: u.view, role: u.role });
                                 }}
-                                className="rounded bg-cyan-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-cyan-400 hover:text-cyan-200"
+                                className={adminUi.cyanButton}
                               >
                                 Manage
                               </button>
@@ -1154,17 +1157,17 @@ export default function SuperAdminDashboard() {
         {activeTab === "my-agency" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
             <div className="flex justify-between items-center">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">Default Agency Team</h2>
+              <h2 className={adminUi.sectionTitle}>Default Agency Team</h2>
               <button
                 onClick={() => setShowAddTeamModal(true)}
-                className="bg-brand-accent hover:bg-cyan-300 text-gray-950 px-6 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest"
+                className={adminUi.primaryButton}
               >
                 Add Team Member
               </button>
             </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
+            <div className={`${adminUi.tablePanel} overflow-x-auto`}>
               <table className="w-full text-left min-w-[1000px]">
-                <thead className="bg-gray-950 text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+                <thead className={adminUi.tableHead}>
                   <tr>
                     <th className="p-6">User</th>
                     <th className="p-6 text-center">View</th>
@@ -1174,9 +1177,9 @@ export default function SuperAdminDashboard() {
                     <th className="p-6 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-800">
+                <tbody>
                   {myAgencyUsers.map(u => (
-                    <tr key={u.id} className="hover:bg-gray-800/30 transition-colors">
+                    <tr key={u.id} className={adminUi.tableRow}>
                       <td className="p-6">
                         <div className="font-bold text-white text-sm">{u.name}</div>
                         <div className="text-[10px] text-gray-500 font-mono">{u.email}</div>
@@ -1212,13 +1215,13 @@ export default function SuperAdminDashboard() {
                         <div className="flex gap-2 justify-end">
                           <button
                             onClick={() => handleEnterReadOnlyDashboard(u)}
-                            className="text-amber-300 hover:text-amber-200 text-[10px] font-bold uppercase tracking-widest bg-amber-400/10 px-3 py-1 rounded"
+                            className={adminUi.amberButton}
                           >
                             Enter Dashboard
                           </button>
-                          <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className="text-cyan-400 hover:text-cyan-300 text-[10px] font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded">Manage</button>
+                          <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className={adminUi.cyanButton}>Manage</button>
                           <button
-                            className="text-red-500/50 hover:text-red-400 text-[10px] font-bold uppercase tracking-widest"
+                            className={adminUi.dangerButton}
                             onClick={async () => {
                               if (await confirmAction("Remove user?", { confirmLabel: "Remove" })) {
                                 apiEndpoints.tenantDeleteUser(u.id).then(fetchInitialData);
@@ -1241,10 +1244,10 @@ export default function SuperAdminDashboard() {
         {activeTab === "demo-leads" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
             <div className="flex justify-between items-center">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">Picdrift Demo Users</h2>
+              <h2 className={adminUi.sectionTitle}>Picdrift Demo Users</h2>
               <button
                 onClick={() => setShowDemoModal(true)}
-                className="bg-brand-accent hover:bg-cyan-300 text-gray-950 px-6 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest"
+                className={adminUi.primaryButton}
               >
                 New Demo User
               </button>
@@ -1252,7 +1255,7 @@ export default function SuperAdminDashboard() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {demoUsers.map(u => (
-                <div key={u.id} className="bg-gray-900 border border-gray-800 p-6 rounded-xl relative group">
+                <div key={u.id} className={`${adminUi.panel} relative p-6 group`}>
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <div className="font-bold text-white">{u.name}</div>
@@ -1266,12 +1269,12 @@ export default function SuperAdminDashboard() {
                       <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className="text-[8px] text-gray-500 hover:text-white uppercase font-bold tracking-tighter">Edit View</button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 border-t border-gray-800 pt-4 mt-4">
+                  <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-4 mt-4">
                     <div>
                       <div className="text-[9px] uppercase text-gray-500 font-bold mb-1">PicDrift</div>
                       <div className="text-sm font-bold text-white">{u.creditsPicDrift}</div>
                     </div>
-                    <div className="border-l border-gray-800 pl-4">
+                    <div className="border-l border-white/10 pl-4">
                       <div className="text-[9px] uppercase text-gray-500 font-bold mb-1">PicFX</div>
                       <div className="text-sm font-bold text-white">{u.creditsImageFX}</div>
                     </div>
@@ -1285,14 +1288,14 @@ export default function SuperAdminDashboard() {
         {/* TAB CONTENT: GLOBAL SETTINGS */}
         {activeTab === "global-settings" && globalSettings && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-            <div className="bg-brand-accent/10 border border-brand-accent/20 p-6 rounded-xl">
-              <h3 className="text-brand-accent font-bold uppercase text-xs tracking-widest mb-2">Global Pricing Template</h3>
+            <div className="rounded-2xl border border-brand-accent/20 bg-brand-accent/10 p-6 shadow-[0_18px_42px_rgba(2,8,23,0.24)] backdrop-blur-xl">
+              <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-brand-accent">Global Pricing Template</h3>
               <p className="text-xs text-gray-400 italic">These prices are used as defaults for all new organizations unless overridden.</p>
             </div>
 
-            <div className="bg-gray-900 p-6 rounded-xl border border-gray-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className={`${adminUi.panel} flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between`}>
               <div>
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Experimental Video Editor Rollout</h4>
+                <h4 className={`${adminUi.sectionTitle} mb-1`}>Experimental Video Editor Rollout</h4>
                 <p className="text-xs text-gray-500">
                   Keep editor restricted to SuperAdmin during testing, then switch once ready.
                 </p>
@@ -1320,7 +1323,7 @@ export default function SuperAdminDashboard() {
                 className={`px-4 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest border transition-colors ${
                   globalSettings.featureVideoEditorForAll
                     ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30"
-                    : "bg-gray-950 border-gray-700 text-gray-300 hover:bg-gray-800"
+                    : "bg-white/[0.055] border-white/10 text-gray-300 hover:bg-white/10"
                 }`}
               >
                 {globalSettings.featureVideoEditorForAll
@@ -1329,15 +1332,15 @@ export default function SuperAdminDashboard() {
               </button>
             </div>
 
-            <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
+            <div className={`${adminUi.panel} p-6`}>
               <div className="mb-4">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Default Welcome Video</h4>
+                <h4 className={`${adminUi.sectionTitle} mb-1`}>Default Welcome Video</h4>
                 <p className="text-xs text-gray-500">
                   This video appears as a read-only system item in every user's timeline. Uploading stores it in your configured storage.
                 </p>
               </div>
               <div className="mb-4 rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-3">
-                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-white/10 bg-gray-950 px-4 py-3 text-sm font-semibold text-cyan-200 hover:bg-gray-800">
+                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.045] px-4 py-3 text-sm font-semibold text-cyan-200 hover:bg-white/10">
                   <span>{welcomeVideoUploading ? "Uploading welcome video..." : "Upload welcome video to storage"}</span>
                   {welcomeVideoUploading ? (
                     <LoadingSpinner size="sm" variant="light" />
@@ -1386,7 +1389,7 @@ export default function SuperAdminDashboard() {
                       welcomeVideoUrl: e.target.value,
                     })
                   }
-                  className="w-full rounded-lg border border-gray-800 bg-gray-950 p-3 text-sm text-white outline-none focus:border-brand-accent"
+                  className={`${adminUi.input} w-full p-3 text-sm`}
                 />
                 <button
                   type="button"
@@ -1403,7 +1406,7 @@ export default function SuperAdminDashboard() {
                       setMsg("Error: " + err.message);
                     }
                   }}
-                  className="rounded-lg bg-brand-accent px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-950 hover:bg-cyan-300"
+                  className={adminUi.primaryButton}
                 >
                   Save Video
                 </button>
@@ -1411,16 +1414,16 @@ export default function SuperAdminDashboard() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+              <div className={adminUi.metricCard}>
+                <p className="text-[10px] uppercase tracking-[0.14em] text-gray-500 font-bold">
                   Fal Coverage Needed
                 </p>
                 <p className="text-xl font-bold text-pink-400 mt-2">
                   {formatUsd(coverageTotals.fal)}
                 </p>
               </div>
-              <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+              <div className={adminUi.metricCard}>
+                <p className="text-[10px] uppercase tracking-[0.14em] text-gray-500 font-bold">
                   Total Coverage Needed
                 </p>
                 <p className="text-xl font-bold text-white mt-2">
@@ -1430,9 +1433,9 @@ export default function SuperAdminDashboard() {
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-              <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
+              <div className={`${adminUi.panel} p-6 sm:p-8`}>
                 <div className="mb-6">
-                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  <h4 className={adminUi.sectionTitle}>
                     Actual Provider Cost
                   </h4>
                   <p className="text-xs text-gray-500 mt-2">
@@ -1442,7 +1445,7 @@ export default function SuperAdminDashboard() {
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-0">
                     <thead>
-                      <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
+                      <tr className="border-b border-white/10 text-[10px] uppercase tracking-[0.14em] text-gray-500">
                         <th className="py-3 text-left">Generation Variant</th>
                         <th className="py-3 text-left">Provider</th>
                         <th className="py-3 text-right">Credit / Render</th>
@@ -1452,7 +1455,7 @@ export default function SuperAdminDashboard() {
                     </thead>
                     <tbody>
                       {variantRows.map((row) => (
-                        <tr key={row.id} className="border-b border-gray-900/60">
+                        <tr key={row.id} className="border-b border-white/10">
                           <td className="py-3 text-sm text-gray-200">{row.label}</td>
                           <td className="py-3 text-xs uppercase tracking-widest text-gray-400">
                             {row.provider}
@@ -1467,7 +1470,7 @@ export default function SuperAdminDashboard() {
                               min="0"
                               value={row.providerCostPerRender}
                               onChange={(e) => handleVariantCostChange(row.id, e.target.value)}
-                              className="w-24 bg-gray-950 border border-gray-700 rounded p-2 text-right text-xs text-white outline-none focus:border-brand-accent"
+                              className={`${adminUi.input} w-24 p-2 text-right text-xs`}
                             />
                           </td>
                           <td className="py-3 text-sm text-right font-semibold text-brand-accent">
@@ -1478,13 +1481,13 @@ export default function SuperAdminDashboard() {
                     </tbody>
                   </table>
                 </div>
-                <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-4">
+                <p className="mt-4 text-[10px] uppercase tracking-[0.14em] text-gray-500">
                   Wallet USD/credit uses the highest implied variant rate per wallet (conservative mode).
                 </p>
                 <div className="overflow-x-auto mt-3">
                   <table className="w-full min-w-0">
                     <thead>
-                      <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
+                      <tr className="border-b border-white/10 text-[10px] uppercase tracking-[0.14em] text-gray-500">
                         <th className="py-3 text-left">Wallet</th>
                         <th className="py-3 text-left">Provider</th>
                         <th className="py-3 text-right">Allocated Credits</th>
@@ -1494,7 +1497,7 @@ export default function SuperAdminDashboard() {
                     </thead>
                     <tbody>
                       {walletCoverageRows.map((row) => (
-                        <tr key={row.key} className="border-b border-gray-900/60">
+                        <tr key={row.key} className="border-b border-white/10">
                           <td className="py-3 text-sm text-gray-200">{row.label}</td>
                           <td className="py-3 text-xs uppercase tracking-widest text-gray-400">
                             {row.provider}
@@ -1515,13 +1518,13 @@ export default function SuperAdminDashboard() {
                 </div>
               </div>
 
-              <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">
+              <div className={`${adminUi.panel} p-6 sm:p-8`}>
+                <h4 className={`${adminUi.sectionTitle} mb-6 border-b border-white/10 pb-2`}>
                   Platform Render Credit Cost
                 </h4>
                 <div className="grid grid-cols-1 gap-6">
-                  <div className="bg-gray-950 border border-gray-800 rounded-lg p-6">
-                    <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">PicDrift Engine</h5>
+                  <div className={`${adminUi.mutedCard} p-6`}>
+                    <h5 className={`${adminUi.sectionTitle} mb-4`}>PicDrift Engine</h5>
                     <div className="space-y-4">
                       {["pricePicDrift_5s", "pricePicDrift_10s", "pricePicDrift_Plus_5s", "pricePicDrift_Plus_10s", "priceAsset_DriftPath"].map(key => (
                         <div key={key} className="flex justify-between items-center">
@@ -1530,7 +1533,7 @@ export default function SuperAdminDashboard() {
                             type="number"
                             step="1"
                             min="0"
-                            className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center text-xs text-white"
+                            className={`${adminUi.input} w-16 p-1 text-center text-xs`}
                             defaultValue={globalSettings[key]}
                             onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: toInt(e.target.value, globalSettings[key]) })}
                           />
@@ -1539,8 +1542,8 @@ export default function SuperAdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="bg-gray-950 border border-gray-800 rounded-lg p-6">
-                    <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Studio & Editor</h5>
+                  <div className={`${adminUi.mutedCard} p-6`}>
+                    <h5 className={`${adminUi.sectionTitle} mb-4`}>Studio & Editor</h5>
                     <div className="space-y-4">
                       {["pricePicFX_Standard", "pricePicFX_Carousel", "pricePicFX_Batch", "priceEditor_Pro", "priceEditor_Enhance", "priceEditor_Convert"].map(key => (
                         <div key={key} className="flex justify-between items-center">
@@ -1549,7 +1552,7 @@ export default function SuperAdminDashboard() {
                             type="number"
                             step="1"
                             min="0"
-                            className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center text-xs text-white"
+                            className={`${adminUi.input} w-16 p-1 text-center text-xs`}
                             defaultValue={globalSettings[key]}
                             onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: toInt(e.target.value, globalSettings[key]) })}
                           />
@@ -1558,8 +1561,8 @@ export default function SuperAdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="bg-gray-950 border border-gray-800 rounded-lg p-6">
-                    <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Video FX Engines</h5>
+                  <div className={`${adminUi.mutedCard} p-6`}>
+                    <h5 className={`${adminUi.sectionTitle} mb-4`}>Video FX Engines</h5>
                     <div className="space-y-4">
                       {["priceVideoFX1_10s", "priceVideoFX1_15s", "priceVideoFX2_4s", "priceVideoFX2_8s", "priceVideoFX2_12s", "priceVideoFX3_4s", "priceVideoFX3_6s", "priceVideoFX3_8s"].map(key => (
                         <div key={key} className="flex justify-between items-center">
@@ -1568,7 +1571,7 @@ export default function SuperAdminDashboard() {
                             type="number"
                             step="1"
                             min="0"
-                            className="w-16 bg-gray-900 border border-gray-700 rounded p-1 text-center text-xs text-white"
+                            className={`${adminUi.input} w-16 p-1 text-center text-xs`}
                             defaultValue={globalSettings[key]}
                             onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: toInt(e.target.value, globalSettings[key]) })}
                           />

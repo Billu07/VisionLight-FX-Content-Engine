@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiEndpoints, startReadOnlyImpersonation } from "../lib/api";
+import { adminUi } from "../lib/adminUi";
 import { confirmAction, notify } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
@@ -392,7 +393,7 @@ export default function TenantDashboard() {
   };
 
   if (loading && !users.length && !config) return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+    <div className={adminUi.loading}>
       <LoadingSpinner size="lg" variant="neon" />
     </div>
   );
@@ -474,27 +475,28 @@ export default function TenantDashboard() {
     });
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-200 p-6 sm:p-10 font-sans">
-      <div className="max-w-[1400px] mx-auto pb-24">
+    <div className={`${adminUi.page} font-sans`}>
+      <div className={adminUi.backdrop} />
+      <div className={adminUi.container}>
         {/* HEADER */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-8 border-b border-gray-800 pb-8">
+        <div className={adminUi.header}>
           <div>
             <div className="flex items-center gap-4 mb-2">
-              <h1 className="text-2xl font-bold text-white tracking-tight uppercase">
+              <h1 className={`${adminUi.title} uppercase`}>
                 Agency <span className="text-brand-accent">Management</span>
               </h1>
 
             </div>
-            <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">
+            <p className={adminUi.eyebrow}>
               {adminUser?.organizationName || "Your Organization"} - Admin Panel
             </p>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto md:items-center">
-            <div className="flex flex-nowrap overflow-x-auto w-full md:w-auto bg-gray-900 p-1 rounded-lg border border-gray-800 gap-1">
+          <div className="flex flex-col gap-3 w-full xl:w-auto xl:flex-row xl:items-center">
+            <div className={adminUi.tabBar}>
               <button
                 onClick={() => navigate("/app")}
-                className="shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest text-brand-accent hover:bg-brand-accent/10 transition-all border border-brand-accent/20 mr-1"
+                className={`${adminUi.tab} border border-brand-accent/20 text-brand-accent hover:bg-brand-accent/10`}
               >
                 Back to App
               </button>
@@ -510,10 +512,8 @@ export default function TenantDashboard() {
                       tab.id as "team" | "pricing" | "integrations",
                     )
                   }
-                  className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md text-[9px] font-bold uppercase tracking-widest transition-colors ${
-                    activeTab === tab.id
-                      ? "bg-gray-800 text-brand-accent"
-                      : "text-gray-400 hover:text-white"
+                  className={`${adminUi.tab} ${
+                    activeTab === tab.id ? adminUi.tabActive : adminUi.tabInactive
                   }`}
                 >
                   {tab.label}
@@ -524,7 +524,7 @@ export default function TenantDashboard() {
               href="https://fal.ai/dashboard/usage-billing/credits"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-pink-600 hover:bg-pink-500 border border-pink-400/40 text-white transition-colors whitespace-nowrap"
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-lg border border-pink-400/30 bg-pink-500/15 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-pink-100 transition-colors hover:bg-pink-500/25"
             >
               Check Your Credit
             </a>
@@ -532,19 +532,19 @@ export default function TenantDashboard() {
         </div>
 
         {msg && (
-          <div className="mb-8 p-4 rounded-lg bg-brand-accent/5 border border-brand-accent/20 text-brand-accent text-[10px] font-bold uppercase tracking-widest flex justify-between items-center">
+          <div className="mb-8 flex items-center justify-between rounded-xl border border-brand-accent/20 bg-brand-accent/10 p-4 text-[10px] font-bold uppercase tracking-[0.14em] text-brand-accent">
             {msg}
-            <button onClick={() => setMsg("")} className="text-lg">×</button>
+            <button onClick={() => setMsg("")} className="text-lg">x</button>
           </div>
         )}
 
         {/* TEAM TAB */}
         {activeTab === "team" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-xl">
-              <div className="p-5 border-b border-gray-800 flex items-center justify-between">
-                <h2 className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Pending Render Requests</h2>
-                <span className="text-[10px] font-bold text-brand-accent uppercase tracking-widest">
+            <div className={adminUi.tablePanel}>
+              <div className={`${adminUi.panelHeader} flex items-center justify-between`}>
+                <h2 className={adminUi.sectionTitle}>Pending Render Requests</h2>
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand-accent">
                   {creditRequests.length} Pending
                 </span>
               </div>
@@ -552,7 +552,7 @@ export default function TenantDashboard() {
                 <div className="p-6 text-xs text-gray-500 italic">No pending render requests.</div>
               ) : (
                 <table className="w-full text-left min-w-[700px]">
-                  <thead className="bg-gray-950/50 text-[9px] uppercase tracking-widest text-gray-500 font-bold">
+                  <thead className={adminUi.tableHead}>
                     <tr>
                       <th className="p-5">Requester</th>
                       <th className="p-5">Email</th>
@@ -560,9 +560,9 @@ export default function TenantDashboard() {
                       <th className="p-5 text-right">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-800">
+                  <tbody>
                     {creditRequests.map((r) => (
-                      <tr key={r.id} className="hover:bg-gray-800/20 transition-colors">
+                      <tr key={r.id} className={adminUi.tableRow}>
                         <td className="p-5 text-sm text-white">{r.user?.name || r.name || "Unknown User"}</td>
                         <td className="p-5 text-xs text-gray-400 font-mono">{r.user?.email || r.email}</td>
                         <td className="p-5 text-xs text-gray-500">
@@ -571,7 +571,7 @@ export default function TenantDashboard() {
                         <td className="p-5 text-right">
                           <button
                             onClick={() => handleResolveCreditRequest(r.id)}
-                            className="px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-brand-accent hover:bg-cyan-300 text-gray-950 transition-all"
+                            className={adminUi.primaryButton}
                           >
                             Mark Resolved
                           </button>
@@ -584,22 +584,22 @@ export default function TenantDashboard() {
             </div>
 
             <div className="flex justify-between items-center">
-              <h2 className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Team Members</h2>
+              <h2 className={adminUi.sectionTitle}>Team Members</h2>
               <button
                 onClick={() => setShowAddUserModal(true)}
-                className="bg-brand-accent hover:bg-cyan-300 text-gray-950 px-5 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all"
+                className={adminUi.primaryButton}
               >
                 Add Member
               </button>
             </div>
 
-            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto shadow-xl">
+            <div className={`${adminUi.tablePanel} overflow-x-auto`}>
               <table
                 className={`w-full text-left ${
                   isPicdriftTenant ? "min-w-[860px]" : "min-w-[1000px]"
                 }`}
               >
-                <thead className="bg-gray-950/50 text-[9px] uppercase tracking-widest text-gray-500 font-bold">
+                <thead className={adminUi.tableHead}>
                   <tr>
                     <th className="p-5">User</th>
                     <th className="p-5 text-center">Role</th>
@@ -613,15 +613,15 @@ export default function TenantDashboard() {
                     <th className="p-5 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-800">
+                <tbody>
                   {users.map(u => (
-                    <tr key={u.id} className="hover:bg-gray-800/20 transition-colors group">
+                    <tr key={u.id} className={`${adminUi.tableRow} group`}>
                       <td className="p-5">
                         <div className="font-bold text-white text-sm">{u.name}</div>
                         <div className="text-[10px] text-gray-500 font-mono">{u.email}</div>
                       </td>
                       <td className="p-5 text-center">
-                        <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700">
+                        <span className={adminUi.pill}>
                           {u.role}
                         </span>
                       </td>
@@ -655,18 +655,18 @@ export default function TenantDashboard() {
                         <div className="flex gap-2 justify-end">
                           <button
                             onClick={() => handleEnterReadOnlyDashboard(u)}
-                            className="text-amber-300 hover:text-amber-200 text-[9px] font-bold uppercase tracking-widest bg-amber-400/10 px-3 py-1 rounded"
+                            className={adminUi.amberButton}
                           >
                             Enter Dashboard
                           </button>
-                          <button onClick={() => setEditingUser(u)} className="text-cyan-400 hover:text-cyan-300 text-[9px] font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded">Manage</button>
+                          <button onClick={() => setEditingUser(u)} className={adminUi.cyanButton}>Manage</button>
                           {u.id === adminUser?.id ? (
-                            <span className="text-gray-500 text-[9px] font-bold uppercase tracking-widest">
+                            <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-gray-500">
                               Active Admin
                             </span>
                           ) : (
                             <button
-                              className="text-red-500/50 hover:text-red-400 text-[9px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all"
+                              className={`${adminUi.dangerButton} opacity-0 group-hover:opacity-100`}
                               onClick={async () => {
                                 if (await confirmAction("Remove user?", { confirmLabel: "Remove" })) {
                                   try {
@@ -695,24 +695,24 @@ export default function TenantDashboard() {
         {/* PRICING TAB */}
         {activeTab === "pricing" && config && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-            <div className="bg-brand-accent/5 border border-brand-accent/20 p-6 rounded-xl">
-              <h3 className="text-brand-accent font-bold uppercase text-[10px] tracking-[0.2em] mb-2">Global Control Settings</h3>
+            <div className="rounded-2xl border border-brand-accent/20 bg-brand-accent/10 p-6 shadow-[0_18px_42px_rgba(2,8,23,0.24)] backdrop-blur-xl">
+              <h3 className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-accent">Global Control Settings</h3>
               <p className="text-xs text-gray-500 italic">
                 Platform render deductions are controlled by the platform admin. This tenant view is read-only and shows coverage estimates only.
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+              <div className={adminUi.metricCard}>
+                <p className="text-[10px] uppercase tracking-[0.14em] text-gray-500 font-bold">
                   Fal Coverage Needed
                 </p>
                 <p className="text-xl font-bold text-pink-400 mt-2">
                   {formatUsd(coverageTotals.fal)}
                 </p>
               </div>
-              <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
+              <div className={adminUi.metricCard}>
+                <p className="text-[10px] uppercase tracking-[0.14em] text-gray-500 font-bold">
                   Total Coverage Needed
                 </p>
                 <p className="text-xl font-bold text-white mt-2">
@@ -722,9 +722,9 @@ export default function TenantDashboard() {
             </div>
 
             <div className="grid grid-cols-1 gap-8">
-              <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
+              <div className={`${adminUi.panel} p-6 sm:p-8`}>
                 <div className="mb-6">
-                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                  <h4 className={adminUi.sectionTitle}>
                     Provider Cost Reference
                   </h4>
                   <p className="text-xs text-gray-500 mt-2">
@@ -734,7 +734,7 @@ export default function TenantDashboard() {
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[760px]">
                     <thead>
-                      <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
+                      <tr className="border-b border-white/10 text-[10px] uppercase tracking-[0.14em] text-gray-500">
                         <th className="py-3 text-left">Generation Variant</th>
                         <th className="py-3 text-left">Provider</th>
                         <th className="py-3 text-right">Credit / Render</th>
@@ -744,9 +744,9 @@ export default function TenantDashboard() {
                     </thead>
                     <tbody>
                       {variantRows.map((row) => (
-                        <tr key={row.id} className="border-b border-gray-900/60">
+                        <tr key={row.id} className="border-b border-white/10">
                           <td className="py-3 text-sm text-gray-200">{row.label}</td>
-                          <td className="py-3 text-xs uppercase tracking-widest text-gray-400">
+                          <td className="py-3 text-xs uppercase tracking-[0.14em] text-gray-400">
                             {row.provider}
                           </td>
                           <td className="py-3 text-sm text-right text-gray-200">
@@ -763,13 +763,13 @@ export default function TenantDashboard() {
                     </tbody>
                   </table>
                 </div>
-                <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-4">
+                <p className="mt-4 text-[10px] uppercase tracking-[0.14em] text-gray-500">
                   Wallet USD/credit uses the highest implied variant rate per wallet (conservative mode).
                 </p>
                 <div className="overflow-x-auto mt-3">
                   <table className="w-full min-w-[760px]">
                     <thead>
-                      <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
+                      <tr className="border-b border-white/10 text-[10px] uppercase tracking-[0.14em] text-gray-500">
                         <th className="py-3 text-left">Wallet</th>
                         <th className="py-3 text-left">Provider</th>
                         <th className="py-3 text-right">Allocated Credits</th>
@@ -779,9 +779,9 @@ export default function TenantDashboard() {
                     </thead>
                     <tbody>
                       {walletCoverageRows.map((row) => (
-                        <tr key={row.key} className="border-b border-gray-900/60">
+                        <tr key={row.key} className="border-b border-white/10">
                           <td className="py-3 text-sm text-gray-200">{row.label}</td>
-                          <td className="py-3 text-xs uppercase tracking-widest text-gray-400">
+                          <td className="py-3 text-xs uppercase tracking-[0.14em] text-gray-400">
                             {row.provider}
                           </td>
                           <td className="py-3 text-sm text-right text-gray-200">
@@ -806,26 +806,26 @@ export default function TenantDashboard() {
         {/* INTEGRATIONS TAB */}
         {activeTab === "integrations" && config && (
           <div className="max-w-xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 shadow-xl">
+            <div className={`${adminUi.panel} p-6 sm:p-8`}>
               <h2 className="text-lg font-bold text-white mb-6 uppercase tracking-tight">Organization Profile</h2>
               <form onSubmit={handleUpdateConfig} className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Agency Name</label>
+                  <label className={adminUi.sectionTitle}>Agency Name</label>
                   <input
                     type="text"
-                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white focus:border-brand-accent outline-none"
+                    className={`${adminUi.input} w-full p-3 text-sm`}
                     value={config.name}
                     onChange={e => setConfig({ ...config, name: e.target.value })}
                   />
                 </div>
-                <div className="border-t border-gray-800 pt-6 mt-6">
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">API Credentials</h3>
+                <div className="mt-6 border-t border-white/10 pt-6">
+                  <h3 className={`${adminUi.sectionTitle} mb-6`}>API Credentials</h3>
                   <div className="space-y-6">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fal AI Key</label>
+                      <label className={adminUi.sectionTitle}>Fal AI Key</label>
                       <input
                         type="password"
-                        className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white focus:border-brand-accent outline-none font-mono"
+                        className={`${adminUi.input} w-full p-3 font-mono text-sm`}
                         value={config.falApiKey}
                         onChange={e => setConfig({ ...config, falApiKey: e.target.value })}
                       />
@@ -835,7 +835,7 @@ export default function TenantDashboard() {
                 <button
                   type="submit"
                   disabled={actionLoading}
-                  className="w-full py-4 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-xl font-bold uppercase text-[11px] tracking-widest transition-all shadow-lg"
+                  className={`${adminUi.primaryButton} w-full py-4 text-[11px]`}
                 >
                   {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : "Save Configuration"}
                 </button>
