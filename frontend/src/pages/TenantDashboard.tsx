@@ -205,6 +205,7 @@ export default function TenantDashboard() {
     const requestedTab = searchParams.get("tab");
     if (
       requestedTab === "team" ||
+      requestedTab === "pricing" ||
       requestedTab === "integrations"
     ) {
       setActiveTab(requestedTab);
@@ -504,19 +505,25 @@ export default function TenantDashboard() {
               >
                 Back to App
               </button>
-              {["team", "integrations"].map((tab) => (
+              {[
+                { id: "team", label: "Team" },
+                { id: "pricing", label: "Global Controls" },
+                { id: "integrations", label: "Integrations" },
+              ].map((tab) => (
                 <button
-                  key={tab}
+                  key={tab.id}
                   onClick={() =>
-                    handleTabChange(tab as "team" | "pricing" | "integrations")
+                    handleTabChange(
+                      tab.id as "team" | "pricing" | "integrations",
+                    )
                   }
                   className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md text-[9px] font-bold uppercase tracking-widest transition-colors ${
-                    activeTab === tab
+                    activeTab === tab.id
                       ? "bg-gray-800 text-brand-accent"
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
-                  {tab}
+                  {tab.label}
                 </button>
               ))}
             </div>
@@ -696,9 +703,9 @@ export default function TenantDashboard() {
         {activeTab === "pricing" && config && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
             <div className="bg-brand-accent/5 border border-brand-accent/20 p-6 rounded-xl">
-              <h3 className="text-brand-accent font-bold uppercase text-[10px] tracking-[0.2em] mb-2">Cost Configuration</h3>
+              <h3 className="text-brand-accent font-bold uppercase text-[10px] tracking-[0.2em] mb-2">Global Control Settings</h3>
               <p className="text-xs text-gray-500 italic">
-                Enter actual provider cost per render and keep your platform deductions aligned.
+                Platform render deductions are controlled by the platform admin. Provider-cost inputs below only adjust this local coverage estimate.
               </p>
             </div>
 
@@ -721,7 +728,7 @@ export default function TenantDashboard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 gap-8">
               <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
                 <div className="mb-6">
                   <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
@@ -806,137 +813,6 @@ export default function TenantDashboard() {
                       ))}
                     </tbody>
                   </table>
-                </div>
-              </div>
-
-              <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
-                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-6 pb-2 border-b border-gray-800">
-                  Platform Render Credit Cost
-                </h4>
-                <div className="space-y-8">
-                  <div>
-                    <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">
-                      PicDrift Credits
-                    </h5>
-                    <div className="space-y-4">
-                      {[
-                        "pricePicDrift_5s",
-                        "pricePicDrift_10s",
-                        ...(!isPicdriftTenant
-                          ? ["pricePicDrift_Plus_5s", "pricePicDrift_Plus_10s"]
-                          : []),
-                      ].map((key) => (
-                        <div key={key} className="flex justify-between items-center">
-                          <span className="text-[10px] text-gray-400 uppercase font-bold">
-                            {key.replace("price", "").replace(/_/g, " ")}
-                          </span>
-                          <input
-                            type="number"
-                            step="1"
-                            min="0"
-                            className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
-                            value={config.pricing[key]}
-                            onChange={(e) =>
-                              setConfig({
-                                ...config,
-                                pricing: {
-                                  ...config.pricing,
-                                  [key]: toInt(e.target.value, config.pricing[key]),
-                                },
-                              })
-                            }
-                            onBlur={() => handleUpdateConfig()}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">
-                      Pic FX & Editor
-                    </h5>
-                    <div className="space-y-4">
-                      {[
-                        "pricePicFX_Standard",
-                        "pricePicFX_Carousel",
-                        "pricePicFX_Batch",
-                        "priceEditor_Pro",
-                        "priceEditor_Enhance",
-                        "priceEditor_Convert",
-                        "priceAsset_DriftPath",
-                      ].map((key) => (
-                        <div key={key} className="flex justify-between items-center">
-                          <span
-                            className="text-[10px] text-gray-400 uppercase font-bold truncate max-w-[120px]"
-                            title={key}
-                          >
-                            {key.replace("price", "").replace(/_/g, " ")}
-                          </span>
-                          <input
-                            type="number"
-                            step="1"
-                            min="0"
-                            className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
-                            value={config.pricing[key]}
-                            onChange={(e) =>
-                              setConfig({
-                                ...config,
-                                pricing: {
-                                  ...config.pricing,
-                                  [key]: toInt(e.target.value, config.pricing[key]),
-                                },
-                              })
-                            }
-                            onBlur={() => handleUpdateConfig()}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {!isPicdriftTenant && (
-                    <div>
-                      <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">
-                        Video FX
-                      </h5>
-                      <div className="space-y-4">
-                        {[
-                          "priceVideoFX1_10s",
-                          "priceVideoFX1_15s",
-                          "priceVideoFX2_4s",
-                          "priceVideoFX2_8s",
-                          "priceVideoFX2_12s",
-                          "priceVideoFX3_4s",
-                          "priceVideoFX3_6s",
-                          "priceVideoFX3_8s",
-                        ].map((key) => (
-                          <div key={key} className="flex justify-between items-center">
-                            <span className="text-[10px] text-gray-400 uppercase font-bold">
-                              {key.replace("price", "").replace(/_/g, " ")}
-                            </span>
-                            <input
-                              type="number"
-                              step="1"
-                              min="0"
-                              className="w-16 bg-gray-950 border border-gray-700 rounded p-1 text-center text-xs text-white"
-                              value={config.pricing[key]}
-                              onChange={(e) =>
-                                setConfig({
-                                  ...config,
-                                  pricing: {
-                                    ...config.pricing,
-                                    [key]: toInt(e.target.value, config.pricing[key]),
-                                  },
-                                })
-                              }
-                              onBlur={() => handleUpdateConfig()}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
