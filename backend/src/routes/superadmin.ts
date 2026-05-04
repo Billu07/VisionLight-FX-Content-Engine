@@ -274,6 +274,17 @@ router.put("/organizations/:id/limits", async (req: AuthenticatedRequest, res) =
       return res.status(400).json({ error: "Invalid organization limit values." });
     }
 
+    const existingOrg = await dbService.getOrganization(req.params.id);
+    if (!existingOrg) {
+      return res.status(404).json({ error: "Organization not found." });
+    }
+    if (view && existingOrg.isDefault) {
+      return res.status(400).json({
+        error:
+          "Default system organization cannot be bulk-switched by platform view. Update individual user views instead.",
+      });
+    }
+
     if (parsedMaxUsers !== undefined && parsedMaxUsers !== null) {
       const userCount = await prisma.user.count({ where: { organizationId: req.params.id } });
       if (parsedMaxUsers < userCount) {

@@ -524,7 +524,7 @@ export default function TenantDashboard() {
               href="https://fal.ai/dashboard/usage-billing/credits"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center whitespace-nowrap rounded-lg border border-pink-400/30 bg-pink-500/15 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-pink-100 transition-colors hover:bg-pink-500/25"
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-lg border border-pink-400/40 bg-pink-600 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-white transition-colors hover:bg-pink-500"
             >
               Check Your Credit
             </a>

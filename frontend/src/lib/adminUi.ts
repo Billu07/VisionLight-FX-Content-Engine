@@ -10,13 +10,13 @@ export const adminUi = {
     "mb-8 flex flex-col gap-5 border-b border-white/10 pb-6 xl:flex-row xl:items-end xl:justify-between",
   title: "text-2xl font-bold tracking-tight text-white sm:text-3xl",
   eyebrow:
-    "text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400",
+    "text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-300",
   tabBar:
     "flex w-full flex-nowrap items-center gap-1 overflow-x-auto rounded-xl border border-white/10 bg-white/[0.04] p-1 shadow-[0_18px_45px_rgba(2,8,23,0.32)] backdrop-blur-xl xl:w-auto",
   tab:
     "shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors",
   tabActive: "bg-cyan-400/10 text-brand-accent",
-  tabInactive: "text-gray-400 hover:bg-white/5 hover:text-white",
+  tabInactive: "text-gray-300 hover:bg-white/5 hover:text-white",
   panel:
     "rounded-2xl border border-white/10 bg-gray-900/45 shadow-[0_22px_50px_rgba(2,8,23,0.42)] backdrop-blur-xl",
   tablePanel:
@@ -24,10 +24,10 @@ export const adminUi = {
   panelHeader:
     "border-b border-white/10 p-5 sm:p-6",
   sectionTitle:
-    "text-[11px] font-bold uppercase tracking-[0.16em] text-gray-400",
-  sectionCopy: "mt-1 text-xs leading-relaxed text-gray-500",
+    "text-[11px] font-bold uppercase tracking-[0.16em] text-gray-300",
+  sectionCopy: "mt-1 text-xs leading-relaxed text-gray-300/85",
   tableHead:
-    "bg-white/[0.035] text-[10px] font-bold uppercase tracking-[0.14em] text-gray-400",
+    "bg-white/[0.035] text-[10px] font-bold uppercase tracking-[0.14em] text-gray-300",
   tableRow:
     "border-b border-white/10 transition-colors last:border-b-0 hover:bg-white/[0.04]",
   metricCard:
@@ -38,7 +38,7 @@ export const adminUi = {
   primaryButton:
     "rounded-lg bg-brand-accent px-5 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-950 transition-colors hover:bg-cyan-300 disabled:opacity-50",
   softButton:
-    "rounded-lg border border-white/10 bg-white/[0.055] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-300 transition-colors hover:bg-white/10 hover:text-white",
+    "rounded-lg border border-white/10 bg-white/[0.055] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-200 transition-colors hover:bg-white/10 hover:text-white",
   cyanButton:
     "rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-300 transition-colors hover:bg-cyan-400/15 hover:text-cyan-100",
   amberButton:
@@ -46,5 +46,5 @@ export const adminUi = {
   dangerButton:
     "rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-red-300/80 transition-colors hover:bg-red-500/15 hover:text-red-200",
   pill:
-    "rounded-full border border-white/10 bg-white/[0.055] px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-gray-300",
+    "rounded-full border border-white/10 bg-white/[0.055] px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-gray-200",
 };
