@@ -1,9 +1,15 @@
 import { create } from "zustand";
 import { supabase } from "../lib/supabase";
-import { apiEndpoints, setAuthToken, stopReadOnlyImpersonation } from "../lib/api";
+import {
+  apiEndpoints,
+  clearActiveProfile,
+  setAuthToken,
+  stopReadOnlyImpersonation,
+} from "../lib/api";
 
 interface User {
   id: string;
+  authUserId?: string | null;
   email: string;
   name: string;
   creditSystem?: "COMMERCIAL" | "INTERNAL";
@@ -30,19 +36,44 @@ interface User {
   };
 }
 
+export interface WorkspaceProfile {
+  id: string;
+  email: string;
+  name?: string | null;
+  role?: "ADMIN" | "USER" | "MANAGER" | "SUPERADMIN";
+  view?: "VISIONLIGHT" | "PICDRIFT";
+  organizationId?: string | null;
+  organizationName?: string | null;
+  isOrgActive?: boolean;
+  canonicalDomain?: string | null;
+}
+
+interface AuthCheckResult {
+  hasUser: boolean;
+  profileSelectionRequired: boolean;
+}
+
 interface AuthState {
   user: User | null;
-  systemPresets: any[] | null; // 👈 Added this
+  profiles: WorkspaceProfile[];
+  profileSelectionRequired: boolean;
+  systemPresets: any[] | null;
   isLoading: boolean;
   token: string | null;
-  checkAuth: () => Promise<void>;
+  checkAuth: () => Promise<AuthCheckResult>;
   logout: () => Promise<void>;
 }
 
-export const useAuth = create<AuthState>((set) => ({
+const signedOutState = {
   user: null,
+  profiles: [],
+  profileSelectionRequired: false,
   systemPresets: null,
   token: null,
+};
+
+export const useAuth = create<AuthState>((set) => ({
+  ...signedOutState,
   isLoading: true,
 
   checkAuth: async () => {
@@ -52,38 +83,54 @@ export const useAuth = create<AuthState>((set) => ({
       } = await supabase.auth.getSession();
 
       if (!session?.access_token) {
-        set({ user: null, systemPresets: null, token: null, isLoading: false });
+        set({ ...signedOutState, isLoading: false });
         setAuthToken(null);
-        return;
+        return { hasUser: false, profileSelectionRequired: false };
       }
 
       setAuthToken(session.access_token);
-
-      // This calls the backend which now returns role & creditSystem
       const response = await apiEndpoints.getMe();
 
       if (response.data.success) {
+        if (response.data.profileSelectionRequired) {
+          set({
+            user: null,
+            profiles: response.data.profiles || [],
+            profileSelectionRequired: true,
+            systemPresets: response.data.systemPresets || [],
+            token: session.access_token,
+            isLoading: false,
+          });
+          return { hasUser: false, profileSelectionRequired: true };
+        }
+
         set({
           user: response.data.user,
-          systemPresets: response.data.systemPresets || [], // 👈 Store global presets
+          profiles: response.data.profiles || [],
+          profileSelectionRequired: false,
+          systemPresets: response.data.systemPresets || [],
           token: session.access_token,
           isLoading: false,
         });
-      } else {
-        set({ user: null, systemPresets: null, token: null, isLoading: false });
+        return { hasUser: true, profileSelectionRequired: false };
       }
+
+      set({ ...signedOutState, isLoading: false });
+      return { hasUser: false, profileSelectionRequired: false };
     } catch (error) {
       console.error("Auth check failed:", error);
-      set({ user: null, systemPresets: null, token: null, isLoading: false });
+      set({ ...signedOutState, isLoading: false });
       setAuthToken(null);
+      return { hasUser: false, profileSelectionRequired: false };
     }
   },
 
   logout: async () => {
     await supabase.auth.signOut();
     setAuthToken(null);
+    clearActiveProfile();
     stopReadOnlyImpersonation();
     localStorage.removeItem("visionlight_active_project");
-    set({ user: null, systemPresets: null, token: null });
+    set({ ...signedOutState, isLoading: false });
   },
 }));

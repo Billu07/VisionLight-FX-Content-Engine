@@ -63,9 +63,10 @@ model Organization {
 }
 
 model User {
-  id    String  @id @default(uuid())
-  email String  @unique
-  name  String?
+  id         String  @id @default(uuid())
+  authUserId String?
+  email      String
+  name       String?
 
   creditsPicDrift     Float @default(10)
   creditsPicDriftPlus Float @default(10)
@@ -96,6 +97,9 @@ model User {
   roiMetrics     ROIMetrics?
   creditRequests CreditRequest[]
   storyboard     Json?
+
+  @@index([authUserId])
+  @@index([email])
 }
 
 model Project {

@@ -410,7 +410,9 @@ router.delete("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
       }
     }
 
-    await AuthService.deleteSupabaseUserByEmail(targetUser.email);
+    await AuthService.deleteSupabaseUserByEmail(targetUser.email, {
+      deletingUserId: userId,
+    });
     await dbService.deleteUser(userId);
 
     res.json({ success: true, message: "User removed from team." });

@@ -4,9 +4,8 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Initialize Supabase Admin Client
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("❌ Missing Supabase Credentials in .env");
+  console.error("Missing Supabase credentials in .env");
 }
 
 const supabase = createClient(
@@ -14,41 +13,83 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || "",
 );
 
-// Load Super Admins from Backend ENV (Safety Net)
 const ADMIN_EMAILS_RAW = process.env.ADMIN_EMAILS || "";
 const ADMIN_EMAILS = ADMIN_EMAILS_RAW.split(",").map((email) =>
   email.trim().toLowerCase(),
 ).filter(Boolean);
 
+const sanitizeDomain = (raw?: string | null): string | null => {
+  if (!raw) return null;
+  const trimmed = raw.trim().toLowerCase();
+  if (!trimmed) return null;
+  const withoutProtocol = trimmed.replace(/^https?:\/\//, "");
+  const host = withoutProtocol.split("/")[0]?.replace(/:\d+$/, "").replace(/\.$/, "");
+  return host || null;
+};
+
+const PICDRIFT_CANONICAL_DOMAIN =
+  sanitizeDomain(process.env.PICDRIFT_CANONICAL_DOMAIN || process.env.PICDRIFT_DOMAIN) ||
+  "picdrift.studio";
+const VISIONLIGHT_CANONICAL_DOMAIN =
+  sanitizeDomain(
+    process.env.VISIONLIGHT_CANONICAL_DOMAIN ||
+      process.env.VISUALFX_CANONICAL_DOMAIN ||
+      process.env.VISUALFX_DOMAIN,
+  ) || "visualfx.studio";
+
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
 export class AuthService {
-  private static toSessionUser(user: any) {
-    const isSuperAdminEnv = ADMIN_EMAILS.includes(user.email.toLowerCase());
+  static isSuperAdminEmail(email?: string | null) {
+    return !!email && ADMIN_EMAILS.includes(email.toLowerCase());
+  }
+
+  private static getFinalRole(user: any) {
+    const isSuperAdminEnv = this.isSuperAdminEmail(user.email);
     const dbRole = user.role;
 
-    let finalRole = "USER";
-    if (isSuperAdminEnv || dbRole === "SUPERADMIN") {
-      finalRole = "SUPERADMIN";
-    } else if (dbRole === "ADMIN") {
-      finalRole = "ADMIN";
-    } else if (dbRole === "MANAGER") {
-      finalRole = "MANAGER";
-    }
+    if (isSuperAdminEnv || dbRole === "SUPERADMIN") return "SUPERADMIN";
+    if (dbRole === "ADMIN") return "ADMIN";
+    if (dbRole === "MANAGER") return "MANAGER";
+    return "USER";
+  }
 
+  private static toSessionUser(user: any) {
     return {
       id: user.id,
+      authUserId: user.authUserId || null,
       email: user.email,
       name: user.name,
       creditSystem: user.creditSystem,
       isDemo: user.isDemo === true,
-      role: finalRole,
+      role: this.getFinalRole(user),
       organizationId: user.organizationId,
       view: user.view || "VISIONLIGHT",
       maxProjects: user.maxProjects || 3,
     };
   }
 
+  private static toProfileOption(user: any) {
+    const view = user.view === "PICDRIFT" ? "PICDRIFT" : "VISIONLIGHT";
+    const organizationName = user.organization?.name || "Personal Workspace";
+    return {
+      id: user.id,
+      authUserId: user.authUserId || null,
+      email: user.email,
+      name: user.name,
+      role: this.getFinalRole(user),
+      view,
+      organizationId: user.organizationId,
+      organizationName,
+      isOrgActive: user.organization?.isActive !== false,
+      canonicalDomain:
+        view === "PICDRIFT" ? PICDRIFT_CANONICAL_DOMAIN : VISIONLIGHT_CANONICAL_DOMAIN,
+    };
+  }
+
   /**
-   * ADMIN ONLY: Creates a user in Supabase AND ensures they exist in Database.
+   * ADMIN ONLY: Creates or updates one internal workspace profile for a Supabase identity.
+   * The same Supabase email may now have multiple User rows, one per organization/profile.
    */
   static async createSystemUser(
     email: string,
@@ -60,10 +101,11 @@ export class AuthService {
     role?: string,
     isDemo?: boolean,
   ) {
-    // 1. Attempt to create in Supabase
-    let supabaseUser;
+    const normalizedEmail = normalizeEmail(email);
+
+    let supabaseUser: any;
     const { data, error } = await supabase.auth.admin.createUser({
-      email,
+      email: normalizedEmail,
       password,
       email_confirm: true,
       user_metadata: { full_name: name },
@@ -71,18 +113,18 @@ export class AuthService {
 
     if (error) {
       if (error.message.includes("already registered") || error.message.includes("already exists")) {
-        console.log(`ℹ️ User ${email} already in Supabase. Syncing identity...`);
-        // Find existing user to get ID
-        const { data: list } = await supabase.auth.admin.listUsers();
-        const existingAuth = list.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
-        
-        if (existingAuth) {
-          // Update password to match the new form
-          await supabase.auth.admin.updateUserById(existingAuth.id, { password });
-          supabaseUser = existingAuth;
-        } else {
+        const { data: list, error: listError } = await supabase.auth.admin.listUsers();
+        if (listError) throw listError;
+        const existingAuth = list.users.find(
+          (u) => u.email?.toLowerCase() === normalizedEmail,
+        );
+
+        if (!existingAuth) {
           throw new Error("Conflict: Supabase says user exists but cannot find them.");
         }
+
+        await supabase.auth.admin.updateUserById(existingAuth.id, { password });
+        supabaseUser = existingAuth;
       } else {
         throw new Error(`Supabase Create Failed: ${error.message}`);
       }
@@ -90,41 +132,65 @@ export class AuthService {
       supabaseUser = data.user;
     }
 
-    // 2. Sync with Database
-    const existingDbUser = await airtableService.findUserByEmail(email);
-    let dbUser;
+    await airtableService.attachAuthIdentityToEmail(normalizedEmail, supabaseUser.id);
+    const profiles = await airtableService.findUsersForAuthIdentity(
+      supabaseUser.id,
+      normalizedEmail,
+    );
+    const normalizedOrgId = organizationId || null;
+    const existingProfile = profiles.find(
+      (profile: any) => (profile.organizationId || null) === normalizedOrgId,
+    );
 
-    if (!existingDbUser) {
-      dbUser = await airtableService.createUser({
-        id: supabaseUser.id, // 👈 Pass the Supabase UUID
-        email,
-        name,
-        view,
-        maxProjects,
-        organizationId,
-        role,
-        isDemo,
-      });
-    } else {
-      // If they exist in DB, update them to the new Org/Role
-      dbUser = await airtableService.adminUpdateUser(existingDbUser.id, {
-        organizationId,
+    if (existingProfile) {
+      return await airtableService.adminUpdateUser(existingProfile.id, {
+        authUserId: supabaseUser.id,
         role,
         view,
         name,
         maxProjects,
+        organizationId,
         isDemo: isDemo === true,
       });
     }
 
-    return dbUser; // 👈 Return the DB record for the router to use
+    return await airtableService.createUser({
+      id: profiles.length === 0 ? supabaseUser.id : undefined,
+      authUserId: supabaseUser.id,
+      email: normalizedEmail,
+      name,
+      view,
+      maxProjects,
+      organizationId,
+      role,
+      isDemo,
+    });
   }
 
   /**
-   * ADMIN ONLY: Deletes a user from Supabase to prevent login.
+   * Deletes the Supabase identity only when no other internal profiles remain.
    */
-  static async deleteSupabaseUserByEmail(email: string) {
-    // 1. Find the Supabase User ID (UUID)
+  static async deleteSupabaseUserByEmail(
+    email: string,
+    scope?: { deletingUserId?: string; deletingOrganizationId?: string },
+  ) {
+    const normalizedEmail = normalizeEmail(email);
+    const profiles = await airtableService.findUsersByEmail(normalizedEmail);
+    const remainingProfiles = profiles.filter((profile: any) => {
+      if (scope?.deletingUserId && profile.id === scope.deletingUserId) return false;
+      if (
+        scope?.deletingOrganizationId &&
+        profile.organizationId === scope.deletingOrganizationId
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    if (remainingProfiles.length > 0) {
+      return false;
+    }
+
     const {
       data: { users },
       error: listError,
@@ -132,9 +198,7 @@ export class AuthService {
 
     if (listError) throw listError;
 
-    const userToDelete = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-
-    // 2. If found, delete by ID
+    const userToDelete = users.find((u) => u.email?.toLowerCase() === normalizedEmail);
     if (userToDelete) {
       const { error: deleteError } = await supabase.auth.admin.deleteUser(
         userToDelete.id,
@@ -146,11 +210,8 @@ export class AuthService {
     return false;
   }
 
-  /**
-   * ADMIN ONLY: Force update a user's password in Supabase.
-   */
   static async updateSupabaseUserPassword(email: string, newPassword: string) {
-    // 1. Find the Supabase User
+    const normalizedEmail = normalizeEmail(email);
     const {
       data: { users },
       error: listError,
@@ -158,26 +219,20 @@ export class AuthService {
 
     if (listError) throw listError;
 
-    const userToUpdate = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-
-    // 2. If found, update by ID
+    const userToUpdate = users.find((u) => u.email?.toLowerCase() === normalizedEmail);
     if (userToUpdate) {
       const { error: updateError } = await supabase.auth.admin.updateUserById(
         userToUpdate.id,
-        { password: newPassword }
+        { password: newPassword },
       );
       if (updateError) throw updateError;
       return true;
     }
 
-    throw new Error(`User ${email} not found in Supabase Auth.`);
+    throw new Error(`User ${normalizedEmail} not found in Supabase Auth.`);
   }
 
-  /**
-   * Validates the Bearer token (JWT) from Supabase.
-   * ✅ UPDATED: Checks .env AND Database for Admin Role.
-   */
-  static async validateSession(token: string) {
+  static async validateSession(token: string, activeProfileId?: string) {
     try {
       const {
         data: { user: supabaseUser },
@@ -188,23 +243,55 @@ export class AuthService {
         return null;
       }
 
-      let user = await airtableService.findUserByEmail(supabaseUser.email);
+      const email = normalizeEmail(supabaseUser.email);
+      await airtableService.attachAuthIdentityToEmail(email, supabaseUser.id);
+      let profiles = await airtableService.findUsersForAuthIdentity(supabaseUser.id, email);
 
-      if (!user) {
-        console.log(
-          `⚠️ User ${supabaseUser.email} found in Supabase but missing in DB. Re-syncing...`,
-        );
-        user = await airtableService.createUser({
-          email: supabaseUser.email,
+      if (profiles.length === 0) {
+        const created = await airtableService.createUser({
+          id: supabaseUser.id,
+          authUserId: supabaseUser.id,
+          email,
           name:
             supabaseUser.user_metadata?.full_name ||
-            supabaseUser.email.split("@")[0],
+            email.split("@")[0],
         });
+        profiles = [created];
       }
 
-      if (!user) return null;
+      if (activeProfileId) {
+        const selected = profiles.find((profile: any) => profile.id === activeProfileId);
+        if (selected) {
+          if (!selected.authUserId) {
+            const updated = await airtableService.attachAuthIdentityToUser(
+              selected.id,
+              supabaseUser.id,
+            );
+            return this.toSessionUser(updated);
+          }
+          return this.toSessionUser(selected);
+        }
+      }
 
-      return this.toSessionUser(user);
+      if (profiles.length === 1) {
+        const selected = profiles[0];
+        if (!selected.authUserId) {
+          const updated = await airtableService.attachAuthIdentityToUser(
+            selected.id,
+            supabaseUser.id,
+          );
+          return this.toSessionUser(updated);
+        }
+        return this.toSessionUser(selected);
+      }
+
+      return {
+        profileSelectionRequired: true,
+        authUserId: supabaseUser.id,
+        email,
+        name: supabaseUser.user_metadata?.full_name || email.split("@")[0],
+        profiles: profiles.map((profile: any) => this.toProfileOption(profile)),
+      };
     } catch (error) {
       console.error("Auth Validation Error:", error);
       return null;

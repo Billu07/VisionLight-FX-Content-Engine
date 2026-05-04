@@ -36,6 +36,26 @@ const VISIONLIGHT_CANONICAL_DOMAIN =
       process.env.VISUALFX_DOMAIN,
   ) || "visualfx.studio";
 
+const getCanonicalDomainForView = (view: "VISIONLIGHT" | "PICDRIFT") =>
+  view === "PICDRIFT" ? PICDRIFT_CANONICAL_DOMAIN : VISIONLIGHT_CANONICAL_DOMAIN;
+
+const buildPublicProfileOption = (user: any) => {
+  const view = (user?.view === "PICDRIFT" ? "PICDRIFT" : "VISIONLIGHT") as
+    | "VISIONLIGHT"
+    | "PICDRIFT";
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    view,
+    organizationId: user.organizationId,
+    organizationName: user.organization?.name || "Personal Workspace",
+    isOrgActive: user.organization?.isActive !== false,
+    canonicalDomain: getCanonicalDomainForView(view),
+  };
+};
+
 router.post("/api/auth/resolve-domain", async (req, res) => {
   try {
     const rawEmail = req.body?.email;
@@ -44,17 +64,20 @@ router.post("/api/auth/resolve-domain", async (req, res) => {
     }
 
     const email = rawEmail.trim().toLowerCase();
-    const user = await airtableService.findUserByEmail(email);
+    const users = await airtableService.findUsersByEmail(email);
+    const user = users[0];
     const incomingHost = resolveIncomingHost(req);
 
     const resolvedView = (user?.view || "VISIONLIGHT") as "VISIONLIGHT" | "PICDRIFT";
-    const canonicalFromView =
-      resolvedView === "PICDRIFT" ? PICDRIFT_CANONICAL_DOMAIN : VISIONLIGHT_CANONICAL_DOMAIN;
+    const canonicalFromView = getCanonicalDomainForView(resolvedView);
+    const profiles = users.map(buildPublicProfileOption);
+    const hasMultipleProfiles = profiles.length > 1;
 
     // Keep response generic to reduce account-enumeration signal.
-    // If user isn't known, stay on current host.
+    // If user isn't known, stay on current host. If multiple profiles exist,
+    // let the client ask the user to choose a workspace before password entry.
     const canonicalDomain =
-      !DOMAIN_ROUTING_ENABLED
+      !DOMAIN_ROUTING_ENABLED || hasMultipleProfiles
         ? null
         : user
           ? canonicalFromView
@@ -69,6 +92,8 @@ router.post("/api/auth/resolve-domain", async (req, res) => {
       domainRoutingEnabled: DOMAIN_ROUTING_ENABLED,
       canonicalDomain,
       domainRedirectRequired,
+      profiles,
+      profileSelectionRequired: hasMultipleProfiles,
     });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
@@ -81,6 +106,15 @@ router.get(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
+      if (req.user?.profileSelectionRequired) {
+        return res.json({
+          success: true,
+          profileSelectionRequired: true,
+          profiles: req.user.profiles || [],
+          user: null,
+        });
+      }
+
       const user = await airtableService.findUserById(req.user!.id);
       if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -121,6 +155,11 @@ router.get(
         where: { isActive: true },
         select: { id: true, name: true, prompt: true },
       });
+      const profileRows = await airtableService.findUsersForAuthIdentity(
+        (user as any).authUserId || req.user?.authUserId || "",
+        user.email,
+      );
+      const profiles = profileRows.map(buildPublicProfileOption);
 
       let videoEditorEnabledForAll = false;
       try {
@@ -137,9 +176,7 @@ router.get(
       const canonicalDomain =
         !DOMAIN_ROUTING_ENABLED || isReadOnlyImpersonation
           ? null
-          : orgViewType === "PICDRIFT"
-            ? PICDRIFT_CANONICAL_DOMAIN
-            : VISIONLIGHT_CANONICAL_DOMAIN;
+          : getCanonicalDomainForView(orgViewType);
       const incomingHost = resolveIncomingHost(req);
       const domainRedirectRequired = Boolean(
         canonicalDomain && incomingHost && incomingHost !== canonicalDomain,
@@ -148,6 +185,7 @@ router.get(
       res.json({
         success: true,
         systemPresets,
+        profiles,
         user: {
           ...req.user,
           view: orgViewType,

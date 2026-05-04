@@ -82,7 +82,7 @@ const sanitizePricingUpdate = (payload: any) => {
 
 // Debug Logger
 router.use((req, res, next) => {
-  console.log(`📡 SuperAdmin Router Hit: ${req.method} ${req.url}`);
+  console.log(`SuperAdmin Router Hit: ${req.method} ${req.url}`);
   next();
 });
 
@@ -157,89 +157,36 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
       isDefault: false
     });
     const initialAdminMaxProjects = Math.max(1, Math.min(3, org.maxProjectsTotal));
-    // 2. Check if User already exists
-    const existingUser = await dbService.findUserByEmail(adminEmail);
-    let adminUser;
-
-    if (existingUser) {
-      // Security check: Don't move other SuperAdmins
-      if (existingUser.role === "SUPERADMIN") {
-        throw new Error("Cannot move a System SuperAdmin to a Tenant organization.");
-      }
-
-      // 3a. Update Password in Supabase (Identity Sync)
-      await AuthService.updateSupabaseUserPassword(adminEmail, adminPassword);
-
-      // 3b. Update Existing User (Migrate to new Org & Reset Credits)
-      adminUser = await dbService.adminUpdateUser(existingUser.id, {
-        organizationId: org.id,
-        role: "ADMIN",
-        view: userView,
-        isDemo: false,
-        name: adminName || existingUser.name,
-        maxProjects: initialAdminMaxProjects,
-        // Reset credits to 0 - Tenant must add credits or configure keys
-        creditsPicDrift: 0,
-        creditsPicDriftPlus: 0,
-        creditsImageFX: 0,
-        creditsVideoFX1: 0,
-        creditsVideoFX2: 0,
-        creditsVideoFX3: 0,
-        creditSystem: "INTERNAL"
-      });
-
-      // 3c. Migrate Data to New Organization
-      // Move any existing projects to the new organization
-      await prisma.project.updateMany({
-        where: { userId: existingUser.id },
-        data: { organizationId: org.id }
-      });
-
-      // Find assets that belong to the user but are not explicitly assigned to a project (or are in the default org)
-      // Actually, let's create a default project to hold migrated demo assets
-      const migratedProject = await prisma.project.create({
-        data: {
-          name: "Migrated Demo Assets",
-          userId: existingUser.id,
-          organizationId: org.id,
-        }
-      });
-
-      // Update all assets belonging to the user to point to the new org, and assign them to the migrated project if they have none
-      await prisma.asset.updateMany({
-        where: { userId: existingUser.id, projectId: null },
-        data: { organizationId: org.id, projectId: migratedProject.id }
-      });
-      // Also update org ID for assets that ALREADY have a project (since we migrated the projects too)
-      await prisma.asset.updateMany({
-        where: { userId: existingUser.id, projectId: { not: null } },
-        data: { organizationId: org.id }
-      });
-
-      // Do the same for posts
-      await prisma.post.updateMany({
-        where: { userId: existingUser.id, projectId: null },
-        data: { organizationId: org.id, projectId: migratedProject.id }
-      });
-      await prisma.post.updateMany({
-        where: { userId: existingUser.id, projectId: { not: null } },
-        data: { organizationId: org.id }
-      });
-
-      console.log(`✅ Fully Migrated and Synced user ${adminEmail} to new Tenant Org: ${orgName}`);
-    } else {
-      // 3d. Create Brand New Admin User (Starts with 0 credits automatically now)
-      adminUser = await AuthService.createSystemUser(
-        adminEmail,
-        adminPassword,
-        adminName || `${orgName} Admin`,
-        userView,
-        initialAdminMaxProjects,
-        org.id,
-        "ADMIN"
-      );
+    const existingProfiles = await dbService.findUsersByEmail(adminEmail);
+    if (
+      AuthService.isSuperAdminEmail(adminEmail) ||
+      existingProfiles.some((profile: any) => profile.role === "SUPERADMIN")
+    ) {
+      throw new Error("Cannot create a tenant profile for a System SuperAdmin email.");
     }
 
+    // Existing emails now get a new internal profile for this tenant. Their
+    // previous projects/assets stay attached to their original profile.
+    const adminUser = await AuthService.createSystemUser(
+      adminEmail,
+      adminPassword,
+      adminName || `${orgName} Admin`,
+      userView,
+      initialAdminMaxProjects,
+      org.id,
+      "ADMIN"
+    );
+
+    await dbService.adminUpdateUser(adminUser.id, {
+      creditsPicDrift: 0,
+      creditsPicDriftPlus: 0,
+      creditsImageFX: 0,
+      creditsVideoFX1: 0,
+      creditsVideoFX2: 0,
+      creditsVideoFX3: 0,
+      creditSystem: "INTERNAL",
+      isDemo: false,
+    });
     res.json({ success: true, organization: org, adminUser });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -252,7 +199,7 @@ router.get("/test", (req, res) => res.json({ success: true, message: "SuperAdmin
 // Delete Organization
 router.delete("/organizations/:id", async (req: AuthenticatedRequest, res) => {
   try {
-    console.log(`🗑️ DEEP DELETE Request for Organization: ${req.params.id}`);
+    console.log(`Deep delete request for organization: ${req.params.id}`);
     
     // 1. Check if it's the default org (cannot delete)
     const org = await dbService.getOrganization(req.params.id);
@@ -265,10 +212,16 @@ router.delete("/organizations/:id", async (req: AuthenticatedRequest, res) => {
     
     for (const u of usersInOrg) {
       try {
-        await AuthService.deleteSupabaseUserByEmail(u.email);
-        console.log(`🧹 Wiped ${u.email} from Supabase Auth`);
+        const deletedAuthUser = await AuthService.deleteSupabaseUserByEmail(u.email, {
+          deletingOrganizationId: req.params.id,
+        });
+        console.log(
+          deletedAuthUser
+            ? `Wiped ${u.email} from Supabase Auth`
+            : `Kept Supabase Auth for ${u.email}; another profile still exists`,
+        );
       } catch (e) {
-        console.error(`⚠️ Failed to wipe ${u.email} from Supabase:`, e);
+        console.error(`Failed to wipe ${u.email} from Supabase:`, e);
       }
     }
 

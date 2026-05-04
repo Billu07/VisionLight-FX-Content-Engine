@@ -49,8 +49,8 @@ async function purgeZombies() {
     }
 
     // Safety Check 2: Does it exist in our DB?
-    const dbUser = await prisma.user.findUnique({
-      where: { email: email }
+    const dbUser = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } }
     });
 
     if (dbUser) {

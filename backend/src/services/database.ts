@@ -112,8 +112,64 @@ export const dbService = {
 
   // === USER ===
   async findUserByEmail(email: string) {
-    return prisma.user.findUnique({
-      where: { email },
+    return prisma.user.findFirst({
+      where: { email: { equals: email.trim().toLowerCase(), mode: "insensitive" } },
+      orderBy: { createdAt: "asc" },
+      include: { organization: true },
+    });
+  },
+  async findUsersByEmail(email: string) {
+    return prisma.user.findMany({
+      where: { email: { equals: email.trim().toLowerCase(), mode: "insensitive" } },
+      include: { organization: true },
+      orderBy: { createdAt: "asc" },
+    });
+  },
+  async findUsersForAuthIdentity(authUserId: string, email: string) {
+    const orClauses: any[] = [
+      { email: { equals: email.trim().toLowerCase(), mode: "insensitive" } },
+    ];
+    if (authUserId?.trim()) {
+      orClauses.unshift({ authUserId });
+    }
+
+    return prisma.user.findMany({
+      where: {
+        OR: orClauses,
+      },
+      include: { organization: true },
+      orderBy: { createdAt: "asc" },
+    });
+  },
+  async findUserProfileForAuthIdentity(
+    profileId: string,
+    authUserId: string,
+    email: string,
+  ) {
+    return prisma.user.findFirst({
+      where: {
+        id: profileId,
+        OR: [
+          { authUserId },
+          { email: { equals: email.trim().toLowerCase(), mode: "insensitive" } },
+        ],
+      },
+      include: { organization: true },
+    });
+  },
+  async attachAuthIdentityToEmail(email: string, authUserId: string) {
+    return prisma.user.updateMany({
+      where: {
+        email: { equals: email.trim().toLowerCase(), mode: "insensitive" },
+        OR: [{ authUserId: null }, { authUserId: "" }],
+      },
+      data: { authUserId },
+    });
+  },
+  async attachAuthIdentityToUser(userId: string, authUserId: string) {
+    return prisma.user.update({
+      where: { id: userId },
+      data: { authUserId },
       include: { organization: true },
     });
   },
@@ -126,6 +182,7 @@ export const dbService = {
   async createUser(data: {
     id?: string; // 👈 Allow passing Supabase UUID
     email: string;
+    authUserId?: string;
     name?: string;
     view?: string;
     maxProjects?: number;
@@ -148,7 +205,8 @@ export const dbService = {
     return prisma.user.create({
       data: {
         id: data.id, // 👈 Map Supabase ID here
-        email: data.email,
+        authUserId: data.authUserId,
+        email: data.email.trim().toLowerCase(),
         name: data.name,
         view: data.view || "VISIONLIGHT",
         maxProjects: data.maxProjects || 3,

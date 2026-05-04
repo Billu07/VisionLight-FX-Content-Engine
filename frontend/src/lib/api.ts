@@ -5,6 +5,8 @@ const RAW_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const API_BASE_URL = RAW_URL.replace(/\/api\/?$/, "").replace(/\/$/, "");
 const IMPERSONATE_USER_ID_KEY = "visionlight_impersonate_user_id";
 const IMPERSONATE_USER_LABEL_KEY = "visionlight_impersonate_user_label";
+const ACTIVE_PROFILE_ID_KEY = "visionlight_active_profile_id";
+const ACTIVE_PROFILE_LABEL_KEY = "visionlight_active_profile_label";
 
 console.log("API Base URL:", API_BASE_URL);
 
@@ -249,7 +251,33 @@ export const stopReadOnlyImpersonation = () => {
 export const getReadOnlyImpersonationLabel = () =>
   localStorage.getItem(IMPERSONATE_USER_LABEL_KEY) || "";
 
+export const setActiveProfile = (profileId: string, label?: string) => {
+  localStorage.setItem(ACTIVE_PROFILE_ID_KEY, profileId);
+  if (label) localStorage.setItem(ACTIVE_PROFILE_LABEL_KEY, label);
+  localStorage.removeItem("visionlight_active_project");
+  stopReadOnlyImpersonation();
+};
+
+export const clearActiveProfile = () => {
+  localStorage.removeItem(ACTIVE_PROFILE_ID_KEY);
+  localStorage.removeItem(ACTIVE_PROFILE_LABEL_KEY);
+  localStorage.removeItem("visionlight_active_project");
+  stopReadOnlyImpersonation();
+};
+
+export const getActiveProfileId = () =>
+  localStorage.getItem(ACTIVE_PROFILE_ID_KEY) || "";
+
+export const getActiveProfileLabel = () =>
+  localStorage.getItem(ACTIVE_PROFILE_LABEL_KEY) || "";
+
 api.interceptors.request.use((config) => {
+  const activeProfileId = localStorage.getItem(ACTIVE_PROFILE_ID_KEY);
+  if (activeProfileId) {
+    config.headers = config.headers || {};
+    config.headers["X-Active-User-Id"] = activeProfileId;
+  }
+
   const impersonateUserId = localStorage.getItem(IMPERSONATE_USER_ID_KEY);
   if (impersonateUserId) {
     config.headers = config.headers || {};

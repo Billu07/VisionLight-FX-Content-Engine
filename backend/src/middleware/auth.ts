@@ -21,9 +21,32 @@ export const authenticateToken = async (
   if (!token) return res.status(401).json({ error: "Authentication required" });
 
   try {
-    const user = await AuthService.validateSession(token);
+    const activeProfileHeader = req.headers["x-active-user-id"];
+    const activeProfileId = Array.isArray(activeProfileHeader)
+      ? activeProfileHeader[0]
+      : activeProfileHeader;
+
+    const user = await AuthService.validateSession(
+      token,
+      typeof activeProfileId === "string" ? activeProfileId.trim() : undefined,
+    );
     if (!user)
       return res.status(401).json({ error: "Invalid or expired token" });
+    const sessionUser: any = user;
+
+    if (sessionUser.profileSelectionRequired && req.originalUrl !== "/api/auth/me") {
+      return res.status(409).json({
+        error: "Workspace selection required.",
+        code: "PROFILE_SELECTION_REQUIRED",
+        profiles: sessionUser.profiles || [],
+      });
+    }
+
+    if (sessionUser.profileSelectionRequired) {
+      req.user = sessionUser;
+      req.token = token;
+      return next();
+    }
 
     const impersonateHeader = req.headers["x-impersonate-user-id"];
     const impersonateUserId = Array.isArray(impersonateHeader)
@@ -32,11 +55,11 @@ export const authenticateToken = async (
 
     if (typeof impersonateUserId === "string" && impersonateUserId.trim()) {
       req.user = await AuthService.getReadOnlyImpersonationTarget(
-        user,
+        sessionUser,
         impersonateUserId.trim(),
       );
     } else {
-      req.user = user;
+      req.user = sessionUser;
     }
 
     if (

@@ -8,13 +8,13 @@ async function main() {
   console.log("🚀 Promoting users to SUPERADMIN...");
 
   for (const email of emailsToPromote) {
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: email.toLowerCase(), mode: "insensitive" } },
     });
 
     if (user) {
-      await prisma.user.update({
-        where: { email: email.toLowerCase() },
+      await prisma.user.updateMany({
+        where: { email: { equals: email.toLowerCase(), mode: "insensitive" } },
         data: { role: "SUPERADMIN" },
       });
       console.log(`✅ Promoted ${email} to SUPERADMIN`);

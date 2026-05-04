@@ -15,6 +15,7 @@ import Dashboard from "./pages/Dashboard";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import TenantDashboard from "./pages/TenantDashboard";
 import Projects from "./pages/Projects";
+import StudioChooser from "./pages/StudioChooser";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { BrandProvider } from "./contexts/BrandContext";
 import { useAuth } from "./hooks/useAuth";
@@ -77,7 +78,7 @@ const DeactivatedAccountScreen = () => {
 
 // --- Standard Protected Route ---
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading, checkAuth } = useAuth();
+  const { user, isLoading, checkAuth, profileSelectionRequired } = useAuth();
   const location = useLocation();
   const redirectUrl = getCanonicalDomainRedirectUrl(user);
   const hasRedirectedRef = useRef(false);
@@ -99,6 +100,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         <LoadingSpinner size="lg" variant="neon" />
       </div>
     );
+  if (profileSelectionRequired) return <Navigate to="/studios" replace />;
+
   if (!user) return <Navigate to="/" state={{ from: location }} replace />;
 
   if (redirectUrl) {
@@ -129,7 +132,7 @@ const ProjectRoute = ({ children }: { children: React.ReactNode }) => {
 
 // --- 🔒 Admin Only Route ---
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoading, checkAuth } = useAuth();
+  const { user, isLoading, checkAuth, profileSelectionRequired } = useAuth();
   const redirectUrl = getCanonicalDomainRedirectUrl(user);
   const hasRedirectedRef = useRef(false);
 
@@ -150,6 +153,8 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
         <LoadingSpinner size="lg" variant="neon" />
       </div>
     );
+
+  if (profileSelectionRequired) return <Navigate to="/studios" replace />;
 
   // 1. Must be logged in
   if (!user) return <Navigate to="/" replace />;
@@ -201,6 +206,7 @@ function App() {
             {/* --- ADD THESE NEW ROUTES --- */}
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/studios" element={<StudioChooser />} />
             {/* --------------------------- */}
 
             <Route
