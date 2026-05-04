@@ -161,11 +161,14 @@ router.get(
         where: { isActive: true },
         select: { id: true, name: true, prompt: true },
       });
-      const profileRows = await airtableService.findUsersForAuthIdentity(
-        (user as any).authUserId || req.user?.authUserId || "",
-        user.email,
-      );
-      const profiles = profileRows.map(buildPublicProfileOption);
+      const profiles = isReadOnlyImpersonation
+        ? [buildPublicProfileOption(user)]
+        : (
+            await airtableService.findUsersForAuthIdentity(
+              (user as any).authUserId || req.user?.authUserId || "",
+              user.email,
+            )
+          ).map(buildPublicProfileOption);
 
       let videoEditorEnabledForAll = false;
       try {

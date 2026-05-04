@@ -16,8 +16,9 @@ export default function Projects() {
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [openMenuProjectId, setOpenMenuProjectId] = useState<string | null>(null);
+  const isReadOnlyAccess = user?.readOnlyImpersonation === true;
   const canOpenAdmin =
-    !user?.readOnlyImpersonation &&
+    !isReadOnlyAccess &&
     (user?.role === "ADMIN" || user?.role === "SUPERADMIN");
 
   const { data: projectsData, isLoading } = useQuery({
@@ -108,7 +109,7 @@ export default function Projects() {
           </h1>
 
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-            {profiles.length > 1 && (
+            {!isReadOnlyAccess && profiles.length > 1 && (
               <button
                 type="button"
                 onClick={() => navigate("/studios")}
@@ -129,12 +130,12 @@ export default function Projects() {
             <button
               type="button"
               onClick={() => setShowCreateForm((prev) => !prev)}
-              disabled={user?.readOnlyImpersonation}
+              disabled={isReadOnlyAccess}
               className="rounded-lg border border-cyan-700/50 bg-cyan-900/50 px-4 py-2 text-xs font-semibold text-cyan-300 transition-colors hover:border-cyan-500 hover:bg-cyan-800"
             >
               {showCreateForm ? "Close" : "Create Project"}
             </button>
-            {user?.readOnlyImpersonation && (
+            {isReadOnlyAccess && (
               <button
                 type="button"
                 onClick={() => {
@@ -156,13 +157,13 @@ export default function Projects() {
           </div>
         </div>
 
-        {user?.readOnlyImpersonation && (
+        {isReadOnlyAccess && (
           <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
             Read-only dashboard access for {user.email}. Project creation and edits are blocked.
           </div>
         )}
 
-        {showCreateForm && !user?.readOnlyImpersonation && (
+        {showCreateForm && !isReadOnlyAccess && (
           <div className="mb-6 rounded-2xl border border-cyan-500/25 bg-gray-900/55 p-4 shadow-2xl backdrop-blur-xl">
             <form
               onSubmit={handleCreate}
@@ -267,7 +268,7 @@ export default function Projects() {
                           </svg>
                         </button>
 
-                        {openMenuProjectId === project.id && !user?.readOnlyImpersonation && (
+                        {openMenuProjectId === project.id && !isReadOnlyAccess && (
                           <div className="absolute right-0 top-full z-20 mt-2 w-36 rounded-xl border border-white/10 bg-gray-900 p-1 shadow-2xl">
                             <button
                               type="button"

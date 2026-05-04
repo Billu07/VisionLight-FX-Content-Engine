@@ -70,6 +70,10 @@ export default function StudioChooser() {
     );
   }
 
+  if (user?.readOnlyImpersonation) {
+    return <Navigate to="/projects" replace />;
+  }
+
   if (user && !profileSelectionRequired && profiles.length <= 1) {
     return <Navigate to="/projects" replace />;
   }
