@@ -58,6 +58,11 @@ export const apiEndpoints = {
   superadminUpdateOrgStatus: (id: string, isActive: boolean) => api.put(`/api/superadmin/organizations/${id}/status`, { isActive }),
   superadminUpdateOrgLimits: (id: string, data: any) => api.put(`/api/superadmin/organizations/${id}/limits`, data),
   superadminGetUsers: () => api.get("/api/superadmin/users"),
+  superadminCheckEmailStatus: (data: {
+    email: string;
+    organizationId?: string;
+    defaultOrganization?: boolean;
+  }) => api.post("/api/superadmin/users/email-status", data),
   superadminUpdateUser: (userId: string, data: any) =>
     api.put(`/api/superadmin/users/${userId}`, data),
   superadminCreateDemoUser: (data: any) => api.post("/api/superadmin/users/demo", data),
@@ -80,6 +85,8 @@ export const apiEndpoints = {
 
   // === Tenant (Team Management) ===
   tenantGetTeam: () => api.get("/api/tenant/team"),
+  tenantCheckTeamEmail: (email: string) =>
+    api.post("/api/tenant/team/email-status", { email }),
   tenantAddUser: (data: any) => api.post("/api/tenant/team/user", data),
   tenantUpdateUser: (userId: string, data: any) => api.put(`/api/tenant/team/user/${userId}`, data),
   tenantDeleteUser: (userId: string) => api.delete(`/api/tenant/team/user/${userId}`),

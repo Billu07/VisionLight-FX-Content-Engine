@@ -50,6 +50,14 @@ interface CreditRequest {
   } | null;
 }
 
+interface ProvisionEmailStatus {
+  email: string;
+  authExists: boolean;
+  profileCount: number;
+  existingProfileInOrganization: boolean;
+  requiresPassword: boolean;
+}
+
 const COVERAGE_WALLETS = [
   { key: "creditsPicDrift", label: "PicDrift (Standard)", provider: "fal" },
   { key: "creditsPicDriftPlus", label: "Kling 3.0", provider: "fal" },
@@ -251,12 +259,18 @@ export default function SuperAdminDashboard() {
     trialDays: 14,
     view: "VISIONLIGHT"
   });
+  const [tenantAdminEmailStatus, setTenantAdminEmailStatus] =
+    useState<ProvisionEmailStatus | null>(null);
+  const [checkingTenantAdminEmail, setCheckingTenantAdminEmail] = useState(false);
 
   const [newDemo, setNewDemo] = useState({
     email: "",
     password: "",
     name: ""
   });
+  const [demoEmailStatus, setDemoEmailStatus] =
+    useState<ProvisionEmailStatus | null>(null);
+  const [checkingDemoEmail, setCheckingDemoEmail] = useState(false);
 
   const [newTeamMember, setNewTeamMember] = useState({
     email: "",
@@ -265,6 +279,9 @@ export default function SuperAdminDashboard() {
     role: "USER",
     view: "VISIONLIGHT",
   });
+  const [teamMemberEmailStatus, setTeamMemberEmailStatus] =
+    useState<ProvisionEmailStatus | null>(null);
+  const [checkingTeamMemberEmail, setCheckingTeamMemberEmail] = useState(false);
   const [welcomeVideoUploading, setWelcomeVideoUploading] = useState(false);
   const [variantCostUsd, setVariantCostUsd] = useState<
     Record<CoverageVariantId, number>
@@ -293,6 +310,137 @@ export default function SuperAdminDashboard() {
     const n = Number(value);
     if (!Number.isFinite(n)) return fallback;
     return Math.max(0, Math.round(n));
+  };
+
+  const normalizedTenantAdminEmail = newTenant.adminEmail.trim().toLowerCase();
+  const normalizedDemoEmail = newDemo.email.trim().toLowerCase();
+  const normalizedTeamMemberEmail = newTeamMember.email.trim().toLowerCase();
+
+  const isTenantAdminEmailChecked =
+    !!tenantAdminEmailStatus &&
+    tenantAdminEmailStatus.email === normalizedTenantAdminEmail;
+  const canContinueTenantAdmin =
+    isTenantAdminEmailChecked &&
+    !tenantAdminEmailStatus?.existingProfileInOrganization;
+  const tenantAdminNeedsPassword =
+    canContinueTenantAdmin && tenantAdminEmailStatus?.requiresPassword === true;
+
+  const isDemoEmailChecked =
+    !!demoEmailStatus && demoEmailStatus.email === normalizedDemoEmail;
+  const canContinueDemo =
+    isDemoEmailChecked && !demoEmailStatus?.existingProfileInOrganization;
+  const demoNeedsPassword =
+    canContinueDemo && demoEmailStatus?.requiresPassword === true;
+
+  const isTeamMemberEmailChecked =
+    !!teamMemberEmailStatus &&
+    teamMemberEmailStatus.email === normalizedTeamMemberEmail;
+  const canContinueTeamMember =
+    isTeamMemberEmailChecked &&
+    !teamMemberEmailStatus?.existingProfileInOrganization;
+  const teamMemberNeedsPassword =
+    canContinueTeamMember && teamMemberEmailStatus?.requiresPassword === true;
+
+  const resetNewTenantForm = () => {
+    setNewTenant({
+      orgName: "",
+      adminEmail: "",
+      adminPassword: "",
+      adminName: "",
+      maxUsers: 5,
+      maxProjectsTotal: 20,
+      tenantPlan: "PAID",
+      trialDays: 14,
+      view: "VISIONLIGHT",
+    });
+    setTenantAdminEmailStatus(null);
+  };
+
+  const resetNewDemoForm = () => {
+    setNewDemo({ email: "", password: "", name: "" });
+    setDemoEmailStatus(null);
+  };
+
+  const resetNewTeamMemberForm = () => {
+    setNewTeamMember({
+      email: "",
+      password: "",
+      name: "",
+      role: "USER",
+      view: "VISIONLIGHT",
+    });
+    setTeamMemberEmailStatus(null);
+  };
+
+  const checkTenantAdminEmail = async () => {
+    if (!normalizedTenantAdminEmail) {
+      setMsg("Error: Admin email is required.");
+      return null;
+    }
+    setCheckingTenantAdminEmail(true);
+    try {
+      const res = await apiEndpoints.superadminCheckEmailStatus({
+        email: normalizedTenantAdminEmail,
+      });
+      const status = res.data as ProvisionEmailStatus;
+      setTenantAdminEmailStatus(status);
+      if (status.authExists) {
+        setNewTenant((prev) => ({ ...prev, adminPassword: "" }));
+      }
+      return status;
+    } catch (err: any) {
+      setMsg("Error: " + err.message);
+      return null;
+    } finally {
+      setCheckingTenantAdminEmail(false);
+    }
+  };
+
+  const checkDemoEmail = async () => {
+    if (!normalizedDemoEmail) {
+      setMsg("Error: Demo lead email is required.");
+      return null;
+    }
+    setCheckingDemoEmail(true);
+    try {
+      const res = await apiEndpoints.superadminCheckEmailStatus({
+        email: normalizedDemoEmail,
+        defaultOrganization: true,
+      });
+      const status = res.data as ProvisionEmailStatus;
+      setDemoEmailStatus(status);
+      if (status.authExists) {
+        setNewDemo((prev) => ({ ...prev, password: "" }));
+      }
+      return status;
+    } catch (err: any) {
+      setMsg("Error: " + err.message);
+      return null;
+    } finally {
+      setCheckingDemoEmail(false);
+    }
+  };
+
+  const checkTeamMemberEmail = async () => {
+    if (!normalizedTeamMemberEmail) {
+      setMsg("Error: Team member email is required.");
+      return null;
+    }
+    setCheckingTeamMemberEmail(true);
+    try {
+      const res = await apiEndpoints.tenantCheckTeamEmail(normalizedTeamMemberEmail);
+      const status = res.data as ProvisionEmailStatus;
+      setTeamMemberEmailStatus(status);
+      if (status.authExists) {
+        setNewTeamMember((prev) => ({ ...prev, password: "" }));
+      }
+      return status;
+    } catch (err: any) {
+      setMsg("Error: " + err.message);
+      return null;
+    } finally {
+      setCheckingTeamMemberEmail(false);
+    }
   };
 
   useEffect(() => {
@@ -391,15 +539,31 @@ export default function SuperAdminDashboard() {
 
   const handleCreateTenant = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!canContinueTenantAdmin) {
+      await checkTenantAdminEmail();
+      return;
+    }
+    if (tenantAdminNeedsPassword && newTenant.adminPassword.trim().length < 6) {
+      setMsg("Error: Admin password must be at least 6 characters for a new login.");
+      return;
+    }
+
     setActionLoading(true);
     try {
-      const res = await apiEndpoints.superadminCreateTenant(newTenant);
+      const res = await apiEndpoints.superadminCreateTenant({
+        ...newTenant,
+        adminPassword: tenantAdminNeedsPassword
+          ? newTenant.adminPassword.trim()
+          : "",
+      });
       setMsg(
         res.data?.adminUser?.authIdentityReused
           ? "Tenant created. Existing admin login credentials will be reused."
           : "Tenant created successfully.",
       );
       setShowTenantModal(false);
+      resetNewTenantForm();
       fetchInitialData();
     } catch (err: any) {
       setMsg("Error: " + err.message);
@@ -462,15 +626,29 @@ export default function SuperAdminDashboard() {
 
   const handleCreateDemo = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!canContinueDemo) {
+      await checkDemoEmail();
+      return;
+    }
+    if (demoNeedsPassword && newDemo.password.trim().length < 6) {
+      setMsg("Error: Password must be at least 6 characters for a new login.");
+      return;
+    }
+
     setActionLoading(true);
     try {
-      const res = await apiEndpoints.superadminCreateDemoUser(newDemo);
+      const res = await apiEndpoints.superadminCreateDemoUser({
+        ...newDemo,
+        password: demoNeedsPassword ? newDemo.password.trim() : "",
+      });
       setMsg(
         res.data?.user?.authIdentityReused
           ? "Demo profile created. Existing login credentials will be reused."
           : "Demo user created.",
       );
       setShowDemoModal(false);
+      resetNewDemoForm();
       fetchInitialData();
     } catch (err: any) {
       setMsg("Error: " + err.message);
@@ -481,15 +659,31 @@ export default function SuperAdminDashboard() {
 
   const handleAddTeamMember = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!canContinueTeamMember) {
+      await checkTeamMemberEmail();
+      return;
+    }
+    if (teamMemberNeedsPassword && newTeamMember.password.trim().length < 6) {
+      setMsg("Error: Password must be at least 6 characters for a new login.");
+      return;
+    }
+
     setActionLoading(true);
     try {
-      const res = await apiEndpoints.tenantAddUser(newTeamMember);
+      const res = await apiEndpoints.tenantAddUser({
+        ...newTeamMember,
+        password: teamMemberNeedsPassword
+          ? newTeamMember.password.trim()
+          : "",
+      });
       setMsg(
         res.data?.user?.authIdentityReused
           ? "Team member added. Existing login credentials will be reused."
           : "Team member added.",
       );
       setShowAddTeamModal(false);
+      resetNewTeamMemberForm();
       fetchInitialData();
     } catch (err: any) {
       setMsg("Error: " + err.message);
@@ -1472,22 +1666,74 @@ export default function SuperAdminDashboard() {
                     className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
                     placeholder="Admin Email"
                     type="email"
+                    value={newTenant.adminEmail}
                     required
-                    onChange={e => setNewTenant({ ...newTenant, adminEmail: e.target.value })}
+                    onChange={(e) => {
+                      setNewTenant({ ...newTenant, adminEmail: e.target.value });
+                      setTenantAdminEmailStatus(null);
+                    }}
                   />
-                  <input
-                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
-                    placeholder="Initial Password"
-                    type="password"
-                    required
-                    onChange={e => setNewTenant({ ...newTenant, adminPassword: e.target.value })}
-                  />
+                  {isTenantAdminEmailChecked && (
+                    <div
+                      className={`rounded-xl border p-3 text-[10px] font-bold uppercase tracking-widest ${
+                        tenantAdminEmailStatus?.authExists
+                          ? "border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
+                          : "border-amber-400/25 bg-amber-400/10 text-amber-200"
+                      }`}
+                    >
+                      {tenantAdminEmailStatus?.authExists
+                        ? "Existing login found. Tenant admin will use their current password."
+                        : "New login. Set an initial password for this tenant admin."}
+                    </div>
+                  )}
+                  {canContinueTenantAdmin && (
+                    <>
+                      <input
+                        className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
+                        placeholder="Admin Name (optional)"
+                        value={newTenant.adminName}
+                        onChange={e => setNewTenant({ ...newTenant, adminName: e.target.value })}
+                      />
+                      {tenantAdminNeedsPassword && (
+                        <input
+                          className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
+                          placeholder="Initial Password"
+                          type="password"
+                          value={newTenant.adminPassword}
+                          required
+                          minLength={6}
+                          onChange={e => setNewTenant({ ...newTenant, adminPassword: e.target.value })}
+                        />
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
               <div className="flex gap-4 pt-4">
-                <button type="button" onClick={() => setShowTenantModal(false)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
-                <button type="submit" disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
-                  {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : "Deploy Tenant"}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTenantModal(false);
+                    resetNewTenantForm();
+                  }}
+                  className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={actionLoading || checkingTenantAdminEmail}
+                  className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all disabled:opacity-50"
+                >
+                  {actionLoading ? (
+                    <LoadingSpinner size="sm" color="text-gray-950" />
+                  ) : checkingTenantAdminEmail ? (
+                    "Checking..."
+                  ) : canContinueTenantAdmin ? (
+                    "Deploy Tenant"
+                  ) : (
+                    "Continue"
+                  )}
                 </button>
               </div>
             </form>
@@ -1667,26 +1913,81 @@ export default function SuperAdminDashboard() {
                 className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
                 placeholder="Demo Lead Email"
                 type="email"
+                value={newDemo.email}
                 required
-                onChange={e => setNewDemo({ ...newDemo, email: e.target.value })}
+                onChange={(e) => {
+                  setNewDemo({ ...newDemo, email: e.target.value });
+                  setDemoEmailStatus(null);
+                }}
               />
-              <input
-                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
-                placeholder="Demo Lead Name"
-                required
-                onChange={e => setNewDemo({ ...newDemo, name: e.target.value })}
-              />
-              <input
-                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
-                placeholder="Initial Password"
-                type="password"
-                required
-                onChange={e => setNewDemo({ ...newDemo, password: e.target.value })}
-              />
+              {isDemoEmailChecked && (
+                <div
+                  className={`rounded-xl border p-3 text-[10px] font-bold uppercase tracking-widest ${
+                    demoEmailStatus?.existingProfileInOrganization
+                      ? "border-red-500/30 bg-red-500/10 text-red-300"
+                      : demoEmailStatus?.authExists
+                        ? "border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
+                        : "border-amber-400/25 bg-amber-400/10 text-amber-200"
+                  }`}
+                >
+                  {demoEmailStatus?.existingProfileInOrganization
+                    ? "This email already has a demo/default workspace profile."
+                    : demoEmailStatus?.authExists
+                      ? "Existing login found. Demo profile will use the current password."
+                      : "New login. Set an initial password for this demo profile."}
+                </div>
+              )}
+              {canContinueDemo && (
+                <>
+                  <input
+                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                    placeholder="Demo Lead Name"
+                    value={newDemo.name}
+                    required
+                    onChange={e => setNewDemo({ ...newDemo, name: e.target.value })}
+                  />
+                  {demoNeedsPassword && (
+                    <input
+                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                      placeholder="Initial Password"
+                      type="password"
+                      value={newDemo.password}
+                      required
+                      minLength={6}
+                      onChange={e => setNewDemo({ ...newDemo, password: e.target.value })}
+                    />
+                  )}
+                </>
+              )}
               <div className="flex gap-4 pt-4">
-                <button type="button" onClick={() => setShowDemoModal(false)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
-                <button type="submit" disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
-                  {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : "Create Demo"}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDemoModal(false);
+                    resetNewDemoForm();
+                  }}
+                  className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    actionLoading ||
+                    checkingDemoEmail ||
+                    demoEmailStatus?.existingProfileInOrganization === true
+                  }
+                  className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all disabled:opacity-50"
+                >
+                  {actionLoading ? (
+                    <LoadingSpinner size="sm" color="text-gray-950" />
+                  ) : checkingDemoEmail ? (
+                    "Checking..."
+                  ) : canContinueDemo ? (
+                    "Create Demo"
+                  ) : (
+                    "Continue"
+                  )}
                 </button>
               </div>
             </form>
@@ -1766,41 +2067,97 @@ export default function SuperAdminDashboard() {
                 className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
                 placeholder="Email Address"
                 type="email"
+                value={newTeamMember.email}
                 required
-                onChange={e => setNewTeamMember({ ...newTeamMember, email: e.target.value })}
+                onChange={(e) => {
+                  setNewTeamMember({ ...newTeamMember, email: e.target.value });
+                  setTeamMemberEmailStatus(null);
+                }}
               />
-              <input
-                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
-                placeholder="Full Name"
-                required
-                onChange={e => setNewTeamMember({ ...newTeamMember, name: e.target.value })}
-              />
-              <input
-                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
-                placeholder="Password"
-                type="password"
-                required
-                onChange={e => setNewTeamMember({ ...newTeamMember, password: e.target.value })}
-              />
-              <select
-                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-gray-300"
-                onChange={e => setNewTeamMember({ ...newTeamMember, role: e.target.value })}
-              >
-                <option value="USER">Standard User</option>
-                <option value="MANAGER">Team Manager</option>
-              </select>
-              <select
-                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-gray-300"
-                value={newTeamMember.view}
-                onChange={e => setNewTeamMember({ ...newTeamMember, view: e.target.value })}
-              >
-                <option value="VISIONLIGHT">VisionLight View (Full)</option>
-                <option value="PICDRIFT">PicDrift View (Limited)</option>
-              </select>
+              {isTeamMemberEmailChecked && (
+                <div
+                  className={`rounded-xl border p-3 text-[10px] font-bold uppercase tracking-widest ${
+                    teamMemberEmailStatus?.existingProfileInOrganization
+                      ? "border-red-500/30 bg-red-500/10 text-red-300"
+                      : teamMemberEmailStatus?.authExists
+                        ? "border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
+                        : "border-amber-400/25 bg-amber-400/10 text-amber-200"
+                  }`}
+                >
+                  {teamMemberEmailStatus?.existingProfileInOrganization
+                    ? "This email is already a member of this organization."
+                    : teamMemberEmailStatus?.authExists
+                      ? "Existing login found. This member will use their current password."
+                      : "New login. Set a temporary password for this member."}
+                </div>
+              )}
+              {canContinueTeamMember && (
+                <>
+                  <input
+                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
+                    placeholder="Full Name"
+                    value={newTeamMember.name}
+                    required
+                    onChange={e => setNewTeamMember({ ...newTeamMember, name: e.target.value })}
+                  />
+                  {teamMemberNeedsPassword && (
+                    <input
+                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
+                      placeholder="Temporary Password"
+                      type="password"
+                      value={newTeamMember.password}
+                      required
+                      minLength={6}
+                      onChange={e => setNewTeamMember({ ...newTeamMember, password: e.target.value })}
+                    />
+                  )}
+                  <select
+                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-gray-300"
+                    value={newTeamMember.role}
+                    onChange={e => setNewTeamMember({ ...newTeamMember, role: e.target.value })}
+                  >
+                    <option value="USER">Standard User</option>
+                    <option value="MANAGER">Team Manager</option>
+                  </select>
+                  <select
+                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-gray-300"
+                    value={newTeamMember.view}
+                    onChange={e => setNewTeamMember({ ...newTeamMember, view: e.target.value })}
+                  >
+                    <option value="VISIONLIGHT">VisionLight View (Full)</option>
+                    <option value="PICDRIFT">PicDrift View (Limited)</option>
+                  </select>
+                </>
+              )}
               <div className="flex gap-4 pt-4">
-                <button type="button" onClick={() => setShowAddTeamModal(false)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
-                <button type="submit" disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
-                  {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : "Add Member"}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddTeamModal(false);
+                    resetNewTeamMemberForm();
+                  }}
+                  className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    actionLoading ||
+                    checkingTeamMemberEmail ||
+                    teamMemberEmailStatus?.existingProfileInOrganization === true
+                  }
+                  className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all disabled:opacity-50"
+                >
+                  {actionLoading ? (
+                    <LoadingSpinner size="sm" color="text-gray-950" />
+                  ) : checkingTeamMemberEmail ? (
+                    "Checking..."
+                  ) : canContinueTeamMember ? (
+                    "Add Member"
+                  ) : (
+                    "Continue"
+                  )}
                 </button>
               </div>
             </form>

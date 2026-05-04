@@ -121,7 +121,7 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
     trialDays,
   } = req.body;
 
-  if (!orgName || !adminEmail || !adminPassword) {
+  if (!orgName || !adminEmail || typeof adminEmail !== "string" || !adminEmail.trim()) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
@@ -145,6 +145,23 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
       return res.status(400).json({ error: "Invalid tenant limits." });
     }
 
+    const adminEmailStatus = await AuthService.getProvisioningEmailStatus(adminEmail);
+    if (
+      AuthService.isSuperAdminEmail(adminEmail) ||
+      adminEmailStatus.hasSuperAdminProfile
+    ) {
+      return res.status(400).json({
+        error: "Cannot create a tenant profile for a System SuperAdmin email.",
+      });
+    }
+    if (!adminEmailStatus.authExists) {
+      if (typeof adminPassword !== "string" || adminPassword.trim().length < 6) {
+        return res.status(400).json({
+          error: "Admin password must be at least 6 characters for a new login.",
+        });
+      }
+    }
+
     // 1. Create Organization
     const org = await dbService.createOrganization({
       name: orgName,
@@ -159,19 +176,12 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
       isDefault: false
     });
     const initialAdminMaxProjects = Math.max(1, Math.min(3, org.maxProjectsTotal));
-    const existingProfiles = await dbService.findUsersByEmail(adminEmail);
-    if (
-      AuthService.isSuperAdminEmail(adminEmail) ||
-      existingProfiles.some((profile: any) => profile.role === "SUPERADMIN")
-    ) {
-      throw new Error("Cannot create a tenant profile for a System SuperAdmin email.");
-    }
 
     // Existing emails now get a new internal profile for this tenant. Their
     // previous projects/assets stay attached to their original profile.
     const adminUser = await AuthService.createSystemUser(
       adminEmail,
-      adminPassword,
+      adminEmailStatus.authExists ? "" : adminPassword,
       adminName || `${orgName} Admin`,
       userView,
       initialAdminMaxProjects,
@@ -316,6 +326,32 @@ router.get("/users", async (req: AuthenticatedRequest, res) => {
   }
 });
 
+router.post("/users/email-status", async (req: AuthenticatedRequest, res) => {
+  const { email, organizationId, defaultOrganization } = req.body;
+  if (!email || typeof email !== "string" || !email.trim()) {
+    return res.status(400).json({ error: "Email is required." });
+  }
+
+  try {
+    let scopedOrganizationId =
+      typeof organizationId === "string" && organizationId.trim()
+        ? organizationId.trim()
+        : null;
+    if (defaultOrganization === true) {
+      const defaultOrg = await dbService.getDefaultOrganization();
+      scopedOrganizationId = defaultOrg?.id || null;
+    }
+
+    const status = await AuthService.getProvisioningEmailStatus(
+      email,
+      scopedOrganizationId,
+    );
+    res.json({ success: true, ...status });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Update User (Basic Info / Role / View)
 router.put("/users/:userId", async (req: AuthenticatedRequest, res) => {
   const { userId } = req.params;
@@ -374,17 +410,33 @@ router.put("/users/:userId", async (req: AuthenticatedRequest, res) => {
 router.post("/users/demo", async (req: AuthenticatedRequest, res) => {
   const { email, password, name } = req.body;
   
-  if (!email || !password) {
-    return res.status(400).json({ error: "Missing fields" });
+  if (!email || typeof email !== "string" || !email.trim()) {
+    return res.status(400).json({ error: "Email is required." });
   }
 
   try {
     const defaultOrg = await dbService.getDefaultOrganization();
+    const emailStatus = await AuthService.getProvisioningEmailStatus(
+      email,
+      defaultOrg?.id,
+    );
+    if (emailStatus.existingProfileInOrganization) {
+      return res.status(409).json({
+        error: "This email already has a profile in the demo/default organization.",
+      });
+    }
+    if (!emailStatus.authExists) {
+      if (typeof password !== "string" || password.trim().length < 6) {
+        return res.status(400).json({
+          error: "Password must be at least 6 characters for a new login.",
+        });
+      }
+    }
     
     // Create in Supabase and DB
     const user = await AuthService.createSystemUser(
       email,
-      password,
+      emailStatus.authExists ? "" : password,
       name || "Demo User",
       "PICDRIFT",
       1, // Demo users get 1 project

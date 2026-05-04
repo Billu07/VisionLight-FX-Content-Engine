@@ -80,6 +80,38 @@ export class AuthService {
     return { ...user, authIdentityReused: true };
   }
 
+  static async getProvisioningEmailStatus(
+    email: string,
+    organizationId?: string | null,
+  ) {
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) {
+      throw new Error("Email is required.");
+    }
+    const [authUser, profiles] = await Promise.all([
+      this.findSupabaseUserByEmail(normalizedEmail),
+      airtableService.findUsersByEmail(normalizedEmail),
+    ]);
+    const normalizedOrgId = organizationId || null;
+    const existingProfileInOrganization = normalizedOrgId
+      ? profiles.some(
+          (profile: any) => (profile.organizationId || null) === normalizedOrgId,
+        )
+      : false;
+
+    return {
+      email: normalizedEmail,
+      authExists: !!authUser,
+      authUserId: authUser?.id || null,
+      profileCount: profiles.length,
+      existingProfileInOrganization,
+      hasSuperAdminProfile: profiles.some(
+        (profile: any) => profile.role === "SUPERADMIN",
+      ),
+      requiresPassword: !authUser,
+    };
+  }
+
   static isSuperAdminEmail(email?: string | null) {
     return !!email && ADMIN_EMAILS.includes(email.toLowerCase());
   }
@@ -142,34 +174,49 @@ export class AuthService {
     isDemo?: boolean,
   ) {
     const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) {
+      throw new Error("Email is required.");
+    }
+    const trimmedPassword = typeof password === "string" ? password.trim() : "";
 
     let supabaseUser: any;
     let authIdentityReused = false;
-    const { data, error } = await supabase.auth.admin.createUser({
-      email: normalizedEmail,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name: name },
-    });
 
-    if (error) {
-      if (this.isExistingSupabaseEmailError(error)) {
-        const existingAuth = await this.findSupabaseUserByEmail(normalizedEmail);
-
-        if (!existingAuth) {
-          throw new Error("Conflict: Supabase says user exists but cannot find them.");
-        }
-
-        // One Supabase Auth identity can back multiple internal workspace profiles.
-        // Do not reset the shared password during profile creation; explicit reset
-        // flows use updateSupabaseUserPassword instead.
+    if (!trimmedPassword) {
+      const existingAuth = await this.findSupabaseUserByEmail(normalizedEmail);
+      if (existingAuth) {
         supabaseUser = existingAuth;
         authIdentityReused = true;
       } else {
-        throw new Error(`Supabase Create Failed: ${error.message}`);
+        throw new Error("Password is required for a new login identity.");
       }
     } else {
-      supabaseUser = data.user;
+      const { data, error } = await supabase.auth.admin.createUser({
+        email: normalizedEmail,
+        password: trimmedPassword,
+        email_confirm: true,
+        user_metadata: { full_name: name },
+      });
+
+      if (error) {
+        if (this.isExistingSupabaseEmailError(error)) {
+          const existingAuth = await this.findSupabaseUserByEmail(normalizedEmail);
+
+          if (!existingAuth) {
+            throw new Error("Conflict: Supabase says user exists but cannot find them.");
+          }
+
+          // One Supabase Auth identity can back multiple internal workspace profiles.
+          // Do not reset the shared password during profile creation; explicit reset
+          // flows use updateSupabaseUserPassword instead.
+          supabaseUser = existingAuth;
+          authIdentityReused = true;
+        } else {
+          throw new Error(`Supabase Create Failed: ${error.message}`);
+        }
+      } else {
+        supabaseUser = data.user;
+      }
     }
 
     if (!supabaseUser?.id) {

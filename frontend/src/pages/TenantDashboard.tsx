@@ -38,6 +38,14 @@ interface CreditRequest {
   };
 }
 
+interface ProvisionEmailStatus {
+  email: string;
+  authExists: boolean;
+  profileCount: number;
+  existingProfileInOrganization: boolean;
+  requiresPassword: boolean;
+}
+
 const COVERAGE_WALLETS = [
   { key: "creditsPicDrift", label: "PicDrift (Standard)", provider: "fal" },
   { key: "creditsPicDriftPlus", label: "Kling 3.0", provider: "fal" },
@@ -130,6 +138,9 @@ export default function TenantDashboard() {
     role: "USER",
     maxProjects: 3
   });
+  const [newUserEmailStatus, setNewUserEmailStatus] =
+    useState<ProvisionEmailStatus | null>(null);
+  const [checkingNewUserEmail, setCheckingNewUserEmail] = useState(false);
 
   // Edit User Modal
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -145,6 +156,47 @@ export default function TenantDashboard() {
     const n = Number(value);
     if (!Number.isFinite(n)) return fallback;
     return Math.round(n);
+  };
+
+  const normalizedNewUserEmail = newUser.email.trim().toLowerCase();
+  const isNewUserEmailChecked =
+    !!newUserEmailStatus && newUserEmailStatus.email === normalizedNewUserEmail;
+  const canContinueNewUser =
+    isNewUserEmailChecked && !newUserEmailStatus?.existingProfileInOrganization;
+  const newUserNeedsPassword =
+    canContinueNewUser && newUserEmailStatus?.requiresPassword === true;
+  const resetNewUserForm = () => {
+    setNewUser({
+      email: "",
+      password: "",
+      name: "",
+      role: "USER",
+      maxProjects: 3,
+    });
+    setNewUserEmailStatus(null);
+  };
+
+  const checkNewUserEmail = async () => {
+    if (!normalizedNewUserEmail) {
+      setMsg("Error: Email is required.");
+      return null;
+    }
+
+    setCheckingNewUserEmail(true);
+    try {
+      const res = await apiEndpoints.tenantCheckTeamEmail(normalizedNewUserEmail);
+      const status = res.data as ProvisionEmailStatus;
+      setNewUserEmailStatus(status);
+      if (status.authExists) {
+        setNewUser((prev) => ({ ...prev, password: "" }));
+      }
+      return status;
+    } catch (err: any) {
+      setMsg("Error: " + err.message);
+      return null;
+    } finally {
+      setCheckingNewUserEmail(false);
+    }
   };
 
   useEffect(() => {
@@ -207,15 +259,29 @@ export default function TenantDashboard() {
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!canContinueNewUser) {
+      await checkNewUserEmail();
+      return;
+    }
+    if (newUserNeedsPassword && newUser.password.trim().length < 6) {
+      setMsg("Error: Password must be at least 6 characters for a new login.");
+      return;
+    }
+
     setActionLoading(true);
     try {
-      const res = await apiEndpoints.tenantAddUser(newUser);
+      const res = await apiEndpoints.tenantAddUser({
+        ...newUser,
+        password: newUserNeedsPassword ? newUser.password.trim() : "",
+      });
       setMsg(
         res.data?.user?.authIdentityReused
           ? "User added to team. Existing login credentials will be reused."
           : "User added to team.",
       );
       setShowAddUserModal(false);
+      resetNewUserForm();
       fetchData();
     } catch (err: any) {
       setMsg("Error: " + err.message);
@@ -1032,51 +1098,104 @@ export default function TenantDashboard() {
                 className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
                 placeholder="Email Address"
                 type="email"
+                value={newUser.email}
                 required
-                onChange={e => setNewUser({ ...newUser, email: e.target.value })}
+                onChange={(e) => {
+                  setNewUser({ ...newUser, email: e.target.value });
+                  setNewUserEmailStatus(null);
+                }}
               />
-              <input
-                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
-                placeholder="Full Name"
-                required
-                onChange={e => setNewUser({ ...newUser, name: e.target.value })}
-              />
-              <input
-                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
-                placeholder="Password"
-                type="password"
-                required
-                onChange={e => setNewUser({ ...newUser, password: e.target.value })}
-              />
-              <select
-                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-gray-300"
-                onChange={e => setNewUser({ ...newUser, role: e.target.value })}
-              >
-                <option value="USER">Standard User</option>
-                <option value="MANAGER">Team Manager</option>
-              </select>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                  Project Limit
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
-                  value={newUser.maxProjects}
-                  onChange={(e) =>
-                    setNewUser({
-                      ...newUser,
-                      maxProjects: Math.max(1, toInt(e.target.value, 3)),
-                    })
-                  }
-                />
-              </div>
+              {isNewUserEmailChecked && (
+                <div
+                  className={`rounded-xl border p-3 text-[10px] font-bold uppercase tracking-widest ${
+                    newUserEmailStatus?.existingProfileInOrganization
+                      ? "border-red-500/30 bg-red-500/10 text-red-300"
+                      : newUserEmailStatus?.authExists
+                        ? "border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
+                        : "border-amber-400/25 bg-amber-400/10 text-amber-200"
+                  }`}
+                >
+                  {newUserEmailStatus?.existingProfileInOrganization
+                    ? "This email is already a member of this organization."
+                    : newUserEmailStatus?.authExists
+                      ? "Existing login found. This member will use their current password."
+                      : "New login. Set a temporary password for this member."}
+                </div>
+              )}
+
+              {canContinueNewUser && (
+                <>
+                  <input
+                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
+                    placeholder="Full Name"
+                    value={newUser.name}
+                    required
+                    onChange={e => setNewUser({ ...newUser, name: e.target.value })}
+                  />
+                  {newUserNeedsPassword && (
+                    <input
+                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
+                      placeholder="Temporary Password"
+                      type="password"
+                      value={newUser.password}
+                      required
+                      minLength={6}
+                      onChange={e => setNewUser({ ...newUser, password: e.target.value })}
+                    />
+                  )}
+                  <select
+                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-gray-300"
+                    value={newUser.role}
+                    onChange={e => setNewUser({ ...newUser, role: e.target.value })}
+                  >
+                    <option value="USER">Standard User</option>
+                    <option value="MANAGER">Team Manager</option>
+                  </select>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      Project Limit
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
+                      value={newUser.maxProjects}
+                      onChange={(e) =>
+                        setNewUser({
+                          ...newUser,
+                          maxProjects: Math.max(1, toInt(e.target.value, 3)),
+                        })
+                      }
+                    />
+                  </div>
+                </>
+              )}
               <div className="flex gap-4 pt-4">
-                <button type="button" onClick={() => setShowAddUserModal(false)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500">Cancel</button>
-                <button type="submit" disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest">
-                  Deploy
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddUserModal(false);
+                    resetNewUserForm();
+                  }}
+                  className="flex-1 py-3 text-xs font-bold uppercase text-gray-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    actionLoading ||
+                    checkingNewUserEmail ||
+                    newUserEmailStatus?.existingProfileInOrganization === true
+                  }
+                  className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest disabled:opacity-50"
+                >
+                  {checkingNewUserEmail
+                    ? "Checking..."
+                    : canContinueNewUser
+                      ? "Deploy"
+                      : "Continue"}
                 </button>
               </div>
             </form>

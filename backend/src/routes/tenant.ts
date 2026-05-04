@@ -218,16 +218,45 @@ router.get("/team", async (req: AuthenticatedRequest, res) => {
   }
 });
 
-// Add a team member
-router.post("/team/user", async (req: AuthenticatedRequest, res) => {
-  const { email, password, name, role, maxProjects, view } = req.body;
-  
-  if (!email || !password) {
-    return res.status(400).json({ error: "Email and password required" });
+router.post("/team/email-status", async (req: AuthenticatedRequest, res) => {
+  const { email } = req.body;
+  if (!email || typeof email !== "string" || !email.trim()) {
+    return res.status(400).json({ error: "Email is required." });
   }
 
   try {
     const org = await getOrg(req);
+    const status = await AuthService.getProvisioningEmailStatus(email, org.id);
+    res.json({ success: true, ...status });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Add a team member
+router.post("/team/user", async (req: AuthenticatedRequest, res) => {
+  const { email, password, name, role, maxProjects, view } = req.body;
+  
+  if (!email || typeof email !== "string" || !email.trim()) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  try {
+    const org = await getOrg(req);
+    const emailStatus = await AuthService.getProvisioningEmailStatus(email, org.id);
+    if (emailStatus.existingProfileInOrganization) {
+      return res.status(409).json({
+        error: "This email is already a member of your organization.",
+      });
+    }
+    if (!emailStatus.authExists) {
+      if (typeof password !== "string" || password.trim().length < 6) {
+        return res.status(400).json({
+          error: "Password must be at least 6 characters for a new login.",
+        });
+      }
+    }
+
     const parsedMaxProjects =
       maxProjects !== undefined ? toNonNegativeInt(maxProjects) : 3;
     if (parsedMaxProjects === null) {
@@ -261,7 +290,7 @@ router.post("/team/user", async (req: AuthenticatedRequest, res) => {
 
     const newUser = await AuthService.createSystemUser(
       email,
-      password,
+      emailStatus.authExists ? "" : password,
       name || "Team Member",
       finalView,
       requestedMaxProjects,
