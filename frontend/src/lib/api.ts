@@ -66,6 +66,11 @@ export const apiEndpoints = {
   superadminResolveRequest: (id: string) => api.put(`/api/superadmin/requests/${id}/resolve`),
   superadminGetGlobalSettings: () => api.get("/api/superadmin/settings/global"),
   superadminUpdateGlobalSettings: (data: any) => api.put("/api/superadmin/settings/global", data),
+  superadminUploadWelcomeVideo: (formData: FormData) =>
+    api.post("/api/superadmin/settings/welcome-video/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 600000,
+    }),
 
   // Global Presets
   superadminGetPresets: () => api.get("/api/superadmin/presets"),
@@ -104,6 +109,11 @@ export const apiEndpoints = {
   // === Data ===
   getBrandConfig: () => api.get("/api/brand-config"),
   updateBrandConfig: (data: any) => api.put("/api/brand-config", data),
+  uploadBrandLogo: (formData: FormData) =>
+    api.post("/api/brand-config/logo", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 600000,
+    }),
   getPosts: (projectId?: string) => api.get("/api/posts", { params: { projectId } }),
   getPostById: (id: string) => api.get(`/api/post/${id}`),
   updatePostTitle: (postId: string, title: string) =>

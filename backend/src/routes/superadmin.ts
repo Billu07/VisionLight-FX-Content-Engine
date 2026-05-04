@@ -3,6 +3,8 @@ import { dbService, prisma } from "../services/database";
 import { AuthService } from "../services/auth";
 import { authenticateToken, requireSuperAdmin, AuthenticatedRequest } from "../middleware/auth";
 import { encryptionUtils } from "../utils/encryption";
+import { upload } from "../utils/fileUpload";
+import { uploadManagedBuffer } from "../utils/managedStorage";
 import { PRICE_KEYS } from "../config/pricing";
 
 const router = express.Router();
@@ -534,6 +536,27 @@ router.put("/settings/global", async (req, res) => {
       const key = error.message.split(":")[1] || "unknown";
       return res.status(400).json({ error: `Invalid pricing value for ${key}` });
     }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post("/settings/welcome-video/upload", upload.single("video"), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: "Welcome video file is required." });
+    if (!file.mimetype.startsWith("video/")) {
+      return res.status(400).json({ error: "Welcome media must be a video file." });
+    }
+
+    const welcomeVideoUrl = await uploadManagedBuffer({
+      buffer: file.buffer,
+      contentType: file.mimetype,
+      keyPrefix: "visionlight/system/welcome-videos",
+      fallbackExtension: "mp4",
+    });
+    const settings = await dbService.updateGlobalSettings({ welcomeVideoUrl });
+    res.json({ success: true, welcomeVideoUrl, settings });
+  } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });

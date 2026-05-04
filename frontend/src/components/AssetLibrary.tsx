@@ -274,15 +274,40 @@ export function AssetLibrary({
       const res = await apiEndpoints.getPosts(activeProject);
       return Array.isArray(res.data.posts) ? res.data.posts : [];
     },
-    enabled: !!user && !isLibraryFocusMode,
-    staleTime: 15000,
+    enabled: !!user,
+    staleTime: 5000,
     refetchInterval: () => {
-      if (isLibraryFocusMode || activeTab !== "TIMELINE") return false;
-      return 8000;
+      if (activeTab === "TIMELINE") return 8000;
+      if (["16:9", "9:16", "1:1"].includes(activeTab)) return 4000;
+      return false;
     },
     refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
   });
+
+  const activeAutoProcessTasks = useMemo(() => {
+    const parseParams = (raw: any) => {
+      if (!raw) return {};
+      if (typeof raw === "object") return raw;
+      if (typeof raw === "string") {
+        try {
+          return JSON.parse(raw);
+        } catch {
+          return {};
+        }
+      }
+      return {};
+    };
+
+    if (!["16:9", "9:16", "1:1"].includes(activeTab)) return [];
+
+    return (timelinePosts as any[]).filter((post) => {
+      if (post?.mediaProvider !== "asset-auto-process") return false;
+      if (post?.status !== "PROCESSING") return false;
+      const params = parseParams(post?.generationParams);
+      return params?.aspectRatio === activeTab;
+    });
+  }, [activeTab, timelinePosts]);
 
   const timelineVideoAssets = useMemo(() => {
     const extractMediaUrl = (raw: unknown): string => {
@@ -386,6 +411,12 @@ export function AssetLibrary({
 
   const displayedAssets = filteredAssets.slice(0, visibleCount);
   const hasMoreAssets = filteredAssets.length > displayedAssets.length;
+  const localProcessingCardCount =
+    pollingUntil > 0 && processingTab === activeTab ? processingCount : 0;
+  const processingCardCount = Math.max(
+    localProcessingCardCount,
+    activeAutoProcessTasks.length,
+  );
   const uploadLimitText =
     activeTab === "VIDEO" || (activeTab === "original" && originalMediaTab === "videos")
       ? "Video upload limit: 25MB"
@@ -557,7 +588,11 @@ export function AssetLibrary({
               aspectRatio: activeTab,
               projectId: activeProject || undefined,
             })
-            .then(() => ({ ok: true as const }))
+            .then(() => {
+              queryClient.invalidateQueries({ queryKey: ["library-timeline-videos"] });
+              queryClient.invalidateQueries({ queryKey: ["posts"] });
+              return { ok: true as const };
+            })
             .catch((err: any) => {
               console.error("Auto processing failed:", err);
               const reason =
@@ -591,6 +626,7 @@ export function AssetLibrary({
 
           queryClient.invalidateQueries({ queryKey: ["assets"] });
           queryClient.invalidateQueries({ queryKey: ["posts"] });
+          queryClient.invalidateQueries({ queryKey: ["library-timeline-videos"] });
         });
       }
       return uploadedAssets;
@@ -616,6 +652,7 @@ export function AssetLibrary({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["assets"] });
+      queryClient.invalidateQueries({ queryKey: ["library-timeline-videos"] });
     },
     onError: (err: any) => {
       alert("Upload failed: " + err.message);
@@ -905,28 +942,36 @@ export function AssetLibrary({
           ) : (
             <div className="grid gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {/* SKELETON CARDS */}
-              {pollingUntil > 0 &&
-                processingTab === activeTab &&
-                Array.from({ length: processingCount }).map((_, i) => (
+              {processingCardCount > 0 &&
+                Array.from({ length: processingCardCount }).map((_, i) => {
+                  const task = activeAutoProcessTasks[i];
+                  const taskLabel =
+                    typeof task?.title === "string" && task.title.trim()
+                      ? task.title
+                      : `Generating ${getAspectProcessingLabel(activeTab)}`;
+                  const progress =
+                    typeof task?.progress === "number" && task.progress > 0
+                      ? Math.min(99, Math.round(task.progress))
+                      : null;
+                  return (
                   <div
-                    key={`skeleton-${i}`}
+                    key={task?.id || `skeleton-${i}`}
                     className="aspect-square rounded-xl border border-cyan-500/30 bg-gray-900/50 flex flex-col items-center justify-center animate-pulse"
                   >
                     <LoadingSpinner size="md" variant="default" />
                     <span className="text-cyan-400 text-xs font-bold mt-3 tracking-wide">
-                      Generating{" "}
-                      {activeTab !== "original" &&
-                        activeTab !== "VIDEO" &&
-                        activeTab !== "custom" &&
-                        activeTab !== "TIMELINE"
-                        ? getAspectProcessingLabel(activeTab)
-                        : "Asset"}
-                      ...
+                      {taskLabel}
                     </span>
+                    {progress !== null && (
+                      <span className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+                        Task active {progress}%
+                      </span>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
 
-              {filteredAssets.length === 0 && pollingUntil === 0 ? (
+              {filteredAssets.length === 0 && processingCardCount === 0 ? (
                 <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-500 opacity-60">
                   <span className="text-6xl mb-4">
                     {activeTab === "VIDEO" || activeTab === "TIMELINE" ? "Video" : "Image"}

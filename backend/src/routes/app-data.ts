@@ -3,6 +3,12 @@ import { authenticateToken, AuthenticatedRequest } from "../middleware/auth";
 import { dbService as airtableService, prisma } from "../services/database";
 import { ROIService } from "../services/roi";
 import { getTenantSettings, isOrganizationExpired } from "../lib/app-runtime";
+import { upload } from "../utils/fileUpload";
+import {
+  copyExternalImageToManagedStorage,
+  isManagedStorageUrl,
+  uploadManagedBuffer,
+} from "../utils/managedStorage";
 
 const router = express.Router();
 
@@ -308,14 +314,60 @@ router.put(
   async (req: AuthenticatedRequest, res) => {
     const { companyName, primaryColor, secondaryColor, logoUrl } = req.body;
     try {
+      let storedLogoUrl =
+        typeof logoUrl === "string" ? logoUrl.trim() : logoUrl;
+      if (storedLogoUrl && !isManagedStorageUrl(storedLogoUrl)) {
+        storedLogoUrl = await copyExternalImageToManagedStorage({
+          rawUrl: storedLogoUrl,
+          keyPrefix: `visionlight/brand-logos/user_${req.user!.id}`,
+        });
+      }
+
       const config = await airtableService.upsertBrandConfig({
         userId: req.user!.id,
         companyName,
         primaryColor,
         secondaryColor,
-        logoUrl,
+        logoUrl: storedLogoUrl,
       });
       res.json({ success: true, config });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  },
+);
+
+router.post(
+  "/api/brand-config/logo",
+  authenticateToken,
+  upload.single("image"),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const file = req.file;
+      if (!file) return res.status(400).json({ error: "Logo file is required." });
+      if (!file.mimetype.startsWith("image/")) {
+        return res.status(400).json({ error: "Logo must be an image file." });
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        return res.status(400).json({ error: "Logo file is too large. Maximum size is 10MB." });
+      }
+
+      const logoUrl = await uploadManagedBuffer({
+        buffer: file.buffer,
+        contentType: file.mimetype,
+        keyPrefix: `visionlight/brand-logos/user_${req.user!.id}`,
+        fallbackExtension: "png",
+      });
+      const existing = await airtableService.getBrandConfig(req.user!.id);
+      const config = await airtableService.upsertBrandConfig({
+        userId: req.user!.id,
+        companyName: existing?.companyName,
+        primaryColor: existing?.primaryColor,
+        secondaryColor: existing?.secondaryColor,
+        logoUrl,
+      });
+
+      res.json({ success: true, logoUrl, config });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

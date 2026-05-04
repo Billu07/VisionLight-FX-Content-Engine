@@ -492,7 +492,12 @@ function Dashboard() {
     queryFn: async () => {
       try {
         const response = await apiEndpoints.getPosts(activeProject);
-        return Array.isArray(response.data.posts) ? response.data.posts : [];
+        const fetchedPosts = Array.isArray(response.data.posts)
+          ? response.data.posts
+          : [];
+        return fetchedPosts.filter(
+          (post: any) => post?.mediaProvider !== "asset-auto-process",
+        );
       } catch (e) {
         return [];
       }
@@ -1968,6 +1973,28 @@ function Dashboard() {
     brandConfig?.companyName || user?.name || "Visionlight AI";
   const brandLogoUrl =
     typeof brandConfig?.logoUrl === "string" ? brandConfig.logoUrl.trim() : "";
+  const [loadedBrandLogoUrl, setLoadedBrandLogoUrl] = useState("");
+
+  useEffect(() => {
+    if (!brandLogoUrl) {
+      setLoadedBrandLogoUrl("");
+      return;
+    }
+
+    let cancelled = false;
+    const image = new Image();
+    image.onload = () => {
+      if (!cancelled) setLoadedBrandLogoUrl(brandLogoUrl);
+    };
+    image.onerror = () => {
+      if (!cancelled) setLoadedBrandLogoUrl("");
+    };
+    image.src = brandLogoUrl;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [brandLogoUrl]);
 
   if (authLoading)
     return (
@@ -2441,14 +2468,11 @@ function Dashboard() {
             )}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                {brandLogoUrl && (
+                {loadedBrandLogoUrl && (
                   <img
-                    src={brandLogoUrl}
+                    src={loadedBrandLogoUrl}
                     alt={`${companyName} logo`}
                     className="h-9 w-9 rounded-xl border border-white/10 bg-white/5 object-contain p-1 sm:h-11 sm:w-11"
-                    onError={(event) => {
-                      event.currentTarget.style.display = "none";
-                    }}
                   />
                 )}
                 <div>

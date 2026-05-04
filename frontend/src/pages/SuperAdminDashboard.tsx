@@ -265,6 +265,7 @@ export default function SuperAdminDashboard() {
     role: "USER",
     view: "VISIONLIGHT",
   });
+  const [welcomeVideoUploading, setWelcomeVideoUploading] = useState(false);
   const [variantCostUsd, setVariantCostUsd] = useState<
     Record<CoverageVariantId, number>
   >({
@@ -1122,8 +1123,47 @@ export default function SuperAdminDashboard() {
               <div className="mb-4">
                 <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Default Welcome Video</h4>
                 <p className="text-xs text-gray-500">
-                  This video appears as a read-only system item in every user's timeline.
+                  This video appears as a read-only system item in every user's timeline. Uploading stores it in your configured storage.
                 </p>
+              </div>
+              <div className="mb-4 rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-3">
+                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-white/10 bg-gray-950 px-4 py-3 text-sm font-semibold text-cyan-200 hover:bg-gray-800">
+                  <span>{welcomeVideoUploading ? "Uploading welcome video..." : "Upload welcome video to storage"}</span>
+                  {welcomeVideoUploading ? (
+                    <LoadingSpinner size="sm" variant="light" />
+                  ) : (
+                    <span className="text-xs uppercase tracking-widest text-cyan-300">Choose</span>
+                  )}
+                  <input
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    disabled={welcomeVideoUploading}
+                    onChange={async (event) => {
+                      const file = event.currentTarget.files?.[0];
+                      event.currentTarget.value = "";
+                      if (!file) return;
+                      if (!file.type.startsWith("video/")) {
+                        setMsg("Error: Welcome media must be a video file.");
+                        return;
+                      }
+                      setWelcomeVideoUploading(true);
+                      try {
+                        const payload = new FormData();
+                        payload.append("video", file);
+                        const res = await apiEndpoints.superadminUploadWelcomeVideo(payload);
+                        if (res.data?.success) {
+                          setGlobalSettings(res.data.settings);
+                          setMsg("Welcome video uploaded and updated.");
+                        }
+                      } catch (err: any) {
+                        setMsg("Error: " + (err?.message || "Welcome video upload failed."));
+                      } finally {
+                        setWelcomeVideoUploading(false);
+                      }
+                    }}
+                  />
+                </label>
               </div>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
                 <input
