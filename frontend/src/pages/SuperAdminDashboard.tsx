@@ -144,7 +144,7 @@ const COVERAGE_VARIANTS = [
     id: "asset_drift_path",
     label: "3DX Drift Path",
     provider: "fal",
-    wallet: "creditsImageFX",
+    wallet: "creditsPicDrift",
     deductionKey: "priceAsset_DriftPath",
   },
   {
@@ -1523,7 +1523,7 @@ export default function SuperAdminDashboard() {
                   <div className="bg-gray-950 border border-gray-800 rounded-lg p-6">
                     <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">PicDrift Engine</h5>
                     <div className="space-y-4">
-                      {["pricePicDrift_5s", "pricePicDrift_10s", "pricePicDrift_Plus_5s", "pricePicDrift_Plus_10s"].map(key => (
+                      {["pricePicDrift_5s", "pricePicDrift_10s", "pricePicDrift_Plus_5s", "pricePicDrift_Plus_10s", "priceAsset_DriftPath"].map(key => (
                         <div key={key} className="flex justify-between items-center">
                           <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
                           <input
@@ -1542,7 +1542,7 @@ export default function SuperAdminDashboard() {
                   <div className="bg-gray-950 border border-gray-800 rounded-lg p-6">
                     <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Studio & Editor</h5>
                     <div className="space-y-4">
-                      {["pricePicFX_Standard", "pricePicFX_Carousel", "pricePicFX_Batch", "priceEditor_Pro", "priceEditor_Enhance", "priceEditor_Convert", "priceAsset_DriftPath"].map(key => (
+                      {["pricePicFX_Standard", "pricePicFX_Carousel", "pricePicFX_Batch", "priceEditor_Pro", "priceEditor_Enhance", "priceEditor_Convert"].map(key => (
                         <div key={key} className="flex justify-between items-center">
                           <span className="text-[10px] text-gray-400 uppercase font-bold truncate max-w-[120px]" title={key}>{key.replace('price', '').replace(/_/g, ' ')}</span>
                           <input

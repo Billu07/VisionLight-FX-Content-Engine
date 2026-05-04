@@ -68,7 +68,7 @@ const COVERAGE_VARIANTS = [
   { id: "editor_pro", label: "Pic FX Editor", provider: "fal", wallet: "creditsImageFX", deductionKey: "priceEditor_Pro" },
   { id: "editor_enhance", label: "Image Enhance/Upscale", provider: "fal", wallet: "creditsImageFX", deductionKey: "priceEditor_Enhance" },
   { id: "editor_convert", label: "Image Format Convert", provider: "fal", wallet: "creditsImageFX", deductionKey: "priceEditor_Convert" },
-  { id: "asset_drift_path", label: "3DX Drift Path", provider: "fal", wallet: "creditsImageFX", deductionKey: "priceAsset_DriftPath" },
+  { id: "asset_drift_path", label: "3DX Drift Path", provider: "fal", wallet: "creditsPicDrift", deductionKey: "priceAsset_DriftPath" },
   { id: "topaz_upscale_2x", label: "Topaz Upscale 2x", provider: "fal", wallet: "creditsVideoFX1", deductionKey: "priceVideoFX1_10s" },
   { id: "topaz_upscale_4x", label: "Topaz Upscale 4x", provider: "fal", wallet: "creditsVideoFX1", deductionKey: "priceVideoFX1_15s" },
   { id: "seedance_fal_4s", label: "Seedance 2.0 4s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_4s" },

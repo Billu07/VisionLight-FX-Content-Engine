@@ -114,8 +114,8 @@ export function RenderReserveModal({
     {
       label: "3DX Drift Path",
       key: "priceAsset_DriftPath",
-      wallet: "Image FX",
-      note: "Used when extracting camera path data from a source frame.",
+      wallet: "PicDrift",
+      note: "Used for 3DX camera path renders through the PicDrift standard wallet.",
     },
   ];
 

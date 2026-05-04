@@ -84,6 +84,13 @@ const COVERAGE_VARIANTS = [
     deductionKey: "pricePicDrift_Plus_10s",
   },
   {
+    id: "asset_drift_path",
+    label: "3DX Drift Path",
+    provider: "fal",
+    wallet: "creditsPicDrift",
+    deductionKey: "priceAsset_DriftPath",
+  },
+  {
     id: "topaz_upscale_2x",
     label: "Topaz Upscale 2x",
     provider: "fal",
@@ -205,6 +212,7 @@ export default function AdminDashboard() {
     picdrift_10s: 0.2,
     picdrift_plus_5s: 0.2,
     picdrift_plus_10s: 0.3,
+    asset_drift_path: 0.08,
     topaz_upscale_2x: 0.45,
     topaz_upscale_4x: 0.7,
     seedance_fal_4s: 0.2,
@@ -763,6 +771,7 @@ export default function AdminDashboard() {
                     { label: "Standard 10s", key: "pricePicDrift_10s" },
                     { label: "Plus 5s", key: "pricePicDrift_Plus_5s" },
                     { label: "Plus 10s", key: "pricePicDrift_Plus_10s" },
+                    { label: "3DX Drift Path", key: "priceAsset_DriftPath" },
                   ],
                 },
                 {
@@ -796,12 +805,11 @@ export default function AdminDashboard() {
                   ],
                 },
                 {
-                  title: "PicFX Editor & Path",
+                  title: "PicFX Editor",
                   items: [
                     { label: "PicFX Editor", key: "priceEditor_Pro" },
                     { label: "Enhance / Upscale", key: "priceEditor_Enhance" },
                     { label: "Format Convert", key: "priceEditor_Convert" },
-                    { label: "Generate Path", key: "priceAsset_DriftPath" },
                   ],
                 },
               ].map((section, sIdx) => (
