@@ -532,7 +532,10 @@ function Dashboard() {
   });
 
   // 2. Core logic and permissions
-  const isTenantScopedAccount = Boolean(user?.organizationId) && user?.role !== "SUPERADMIN";
+  const isTenantScopedAccount =
+    Boolean(user?.organizationId) &&
+    user?.organizationIsDefault !== true &&
+    user?.role !== "SUPERADMIN";
   const isCommercial = user?.creditSystem !== "INTERNAL" && !isTenantScopedAccount;
   const canUseExternalCreditLink = user?.role === "SUPERADMIN" && isCommercial;
   const isAdmin = user?.role === "ADMIN" || user?.role === "SUPERADMIN";

@@ -11,6 +11,7 @@ interface User {
   email: string;
   name: string;
   role: string;
+  view: string;
   maxProjects: number;
   creditsPicDrift: number;
   creditsPicDriftPlus: number;
@@ -120,7 +121,8 @@ export default function TenantDashboard() {
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const isPicdriftTenant = adminUser?.view === "PICDRIFT";
+  const isDefaultOrgAdmin = adminUser?.organizationIsDefault === true;
+  const isPicdriftTenant = !isDefaultOrgAdmin && adminUser?.view === "PICDRIFT";
 
   const [activeTab, setActiveTab] = useState<"team" | "pricing" | "integrations">(
     "team",
@@ -138,6 +140,7 @@ export default function TenantDashboard() {
     password: "",
     name: "",
     role: "USER",
+    view: "VISIONLIGHT",
     maxProjects: 3
   });
   const [newUserEmailStatus, setNewUserEmailStatus] =
@@ -171,6 +174,7 @@ export default function TenantDashboard() {
       password: "",
       name: "",
       role: "USER",
+      view: "VISIONLIGHT",
       maxProjects: 3,
     });
     setNewUserEmailStatus(null);
@@ -901,6 +905,31 @@ export default function TenantDashboard() {
                   />
                 </div>
               </div>
+              {isDefaultOrgAdmin && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform View</label>
+                  <select
+                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                    defaultValue={editingUser.view || "VISIONLIGHT"}
+                    onChange={async (e) => {
+                      try {
+                        await apiEndpoints.tenantUpdateUser(editingUser.id, {
+                          view: e.target.value,
+                        });
+                        setMsg("User view updated.");
+                        fetchData();
+                      } catch (err: any) {
+                        notify.error(
+                          err?.message || "Failed to update user view.",
+                        );
+                      }
+                    }}
+                  >
+                    <option value="VISIONLIGHT">VisualFX View</option>
+                    <option value="PICDRIFT">PicDrift View</option>
+                  </select>
+                </div>
+              )}
 
               <div className="pt-4 border-t border-gray-800">
                 <div className="mb-6 space-y-3 rounded-xl border border-gray-800 bg-gray-950/60 p-4">
@@ -984,6 +1013,16 @@ export default function TenantDashboard() {
                     <option value="USER">Standard User</option>
                     <option value="MANAGER">Team Manager</option>
                   </select>
+                  {isDefaultOrgAdmin && (
+                    <select
+                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-gray-300"
+                      value={newUser.view}
+                      onChange={e => setNewUser({ ...newUser, view: e.target.value })}
+                    >
+                      <option value="VISIONLIGHT">VisualFX View</option>
+                      <option value="PICDRIFT">PicDrift View</option>
+                    </select>
+                  )}
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                       Project Limit

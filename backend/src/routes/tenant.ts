@@ -284,7 +284,8 @@ router.post("/team/user", async (req: AuthenticatedRequest, res) => {
     // Superadmins (while operating inside their org) can choose either view.
     const requestingUser = await dbService.findUserById(req.user!.id);
     const isSuperAdminRequester = requestingUser?.role === "SUPERADMIN";
-    const finalView = isSuperAdminRequester
+    const canChooseMemberView = isSuperAdminRequester || org.isDefault === true;
+    const finalView = canChooseMemberView
       ? normalizeView(view)
       : normalizeView(requestingUser?.view);
 
@@ -316,7 +317,7 @@ router.post("/team/user", async (req: AuthenticatedRequest, res) => {
 // Update team member (Credits, Role, Limits)
 router.put("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
   const { userId } = req.params;
-  const { addCredits, creditType, role, maxProjects, name, password } = req.body;
+  const { addCredits, creditType, role, maxProjects, name, password, view } = req.body;
 
   try {
     if (password !== undefined) {
@@ -366,17 +367,23 @@ router.put("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
       }
       updates.role = role;
     }
+    if (org.isDefault === true && view !== undefined) {
+      updates.view = normalizeView(view);
+    }
 
     // Handle credits
     if (addCredits !== undefined && creditType) {
       const requestingUser = await dbService.findUserById(req.user!.id);
       const requesterView = normalizeView(requestingUser?.view);
       const isSuperAdminRequester = requestingUser?.role === "SUPERADMIN";
+      const isPicdriftTenantRequester =
+        !isSuperAdminRequester &&
+        org.isDefault !== true &&
+        requesterView === "PICDRIFT";
       const creditPool = String(creditType);
 
       if (
-        !isSuperAdminRequester &&
-        requesterView === "PICDRIFT" &&
+        isPicdriftTenantRequester &&
         !PICDRIFT_ALLOWED_CREDIT_POOLS.has(creditPool)
       ) {
         return res.status(403).json({
@@ -470,7 +477,9 @@ router.get("/provider-balances", async (req: AuthenticatedRequest, res) => {
     const requesterView = normalizeView(requestingUser?.view);
     const isSuperAdminRequester = requestingUser?.role === "SUPERADMIN";
     const isPicdriftTenantRequester =
-      !isSuperAdminRequester && requesterView === "PICDRIFT";
+      !isSuperAdminRequester &&
+      org.isDefault !== true &&
+      requesterView === "PICDRIFT";
     const falApiKey = encryptionUtils.decrypt(org.falApiKey);
     const kieApiKey = isPicdriftTenantRequester
       ? null
@@ -527,7 +536,7 @@ router.get("/config", async (req: AuthenticatedRequest, res) => {
     const requesterView = normalizeView(requestingUser?.view);
     const isSuperAdminRequester = requestingUser?.role === "SUPERADMIN";
     const canReadKieApiKey =
-      isSuperAdminRequester || requesterView !== "PICDRIFT";
+      isSuperAdminRequester || org.isDefault === true || requesterView !== "PICDRIFT";
     
     // Decrypt keys for the admin to see/edit
     res.json({
@@ -572,12 +581,15 @@ router.get("/config", async (req: AuthenticatedRequest, res) => {
 router.put("/config", async (req: AuthenticatedRequest, res) => {
   const { falApiKey, kieApiKey, name, pricing } = req.body;
   try {
-    const orgId = req.user!.organizationId!;
+    const org = await getOrg(req);
+    const orgId = org.id;
     const requestingUser = await dbService.findUserById(req.user!.id);
     const requesterView = normalizeView(requestingUser?.view);
     const isSuperAdminRequester = requestingUser?.role === "SUPERADMIN";
     const isPicdriftTenantRequester =
-      !isSuperAdminRequester && requesterView === "PICDRIFT";
+      !isSuperAdminRequester &&
+      org.isDefault !== true &&
+      requesterView === "PICDRIFT";
 
     if (
       falApiKey !== undefined &&

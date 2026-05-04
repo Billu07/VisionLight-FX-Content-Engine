@@ -17,6 +17,8 @@ interface User {
   role?: "ADMIN" | "USER" | "MANAGER" | "SUPERADMIN";
   organizationId?: string | null;
   organizationName?: string | null;
+  organizationIsDefault?: boolean;
+  organizationTenantPlan?: string | null;
   isOrgActive?: boolean;
   needsActivation?: boolean;
   orgLockReason?: "DEACTIVATED" | "MISSING_FAL_KEY" | null;
@@ -44,6 +46,7 @@ export interface WorkspaceProfile {
   view?: "VISIONLIGHT" | "PICDRIFT";
   organizationId?: string | null;
   organizationName?: string | null;
+  organizationIsDefault?: boolean;
   isOrgActive?: boolean;
   canonicalDomain?: string | null;
 }

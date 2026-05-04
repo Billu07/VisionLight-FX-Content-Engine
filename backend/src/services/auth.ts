@@ -136,6 +136,7 @@ export class AuthService {
       isDemo: user.isDemo === true,
       role: this.getFinalRole(user),
       organizationId: user.organizationId,
+      organizationIsDefault: user.organization?.isDefault === true,
       view: user.view || "VISIONLIGHT",
       maxProjects: user.maxProjects || 3,
     };
@@ -153,6 +154,7 @@ export class AuthService {
       view,
       organizationId: user.organizationId,
       organizationName,
+      organizationIsDefault: user.organization?.isDefault === true,
       isOrgActive: user.organization?.isActive !== false,
       canonicalDomain:
         view === "PICDRIFT" ? PICDRIFT_CANONICAL_DOMAIN : VISIONLIGHT_CANONICAL_DOMAIN,

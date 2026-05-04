@@ -57,6 +57,7 @@ const buildPublicProfileOption = (user: any) => {
     view,
     organizationId: user.organizationId,
     organizationName: user.organization?.name || "Personal Workspace",
+    organizationIsDefault: user.organization?.isDefault === true,
     isOrgActive: user.organization?.isActive !== false,
     canonicalDomain: getCanonicalDomainForView(view),
   };
@@ -201,6 +202,8 @@ router.get(
           orgViewType,
           isSuperAdmin,
           isOrgActive,
+          organizationIsDefault: isDefaultOrg === true,
+          organizationTenantPlan: org?.tenantPlan || null,
           needsActivation,
           orgLockReason,
           organizationName: org?.name,
