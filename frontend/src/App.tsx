@@ -16,6 +16,7 @@ import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import TenantDashboard from "./pages/TenantDashboard";
 import Projects from "./pages/Projects";
 import StudioChooser from "./pages/StudioChooser";
+import ResetPassword from "./pages/ResetPassword";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { BrandProvider } from "./contexts/BrandContext";
 import { useAuth } from "./hooks/useAuth";
@@ -206,6 +207,7 @@ function App() {
             {/* --- ADD THESE NEW ROUTES --- */}
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/studios" element={<StudioChooser />} />
             {/* --------------------------- */}
 

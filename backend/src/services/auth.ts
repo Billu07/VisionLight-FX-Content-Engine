@@ -207,8 +207,8 @@ export class AuthService {
           }
 
           // One Supabase Auth identity can back multiple internal workspace profiles.
-          // Do not reset the shared password during profile creation; explicit reset
-          // flows use updateSupabaseUserPassword instead.
+          // Do not reset the shared password during profile creation; users
+          // reset their own account password through Supabase recovery links.
           supabaseUser = existingAuth;
           authIdentityReused = true;
         } else {
@@ -294,21 +294,6 @@ export class AuthService {
     }
 
     return false;
-  }
-
-  static async updateSupabaseUserPassword(email: string, newPassword: string) {
-    const normalizedEmail = normalizeEmail(email);
-    const userToUpdate = await this.findSupabaseUserByEmail(normalizedEmail);
-    if (userToUpdate) {
-      const { error: updateError } = await supabase.auth.admin.updateUserById(
-        userToUpdate.id,
-        { password: newPassword },
-      );
-      if (updateError) throw updateError;
-      return true;
-    }
-
-    throw new Error(`User ${normalizedEmail} not found in Supabase Auth.`);
   }
 
   static async validateSession(token: string, activeProfileId?: string) {

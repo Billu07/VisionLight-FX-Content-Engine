@@ -142,9 +142,7 @@ export default function TenantDashboard() {
     useState<ProvisionEmailStatus | null>(null);
   const [checkingNewUserEmail, setCheckingNewUserEmail] = useState(false);
 
-  // Edit User Modal
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [resetPassword, setResetPassword] = useState("");
 
   const toInt = (value: string, fallback = 0) => {
     const n = Number(value);
@@ -661,7 +659,7 @@ export default function TenantDashboard() {
                           >
                             Enter Dashboard
                           </button>
-                          <button onClick={() => { setEditingUser(u); setResetPassword(""); }} className="text-cyan-400 hover:text-cyan-300 text-[9px] font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded">Manage</button>
+                          <button onClick={() => setEditingUser(u)} className="text-cyan-400 hover:text-cyan-300 text-[9px] font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded">Manage</button>
                           {u.id === adminUser?.id ? (
                             <span className="text-gray-500 text-[9px] font-bold uppercase tracking-widest">
                               Active Admin
@@ -1048,33 +1046,8 @@ export default function TenantDashboard() {
                 <div className="mb-6 space-y-3 rounded-xl border border-gray-800 bg-gray-950/60 p-4">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Password Reset</label>
                   <p className="text-[10px] leading-relaxed text-gray-500">
-                    Current passwords are not viewable. Set a new temporary password if this member needs access help.
+                    Passwords are account-level and may be shared across multiple studios. Members reset their own password from the login page.
                   </p>
-                  <input
-                    type="password"
-                    value={resetPassword}
-                    onChange={(e) => setResetPassword(e.target.value)}
-                    placeholder="New password"
-                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
-                  />
-                  <button
-                    type="button"
-                    disabled={!resetPassword.trim()}
-                    onClick={async () => {
-                      try {
-                        await apiEndpoints.tenantUpdateUser(editingUser.id, {
-                          password: resetPassword.trim(),
-                        });
-                        setResetPassword("");
-                        setMsg("Password updated.");
-                      } catch (err: any) {
-                        notify.error(err?.message || "Failed to update password.");
-                      }
-                    }}
-                    className="w-full rounded-lg bg-brand-accent py-2.5 text-[10px] font-bold uppercase tracking-widest text-gray-950 disabled:opacity-50"
-                  >
-                    Set New Password
-                  </button>
                 </div>
                 <p className="text-[10px] text-gray-500 uppercase font-bold mb-4 tracking-widest">Credit Top-ups handled via table view.</p>
                 <button onClick={() => setEditingUser(null)} className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-bold uppercase text-xs tracking-widest transition-all">

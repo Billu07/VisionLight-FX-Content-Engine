@@ -358,6 +358,13 @@ router.put("/users/:userId", async (req: AuthenticatedRequest, res) => {
   const { name, role, view, maxProjects, password } = req.body;
 
   try {
+    if (password !== undefined) {
+      return res.status(400).json({
+        error:
+          "Admins cannot reset user passwords. Users must reset their own password from the login page.",
+      });
+    }
+
     const parsedMaxProjects =
       maxProjects !== undefined ? toPositiveInt(maxProjects) : undefined;
     if (maxProjects !== undefined && parsedMaxProjects === null) {
@@ -391,13 +398,6 @@ router.put("/users/:userId", async (req: AuthenticatedRequest, res) => {
     if (role) updates.role = role;
     if (view) updates.view = view;
     if (parsedMaxProjects !== undefined) updates.maxProjects = parsedMaxProjects;
-
-    if (password !== undefined) {
-      if (typeof password !== "string" || password.trim().length < 6) {
-        return res.status(400).json({ error: "Password must be at least 6 characters." });
-      }
-      await AuthService.updateSupabaseUserPassword(targetUser.email, password.trim());
-    }
 
     const updatedUser = await dbService.adminUpdateUser(userId, updates);
     res.json({ success: true, user: updatedUser });

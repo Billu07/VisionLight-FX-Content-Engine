@@ -92,7 +92,9 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
   const [step, setStep] = useState<LoginStep>("email");
   const [profiles, setProfiles] = useState<LoginProfile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [error, setError] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
 
   const navigate = useNavigate();
   const { checkAuth } = useAuth();
@@ -116,6 +118,7 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
       clearActiveProfile();
     }
     setError("");
+    setResetMessage("");
   }, [isOpen]);
 
   const continueToPassword = (
@@ -156,6 +159,7 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
 
     setIsLoading(true);
     setError("");
+    setResetMessage("");
     setProfiles([]);
     clearActiveProfile();
 
@@ -195,7 +199,37 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail) return;
     setError("");
+    setResetMessage("");
     continueToPassword(normalizedEmail, profile, profile.canonicalDomain);
+  };
+
+  const handlePasswordResetRequest = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setError("Enter your email first.");
+      return;
+    }
+
+    setIsResettingPassword(true);
+    setError("");
+    setResetMessage("");
+
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        normalizedEmail,
+        {
+          redirectTo: `${window.location.origin}/reset-password`,
+        },
+      );
+      if (resetError) throw resetError;
+      setResetMessage(
+        "If this email has an account, a password reset link has been sent.",
+      );
+    } catch (err: any) {
+      setError(err.message || "Failed to send password reset link.");
+    } finally {
+      setIsResettingPassword(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -213,6 +247,7 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
 
     setIsLoading(true);
     setError("");
+    setResetMessage("");
 
     try {
       const { error: authError } = await supabase.auth.signInWithPassword({
@@ -267,6 +302,7 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
+                setResetMessage("");
                 if (step !== "email") {
                   setStep("email");
                   setProfiles([]);
@@ -322,12 +358,26 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
                 required
                 autoComplete="current-password"
               />
+              <button
+                type="button"
+                onClick={handlePasswordResetRequest}
+                disabled={isLoading || isResettingPassword}
+                className="mt-3 text-xs font-semibold text-cyan-300 transition-colors hover:text-cyan-200 disabled:opacity-50"
+              >
+                {isResettingPassword ? "Sending reset link..." : "Forgot password?"}
+              </button>
             </div>
           )}
 
           {error && (
             <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-300 rounded-lg text-sm">
               {error}
+            </div>
+          )}
+
+          {resetMessage && (
+            <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 text-cyan-200 rounded-lg text-sm">
+              {resetMessage}
             </div>
           )}
 

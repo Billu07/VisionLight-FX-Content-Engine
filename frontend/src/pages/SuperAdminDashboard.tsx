@@ -245,7 +245,6 @@ export default function SuperAdminDashboard() {
   const [userUpdates, setUserUpdates] = useState({
     view: "VISIONLIGHT",
     role: "USER",
-    password: ""
   });
 
   const [newTenant, setNewTenant] = useState({
@@ -708,13 +707,10 @@ export default function SuperAdminDashboard() {
         view: userUpdates.view,
         role: userUpdates.role,
       };
-      if (userUpdates.password.trim()) {
-        payload.password = userUpdates.password.trim();
-      }
       await apiEndpoints.superadminUpdateUser(editingUser.id, payload);
       setMsg("User updated.");
       setEditingUser(null);
-      setUserUpdates({ view: "VISIONLIGHT", role: "USER", password: "" });
+      setUserUpdates({ view: "VISIONLIGHT", role: "USER" });
       fetchInitialData();
     } catch (err: any) {
       alert(err.message);
@@ -1128,7 +1124,7 @@ export default function SuperAdminDashboard() {
                               <button
                                 onClick={() => {
                                   setEditingUser(u);
-                                  setUserUpdates({ view: u.view, role: u.role, password: "" });
+                                  setUserUpdates({ view: u.view, role: u.role });
                                 }}
                                 className="rounded bg-cyan-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-cyan-400 hover:text-cyan-200"
                               >
@@ -1212,7 +1208,7 @@ export default function SuperAdminDashboard() {
                           >
                             Enter Dashboard
                           </button>
-                          <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role, password: "" }); }} className="text-cyan-400 hover:text-cyan-300 text-[10px] font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded">Manage</button>
+                          <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className="text-cyan-400 hover:text-cyan-300 text-[10px] font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded">Manage</button>
                           <button
                             className="text-red-500/50 hover:text-red-400 text-[10px] font-bold uppercase tracking-widest"
                             onClick={async () => {
@@ -1259,7 +1255,7 @@ export default function SuperAdminDashboard() {
                         {u.view}
                       </span>
                       <button onClick={() => handleEnterReadOnlyDashboard(u)} className="text-[8px] text-amber-300 hover:text-amber-100 uppercase font-bold tracking-tighter">Enter Dashboard</button>
-                      <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role, password: "" }); }} className="text-[8px] text-gray-500 hover:text-white uppercase font-bold tracking-tighter">Edit View</button>
+                      <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className="text-[8px] text-gray-500 hover:text-white uppercase font-bold tracking-tighter">Edit View</button>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4 border-t border-gray-800 pt-4 mt-4">
@@ -1878,15 +1874,8 @@ export default function SuperAdminDashboard() {
               <div className="space-y-2 rounded-xl border border-gray-800 bg-gray-950/60 p-4">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Password Reset</label>
                 <p className="text-[10px] leading-relaxed text-gray-500">
-                  Current passwords are not viewable. Set a new temporary password here if the user needs access help.
+                  Passwords are account-level and may be shared across multiple studios. Users reset their own password from the login page.
                 </p>
-                <input
-                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
-                  type="password"
-                  placeholder="New password (optional)"
-                  value={userUpdates.password}
-                  onChange={e => setUserUpdates({ ...userUpdates, password: e.target.value })}
-                />
               </div>
 
               <div className="flex gap-4 pt-4">

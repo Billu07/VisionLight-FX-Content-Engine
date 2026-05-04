@@ -319,6 +319,13 @@ router.put("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
   const { addCredits, creditType, role, maxProjects, name, password } = req.body;
 
   try {
+    if (password !== undefined) {
+      return res.status(400).json({
+        error:
+          "Admins cannot reset user passwords. Users must reset their own password from the login page.",
+      });
+    }
+
     const org = await getOrg(req);
     const orgId = org.id;
     
@@ -331,12 +338,6 @@ router.put("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
     // Prepare updates
     const updates: any = {};
     if (name) updates.name = name;
-    if (password !== undefined) {
-      if (typeof password !== "string" || password.trim().length < 6) {
-        return res.status(400).json({ error: "Password must be at least 6 characters." });
-      }
-      await AuthService.updateSupabaseUserPassword(targetUser.email, password.trim());
-    }
     if (maxProjects !== undefined) {
       const parsedMaxProjects = toNonNegativeInt(maxProjects);
       if (parsedMaxProjects === null) {
