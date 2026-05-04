@@ -209,8 +209,12 @@ export default function TenantDashboard() {
     e.preventDefault();
     setActionLoading(true);
     try {
-      await apiEndpoints.tenantAddUser(newUser);
-      setMsg("User added to team.");
+      const res = await apiEndpoints.tenantAddUser(newUser);
+      setMsg(
+        res.data?.user?.authIdentityReused
+          ? "User added to team. Existing login credentials will be reused."
+          : "User added to team.",
+      );
       setShowAddUserModal(false);
       fetchData();
     } catch (err: any) {

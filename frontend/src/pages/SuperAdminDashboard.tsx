@@ -393,8 +393,12 @@ export default function SuperAdminDashboard() {
     e.preventDefault();
     setActionLoading(true);
     try {
-      await apiEndpoints.superadminCreateTenant(newTenant);
-      setMsg("Tenant created successfully.");
+      const res = await apiEndpoints.superadminCreateTenant(newTenant);
+      setMsg(
+        res.data?.adminUser?.authIdentityReused
+          ? "Tenant created. Existing admin login credentials will be reused."
+          : "Tenant created successfully.",
+      );
       setShowTenantModal(false);
       fetchInitialData();
     } catch (err: any) {
@@ -460,8 +464,12 @@ export default function SuperAdminDashboard() {
     e.preventDefault();
     setActionLoading(true);
     try {
-      await apiEndpoints.superadminCreateDemoUser(newDemo);
-      setMsg("Demo user created.");
+      const res = await apiEndpoints.superadminCreateDemoUser(newDemo);
+      setMsg(
+        res.data?.user?.authIdentityReused
+          ? "Demo profile created. Existing login credentials will be reused."
+          : "Demo user created.",
+      );
       setShowDemoModal(false);
       fetchInitialData();
     } catch (err: any) {
@@ -475,8 +483,12 @@ export default function SuperAdminDashboard() {
     e.preventDefault();
     setActionLoading(true);
     try {
-      await apiEndpoints.tenantAddUser(newTeamMember);
-      setMsg("Team member added.");
+      const res = await apiEndpoints.tenantAddUser(newTeamMember);
+      setMsg(
+        res.data?.user?.authIdentityReused
+          ? "Team member added. Existing login credentials will be reused."
+          : "Team member added.",
+      );
       setShowAddTeamModal(false);
       fetchInitialData();
     } catch (err: any) {

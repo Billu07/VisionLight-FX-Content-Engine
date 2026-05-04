@@ -40,6 +40,46 @@ const VISIONLIGHT_CANONICAL_DOMAIN =
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 export class AuthService {
+  private static isExistingSupabaseEmailError(error: any) {
+    const message = String(error?.message || "").toLowerCase();
+    const code = String(error?.code || "").toLowerCase();
+
+    return (
+      code.includes("user_already") ||
+      code.includes("email_exists") ||
+      (message.includes("email") &&
+        message.includes("already") &&
+        (message.includes("registered") || message.includes("exists")))
+    );
+  }
+
+  private static async findSupabaseUserByEmail(email: string) {
+    const normalizedEmail = normalizeEmail(email);
+    const perPage = 1000;
+
+    for (let page = 1; page <= 100; page += 1) {
+      const { data, error } = await supabase.auth.admin.listUsers({
+        page,
+        perPage,
+      });
+      if (error) throw error;
+
+      const users = data?.users || [];
+      const match = users.find(
+        (user) => user.email?.toLowerCase() === normalizedEmail,
+      );
+      if (match) return match;
+      if (users.length < perPage) return null;
+    }
+
+    return null;
+  }
+
+  private static withAuthReuseFlag(user: any, authIdentityReused: boolean) {
+    if (!authIdentityReused) return user;
+    return { ...user, authIdentityReused: true };
+  }
+
   static isSuperAdminEmail(email?: string | null) {
     return !!email && ADMIN_EMAILS.includes(email.toLowerCase());
   }
@@ -104,6 +144,7 @@ export class AuthService {
     const normalizedEmail = normalizeEmail(email);
 
     let supabaseUser: any;
+    let authIdentityReused = false;
     const { data, error } = await supabase.auth.admin.createUser({
       email: normalizedEmail,
       password,
@@ -112,24 +153,27 @@ export class AuthService {
     });
 
     if (error) {
-      if (error.message.includes("already registered") || error.message.includes("already exists")) {
-        const { data: list, error: listError } = await supabase.auth.admin.listUsers();
-        if (listError) throw listError;
-        const existingAuth = list.users.find(
-          (u) => u.email?.toLowerCase() === normalizedEmail,
-        );
+      if (this.isExistingSupabaseEmailError(error)) {
+        const existingAuth = await this.findSupabaseUserByEmail(normalizedEmail);
 
         if (!existingAuth) {
           throw new Error("Conflict: Supabase says user exists but cannot find them.");
         }
 
-        await supabase.auth.admin.updateUserById(existingAuth.id, { password });
+        // One Supabase Auth identity can back multiple internal workspace profiles.
+        // Do not reset the shared password during profile creation; explicit reset
+        // flows use updateSupabaseUserPassword instead.
         supabaseUser = existingAuth;
+        authIdentityReused = true;
       } else {
         throw new Error(`Supabase Create Failed: ${error.message}`);
       }
     } else {
       supabaseUser = data.user;
+    }
+
+    if (!supabaseUser?.id) {
+      throw new Error("Supabase Create Failed: missing auth user ID.");
     }
 
     await airtableService.attachAuthIdentityToEmail(normalizedEmail, supabaseUser.id);
@@ -143,7 +187,7 @@ export class AuthService {
     );
 
     if (existingProfile) {
-      return await airtableService.adminUpdateUser(existingProfile.id, {
+      const updatedUser = await airtableService.adminUpdateUser(existingProfile.id, {
         authUserId: supabaseUser.id,
         role,
         view,
@@ -152,9 +196,10 @@ export class AuthService {
         organizationId,
         isDemo: isDemo === true,
       });
+      return this.withAuthReuseFlag(updatedUser, authIdentityReused);
     }
 
-    return await airtableService.createUser({
+    const createdUser = await airtableService.createUser({
       id: profiles.length === 0 ? supabaseUser.id : undefined,
       authUserId: supabaseUser.id,
       email: normalizedEmail,
@@ -165,6 +210,7 @@ export class AuthService {
       role,
       isDemo,
     });
+    return this.withAuthReuseFlag(createdUser, authIdentityReused);
   }
 
   /**
@@ -191,14 +237,7 @@ export class AuthService {
       return false;
     }
 
-    const {
-      data: { users },
-      error: listError,
-    } = await supabase.auth.admin.listUsers();
-
-    if (listError) throw listError;
-
-    const userToDelete = users.find((u) => u.email?.toLowerCase() === normalizedEmail);
+    const userToDelete = await this.findSupabaseUserByEmail(normalizedEmail);
     if (userToDelete) {
       const { error: deleteError } = await supabase.auth.admin.deleteUser(
         userToDelete.id,
@@ -212,14 +251,7 @@ export class AuthService {
 
   static async updateSupabaseUserPassword(email: string, newPassword: string) {
     const normalizedEmail = normalizeEmail(email);
-    const {
-      data: { users },
-      error: listError,
-    } = await supabase.auth.admin.listUsers();
-
-    if (listError) throw listError;
-
-    const userToUpdate = users.find((u) => u.email?.toLowerCase() === normalizedEmail);
+    const userToUpdate = await this.findSupabaseUserByEmail(normalizedEmail);
     if (userToUpdate) {
       const { error: updateError } = await supabase.auth.admin.updateUserById(
         userToUpdate.id,
