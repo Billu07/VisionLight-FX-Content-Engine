@@ -161,6 +161,29 @@ const buildAutoOutpaintPrompt = (ratio: "16:9" | "9:16" | "1:1"): string => {
   return "Extend this image to 16:9 by adding content only on the left and right. Keep all original image pixels unchanged.";
 };
 
+const getAutoProcessTitle = (ratio: "16:9" | "9:16" | "1:1") => {
+  if (ratio === "9:16") return "Generating 9:16 portrait";
+  if (ratio === "1:1") return "Generating 1:1 square";
+  return "Generating 16:9 landscape";
+};
+
+const shouldSkipProviderPolling = (post: any) => {
+  if (post?.mediaProvider === "asset-auto-process") return true;
+  const params = post?.generationParams;
+  if (!params) return false;
+  if (typeof params === "object" && (params as any).skipProviderPolling === true) {
+    return true;
+  }
+  if (typeof params === "string") {
+    try {
+      return JSON.parse(params)?.skipProviderPolling === true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+};
+
 // ==================== ASSET MANAGEMENT ====================
 router.post(
   "/api/posts/:postId/to-asset",
@@ -231,6 +254,137 @@ router.post(
           });
         });
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.post(
+  "/api/assets/auto-process",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    let conversionDeducted = false;
+    let conversionCost = 0;
+    let processingPostId: string | null = null;
+
+    try {
+      const { originalAssetId, aspectRatio, projectId } = req.body;
+      if (typeof originalAssetId !== "string" || !originalAssetId.trim()) {
+        return res.status(400).json({ error: "Original asset ID required" });
+      }
+
+      const normalizedAspectRatio = normalizeAutoAspectRatio(aspectRatio);
+      const sourceAsset = await prisma.asset.findFirst({
+        where: { id: originalAssetId, userId: req.user!.id, type: "IMAGE" },
+      });
+      if (!sourceAsset?.url) {
+        return res.status(404).json({ error: "Source image asset not found" });
+      }
+
+      if (projectId) {
+        const project = await airtableService.getProjectById(projectId);
+        if (!project || project.userId !== req.user!.id) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+
+      const [settings, user] = await Promise.all([
+        getTenantSettings(req.user!.id),
+        airtableService.findUserById(req.user!.id),
+      ]);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const apiKeys = await getTenantApiKeys(req.user!.id);
+      if (!apiKeys.falApiKey) {
+        return res.status(403).json({
+          error:
+            "Missing Fal API key. Configure it in the Admin Panel before auto-processing images.",
+        });
+      }
+
+      const cost = getCost(user, { mediaType: "image", mode: "convert" }, settings);
+      conversionCost = cost;
+      if ((user as any).creditsImageFX < cost) {
+        return res.status(403).json({ error: "Insufficient Image FX credits" });
+      }
+
+      await airtableService.deductGranularCredits(req.user!.id, "creditsImageFX", cost);
+      conversionDeducted = true;
+
+      const post = await airtableService.createPost({
+        userId: req.user!.id,
+        projectId,
+        title: getAutoProcessTitle(normalizedAspectRatio),
+        prompt: buildAutoOutpaintPrompt(normalizedAspectRatio),
+        mediaType: "IMAGE",
+        mediaProvider: "asset-auto-process",
+        platform: "Asset Library",
+        status: "PROCESSING",
+        progress: 10,
+        imageReference: sourceAsset.url,
+        generationParams: {
+          skipProviderPolling: true,
+          originalAssetId: sourceAsset.id,
+          aspectRatio: normalizedAspectRatio,
+          chargedPool: "creditsImageFX",
+          cost,
+        },
+      });
+      processingPostId = post.id;
+
+      res.json({ success: true, post: sanitizePostForResponse(post) });
+
+      contentEngine
+        .editAsset(
+          sourceAsset.url,
+          buildAutoOutpaintPrompt(normalizedAspectRatio),
+          req.user!.id,
+          normalizedAspectRatio,
+          [],
+          "pro",
+          sourceAsset.id,
+          apiKeys,
+          "gpt-image-2",
+        )
+        .then(async (asset: any) => {
+          await airtableService.updatePost(post.id, {
+            status: "READY",
+            progress: 100,
+            mediaUrl: asset?.url,
+            title: `${getAutoProcessTitle(normalizedAspectRatio)} complete`,
+            generationStep: "Saved to Asset Library",
+          });
+        })
+        .catch(async (error: any) => {
+          console.error("Auto process task failed:", error);
+          if (conversionDeducted && conversionCost > 0) {
+            await airtableService.refundGranularCredits(
+              req.user!.id,
+              "creditsImageFX",
+              conversionCost,
+            );
+          }
+          await airtableService.updatePost(post.id, {
+            status: "FAILED",
+            progress: 0,
+            error: error?.message || "Auto processing failed",
+          });
+        });
+    } catch (error: any) {
+      if (conversionDeducted && conversionCost > 0) {
+        await airtableService.refundGranularCredits(
+          req.user!.id,
+          "creditsImageFX",
+          conversionCost,
+        );
+      }
+      if (processingPostId) {
+        await airtableService.updatePost(processingPostId, {
+          status: "FAILED",
+          progress: 0,
+          error: error?.message || "Auto processing failed",
+        });
+      }
       res.status(500).json({ error: error.message });
     }
   },
@@ -940,11 +1094,44 @@ router.get(
     try {
       const projectId = req.query.projectId as string | undefined;
       const posts = await airtableService.getUserPosts(req.user!.id, projectId);
+      const settings = await airtableService.getGlobalSettings();
+      const welcomeVideoUrl =
+        typeof (settings as any)?.welcomeVideoUrl === "string"
+          ? (settings as any).welcomeVideoUrl.trim()
+          : "";
+      const welcomePost = welcomeVideoUrl
+        ? [
+            {
+              id: "system-welcome-video",
+              userId: req.user!.id,
+              title: "Welcome Video",
+              prompt: "Welcome to your creative dashboard.",
+              mediaType: "VIDEO",
+              mediaProvider: "system-welcome",
+              mediaUrl: welcomeVideoUrl,
+              status: "READY",
+              progress: 100,
+              platform: "System",
+              createdAt:
+                (settings as any)?.updatedAt instanceof Date
+                  ? (settings as any).updatedAt.toISOString()
+                  : new Date().toISOString(),
+              updatedAt:
+                (settings as any)?.updatedAt instanceof Date
+                  ? (settings as any).updatedAt.toISOString()
+                  : new Date().toISOString(),
+              isSystemWelcome: true,
+            },
+          ]
+        : [];
+      const sanitizedPosts = Array.isArray(posts)
+        ? posts.map((post: any) => sanitizePostForResponse(post))
+        : posts;
       res.json({
         success: true,
-        posts: Array.isArray(posts)
-          ? posts.map((post: any) => sanitizePostForResponse(post))
-          : posts,
+        posts: Array.isArray(sanitizedPosts)
+          ? [...welcomePost, ...sanitizedPosts]
+          : sanitizedPosts,
       });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch posts" });
@@ -1266,7 +1453,7 @@ router.get(
         return res.status(403).json({ error: "Denied" });
       }
 
-      if (post.status === "PROCESSING") {
+      if (post.status === "PROCESSING" && !shouldSkipProviderPolling(post)) {
         const apiKeys = await getTenantApiKeys(req.user!.id);
         await contentEngine.checkPostStatus(post, apiKeys);
         post = await airtableService.getPostById(req.params.postId);
@@ -1299,7 +1486,11 @@ router.get(
 
       const updates = activePosts.map(async (simplePost: any) => {
         const fullPost = await airtableService.getPostById(simplePost.id);
-        if (fullPost && fullPost.status === "PROCESSING") {
+        if (
+          fullPost &&
+          fullPost.status === "PROCESSING" &&
+          !shouldSkipProviderPolling(fullPost)
+        ) {
           const apiKeys = await getTenantApiKeys(req.user!.id);
           await contentEngine.checkPostStatus(fullPost, apiKeys);
         }

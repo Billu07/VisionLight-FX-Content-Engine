@@ -2,7 +2,7 @@ import express, { Request } from "express";
 import { authenticateToken, AuthenticatedRequest } from "../middleware/auth";
 import { dbService as airtableService, prisma } from "../services/database";
 import { ROIService } from "../services/roi";
-import { getTenantSettings } from "../lib/app-runtime";
+import { getTenantSettings, isOrganizationExpired } from "../lib/app-runtime";
 
 const router = express.Router();
 
@@ -89,14 +89,22 @@ router.get(
       const orgViewType = ((user as any).view || req.user?.view || "VISIONLIGHT") as
         | "VISIONLIGHT"
         | "PICDRIFT";
-      const isSuperAdmin = req.user?.role === "SUPERADMIN";
+      const isReadOnlyImpersonation = req.user?.readOnlyImpersonation === true;
+      const isSuperAdmin =
+        req.user?.role === "SUPERADMIN" ||
+        req.user?.impersonator?.role === "SUPERADMIN";
 
       let isOrgActive = true;
       let needsActivation = false;
       let orgLockReason: "DEACTIVATED" | "MISSING_FAL_KEY" | null = null;
 
       if (org && !isDefaultOrg) {
-        const isDeactivated = org.isActive === false;
+        const isDeactivated = org.isActive === false || isOrganizationExpired(org);
+        if (isOrganizationExpired(org) && org.isActive !== false) {
+          void airtableService.updateOrganizationStatus(org.id, false).catch((error: any) =>
+            console.warn("[auth/me] Failed to mark expired demo tenant inactive:", error?.message || error),
+          );
+        }
         const hasFalKey = !!org.falApiKey;
         if (isDeactivated) {
           isOrgActive = false;
@@ -127,7 +135,7 @@ router.get(
       }
 
       const canonicalDomain =
-        !DOMAIN_ROUTING_ENABLED
+        !DOMAIN_ROUTING_ENABLED || isReadOnlyImpersonation
           ? null
           : orgViewType === "PICDRIFT"
             ? PICDRIFT_CANONICAL_DOMAIN

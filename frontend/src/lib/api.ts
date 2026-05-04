@@ -3,6 +3,8 @@ import type { AxiosProgressEvent } from "axios";
 
 const RAW_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 const API_BASE_URL = RAW_URL.replace(/\/api\/?$/, "").replace(/\/$/, "");
+const IMPERSONATE_USER_ID_KEY = "visionlight_impersonate_user_id";
+const IMPERSONATE_USER_LABEL_KEY = "visionlight_impersonate_user_label";
 
 console.log("API Base URL:", API_BASE_URL);
 
@@ -125,6 +127,12 @@ export const apiEndpoints = {
       timeout: 600000,
     }),
 
+  autoProcessAsset: (data: {
+    originalAssetId: string;
+    aspectRatio: string;
+    projectId?: string;
+  }) => api.post("/api/assets/auto-process", data),
+
   // Video export
   exportVideo: (data: { editorState: any; projectId?: string; fps?: number }) =>
     api.post("/api/export/video", data),
@@ -225,6 +233,30 @@ export const getCORSProxyUrl = (url: string, width?: number, quality?: number) =
   if (quality) proxyUrl += `&q=${quality}`;
   return proxyUrl;
 };
+
+export const startReadOnlyImpersonation = (userId: string, label: string) => {
+  localStorage.setItem(IMPERSONATE_USER_ID_KEY, userId);
+  localStorage.setItem(IMPERSONATE_USER_LABEL_KEY, label);
+  localStorage.removeItem("visionlight_active_project");
+};
+
+export const stopReadOnlyImpersonation = () => {
+  localStorage.removeItem(IMPERSONATE_USER_ID_KEY);
+  localStorage.removeItem(IMPERSONATE_USER_LABEL_KEY);
+  localStorage.removeItem("visionlight_active_project");
+};
+
+export const getReadOnlyImpersonationLabel = () =>
+  localStorage.getItem(IMPERSONATE_USER_LABEL_KEY) || "";
+
+api.interceptors.request.use((config) => {
+  const impersonateUserId = localStorage.getItem(IMPERSONATE_USER_ID_KEY);
+  if (impersonateUserId) {
+    config.headers = config.headers || {};
+    config.headers["X-Impersonate-User-Id"] = impersonateUserId;
+  }
+  return config;
+});
 
 /**
  * Proxy R2-hosted videos through backend with range support to keep seeking/scrubbing reliable.

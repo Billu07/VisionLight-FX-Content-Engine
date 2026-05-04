@@ -21,6 +21,32 @@ const ADMIN_EMAILS = ADMIN_EMAILS_RAW.split(",").map((email) =>
 ).filter(Boolean);
 
 export class AuthService {
+  private static toSessionUser(user: any) {
+    const isSuperAdminEnv = ADMIN_EMAILS.includes(user.email.toLowerCase());
+    const dbRole = user.role;
+
+    let finalRole = "USER";
+    if (isSuperAdminEnv || dbRole === "SUPERADMIN") {
+      finalRole = "SUPERADMIN";
+    } else if (dbRole === "ADMIN") {
+      finalRole = "ADMIN";
+    } else if (dbRole === "MANAGER") {
+      finalRole = "MANAGER";
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      creditSystem: user.creditSystem,
+      isDemo: user.isDemo === true,
+      role: finalRole,
+      organizationId: user.organizationId,
+      view: user.view || "VISIONLIGHT",
+      maxProjects: user.maxProjects || 3,
+    };
+  }
+
   /**
    * ADMIN ONLY: Creates a user in Supabase AND ensures they exist in Database.
    */
@@ -178,37 +204,43 @@ export class AuthService {
 
       if (!user) return null;
 
-      // 1. Check .env (Super Admin Safety Net)
-      const isSuperAdminEnv = ADMIN_EMAILS.includes(user.email.toLowerCase());
-
-      // 2. Check Database (Dynamic Role)
-      const dbRole = (user as any).role;
-
-      // 3. Determine Final Role
-      let finalRole = "USER";
-      if (isSuperAdminEnv || dbRole === "SUPERADMIN") {
-        finalRole = "SUPERADMIN";
-      } else if (dbRole === "ADMIN") {
-        finalRole = "ADMIN";
-      } else if (dbRole === "MANAGER") {
-        finalRole = "MANAGER";
-      }
-
-      return {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        creditSystem: user.creditSystem,
-        isDemo: (user as any).isDemo === true,
-        role: finalRole,
-        organizationId: user.organizationId,
-        view: (user as any).view || "VISIONLIGHT",
-        maxProjects: (user as any).maxProjects || 3,
-      };
+      return this.toSessionUser(user);
     } catch (error) {
       console.error("Auth Validation Error:", error);
       return null;
     }
+  }
+
+  static async getReadOnlyImpersonationTarget(impersonator: any, targetUserId: string) {
+    const target = await airtableService.findUserById(targetUserId);
+    if (!target) {
+      throw new Error("Impersonation target not found.");
+    }
+
+    const isSuperAdmin = impersonator?.role === "SUPERADMIN";
+    const isOrgAdmin = impersonator?.role === "ADMIN";
+
+    if (!isSuperAdmin) {
+      if (!isOrgAdmin || !impersonator?.organizationId) {
+        throw new Error("Impersonation is restricted to admins.");
+      }
+      if (target.role === "SUPERADMIN") {
+        throw new Error("Organization admins cannot enter SuperAdmin dashboards.");
+      }
+      if (target.organizationId !== impersonator.organizationId) {
+        throw new Error("Target user is outside your organization.");
+      }
+    }
+
+    return {
+      ...this.toSessionUser(target),
+      readOnlyImpersonation: true,
+      impersonator: {
+        id: impersonator.id,
+        email: impersonator.email,
+        role: impersonator.role,
+      },
+    };
   }
 
   static async deleteSession(token: string) {

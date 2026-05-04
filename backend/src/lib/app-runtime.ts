@@ -2,6 +2,11 @@ import net from "node:net";
 import { dbService as airtableService } from "../services/database";
 import { encryptionUtils } from "../utils/encryption";
 
+export const isOrganizationExpired = (org: any) =>
+  org?.tenantPlan === "DEMO" &&
+  org?.trialEndsAt &&
+  new Date(org.trialEndsAt).getTime() <= Date.now();
+
 export async function getTenantApiKeys(userId: string) {
   const user = await airtableService.findUserById(userId);
   if (!user) throw new Error("User not found");
@@ -15,7 +20,7 @@ export async function getTenantApiKeys(userId: string) {
   const openAIKey = encryptionUtils.decrypt(org?.openaiApiKey);
 
   if (!isDefaultOrg && !noOrg) {
-    if (org?.isActive === false) {
+    if (org?.isActive === false || isOrganizationExpired(org)) {
       throw new Error(
         "Your organization is currently deactivated. Please contact your platform administrator.",
       );
@@ -36,12 +41,9 @@ export async function getTenantApiKeys(userId: string) {
   };
 }
 
-export async function getTenantSettings(userId: string) {
-  const user = await airtableService.findUserById(userId);
-  if (user?.organizationId) {
-    const org = await airtableService.getOrganization(user.organizationId);
-    if (org) return org;
-  }
+export async function getTenantSettings(_userId: string) {
+  // Pricing is centrally controlled by SuperAdmin. Organization records still
+  // store API keys and legacy values, but render deductions come from global settings.
   return await airtableService.getGlobalSettings();
 }
 

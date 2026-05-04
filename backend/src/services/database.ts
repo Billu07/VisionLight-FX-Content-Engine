@@ -62,7 +62,15 @@ export const dbService = {
   },
 
   // === ORGANIZATION ===
-  async createOrganization(data: { name: string; maxUsers: number; maxProjectsTotal: number; maxStorageMb?: number; isDefault?: boolean }) {
+  async createOrganization(data: {
+    name: string;
+    maxUsers: number;
+    maxProjectsTotal: number;
+    maxStorageMb?: number;
+    isDefault?: boolean;
+    tenantPlan?: string;
+    trialEndsAt?: Date | null;
+  }) {
     return prisma.organization.create({
       data: {
         name: data.name,
@@ -70,7 +78,9 @@ export const dbService = {
         maxProjectsTotal: data.maxProjectsTotal,
         maxStorageMb: data.maxStorageMb || 500,
         isDefault: data.isDefault || false,
-      },
+        tenantPlan: data.tenantPlan || "PAID",
+        trialEndsAt: data.trialEndsAt || null,
+      } as any,
     });
   },
 

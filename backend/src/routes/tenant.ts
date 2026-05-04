@@ -111,8 +111,8 @@ const fetchFalBalance = async (falApiKey: string | null) => {
 const fetchKieBalance = async (kieApiKey: string | null) => {
   if (!kieApiKey) {
     return {
-      status: "missing_key" as ProviderBalanceStatus,
-      message: "KIE key is not configured.",
+      status: "not_applicable" as ProviderBalanceStatus,
+      message: "KIE is not required for dashboard activation.",
     };
   }
 
@@ -287,7 +287,7 @@ router.post("/team/user", async (req: AuthenticatedRequest, res) => {
 // Update team member (Credits, Role, Limits)
 router.put("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
   const { userId } = req.params;
-  const { addCredits, creditType, role, maxProjects, name } = req.body;
+  const { addCredits, creditType, role, maxProjects, name, password } = req.body;
 
   try {
     const org = await getOrg(req);
@@ -302,6 +302,12 @@ router.put("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
     // Prepare updates
     const updates: any = {};
     if (name) updates.name = name;
+    if (password !== undefined) {
+      if (typeof password !== "string" || password.trim().length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters." });
+      }
+      await AuthService.updateSupabaseUserPassword(targetUser.email, password.trim());
+    }
     if (maxProjects !== undefined) {
       const parsedMaxProjects = toNonNegativeInt(maxProjects);
       if (parsedMaxProjects === null) {
@@ -572,8 +578,8 @@ router.put("/config", async (req: AuthenticatedRequest, res) => {
       updates.kieApiKey = trimmed ? encryptionUtils.encrypt(trimmed) : null;
     }
 
-    // Apply pricing overrides if provided
-    if (pricing) {
+    // Pricing is globally controlled by SuperAdmin. Tenant admins can edit keys/profile only.
+    if (pricing && isSuperAdminRequester) {
       const sanitizedPricing = sanitizePricingUpdate(pricing);
       if (isPicdriftTenantRequester) {
         for (const key of PICDRIFT_PRICING_DISALLOWED_KEYS) {

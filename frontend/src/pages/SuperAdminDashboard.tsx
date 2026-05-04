@@ -1,6 +1,6 @@
-﻿import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiEndpoints } from "../lib/api";
+import { apiEndpoints, startReadOnlyImpersonation } from "../lib/api";
 import { confirmAction } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
@@ -9,6 +9,8 @@ interface Tenant {
   id: string;
   name: string;
   isActive: boolean;
+  tenantPlan?: "PAID" | "DEMO";
+  trialEndsAt?: string | null;
   maxUsers: number;
   maxProjectsTotal: number;
   maxStorageMb: number;
@@ -53,7 +55,7 @@ const COVERAGE_WALLETS = [
   { key: "creditsPicDriftPlus", label: "Kling 3.0", provider: "fal" },
   { key: "creditsImageFX", label: "Image FX (Nano/GPT 2)", provider: "fal" },
   { key: "creditsVideoFX1", label: "Topaz Upscale", provider: "fal" },
-  { key: "creditsVideoFX2", label: "Seedance 2.0 FAL", provider: "fal" },
+  { key: "creditsVideoFX2", label: "Seedance 2.0", provider: "fal" },
   { key: "creditsVideoFX3", label: "Veo 3", provider: "fal" },
 ] as const;
 
@@ -146,21 +148,21 @@ const COVERAGE_VARIANTS = [
   },
   {
     id: "seedance_fal_4s",
-    label: "Seedance 2.0 FAL 4s",
+    label: "Seedance 2.0 4s",
     provider: "fal",
     wallet: "creditsVideoFX2",
     deductionKey: "priceVideoFX2_4s",
   },
   {
     id: "seedance_fal_8s",
-    label: "Seedance 2.0 FAL 8s",
+    label: "Seedance 2.0 8s",
     provider: "fal",
     wallet: "creditsVideoFX2",
     deductionKey: "priceVideoFX2_8s",
   },
   {
     id: "seedance_fal_12s",
-    label: "Seedance 2.0 FAL 12s",
+    label: "Seedance 2.0 12s",
     provider: "fal",
     wallet: "creditsVideoFX2",
     deductionKey: "priceVideoFX2_12s",
@@ -234,7 +236,8 @@ export default function SuperAdminDashboard() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [userUpdates, setUserUpdates] = useState({
     view: "VISIONLIGHT",
-    role: "USER"
+    role: "USER",
+    password: ""
   });
 
   const [newTenant, setNewTenant] = useState({
@@ -244,6 +247,8 @@ export default function SuperAdminDashboard() {
     adminName: "",
     maxUsers: 5,
     maxProjectsTotal: 20,
+    tenantPlan: "PAID",
+    trialDays: 14,
     view: "VISIONLIGHT"
   });
 
@@ -492,14 +497,38 @@ export default function SuperAdminDashboard() {
   const handleUpdateUserBasic = async () => {
     if (!editingUser) return;
     try {
-      await apiEndpoints.superadminUpdateUser(editingUser.id, userUpdates);
+      const payload: any = {
+        view: userUpdates.view,
+        role: userUpdates.role,
+      };
+      if (userUpdates.password.trim()) {
+        payload.password = userUpdates.password.trim();
+      }
+      await apiEndpoints.superadminUpdateUser(editingUser.id, payload);
       setMsg("User updated.");
       setEditingUser(null);
+      setUserUpdates({ view: "VISIONLIGHT", role: "USER", password: "" });
       fetchInitialData();
     } catch (err: any) {
       alert(err.message);
     }
   }
+
+  const handleEnterReadOnlyDashboard = async (target: User) => {
+    try {
+      startReadOnlyImpersonation(target.id, target.email);
+      const res = await apiEndpoints.getProjects();
+      const firstProject = res.data?.projects?.[0];
+      if (firstProject?.id) {
+        localStorage.setItem("visionlight_active_project", firstProject.id);
+        navigate("/app");
+        return;
+      }
+      navigate("/projects");
+    } catch (err: any) {
+      alert(err?.message || "Failed to enter dashboard.");
+    }
+  };
 
   const myAgencyUsers = useMemo(() => {
     return users.filter(u => u.organizationId === adminUser?.organizationId);
@@ -638,7 +667,7 @@ export default function SuperAdminDashboard() {
         {msg && (
           <div className="mb-8 p-4 rounded-lg bg-brand-accent/10 border border-brand-accent/20 text-brand-accent text-sm font-semibold flex justify-between items-center">
             {msg}
-            <button onClick={() => setMsg("")} className="text-lg">×</button>
+            <button onClick={() => setMsg("")} className="text-lg">x</button>
           </div>
         )}
 
@@ -714,6 +743,7 @@ export default function SuperAdminDashboard() {
                 </tbody>
               </table>
             </div>
+
           </div>
         )}
 
@@ -785,47 +815,126 @@ export default function SuperAdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
-                  {tenants.map(t => (
-                    <tr key={t.id} className="hover:bg-gray-800/30 transition-colors">
-                      <td className="p-6">
-                        <div className="font-bold text-white">{t.name}</div>
-                        <div className="text-xs text-gray-500 font-mono mt-1">{t.id}</div>
-                      </td>
-                      <td className="p-6 text-center">
-                        <span
-                          className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${t.isActive
-                              ? "bg-green-500/10 text-green-400 border-green-500/20"
-                              : "bg-red-500/10 text-red-400 border-red-500/20"
-                            }`}
-                        >
-                          {t.isActive ? "Active" : "Deactivated"}
-                        </span>
-                      </td>
-                      <td className="p-6 text-center">
-                        <div className="text-xs text-gray-300 font-semibold">
-                          Max Users: {t.maxUsers} | Max Projects: {t.maxProjectsTotal}
-                        </div>
-                      </td>
-                      <td className="p-6 text-right">
-                        <div className="flex gap-2 justify-end">
-                          <button
-                            className="text-gray-400 hover:text-white text-[10px] font-bold uppercase tracking-widest px-4 py-2 bg-gray-800 rounded-md border border-gray-700 hover:bg-gray-700 transition-colors"
-                            onClick={() => openEditTenant(t)}
+                  {tenants.map((t) => {
+                    const tenantAdmin =
+                      users.find((u) => u.organizationId === t.id && u.role === "ADMIN") ||
+                      users.find((u) => u.organizationId === t.id);
+                    return (
+                      <tr key={t.id} className="hover:bg-gray-800/30 transition-colors">
+                        <td className="p-6">
+                          <div className="font-bold text-white">{t.name}</div>
+                          <div className="text-xs text-gray-500 font-mono mt-1">{t.id}</div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <span className="rounded border border-gray-700 bg-gray-950 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-gray-400">
+                              {t.tenantPlan === "DEMO" ? "Demo Tenant" : "Paid Tenant"}
+                            </span>
+                            {t.trialEndsAt && (
+                              <span className="rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-amber-300">
+                                Ends {new Date(t.trialEndsAt).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-6 text-center">
+                          <span
+                            className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${t.isActive
+                                ? "bg-green-500/10 text-green-400 border-green-500/20"
+                                : "bg-red-500/10 text-red-400 border-red-500/20"
+                              }`}
                           >
-                            Configure
-                          </button>
-                          <button
-                            className="text-red-500/50 hover:text-red-400 text-[10px] font-bold uppercase tracking-widest px-4 py-2 hover:bg-red-500/10 transition-colors rounded-md"
-                            onClick={() => handleDeleteTenant(t.id)}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                            {t.isActive ? "Active" : "Deactivated"}
+                          </span>
+                        </td>
+                        <td className="p-6 text-center">
+                          <div className="text-xs text-gray-300 font-semibold">
+                            Max Users: {t.maxUsers} | Max Projects: {t.maxProjectsTotal}
+                          </div>
+                        </td>
+                        <td className="p-6 text-right">
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              className="text-amber-300 hover:text-amber-200 text-[10px] font-bold uppercase tracking-widest px-4 py-2 bg-amber-400/10 rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                              onClick={() => tenantAdmin && handleEnterReadOnlyDashboard(tenantAdmin)}
+                              disabled={!tenantAdmin}
+                            >
+                              Enter Dashboard
+                            </button>
+                            <button
+                              className="text-gray-400 hover:text-white text-[10px] font-bold uppercase tracking-widest px-4 py-2 bg-gray-800 rounded-md border border-gray-700 hover:bg-gray-700 transition-colors"
+                              onClick={() => openEditTenant(t)}
+                            >
+                              Configure
+                            </button>
+                            <button
+                              className="text-red-500/50 hover:text-red-400 text-[10px] font-bold uppercase tracking-widest px-4 py-2 hover:bg-red-500/10 transition-colors rounded-md"
+                              onClick={() => handleDeleteTenant(t.id)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
+            </div>
+
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+              <div className="p-6 border-b border-gray-800">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-gray-400">All Platform Users</h2>
+                <p className="mt-1 text-xs text-gray-500">
+                  Use read-only entry for support/debugging. Passwords can be reset from Manage.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px] text-left">
+                  <thead className="bg-gray-950 text-[10px] uppercase tracking-widest text-gray-500">
+                    <tr>
+                      <th className="p-5">User</th>
+                      <th className="p-5">Organization</th>
+                      <th className="p-5 text-center">Role</th>
+                      <th className="p-5 text-center">View</th>
+                      <th className="p-5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800">
+                    {users.map((u) => {
+                      const org = tenants.find((t) => t.id === u.organizationId);
+                      return (
+                        <tr key={u.id} className="hover:bg-gray-800/30 transition-colors">
+                          <td className="p-5">
+                            <div className="font-bold text-white text-sm">{u.name || "Unnamed User"}</div>
+                            <div className="text-[10px] text-gray-500 font-mono">{u.email}</div>
+                          </td>
+                          <td className="p-5 text-xs text-gray-400">{org?.name || "Default / Unassigned"}</td>
+                          <td className="p-5 text-center text-[10px] font-bold uppercase tracking-widest text-gray-300">{u.role}</td>
+                          <td className="p-5 text-center text-[10px] font-bold uppercase tracking-widest text-gray-400">{u.view}</td>
+                          <td className="p-5 text-right">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => handleEnterReadOnlyDashboard(u)}
+                                className="rounded bg-amber-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-300 hover:text-amber-100"
+                              >
+                                Enter Dashboard
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingUser(u);
+                                  setUserUpdates({ view: u.view, role: u.role, password: "" });
+                                }}
+                                className="rounded bg-cyan-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-cyan-400 hover:text-cyan-200"
+                              >
+                                Manage
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -848,7 +957,7 @@ export default function SuperAdminDashboard() {
                   <tr>
                     <th className="p-6">User</th>
                     <th className="p-6 text-center">View</th>
-                    <th className="p-6 text-center">PicDrift / +</th>
+                    <th className="p-6 text-center">PicDrift / Kling 3.0</th>
                     <th className="p-6 text-center">PicFX</th>
                     <th className="p-6 text-center">Topaz / FAL / VFX3</th>
                     <th className="p-6 text-right">Actions</th>
@@ -873,7 +982,7 @@ export default function SuperAdminDashboard() {
                             <input type="number" step="1" min="0" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDrift} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsPicDrift) - u.creditsPicDrift, creditType: "creditsPicDrift" })} />
                           </div>
                           <div className="flex items-center justify-center gap-2">
-                            <span className="text-[10px] text-gray-500">Plus:</span>
+                            <span className="text-[10px] text-gray-500">Kling:</span>
                             <input type="number" step="1" min="0" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsPicDriftPlus) - u.creditsPicDriftPlus, creditType: "creditsPicDriftPlus" })} />
                           </div>
                         </div>
@@ -884,13 +993,19 @@ export default function SuperAdminDashboard() {
                       <td className="p-6 text-center">
                         <div className="flex gap-2 justify-center">
                           <input type="number" step="1" min="0" title="Topaz Upscale" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1, creditType: "creditsVideoFX1" })} />
-                          <input type="number" step="1" min="0" title="Seedance 2.0 FAL" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2, creditType: "creditsVideoFX2" })} />
+                          <input type="number" step="1" min="0" title="Seedance 2.0" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2, creditType: "creditsVideoFX2" })} />
                           <input type="number" step="1" min="0" title="VidFX 3" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3, creditType: "creditsVideoFX3" })} />
                         </div>
                       </td>
                       <td className="p-6 text-right">
                         <div className="flex gap-2 justify-end">
-                          <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className="text-cyan-400 hover:text-cyan-300 text-[10px] font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded">Manage</button>
+                          <button
+                            onClick={() => handleEnterReadOnlyDashboard(u)}
+                            className="text-amber-300 hover:text-amber-200 text-[10px] font-bold uppercase tracking-widest bg-amber-400/10 px-3 py-1 rounded"
+                          >
+                            Enter Dashboard
+                          </button>
+                          <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role, password: "" }); }} className="text-cyan-400 hover:text-cyan-300 text-[10px] font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded">Manage</button>
                           <button
                             className="text-red-500/50 hover:text-red-400 text-[10px] font-bold uppercase tracking-widest"
                             onClick={async () => {
@@ -936,7 +1051,8 @@ export default function SuperAdminDashboard() {
                       <span className="bg-cyan-500/10 text-cyan-400 text-[9px] font-bold px-2 py-1 rounded uppercase tracking-widest border border-cyan-500/20">
                         {u.view}
                       </span>
-                      <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className="text-[8px] text-gray-500 hover:text-white uppercase font-bold tracking-tighter">Edit View</button>
+                      <button onClick={() => handleEnterReadOnlyDashboard(u)} className="text-[8px] text-amber-300 hover:text-amber-100 uppercase font-bold tracking-tighter">Enter Dashboard</button>
+                      <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role, password: "" }); }} className="text-[8px] text-gray-500 hover:text-white uppercase font-bold tracking-tighter">Edit View</button>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4 border-t border-gray-800 pt-4 mt-4">
@@ -1002,6 +1118,48 @@ export default function SuperAdminDashboard() {
               </button>
             </div>
 
+            <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
+              <div className="mb-4">
+                <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Default Welcome Video</h4>
+                <p className="text-xs text-gray-500">
+                  This video appears as a read-only system item in every user's timeline.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
+                <input
+                  type="url"
+                  placeholder="https://..."
+                  value={globalSettings.welcomeVideoUrl || ""}
+                  onChange={(e) =>
+                    setGlobalSettings({
+                      ...globalSettings,
+                      welcomeVideoUrl: e.target.value,
+                    })
+                  }
+                  className="w-full rounded-lg border border-gray-800 bg-gray-950 p-3 text-sm text-white outline-none focus:border-brand-accent"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await apiEndpoints.superadminUpdateGlobalSettings({
+                        welcomeVideoUrl: globalSettings.welcomeVideoUrl || "",
+                      });
+                      if (res.data?.success) {
+                        setGlobalSettings(res.data.settings);
+                        setMsg("Welcome video updated.");
+                      }
+                    } catch (err: any) {
+                      setMsg("Error: " + err.message);
+                    }
+                  }}
+                  className="rounded-lg bg-brand-accent px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-950 hover:bg-cyan-300"
+                >
+                  Save Video
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
                 <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">
@@ -1032,7 +1190,7 @@ export default function SuperAdminDashboard() {
                   </p>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[760px]">
+                  <table className="w-full min-w-0">
                     <thead>
                       <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
                         <th className="py-3 text-left">Generation Variant</th>
@@ -1074,7 +1232,7 @@ export default function SuperAdminDashboard() {
                   Wallet USD/credit uses the highest implied variant rate per wallet (conservative mode).
                 </p>
                 <div className="overflow-x-auto mt-3">
-                  <table className="w-full min-w-[760px]">
+                  <table className="w-full min-w-0">
                     <thead>
                       <tr className="text-[10px] uppercase tracking-widest text-gray-500 border-b border-gray-800">
                         <th className="py-3 text-left">Wallet</th>
@@ -1219,6 +1377,43 @@ export default function SuperAdminDashboard() {
                       <option value="PICDRIFT">PicDrift View (Limited)</option>
                     </select>
                 </div>
+                <div className="space-y-3 rounded-xl border border-gray-800 bg-gray-950/70 p-4">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Tenant Type</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {["PAID", "DEMO"].map((plan) => (
+                      <button
+                        key={plan}
+                        type="button"
+                        onClick={() => setNewTenant({ ...newTenant, tenantPlan: plan })}
+                        className={`rounded-lg border py-3 text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                          newTenant.tenantPlan === plan
+                            ? "border-brand-accent bg-brand-accent/15 text-brand-accent"
+                            : "border-gray-800 bg-gray-900 text-gray-500 hover:text-white"
+                        }`}
+                      >
+                        {plan === "PAID" ? "Paid" : "Demo"}
+                      </button>
+                    ))}
+                  </div>
+                  {newTenant.tenantPlan === "DEMO" && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Deactivate After Days</label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        className="w-full p-3 bg-gray-900 border border-gray-800 rounded-lg text-sm text-white"
+                        value={newTenant.trialDays}
+                        onChange={(e) =>
+                          setNewTenant({
+                            ...newTenant,
+                            trialDays: Math.max(1, toInt(e.target.value, 14)),
+                          })
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
                 <div className="border-t border-gray-800 pt-6 space-y-4">
                   <h4 className="text-[10px] font-bold text-brand-accent uppercase tracking-widest">Tenant Admin Account</h4>
                   <input
@@ -1257,7 +1452,7 @@ export default function SuperAdminDashboard() {
                 <h3 className="text-xl font-bold text-white uppercase tracking-tight">Configure Tenant</h3>
                 <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">{editingTenant.name}</p>
               </div>
-              <button onClick={() => setEditingTenant(null)} className="text-gray-500 hover:text-white font-bold text-xl">×</button>
+              <button onClick={() => setEditingTenant(null)} className="text-gray-500 hover:text-white font-bold text-xl">x</button>
             </div>
             <div className="p-8 space-y-6">
               <div className="space-y-2">
@@ -1382,6 +1577,20 @@ export default function SuperAdminDashboard() {
                 </select>
               </div>
 
+              <div className="space-y-2 rounded-xl border border-gray-800 bg-gray-950/60 p-4">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Password Reset</label>
+                <p className="text-[10px] leading-relaxed text-gray-500">
+                  Current passwords are not viewable. Set a new temporary password here if the user needs access help.
+                </p>
+                <input
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                  type="password"
+                  placeholder="New password (optional)"
+                  value={userUpdates.password}
+                  onChange={e => setUserUpdates({ ...userUpdates, password: e.target.value })}
+                />
+              </div>
+
               <div className="flex gap-4 pt-4">
                 <button type="button" onClick={() => setEditingUser(null)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
                 <button onClick={handleUpdateUserBasic} disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
@@ -1444,7 +1653,7 @@ export default function SuperAdminDashboard() {
                 </h3>
                 <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Appears for every user</p>
               </div>
-              <button onClick={() => setShowPresetModal(false)} className="text-gray-500 hover:text-white font-bold text-xl">×</button>
+              <button onClick={() => setShowPresetModal(false)} className="text-gray-500 hover:text-white font-bold text-xl">x</button>
             </div>
             <form onSubmit={handleSavePreset} className="p-8 space-y-6">
               <div className="space-y-2">
@@ -1549,8 +1758,3 @@ export default function SuperAdminDashboard() {
     </div>
   );
 }
-
-
-
-
-

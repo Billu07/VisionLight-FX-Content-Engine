@@ -12,6 +12,8 @@ model Organization {
   name             String
   isActive         Boolean @default(true)
   isDefault        Boolean @default(false)
+  tenantPlan       String  @default("PAID")
+  trialEndsAt      DateTime?
   maxUsers         Int     @default(5)
   maxProjectsTotal Int     @default(20)
   maxStorageMb     Int     @default(500) // SuperAdmin defined storage limit in MB for the entire tenant
@@ -142,6 +144,7 @@ model GlobalSettings {
 
   priceAsset_DriftPath Float @default(2)
   featureVideoEditorForAll Boolean @default(false)
+  welcomeVideoUrl String?
 
   updatedAt DateTime @updatedAt
 }

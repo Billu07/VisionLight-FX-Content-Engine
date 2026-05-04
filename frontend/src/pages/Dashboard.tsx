@@ -1,13 +1,14 @@
-﻿import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import {
   apiEndpoints,
+  stopReadOnlyImpersonation,
   getCORSProxyUrl,
   getCORSProxyVideoUrl,
 } from "../lib/api";
-import { confirmAction } from "../lib/notifications";
+import { confirmAction, notify } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { ErrorAlert } from "../components/ErrorAlert";
 import { PostCard } from "../components/PostCard";
@@ -360,7 +361,7 @@ function Dashboard() {
   useEffect(() => {
     setTimelineVisibleCount(TIMELINE_PAGE_SIZE);
     setStorylineVisibleCount(TIMELINE_PAGE_SIZE);
-  }, [timelinePanelMode]);
+  }, [timelinePanelMode, activeProjectId]);
 
   useEffect(() => {
     if (activeEngine !== "openai") return;
@@ -431,6 +432,16 @@ function Dashboard() {
   useEffect(() => {
     if (!authLoading && !user) navigate("/");
   }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    const activationMessage = sessionStorage.getItem(
+      "visionlight_activation_message",
+    );
+    if (activationMessage) {
+      sessionStorage.removeItem("visionlight_activation_message");
+      notify.success(activationMessage);
+    }
+  }, []);
 
   useEffect(() => {
     try {
@@ -516,7 +527,9 @@ function Dashboard() {
   });
 
   // 2. Core logic and permissions
-  const isCommercial = user?.creditSystem !== "INTERNAL";
+  const isTenantScopedAccount = Boolean(user?.organizationId) && user?.role !== "SUPERADMIN";
+  const isCommercial = user?.creditSystem !== "INTERNAL" && !isTenantScopedAccount;
+  const canUseExternalCreditLink = user?.role === "SUPERADMIN" && isCommercial;
   const isAdmin = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
 
   // 3. Virtual sum (fixes timeline build errors)
@@ -529,14 +542,14 @@ function Dashboard() {
 
   // 4. UI helpers
   const formatBal = (val: number) => {
-    if (user?.view === "PICDRIFT") return `${Math.floor(val)}`;
+    if (user?.view === "PICDRIFT" || isTenantScopedAccount) return `${Math.floor(val)}`;
     return isCommercial ? `$${val.toFixed(2)}` : `${val}`;
   };
   const [isRequesting, setIsRequesting] = useState(false);
-  const creditLink = isCommercial
+  const creditLink = canUseExternalCreditLink
     ? "https://picdrift.com/fx-credits"
     : "https://picdrift.com/renders";
-  const creditBtnText = isCommercial ? "Buy Credit" : "Request Render";
+  const creditBtnText = canUseExternalCreditLink ? "Buy Credit" : "Request Renders";
 
   // 5. Background job polling
   useQuery({
@@ -720,16 +733,19 @@ function Dashboard() {
     if (isRequesting) return;
     if (!(await confirmAction("Request more Render Reserve to Admin?", { confirmLabel: "Request" }))) return;
     const rendersUrl = "https://picdrift.com/renders";
-    const openedTab = window.open(rendersUrl, "_blank", "noopener,noreferrer");
+    const shouldOpenRendersPage = user?.role === "SUPERADMIN";
+    const openedTab = shouldOpenRendersPage
+      ? window.open(rendersUrl, "_blank", "noopener,noreferrer")
+      : null;
     setIsRequesting(true);
     try {
       const res = await apiEndpoints.requestCredits();
-      if (!openedTab) {
+      if (shouldOpenRendersPage && !openedTab) {
         window.location.assign(rendersUrl);
       }
-      alert(res?.data?.message || "Request sent! Admin inbox updated and renders page opened.");
+      alert(res?.data?.message || "Request sent! Admin inbox updated.");
     } catch (err: any) {
-      if (!openedTab) {
+      if (shouldOpenRendersPage && !openedTab) {
         window.location.assign(rendersUrl);
       }
       alert(`Failed to send request: ${err?.message || "Unknown error"}`);
@@ -1950,6 +1966,8 @@ function Dashboard() {
   };
   const companyName =
     brandConfig?.companyName || user?.name || "Visionlight AI";
+  const brandLogoUrl =
+    typeof brandConfig?.logoUrl === "string" ? brandConfig.logoUrl.trim() : "";
 
   if (authLoading)
     return (
@@ -2248,7 +2266,7 @@ function Dashboard() {
                 You need more credits to start this generation.
               </p>
               <div className="flex flex-col gap-3">
-                {isCommercial ? (
+                {canUseExternalCreditLink ? (
                   <a
                     href={creditLink}
                     target="_blank"
@@ -2397,8 +2415,42 @@ function Dashboard() {
           {" "}
           {/* HEADER */}
           <div className="mb-6 sm:mb-8 flex flex-col gap-4">
+            {user?.readOnlyImpersonation && (
+              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100 shadow-xl">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <span className="font-bold uppercase tracking-widest text-amber-300">
+                      Read-only dashboard access
+                    </span>
+                    <p className="mt-1 text-xs text-amber-100/80">
+                      You are viewing {user.email}. Generate, edit, upload, and delete actions are blocked.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      stopReadOnlyImpersonation();
+                      navigate("/admin");
+                    }}
+                    className="rounded-xl border border-amber-400/30 bg-amber-400/15 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-amber-100 hover:bg-amber-400/25"
+                  >
+                    Exit Read-only
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
+                {brandLogoUrl && (
+                  <img
+                    src={brandLogoUrl}
+                    alt={`${companyName} logo`}
+                    className="h-9 w-9 rounded-xl border border-white/10 bg-white/5 object-contain p-1 sm:h-11 sm:w-11"
+                    onError={(event) => {
+                      event.currentTarget.style.display = "none";
+                    }}
+                  />
+                )}
                 <div>
                   <h1 className="text-xl sm:text-3xl md:text-4xl font-bold leading-tight brand-gradient-text">
                     {companyName}
@@ -2462,14 +2514,14 @@ function Dashboard() {
                           </div>
                         </div>
 
-                        {/* PICDRIFT PLUS POOL */}
+                        {/* KLING 3.0 POOL */}
                         <div className="flex items-center sm:border-r border-gray-700/50 sm:pr-4 md:pr-5 lg:pr-6 min-w-0">
                           <div className="flex flex-col">
                             <span className="text-rose-400 font-medium text-lg sm:text-sm md:text-base leading-none tracking-wide flex items-start">
                               {formatBal(credits.creditsPicDriftPlus)}
                             </span>
                             <span className="text-[10px] sm:text-[8px] md:text-[9px] text-gray-400 uppercase font-medium tracking-widest mt-1 leading-tight whitespace-normal flex items-center">
-                              PicDrift<sup className="text-[10px] font-bold text-rose-500 ml-0.5">+</sup>
+                              Kling 3.0
                             </span>
                           </div>
                         </div>
@@ -2493,7 +2545,7 @@ function Dashboard() {
                               {formatBal(credits.creditsVideoFX2)}
                             </span>
                             <span className="text-[10px] sm:text-[8px] md:text-[9px] text-gray-400 uppercase font-medium tracking-widest mt-1 leading-tight whitespace-normal">
-                              Seedance FAL
+                              Seedance 2.0
                             </span>
                           </div>
                         </div>
@@ -2602,7 +2654,7 @@ function Dashboard() {
                         </button>
                       )}
 
-                      {isCommercial ? (
+                      {canUseExternalCreditLink ? (
                         <a
                           href={creditLink}
                           target="_blank"
@@ -2708,7 +2760,7 @@ function Dashboard() {
                     Render Reserve
                   </button>
 
-                  {isCommercial ? (
+                  {canUseExternalCreditLink ? (
                     <a
                       href={creditLink}
                       target="_blank"
@@ -3140,7 +3192,7 @@ function Dashboard() {
                                   : "text-gray-400 hover:text-white"
                                   }`}
                               >
-                                Seedance 2.0 FAL
+                                Seedance 2.0
                               </button>
                               <button
                                 type="button"
@@ -4589,6 +4641,7 @@ function Dashboard() {
                                   (currentVisualTab === "3dx"
                                     ? driftStartMutation.isPending
                                     : generateMediaMutation.isPending) ||
+                                  user?.readOnlyImpersonation ||
                                   (activeEngine !== "topaz" && !prompt.trim())
                                 }
                                 className={`w-full py-4 sm:py-5 px-6 sm:px-8 rounded-2xl transition-all disabled:opacity-50 font-bold text-base sm:text-lg flex flex-col items-center justify-center gap-1 ${activeEngine === "veo"
@@ -4693,6 +4746,7 @@ function Dashboard() {
                               onTitleUpdated={(title) =>
                                 handleTimelineTitleUpdate(post.id, title)
                               }
+                              canEditTitle={!post.isSystemWelcome}
                               onUseAsStartFrame={handleUseAsStartFrame}
                               onDrift={() => handleDriftFromPost(post)}
                               onPreview={() => {
@@ -4714,7 +4768,7 @@ function Dashboard() {
                                   ? () => handleMoveToAssets(post.id)
                                   : undefined
                               }
-                              onDelete={() => {
+                              onDelete={post.isSystemWelcome ? undefined : () => {
                                 (async () => {
                                   if (
                                     await confirmAction(

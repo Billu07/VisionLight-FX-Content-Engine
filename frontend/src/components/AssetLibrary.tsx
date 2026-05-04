@@ -15,6 +15,13 @@ import { DriftFrameExtractor } from "./DriftFrameExtractor";
 const MAX_IMAGE_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_VIDEO_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 const ASSET_PAGE_SIZE = 24;
+
+const getAspectProcessingLabel = (tab: string | null | undefined) => {
+  if (tab === "9:16") return "9:16 portrait";
+  if (tab === "16:9") return "16:9 landscape";
+  if (tab === "1:1") return "1:1 square";
+  return "asset";
+};
 interface Asset {
   id: string;
   url: string;
@@ -379,6 +386,10 @@ export function AssetLibrary({
 
   const displayedAssets = filteredAssets.slice(0, visibleCount);
   const hasMoreAssets = filteredAssets.length > displayedAssets.length;
+  const uploadLimitText =
+    activeTab === "VIDEO" || (activeTab === "original" && originalMediaTab === "videos")
+      ? "Video upload limit: 25MB"
+      : "Image upload limit: 10MB";
   const processingTabAssetCount = useMemo(() => {
     if (!processingTab || !Array.isArray(assets)) return 0;
 
@@ -540,14 +551,12 @@ export function AssetLibrary({
         }
 
         if (requiresProcessedVariant(file)) {
-          const processFormData = new FormData();
-          processFormData.append("image", file);
-          processFormData.append("raw", "false");
-          processFormData.append("aspectRatio", activeTab);
-          processFormData.append("originalAssetId", originalAsset.id);
-          if (activeProject) processFormData.append("projectId", activeProject);
           const processTask = apiEndpoints
-            .uploadAssetSync(processFormData)
+            .autoProcessAsset({
+              originalAssetId: originalAsset.id,
+              aspectRatio: activeTab,
+              projectId: activeProject || undefined,
+            })
             .then(() => ({ ok: true as const }))
             .catch((err: any) => {
               console.error("Auto processing failed:", err);
@@ -581,6 +590,7 @@ export function AssetLibrary({
           }
 
           queryClient.invalidateQueries({ queryKey: ["assets"] });
+          queryClient.invalidateQueries({ queryKey: ["posts"] });
         });
       }
       return uploadedAssets;
@@ -848,7 +858,7 @@ export function AssetLibrary({
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading || pollingUntil > 0}
+              disabled={isUploading}
               className="px-4 sm:px-5 py-2.5 font-bold rounded-lg bg-purple-600 text-white hover:bg-purple-500 flex items-center justify-center transition-colors min-w-[124px] whitespace-nowrap"
             >
               {isUploading ? (
@@ -860,6 +870,9 @@ export function AssetLibrary({
                 <span>Upload Media</span>
               )}
             </button>
+            <p className="w-full text-[10px] font-semibold uppercase tracking-widest text-gray-500 sm:w-auto">
+              {uploadLimitText}
+            </p>
           </div>
         </div>
         {isUploading && (
@@ -906,7 +919,7 @@ export function AssetLibrary({
                         activeTab !== "VIDEO" &&
                         activeTab !== "custom" &&
                         activeTab !== "TIMELINE"
-                        ? activeTab
+                        ? getAspectProcessingLabel(activeTab)
                         : "Asset"}
                       ...
                     </span>

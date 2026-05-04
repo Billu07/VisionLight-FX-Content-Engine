@@ -1,4 +1,4 @@
-﻿import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 
 interface RenderReserveModalProps {
   isOpen: boolean;
@@ -104,12 +104,12 @@ export function RenderReserveModal({
     {
       label: "Kling 3.0  -  5s",
       key: "pricePicDrift_Plus_5s",
-      wallet: "PicDrift+",
+      wallet: "Kling 3.0",
     },
     {
       label: "Kling 3.0  -  10s",
       key: "pricePicDrift_Plus_10s",
-      wallet: "PicDrift+",
+      wallet: "Kling 3.0",
     },
     {
       label: "3DX Drift Path",
@@ -132,20 +132,20 @@ export function RenderReserveModal({
       wallet: "Topaz Upscale",
     },
     {
-      label: "Seedance 2.0 FAL · 4s",
+      label: "Seedance 2.0 · 4s",
       key: "priceVideoFX2_4s",
-      wallet: "Seedance 2.0 FAL",
+      wallet: "Seedance 2.0",
       note: "Resolution support in UI: 480p, 720p.",
     },
     {
-      label: "Seedance 2.0 FAL · 8s",
+      label: "Seedance 2.0 · 8s",
       key: "priceVideoFX2_8s",
-      wallet: "Seedance 2.0 FAL",
+      wallet: "Seedance 2.0",
     },
     {
-      label: "Seedance 2.0 FAL · 12s",
+      label: "Seedance 2.0 · 12s",
       key: "priceVideoFX2_12s",
-      wallet: "Seedance 2.0 FAL",
+      wallet: "Seedance 2.0",
     },
     {
       label: "Video FX 3 · 4s",
@@ -268,7 +268,7 @@ export function RenderReserveModal({
               />
               <Section
                 title="Video Engines"
-                subtitle="Topaz Upscale, Seedance 2.0 FAL, and Video FX 3 tiers."
+                subtitle="Topaz Upscale, Seedance 2.0, and Video FX 3 tiers."
                 items={videoEngines}
                 accent="bg-cyan-400"
               />
@@ -297,8 +297,3 @@ export function RenderReserveModal({
     </AnimatePresence>
   );
 }
-
-
-
-
-

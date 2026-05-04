@@ -1,6 +1,6 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { apiEndpoints } from "../lib/api";
+import { apiEndpoints, startReadOnlyImpersonation } from "../lib/api";
 import { confirmAction, notify } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
@@ -43,7 +43,7 @@ const COVERAGE_WALLETS = [
   { key: "creditsPicDriftPlus", label: "Kling 3.0", provider: "fal" },
   { key: "creditsImageFX", label: "Image FX (Nano/GPT 2)", provider: "fal" },
   { key: "creditsVideoFX1", label: "Topaz Upscale", provider: "fal" },
-  { key: "creditsVideoFX2", label: "Seedance 2.0 FAL", provider: "fal" },
+  { key: "creditsVideoFX2", label: "Seedance 2.0", provider: "fal" },
   { key: "creditsVideoFX3", label: "Veo 3", provider: "fal" },
 ] as const;
 
@@ -62,9 +62,9 @@ const COVERAGE_VARIANTS = [
   { id: "editor_convert", label: "Image Format Convert", provider: "fal", wallet: "creditsImageFX", deductionKey: "priceEditor_Convert" },
   { id: "topaz_upscale_2x", label: "Topaz Upscale 2x", provider: "fal", wallet: "creditsVideoFX1", deductionKey: "priceVideoFX1_10s" },
   { id: "topaz_upscale_4x", label: "Topaz Upscale 4x", provider: "fal", wallet: "creditsVideoFX1", deductionKey: "priceVideoFX1_15s" },
-  { id: "seedance_fal_4s", label: "Seedance 2.0 FAL 4s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_4s" },
-  { id: "seedance_fal_8s", label: "Seedance 2.0 FAL 8s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_8s" },
-  { id: "seedance_fal_12s", label: "Seedance 2.0 FAL 12s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_12s" },
+  { id: "seedance_fal_4s", label: "Seedance 2.0 4s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_4s" },
+  { id: "seedance_fal_8s", label: "Seedance 2.0 8s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_8s" },
+  { id: "seedance_fal_12s", label: "Seedance 2.0 12s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_12s" },
   { id: "veo3_4s", label: "Veo 3 4s", provider: "fal", wallet: "creditsVideoFX3", deductionKey: "priceVideoFX3_4s" },
   { id: "veo3_6s", label: "Veo 3 6s", provider: "fal", wallet: "creditsVideoFX3", deductionKey: "priceVideoFX3_6s" },
   { id: "veo3_8s", label: "Veo 3 8s", provider: "fal", wallet: "creditsVideoFX3", deductionKey: "priceVideoFX3_8s" },
@@ -133,6 +133,7 @@ export default function TenantDashboard() {
 
   // Edit User Modal
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
 
   const toInt = (value: string, fallback = 0) => {
     const n = Number(value);
@@ -154,7 +155,6 @@ export default function TenantDashboard() {
     const requestedTab = searchParams.get("tab");
     if (
       requestedTab === "team" ||
-      requestedTab === "pricing" ||
       requestedTab === "integrations"
     ) {
       setActiveTab(requestedTab);
@@ -257,6 +257,13 @@ export default function TenantDashboard() {
         }
       }
       setMsg("Configuration saved.");
+      if (isIntegrationSave && config.falApiKey.trim()) {
+        sessionStorage.setItem(
+          "visionlight_activation_message",
+          "Your dashboard is activated. Welcome to your creative studio.",
+        );
+        navigate("/app");
+      }
     } catch (err: any) {
       setMsg("Error: " + err.message);
     } finally {
@@ -284,6 +291,22 @@ export default function TenantDashboard() {
       fetchData();
     } catch (err: any) {
       setMsg("Error: " + (err?.message || "Failed to resolve request."));
+    }
+  };
+
+  const handleEnterReadOnlyDashboard = async (target: User) => {
+    try {
+      startReadOnlyImpersonation(target.id, target.email);
+      const res = await apiEndpoints.getProjects();
+      const firstProject = res.data?.projects?.[0];
+      if (firstProject?.id) {
+        localStorage.setItem("visionlight_active_project", firstProject.id);
+        navigate("/app");
+        return;
+      }
+      navigate("/projects");
+    } catch (err: any) {
+      setMsg("Error: " + (err?.message || "Failed to enter dashboard."));
     }
   };
 
@@ -413,7 +436,7 @@ export default function TenantDashboard() {
               >
                 Back to App
               </button>
-              {["team", "pricing", "integrations"].map((tab) => (
+              {["team", "integrations"].map((tab) => (
                 <button
                   key={tab}
                   onClick={() =>
@@ -513,7 +536,7 @@ export default function TenantDashboard() {
                     <th className="p-5">User</th>
                     <th className="p-5 text-center">Role</th>
                     <th className="p-5 text-center">
-                      {isPicdriftTenant ? "PicDrift" : "PicDrift / +"}
+                      {isPicdriftTenant ? "PicDrift" : "PicDrift / Kling 3.0"}
                     </th>
                     <th className="p-5 text-center">PicFX</th>
                     {!isPicdriftTenant && (
@@ -542,7 +565,7 @@ export default function TenantDashboard() {
                           </div>
                           {!isPicdriftTenant && (
                             <div className="flex items-center gap-2">
-                              <span className="text-[9px] text-gray-500">Plus:</span>
+                              <span className="text-[9px] text-gray-500">Kling:</span>
                               <input type="number" step="1" min="0" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsPicDriftPlus", (toInt(e.target.value, u.creditsPicDriftPlus) - u.creditsPicDriftPlus).toString())} />
                             </div>
                           )}
@@ -555,14 +578,20 @@ export default function TenantDashboard() {
                         <td className="p-5 text-center">
                           <div className="flex gap-1 justify-center">
                             <input type="number" step="1" min="0" title="Topaz Upscale" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX1", (toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1).toString())} />
-                            <input type="number" step="1" min="0" title="Seedance 2.0 FAL" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX2", (toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2).toString())} />
+                            <input type="number" step="1" min="0" title="Seedance 2.0" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX2", (toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2).toString())} />
                             <input type="number" step="1" min="0" title="VidFX 3" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX3", (toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3).toString())} />
                           </div>
                         </td>
                       )}
                       <td className="p-5 text-right">
                         <div className="flex gap-2 justify-end">
-                          <button onClick={() => setEditingUser(u)} className="text-cyan-400 hover:text-cyan-300 text-[9px] font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded">Manage</button>
+                          <button
+                            onClick={() => handleEnterReadOnlyDashboard(u)}
+                            className="text-amber-300 hover:text-amber-200 text-[9px] font-bold uppercase tracking-widest bg-amber-400/10 px-3 py-1 rounded"
+                          >
+                            Enter Dashboard
+                          </button>
+                          <button onClick={() => { setEditingUser(u); setResetPassword(""); }} className="text-cyan-400 hover:text-cyan-300 text-[9px] font-bold uppercase tracking-widest bg-cyan-400/10 px-3 py-1 rounded">Manage</button>
                           {u.id === adminUser?.id ? (
                             <span className="text-gray-500 text-[9px] font-bold uppercase tracking-widest">
                               Active Admin
@@ -946,6 +975,37 @@ export default function TenantDashboard() {
               </div>
 
               <div className="pt-4 border-t border-gray-800">
+                <div className="mb-6 space-y-3 rounded-xl border border-gray-800 bg-gray-950/60 p-4">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Password Reset</label>
+                  <p className="text-[10px] leading-relaxed text-gray-500">
+                    Current passwords are not viewable. Set a new temporary password if this member needs access help.
+                  </p>
+                  <input
+                    type="password"
+                    value={resetPassword}
+                    onChange={(e) => setResetPassword(e.target.value)}
+                    placeholder="New password"
+                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                  />
+                  <button
+                    type="button"
+                    disabled={!resetPassword.trim()}
+                    onClick={async () => {
+                      try {
+                        await apiEndpoints.tenantUpdateUser(editingUser.id, {
+                          password: resetPassword.trim(),
+                        });
+                        setResetPassword("");
+                        setMsg("Password updated.");
+                      } catch (err: any) {
+                        notify.error(err?.message || "Failed to update password.");
+                      }
+                    }}
+                    className="w-full rounded-lg bg-brand-accent py-2.5 text-[10px] font-bold uppercase tracking-widest text-gray-950 disabled:opacity-50"
+                  >
+                    Set New Password
+                  </button>
+                </div>
                 <p className="text-[10px] text-gray-500 uppercase font-bold mb-4 tracking-widest">Credit Top-ups handled via table view.</p>
                 <button onClick={() => setEditingUser(null)} className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
                   Done
@@ -1022,7 +1082,3 @@ export default function TenantDashboard() {
     </div>
   );
 }
-
-
-
-

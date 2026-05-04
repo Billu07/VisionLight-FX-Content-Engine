@@ -25,11 +25,37 @@ export const authenticateToken = async (
     if (!user)
       return res.status(401).json({ error: "Invalid or expired token" });
 
-    req.user = user;
+    const impersonateHeader = req.headers["x-impersonate-user-id"];
+    const impersonateUserId = Array.isArray(impersonateHeader)
+      ? impersonateHeader[0]
+      : impersonateHeader;
+
+    if (typeof impersonateUserId === "string" && impersonateUserId.trim()) {
+      req.user = await AuthService.getReadOnlyImpersonationTarget(
+        user,
+        impersonateUserId.trim(),
+      );
+    } else {
+      req.user = user;
+    }
+
+    if (
+      req.user?.readOnlyImpersonation &&
+      !["GET", "HEAD", "OPTIONS"].includes(req.method)
+    ) {
+      return res.status(403).json({
+        error: "Read-only dashboard access cannot make changes.",
+      });
+    }
+
     req.token = token;
     next();
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    const message = error?.message || "Authentication failed";
+    if (message.toLowerCase().includes("impersonation")) {
+      return res.status(403).json({ error: message });
+    }
+    res.status(500).json({ error: message });
   }
 };
 

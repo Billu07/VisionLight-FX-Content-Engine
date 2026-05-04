@@ -45,7 +45,7 @@ const parseBoolean = (value: any) => {
 };
 
 const sanitizePricingUpdate = (payload: any) => {
-  const updates: Record<string, number | boolean> = {};
+  const updates: Record<string, number | boolean | string> = {};
   for (const key of PRICE_KEYS) {
     if (payload?.[key] === undefined) continue;
     const parsed = toNonNegativeInt(payload[key]);
@@ -61,6 +61,20 @@ const sanitizePricingUpdate = (payload: any) => {
       throw new Error("INVALID_PRICING_VALUE:featureVideoEditorForAll");
     }
     updates.featureVideoEditorForAll = enabled;
+  }
+
+  if (payload?.welcomeVideoUrl !== undefined) {
+    if (payload.welcomeVideoUrl === null || payload.welcomeVideoUrl === "") {
+      updates.welcomeVideoUrl = "";
+    } else if (typeof payload.welcomeVideoUrl === "string") {
+      const trimmed = payload.welcomeVideoUrl.trim();
+      if (trimmed && !/^https?:\/\//i.test(trimmed)) {
+        throw new Error("INVALID_PRICING_VALUE:welcomeVideoUrl");
+      }
+      updates.welcomeVideoUrl = trimmed;
+    } else {
+      throw new Error("INVALID_PRICING_VALUE:welcomeVideoUrl");
+    }
   }
 
   return updates;
@@ -92,7 +106,18 @@ router.get("/organizations", async (req: AuthenticatedRequest, res) => {
 
 // Create a new Tenant (Organization + Admin User)
 router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
-  const { orgName, adminEmail, adminPassword, adminName, maxUsers, maxProjectsTotal, maxStorageMb, view } = req.body;
+  const {
+    orgName,
+    adminEmail,
+    adminPassword,
+    adminName,
+    maxUsers,
+    maxProjectsTotal,
+    maxStorageMb,
+    view,
+    tenantPlan,
+    trialDays,
+  } = req.body;
 
   if (!orgName || !adminEmail || !adminPassword) {
     return res.status(400).json({ error: "Missing required fields" });
@@ -106,11 +131,14 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
     const parsedMaxProjectsTotal =
       maxProjectsTotal !== undefined ? toPositiveInt(maxProjectsTotal) : undefined;
     const parsedMaxStorageMb = toNonNegativeInt(maxStorageMb);
+    const parsedTrialDays = trialDays !== undefined ? toPositiveInt(trialDays) : 14;
+    const normalizedTenantPlan = tenantPlan === "DEMO" ? "DEMO" : "PAID";
 
     if (
       (maxUsers !== undefined && parsedMaxUsers === null) ||
       (maxProjectsTotal !== undefined && parsedMaxProjectsTotal === null) ||
-      (maxStorageMb !== undefined && parsedMaxStorageMb === null)
+      (maxStorageMb !== undefined && parsedMaxStorageMb === null) ||
+      (trialDays !== undefined && parsedTrialDays === null)
     ) {
       return res.status(400).json({ error: "Invalid tenant limits." });
     }
@@ -121,6 +149,11 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
       maxUsers: parsedMaxUsers ?? 5,
       maxProjectsTotal: parsedMaxProjectsTotal ?? 20,
       maxStorageMb: parsedMaxStorageMb ?? 500,
+      tenantPlan: normalizedTenantPlan,
+      trialEndsAt:
+        normalizedTenantPlan === "DEMO"
+          ? new Date(Date.now() + (parsedTrialDays ?? 14) * 24 * 60 * 60 * 1000)
+          : null,
       isDefault: false
     });
     const initialAdminMaxProjects = Math.max(1, Math.min(3, org.maxProjectsTotal));
@@ -331,7 +364,7 @@ router.get("/users", async (req: AuthenticatedRequest, res) => {
 // Update User (Basic Info / Role / View)
 router.put("/users/:userId", async (req: AuthenticatedRequest, res) => {
   const { userId } = req.params;
-  const { name, role, view, maxProjects } = req.body;
+  const { name, role, view, maxProjects, password } = req.body;
 
   try {
     const parsedMaxProjects =
@@ -367,6 +400,13 @@ router.put("/users/:userId", async (req: AuthenticatedRequest, res) => {
     if (role) updates.role = role;
     if (view) updates.view = view;
     if (parsedMaxProjects !== undefined) updates.maxProjects = parsedMaxProjects;
+
+    if (password !== undefined) {
+      if (typeof password !== "string" || password.trim().length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters." });
+      }
+      await AuthService.updateSupabaseUserPassword(targetUser.email, password.trim());
+    }
 
     const updatedUser = await dbService.adminUpdateUser(userId, updates);
     res.json({ success: true, user: updatedUser });

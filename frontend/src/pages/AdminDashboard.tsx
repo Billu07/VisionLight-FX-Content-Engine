@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import { confirmAction } from "../lib/notifications";
@@ -48,7 +48,7 @@ const COVERAGE_WALLETS = [
   { key: "creditsPicDrift", label: "PicDrift (Standard)", provider: "fal" },
   { key: "creditsPicDriftPlus", label: "Kling 3.0", provider: "fal" },
   { key: "creditsVideoFX1", label: "Topaz Upscale", provider: "fal" },
-  { key: "creditsVideoFX2", label: "Seedance 2.0 FAL", provider: "fal" },
+  { key: "creditsVideoFX2", label: "Seedance 2.0", provider: "fal" },
   { key: "creditsVideoFX3", label: "Veo 3", provider: "fal" },
 ] as const;
 
@@ -99,21 +99,21 @@ const COVERAGE_VARIANTS = [
   },
   {
     id: "seedance_fal_4s",
-    label: "Seedance 2.0 FAL 4s",
+    label: "Seedance 2.0 4s",
     provider: "fal",
     wallet: "creditsVideoFX2",
     deductionKey: "priceVideoFX2_4s",
   },
   {
     id: "seedance_fal_8s",
-    label: "Seedance 2.0 FAL 8s",
+    label: "Seedance 2.0 8s",
     provider: "fal",
     wallet: "creditsVideoFX2",
     deductionKey: "priceVideoFX2_8s",
   },
   {
     id: "seedance_fal_12s",
-    label: "Seedance 2.0 FAL 12s",
+    label: "Seedance 2.0 12s",
     provider: "fal",
     wallet: "creditsVideoFX2",
     deductionKey: "priceVideoFX2_12s",
@@ -664,10 +664,10 @@ export default function AdminDashboard() {
                   <tr>
                     <th className="p-6 border-b border-gray-800">Identity</th>
                     <th className="p-6 border-b border-gray-800 text-center">PD Standard</th>
-                    <th className="p-6 border-b border-gray-800 text-center">PD Plus</th>
+                    <th className="p-6 border-b border-gray-800 text-center">Kling 3.0</th>
                     <th className="p-6 border-b border-gray-800 text-center">PicFX</th>
                     <th className="p-6 border-b border-gray-800 text-center">Topaz Upscale</th>
-                    <th className="p-6 border-b border-gray-800 text-center">Seedance 2.0 FAL</th>
+                    <th className="p-6 border-b border-gray-800 text-center">Seedance 2.0</th>
                     <th className="p-6 border-b border-gray-800 text-center">Video FX 3</th>
                     <th className="p-6 border-b border-gray-800 text-right">Operations</th>
                   </tr>
@@ -1112,10 +1112,10 @@ export default function AdminDashboard() {
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                       {[
                         { id: "creditsPicDrift", label: "PD Standard" },
-                        { id: "creditsPicDriftPlus", label: "PD Plus" },
+                        { id: "creditsPicDriftPlus", label: "Kling 3.0" },
                         { id: "creditsImageFX", label: "Pic FX" },
                         { id: "creditsVideoFX1", label: "Topaz Upscale" },
-                        { id: "creditsVideoFX2", label: "Seedance 2.0 FAL" },
+                        { id: "creditsVideoFX2", label: "Seedance 2.0" },
                         { id: "creditsVideoFX3", label: "Video FX 3" },
                       ].map((pool) => (
                         <div key={pool.id} className="flex flex-col gap-3">
@@ -1163,7 +1163,7 @@ export default function AdminDashboard() {
                           <option value="creditsPicDriftPlus">Kling 3.0</option>
                           <option value="creditsImageFX">PicFX</option>
                           <option value="creditsVideoFX1">Topaz Upscale</option>
-                          <option value="creditsVideoFX2">Seedance 2.0 FAL</option>
+                          <option value="creditsVideoFX2">Seedance 2.0</option>
                           <option value="creditsVideoFX3">Video FX 3</option>
                         </select>
                       </div>
@@ -1535,7 +1535,3 @@ export default function AdminDashboard() {
     </div>
   );
 }
-
-
-
-

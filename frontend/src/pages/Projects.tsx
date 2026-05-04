@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
-import { apiEndpoints } from "../lib/api";
+import { apiEndpoints, stopReadOnlyImpersonation } from "../lib/api";
+import { notify } from "../lib/notifications";
 
 export default function Projects() {
   const { user, logout } = useAuth();
@@ -54,6 +55,14 @@ export default function Projects() {
   });
 
   useEffect(() => {
+    const activationMessage = sessionStorage.getItem(
+      "visionlight_activation_message",
+    );
+    if (activationMessage) {
+      sessionStorage.removeItem("visionlight_activation_message");
+      notify.success(activationMessage);
+    }
+
     const handleDocumentClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
       if (!target?.closest("[data-project-menu]")) {
@@ -99,10 +108,23 @@ export default function Projects() {
             <button
               type="button"
               onClick={() => setShowCreateForm((prev) => !prev)}
+              disabled={user?.readOnlyImpersonation}
               className="rounded-lg border border-cyan-700/50 bg-cyan-900/50 px-4 py-2 text-xs font-semibold text-cyan-300 transition-colors hover:border-cyan-500 hover:bg-cyan-800"
             >
               {showCreateForm ? "Close" : "Create Project"}
             </button>
+            {user?.readOnlyImpersonation && (
+              <button
+                type="button"
+                onClick={() => {
+                  stopReadOnlyImpersonation();
+                  navigate("/admin");
+                }}
+                className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/20"
+              >
+                Exit Read-only
+              </button>
+            )}
             <button
               type="button"
               onClick={logout}
@@ -113,7 +135,13 @@ export default function Projects() {
           </div>
         </div>
 
-        {showCreateForm && (
+        {user?.readOnlyImpersonation && (
+          <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+            Read-only dashboard access for {user.email}. Project creation and edits are blocked.
+          </div>
+        )}
+
+        {showCreateForm && !user?.readOnlyImpersonation && (
           <div className="mb-6 rounded-2xl border border-cyan-500/25 bg-gray-900/55 p-4 shadow-2xl backdrop-blur-xl">
             <form
               onSubmit={handleCreate}
@@ -218,7 +246,7 @@ export default function Projects() {
                           </svg>
                         </button>
 
-                        {openMenuProjectId === project.id && (
+                        {openMenuProjectId === project.id && !user?.readOnlyImpersonation && (
                           <div className="absolute right-0 top-full z-20 mt-2 w-36 rounded-xl border border-white/10 bg-gray-900 p-1 shadow-2xl">
                             <button
                               type="button"

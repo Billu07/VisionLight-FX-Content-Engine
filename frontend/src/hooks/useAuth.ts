@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { supabase } from "../lib/supabase";
-import { apiEndpoints, setAuthToken } from "../lib/api";
+import { apiEndpoints, setAuthToken, stopReadOnlyImpersonation } from "../lib/api";
 
 interface User {
   id: string;
@@ -22,6 +22,12 @@ interface User {
   canonicalDomain?: string | null;
   domainRoutingEnabled?: boolean;
   domainRedirectRequired?: boolean;
+  readOnlyImpersonation?: boolean;
+  impersonator?: {
+    id: string;
+    email: string;
+    role: string;
+  };
 }
 
 interface AuthState {
@@ -76,6 +82,7 @@ export const useAuth = create<AuthState>((set) => ({
   logout: async () => {
     await supabase.auth.signOut();
     setAuthToken(null);
+    stopReadOnlyImpersonation();
     localStorage.removeItem("visionlight_active_project");
     set({ user: null, systemPresets: null, token: null });
   },
