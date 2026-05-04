@@ -68,6 +68,7 @@ const COVERAGE_VARIANTS = [
   { id: "editor_pro", label: "Pic FX Editor", provider: "fal", wallet: "creditsImageFX", deductionKey: "priceEditor_Pro" },
   { id: "editor_enhance", label: "Image Enhance/Upscale", provider: "fal", wallet: "creditsImageFX", deductionKey: "priceEditor_Enhance" },
   { id: "editor_convert", label: "Image Format Convert", provider: "fal", wallet: "creditsImageFX", deductionKey: "priceEditor_Convert" },
+  { id: "asset_drift_path", label: "3DX Drift Path", provider: "fal", wallet: "creditsImageFX", deductionKey: "priceAsset_DriftPath" },
   { id: "topaz_upscale_2x", label: "Topaz Upscale 2x", provider: "fal", wallet: "creditsVideoFX1", deductionKey: "priceVideoFX1_10s" },
   { id: "topaz_upscale_4x", label: "Topaz Upscale 4x", provider: "fal", wallet: "creditsVideoFX1", deductionKey: "priceVideoFX1_15s" },
   { id: "seedance_fal_4s", label: "Seedance 2.0 4s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_4s" },
@@ -79,6 +80,28 @@ const COVERAGE_VARIANTS = [
 ] as const;
 
 type CoverageVariantId = (typeof COVERAGE_VARIANTS)[number]["id"];
+
+const DEFAULT_VARIANT_COST_USD: Record<CoverageVariantId, number> = {
+  picdrift_5s: 0.1,
+  picdrift_10s: 0.2,
+  picdrift_plus_5s: 0.2,
+  picdrift_plus_10s: 0.3,
+  picfx_standard: 0.08,
+  picfx_carousel: 0.2,
+  picfx_batch: 0.08,
+  editor_pro: 0.1,
+  editor_enhance: 0.12,
+  editor_convert: 0.08,
+  asset_drift_path: 0.08,
+  topaz_upscale_2x: 0.45,
+  topaz_upscale_4x: 0.7,
+  seedance_fal_4s: 0.2,
+  seedance_fal_8s: 0.35,
+  seedance_fal_12s: 0.5,
+  veo3_4s: 0.25,
+  veo3_6s: 0.38,
+  veo3_8s: 0.5,
+};
 
 const PICDRIFT_PRICING_KEYS = [
   "pricePicDrift_5s",
@@ -109,28 +132,6 @@ export default function TenantDashboard() {
   const [msg, setMsg] = useState("");
 
   const [showAddUserModal, setShowAddUserModal] = useState(false);
-  const [variantCostUsd, setVariantCostUsd] = useState<
-    Record<CoverageVariantId, number>
-  >({
-    picdrift_5s: 0.1,
-    picdrift_10s: 0.2,
-    picdrift_plus_5s: 0.2,
-    picdrift_plus_10s: 0.3,
-    picfx_standard: 0.08,
-    picfx_carousel: 0.2,
-    picfx_batch: 0.08,
-    editor_pro: 0.1,
-    editor_enhance: 0.12,
-    editor_convert: 0.08,
-    topaz_upscale_2x: 0.45,
-    topaz_upscale_4x: 0.7,
-    seedance_fal_4s: 0.2,
-    seedance_fal_8s: 0.35,
-    seedance_fal_12s: 0.5,
-    veo3_4s: 0.25,
-    veo3_6s: 0.38,
-    veo3_8s: 0.5,
-  });
   const [newUser, setNewUser] = useState({
     email: "",
     password: "",
@@ -420,7 +421,7 @@ export default function TenantDashboard() {
     );
     const providerCostPerRender = Math.max(
       0,
-      Number(variantCostUsd[variant.id]) || 0,
+      Number(DEFAULT_VARIANT_COST_USD[variant.id]) || 0,
     );
     const impliedUsdPerCredit =
       deductionCredits > 0 ? providerCostPerRender / deductionCredits : 0;
@@ -471,14 +472,6 @@ export default function TenantDashboard() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
-
-  const handleVariantCostChange = (key: CoverageVariantId, raw: string) => {
-    const parsed = Number(raw);
-    setVariantCostUsd((prev) => ({
-      ...prev,
-      [key]: Number.isFinite(parsed) && parsed >= 0 ? parsed : 0,
-    }));
-  };
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-200 p-6 sm:p-10 font-sans">
@@ -705,7 +698,7 @@ export default function TenantDashboard() {
             <div className="bg-brand-accent/5 border border-brand-accent/20 p-6 rounded-xl">
               <h3 className="text-brand-accent font-bold uppercase text-[10px] tracking-[0.2em] mb-2">Global Control Settings</h3>
               <p className="text-xs text-gray-500 italic">
-                Platform render deductions are controlled by the platform admin. Provider-cost inputs below only adjust this local coverage estimate.
+                Platform render deductions are controlled by the platform admin. This tenant view is read-only and shows coverage estimates only.
               </p>
             </div>
 
@@ -732,10 +725,10 @@ export default function TenantDashboard() {
               <div className="bg-gray-900 p-8 rounded-xl border border-gray-800">
                 <div className="mb-6">
                   <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                    Actual Provider Cost
+                    Provider Cost Reference
                   </h4>
                   <p className="text-xs text-gray-500 mt-2">
-                    USD per render. Implied USD/credit is auto-calculated from your platform deductions.
+                    Read-only USD reference per render. Implied USD/credit is auto-calculated from platform deductions.
                   </p>
                 </div>
                 <div className="overflow-x-auto">
@@ -745,7 +738,7 @@ export default function TenantDashboard() {
                         <th className="py-3 text-left">Generation Variant</th>
                         <th className="py-3 text-left">Provider</th>
                         <th className="py-3 text-right">Credit / Render</th>
-                        <th className="py-3 text-right">Cost / Render ($)</th>
+                        <th className="py-3 text-right">Cost / Render</th>
                         <th className="py-3 text-right">Implied / Credit ($)</th>
                       </tr>
                     </thead>
@@ -759,17 +752,8 @@ export default function TenantDashboard() {
                           <td className="py-3 text-sm text-right text-gray-200">
                             {row.deductionCredits.toFixed(0)}
                           </td>
-                          <td className="py-3 text-right">
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={row.providerCostPerRender}
-                              onChange={(e) =>
-                                handleVariantCostChange(row.id, e.target.value)
-                              }
-                              className="w-24 bg-gray-950 border border-gray-700 rounded p-2 text-right text-xs text-white outline-none focus:border-brand-accent"
-                            />
+                          <td className="py-3 text-right text-sm font-semibold text-gray-200">
+                            {formatUsd(row.providerCostPerRender)}
                           </td>
                           <td className="py-3 text-sm text-right font-semibold text-brand-accent">
                             {formatUsd(row.impliedUsdPerCredit)}

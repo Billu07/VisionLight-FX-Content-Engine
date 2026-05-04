@@ -141,6 +141,13 @@ const COVERAGE_VARIANTS = [
     deductionKey: "priceEditor_Convert",
   },
   {
+    id: "asset_drift_path",
+    label: "3DX Drift Path",
+    provider: "fal",
+    wallet: "creditsImageFX",
+    deductionKey: "priceAsset_DriftPath",
+  },
+  {
     id: "topaz_upscale_2x",
     label: "Topaz Upscale 2x",
     provider: "fal",
@@ -295,6 +302,7 @@ export default function SuperAdminDashboard() {
     editor_pro: 0.1,
     editor_enhance: 0.12,
     editor_convert: 0.08,
+    asset_drift_path: 0.08,
     topaz_upscale_2x: 0.45,
     topaz_upscale_4x: 0.7,
     seedance_fal_4s: 0.2,
