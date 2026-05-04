@@ -86,7 +86,7 @@ export const calculateGranularCost = (
     return settings.priceVideoFX2_12s;
   }
 
-  // 5. VIDEO FX 3 (Veo)
+  // 5. Veo 3.1
   if (mediaType === "video" && model === "veo-3") {
     if (duration === 6) return settings.priceVideoFX3_6s;
     if (duration === 8) return settings.priceVideoFX3_8s;

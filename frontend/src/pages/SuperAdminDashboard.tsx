@@ -64,7 +64,7 @@ const COVERAGE_WALLETS = [
   { key: "creditsImageFX", label: "Image FX (Nano/GPT 2)", provider: "fal" },
   { key: "creditsVideoFX1", label: "Topaz Upscale", provider: "fal" },
   { key: "creditsVideoFX2", label: "Seedance 2.0", provider: "fal" },
-  { key: "creditsVideoFX3", label: "Veo 3", provider: "fal" },
+  { key: "creditsVideoFX3", label: "Veo 3.1", provider: "fal" },
 ] as const;
 
 type CoverageWalletKey = (typeof COVERAGE_WALLETS)[number]["key"];
@@ -177,21 +177,21 @@ const COVERAGE_VARIANTS = [
   },
   {
     id: "veo3_4s",
-    label: "Veo 3 4s",
+    label: "Veo 3.1 4s",
     provider: "fal",
     wallet: "creditsVideoFX3",
     deductionKey: "priceVideoFX3_4s",
   },
   {
     id: "veo3_6s",
-    label: "Veo 3 6s",
+    label: "Veo 3.1 6s",
     provider: "fal",
     wallet: "creditsVideoFX3",
     deductionKey: "priceVideoFX3_6s",
   },
   {
     id: "veo3_8s",
-    label: "Veo 3 8s",
+    label: "Veo 3.1 8s",
     provider: "fal",
     wallet: "creditsVideoFX3",
     deductionKey: "priceVideoFX3_8s",
@@ -1162,7 +1162,7 @@ export default function SuperAdminDashboard() {
                     <th className="p-6 text-center">View</th>
                     <th className="p-6 text-center">PicDrift / Kling 3.0</th>
                     <th className="p-6 text-center">PicFX</th>
-                    <th className="p-6 text-center">Topaz / FAL / VFX3</th>
+                    <th className="p-6 text-center">Topaz / FAL / Veo 3.1</th>
                     <th className="p-6 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -1197,7 +1197,7 @@ export default function SuperAdminDashboard() {
                         <div className="flex gap-2 justify-center">
                           <input type="number" step="1" min="0" title="Topaz Upscale" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1, creditType: "creditsVideoFX1" })} />
                           <input type="number" step="1" min="0" title="Seedance 2.0" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2, creditType: "creditsVideoFX2" })} />
-                          <input type="number" step="1" min="0" title="VidFX 3" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3, creditType: "creditsVideoFX3" })} />
+                          <input type="number" step="1" min="0" title="Veo 3.1" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3, creditType: "creditsVideoFX3" })} />
                         </div>
                       </td>
                       <td className="p-6 text-right">

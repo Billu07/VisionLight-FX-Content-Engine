@@ -49,7 +49,7 @@ const COVERAGE_WALLETS = [
   { key: "creditsPicDriftPlus", label: "Kling 3.0", provider: "fal" },
   { key: "creditsVideoFX1", label: "Topaz Upscale", provider: "fal" },
   { key: "creditsVideoFX2", label: "Seedance 2.0", provider: "fal" },
-  { key: "creditsVideoFX3", label: "Veo 3", provider: "fal" },
+  { key: "creditsVideoFX3", label: "Veo 3.1", provider: "fal" },
 ] as const;
 
 type CoverageWalletKey = (typeof COVERAGE_WALLETS)[number]["key"];
@@ -120,21 +120,21 @@ const COVERAGE_VARIANTS = [
   },
   {
     id: "veo3_4s",
-    label: "Veo 3 4s",
+    label: "Veo 3.1 4s",
     provider: "fal",
     wallet: "creditsVideoFX3",
     deductionKey: "priceVideoFX3_4s",
   },
   {
     id: "veo3_6s",
-    label: "Veo 3 6s",
+    label: "Veo 3.1 6s",
     provider: "fal",
     wallet: "creditsVideoFX3",
     deductionKey: "priceVideoFX3_6s",
   },
   {
     id: "veo3_8s",
-    label: "Veo 3 8s",
+    label: "Veo 3.1 8s",
     provider: "fal",
     wallet: "creditsVideoFX3",
     deductionKey: "priceVideoFX3_8s",
@@ -668,7 +668,7 @@ export default function AdminDashboard() {
                     <th className="p-6 border-b border-gray-800 text-center">PicFX</th>
                     <th className="p-6 border-b border-gray-800 text-center">Topaz Upscale</th>
                     <th className="p-6 border-b border-gray-800 text-center">Seedance 2.0</th>
-                    <th className="p-6 border-b border-gray-800 text-center">Video FX 3</th>
+                    <th className="p-6 border-b border-gray-800 text-center">Veo 3.1</th>
                     <th className="p-6 border-b border-gray-800 text-right">Operations</th>
                   </tr>
                 </thead>
@@ -790,9 +790,9 @@ export default function AdminDashboard() {
                 {
                   title: "Video FX Engine 3",
                   items: [
-                    { label: "FX 3 - 4s", key: "priceVideoFX3_4s" },
-                    { label: "FX 3 - 6s", key: "priceVideoFX3_6s" },
-                    { label: "FX 3 - 8s", key: "priceVideoFX3_8s" },
+                    { label: "Veo 3.1 - 4s", key: "priceVideoFX3_4s" },
+                    { label: "Veo 3.1 - 6s", key: "priceVideoFX3_6s" },
+                    { label: "Veo 3.1 - 8s", key: "priceVideoFX3_8s" },
                   ],
                 },
                 {
@@ -1116,7 +1116,7 @@ export default function AdminDashboard() {
                         { id: "creditsImageFX", label: "Pic FX" },
                         { id: "creditsVideoFX1", label: "Topaz Upscale" },
                         { id: "creditsVideoFX2", label: "Seedance 2.0" },
-                        { id: "creditsVideoFX3", label: "Video FX 3" },
+                        { id: "creditsVideoFX3", label: "Veo 3.1" },
                       ].map((pool) => (
                         <div key={pool.id} className="flex flex-col gap-3">
                           <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
@@ -1164,7 +1164,7 @@ export default function AdminDashboard() {
                           <option value="creditsImageFX">PicFX</option>
                           <option value="creditsVideoFX1">Topaz Upscale</option>
                           <option value="creditsVideoFX2">Seedance 2.0</option>
-                          <option value="creditsVideoFX3">Video FX 3</option>
+                          <option value="creditsVideoFX3">Veo 3.1</option>
                         </select>
                       </div>
                       <div>

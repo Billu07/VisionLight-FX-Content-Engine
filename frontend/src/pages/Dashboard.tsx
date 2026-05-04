@@ -1079,7 +1079,7 @@ function Dashboard() {
             return;
           }
           if (file.size > MAX_VEO_IMAGE_BYTES) {
-            alert("Image source must be 8MB or smaller for Video FX 3.");
+            alert("Image source must be 8MB or smaller for Veo 3.1.");
             setActiveLibrarySlot(null);
             return;
           }
@@ -1091,7 +1091,7 @@ function Dashboard() {
             return;
           }
           if (file.size > MAX_VEO_IMAGE_BYTES) {
-            alert("Each reference image must be 8MB or smaller for Video FX 3.");
+            alert("Each reference image must be 8MB or smaller for Veo 3.1.");
             setActiveLibrarySlot(null);
             return;
           }
@@ -1103,7 +1103,7 @@ function Dashboard() {
             return;
           }
           if (file.size > MAX_VEO_IMAGE_BYTES) {
-            alert("Frame image must be 8MB or smaller for Video FX 3.");
+            alert("Frame image must be 8MB or smaller for Veo 3.1.");
             setActiveLibrarySlot(null);
             return;
           }
@@ -1169,7 +1169,7 @@ function Dashboard() {
         setVideoFx2Aspect(r);
       }
 
-      // C. VEO / VIDEO FX 3
+      // C. VEO 3.1
       else if (activeEngine === "veo") {
         if (r === "16:9") setAspectRatio("16:9");
         else if (r === "9:16") setAspectRatio("9:16");
@@ -1312,7 +1312,7 @@ function Dashboard() {
           veoMode === "reference_to_video") &&
         newFiles.some((file) => file.size > MAX_VEO_IMAGE_BYTES)
       ) {
-        alert("Image input must be 8MB or smaller for Video FX 3.");
+        alert("Image input must be 8MB or smaller for Veo 3.1.");
         return;
       }
     }
@@ -1367,7 +1367,7 @@ function Dashboard() {
         continue;
       }
       if (file.size > MAX_VEO_IMAGE_BYTES) {
-        alert("Each reference image must be 8MB or smaller for Video FX 3.");
+        alert("Each reference image must be 8MB or smaller for Veo 3.1.");
         continue;
       }
       addVeoReference(file, URL.createObjectURL(file));
@@ -1809,7 +1809,7 @@ function Dashboard() {
           return;
         }
         if (veoFrames.first.size > MAX_VEO_IMAGE_BYTES || veoFrames.last.size > MAX_VEO_IMAGE_BYTES) {
-          alert("Each frame image must be 8MB or smaller for Video FX 3.");
+          alert("Each frame image must be 8MB or smaller for Veo 3.1.");
           return;
         }
       } else if (veoMode === "reference_to_video") {
@@ -1847,7 +1847,7 @@ function Dashboard() {
           return;
         }
         if (veoSourceFile.size > MAX_VEO_IMAGE_BYTES) {
-          alert("Source image must be 8MB or smaller for Video FX 3.");
+          alert("Source image must be 8MB or smaller for Veo 3.1.");
           return;
         }
       }
@@ -2574,14 +2574,14 @@ function Dashboard() {
                           </div>
                         </div>
 
-                        {/* VIDEO FX 3 POOL */}
+                        {/* VEO 3.1 POOL */}
                         <div className="flex items-center min-w-0">
                           <div className="flex flex-col">
                             <span className="text-indigo-400 font-medium text-lg sm:text-sm md:text-base leading-none tracking-wide">
                               {formatBal(credits.creditsVideoFX3)}
                             </span>
                             <span className="text-[10px] sm:text-[8px] md:text-[9px] text-gray-400 uppercase font-medium tracking-widest mt-1 leading-tight whitespace-normal">
-                              VidFX 3
+                              Veo 3.1
                             </span>
                           </div>
                         </div>
@@ -3226,7 +3226,7 @@ function Dashboard() {
                                   : "text-gray-400 hover:text-white"
                                   }`}
                               >
-                                Veo 3
+                                Veo 3.1
                               </button>
                               <button
                                 type="button"
@@ -3910,7 +3910,7 @@ function Dashboard() {
                                   </div>
                                 )}
 
-                              {/* VEO 3 SETTINGS (Video FX 3) */}
+                              {/* VEO 3.1 SETTINGS */}
                               {currentVisualTab === "videofx" &&
                                 activeEngine === "veo" && (
                                   <div className="space-y-6 animate-in fade-in duration-500">
@@ -4313,7 +4313,7 @@ function Dashboard() {
                                                     return;
                                                   }
                                                   if (!isVideo && file.size > MAX_VEO_IMAGE_BYTES) {
-                                                    alert("Image input must be 8MB or smaller for Video FX 3.");
+                                                    alert("Image input must be 8MB or smaller for Veo 3.1.");
                                                     return;
                                                   }
                                                   setVeoSingleSource(file, URL.createObjectURL(file));
