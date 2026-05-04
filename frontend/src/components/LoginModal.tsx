@@ -10,7 +10,7 @@ interface LoginModalProps {
   onClose: () => void;
 }
 
-type LoginStep = "email" | "workspace" | "password";
+type LoginStep = "email" | "password";
 
 type LoginProfile = {
   id: string;
@@ -90,7 +90,6 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [step, setStep] = useState<LoginStep>("email");
-  const [profiles, setProfiles] = useState<LoginProfile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [error, setError] = useState("");
@@ -114,7 +113,6 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
     } else {
       setStep("email");
       setPassword("");
-      setProfiles([]);
       clearActiveProfile();
     }
     setError("");
@@ -160,13 +158,9 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
     setIsLoading(true);
     setError("");
     setResetMessage("");
-    setProfiles([]);
     clearActiveProfile();
 
     const cached = getCachedDomainForEmail(normalizedEmail);
-    if (cached?.profileId) {
-      setActiveProfile(cached.profileId, normalizedEmail);
-    }
 
     try {
       const response = await apiEndpoints.resolveAuthDomain(normalizedEmail);
@@ -176,8 +170,7 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
 
       if (resolvedProfiles.length > 1) {
         clearActiveProfile();
-        setProfiles(resolvedProfiles);
-        setStep("workspace");
+        continueToPassword(normalizedEmail);
         return;
       }
 
@@ -189,18 +182,10 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
       );
     } catch {
       // Generic fallback to avoid account-enumeration hints.
-      continueToPassword(normalizedEmail);
+      continueToPassword(normalizedEmail, undefined, cached?.domain);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleWorkspaceSelect = (profile: LoginProfile) => {
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail) return;
-    setError("");
-    setResetMessage("");
-    continueToPassword(normalizedEmail, profile, profile.canonicalDomain);
   };
 
   const handlePasswordResetRequest = async () => {
@@ -242,7 +227,6 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
       return;
     }
 
-    if (step === "workspace") return;
     if (!normalizedEmail || !password.trim()) return;
 
     setIsLoading(true);
@@ -287,9 +271,7 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
         <p className="text-purple-200/70 text-sm mb-6">
           {step === "email"
             ? "Enter your email to find the right workspace."
-            : step === "workspace"
-              ? "Choose which organization you want to enter."
-              : "Enter your password to continue."}
+            : "Enter your password to continue."}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -305,7 +287,6 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
                 setResetMessage("");
                 if (step !== "email") {
                   setStep("email");
-                  setProfiles([]);
                   setPassword("");
                   clearActiveProfile();
                 }
@@ -316,33 +297,6 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
               autoComplete="email"
             />
           </div>
-
-          {step === "workspace" && (
-            <div className="space-y-3">
-              {profiles.map((profile) => (
-                <button
-                  key={profile.id}
-                  type="button"
-                  onClick={() => handleWorkspaceSelect(profile)}
-                  className="w-full rounded-xl border border-white/10 bg-white/[0.04] p-4 text-left transition-colors hover:border-cyan-300/40 hover:bg-white/[0.08]"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="font-bold text-white">
-                        {profile.organizationName || "Personal Workspace"}
-                      </div>
-                      <div className="mt-1 text-[11px] text-gray-500">
-                        {profile.role || "USER"} access
-                      </div>
-                    </div>
-                    <span className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-cyan-200">
-                      {profile.view === "PICDRIFT" ? "PicDrift" : "VisualFX"}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
 
           {step === "password" && (
             <div>
@@ -390,16 +344,14 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
             >
               {step === "email" ? "Cancel" : "Back"}
             </button>
-            {step !== "workspace" && (
-              <button
-                type="submit"
-                disabled={isLoading || !email || (step === "password" && !password)}
-                className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white py-3 px-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 font-bold shadow-lg hover:shadow-cyan-500/25"
-              >
-                {isLoading ? <LoadingSpinner size="sm" variant="light" /> : null}
-                {step === "email" ? "Continue" : "Login"}
-              </button>
-            )}
+            <button
+              type="submit"
+              disabled={isLoading || !email || (step === "password" && !password)}
+              className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white py-3 px-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 font-bold shadow-lg hover:shadow-cyan-500/25"
+            >
+              {isLoading ? <LoadingSpinner size="sm" variant="light" /> : null}
+              {step === "email" ? "Continue" : "Login"}
+            </button>
           </div>
 
           <div className="text-center mt-4 pt-2 border-t border-white/5">

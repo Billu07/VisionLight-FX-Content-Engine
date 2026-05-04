@@ -16,6 +16,9 @@ export default function Projects() {
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [openMenuProjectId, setOpenMenuProjectId] = useState<string | null>(null);
+  const canOpenAdmin =
+    !user?.readOnlyImpersonation &&
+    (user?.role === "ADMIN" || user?.role === "SUPERADMIN");
 
   const { data: projectsData, isLoading } = useQuery({
     queryKey: ["projects"],
@@ -104,7 +107,7 @@ export default function Projects() {
             Your Projects
           </h1>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             {profiles.length > 1 && (
               <button
                 type="button"
@@ -112,6 +115,15 @@ export default function Projects() {
                 className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-gray-200 transition-colors hover:bg-white/10 hover:text-white"
               >
                 Switch Studio
+              </button>
+            )}
+            {canOpenAdmin && (
+              <button
+                type="button"
+                onClick={() => navigate("/admin")}
+                className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-4 py-2 text-xs font-semibold text-sky-200 transition-colors hover:bg-sky-500/20 hover:text-white"
+              >
+                Admin
               </button>
             )}
             <button
