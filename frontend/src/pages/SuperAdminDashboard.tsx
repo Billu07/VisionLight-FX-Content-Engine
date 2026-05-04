@@ -599,17 +599,21 @@ export default function SuperAdminDashboard() {
     if (!editingTenant) return;
     setActionLoading(true);
     try {
-      await apiEndpoints.superadminUpdateOrgLimits(editingTenant.id, {
+      const orgUpdates: Record<string, any> = {
         name: tenantUpdates.name,
         maxUsers: tenantUpdates.maxUsers,
         maxProjectsTotal: tenantUpdates.maxProjectsTotal,
         maxStorageMb: tenantUpdates.maxStorageMb,
-        view: tenantUpdates.view
-      });
-      if (editingTenant.isActive !== tenantUpdates.isActive) {
+      };
+      if (!editingTenant.isDefault) {
+        orgUpdates.view = tenantUpdates.view;
+      }
+
+      await apiEndpoints.superadminUpdateOrgLimits(editingTenant.id, orgUpdates);
+      if (!editingTenant.isDefault && editingTenant.isActive !== tenantUpdates.isActive) {
         await apiEndpoints.superadminUpdateOrgStatus(editingTenant.id, tenantUpdates.isActive);
       }
-      setMsg("Tenant updated.");
+      setMsg(editingTenant.isDefault ? "Default organization updated." : "Tenant updated.");
       setEditingTenant(null);
       fetchInitialData();
     } catch (err: any) {
@@ -621,7 +625,11 @@ export default function SuperAdminDashboard() {
 
   const openEditTenant = (t: Tenant) => {
     // Try to find an admin user for this tenant to get the current view
-    const adminUser = users.find(u => u.organizationId === t.id && u.role === "ADMIN");
+    const adminUser = users.find(
+      (u) =>
+        u.organizationId === t.id &&
+        (t.isDefault ? u.role === "SUPERADMIN" : u.role === "ADMIN"),
+    );
     setEditingTenant(t);
     setTenantUpdates({
       name: t.name,
@@ -750,10 +758,6 @@ export default function SuperAdminDashboard() {
   const demoUsers = useMemo(() => {
     return users.filter(u => u.isDemo === true);
   }, [users]);
-
-  const tenantOrganizations = useMemo(() => {
-    return tenants.filter((t) => t.isDefault !== true);
-  }, [tenants]);
 
   const variantRows = useMemo(() => {
     return COVERAGE_VARIANTS.map((variant) => {
@@ -1033,29 +1037,37 @@ export default function SuperAdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {tenantOrganizations.length === 0 ? (
+                  {tenants.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="p-10 text-center text-sm text-gray-300/80">
-                        No tenant organizations created yet.
+                        No organizations created yet.
                       </td>
                     </tr>
-                  ) : tenantOrganizations.map((t) => {
-                    const tenantAdmin =
-                      users.find(
-                        (u) =>
-                          u.organizationId === t.id &&
-                          (u.role === "ADMIN" || u.role === "SUPERADMIN"),
-                      );
+                  ) : tenants.map((t) => {
+                    const adminCandidates = users.filter(
+                      (u) =>
+                        u.organizationId === t.id &&
+                        (u.role === "ADMIN" || u.role === "SUPERADMIN"),
+                    );
+                    const organizationAdmin = t.isDefault
+                      ? adminCandidates.find((u) => u.role === "SUPERADMIN") ||
+                        adminCandidates.find((u) => u.role === "ADMIN")
+                      : adminCandidates.find((u) => u.role === "ADMIN") ||
+                        adminCandidates.find((u) => u.role === "SUPERADMIN");
                     return (
                       <tr key={t.id} className={adminUi.tableRow}>
                         <td className="p-6">
                           <div className="font-bold text-white">{t.name}</div>
                           <div className="mt-1 text-xs text-cyan-200/80 font-mono">
-                            {tenantAdmin?.email || "No tenant admin email"}
+                            {organizationAdmin?.email || "No admin email"}
                           </div>
                           <div className="mt-2 flex flex-wrap gap-2">
                             <span className={adminUi.pill}>
-                              {t.tenantPlan === "DEMO" ? "Demo Tenant" : "Paid Tenant"}
+                              {t.isDefault
+                                ? "Default Org"
+                                : t.tenantPlan === "DEMO"
+                                  ? "Demo Tenant"
+                                  : "Paid Tenant"}
                             </span>
                             {t.trialEndsAt && (
                               <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-amber-300">
@@ -1065,14 +1077,20 @@ export default function SuperAdminDashboard() {
                           </div>
                         </td>
                         <td className="p-6 text-center">
-                          <span
-                            className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${t.isActive
-                                ? "bg-green-500/10 text-green-400 border-green-500/20"
-                                : "bg-red-500/10 text-red-400 border-red-500/20"
-                              }`}
-                          >
-                            {t.isActive ? "Active" : "Deactivated"}
-                          </span>
+                          {t.isDefault ? (
+                            <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-emerald-300">
+                              System
+                            </span>
+                          ) : (
+                            <span
+                              className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${t.isActive
+                                  ? "bg-green-500/10 text-green-400 border-green-500/20"
+                                  : "bg-red-500/10 text-red-400 border-red-500/20"
+                                }`}
+                            >
+                              {t.isActive ? "Active" : "Deactivated"}
+                            </span>
+                          )}
                         </td>
                         <td className="p-6 text-center">
                           <div className="text-sm font-semibold text-gray-200">{t.maxUsers} users</div>
@@ -1082,8 +1100,8 @@ export default function SuperAdminDashboard() {
                           <div className="flex gap-2 justify-end">
                             <button
                               className={adminUi.amberButton}
-                              onClick={() => tenantAdmin && handleEnterReadOnlyDashboard(tenantAdmin)}
-                              disabled={!tenantAdmin}
+                              onClick={() => organizationAdmin && handleEnterReadOnlyDashboard(organizationAdmin)}
+                              disabled={!organizationAdmin}
                             >
                               Enter Dashboard
                             </button>
@@ -1093,12 +1111,18 @@ export default function SuperAdminDashboard() {
                             >
                               Configure
                             </button>
-                            <button
-                              className={adminUi.dangerButton}
-                              onClick={() => handleDeleteTenant(t.id)}
-                            >
-                              Delete
-                            </button>
+                            {t.isDefault ? (
+                              <span className="rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-300">
+                                Protected
+                              </span>
+                            ) : (
+                              <button
+                                className={adminUi.dangerButton}
+                                onClick={() => handleDeleteTenant(t.id)}
+                              >
+                                Delete
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1768,7 +1792,9 @@ export default function SuperAdminDashboard() {
           <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg shadow-2xl max-h-[92vh] overflow-y-auto">
             <div className="p-8 border-b border-gray-800 flex justify-between items-center">
               <div>
-                <h3 className="text-xl font-bold text-white uppercase tracking-tight">Configure Tenant</h3>
+                <h3 className="text-xl font-bold text-white uppercase tracking-tight">
+                  {editingTenant.isDefault ? "Configure Default Org" : "Configure Tenant"}
+                </h3>
                 <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">{editingTenant.name}</p>
               </div>
               <button onClick={() => setEditingTenant(null)} className="text-gray-500 hover:text-white font-bold text-xl">x</button>
@@ -1814,41 +1840,50 @@ export default function SuperAdminDashboard() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform View (Applies to all users)</label>
-                <select
-                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
-                  value={tenantUpdates.view}
-                  onChange={e => setTenantUpdates({ ...tenantUpdates, view: e.target.value })}
-                >
-                  <option value="VISIONLIGHT">VisionLight View (Full)</option>
-                  <option value="PICDRIFT">PicDrift View (Limited)</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Subscription Status</label>
-                <div className="flex gap-4">
-                  <button
-                    onClick={() => setTenantUpdates({ ...tenantUpdates, isActive: true })}
-                    className={`flex-1 py-3 rounded-lg border text-xs font-bold uppercase tracking-widest transition-colors ${tenantUpdates.isActive
-                        ? "bg-green-500/10 border-green-500/50 text-green-400"
-                        : "bg-gray-950 border-gray-800 text-gray-500 hover:text-white"
-                      }`}
-                  >
-                    Active
-                  </button>
-                  <button
-                    onClick={() => setTenantUpdates({ ...tenantUpdates, isActive: false })}
-                    className={`flex-1 py-3 rounded-lg border text-xs font-bold uppercase tracking-widest transition-colors ${!tenantUpdates.isActive
-                        ? "bg-red-500/10 border-red-500/50 text-red-400"
-                        : "bg-gray-950 border-gray-800 text-gray-500 hover:text-white"
-                      }`}
-                  >
-                    Deactivated
-                  </button>
+              {editingTenant.isDefault ? (
+                <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-xs leading-relaxed text-emerald-100">
+                  Default org is platform-owned and protected. You can rename it and adjust limits, but deletion,
+                  deactivation, and bulk platform-view switching are disabled.
                 </div>
-              </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform View (Applies to all users)</label>
+                    <select
+                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                      value={tenantUpdates.view}
+                      onChange={e => setTenantUpdates({ ...tenantUpdates, view: e.target.value })}
+                    >
+                      <option value="VISIONLIGHT">VisionLight View (Full)</option>
+                      <option value="PICDRIFT">PicDrift View (Limited)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Subscription Status</label>
+                    <div className="flex gap-4">
+                      <button
+                        onClick={() => setTenantUpdates({ ...tenantUpdates, isActive: true })}
+                        className={`flex-1 py-3 rounded-lg border text-xs font-bold uppercase tracking-widest transition-colors ${tenantUpdates.isActive
+                            ? "bg-green-500/10 border-green-500/50 text-green-400"
+                            : "bg-gray-950 border-gray-800 text-gray-500 hover:text-white"
+                          }`}
+                      >
+                        Active
+                      </button>
+                      <button
+                        onClick={() => setTenantUpdates({ ...tenantUpdates, isActive: false })}
+                        className={`flex-1 py-3 rounded-lg border text-xs font-bold uppercase tracking-widest transition-colors ${!tenantUpdates.isActive
+                            ? "bg-red-500/10 border-red-500/50 text-red-400"
+                            : "bg-gray-950 border-gray-800 text-gray-500 hover:text-white"
+                          }`}
+                      >
+                        Deactivated
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="flex gap-4 pt-4">
                 <button type="button" onClick={() => setEditingTenant(null)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>

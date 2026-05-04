@@ -251,6 +251,15 @@ router.delete("/organizations/:id", async (req: AuthenticatedRequest, res) => {
 router.put("/organizations/:id/status", async (req: AuthenticatedRequest, res) => {
   const { isActive } = req.body;
   try {
+    const existingOrg = await dbService.getOrganization(req.params.id);
+    if (!existingOrg) {
+      return res.status(404).json({ error: "Organization not found." });
+    }
+    if (existingOrg.isDefault) {
+      return res.status(400).json({
+        error: "Default system organization status cannot be changed.",
+      });
+    }
     const org = await dbService.updateOrganizationStatus(req.params.id, !!isActive);
     res.json({ success: true, organization: org });
   } catch (error: any) {
