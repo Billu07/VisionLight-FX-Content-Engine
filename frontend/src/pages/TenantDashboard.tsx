@@ -728,7 +728,13 @@ export default function TenantDashboard() {
                             <button
                               className={`${adminUi.dangerButton} opacity-0 group-hover:opacity-100`}
                               onClick={async () => {
-                                if (await confirmAction("Remove user?", { confirmLabel: "Remove" })) {
+                                if (
+                                  await confirmAction(`Remove "${u.email}" from team?`, {
+                                    confirmLabel: "Remove",
+                                    critical: true,
+                                    confirmationText: `REMOVE ${u.email}`,
+                                  })
+                                ) {
                                   try {
                                     await apiEndpoints.tenantDeleteUser(u.id);
                                     setMsg("User removed from team.");

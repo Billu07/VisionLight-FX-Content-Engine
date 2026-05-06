@@ -289,7 +289,14 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteUser = async (user: User) => {
-    if (!(await confirmAction(`Delete ${user.email}?`, { confirmLabel: "Delete" }))) return;
+    if (
+      !(await confirmAction(`Delete ${user.email}?`, {
+        confirmLabel: "Delete",
+        critical: true,
+        confirmationText: `DELETE ${user.email}`,
+      }))
+    )
+      return;
     setActionLoading(true);
     try {
       await apiEndpoints.adminDeleteUser(user.id);

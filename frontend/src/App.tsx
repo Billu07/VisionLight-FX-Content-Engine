@@ -192,12 +192,16 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrandProvider>
         <Toaster
-          position="top-right"
+          position="top-center"
           richColors
           closeButton
-          duration={5000}
+          visibleToasts={5}
+          duration={5200}
+          offset={20}
+          gap={10}
           toastOptions={{
-            className: "!bg-gray-900 !text-gray-100 !border !border-white/10",
+            className:
+              "!w-[min(92vw,420px)] !bg-gray-950/92 !text-gray-100 !border !border-white/15 !backdrop-blur-xl !shadow-[0_18px_50px_rgba(2,8,23,0.45)]",
           }}
         />
         <Router>

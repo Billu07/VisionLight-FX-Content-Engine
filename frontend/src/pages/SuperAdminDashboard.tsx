@@ -610,7 +610,19 @@ export default function SuperAdminDashboard() {
   };
 
   const handleDeleteTenant = async (id: string) => {
-    if (!(await confirmAction("Are you sure? This will delete the organization and ALL its users forever.", { confirmLabel: "Delete" }))) return;
+    const targetTenant = tenants.find((t) => t.id === id);
+    const targetName = targetTenant?.name || "this organization";
+    if (
+      !(await confirmAction(
+        `Delete "${targetName}" and all associated users forever?`,
+        {
+          confirmLabel: "Delete",
+          critical: true,
+          confirmationText: `DELETE ${targetName}`,
+        },
+      ))
+    )
+      return;
     setActionLoading(true);
     try {
       await apiEndpoints.superadminDeleteOrganization(id);
@@ -1359,7 +1371,13 @@ export default function SuperAdminDashboard() {
                           <button
                             className={adminUi.dangerButton}
                             onClick={async () => {
-                              if (await confirmAction("Remove user?", { confirmLabel: "Remove" })) {
+                              if (
+                                await confirmAction(`Remove "${u.email}" from platform?`, {
+                                  confirmLabel: "Remove",
+                                  critical: true,
+                                  confirmationText: `REMOVE ${u.email}`,
+                                })
+                              ) {
                                 apiEndpoints.tenantDeleteUser(u.id).then(fetchInitialData);
                               }
                             }}
