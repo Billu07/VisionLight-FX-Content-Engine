@@ -1840,9 +1840,17 @@ export default function SuperAdminDashboard() {
                   <div className={`${adminUi.mutedCard} p-6`}>
                     <h5 className={`${adminUi.sectionTitle} mb-4`}>PicDrift Engine</h5>
                     <div className="space-y-4">
-                      {["pricePicDrift_5s", "pricePicDrift_10s", "pricePicDrift_Plus_5s", "pricePicDrift_Plus_10s", "priceAsset_DriftPath"].map(key => (
+                      {[
+                        { key: "pricePicDrift_5s", label: "Standard 5s" },
+                        { key: "pricePicDrift_10s", label: "Standard 10s" },
+                        { key: "pricePicDrift_Plus_5s", label: "Kling 3.0 5s" },
+                        { key: "pricePicDrift_Plus_10s", label: "Kling 3.0 10s" },
+                        { key: "priceAsset_DriftPath", label: "3DX Drift Path" },
+                      ].map(({ key, label }) => (
                         <div key={key} className="flex justify-between items-center">
-                          <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
+                          <span className="text-[10px] text-gray-400 uppercase font-bold">
+                            {label}
+                          </span>
                           <input
                             type="number"
                             step="1"

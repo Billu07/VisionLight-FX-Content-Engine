@@ -776,8 +776,8 @@ export default function AdminDashboard() {
                   items: [
                     { label: "Standard 5s", key: "pricePicDrift_5s" },
                     { label: "Standard 10s", key: "pricePicDrift_10s" },
-                    { label: "Plus 5s", key: "pricePicDrift_Plus_5s" },
-                    { label: "Plus 10s", key: "pricePicDrift_Plus_10s" },
+                    { label: "Kling 3.0 5s", key: "pricePicDrift_Plus_5s" },
+                    { label: "Kling 3.0 10s", key: "pricePicDrift_Plus_10s" },
                     { label: "3DX Drift Path", key: "priceAsset_DriftPath" },
                   ],
                 },
