@@ -568,8 +568,8 @@ function Dashboard() {
     storageLimitMb > 0
       ? Math.max(0, Math.min(100, (storageUsedMb / storageLimitMb) * 100))
       : 0;
-  const formatStorageMb = (value: number) =>
-    `${Math.max(0, Number(value || 0)).toFixed(1)} MB`;
+  const formatStorageGb = (valueMb: number) =>
+    `${(Math.max(0, Number(valueMb || 0)) / 1024).toFixed(2)} GB`;
   const [isRequesting, setIsRequesting] = useState(false);
   const creditLink = canUseExternalCreditLink
     ? "https://picdrift.com/fx-credits"
@@ -2621,7 +2621,7 @@ function Dashboard() {
                     <div className="flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest text-gray-400">
                       <span>Storage</span>
                       <span className="text-cyan-300">
-                        {formatStorageMb(storageUsedMb)} / {formatStorageMb(storageLimitMb)}
+                        {formatStorageGb(storageUsedMb)} / {formatStorageGb(storageLimitMb)}
                       </span>
                     </div>
                     <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-900/90">
@@ -2637,7 +2637,7 @@ function Dashboard() {
                       />
                     </div>
                     <div className="mt-2 text-[10px] text-gray-500">
-                      Remaining: {formatStorageMb(storageRemainingMb)}
+                      Remaining: {formatStorageGb(storageRemainingMb)}
                     </div>
                   </div>
                 )}

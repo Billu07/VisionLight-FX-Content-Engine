@@ -494,8 +494,8 @@ export default function TenantDashboard() {
     storageLimitMb > 0
       ? Math.max(0, Math.min(100, (storageUsedMb / storageLimitMb) * 100))
       : 0;
-  const formatStorageMb = (value: number) =>
-    `${Math.max(0, Number(value || 0)).toFixed(1)} MB`;
+  const formatStorageGb = (valueMb: number) =>
+    `${(Math.max(0, Number(valueMb || 0)) / 1024).toFixed(2)} GB`;
 
   return (
     <div className={`${adminUi.page} font-sans`}>
@@ -568,7 +568,7 @@ export default function TenantDashboard() {
                 Organization Storage
               </p>
               <p className="text-[10px] uppercase tracking-[0.14em] text-brand-accent font-bold">
-                {formatStorageMb(storageUsedMb)} / {formatStorageMb(storageLimitMb)}
+                {formatStorageGb(storageUsedMb)} / {formatStorageGb(storageLimitMb)}
               </p>
             </div>
             <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-900/90">
@@ -586,7 +586,7 @@ export default function TenantDashboard() {
             <div className="mt-3 text-xs text-gray-400">
               Remaining:{" "}
               <span className="font-semibold text-gray-200">
-                {formatStorageMb(storageRemainingMb)}
+                {formatStorageGb(storageRemainingMb)}
               </span>
             </div>
           </div>

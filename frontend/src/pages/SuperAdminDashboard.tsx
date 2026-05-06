@@ -332,6 +332,13 @@ export default function SuperAdminDashboard() {
     if (!Number.isFinite(n)) return fallback;
     return Math.max(0, Math.round(n));
   };
+  const MB_PER_GB = 1024;
+  const mbToGb = (mb: number) => Math.max(0, Number(mb || 0)) / MB_PER_GB;
+  const gbToMb = (gb: string, fallbackMb = 0) => {
+    const parsed = Number(gb);
+    if (!Number.isFinite(parsed)) return fallbackMb;
+    return Math.max(0, Math.round(parsed * MB_PER_GB));
+  };
 
   const normalizedTenantAdminEmail = newTenant.adminEmail.trim().toLowerCase();
   const normalizedDemoEmail = newDemo.email.trim().toLowerCase();
@@ -1135,7 +1142,7 @@ export default function SuperAdminDashboard() {
                           <div className="text-sm font-semibold text-gray-200">{t.maxUsers} users</div>
                           <div className="mt-1 text-xs text-gray-500">{t.maxProjectsTotal} projects</div>
                           <div className="mt-2 text-xs text-gray-400">
-                            {Number(t.storageSummary?.usedMb || 0).toFixed(1)}MB / {Number(t.maxStorageMb || 0).toFixed(0)}MB
+                            {mbToGb(Number(t.storageSummary?.usedMb || 0)).toFixed(2)}GB / {mbToGb(Number(t.maxStorageMb || 0)).toFixed(2)}GB
                           </div>
                           <div className="mx-auto mt-2 h-1.5 w-36 overflow-hidden rounded-full bg-gray-900/90">
                             <div
@@ -1773,9 +1780,21 @@ export default function SuperAdminDashboard() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform Storage Limit (MB)</label>
-                    <input type="number" className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white" defaultValue={10240} onChange={e => setNewTenant({ ...newTenant, maxStorageMb: parseInt(e.target.value) })} />
-                    <p className="text-[10px] text-gray-500">Default 10GB = 10240MB</p>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform Storage Limit (GB)</label>
+                    <input
+                      type="number"
+                      step="0.25"
+                      min="0"
+                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
+                      value={mbToGb(newTenant.maxStorageMb).toString()}
+                      onChange={e =>
+                        setNewTenant({
+                          ...newTenant,
+                          maxStorageMb: gbToMb(e.target.value, newTenant.maxStorageMb),
+                        })
+                      }
+                    />
+                    <p className="text-[10px] text-gray-500">Default 10GB</p>
                 </div>
                 <div className="space-y-2">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform View</label>
@@ -1951,12 +1970,19 @@ export default function SuperAdminDashboard() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform Storage Limit (MB)</label>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform Storage Limit (GB)</label>
                 <input
                   type="number"
+                  step="0.25"
+                  min="0"
                   className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
-                  value={tenantUpdates.maxStorageMb}
-                  onChange={e => setTenantUpdates({ ...tenantUpdates, maxStorageMb: parseInt(e.target.value) })}
+                  value={mbToGb(tenantUpdates.maxStorageMb).toString()}
+                  onChange={e =>
+                    setTenantUpdates({
+                      ...tenantUpdates,
+                      maxStorageMb: gbToMb(e.target.value, tenantUpdates.maxStorageMb),
+                    })
+                  }
                 />
               </div>
               {editingTenant.storageSummary && (
@@ -1965,10 +1991,10 @@ export default function SuperAdminDashboard() {
                     Current Storage Usage
                   </p>
                   <p className="mt-2 text-sm font-semibold text-white">
-                    {Number(editingTenant.storageSummary.usedMb || 0).toFixed(2)}MB used
+                    {mbToGb(Number(editingTenant.storageSummary.usedMb || 0)).toFixed(2)}GB used
                   </p>
                   <p className="mt-1 text-[10px] uppercase tracking-widest text-gray-500">
-                    Remaining {Number(editingTenant.storageSummary.remainingMb || 0).toFixed(2)}MB
+                    Remaining {mbToGb(Number(editingTenant.storageSummary.remainingMb || 0)).toFixed(2)}GB
                   </p>
                 </div>
               )}
