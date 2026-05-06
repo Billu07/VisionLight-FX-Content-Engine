@@ -1265,11 +1265,6 @@ router.post(
       const isSuperAdminSession =
         req.user?.role === "SUPERADMIN" ||
         req.user?.impersonator?.role === "SUPERADMIN";
-      if (mediaType === "carousel" && !isSuperAdminSession) {
-        return res.status(403).json({
-          error: "Carousel generation is available for SuperAdmin accounts only.",
-        });
-      }
 
       if (projectId) {
         const project = await airtableService.getProjectById(projectId);
@@ -1283,6 +1278,19 @@ router.post(
         getTenantSettings(req.user!.id),
         airtableService.findUserById(req.user!.id),
       ]);
+      const carouselEnabledForAll =
+        Number((settings as any)?.pricePicFX_Carousel || 0) > 0;
+      const normalizedMediaType =
+        typeof mediaType === "string" ? mediaType.toLowerCase() : "";
+      if (
+        normalizedMediaType === "carousel" &&
+        !isSuperAdminSession &&
+        !carouselEnabledForAll
+      ) {
+        return res.status(403).json({
+          error: "Carousel generation is currently disabled by platform policy.",
+        });
+      }
 
       if (!user) {
         console.warn("User not found in DB");

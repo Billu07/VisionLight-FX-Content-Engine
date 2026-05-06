@@ -25,6 +25,7 @@ interface User {
   needsActivation?: boolean;
   orgLockReason?: "DEACTIVATED" | "MISSING_FAL_KEY" | null;
   videoEditorEnabledForAll?: boolean;
+  carouselEnabledForAll?: boolean;
   view?: "VISIONLIGHT" | "PICDRIFT";
   orgViewType?: "VISIONLIGHT" | "PICDRIFT";
   maxProjects?: number;

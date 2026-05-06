@@ -320,10 +320,13 @@ router.get(
           ).map(buildPublicProfileOption);
 
       let videoEditorEnabledForAll = false;
+      let carouselEnabledForAll = false;
       try {
         const globalSettings = await airtableService.getGlobalSettings();
         videoEditorEnabledForAll =
           globalSettings?.featureVideoEditorForAll === true;
+        carouselEnabledForAll =
+          Number((globalSettings as any)?.pricePicFX_Carousel || 0) > 0;
       } catch (settingsError: any) {
         console.warn(
           "[auth/me] Global settings unavailable; defaulting Video Editor rollout to superadmin-only.",
@@ -356,6 +359,7 @@ router.get(
           orgLockReason,
           organizationName: org?.name,
           videoEditorEnabledForAll,
+          carouselEnabledForAll,
           canonicalDomain,
           domainRoutingEnabled: DOMAIN_ROUTING_ENABLED,
           domainRedirectRequired,

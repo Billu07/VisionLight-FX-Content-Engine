@@ -303,7 +303,6 @@ export default function SuperAdminDashboard() {
     useState<ProvisionEmailStatus | null>(null);
   const [checkingTeamMemberEmail, setCheckingTeamMemberEmail] = useState(false);
   const [welcomeVideoUploading, setWelcomeVideoUploading] = useState(false);
-  const [welcomePreviewVisible, setWelcomePreviewVisible] = useState(false);
   const [welcomePreviewReady, setWelcomePreviewReady] = useState(false);
   const [variantCostUsd, setVariantCostUsd] = useState<
     Record<CoverageVariantId, number>
@@ -496,7 +495,6 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => {
     if (activeTab !== "lab") return;
-    setWelcomePreviewVisible(false);
     setWelcomePreviewReady(false);
   }, [activeTab, globalSettings?.welcomeVideoUrl]);
 
@@ -1509,16 +1507,50 @@ export default function SuperAdminDashboard() {
                     </div>
 
                     <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4">
-                      <div className="mb-2 flex items-center gap-2">
-                        <span className="rounded-md border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-200">
-                          Locked
-                        </span>
-                        <p className="text-sm font-semibold text-white">Carousel Access Policy</p>
+                      <div className="mb-3 flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-white">Carousel Rollout</p>
+                          <p className="mt-1 text-xs leading-relaxed text-gray-500">
+                            Enable Carousel for all users when needed, or keep it restricted to
+                            SuperAdmin-only lab access.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const enabled =
+                              Number(globalSettings.pricePicFX_Carousel || 0) > 0;
+                            const nextEnabled = !enabled;
+                            const nextCarouselPrice = nextEnabled
+                              ? Math.max(1, Number(globalSettings.pricePicFX_Carousel || 3))
+                              : 0;
+                            try {
+                              const res = await apiEndpoints.superadminUpdateGlobalSettings({
+                                pricePicFX_Carousel: nextCarouselPrice,
+                              });
+                              if (res.data?.success) {
+                                setGlobalSettings(res.data.settings);
+                                setMsg(
+                                  nextEnabled
+                                    ? "Carousel rollout enabled for all users."
+                                    : "Carousel restricted to SuperAdmin lab access.",
+                                );
+                              }
+                            } catch (err: any) {
+                              setMsg("Error: " + err.message);
+                            }
+                          }}
+                          className={`rounded-lg border px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                            Number(globalSettings.pricePicFX_Carousel || 0) > 0
+                              ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
+                              : "border-white/10 bg-white/[0.055] text-gray-300 hover:bg-white/10"
+                          }`}
+                        >
+                          {Number(globalSettings.pricePicFX_Carousel || 0) > 0
+                            ? "Enabled For All"
+                            : "SuperAdmin Only"}
+                        </button>
                       </div>
-                      <p className="text-xs leading-relaxed text-gray-500">
-                        Carousel creation remains hidden for tenant admins and users. Access is reserved
-                        for SuperAdmin sessions only.
-                      </p>
                     </div>
                   </div>
                 </div>
@@ -1568,7 +1600,6 @@ export default function SuperAdminDashboard() {
                           if (res.data?.success) {
                             setGlobalSettings(res.data.settings);
                             setWelcomePreviewReady(false);
-                            setWelcomePreviewVisible(false);
                             setMsg("Welcome video uploaded and updated.");
                           }
                         } catch (err: any) {
@@ -1585,20 +1616,6 @@ export default function SuperAdminDashboard() {
                       <>
                         <button
                           type="button"
-                          onClick={() => {
-                            if (welcomePreviewVisible) {
-                              setWelcomePreviewVisible(false);
-                              return;
-                            }
-                            setWelcomePreviewReady(false);
-                            setWelcomePreviewVisible(true);
-                          }}
-                          className="rounded-lg border border-white/15 bg-white/[0.04] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-300 transition-colors hover:bg-white/10"
-                        >
-                          {welcomePreviewVisible ? "Hide Preview" : "Load Preview"}
-                        </button>
-                        <button
-                          type="button"
                           onClick={async () => {
                             try {
                               const res = await apiEndpoints.superadminUpdateGlobalSettings({
@@ -1606,7 +1623,6 @@ export default function SuperAdminDashboard() {
                               });
                               if (res.data?.success) {
                                 setGlobalSettings(res.data.settings);
-                                setWelcomePreviewVisible(false);
                                 setWelcomePreviewReady(false);
                                 setMsg("Welcome video cleared.");
                               }
@@ -1633,22 +1649,13 @@ export default function SuperAdminDashboard() {
                   <div className="mb-3 flex items-center justify-between">
                     <h4 className={`${adminUi.sectionTitle}`}>Preview Monitor</h4>
                     <span className="text-[10px] uppercase tracking-[0.14em] text-gray-500">
-                      On demand
+                      Auto preview
                     </span>
                   </div>
 
                   {!globalSettings.welcomeVideoUrl ? (
                     <div className="flex aspect-video items-center justify-center rounded-xl border border-white/10 bg-white/[0.025] text-xs text-gray-500">
                       Upload a video to enable preview.
-                    </div>
-                  ) : !welcomePreviewVisible ? (
-                    <div className="flex aspect-video items-center justify-center rounded-xl border border-white/10 bg-white/[0.025] p-6 text-center">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-200">Preview is paused</p>
-                        <p className="mt-1 text-xs text-gray-500">
-                          Load preview only when needed to keep this panel responsive.
-                        </p>
-                      </div>
                     </div>
                   ) : (
                     <div className="relative overflow-hidden rounded-xl border border-white/10 bg-black/35">

@@ -314,7 +314,8 @@ function Dashboard() {
   const navigate = useNavigate();
   const canUseVideoEditor =
     user?.role === "SUPERADMIN" || user?.videoEditorEnabledForAll === true;
-  const canUseCarousel = user?.isSuperAdmin === true;
+  const canUseCarousel =
+    user?.isSuperAdmin === true || user?.carouselEnabledForAll === true;
 
   // Helper to determine the current "Visual Tab"
   const currentVisualTab: VisualTab =
