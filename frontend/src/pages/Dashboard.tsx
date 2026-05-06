@@ -3129,7 +3129,7 @@ function Dashboard() {
 
         {showByokUpgradeModal && (
           <div className="fixed inset-0 z-[220] flex items-center justify-center bg-gray-950/90 p-4 backdrop-blur-md">
-            <div className="w-full max-w-6xl rounded-3xl border border-cyan-400/25 bg-[#060b1f] p-5 shadow-[0_30px_90px_rgba(2,8,23,0.82)] sm:p-6">
+            <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-cyan-400/25 bg-[#060b1f] p-5 shadow-[0_30px_90px_rgba(2,8,23,0.82)] sm:p-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-300">
@@ -3152,117 +3152,119 @@ function Dashboard() {
                 </button>
               </div>
 
-              {isByokActivationPolling ? (
-                <div className="mt-5 rounded-2xl border border-cyan-300/25 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.22),rgba(2,6,23,0.9)_62%)] p-8 text-center">
-                  <div className="mx-auto mb-6 h-24 w-24">
-                    <div className="relative h-full w-full">
-                      <span className="absolute inset-0 animate-ping rounded-full border border-cyan-300/60" />
-                      <span className="absolute inset-2 animate-spin rounded-full border-2 border-cyan-300/60 border-t-transparent" />
-                      <span className="absolute inset-5 animate-pulse rounded-full bg-cyan-300/70 blur-[1px]" />
+              <div className="mt-5 overflow-y-auto pr-1">
+                {isByokActivationPolling ? (
+                  <div className="rounded-2xl border border-cyan-300/25 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.22),rgba(2,6,23,0.9)_62%)] p-8 text-center">
+                    <div className="mx-auto mb-6 h-24 w-24">
+                      <div className="relative h-full w-full">
+                        <span className="absolute inset-0 animate-ping rounded-full border border-cyan-300/60" />
+                        <span className="absolute inset-2 animate-spin rounded-full border-2 border-cyan-300/60 border-t-transparent" />
+                        <span className="absolute inset-5 animate-pulse rounded-full bg-cyan-300/70 blur-[1px]" />
+                      </div>
+                    </div>
+                    <h4 className="text-xl font-black text-white">Activating Your Studio</h4>
+                    <p className="mt-2 text-sm text-cyan-100/90">
+                      {BYOK_ACTIVATION_HINTS[byokActivationHintIndex]}
+                    </p>
+                    <p className="mt-2 text-xs text-slate-300">
+                      This usually completes within 5-20 seconds after successful payment.
+                    </p>
+                    <div className="mt-5 inline-flex rounded-xl border border-cyan-200/30 bg-cyan-300/15 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-100">
+                      Waiting For Webhook Confirmation...
                     </div>
                   </div>
-                  <h4 className="text-xl font-black text-white">Activating Your Studio</h4>
-                  <p className="mt-2 text-sm text-cyan-100/90">
-                    {BYOK_ACTIVATION_HINTS[byokActivationHintIndex]}
-                  </p>
-                  <p className="mt-2 text-xs text-slate-300">
-                    This usually completes within 5-20 seconds after successful payment.
-                  </p>
-                  <div className="mt-5 inline-flex rounded-xl border border-cyan-200/30 bg-cyan-300/15 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-100">
-                    Waiting For Webhook Confirmation...
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-                    {BYOK_CHECKOUT_PLANS.map((plan) => {
-                      const isCurrentPlan = currentByokPackageCode === plan.code;
-                      return (
-                        <article
-                          key={plan.code}
-                          className={`relative rounded-2xl border p-5 shadow-xl transition-all ${
-                            plan.featured
-                              ? "border-cyan-300/45 bg-[linear-gradient(165deg,rgba(8,47,73,0.72),rgba(3,7,18,0.92))]"
-                              : "border-white/12 bg-[linear-gradient(165deg,rgba(15,23,42,0.82),rgba(2,6,23,0.9))]"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-300">
-                                {plan.code.replaceAll("_", " ")}
-                              </p>
-                              <h4 className="mt-1 text-lg font-black text-white">{plan.title}</h4>
+                ) : (
+                  <>
+                    <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                      {BYOK_CHECKOUT_PLANS.map((plan) => {
+                        const isCurrentPlan = currentByokPackageCode === plan.code;
+                        return (
+                          <article
+                            key={plan.code}
+                            className={`relative rounded-2xl border p-5 shadow-xl transition-all ${
+                              plan.featured
+                                ? "border-cyan-300/45 bg-[linear-gradient(165deg,rgba(8,47,73,0.72),rgba(3,7,18,0.92))]"
+                                : "border-white/12 bg-[linear-gradient(165deg,rgba(15,23,42,0.82),rgba(2,6,23,0.9))]"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-300">
+                                  {plan.code.replaceAll("_", " ")}
+                                </p>
+                                <h4 className="mt-1 text-lg font-black text-white">{plan.title}</h4>
+                              </div>
+                              {plan.featured && (
+                                <span className="rounded-lg border border-cyan-300/40 bg-cyan-300/15 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-cyan-100">
+                                  Popular
+                                </span>
+                              )}
                             </div>
-                            {plan.featured && (
-                              <span className="rounded-lg border border-cyan-300/40 bg-cyan-300/15 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-cyan-100">
-                                Popular
+
+                            <p className="mt-2 text-xs text-slate-300">{plan.blurb}</p>
+
+                            <div className="mt-4 flex items-end gap-1">
+                              <span className="text-3xl font-black text-white">{plan.price}</span>
+                              <span className="pb-1 text-xs font-semibold uppercase tracking-wide text-slate-300">
+                                {plan.period}
                               </span>
-                            )}
-                          </div>
+                            </div>
 
-                          <p className="mt-2 text-xs text-slate-300">{plan.blurb}</p>
+                            <div className="mt-4 space-y-2 rounded-xl border border-white/10 bg-black/25 p-3">
+                              <p className="text-[11px] text-slate-200">{plan.users}</p>
+                              <p className="text-[11px] text-slate-200">{plan.projects}</p>
+                              <p className="text-[11px] text-slate-200">{plan.storage}</p>
+                              <p className="text-[11px] text-slate-200">{plan.admin}</p>
+                              <p className="text-[11px] text-slate-200">{plan.retention}</p>
+                              <p className="text-[11px] text-cyan-200">Domain: {plan.domain}</p>
+                            </div>
 
-                          <div className="mt-4 flex items-end gap-1">
-                            <span className="text-3xl font-black text-white">{plan.price}</span>
-                            <span className="pb-1 text-xs font-semibold uppercase tracking-wide text-slate-300">
-                              {plan.period}
-                            </span>
-                          </div>
+                            <div className="mt-4 flex flex-col gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenByokCheckout(plan.checkoutUrl)}
+                                className="w-full rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white"
+                              >
+                                Choose {plan.title}
+                              </button>
+                              {isCurrentPlan && (
+                                <span className="rounded-lg border border-emerald-300/35 bg-emerald-400/15 px-3 py-1.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-100">
+                                  Current Active Package
+                                </span>
+                              )}
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
 
-                          <div className="mt-4 space-y-2 rounded-xl border border-white/10 bg-black/25 p-3">
-                            <p className="text-[11px] text-slate-200">{plan.users}</p>
-                            <p className="text-[11px] text-slate-200">{plan.projects}</p>
-                            <p className="text-[11px] text-slate-200">{plan.storage}</p>
-                            <p className="text-[11px] text-slate-200">{plan.admin}</p>
-                            <p className="text-[11px] text-slate-200">{plan.retention}</p>
-                            <p className="text-[11px] text-cyan-200">Domain: {plan.domain}</p>
-                          </div>
-
-                          <div className="mt-4 flex flex-col gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenByokCheckout(plan.checkoutUrl)}
-                              className="w-full rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white"
-                            >
-                              Choose {plan.title}
-                            </button>
-                            {isCurrentPlan && (
-                              <span className="rounded-lg border border-emerald-300/35 bg-emerald-400/15 px-3 py-1.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-100">
-                                Current Active Package
-                              </span>
-                            )}
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={handleStartByokActivationCheck}
-                      className="rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-white"
-                    >
-                      I Completed Payment
-                    </button>
-                    <a
-                      href={BYOK_PRICING_URL}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-gray-200"
-                    >
-                      View Full Pricing Page
-                    </a>
-                    <button
-                      type="button"
-                      onClick={closeByokUpgradeModal}
-                      className="rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-gray-200"
-                    >
-                      I&apos;ll upgrade later
-                    </button>
-                  </div>
-                </>
-              )}
+                    <div className="mt-5 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={handleStartByokActivationCheck}
+                        className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-white sm:w-auto"
+                      >
+                        I Completed Payment
+                      </button>
+                      <a
+                        href={BYOK_PRICING_URL}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-full rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-center text-xs font-bold uppercase tracking-[0.14em] text-gray-200 sm:w-auto"
+                      >
+                        View Full Pricing Page
+                      </a>
+                      <button
+                        type="button"
+                        onClick={closeByokUpgradeModal}
+                        className="w-full rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-gray-200 sm:w-auto"
+                      >
+                        I&apos;ll upgrade later
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )}
