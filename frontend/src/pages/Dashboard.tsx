@@ -2902,7 +2902,7 @@ function Dashboard() {
                 {storageSummary && (
                   <div className="mt-4 border-t border-gray-700/60 pt-3">
                     <div className="flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                      <span>Storage</span>
+                      <span>Organization Shared Storage</span>
                       <span className="text-cyan-300">
                         {formatStorageGb(storageUsedMb)} / {formatStorageGb(storageLimitMb)}
                       </span>
@@ -2920,7 +2920,7 @@ function Dashboard() {
                       />
                     </div>
                     <div className="mt-2 text-[10px] text-gray-500">
-                      Remaining: {formatStorageGb(storageRemainingMb)}
+                      Remaining (shared across your tenant): {formatStorageGb(storageRemainingMb)}
                     </div>
                   </div>
                 )}

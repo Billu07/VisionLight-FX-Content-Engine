@@ -595,7 +595,7 @@ export default function TenantDashboard() {
           <div className={`${adminUi.metricCard} mb-6`}>
             <div className="flex items-center justify-between gap-4">
               <p className="text-[10px] uppercase tracking-[0.14em] text-gray-500 font-bold">
-                Organization Storage
+                Organization Shared Storage
               </p>
               <p className="text-[10px] uppercase tracking-[0.14em] text-brand-accent font-bold">
                 {formatStorageGb(storageUsedMb)} / {formatStorageGb(storageLimitMb)}
@@ -614,7 +614,7 @@ export default function TenantDashboard() {
               />
             </div>
             <div className="mt-3 text-xs text-gray-400">
-              Remaining:{" "}
+              Remaining (shared across all tenant members):{" "}
               <span className="font-semibold text-gray-200">
                 {formatStorageGb(storageRemainingMb)}
               </span>

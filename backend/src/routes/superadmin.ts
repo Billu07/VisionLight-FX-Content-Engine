@@ -23,6 +23,17 @@ const toPositiveInt = (value: any) => {
 };
 
 const ADMIN_ROLES = new Set(["ADMIN", "SUPERADMIN"]);
+const USER_STORAGE_FIELDS = [
+  "maxStorageMb",
+  "maxStorageGb",
+  "storageLimitMb",
+  "storageLimitGb",
+  "storageMb",
+  "storageGb",
+];
+
+const hasUserStoragePayload = (payload: any) =>
+  USER_STORAGE_FIELDS.some((field) => payload?.[field] !== undefined);
 
 const getAllocatedProjectQuota = async (orgId: string, excludeUserId?: string) => {
   const allocation = await prisma.user.aggregate({
@@ -449,6 +460,13 @@ router.put("/users/:userId", async (req: AuthenticatedRequest, res) => {
   const { name, role, view, maxProjects, password } = req.body;
 
   try {
+    if (hasUserStoragePayload(req.body)) {
+      return res.status(400).json({
+        error:
+          "Storage quota is organization-wide. Update storage on tenant limits, not per user.",
+      });
+    }
+
     if (password !== undefined) {
       return res.status(400).json({
         error:

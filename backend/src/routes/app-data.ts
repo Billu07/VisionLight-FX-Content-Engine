@@ -568,7 +568,13 @@ router.get(
         creditsVideoFX2: u.creditsVideoFX2,
         creditsVideoFX3: u.creditsVideoFX3,
         prices: settings,
-        storage: storageSummary,
+        storage: storageSummary
+          ? {
+              ...storageSummary,
+              scope: "ORGANIZATION_SHARED",
+              organizationId: user.organizationId || null,
+            }
+          : null,
       });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch credits" });

@@ -50,6 +50,18 @@ const PICDRIFT_ALLOWED_CREDIT_POOLS = new Set([
   "creditsImageFX",
 ]);
 
+const USER_STORAGE_FIELDS = [
+  "maxStorageMb",
+  "maxStorageGb",
+  "storageLimitMb",
+  "storageLimitGb",
+  "storageMb",
+  "storageGb",
+];
+
+const hasUserStoragePayload = (payload: any) =>
+  USER_STORAGE_FIELDS.some((field) => payload?.[field] !== undefined);
+
 const normalizeView = (raw: unknown): "PICDRIFT" | "VISIONLIGHT" =>
   raw === "PICDRIFT" ? "PICDRIFT" : "VISIONLIGHT";
 
@@ -268,6 +280,13 @@ router.post("/team/user", async (req: AuthenticatedRequest, res) => {
   }
 
   try {
+    if (hasUserStoragePayload(req.body)) {
+      return res.status(400).json({
+        error:
+          "Storage quota is organization-wide. Update tenant storage from platform limits, not per user.",
+      });
+    }
+
     const org = await getOrg(req);
     const emailStatus = await AuthService.getProvisioningEmailStatus(email, org.id);
     if (emailStatus.existingProfileInOrganization) {
@@ -346,6 +365,13 @@ router.put("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
   const { addCredits, creditType, role, maxProjects, name, password, view } = req.body;
 
   try {
+    if (hasUserStoragePayload(req.body)) {
+      return res.status(400).json({
+        error:
+          "Storage quota is organization-wide. Update tenant storage from platform limits, not per user.",
+      });
+    }
+
     if (password !== undefined) {
       return res.status(400).json({
         error:
