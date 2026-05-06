@@ -76,7 +76,7 @@ export const dbService = {
         name: data.name,
         maxUsers: data.maxUsers,
         maxProjectsTotal: data.maxProjectsTotal,
-        maxStorageMb: data.maxStorageMb ?? 500,
+        maxStorageMb: data.maxStorageMb ?? 10240,
         isDefault: data.isDefault || false,
         tenantPlan: data.tenantPlan || "PAID",
         trialEndsAt: data.trialEndsAt || null,

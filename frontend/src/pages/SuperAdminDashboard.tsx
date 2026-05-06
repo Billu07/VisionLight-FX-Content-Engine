@@ -256,7 +256,7 @@ export default function SuperAdminDashboard() {
     name: "",
     maxUsers: 0,
     maxProjectsTotal: 0,
-    maxStorageMb: 500,
+    maxStorageMb: 10240,
     view: "VISIONLIGHT",
     isActive: true
   });
@@ -274,7 +274,7 @@ export default function SuperAdminDashboard() {
     adminName: "",
     maxUsers: 5,
     maxProjectsTotal: 20,
-    maxStorageMb: 500,
+    maxStorageMb: 10240,
     tenantPlan: "PAID",
     trialDays: 14,
     view: "VISIONLIGHT"
@@ -370,7 +370,7 @@ export default function SuperAdminDashboard() {
       adminName: "",
       maxUsers: 5,
       maxProjectsTotal: 20,
-      maxStorageMb: 500,
+      maxStorageMb: 10240,
       tenantPlan: "PAID",
       trialDays: 14,
       view: "VISIONLIGHT",
@@ -648,7 +648,7 @@ export default function SuperAdminDashboard() {
       name: t.name,
       maxUsers: t.maxUsers,
       maxProjectsTotal: t.maxProjectsTotal,
-      maxStorageMb: t.maxStorageMb || 500,
+      maxStorageMb: t.maxStorageMb || 10240,
       view: adminUser ? adminUser.view : "VISIONLIGHT",
       isActive: t.isActive
     });
@@ -1773,8 +1773,9 @@ export default function SuperAdminDashboard() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Storage Limit (MB)</label>
-                    <input type="number" className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white" defaultValue={500} onChange={e => setNewTenant({ ...newTenant, maxStorageMb: parseInt(e.target.value) })} />
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform Storage Limit (MB)</label>
+                    <input type="number" className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white" defaultValue={10240} onChange={e => setNewTenant({ ...newTenant, maxStorageMb: parseInt(e.target.value) })} />
+                    <p className="text-[10px] text-gray-500">Default 10GB = 10240MB</p>
                 </div>
                 <div className="space-y-2">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform View</label>
@@ -1950,7 +1951,7 @@ export default function SuperAdminDashboard() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Storage Limit (MB)</label>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform Storage Limit (MB)</label>
                 <input
                   type="number"
                   className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"

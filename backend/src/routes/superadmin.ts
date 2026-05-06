@@ -191,7 +191,7 @@ router.post("/organizations/tenant", async (req: AuthenticatedRequest, res) => {
       name: orgName,
       maxUsers: parsedMaxUsers ?? 5,
       maxProjectsTotal: parsedMaxProjectsTotal ?? 20,
-      maxStorageMb: parsedMaxStorageMb ?? 500,
+      maxStorageMb: parsedMaxStorageMb ?? 10240,
       tenantPlan: normalizedTenantPlan,
       trialEndsAt:
         normalizedTenantPlan === "DEMO"

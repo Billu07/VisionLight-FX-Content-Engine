@@ -16,7 +16,7 @@ model Organization {
   trialEndsAt      DateTime?
   maxUsers         Int     @default(5)
   maxProjectsTotal Int     @default(20)
-  maxStorageMb     Int     @default(500) // SuperAdmin-defined storage limit in MB for the entire tenant organization
+  maxStorageMb     Int     @default(10240) // Platform tenant storage limit in MB for the entire organization (default: 10GB)
 
   // Custom API Keys
   falApiKey    String?
