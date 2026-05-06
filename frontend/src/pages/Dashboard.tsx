@@ -52,6 +52,88 @@ const BYOK_ACTIVATION_HINTS = [
   "Unlocking your studio limits...",
   "Applying access rules and routing...",
 ];
+const BYOK_CHECKOUT_PLANS = [
+  {
+    code: "PD_APP",
+    title: "PicDrift App",
+    price: "$9",
+    period: "/month",
+    blurb: "Focused solo workspace for PicDrift.",
+    domain: "picdrift.app",
+    admin: "Admin Panel Locked",
+    users: "1 user",
+    projects: "3 projects",
+    storage: "10 GB shared storage",
+    retention: "7-day media retention",
+    featured: false,
+    checkoutUrl:
+      "https://www.picdrift.com/pricing-plans/checkout-1?planId=df674622-e11f-4e88-8564-4bb12365d5e5&checkoutFlowId=0ca462cc-de89-4e2c-b02e-bb83d3c7ee98",
+  },
+  {
+    code: "VFX_APP",
+    title: "VisualFX App",
+    price: "$14",
+    period: "/month",
+    blurb: "Focused solo workspace for VisualFX.",
+    domain: "visualfx.app",
+    admin: "Admin Panel Locked",
+    users: "1 user",
+    projects: "3 projects",
+    storage: "10 GB shared storage",
+    retention: "7-day media retention",
+    featured: false,
+    checkoutUrl:
+      "https://www.picdrift.com/pricing-plans/checkout-1?planId=8351c366-2837-44cd-8522-65ec3fecb56d&checkoutFlowId=05b75b73-c0ed-4ae2-ab13-130ab4628ca6",
+  },
+  {
+    code: "PD_STUDIO",
+    title: "PicDrift Studio",
+    price: "$49",
+    period: "/month",
+    blurb: "Team-ready PicDrift studio setup.",
+    domain: "picdrift.studio",
+    admin: "Admin Panel Enabled",
+    users: "5 users",
+    projects: "20 projects",
+    storage: "Full studio storage policy",
+    retention: "Standard retention",
+    checkoutUrl:
+      "https://www.picdrift.com/pricing-plans/checkout-1?planId=dc751744-5641-4086-a510-7d203e187a79&checkoutFlowId=b5b1614d-e4d5-4352-804a-19d57d5225d0",
+    featured: true,
+  },
+  {
+    code: "VFX_STUDIO",
+    title: "VisualFX Studio",
+    price: "$99",
+    period: "/month",
+    blurb: "High-capacity VisualFX studio workspace.",
+    domain: "visualfx.studio",
+    admin: "Admin Panel Enabled",
+    users: "5 users",
+    projects: "20 projects",
+    storage: "Full studio storage policy",
+    retention: "Standard retention",
+    featured: false,
+    checkoutUrl:
+      "https://www.picdrift.com/pricing-plans/checkout-1?planId=a97eb2df-59b6-4500-ba93-618171001d4b&checkoutFlowId=e90e22a5-29ed-4093-b268-7838c0fca777",
+  },
+  {
+    code: "VFX_STUDIO_AGENCY",
+    title: "VisualFX Studio Agency",
+    price: "$197",
+    period: "/month",
+    blurb: "Agency-scale control and operational limits.",
+    domain: "visualfx.studio",
+    admin: "Admin Panel Enabled",
+    users: "20 users",
+    projects: "200 projects",
+    storage: "Agency storage profile",
+    retention: "Standard retention",
+    featured: false,
+    checkoutUrl:
+      "https://www.picdrift.com/pricing-plans/checkout-1?planId=4785cf91-670a-416f-8bb1-637b926bf2a0&checkoutFlowId=893f469b-9e21-4baa-bb7b-3217b96aa285",
+  },
+] as const;
 type DashboardBgMode = "current" | "original";
 type VeoMode =
   | "image_to_video"
@@ -369,6 +451,7 @@ function Dashboard() {
   const isByokWorkspace = byokStatus?.isByok === true;
   const adminPanelLocked = byokStatus?.adminPanelLocked === true;
   const byokNeedsFalKey = isByokWorkspace && byokStatus?.hasFalKey === false;
+  const currentByokPackageCode = byokStatus?.packageCode || null;
   const navigate = useNavigate();
   const canUseVideoEditor =
     user?.role === "SUPERADMIN" || user?.videoEditorEnabledForAll === true;
@@ -2279,6 +2362,10 @@ function Dashboard() {
       setIsByokActivationPolling(false);
     }
   };
+  const handleOpenByokCheckout = (url: string) => {
+    window.open(url, "_blank", "noopener,noreferrer");
+    notify.info("Complete payment, then return and click 'I Completed Payment'.");
+  };
   const dismissByokInfoBanner = () => {
     setShowByokInfoBanner(false);
     try {
@@ -3052,7 +3139,7 @@ function Dashboard() {
                     Upgrade Anytime
                   </h3>
                   <p className="mt-2 text-sm text-slate-300">
-                    Live pricing view from the official BYOK plans page.
+                    Choose a package that matches your production scale.
                   </p>
                 </div>
                 <button
@@ -3087,16 +3174,70 @@ function Dashboard() {
                 </div>
               ) : (
                 <>
-                  <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-                    <iframe
-                      title="BYOK Pricing Plans"
-                      src={BYOK_PRICING_URL}
-                      className="h-[72vh] min-h-[520px] w-full"
-                      loading="lazy"
-                    />
+                  <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                    {BYOK_CHECKOUT_PLANS.map((plan) => {
+                      const isCurrentPlan = currentByokPackageCode === plan.code;
+                      return (
+                        <article
+                          key={plan.code}
+                          className={`relative rounded-2xl border p-5 shadow-xl transition-all ${
+                            plan.featured
+                              ? "border-cyan-300/45 bg-[linear-gradient(165deg,rgba(8,47,73,0.72),rgba(3,7,18,0.92))]"
+                              : "border-white/12 bg-[linear-gradient(165deg,rgba(15,23,42,0.82),rgba(2,6,23,0.9))]"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-300">
+                                {plan.code.replaceAll("_", " ")}
+                              </p>
+                              <h4 className="mt-1 text-lg font-black text-white">{plan.title}</h4>
+                            </div>
+                            {plan.featured && (
+                              <span className="rounded-lg border border-cyan-300/40 bg-cyan-300/15 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-cyan-100">
+                                Popular
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="mt-2 text-xs text-slate-300">{plan.blurb}</p>
+
+                          <div className="mt-4 flex items-end gap-1">
+                            <span className="text-3xl font-black text-white">{plan.price}</span>
+                            <span className="pb-1 text-xs font-semibold uppercase tracking-wide text-slate-300">
+                              {plan.period}
+                            </span>
+                          </div>
+
+                          <div className="mt-4 space-y-2 rounded-xl border border-white/10 bg-black/25 p-3">
+                            <p className="text-[11px] text-slate-200">{plan.users}</p>
+                            <p className="text-[11px] text-slate-200">{plan.projects}</p>
+                            <p className="text-[11px] text-slate-200">{plan.storage}</p>
+                            <p className="text-[11px] text-slate-200">{plan.admin}</p>
+                            <p className="text-[11px] text-slate-200">{plan.retention}</p>
+                            <p className="text-[11px] text-cyan-200">Domain: {plan.domain}</p>
+                          </div>
+
+                          <div className="mt-4 flex flex-col gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenByokCheckout(plan.checkoutUrl)}
+                              className="w-full rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white"
+                            >
+                              Choose {plan.title}
+                            </button>
+                            {isCurrentPlan && (
+                              <span className="rounded-lg border border-emerald-300/35 bg-emerald-400/15 px-3 py-1.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-100">
+                                Current Active Package
+                              </span>
+                            )}
+                          </div>
+                        </article>
+                      );
+                    })}
                   </div>
 
-                  <div className="mt-4 flex flex-wrap gap-3">
+                  <div className="mt-5 flex flex-wrap gap-3">
                     <button
                       type="button"
                       onClick={handleStartByokActivationCheck}
@@ -3108,9 +3249,9 @@ function Dashboard() {
                       href={BYOK_PRICING_URL}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-white"
+                      className="rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-gray-200"
                     >
-                      Open in New Tab
+                      View Full Pricing Page
                     </a>
                     <button
                       type="button"
