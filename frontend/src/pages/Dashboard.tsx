@@ -45,6 +45,7 @@ const DASHBOARD_TASK_INDICATOR_STATE_KEY =
   "visionlight_dashboard_task_indicator_state_v1";
 const BYOK_INFO_BANNER_DISMISS_KEY = "visionlight_byok_info_banner_dismissed_v1";
 const FAL_KEYS_URL = "https://fal.ai/dashboard/keys";
+const BYOK_PRICING_URL = "https://www.picdrift.com/pricing-plans/byok";
 type DashboardBgMode = "current" | "original";
 type VeoMode =
   | "image_to_video"
@@ -653,14 +654,6 @@ function Dashboard() {
     refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
   });
-  const { data: byokPackagesPayload } = useQuery({
-    queryKey: ["byok-packages"],
-    queryFn: async () => (await apiEndpoints.byokGetPackages()).data,
-    enabled: showByokUpgradeModal || isByokWorkspace,
-    staleTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
-
   const { data: autoProcessPosts = [] } = useQuery({
     queryKey: ["asset-auto-process-posts", activeProjectId],
     queryFn: async () => {
@@ -2966,17 +2959,17 @@ function Dashboard() {
 
         {showByokUpgradeModal && (
           <div className="fixed inset-0 z-[220] flex items-center justify-center bg-gray-950/90 p-4 backdrop-blur-md">
-            <div className="w-full max-w-4xl rounded-3xl border border-cyan-400/25 bg-[#060b1f] p-6 shadow-[0_30px_90px_rgba(2,8,23,0.82)] sm:p-8">
+            <div className="w-full max-w-6xl rounded-3xl border border-cyan-400/25 bg-[#060b1f] p-5 shadow-[0_30px_90px_rgba(2,8,23,0.82)] sm:p-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-300">
                     BYOK Packages
                   </p>
                   <h3 className="mt-1 text-2xl font-black text-white">
-                    Select a package to continue rendering
+                    Upgrade Anytime
                   </h3>
                   <p className="mt-2 text-sm text-slate-300">
-                    Your trial can still login, but rendering requires an active package.
+                    Live pricing view from the official BYOK plans page.
                   </p>
                 </div>
                 <button
@@ -2988,52 +2981,30 @@ function Dashboard() {
                 </button>
               </div>
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {Array.isArray(byokPackagesPayload?.packages) &&
-                byokPackagesPayload.packages.length > 0 ? (
-                  byokPackagesPayload.packages.map((pkg: any) => (
-                    <div
-                      key={pkg.code}
-                      className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
-                    >
-                      <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-300">
-                        {pkg.code}
-                      </div>
-                      <div className="mt-1 text-base font-bold text-white">{pkg.title}</div>
-                      <div className="mt-2 text-xs text-slate-300">
-                        {pkg.maxUsers} users • {pkg.maxProjectsTotal} projects •{" "}
-                        {(Number(pkg.maxStorageMb || 0) / 1024).toFixed(1)} GB
-                      </div>
-                      <div className="mt-1 text-xs text-slate-400">
-                        {pkg.adminPanelLocked ? "Admin locked" : "Admin enabled"}
-                        {pkg.storageRetentionDays
-                          ? ` • ${pkg.storageRetentionDays}-day retention`
-                          : ""}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300 sm:col-span-2 lg:col-span-3">
-                    Package details are loading.
-                  </div>
-                )}
+              <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
+                <iframe
+                  title="BYOK Pricing Plans"
+                  src={BYOK_PRICING_URL}
+                  className="h-[72vh] min-h-[520px] w-full"
+                  loading="lazy"
+                />
               </div>
 
-              <div className="mt-6 flex flex-wrap gap-3">
+              <div className="mt-4 flex flex-wrap gap-3">
                 <a
-                  href="https://www.picdrift.com/pricing-plans/byok"
+                  href={BYOK_PRICING_URL}
                   target="_blank"
                   rel="noreferrer"
                   className="rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-white"
                 >
-                  Open Pricing & Buy
+                  Open in New Tab
                 </a>
                 <button
                   type="button"
                   onClick={() => setShowByokUpgradeModal(false)}
                   className="rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-gray-200"
                 >
-                  I’ll upgrade later
+                  I'll upgrade later
                 </button>
               </div>
             </div>
@@ -5726,5 +5697,4 @@ function Dashboard() {
 }
 
 export default Dashboard;
-
 
