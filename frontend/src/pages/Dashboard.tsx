@@ -426,6 +426,15 @@ function Dashboard() {
 
   const [previewCarouselIndex, setPreviewCarouselIndex] = useState(0);
   const byokActivationPollRef = useRef(false);
+  const byokActivationContextRef = useRef<{
+    armed: boolean;
+    baselinePackageCode: string | null;
+    baselineUpgradeRequired: boolean;
+  }>({
+    armed: false,
+    baselinePackageCode: null,
+    baselineUpgradeRequired: false,
+  });
 
   // State for Magic Edit Asset
   const [editingAsset, setEditingAsset] = useState<any | null>(null);
@@ -695,18 +704,33 @@ function Dashboard() {
   useEffect(() => {
     return () => {
       byokActivationPollRef.current = false;
+      byokActivationContextRef.current.armed = false;
     };
   }, []);
 
   useEffect(() => {
-    if (!showByokUpgradeModal || !isByokWorkspace || isByokActivationPolling) {
+    if (
+      !showByokUpgradeModal ||
+      !isByokWorkspace ||
+      isByokActivationPolling ||
+      !byokActivationContextRef.current.armed
+    ) {
       return;
     }
 
     const handleWindowFocus = async () => {
       try {
         const statusResponse = await apiEndpoints.byokGetStatus();
-        if (statusResponse?.data?.status?.upgradeRequired === false) {
+        const status = statusResponse?.data?.status;
+        const ctx = byokActivationContextRef.current;
+        const confirmed =
+          !!status &&
+          ((ctx.baselineUpgradeRequired && status.upgradeRequired === false) ||
+            (typeof status.packageCode === "string" &&
+              status.packageCode !== "BYOK_TRIAL" &&
+              status.packageCode !== ctx.baselinePackageCode));
+        if (confirmed) {
+          byokActivationContextRef.current.armed = false;
           await checkAuth();
           setShowByokUpgradeModal(false);
           notify.success("Payment confirmed. Your package is now active.");
@@ -2328,11 +2352,20 @@ function Dashboard() {
   };
   const closeByokUpgradeModal = () => {
     byokActivationPollRef.current = false;
+    byokActivationContextRef.current.armed = false;
     setIsByokActivationPolling(false);
     setShowByokUpgradeModal(false);
   };
   const handleStartByokActivationCheck = async () => {
     if (isByokActivationPolling) return;
+
+    if (!byokActivationContextRef.current.armed) {
+      byokActivationContextRef.current = {
+        armed: true,
+        baselinePackageCode: currentByokPackageCode,
+        baselineUpgradeRequired: byokStatus?.upgradeRequired === true,
+      };
+    }
 
     setByokActivationHintIndex(0);
     setIsByokActivationPolling(true);
@@ -2343,7 +2376,16 @@ function Dashboard() {
       while (byokActivationPollRef.current && Date.now() < timeoutAt) {
         try {
           const statusResponse = await apiEndpoints.byokGetStatus();
-          if (statusResponse?.data?.status?.upgradeRequired === false) {
+          const status = statusResponse?.data?.status;
+          const ctx = byokActivationContextRef.current;
+          const confirmed =
+            !!status &&
+            ((ctx.baselineUpgradeRequired && status.upgradeRequired === false) ||
+              (typeof status.packageCode === "string" &&
+                status.packageCode !== "BYOK_TRIAL" &&
+                status.packageCode !== ctx.baselinePackageCode));
+          if (confirmed) {
+            byokActivationContextRef.current.armed = false;
             await checkAuth();
             setShowByokUpgradeModal(false);
             notify.success("Payment confirmed. Your package is now active.");
@@ -2363,6 +2405,11 @@ function Dashboard() {
     }
   };
   const handleOpenByokCheckout = (url: string) => {
+    byokActivationContextRef.current = {
+      armed: true,
+      baselinePackageCode: currentByokPackageCode,
+      baselineUpgradeRequired: byokStatus?.upgradeRequired === true,
+    };
     window.open(url, "_blank", "noopener,noreferrer");
     notify.info("Complete payment, then return and click 'I Completed Payment'.");
   };
