@@ -7,6 +7,7 @@ import { dbService as airtableService, prisma, CreditPool } from "../services/da
 import { contentEngine } from "../services/engine";
 import { extractLastFrameAsJpeg } from "../services/frameExtractor";
 import { storageQuotaService } from "../services/storageQuota";
+import { byokService } from "../services/byok";
 import { upload, uploadToCloudinary } from "../utils/fileUpload";
 import {
   getTenantApiKeys,
@@ -185,6 +186,21 @@ const shouldSkipProviderPolling = (post: any) => {
   return false;
 };
 
+const enforceByokRenderPolicy = async (
+  userId: string,
+  res: express.Response,
+) => {
+  const policy = await byokService.assertRenderAllowed(userId);
+  if (!policy.allowed) {
+    res.status(policy.statusCode || 403).json({
+      error: policy.message || "Render blocked by workspace policy.",
+      code: policy.code || "RENDER_BLOCKED",
+    });
+    return null;
+  }
+  return policy;
+};
+
 // ==================== ASSET MANAGEMENT ====================
 router.post(
   "/api/posts/:postId/to-asset",
@@ -294,6 +310,8 @@ router.post(
         airtableService.findUserById(req.user!.id),
       ]);
       if (!user) return res.status(404).json({ error: "User not found" });
+      const byokPolicy = await enforceByokRenderPolicy(req.user!.id, res);
+      if (!byokPolicy) return;
 
       const apiKeys = await getTenantApiKeys(req.user!.id);
       if (!apiKeys.falApiKey) {
@@ -311,6 +329,9 @@ router.post(
 
       await airtableService.deductGranularCredits(req.user!.id, "creditsImageFX", cost);
       conversionDeducted = true;
+      if (byokPolicy.shouldCountDailyUsage) {
+        await byokService.consumeDailyRender(req.user!.id);
+      }
 
       const post = await airtableService.createPost({
         userId: req.user!.id,
@@ -433,6 +454,9 @@ router.post(
         getTenantSettings(req.user!.id),
         airtableService.findUserById(req.user!.id),
       ]);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      const byokPolicy = await enforceByokRenderPolicy(req.user!.id, res);
+      if (!byokPolicy) return;
       const apiKeys = await getTenantApiKeys(req.user!.id);
       if (!apiKeys.falApiKey) {
         return res.status(403).json({
@@ -450,6 +474,9 @@ router.post(
 
       await airtableService.deductGranularCredits(req.user!.id, "creditsImageFX", cost);
       conversionDeducted = true;
+      if (byokPolicy.shouldCountDailyUsage) {
+        await byokService.consumeDailyRender(req.user!.id);
+      }
 
       const normalizedAspectRatio = normalizeAutoAspectRatio(aspectRatio);
 
@@ -515,6 +542,9 @@ router.post(
         getTenantSettings(req.user!.id),
         airtableService.findUserById(req.user!.id),
       ]);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      const byokPolicy = await enforceByokRenderPolicy(req.user!.id, res);
+      if (!byokPolicy) return;
       const apiKeys = await getTenantApiKeys(req.user!.id);
       if (!apiKeys.falApiKey) {
         return res.status(403).json({
@@ -542,6 +572,11 @@ router.post(
         totalCost,
       );
       totalDeducted = totalCost;
+      if (byokPolicy.shouldCountDailyUsage) {
+        for (let i = 0; i < files.length; i += 1) {
+          await byokService.consumeDailyRender(req.user!.id);
+        }
+      }
 
       res.json({
         success: true,
@@ -624,6 +659,9 @@ router.post(
         getTenantSettings(req.user!.id),
         airtableService.findUserById(req.user!.id),
       ]);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      const byokPolicy = await enforceByokRenderPolicy(req.user!.id, res);
+      if (!byokPolicy) return;
 
       const cost = getCost(user, { mediaType: "image", mode: mode || "pro" }, settings);
       chargedCost = cost;
@@ -634,6 +672,9 @@ router.post(
 
       await airtableService.deductGranularCredits(req.user!.id, "creditsImageFX", cost);
       charged = true;
+      if (byokPolicy.shouldCountDailyUsage) {
+        await byokService.consumeDailyRender(req.user!.id);
+      }
 
       const apiKeys = await getTenantApiKeys(req.user!.id);
       const newAsset = await contentEngine.editAsset(
@@ -697,6 +738,9 @@ router.post(
         getTenantSettings(req.user!.id),
         airtableService.findUserById(req.user!.id),
       ]);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      const byokPolicy = await enforceByokRenderPolicy(req.user!.id, res);
+      if (!byokPolicy) return;
 
       const cost = getCost(
         user,
@@ -711,6 +755,9 @@ router.post(
 
       await airtableService.deductGranularCredits(req.user!.id, "creditsPicDrift", cost);
       charged = true;
+      if (byokPolicy.shouldCountDailyUsage) {
+        await byokService.consumeDailyRender(req.user!.id);
+      }
 
       const apiKeys = await getTenantApiKeys(req.user!.id);
       const result = await contentEngine.processKlingDrift(
@@ -871,6 +918,9 @@ router.post(
         getTenantSettings(req.user!.id),
         airtableService.findUserById(req.user!.id),
       ]);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      const byokPolicy = await enforceByokRenderPolicy(req.user!.id, res);
+      if (!byokPolicy) return;
 
       const cost = getCost(user, { mediaType: "image", mode: "enhance" }, settings);
       chargedCost = cost;
@@ -881,6 +931,9 @@ router.post(
 
       await airtableService.deductGranularCredits(req.user!.id, "creditsImageFX", cost);
       charged = true;
+      if (byokPolicy.shouldCountDailyUsage) {
+        await byokService.consumeDailyRender(req.user!.id);
+      }
 
       const apiKeys = await getTenantApiKeys(req.user!.id);
       const asset = await contentEngine.enhanceAsset(
@@ -1296,6 +1349,8 @@ router.post(
         console.warn("User not found in DB");
         return res.status(404).json({ error: "User not found" });
       }
+      const byokPolicy = await enforceByokRenderPolicy(req.user!.id, res);
+      if (!byokPolicy) return;
 
       const tenantApiKeys = await getTenantApiKeys(req.user!.id);
       if (requiresFalForRequest(mediaType, model) && !tenantApiKeys.falApiKey) {
@@ -1377,6 +1432,9 @@ router.post(
       chargedCost = cost;
       await airtableService.deductGranularCredits(req.user!.id, pool, cost);
       charged = true;
+      if (byokPolicy.shouldCountDailyUsage) {
+        await byokService.consumeDailyRender(req.user!.id);
+      }
 
       const post = await airtableService.createPost({
         userId: req.user!.id,

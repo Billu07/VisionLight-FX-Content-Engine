@@ -17,6 +17,7 @@ export default function Projects() {
   const [editingName, setEditingName] = useState("");
   const [openMenuProjectId, setOpenMenuProjectId] = useState<string | null>(null);
   const isReadOnlyAccess = user?.readOnlyImpersonation === true;
+  const adminPanelLocked = user?.byok?.adminPanelLocked === true;
   const canOpenAdmin =
     !isReadOnlyAccess &&
     (user?.role === "ADMIN" || user?.role === "SUPERADMIN");
@@ -142,10 +143,20 @@ export default function Projects() {
             {canOpenAdmin && (
               <button
                 type="button"
-                onClick={() => navigate("/admin")}
-                className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-4 py-2 text-xs font-semibold text-sky-200 transition-colors hover:bg-sky-500/20 hover:text-white"
+                onClick={() => {
+                  if (adminPanelLocked) {
+                    notify.warning("Admin panel is locked for your current package.");
+                    return;
+                  }
+                  navigate("/admin");
+                }}
+                className={`rounded-lg px-4 py-2 text-xs font-semibold transition-colors ${
+                  adminPanelLocked
+                    ? "border border-white/15 bg-white/5 text-gray-400 hover:bg-white/10"
+                    : "border border-sky-500/30 bg-sky-500/10 text-sky-200 hover:bg-sky-500/20 hover:text-white"
+                }`}
               >
-                Admin
+                {adminPanelLocked ? "Admin (Locked)" : "Admin"}
               </button>
             )}
             <button

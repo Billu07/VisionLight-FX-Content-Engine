@@ -2,9 +2,13 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Hero } from "../components/marketing/Hero";
 import { getSiteBrand } from "../lib/branding";
+import ByokLanding from "./ByokLanding";
 
 export const MarketingSite = () => {
   const siteBrand = useMemo(() => getSiteBrand(), []);
+  if (siteBrand === "byok") {
+    return <ByokLanding />;
+  }
   const studioLabel = siteBrand === "visualfx" ? "VisualFX Studio" : "PicDrift Studio";
 
   return (

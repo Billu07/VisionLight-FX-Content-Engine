@@ -178,6 +178,9 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   if (!isAdmin) {
     return <Navigate to="/app" replace />;
   }
+  if (user.byok?.adminPanelLocked && user.role !== "SUPERADMIN") {
+    return <Navigate to="/projects" replace />;
+  }
 
   return <>{children}</>;
 };

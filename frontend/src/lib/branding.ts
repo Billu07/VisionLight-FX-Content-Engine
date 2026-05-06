@@ -1,9 +1,11 @@
-export type SiteBrand = "picdrift" | "visualfx";
+export type SiteBrand = "picdrift" | "visualfx" | "byok";
 
 const VISUALFX_HOSTS = new Set(["visualfx.studio", "www.visualfx.studio"]);
+const BYOK_HOSTS = new Set(["byok.link", "www.byok.link"]);
 
 export const getSiteBrandFromHostname = (hostname: string): SiteBrand => {
   const normalized = hostname.trim().toLowerCase();
+  if (BYOK_HOSTS.has(normalized)) return "byok";
   return VISUALFX_HOSTS.has(normalized) ? "visualfx" : "picdrift";
 };
 

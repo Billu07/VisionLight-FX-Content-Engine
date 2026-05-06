@@ -224,6 +224,7 @@ export default function SuperAdminDashboard() {
 
   const [activeTab, setActiveTab] = useState<
     | "platform"
+    | "byok"
     | "my-agency"
     | "demo-leads"
     | "global-settings"
@@ -231,6 +232,7 @@ export default function SuperAdminDashboard() {
     | "lab"
   >("platform");
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [byokOrganizations, setByokOrganizations] = useState<any[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [creditRequests, setCreditRequests] = useState<CreditRequest[]>([]);
   const [globalSettings, setGlobalSettings] = useState<any>(null);
@@ -504,12 +506,13 @@ export default function SuperAdminDashboard() {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const [tenantsRes, settingsRes, usersRes, presetsRes, requestsRes] = await Promise.all([
+      const [tenantsRes, settingsRes, usersRes, presetsRes, requestsRes, byokRes] = await Promise.all([
         apiEndpoints.superadminGetOrganizations(),
         apiEndpoints.superadminGetGlobalSettings(),
         apiEndpoints.superadminGetUsers(),
         apiEndpoints.superadminGetPresets(),
         apiEndpoints.superadminGetRequests(),
+        apiEndpoints.superadminGetByokOrganizations(),
       ]);
 
       if (tenantsRes.data.success) setTenants(tenantsRes.data.organizations);
@@ -517,10 +520,27 @@ export default function SuperAdminDashboard() {
       if (usersRes.data.success) setUsers(usersRes.data.users);
       if (presetsRes.data.success) setPresets(presetsRes.data.presets);
       if (requestsRes.data.success) setCreditRequests(requestsRes.data.requests || []);
+      if (byokRes.data.success) setByokOrganizations(byokRes.data.organizations || []);
     } catch (err: any) {
       setMsg("Error loading data: " + err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleManualByokActivation = async (
+    organizationId: string,
+    packageCode: string,
+  ) => {
+    setActionLoading(true);
+    try {
+      await apiEndpoints.superadminActivateByokPackage({ organizationId, packageCode });
+      setMsg(`BYOK package switched to ${packageCode}.`);
+      await fetchInitialData();
+    } catch (error: any) {
+      setMsg("Error: " + (error?.message || "Failed to activate package."));
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -948,6 +968,7 @@ export default function SuperAdminDashboard() {
               </button>
               {[
                 { id: "platform", label: "platform" },
+                { id: "byok", label: "byok" },
                 { id: "my-agency", label: "my agency" },
                 { id: "demo-leads", label: "demo leads" },
                 { id: "global-settings", label: "global settings" },
@@ -1314,6 +1335,104 @@ export default function SuperAdminDashboard() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "byok" && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            <div className={adminUi.tablePanel}>
+              <div className={adminUi.panelHeader}>
+                <h2 className={adminUi.sectionTitle}>BYOK Organizations</h2>
+                <p className={adminUi.sectionCopy}>
+                  Isolated self-serve tenants from byok.link and package activations.
+                </p>
+              </div>
+              {byokOrganizations.length === 0 ? (
+                <div className="p-6 text-xs text-gray-500 italic">
+                  No BYOK organizations yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[1100px] text-left">
+                    <thead className={adminUi.tableHead}>
+                      <tr>
+                        <th className="p-5">Organization</th>
+                        <th className="p-5">Package</th>
+                        <th className="p-5">Limits</th>
+                        <th className="p-5">Trial</th>
+                        <th className="p-5">Admin</th>
+                        <th className="p-5 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {byokOrganizations.map((org) => {
+                        const primaryUser = Array.isArray(org.users) ? org.users[0] : null;
+                        return (
+                          <tr key={org.id} className={adminUi.tableRow}>
+                            <td className="p-5">
+                              <div className="font-bold text-white">{org.name}</div>
+                              <div className="mt-1 text-[10px] font-mono text-cyan-200/80">
+                                {primaryUser?.email || "No primary email"}
+                              </div>
+                              <div className="mt-1 text-[10px] text-gray-500">
+                                Domain: {org.routingDomain || "n/a"}
+                              </div>
+                            </td>
+                            <td className="p-5">
+                              <div className="text-xs font-bold text-gray-200">
+                                {org.entitlement?.packageCode || org.entitlementCode || "BYOK_TRIAL"}
+                              </div>
+                              <div className="mt-1 text-[10px] text-gray-500">
+                                {org.entitlement?.status || "ACTIVE"}
+                              </div>
+                            </td>
+                            <td className="p-5 text-xs text-gray-300">
+                              <div>{org.maxUsers} users</div>
+                              <div>{org.maxProjectsTotal} projects</div>
+                              <div>{(Number(org.maxStorageMb || 0) / 1024).toFixed(1)} GB</div>
+                            </td>
+                            <td className="p-5 text-xs text-gray-300">
+                              {org.trialEndsAt
+                                ? new Date(org.trialEndsAt).toLocaleDateString()
+                                : "n/a"}
+                            </td>
+                            <td className="p-5 text-xs">
+                              <span
+                                className={`rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-widest ${
+                                  org.adminPanelLocked
+                                    ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
+                                    : "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                                }`}
+                              >
+                                {org.adminPanelLocked ? "Locked" : "Enabled"}
+                              </span>
+                            </td>
+                            <td className="p-5 text-right">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const packageCode = window.prompt(
+                                      "Enter package code: PD_APP, VFX_APP, PD_STUDIO, VFX_STUDIO, VFX_STUDIO_AGENCY",
+                                    );
+                                    if (!packageCode) return;
+                                    await handleManualByokActivation(org.id, packageCode.trim());
+                                  }}
+                                  className={adminUi.cyanButton}
+                                  disabled={actionLoading}
+                                >
+                                  Activate Package
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}

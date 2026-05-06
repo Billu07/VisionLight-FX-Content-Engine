@@ -5,6 +5,7 @@ import { AuthService } from "../services/auth";
 import { supportHandoffService } from "../services/supportHandoff";
 import { ROIService } from "../services/roi";
 import { storageQuotaService } from "../services/storageQuota";
+import { byokService } from "../services/byok";
 import { getTenantSettings, isOrganizationExpired } from "../lib/app-runtime";
 import { upload } from "../utils/fileUpload";
 import {
@@ -48,6 +49,15 @@ const VISIONLIGHT_CANONICAL_DOMAIN =
 const getCanonicalDomainForView = (view: "VISIONLIGHT" | "PICDRIFT") =>
   view === "PICDRIFT" ? PICDRIFT_CANONICAL_DOMAIN : VISIONLIGHT_CANONICAL_DOMAIN;
 
+const getCanonicalDomainForUser = (user: any) => {
+  const orgRoutingDomain = sanitizeDomain(user?.organization?.routingDomain || null);
+  if (orgRoutingDomain) return orgRoutingDomain;
+  const view = (user?.view === "PICDRIFT" ? "PICDRIFT" : "VISIONLIGHT") as
+    | "VISIONLIGHT"
+    | "PICDRIFT";
+  return getCanonicalDomainForView(view);
+};
+
 const getRequestProtocol = (req: Request) => {
   const forwardedProto = req.headers["x-forwarded-proto"];
   const rawProto = Array.isArray(forwardedProto)
@@ -74,7 +84,7 @@ const buildPublicProfileOption = (user: any) => {
     organizationName: user.organization?.name || "Personal Workspace",
     organizationIsDefault: user.organization?.isDefault === true,
     isOrgActive: user.organization?.isActive !== false,
-    canonicalDomain: getCanonicalDomainForView(view),
+    canonicalDomain: getCanonicalDomainForUser(user),
   };
 };
 
@@ -91,7 +101,7 @@ router.post("/api/auth/resolve-domain", async (req, res) => {
     const incomingHost = resolveIncomingHost(req);
 
     const resolvedView = (user?.view || "VISIONLIGHT") as "VISIONLIGHT" | "PICDRIFT";
-    const canonicalFromView = getCanonicalDomainForView(resolvedView);
+    const canonicalFromView = getCanonicalDomainForUser(user);
     const profiles = users.map(buildPublicProfileOption);
     const hasMultipleProfiles = profiles.length > 1;
 
@@ -159,7 +169,7 @@ router.post(
         (target.view === "PICDRIFT" ? "PICDRIFT" : "VISIONLIGHT") as
           | "VISIONLIGHT"
           | "PICDRIFT";
-      const canonicalDomain = getCanonicalDomainForView(targetView);
+      const canonicalDomain = getCanonicalDomainForUser(target);
       const incomingHost = resolveIncomingHost(req);
       const currentHostMatches = incomingHost === canonicalDomain;
       if (currentHostMatches) {
@@ -278,6 +288,7 @@ router.get(
       const orgViewType = ((user as any).view || req.user?.view || "VISIONLIGHT") as
         | "VISIONLIGHT"
         | "PICDRIFT";
+      const byokStatus = await byokService.getStatusForSessionUser(user.id);
       const isReadOnlyImpersonation = req.user?.readOnlyImpersonation === true;
       const isSuperAdmin =
         req.user?.role === "SUPERADMIN" ||
@@ -337,7 +348,7 @@ router.get(
       const canonicalDomain =
         !DOMAIN_ROUTING_ENABLED || isReadOnlyImpersonation
           ? null
-          : getCanonicalDomainForView(orgViewType);
+          : getCanonicalDomainForUser(user);
       const incomingHost = resolveIncomingHost(req);
       const domainRedirectRequired = Boolean(
         canonicalDomain && incomingHost && incomingHost !== canonicalDomain,
@@ -357,6 +368,7 @@ router.get(
           organizationTenantPlan: org?.tenantPlan || null,
           needsActivation,
           orgLockReason,
+          byok: byokStatus,
           organizationName: org?.name,
           videoEditorEnabledForAll,
           carouselEnabledForAll,

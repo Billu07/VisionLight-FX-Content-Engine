@@ -3,6 +3,7 @@ import { dbService as airtableService } from "../services/database";
 import { encryptionUtils } from "../utils/encryption";
 
 export const isOrganizationExpired = (org: any) =>
+  org?.provisioningSource !== "BYOK" &&
   org?.tenantPlan === "DEMO" &&
   org?.trialEndsAt &&
   new Date(org.trialEndsAt).getTime() <= Date.now();

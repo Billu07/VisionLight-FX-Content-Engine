@@ -171,6 +171,25 @@ const fetchKieBalance = async (kieApiKey: string | null) => {
 // Apply middleware
 router.use(authenticateToken);
 router.use(requireAdmin);
+router.use(async (req: AuthenticatedRequest, res, next) => {
+  try {
+    if (req.user?.role === "SUPERADMIN") return next();
+    const orgId = req.user?.organizationId;
+    if (!orgId) return next();
+    const org = await dbService.getOrganization(orgId);
+    if (org?.adminPanelLocked === true) {
+      return res.status(403).json({
+        error: "Admin panel is locked for this package.",
+        code: "ADMIN_PANEL_LOCKED",
+      });
+    }
+    return next();
+  } catch (error: any) {
+    return res.status(500).json({
+      error: error?.message || "Failed to validate tenant access.",
+    });
+  }
+});
 
 // Helper to get current org and check permissions
 const getOrg = async (req: AuthenticatedRequest) => {

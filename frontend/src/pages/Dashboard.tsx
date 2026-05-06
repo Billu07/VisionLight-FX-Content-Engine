@@ -246,6 +246,7 @@ function Dashboard() {
   const [showQueuedModal, setShowQueuedModal] = useState(false);
   const [showNoCreditsModal, setShowNoCreditsModal] = useState(false);
   const [showReserveModal, setShowReserveModal] = useState(false);
+  const [showByokUpgradeModal, setShowByokUpgradeModal] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
   const [showPromptInfo, setShowPromptInfo] = useState<string | null>(null);
   const [isTaskIndicatorMinimized, setIsTaskIndicatorMinimized] = useState(false);
@@ -346,6 +347,9 @@ function Dashboard() {
 
   const queryClient = useQueryClient();
   const { user, isLoading: authLoading, logout } = useAuth();
+  const byokStatus = user?.byok;
+  const isByokWorkspace = byokStatus?.isByok === true;
+  const adminPanelLocked = byokStatus?.adminPanelLocked === true;
   const navigate = useNavigate();
   const canUseVideoEditor =
     user?.role === "SUPERADMIN" || user?.videoEditorEnabledForAll === true;
@@ -523,6 +527,39 @@ function Dashboard() {
   }, []);
 
   useEffect(() => {
+    const handleUpgradeRequired = () => {
+      setShowByokUpgradeModal(true);
+    };
+    const handleAdminLocked = () => {
+      notify.warning("Admin panel is locked for your current package.");
+    };
+    window.addEventListener(
+      "visionlight:upgrade-required",
+      handleUpgradeRequired as EventListener,
+    );
+    window.addEventListener(
+      "visionlight:admin-locked",
+      handleAdminLocked as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        "visionlight:upgrade-required",
+        handleUpgradeRequired as EventListener,
+      );
+      window.removeEventListener(
+        "visionlight:admin-locked",
+        handleAdminLocked as EventListener,
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    if (byokStatus?.upgradeRequired) {
+      setShowByokUpgradeModal(true);
+    }
+  }, [byokStatus?.upgradeRequired]);
+
+  useEffect(() => {
     try {
       const stored = localStorage.getItem(storylineKey);
       setStorylineSequence(stored ? JSON.parse(stored) : []);
@@ -585,6 +622,13 @@ function Dashboard() {
     staleTime: 3000,
     refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
+  });
+  const { data: byokPackagesPayload } = useQuery({
+    queryKey: ["byok-packages"],
+    queryFn: async () => (await apiEndpoints.byokGetPackages()).data,
+    enabled: showByokUpgradeModal || isByokWorkspace,
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: autoProcessPosts = [] } = useQuery({
@@ -2099,6 +2143,13 @@ function Dashboard() {
     logout();
     navigate("/");
   };
+  const handleOpenAdminPanel = () => {
+    if (adminPanelLocked) {
+      notify.warning("Admin panel is locked for your current package.");
+      return;
+    }
+    navigate("/admin");
+  };
   const openLibraryFromTaskIndicator = () => {
     try {
       localStorage.setItem(
@@ -2727,6 +2778,82 @@ function Dashboard() {
           </div>
         )}
 
+        {showByokUpgradeModal && (
+          <div className="fixed inset-0 z-[220] flex items-center justify-center bg-gray-950/90 p-4 backdrop-blur-md">
+            <div className="w-full max-w-4xl rounded-3xl border border-cyan-400/25 bg-[#060b1f] p-6 shadow-[0_30px_90px_rgba(2,8,23,0.82)] sm:p-8">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-300">
+                    BYOK Packages
+                  </p>
+                  <h3 className="mt-1 text-2xl font-black text-white">
+                    Select a package to continue rendering
+                  </h3>
+                  <p className="mt-2 text-sm text-slate-300">
+                    Your trial can still login, but rendering requires an active package.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowByokUpgradeModal(false)}
+                  className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-bold uppercase tracking-widest text-gray-200 hover:bg-white/10"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {Array.isArray(byokPackagesPayload?.packages) &&
+                byokPackagesPayload.packages.length > 0 ? (
+                  byokPackagesPayload.packages.map((pkg: any) => (
+                    <div
+                      key={pkg.code}
+                      className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+                    >
+                      <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-300">
+                        {pkg.code}
+                      </div>
+                      <div className="mt-1 text-base font-bold text-white">{pkg.title}</div>
+                      <div className="mt-2 text-xs text-slate-300">
+                        {pkg.maxUsers} users • {pkg.maxProjectsTotal} projects •{" "}
+                        {(Number(pkg.maxStorageMb || 0) / 1024).toFixed(1)} GB
+                      </div>
+                      <div className="mt-1 text-xs text-slate-400">
+                        {pkg.adminPanelLocked ? "Admin locked" : "Admin enabled"}
+                        {pkg.storageRetentionDays
+                          ? ` • ${pkg.storageRetentionDays}-day retention`
+                          : ""}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300 sm:col-span-2 lg:col-span-3">
+                    Package details are loading.
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 flex flex-wrap gap-3">
+                <a
+                  href="https://www.picdrift.com/pricing-plans/byok"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-white"
+                >
+                  Open Pricing & Buy
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setShowByokUpgradeModal(false)}
+                  className="rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-gray-200"
+                >
+                  I’ll upgrade later
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Render Reserve Modal */}
 
         <RenderReserveModal
@@ -2769,6 +2896,35 @@ function Dashboard() {
                   >
                     Exit Read-only
                   </button>
+                </div>
+              </div>
+            )}
+            {isByokWorkspace && (
+              <div className="rounded-2xl border border-cyan-400/25 bg-cyan-500/10 p-4 text-sm text-cyan-100 shadow-xl">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-300">
+                      BYOK Workspace
+                    </div>
+                    <p className="mt-1 text-xs text-cyan-100/85">
+                      {byokStatus?.packageTitle || byokStatus?.packageCode || "BYOK"}
+                      {typeof byokStatus?.dailyUsage?.limit === "number"
+                        ? ` • Daily renders: ${byokStatus?.dailyUsage?.used || 0}/${byokStatus.dailyUsage.limit}`
+                        : ""}
+                      {byokStatus?.trialEndsAt
+                        ? ` • Trial ends ${new Date(byokStatus.trialEndsAt).toLocaleDateString()}`
+                        : ""}
+                    </p>
+                  </div>
+                  {(byokStatus?.upgradeRequired || adminPanelLocked) && (
+                    <button
+                      type="button"
+                      onClick={() => setShowByokUpgradeModal(true)}
+                      className="rounded-xl border border-cyan-300/40 bg-cyan-400/15 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-cyan-100 hover:bg-cyan-400/25"
+                    >
+                      {byokStatus?.upgradeRequired ? "Upgrade Package" : "View Packages"}
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -2990,11 +3146,15 @@ function Dashboard() {
                         <button
                           onClick={() => {
                             setShowUserMenu(false);
-                            navigate("/admin");
+                            handleOpenAdminPanel();
                           }}
-                          className="w-full text-left px-4 py-2 text-red-400 hover:bg-red-500/10 text-sm font-medium transition-colors"
+                          className={`w-full text-left px-4 py-2 text-sm font-medium transition-colors ${
+                            adminPanelLocked
+                              ? "text-gray-500 hover:bg-gray-500/10"
+                              : "text-red-400 hover:bg-red-500/10"
+                          }`}
                         >
-                          Admin Panel
+                          {adminPanelLocked ? "Admin Panel (Locked)" : "Admin Panel"}
                         </button>
                       )}
 
@@ -3109,11 +3269,15 @@ function Dashboard() {
                       type="button"
                       onClick={() => {
                         setShowUserMenu(false);
-                        navigate("/admin");
+                        handleOpenAdminPanel();
                       }}
-                      className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-left text-xs font-semibold text-rose-300"
+                      className={`rounded-xl px-3 py-2 text-left text-xs font-semibold ${
+                        adminPanelLocked
+                          ? "border border-white/15 bg-white/5 text-gray-400"
+                          : "border border-rose-500/30 bg-rose-500/10 text-rose-300"
+                      }`}
                     >
-                      Admin Panel
+                      {adminPanelLocked ? "Admin Panel (Locked)" : "Admin Panel"}
                     </button>
                   )}
 

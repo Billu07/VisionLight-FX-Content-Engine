@@ -39,6 +39,26 @@ interface User {
     email: string;
     role: string;
   };
+  byok?: {
+    isByok: boolean;
+    organizationId?: string;
+    packageCode?: string | null;
+    packageTitle?: string | null;
+    routingDomain?: string | null;
+    adminPanelLocked?: boolean;
+    renderDailyLimit?: number | null;
+    dailyUsage?: {
+      used: number;
+      remaining: number | null;
+      limit: number | null;
+      usageDate?: string;
+    };
+    trialEndsAt?: string | null;
+    trialActive?: boolean;
+    trialExpired?: boolean;
+    upgradeRequired?: boolean;
+    hasFalKey?: boolean;
+  };
 }
 
 export interface WorkspaceProfile {

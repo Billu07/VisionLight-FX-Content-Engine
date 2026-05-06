@@ -29,15 +29,46 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const message = error.response?.data?.error || error.message || "Error";
+    const code = error.response?.data?.code;
+    const details = error.response?.data?.details;
     if (error.response?.status !== 404 && error.code !== "ERR_CANCELED") {
       console.error("API Error:", {
         url: error.config?.url,
         status: error.response?.status,
+        code,
       });
     }
     const wrappedError: any = new Error(message);
     wrappedError.status = error.response?.status;
     wrappedError.url = error.config?.url;
+    wrappedError.code = code;
+    wrappedError.details = details;
+    if (wrappedError.status === 402 && wrappedError.code === "UPGRADE_REQUIRED") {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("visionlight:upgrade-required", {
+            detail: {
+              status: wrappedError.status,
+              code: wrappedError.code,
+              message,
+            },
+          }),
+        );
+      }
+    }
+    if (wrappedError.status === 403 && wrappedError.code === "ADMIN_PANEL_LOCKED") {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("visionlight:admin-locked", {
+            detail: {
+              status: wrappedError.status,
+              code: wrappedError.code,
+              message,
+            },
+          }),
+        );
+      }
+    }
     return Promise.reject(wrappedError);
   },
 );
@@ -51,6 +82,10 @@ export const apiEndpoints = {
     api.post("/api/auth/support-handoff/start", { targetUserId }),
   consumeSupportHandoff: (token: string) =>
     api.post("/api/auth/support-handoff/consume", { token }),
+  byokGetPackages: () => api.get("/api/byok/packages"),
+  byokBootstrap: () => api.post("/api/byok/bootstrap"),
+  byokLinkKey: (falApiKey: string) => api.post("/api/byok/link-key", { falApiKey }),
+  byokGetStatus: () => api.get("/api/byok/status"),
   adminCreateUser: (data: any) => api.post("/api/admin/create-user", data),
   adminGetUsers: () => api.get("/api/admin/users"),
   adminUpdateUser: (userId: string, data: any) =>
@@ -77,6 +112,9 @@ export const apiEndpoints = {
   superadminResolveRequest: (id: string) => api.put(`/api/superadmin/requests/${id}/resolve`),
   superadminGetGlobalSettings: () => api.get("/api/superadmin/settings/global"),
   superadminUpdateGlobalSettings: (data: any) => api.put("/api/superadmin/settings/global", data),
+  superadminGetByokOrganizations: () => api.get("/api/superadmin/byok/organizations"),
+  superadminActivateByokPackage: (data: { organizationId: string; packageCode: string }) =>
+    api.post("/api/superadmin/byok/activate", data),
   superadminUploadWelcomeVideo: (formData: FormData) =>
     api.post("/api/superadmin/settings/welcome-video/upload", formData, {
       headers: { "Content-Type": "multipart/form-data" },

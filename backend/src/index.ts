@@ -9,6 +9,7 @@ import tenantRouter from "./routes/tenant";
 import publicRouter from "./routes/public";
 import appDataRouter from "./routes/app-data";
 import mediaRouter from "./routes/media";
+import byokRouter from "./routes/byok";
 
 console.log("Environment Check:", {
   airtableKey: process.env.AIRTABLE_API_KEY ? "Loaded" : "Missing",
@@ -40,6 +41,7 @@ app.use("/api/superadmin", superadminRouter);
 app.use("/api/tenant", tenantRouter);
 app.use(appDataRouter);
 app.use(mediaRouter);
+app.use(byokRouter);
 
 app.use((req, res) => res.status(404).json({ error: "Route not found" }));
 app.use((error: any, req: Request, res: Response, next: NextFunction) => {
