@@ -231,6 +231,12 @@ export const dbService = {
   async getAllUsers() {
     return prisma.user.findMany({ orderBy: { createdAt: "desc" } });
   },
+  async getOrganizationOwnerUser(organizationId: string) {
+    return prisma.user.findFirst({
+      where: { organizationId },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+  },
   async adminUpdateUser(id: string, data: any) {
     const { addCredits, creditType, ...otherData } = data;
 

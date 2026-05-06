@@ -39,6 +39,9 @@ interface User {
   creditsVideoFX1: number;
   creditsVideoFX2: number;
   creditsVideoFX3: number;
+  isOrganizationOwner?: boolean;
+  isProtectedFromRemoval?: boolean;
+  protectionReason?: "SUPERADMIN" | "TENANT_OWNER" | null;
 }
 
 interface CreditRequest {
@@ -883,6 +886,21 @@ export default function SuperAdminDashboard() {
   const canEnterDashboard = (targetUserId?: string) =>
     !!targetUserId && targetUserId !== adminUser?.id;
 
+  const isProtectedUser = (user: User) =>
+    user.isProtectedFromRemoval === true ||
+    user.role === "SUPERADMIN" ||
+    user.isOrganizationOwner === true;
+
+  const getProtectionLabel = (user: User) => {
+    if (user.protectionReason === "SUPERADMIN" || user.role === "SUPERADMIN") {
+      return "Protected: SuperAdmin";
+    }
+    if (user.protectionReason === "TENANT_OWNER" || user.isOrganizationOwner) {
+      return "Protected: Tenant Owner";
+    }
+    return "Protected";
+  };
+
   const formatUsd = (value: number) =>
     value.toLocaleString("en-US", {
       style: "currency",
@@ -1377,22 +1395,28 @@ export default function SuperAdminDashboard() {
                             </span>
                           )}
                           <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className={adminUi.cyanButton}>Manage</button>
-                          <button
-                            className={adminUi.dangerButton}
-                            onClick={async () => {
-                              if (
-                                await confirmAction(`Remove "${u.email}" from platform?`, {
-                                  confirmLabel: "Remove",
-                                  critical: true,
-                                  confirmationText: `REMOVE ${u.email}`,
-                                })
-                              ) {
-                                apiEndpoints.tenantDeleteUser(u.id).then(fetchInitialData);
-                              }
-                            }}
-                          >
-                            Remove
-                          </button>
+                          {isProtectedUser(u) ? (
+                            <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-amber-300">
+                              {getProtectionLabel(u)}
+                            </span>
+                          ) : (
+                            <button
+                              className={adminUi.dangerButton}
+                              onClick={async () => {
+                                if (
+                                  await confirmAction(`Remove "${u.email}" from platform?`, {
+                                    confirmLabel: "Remove",
+                                    critical: true,
+                                    confirmationText: `REMOVE ${u.email}`,
+                                  })
+                                ) {
+                                  apiEndpoints.tenantDeleteUser(u.id).then(fetchInitialData);
+                                }
+                              }}
+                            >
+                              Remove
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -2218,6 +2242,7 @@ export default function SuperAdminDashboard() {
                 <select
                   className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
                   value={userUpdates.role}
+                  disabled={isProtectedUser(editingUser)}
                   onChange={e => setUserUpdates({ ...userUpdates, role: e.target.value })}
                 >
                   <option value="USER">Standard User</option>
@@ -2225,6 +2250,11 @@ export default function SuperAdminDashboard() {
                   <option value="ADMIN">Organization Admin</option>
                   <option value="SUPERADMIN">System SuperAdmin</option>
                 </select>
+                {isProtectedUser(editingUser) && (
+                  <p className="text-[10px] text-amber-300">
+                    {getProtectionLabel(editingUser)} role cannot be downgraded.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2 rounded-xl border border-gray-800 bg-gray-950/60 p-4">

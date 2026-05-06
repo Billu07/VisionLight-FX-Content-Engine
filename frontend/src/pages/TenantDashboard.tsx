@@ -19,6 +19,8 @@ interface User {
   creditsVideoFX1: number;
   creditsVideoFX2: number;
   creditsVideoFX3: number;
+  isProtectedFromRemoval?: boolean;
+  protectionReason?: "SUPERADMIN" | "TENANT_OWNER" | null;
 }
 
 interface Config {
@@ -131,6 +133,7 @@ export default function TenantDashboard() {
     "team",
   );
   const [users, setUsers] = useState<User[]>([]);
+  const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
   const [creditRequests, setCreditRequests] = useState<CreditRequest[]>([]);
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
@@ -181,6 +184,20 @@ export default function TenantDashboard() {
       maxProjects: 3,
     });
     setNewUserEmailStatus(null);
+  };
+
+  const isUserProtected = (user: User) =>
+    user.isProtectedFromRemoval === true ||
+    user.role === "SUPERADMIN" ||
+    (!!ownerUserId && user.id === ownerUserId);
+
+  const getProtectionLabel = (user: User) => {
+    const reason = user.protectionReason;
+    if (reason === "SUPERADMIN" || user.role === "SUPERADMIN") return "Protected: SuperAdmin";
+    if (reason === "TENANT_OWNER" || (!!ownerUserId && user.id === ownerUserId)) {
+      return "Protected: Tenant Owner";
+    }
+    return "Protected";
   };
 
   const checkNewUserEmail = async () => {
@@ -246,7 +263,10 @@ export default function TenantDashboard() {
           apiEndpoints.tenantGetRequests(),
           apiEndpoints.tenantGetConfig(),
         ]);
-        if (teamRes.data.success) setUsers(teamRes.data.users);
+        if (teamRes.data.success) {
+          setUsers(teamRes.data.users);
+          setOwnerUserId(teamRes.data.ownerUserId || null);
+        }
         if (requestsRes.data.success) setCreditRequests(requestsRes.data.requests || []);
         if (configRes.data.success) setConfig(configRes.data.config);
       } else if (activeTab === "pricing") {
@@ -255,7 +275,10 @@ export default function TenantDashboard() {
           apiEndpoints.tenantGetTeam(),
         ]);
         if (configRes.data.success) setConfig(configRes.data.config);
-        if (teamRes.data.success) setUsers(teamRes.data.users);
+        if (teamRes.data.success) {
+          setUsers(teamRes.data.users);
+          setOwnerUserId(teamRes.data.ownerUserId || null);
+        }
       } else if (activeTab === "integrations") {
         const res = await apiEndpoints.tenantGetConfig();
         if (res.data.success) setConfig(res.data.config);
@@ -735,6 +758,10 @@ export default function TenantDashboard() {
                             <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-gray-500">
                               Active Admin
                             </span>
+                          ) : isUserProtected(u) ? (
+                            <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-amber-300">
+                              {getProtectionLabel(u)}
+                            </span>
                           ) : (
                             <button
                               className={`${adminUi.dangerButton} opacity-0 group-hover:opacity-100`}
@@ -948,6 +975,7 @@ export default function TenantDashboard() {
                   <select
                     className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
                     defaultValue={editingUser.role}
+                    disabled={isUserProtected(editingUser)}
                     onChange={async (e) => {
                       try {
                         await apiEndpoints.tenantUpdateUser(editingUser.id, {
@@ -965,6 +993,11 @@ export default function TenantDashboard() {
                     <option value="USER">Standard User</option>
                     <option value="MANAGER">Manager</option>
                   </select>
+                  {isUserProtected(editingUser) && (
+                    <p className="text-[10px] text-amber-300">
+                      {getProtectionLabel(editingUser)} role cannot be downgraded.
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Project Limit</label>

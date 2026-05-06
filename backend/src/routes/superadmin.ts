@@ -22,6 +22,8 @@ const toPositiveInt = (value: any) => {
   return n;
 };
 
+const ADMIN_ROLES = new Set(["ADMIN", "SUPERADMIN"]);
+
 const getAllocatedProjectQuota = async (orgId: string, excludeUserId?: string) => {
   const allocation = await prisma.user.aggregate({
     where: {
@@ -374,8 +376,42 @@ router.put("/organizations/:id/limits", async (req: AuthenticatedRequest, res) =
 // Get all users (SuperAdmin sees everyone)
 router.get("/users", async (req: AuthenticatedRequest, res) => {
   try {
-    const users = await dbService.getAllUsers();
-    res.json({ success: true, users });
+    const [users, ownerCandidates] = await Promise.all([
+      dbService.getAllUsers(),
+      prisma.user.findMany({
+        where: { organizationId: { not: null } },
+        select: { id: true, organizationId: true, createdAt: true },
+        orderBy: [{ organizationId: "asc" }, { createdAt: "asc" }, { id: "asc" }],
+      }),
+    ]);
+
+    const ownerByOrgId = new Map<string, string>();
+    for (const candidate of ownerCandidates) {
+      if (!candidate.organizationId) continue;
+      if (!ownerByOrgId.has(candidate.organizationId)) {
+        ownerByOrgId.set(candidate.organizationId, candidate.id);
+      }
+    }
+
+    const usersWithProtection = users.map((user) => {
+      const isSuperAdmin = user.role === "SUPERADMIN";
+      const isOrganizationOwner =
+        !!user.organizationId && ownerByOrgId.get(user.organizationId) === user.id;
+      const protectionReason = isSuperAdmin
+        ? "SUPERADMIN"
+        : isOrganizationOwner
+          ? "TENANT_OWNER"
+          : null;
+
+      return {
+        ...user,
+        isOrganizationOwner,
+        isProtectedFromRemoval: !!protectionReason,
+        protectionReason,
+      };
+    });
+
+    res.json({ success: true, users: usersWithProtection });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -429,6 +465,25 @@ router.put("/users/:userId", async (req: AuthenticatedRequest, res) => {
     const targetUser = await dbService.findUserById(userId);
     if (!targetUser) {
       return res.status(404).json({ error: "User not found." });
+    }
+    const ownerUser = targetUser.organizationId
+      ? await dbService.getOrganizationOwnerUser(targetUser.organizationId)
+      : null;
+    const isTargetOwner = ownerUser?.id === targetUser.id;
+
+    if (role !== undefined) {
+      const nextRole = String(role).toUpperCase();
+      if (targetUser.role === "SUPERADMIN" && nextRole !== "SUPERADMIN") {
+        return res.status(400).json({
+          error: "SuperAdmin accounts are protected and cannot be downgraded.",
+        });
+      }
+      if (isTargetOwner && !ADMIN_ROLES.has(nextRole)) {
+        return res.status(400).json({
+          error:
+            "This tenant owner account is protected and cannot be downgraded.",
+        });
+      }
     }
 
     if (

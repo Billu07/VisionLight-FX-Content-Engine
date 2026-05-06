@@ -203,6 +203,8 @@ const countOrganizationAdmins = async (orgId: string, excludeUserId?: string) =>
   });
 };
 
+const ADMIN_ROLES = new Set(["ADMIN", "SUPERADMIN"]);
+
 // === TEAM MANAGEMENT ===
 
 // Get all team members
@@ -213,7 +215,30 @@ router.get("/team", async (req: AuthenticatedRequest, res) => {
       where: { organizationId: orgId },
       orderBy: { createdAt: "desc" },
     });
-    res.json({ success: true, users });
+    const ownerUser = orgId
+      ? await dbService.getOrganizationOwnerUser(orgId)
+      : null;
+    const ownerUserId = ownerUser?.id || null;
+    const usersWithProtection = users.map((user) => {
+      const isSuperAdmin = user.role === "SUPERADMIN";
+      const isTenantOwner = ownerUserId === user.id;
+      const protectionReason = isSuperAdmin
+        ? "SUPERADMIN"
+        : isTenantOwner
+          ? "TENANT_OWNER"
+          : null;
+      return {
+        ...user,
+        isProtectedFromRemoval: !!protectionReason,
+        protectionReason,
+      };
+    });
+
+    res.json({
+      success: true,
+      users: usersWithProtection,
+      ownerUserId,
+    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -336,6 +361,8 @@ router.put("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
     if (!targetUser || targetUser.organizationId !== orgId) {
       return res.status(403).json({ error: "Access denied: User belongs to another organization." });
     }
+    const ownerUser = await dbService.getOrganizationOwnerUser(orgId);
+    const isTargetOwner = ownerUser?.id === targetUser.id;
 
     // Prepare updates
     const updates: any = {};
@@ -354,6 +381,21 @@ router.put("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
       );
       updates.maxProjects = requestedMaxProjects;
     }
+    if (role !== undefined) {
+      const nextRole = String(role).toUpperCase();
+      if (targetUser.role === "SUPERADMIN" && nextRole !== "SUPERADMIN") {
+        return res.status(400).json({
+          error: "SuperAdmin accounts are protected and cannot be downgraded.",
+        });
+      }
+      if (isTargetOwner && !ADMIN_ROLES.has(nextRole)) {
+        return res.status(400).json({
+          error:
+            "This tenant owner account is protected and cannot be downgraded.",
+        });
+      }
+    }
+
     if (role === "USER" || role === "MANAGER") {
       const isTargetAdmin =
         targetUser.role === "ADMIN" || targetUser.role === "SUPERADMIN";
@@ -434,6 +476,20 @@ router.delete("/team/user/:userId", async (req: AuthenticatedRequest, res) => {
     // Cannot delete yourself
     if (targetUser.id === req.user!.id) {
       return res.status(400).json({ error: "You cannot delete your own account." });
+    }
+
+    if (targetUser.role === "SUPERADMIN") {
+      return res.status(400).json({
+        error: "SuperAdmin accounts are protected and cannot be removed.",
+      });
+    }
+
+    const ownerUser = await dbService.getOrganizationOwnerUser(orgId!);
+    if (ownerUser?.id === targetUser.id) {
+      return res.status(400).json({
+        error:
+          "This tenant owner account is protected and cannot be removed.",
+      });
     }
 
     const isTargetAdmin =
