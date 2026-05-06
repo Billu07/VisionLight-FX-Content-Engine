@@ -8,8 +8,6 @@ import { LoadingSpinner } from "../components/LoadingSpinner";
 
 type AuthMode = "signup" | "login";
 
-const FAL_KEYS_URL = "https://fal.ai/dashboard/keys";
-
 export const ByokLanding = () => {
   const navigate = useNavigate();
   const { checkAuth } = useAuth();
@@ -18,10 +16,6 @@ export const ByokLanding = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showKeyModal, setShowKeyModal] = useState(false);
-  const [falApiKey, setFalApiKey] = useState("");
-  const [falHelperShown, setFalHelperShown] = useState(false);
-  const [isLinkingKey, setIsLinkingKey] = useState(false);
 
   useEffect(() => {
     const run = async () => {
@@ -35,11 +29,6 @@ export const ByokLanding = () => {
         const profileId = bootstrap.data?.profileId;
         if (typeof profileId === "string" && profileId.trim()) {
           setActiveProfile(profileId, email || "BYOK Workspace");
-        }
-        const status = bootstrap.data?.status;
-        if (status?.isByok && !status?.hasFalKey) {
-          setShowKeyModal(true);
-          return;
         }
         const authResult = await checkAuth();
         navigate(authResult.profileSelectionRequired ? "/studios" : "/projects", {
@@ -95,35 +84,12 @@ export const ByokLanding = () => {
         setActiveProfile(profileId, email.trim().toLowerCase());
       }
 
-      const status = bootstrap.data?.status;
-      if (status?.isByok && !status?.hasFalKey) {
-        setShowAuth(false);
-        setShowKeyModal(true);
-        return;
-      }
-
       await checkAuth();
       navigate("/projects", { replace: true });
     } catch (error: any) {
       notify.error(error?.message || "Authentication failed.");
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleLinkKey = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!falApiKey.trim()) return;
-    setIsLinkingKey(true);
-    try {
-      await apiEndpoints.byokLinkKey(falApiKey.trim());
-      notify.success("14-day trial activated. Dashboard unlocked.");
-      await checkAuth();
-      navigate("/projects", { replace: true });
-    } catch (error: any) {
-      notify.error(error?.message || "Failed to link Fal key.");
-    } finally {
-      setIsLinkingKey(false);
     }
   };
 
@@ -207,7 +173,7 @@ export const ByokLanding = () => {
             <h3 className="text-xl font-black text-white">{ctaLabel}</h3>
             <p className="mt-2 text-sm text-slate-300">
               {authMode === "signup"
-                ? "Create account, then link Fal key to start trial."
+                ? "Create account and enter dashboard. You can link Fal key inside dashboard."
                 : "Login to your BYOK workspace."}
             </p>
 
@@ -265,65 +231,6 @@ export const ByokLanding = () => {
                 {authMode === "signup" ? "Login" : "Create one"}
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {showKeyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl border border-cyan-400/25 bg-[#050b1f] p-7 shadow-[0_30px_90px_rgba(2,8,23,0.8)]">
-            <h3 className="text-2xl font-black text-white">Bring Your Own Key</h3>
-            <p className="mt-3 text-sm leading-relaxed text-slate-300">
-              Pay direct. Total control. 1-2 minute Fal signup.
-            </p>
-
-            <div className="mt-5 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setFalHelperShown(true);
-                  window.open(FAL_KEYS_URL, "_blank", "noopener,noreferrer");
-                }}
-                className="rounded-xl border border-cyan-300/40 bg-cyan-400/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-cyan-100 hover:bg-cyan-400/20"
-              >
-                Signup Fal
-              </button>
-              <a
-                href={FAL_KEYS_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white hover:bg-white/10"
-              >
-                Fal API Key Link
-              </a>
-            </div>
-
-            {falHelperShown && (
-              <p className="mt-3 text-xs text-cyan-200">
-                Fal will open in a new window. Signup and return to this window.
-              </p>
-            )}
-
-            <form className="mt-5 space-y-3" onSubmit={handleLinkKey}>
-              <label className="block text-xs font-bold uppercase tracking-[0.12em] text-slate-300">
-                Fal Key
-              </label>
-              <input
-                type="password"
-                value={falApiKey}
-                onChange={(e) => setFalApiKey(e.target.value)}
-                placeholder="Paste your Fal API key"
-                className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-3 text-sm text-white outline-none focus:border-cyan-300"
-                required
-              />
-              <button
-                type="submit"
-                disabled={isLinkingKey}
-                className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-white disabled:opacity-60"
-              >
-                {isLinkingKey ? "Submitting..." : "Submitted"}
-              </button>
-            </form>
           </div>
         </div>
       )}
