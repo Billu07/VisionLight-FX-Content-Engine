@@ -338,7 +338,7 @@ export function AssetLibrary({
       return Array.isArray(res.data.posts) ? res.data.posts : [];
     },
     enabled: !!user,
-    staleTime: 5000,
+    staleTime: 0,
     refetchInterval: () => {
       const cachedPosts = queryClient.getQueryData([
         "library-timeline-videos",
@@ -356,6 +356,7 @@ export function AssetLibrary({
       if (hasAutoProcessInFlight) return 4000;
       return false;
     },
+    refetchOnMount: "always",
     refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
   });

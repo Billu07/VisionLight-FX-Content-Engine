@@ -40,12 +40,40 @@ const MAX_VIDEOFX2_REFERENCES = 12;
 const MAX_TOPAZ_REFERENCES = 1;
 const TIMELINE_PAGE_SIZE = 15;
 const DASHBOARD_BG_MODE_KEY = "visionlight_dashboard_bg_mode";
+const ASSET_TASK_PANEL_STATE_KEY = "visionlight_asset_task_panel_state_v1";
+const DASHBOARD_TASK_INDICATOR_STATE_KEY =
+  "visionlight_dashboard_task_indicator_state_v1";
 type DashboardBgMode = "current" | "original";
 type VeoMode =
   | "image_to_video"
   | "first_last_frame"
   | "extend_video"
   | "reference_to_video";
+
+type AutoProcessTaskStatus = "PROCESSING" | "READY" | "FAILED";
+
+type DashboardAutoProcessTask = {
+  id: string;
+  status: AutoProcessTaskStatus;
+  progress?: number;
+  title?: string;
+  error?: string;
+  createdAt?: string;
+  aspectRatio?: "16:9" | "9:16" | "1:1";
+};
+
+const parseTaskParams = (raw: unknown) => {
+  if (!raw) return {};
+  if (typeof raw === "object") return raw as Record<string, unknown>;
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+  return {};
+};
 
 function Dashboard() {
   // ==========================================
@@ -217,6 +245,7 @@ function Dashboard() {
   const [showReserveModal, setShowReserveModal] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
   const [showPromptInfo, setShowPromptInfo] = useState<string | null>(null);
+  const [isTaskIndicatorMinimized, setIsTaskIndicatorMinimized] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [dashboardBgMode, setDashboardBgMode] = useState<DashboardBgMode>(() => {
     const stored =
@@ -359,6 +388,30 @@ function Dashboard() {
       setLibraryInitialTab(null);
     }
   }, [activeLibrarySlot]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DASHBOARD_TASK_INDICATOR_STATE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { minimized?: boolean };
+      if (typeof parsed.minimized === "boolean") {
+        setIsTaskIndicatorMinimized(parsed.minimized);
+      }
+    } catch {
+      // no-op
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        DASHBOARD_TASK_INDICATOR_STATE_KEY,
+        JSON.stringify({ minimized: isTaskIndicatorMinimized }),
+      );
+    } catch {
+      // no-op
+    }
+  }, [isTaskIndicatorMinimized]);
 
   useEffect(() => {
     if (!canUseCarousel && studioMode === "carousel") {
@@ -512,6 +565,39 @@ function Dashboard() {
     },
     enabled: !!user,
     staleTime: 3000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
+  });
+
+  const { data: autoProcessPosts = [] } = useQuery({
+    queryKey: ["asset-auto-process-posts", activeProjectId],
+    queryFn: async () => {
+      try {
+        const response = await apiEndpoints.getPosts(activeProject);
+        const fetchedPosts = Array.isArray(response.data.posts)
+          ? response.data.posts
+          : [];
+        return fetchedPosts.filter(
+          (post: any) => post?.mediaProvider === "asset-auto-process",
+        );
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!user,
+    staleTime: 2000,
+    refetchInterval: () => {
+      const cached = queryClient.getQueryData([
+        "asset-auto-process-posts",
+        activeProjectId,
+      ]) as any[] | undefined;
+      const hasActive =
+        Array.isArray(cached) &&
+        cached.some(
+          (post) => post?.status === "PROCESSING" || post?.status === "NEW",
+        );
+      return hasActive ? 3000 : 10000;
+    },
     refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
   });
@@ -1990,6 +2076,19 @@ function Dashboard() {
     logout();
     navigate("/");
   };
+  const openLibraryFromTaskIndicator = () => {
+    try {
+      localStorage.setItem(
+        ASSET_TASK_PANEL_STATE_KEY,
+        JSON.stringify({ minimized: false }),
+      );
+    } catch {
+      // no-op
+    }
+    setLibrarySource("top");
+    setLibraryInitialTab(latestAutoProcessTaskAspect || "original");
+    setActiveLibrarySlot("generic");
+  };
   const toggleDashboardBackground = () => {
     setDashboardBgMode((prev) => (prev === "current" ? "original" : "current"));
   };
@@ -2082,6 +2181,65 @@ function Dashboard() {
     () => storylineSequence.slice(0, storylineVisibleCount),
     [storylineSequence, storylineVisibleCount],
   );
+  const autoProcessTasks = useMemo<DashboardAutoProcessTask[]>(() => {
+    return (autoProcessPosts as any[])
+      .map((post) => {
+        const params = parseTaskParams(post?.generationParams);
+        const statusRaw =
+          typeof post?.status === "string" ? post.status.toUpperCase() : "";
+        const status: AutoProcessTaskStatus =
+          statusRaw === "READY" || statusRaw === "COMPLETED"
+            ? "READY"
+            : statusRaw === "FAILED"
+              ? "FAILED"
+              : "PROCESSING";
+        return {
+          id: String(post?.id || ""),
+          status,
+          progress:
+            typeof post?.progress === "number"
+              ? Math.max(0, Math.min(100, Math.round(post.progress)))
+              : undefined,
+          title: typeof post?.title === "string" ? post.title : undefined,
+          error: typeof post?.error === "string" ? post.error : undefined,
+          createdAt: typeof post?.createdAt === "string" ? post.createdAt : undefined,
+          aspectRatio:
+            params?.aspectRatio === "16:9" ||
+            params?.aspectRatio === "9:16" ||
+            params?.aspectRatio === "1:1"
+              ? (params.aspectRatio as "16:9" | "9:16" | "1:1")
+              : undefined,
+        };
+      })
+      .sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bTime - aTime;
+      });
+  }, [autoProcessPosts]);
+
+  const activeAutoProcessTaskCount = autoProcessTasks.filter(
+    (task) => task.status === "PROCESSING",
+  ).length;
+  const readyAutoProcessTaskCount = autoProcessTasks.filter(
+    (task) => task.status === "READY",
+  ).length;
+  const failedAutoProcessTaskCount = autoProcessTasks.filter(
+    (task) => task.status === "FAILED",
+  ).length;
+  const latestAutoProcessTaskAspect = autoProcessTasks.find(
+    (task) => task.aspectRatio === "16:9" || task.aspectRatio === "9:16" || task.aspectRatio === "1:1",
+  )?.aspectRatio;
+  const hasRecentCompletedAutoProcessTask = autoProcessTasks.some((task) => {
+    if (task.status === "PROCESSING") return true;
+    if (!task.createdAt) return false;
+    const taskTime = new Date(task.createdAt).getTime();
+    return Number.isFinite(taskTime) && Date.now() - taskTime <= 12 * 60 * 60 * 1000;
+  });
+  const showAutoProcessTaskIndicator =
+    activeLibrarySlot === null &&
+    autoProcessTasks.length > 0 &&
+    hasRecentCompletedAutoProcessTask;
   const isOriginalDashboardBg = dashboardBgMode === "original";
 
   return (
@@ -2127,6 +2285,55 @@ function Dashboard() {
             }}
           />
         )}
+
+        {showAutoProcessTaskIndicator &&
+          (isTaskIndicatorMinimized ? (
+            <button
+              type="button"
+              onClick={() => setIsTaskIndicatorMinimized(false)}
+              className="fixed bottom-24 right-4 z-[85] rounded-2xl border border-cyan-400/35 bg-gray-950/95 px-4 py-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-colors hover:border-cyan-300/60 lg:bottom-5"
+            >
+              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200">
+                Asset Tasks
+              </div>
+              <div className="mt-1 text-xs font-semibold text-white">
+                {activeAutoProcessTaskCount} active · {readyAutoProcessTaskCount} ready
+              </div>
+            </button>
+          ) : (
+            <div className="fixed bottom-24 right-4 z-[85] w-[min(92vw,340px)] overflow-hidden rounded-2xl border border-white/15 bg-gray-950/95 shadow-[0_16px_54px_rgba(0,0,0,0.62)] backdrop-blur-xl lg:bottom-5">
+              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200">
+                    Asset Processing
+                  </p>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {activeAutoProcessTaskCount} active · {readyAutoProcessTaskCount} ready ·{" "}
+                    {failedAutoProcessTaskCount} failed
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={openLibraryFromTaskIndicator}
+                    className="rounded-md border border-cyan-400/35 bg-cyan-500/15 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-200 transition-colors hover:bg-cyan-500/25"
+                  >
+                    Open
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsTaskIndicatorMinimized(true)}
+                    className="rounded-md border border-white/10 bg-white/[0.05] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-300 transition-colors hover:bg-white/[0.1]"
+                  >
+                    Min
+                  </button>
+                </div>
+              </div>
+              <div className="px-4 py-2 text-[11px] text-gray-400">
+                Close the library anytime. Use this panel to reopen and resume task results.
+              </div>
+            </div>
+          ))}
 
         {/* Fullscreen sequence editor */}
         {canUseVideoEditor && viewMode === "sequencer" && (
