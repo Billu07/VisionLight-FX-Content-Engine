@@ -1,6 +1,8 @@
 import express, { Request } from "express";
 import { authenticateToken, AuthenticatedRequest } from "../middleware/auth";
 import { dbService as airtableService, prisma } from "../services/database";
+import { AuthService } from "../services/auth";
+import { supportHandoffService } from "../services/supportHandoff";
 import { ROIService } from "../services/roi";
 import { getTenantSettings, isOrganizationExpired } from "../lib/app-runtime";
 import { upload } from "../utils/fileUpload";
@@ -44,6 +46,18 @@ const VISIONLIGHT_CANONICAL_DOMAIN =
 
 const getCanonicalDomainForView = (view: "VISIONLIGHT" | "PICDRIFT") =>
   view === "PICDRIFT" ? PICDRIFT_CANONICAL_DOMAIN : VISIONLIGHT_CANONICAL_DOMAIN;
+
+const getRequestProtocol = (req: Request) => {
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  const rawProto = Array.isArray(forwardedProto)
+    ? forwardedProto[0]
+    : forwardedProto;
+  if (typeof rawProto === "string" && rawProto.trim()) {
+    const proto = rawProto.split(",")[0]?.trim().toLowerCase();
+    if (proto === "http" || proto === "https") return proto;
+  }
+  return req.protocol === "https" ? "https" : "http";
+};
 
 const buildPublicProfileOption = (user: any) => {
   const view = (user?.view === "PICDRIFT" ? "PICDRIFT" : "VISIONLIGHT") as
@@ -104,6 +118,139 @@ router.post("/api/auth/resolve-domain", async (req, res) => {
     });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
+  }
+});
+
+router.post(
+  "/api/auth/support-handoff/start",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const rawTargetUserId = req.body?.targetUserId;
+      if (typeof rawTargetUserId !== "string" || !rawTargetUserId.trim()) {
+        return res.status(400).json({ error: "targetUserId is required" });
+      }
+
+      const targetUserId = rawTargetUserId.trim();
+      const requester =
+        req.user?.readOnlyImpersonation && req.user?.impersonator?.id
+          ? await airtableService.findUserById(req.user.impersonator.id)
+          : await airtableService.findUserById(req.user!.id);
+      if (!requester) {
+        return res.status(401).json({ error: "Requester not found" });
+      }
+
+      const requesterIsSuperAdmin =
+        requester.role === "SUPERADMIN" ||
+        AuthService.isSuperAdminEmail(requester.email);
+      if (!requesterIsSuperAdmin) {
+        return res
+          .status(403)
+          .json({ error: "Only superadmins can create support handoff tokens." });
+      }
+
+      const target = await airtableService.findUserById(targetUserId);
+      if (!target) {
+        return res.status(404).json({ error: "Target user not found" });
+      }
+
+      const targetView =
+        (target.view === "PICDRIFT" ? "PICDRIFT" : "VISIONLIGHT") as
+          | "VISIONLIGHT"
+          | "PICDRIFT";
+      const canonicalDomain = getCanonicalDomainForView(targetView);
+      const incomingHost = resolveIncomingHost(req);
+      const currentHostMatches = incomingHost === canonicalDomain;
+      if (currentHostMatches) {
+        return res.json({
+          success: true,
+          domainSwitchRequired: false,
+          canonicalDomain,
+        });
+      }
+
+      const token = supportHandoffService.issueHandoffToken({
+        issuerUserId: requester.id,
+        targetUserId,
+        audienceDomain: canonicalDomain,
+        sourceDomain: incomingHost,
+      });
+      const protocol = getRequestProtocol(req);
+      const handoffUrl = `${protocol}://${canonicalDomain}/support-handoff#token=${encodeURIComponent(token)}`;
+
+      console.log("[support-handoff:start]", {
+        issuerUserId: requester.id,
+        targetUserId,
+        sourceDomain: incomingHost,
+        destinationDomain: canonicalDomain,
+      });
+
+      return res.json({
+        success: true,
+        domainSwitchRequired: true,
+        canonicalDomain,
+        handoffUrl,
+      });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.post("/api/auth/support-handoff/consume", async (req, res) => {
+  try {
+    const rawToken = req.body?.token;
+    if (typeof rawToken !== "string" || !rawToken.trim()) {
+      return res.status(400).json({ error: "token is required" });
+    }
+    const incomingHost = resolveIncomingHost(req);
+    const handoff = supportHandoffService.consumeHandoffToken(
+      rawToken.trim(),
+      incomingHost,
+    );
+
+    const issuer = await airtableService.findUserById(handoff.issuerUserId);
+    if (!issuer) {
+      return res.status(401).json({ error: "Handoff issuer no longer exists." });
+    }
+    const issuerIsSuperAdmin =
+      issuer.role === "SUPERADMIN" || AuthService.isSuperAdminEmail(issuer.email);
+    if (!issuerIsSuperAdmin) {
+      return res.status(403).json({
+        error: "Handoff issuer is no longer authorized for superadmin support.",
+      });
+    }
+
+    const target = await airtableService.findUserById(handoff.targetUserId);
+    if (!target) {
+      return res.status(404).json({ error: "Target user not found." });
+    }
+
+    const sessionToken = supportHandoffService.issueSupportSessionToken({
+      issuerUserId: handoff.issuerUserId,
+      targetUserId: handoff.targetUserId,
+      audienceDomain: handoff.audienceDomain,
+    });
+
+    console.log("[support-handoff:consume]", {
+      issuerUserId: handoff.issuerUserId,
+      targetUserId: handoff.targetUserId,
+      sourceDomain: handoff.sourceDomain,
+      destinationDomain: handoff.audienceDomain,
+    });
+
+    return res.json({
+      success: true,
+      sessionToken,
+      target: {
+        id: target.id,
+        email: target.email,
+        name: target.name,
+      },
+    });
+  } catch (error: any) {
+    const message = error?.message || "Failed to consume handoff token.";
+    return res.status(400).json({ error: message });
   }
 });
 

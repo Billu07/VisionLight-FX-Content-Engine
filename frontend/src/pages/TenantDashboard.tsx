@@ -65,7 +65,6 @@ const COVERAGE_VARIANTS = [
   { id: "picdrift_plus_5s", label: "Kling 3.0 5s", provider: "fal", wallet: "creditsPicDriftPlus", deductionKey: "pricePicDrift_Plus_5s" },
   { id: "picdrift_plus_10s", label: "Kling 3.0 10s", provider: "fal", wallet: "creditsPicDriftPlus", deductionKey: "pricePicDrift_Plus_10s" },
   { id: "picfx_standard", label: "Pic FX Standard (Nano/GPT 2)", provider: "fal", wallet: "creditsImageFX", deductionKey: "pricePicFX_Standard" },
-  { id: "picfx_carousel", label: "Pic FX Carousel", provider: "fal", wallet: "creditsImageFX", deductionKey: "pricePicFX_Carousel" },
   { id: "picfx_batch", label: "Pic FX Batch", provider: "fal", wallet: "creditsImageFX", deductionKey: "pricePicFX_Batch" },
   { id: "editor_pro", label: "Pic FX Editor", provider: "fal", wallet: "creditsImageFX", deductionKey: "priceEditor_Pro" },
   { id: "editor_enhance", label: "Image Enhance/Upscale", provider: "fal", wallet: "creditsImageFX", deductionKey: "priceEditor_Enhance" },
@@ -89,7 +88,6 @@ const DEFAULT_VARIANT_COST_USD: Record<CoverageVariantId, number> = {
   picdrift_plus_5s: 0.2,
   picdrift_plus_10s: 0.3,
   picfx_standard: 0.08,
-  picfx_carousel: 0.2,
   picfx_batch: 0.08,
   editor_pro: 0.1,
   editor_enhance: 0.12,
@@ -109,7 +107,6 @@ const PICDRIFT_PRICING_KEYS = [
   "pricePicDrift_5s",
   "pricePicDrift_10s",
   "pricePicFX_Standard",
-  "pricePicFX_Carousel",
   "pricePicFX_Batch",
   "priceEditor_Pro",
   "priceEditor_Enhance",
@@ -385,6 +382,9 @@ export default function TenantDashboard() {
     }
   };
 
+  const canEnterDashboard = (targetUserId?: string) =>
+    !!targetUserId && targetUserId !== adminUser?.id;
+
   const handleTabChange = (tab: "team" | "pricing" | "integrations") => {
     setActiveTab(tab);
     const next = new URLSearchParams(searchParams);
@@ -657,12 +657,18 @@ export default function TenantDashboard() {
                       )}
                       <td className="p-5 text-right">
                         <div className="flex gap-2 justify-end">
-                          <button
-                            onClick={() => handleEnterReadOnlyDashboard(u)}
-                            className={adminUi.amberButton}
-                          >
-                            Enter Dashboard
-                          </button>
+                          {canEnterDashboard(u.id) ? (
+                            <button
+                              onClick={() => handleEnterReadOnlyDashboard(u)}
+                              className={adminUi.amberButton}
+                            >
+                              Enter Dashboard
+                            </button>
+                          ) : (
+                            <span className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500">
+                              Own Profile
+                            </span>
+                          )}
                           <button onClick={() => setEditingUser(u)} className={adminUi.cyanButton}>Manage</button>
                           {u.id === adminUser?.id ? (
                             <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-gray-500">
@@ -827,12 +833,22 @@ export default function TenantDashboard() {
                   <div className="space-y-6">
                     <div className="space-y-2">
                       <label className={adminUi.sectionTitle}>Fal AI Key</label>
-                      <input
-                        type="password"
-                        className={`${adminUi.input} w-full p-3 font-mono text-sm`}
-                        value={config.falApiKey}
-                        onChange={e => setConfig({ ...config, falApiKey: e.target.value })}
-                      />
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
+                        <input
+                          type="password"
+                          className={`${adminUi.input} w-full p-3 font-mono text-sm`}
+                          value={config.falApiKey}
+                          onChange={e => setConfig({ ...config, falApiKey: e.target.value })}
+                        />
+                        <a
+                          href="https://fal.ai/dashboard/keys"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center rounded-lg border border-cyan-400/35 bg-cyan-500/15 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-200 transition-colors hover:bg-cyan-500/25"
+                        >
+                          Get Your Key
+                        </a>
+                      </div>
                     </div>
                   </div>
                 </div>

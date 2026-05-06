@@ -1273,6 +1273,15 @@ router.post(
         aspectRatio,
       });
 
+      const isSuperAdminSession =
+        req.user?.role === "SUPERADMIN" ||
+        req.user?.impersonator?.role === "SUPERADMIN";
+      if (mediaType === "carousel" && !isSuperAdminSession) {
+        return res.status(403).json({
+          error: "Carousel generation is available for SuperAdmin accounts only.",
+        });
+      }
+
       if (projectId) {
         const project = await airtableService.getProjectById(projectId);
         if (!project || project.userId !== req.user!.id) {

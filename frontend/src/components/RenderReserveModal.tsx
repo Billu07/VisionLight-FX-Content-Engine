@@ -28,6 +28,7 @@ export function RenderReserveModal({
   user,
 }: RenderReserveModalProps) {
   if (!isOpen) return null;
+  const showCarouselPricing = user?.isSuperAdmin === true;
 
   const formatPrice = (value: any) => {
     const numeric = toNumber(value);
@@ -170,11 +171,15 @@ export function RenderReserveModal({
       key: "pricePicFX_Standard",
       wallet: "Image FX",
     },
-    {
-      label: "Pic FX Carousel",
-      key: "pricePicFX_Carousel",
-      wallet: "Image FX",
-    },
+    ...(showCarouselPricing
+      ? [
+          {
+            label: "Pic FX Carousel",
+            key: "pricePicFX_Carousel",
+            wallet: "Image FX",
+          } satisfies ReserveItem,
+        ]
+      : []),
     {
       label: "Pic FX Batch",
       key: "pricePicFX_Batch",

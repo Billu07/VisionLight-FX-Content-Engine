@@ -21,17 +21,32 @@ export const authenticateToken = async (
   if (!token) return res.status(401).json({ error: "Authentication required" });
 
   try {
+    const forwardedHost = req.headers["x-forwarded-host"];
+    const rawHost = Array.isArray(forwardedHost)
+      ? forwardedHost[0]
+      : forwardedHost || req.headers.host;
+    const hostForTokenValidation = rawHost
+      ? String(rawHost).split(",")[0].trim()
+      : "";
+
     const activeProfileHeader = req.headers["x-active-user-id"];
     const activeProfileId = Array.isArray(activeProfileHeader)
       ? activeProfileHeader[0]
       : activeProfileHeader;
 
-    const user = await AuthService.validateSession(
+    let user = await AuthService.validateSession(
       token,
       typeof activeProfileId === "string" ? activeProfileId.trim() : undefined,
     );
-    if (!user)
-      return res.status(401).json({ error: "Invalid or expired token" });
+
+    if (!user) {
+      user = await AuthService.validateSupportSessionToken(
+        token,
+        hostForTokenValidation,
+      );
+    }
+
+    if (!user) return res.status(401).json({ error: "Invalid or expired token" });
     const sessionUser: any = user;
 
     if (sessionUser.profileSelectionRequired && req.originalUrl !== "/api/auth/me") {

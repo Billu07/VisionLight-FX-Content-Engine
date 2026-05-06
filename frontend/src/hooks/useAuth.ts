@@ -2,7 +2,9 @@ import { create } from "zustand";
 import { supabase } from "../lib/supabase";
 import {
   apiEndpoints,
+  clearSupportSessionToken,
   clearActiveProfile,
+  getSupportSessionToken,
   setAuthToken,
   stopReadOnlyImpersonation,
 } from "../lib/api";
@@ -81,6 +83,28 @@ export const useAuth = create<AuthState>((set) => ({
 
   checkAuth: async () => {
     try {
+      const supportToken = getSupportSessionToken();
+      if (supportToken) {
+        setAuthToken(supportToken);
+        try {
+          const supportResponse = await apiEndpoints.getMe();
+          if (supportResponse.data.success && supportResponse.data.user) {
+            set({
+              user: supportResponse.data.user,
+              profiles: supportResponse.data.profiles || [],
+              profileSelectionRequired: false,
+              systemPresets: supportResponse.data.systemPresets || [],
+              token: supportToken,
+              isLoading: false,
+            });
+            return { hasUser: true, profileSelectionRequired: false };
+          }
+        } catch {
+          clearSupportSessionToken();
+          setAuthToken(null);
+        }
+      }
+
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -131,6 +155,7 @@ export const useAuth = create<AuthState>((set) => ({
   logout: async () => {
     await supabase.auth.signOut();
     setAuthToken(null);
+    clearSupportSessionToken();
     clearActiveProfile();
     stopReadOnlyImpersonation();
     localStorage.removeItem("visionlight_active_project");

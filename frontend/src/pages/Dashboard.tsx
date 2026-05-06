@@ -314,6 +314,7 @@ function Dashboard() {
   const navigate = useNavigate();
   const canUseVideoEditor =
     user?.role === "SUPERADMIN" || user?.videoEditorEnabledForAll === true;
+  const canUseCarousel = user?.isSuperAdmin === true;
 
   // Helper to determine the current "Visual Tab"
   const currentVisualTab: VisualTab =
@@ -357,6 +358,12 @@ function Dashboard() {
       setLibraryInitialTab(null);
     }
   }, [activeLibrarySlot]);
+
+  useEffect(() => {
+    if (!canUseCarousel && studioMode === "carousel") {
+      setStudioMode("image");
+    }
+  }, [canUseCarousel, studioMode]);
 
   useEffect(() => {
     setTimelineVisibleCount(TIMELINE_PAGE_SIZE);
@@ -1779,7 +1786,10 @@ function Dashboard() {
         formData.append("referenceImages", file),
       );
     } else {
-      formData.append("mediaType", studioMode);
+      const mediaType = !canUseCarousel && studioMode === "carousel"
+        ? "image"
+        : studioMode;
+      formData.append("mediaType", mediaType);
       formData.append("model", picFxModel);
       let sizeStr = "1024x1024";
       if (geminiAspect === "16:9") sizeStr = "1792x1024";
@@ -3119,7 +3129,7 @@ function Dashboard() {
                               >
                                 Image FX
                               </button>
-                              {user?.view !== "PICDRIFT" && (
+                              {canUseCarousel && (
                                 <button
                                   onClick={() => setStudioMode("carousel")}
                                   className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${studioMode === "carousel"

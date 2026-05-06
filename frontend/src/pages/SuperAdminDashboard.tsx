@@ -214,7 +214,12 @@ export default function SuperAdminDashboard() {
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<
-    "platform" | "my-agency" | "demo-leads" | "global-settings" | "global-presets"
+    | "platform"
+    | "my-agency"
+    | "demo-leads"
+    | "global-settings"
+    | "global-presets"
+    | "lab"
   >("platform");
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -737,6 +742,12 @@ export default function SuperAdminDashboard() {
 
   const handleEnterReadOnlyDashboard = async (target: User) => {
     try {
+      const handoffRes = await apiEndpoints.startSupportHandoff(target.id);
+      if (handoffRes.data?.domainSwitchRequired && handoffRes.data?.handoffUrl) {
+        window.location.replace(handoffRes.data.handoffUrl);
+        return;
+      }
+
       startReadOnlyImpersonation(target.id, target.email);
       const res = await apiEndpoints.getProjects();
       const firstProject = res.data?.projects?.[0];
@@ -819,6 +830,19 @@ export default function SuperAdminDashboard() {
     );
   }, [walletCoverageRows]);
 
+  const sortedTenants = useMemo(() => {
+    return [...tenants].sort((a, b) => {
+      if (a.isDefault && !b.isDefault) return -1;
+      if (!a.isDefault && b.isDefault) return 1;
+      return (
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    });
+  }, [tenants]);
+
+  const canEnterDashboard = (targetUserId?: string) =>
+    !!targetUserId && targetUserId !== adminUser?.id;
+
   const formatUsd = (value: number) =>
     value.toLocaleString("en-US", {
       style: "currency",
@@ -864,14 +888,21 @@ export default function SuperAdminDashboard() {
               >
                 Back to App
               </button>
-              {["platform", "my-agency", "demo-leads", "global-settings", "global-presets"].map((tab) => (
+              {[
+                { id: "platform", label: "platform" },
+                { id: "my-agency", label: "my agency" },
+                { id: "demo-leads", label: "demo leads" },
+                { id: "global-settings", label: "global settings" },
+                { id: "global-presets", label: "global presets" },
+                { id: "lab", label: "lab" },
+              ].map((tab) => (
                 <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab as any)}
-                  className={`${adminUi.tab} ${activeTab === tab ? adminUi.tabActive : adminUi.tabInactive
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`${adminUi.tab} ${activeTab === tab.id ? adminUi.tabActive : adminUi.tabInactive
                     }`}
                 >
-                  {tab.replace("-", " ")}
+                  {tab.label}
                 </button>
               ))}
             </div>
@@ -1043,7 +1074,7 @@ export default function SuperAdminDashboard() {
                         No organizations created yet.
                       </td>
                     </tr>
-                  ) : tenants.map((t) => {
+                  ) : sortedTenants.map((t) => {
                     const adminCandidates = users.filter(
                       (u) =>
                         u.organizationId === t.id &&
@@ -1098,13 +1129,22 @@ export default function SuperAdminDashboard() {
                         </td>
                         <td className="p-6 text-right">
                           <div className="flex gap-2 justify-end">
-                            <button
-                              className={adminUi.amberButton}
-                              onClick={() => organizationAdmin && handleEnterReadOnlyDashboard(organizationAdmin)}
-                              disabled={!organizationAdmin}
-                            >
-                              Enter Dashboard
-                            </button>
+                            {canEnterDashboard(organizationAdmin?.id) ? (
+                              <button
+                                className={adminUi.amberButton}
+                                onClick={() =>
+                                  organizationAdmin &&
+                                  handleEnterReadOnlyDashboard(organizationAdmin)
+                                }
+                                disabled={!organizationAdmin}
+                              >
+                                Enter Dashboard
+                              </button>
+                            ) : (
+                              <span className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500">
+                                Own Profile
+                              </span>
+                            )}
                             <button
                               className={adminUi.softButton}
                               onClick={() => openEditTenant(t)}
@@ -1164,12 +1204,18 @@ export default function SuperAdminDashboard() {
                           <td className="p-5 text-center text-[10px] font-bold uppercase tracking-[0.14em] text-gray-400">{u.view}</td>
                           <td className="p-5 text-right">
                             <div className="flex justify-end gap-2">
-                              <button
-                                onClick={() => handleEnterReadOnlyDashboard(u)}
-                                className={adminUi.amberButton}
-                              >
-                                Enter Dashboard
-                              </button>
+                              {canEnterDashboard(u.id) ? (
+                                <button
+                                  onClick={() => handleEnterReadOnlyDashboard(u)}
+                                  className={adminUi.amberButton}
+                                >
+                                  Enter Dashboard
+                                </button>
+                              ) : (
+                                <span className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500">
+                                  Own Profile
+                                </span>
+                              )}
                               <button
                                 onClick={() => {
                                   setEditingUser(u);
@@ -1251,12 +1297,18 @@ export default function SuperAdminDashboard() {
                       </td>
                       <td className="p-6 text-right">
                         <div className="flex gap-2 justify-end">
-                          <button
-                            onClick={() => handleEnterReadOnlyDashboard(u)}
-                            className={adminUi.amberButton}
-                          >
-                            Enter Dashboard
-                          </button>
+                          {canEnterDashboard(u.id) ? (
+                            <button
+                              onClick={() => handleEnterReadOnlyDashboard(u)}
+                              className={adminUi.amberButton}
+                            >
+                              Enter Dashboard
+                            </button>
+                          ) : (
+                            <span className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500">
+                              Own Profile
+                            </span>
+                          )}
                           <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className={adminUi.cyanButton}>Manage</button>
                           <button
                             className={adminUi.dangerButton}
@@ -1303,7 +1355,11 @@ export default function SuperAdminDashboard() {
                       <span className="bg-cyan-500/10 text-cyan-400 text-[9px] font-bold px-2 py-1 rounded uppercase tracking-widest border border-cyan-500/20">
                         {u.view}
                       </span>
-                      <button onClick={() => handleEnterReadOnlyDashboard(u)} className="text-[8px] text-amber-300 hover:text-amber-100 uppercase font-bold tracking-tighter">Enter Dashboard</button>
+                      {canEnterDashboard(u.id) ? (
+                        <button onClick={() => handleEnterReadOnlyDashboard(u)} className="text-[8px] text-amber-300 hover:text-amber-100 uppercase font-bold tracking-tighter">Enter Dashboard</button>
+                      ) : (
+                        <span className="text-[8px] text-gray-500 uppercase font-bold tracking-tighter">Own Profile</span>
+                      )}
                       <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className="text-[8px] text-gray-500 hover:text-white uppercase font-bold tracking-tighter">Edit View</button>
                     </div>
                   </div>
@@ -1323,17 +1379,21 @@ export default function SuperAdminDashboard() {
           </div>
         )}
 
-        {/* TAB CONTENT: GLOBAL SETTINGS */}
-        {activeTab === "global-settings" && globalSettings && (
+        {/* TAB CONTENT: LAB */}
+        {activeTab === "lab" && globalSettings && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-            <div className="rounded-2xl border border-brand-accent/20 bg-brand-accent/10 p-6 shadow-[0_18px_42px_rgba(2,8,23,0.24)] backdrop-blur-xl">
-              <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-brand-accent">Global Pricing Template</h3>
-              <p className="text-xs text-gray-400 italic">These prices are used as defaults for all new organizations unless overridden.</p>
+            <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-6 shadow-[0_18px_42px_rgba(2,8,23,0.24)] backdrop-blur-xl">
+              <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-amber-200">
+                Experimental Lab
+              </h3>
+              <p className="text-xs text-gray-300 italic">
+                Controlled rollout and testing tools for platform experiments.
+              </p>
             </div>
 
             <div className={`${adminUi.panel} flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between`}>
               <div>
-                <h4 className={`${adminUi.sectionTitle} mb-1`}>Experimental Video Editor Rollout</h4>
+                <h4 className={`${adminUi.sectionTitle} mb-1`}>Video Editor Rollout</h4>
                 <p className="text-xs text-gray-500">
                   Keep editor restricted to SuperAdmin during testing, then switch once ready.
                 </p>
@@ -1371,10 +1431,19 @@ export default function SuperAdminDashboard() {
             </div>
 
             <div className={`${adminUi.panel} p-6`}>
+              <h4 className={`${adminUi.sectionTitle} mb-2`}>Carousel Access Policy</h4>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Carousel generation is hidden for tenant admins and users. Only SuperAdmin
+                sessions can access it.
+              </p>
+            </div>
+
+            <div className={`${adminUi.panel} p-6`}>
               <div className="mb-4">
                 <h4 className={`${adminUi.sectionTitle} mb-1`}>Default Welcome Video</h4>
                 <p className="text-xs text-gray-500">
-                  This video appears as a read-only system item in every user's timeline. Uploading stores it in your configured storage.
+                  This video appears as a read-only system item in every user's timeline.
+                  Uploading stores it in your configured storage.
                 </p>
               </div>
               <div className="mb-4 rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-3">
@@ -1449,6 +1518,25 @@ export default function SuperAdminDashboard() {
                   Save Video
                 </button>
               </div>
+              {globalSettings.welcomeVideoUrl ? (
+                <div className="mt-4 rounded-xl border border-white/10 bg-black/25 p-3">
+                  <video
+                    src={globalSettings.welcomeVideoUrl}
+                    controls
+                    className="w-full rounded-lg border border-white/10"
+                  />
+                </div>
+              ) : null}
+            </div>
+          </div>
+        )}
+
+        {/* TAB CONTENT: GLOBAL SETTINGS */}
+        {activeTab === "global-settings" && globalSettings && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
+            <div className="rounded-2xl border border-brand-accent/20 bg-brand-accent/10 p-6 shadow-[0_18px_42px_rgba(2,8,23,0.24)] backdrop-blur-xl">
+              <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-brand-accent">Global Pricing Template</h3>
+              <p className="text-xs text-gray-400 italic">These prices are used as defaults for all new organizations unless overridden.</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -83,8 +83,9 @@ export default function StudioChooser() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_32%),linear-gradient(135deg,#030712,#0b1120_52%,#020617)] px-4 py-10 text-white">
-      <div className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-5xl flex-col justify-center">
+    <div className="relative min-h-screen overflow-hidden bg-gray-950 px-4 py-10 text-white">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_14%,rgba(6,182,212,0.18),transparent_36%),radial-gradient(circle_at_82%_82%,rgba(217,70,239,0.12),transparent_34%)]" />
+      <div className="relative mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-5xl flex-col justify-center">
         <div className="mb-8 text-center">
           <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.35em] text-cyan-300">
             Select Workspace
@@ -106,7 +107,7 @@ export default function StudioChooser() {
                 type="button"
                 onClick={() => handleSelect(profile)}
                 disabled={!!selectingId}
-                className="group rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-6 text-left shadow-2xl backdrop-blur-xl transition-all hover:-translate-y-1 hover:border-cyan-300/40 hover:bg-white/[0.09] disabled:cursor-wait disabled:opacity-60"
+                className="group rounded-[1.75rem] border border-white/10 bg-gray-900/75 p-6 text-left shadow-[0_18px_42px_rgba(2,8,23,0.4)] backdrop-blur-xl transition-all hover:-translate-y-1 hover:border-cyan-300/40 hover:bg-gray-900 disabled:cursor-wait disabled:opacity-60"
               >
                 <div className="mb-6 flex items-start justify-between gap-4">
                   <div>
@@ -120,10 +121,10 @@ export default function StudioChooser() {
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                  <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                  <span className="rounded-lg border border-white/10 bg-black/30 px-3 py-2">
                     {profile.role || "USER"}
                   </span>
-                  <span className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                  <span className="rounded-lg border border-white/10 bg-black/30 px-3 py-2">
                     {profile.isOrgActive === false ? "Inactive" : "Active"}
                   </span>
                 </div>
@@ -139,7 +140,7 @@ export default function StudioChooser() {
           <button
             type="button"
             onClick={logout}
-            className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 transition-colors hover:bg-white/[0.08] hover:text-white"
+            className="rounded-xl border border-white/10 bg-gray-900/80 px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
           >
             Logout / use another email
           </button>

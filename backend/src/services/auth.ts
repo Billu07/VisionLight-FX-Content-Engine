@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { dbService as airtableService } from "./database";
+import { supportHandoffService } from "./supportHandoff";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -394,6 +395,22 @@ export class AuthService {
         role: impersonator.role,
       },
     };
+  }
+
+  static async validateSupportSessionToken(token: string, incomingHost?: string) {
+    const payload = supportHandoffService.parseSupportSessionToken(token, incomingHost);
+    if (!payload) return null;
+
+    const [issuer, target] = await Promise.all([
+      airtableService.findUserById(payload.iss),
+      airtableService.findUserById(payload.sub),
+    ]);
+    if (!issuer || !target) return null;
+
+    const issuerRole = this.getFinalRole(issuer);
+    if (issuerRole !== "SUPERADMIN") return null;
+
+    return this.getReadOnlyImpersonationTarget(issuer, target.id);
   }
 
   static async deleteSession(token: string) {

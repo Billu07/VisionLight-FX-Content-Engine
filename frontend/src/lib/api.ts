@@ -7,6 +7,8 @@ const IMPERSONATE_USER_ID_KEY = "visionlight_impersonate_user_id";
 const IMPERSONATE_USER_LABEL_KEY = "visionlight_impersonate_user_label";
 const ACTIVE_PROFILE_ID_KEY = "visionlight_active_profile_id";
 const ACTIVE_PROFILE_LABEL_KEY = "visionlight_active_profile_label";
+const SUPPORT_SESSION_TOKEN_KEY = "visionlight_support_session_token";
+const SUPPORT_SESSION_LABEL_KEY = "visionlight_support_session_label";
 
 console.log("API Base URL:", API_BASE_URL);
 
@@ -45,6 +47,10 @@ export const apiEndpoints = {
   getMe: () => api.get("/api/auth/me"),
   resolveAuthDomain: (email: string) =>
     api.post("/api/auth/resolve-domain", { email }),
+  startSupportHandoff: (targetUserId: string) =>
+    api.post("/api/auth/support-handoff/start", { targetUserId }),
+  consumeSupportHandoff: (token: string) =>
+    api.post("/api/auth/support-handoff/consume", { token }),
   adminCreateUser: (data: any) => api.post("/api/admin/create-user", data),
   adminGetUsers: () => api.get("/api/admin/users"),
   adminUpdateUser: (userId: string, data: any) =>
@@ -281,6 +287,24 @@ export const clearActiveProfile = () => {
   localStorage.removeItem("visionlight_active_project");
   stopReadOnlyImpersonation();
 };
+
+export const setSupportSessionToken = (token: string, label?: string) => {
+  localStorage.setItem(SUPPORT_SESSION_TOKEN_KEY, token);
+  if (label) localStorage.setItem(SUPPORT_SESSION_LABEL_KEY, label);
+  clearActiveProfile();
+  setAuthToken(token);
+};
+
+export const getSupportSessionToken = () =>
+  localStorage.getItem(SUPPORT_SESSION_TOKEN_KEY) || "";
+
+export const clearSupportSessionToken = () => {
+  localStorage.removeItem(SUPPORT_SESSION_TOKEN_KEY);
+  localStorage.removeItem(SUPPORT_SESSION_LABEL_KEY);
+};
+
+export const getSupportSessionLabel = () =>
+  localStorage.getItem(SUPPORT_SESSION_LABEL_KEY) || "";
 
 export const getActiveProfileId = () =>
   localStorage.getItem(ACTIVE_PROFILE_ID_KEY) || "";
