@@ -246,6 +246,9 @@ function Dashboard() {
   const [showStockModal, setShowStockModal] = useState(false);
   const [showPromptInfo, setShowPromptInfo] = useState<string | null>(null);
   const [isTaskIndicatorMinimized, setIsTaskIndicatorMinimized] = useState(false);
+  const [dismissedTaskIndicatorForId, setDismissedTaskIndicatorForId] = useState<
+    string | null
+  >(null);
   const [isMobile, setIsMobile] = useState(false);
   const [dashboardBgMode, setDashboardBgMode] = useState<DashboardBgMode>(() => {
     const stored =
@@ -393,9 +396,18 @@ function Dashboard() {
     try {
       const raw = localStorage.getItem(DASHBOARD_TASK_INDICATOR_STATE_KEY);
       if (!raw) return;
-      const parsed = JSON.parse(raw) as { minimized?: boolean };
+      const parsed = JSON.parse(raw) as {
+        minimized?: boolean;
+        dismissedForId?: string | null;
+      };
       if (typeof parsed.minimized === "boolean") {
         setIsTaskIndicatorMinimized(parsed.minimized);
+      }
+      if (
+        typeof parsed.dismissedForId === "string" ||
+        parsed.dismissedForId === null
+      ) {
+        setDismissedTaskIndicatorForId(parsed.dismissedForId);
       }
     } catch {
       // no-op
@@ -406,12 +418,15 @@ function Dashboard() {
     try {
       localStorage.setItem(
         DASHBOARD_TASK_INDICATOR_STATE_KEY,
-        JSON.stringify({ minimized: isTaskIndicatorMinimized }),
+        JSON.stringify({
+          minimized: isTaskIndicatorMinimized,
+          dismissedForId: dismissedTaskIndicatorForId,
+        }),
       );
     } catch {
       // no-op
     }
-  }, [isTaskIndicatorMinimized]);
+  }, [isTaskIndicatorMinimized, dismissedTaskIndicatorForId]);
 
   useEffect(() => {
     if (!canUseCarousel && studioMode === "carousel") {
@@ -2089,6 +2104,13 @@ function Dashboard() {
     setLibraryInitialTab(latestAutoProcessTaskAspect || "original");
     setActiveLibrarySlot("generic");
   };
+  const closeTaskIndicator = () => {
+    if (latestAutoProcessTaskId) {
+      setDismissedTaskIndicatorForId(latestAutoProcessTaskId);
+    } else {
+      setDismissedTaskIndicatorForId("manual-dismiss");
+    }
+  };
   const toggleDashboardBackground = () => {
     setDashboardBgMode((prev) => (prev === "current" ? "original" : "current"));
   };
@@ -2230,16 +2252,21 @@ function Dashboard() {
   const latestAutoProcessTaskAspect = autoProcessTasks.find(
     (task) => task.aspectRatio === "16:9" || task.aspectRatio === "9:16" || task.aspectRatio === "1:1",
   )?.aspectRatio;
+  const latestAutoProcessTaskId = autoProcessTasks[0]?.id || null;
   const hasRecentCompletedAutoProcessTask = autoProcessTasks.some((task) => {
     if (task.status === "PROCESSING") return true;
     if (!task.createdAt) return false;
     const taskTime = new Date(task.createdAt).getTime();
     return Number.isFinite(taskTime) && Date.now() - taskTime <= 12 * 60 * 60 * 1000;
   });
+  const isTaskIndicatorDismissedForCurrentBatch =
+    latestAutoProcessTaskId !== null &&
+    dismissedTaskIndicatorForId === latestAutoProcessTaskId;
   const showAutoProcessTaskIndicator =
     activeLibrarySlot === null &&
     autoProcessTasks.length > 0 &&
-    hasRecentCompletedAutoProcessTask;
+    hasRecentCompletedAutoProcessTask &&
+    !isTaskIndicatorDismissedForCurrentBatch;
   const isOriginalDashboardBg = dashboardBgMode === "original";
 
   return (
@@ -2291,13 +2318,32 @@ function Dashboard() {
             <button
               type="button"
               onClick={() => setIsTaskIndicatorMinimized(false)}
-              className="fixed bottom-24 right-4 z-[85] rounded-2xl border border-cyan-400/35 bg-gray-950/95 px-4 py-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-colors hover:border-cyan-300/60 lg:bottom-5"
+              className="fixed bottom-24 right-4 z-[85] rounded-2xl border border-cyan-400/35 bg-gray-950/95 px-4 py-3 pr-10 text-left shadow-[0_14px_42px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-colors hover:border-cyan-300/60 lg:bottom-5"
             >
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  closeTaskIndicator();
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    closeTaskIndicator();
+                  }
+                }}
+                className="absolute right-2 top-2 rounded-md border border-white/15 bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-bold text-gray-300 transition-colors hover:bg-white/[0.1]"
+              >
+                X
+              </span>
               <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200">
                 Asset Tasks
               </div>
               <div className="mt-1 text-xs font-semibold text-white">
-                {activeAutoProcessTaskCount} active · {readyAutoProcessTaskCount} ready
+                {activeAutoProcessTaskCount} active | {readyAutoProcessTaskCount} ready
               </div>
             </button>
           ) : (
@@ -2308,7 +2354,7 @@ function Dashboard() {
                     Asset Processing
                   </p>
                   <p className="mt-1 text-xs text-gray-400">
-                    {activeAutoProcessTaskCount} active · {readyAutoProcessTaskCount} ready ·{" "}
+                    {activeAutoProcessTaskCount} active | {readyAutoProcessTaskCount} ready |{" "}
                     {failedAutoProcessTaskCount} failed
                   </p>
                 </div>
@@ -2326,6 +2372,13 @@ function Dashboard() {
                     className="rounded-md border border-white/10 bg-white/[0.05] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-300 transition-colors hover:bg-white/[0.1]"
                   >
                     Min
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeTaskIndicator}
+                    className="rounded-md border border-white/10 bg-white/[0.05] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-300 transition-colors hover:bg-white/[0.1]"
+                  >
+                    Close
                   </button>
                 </div>
               </div>
@@ -5271,3 +5324,4 @@ function Dashboard() {
 }
 
 export default Dashboard;
+
