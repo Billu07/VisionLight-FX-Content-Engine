@@ -15,6 +15,35 @@ import { DriftFrameExtractor } from "./DriftFrameExtractor";
 const MAX_IMAGE_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_VIDEO_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 const ASSET_PAGE_SIZE = 24;
+const ASSET_TASK_PANEL_STATE_KEY = "visionlight_asset_task_panel_state_v1";
+
+const normalizeAssetUrl = (raw: unknown): string => {
+  if (typeof raw !== "string" || !raw.trim()) return "";
+  try {
+    const parsed = new URL(raw.trim());
+    parsed.search = "";
+    parsed.hash = "";
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return raw.trim();
+  }
+};
+
+const extractFirstMediaUrl = (raw: unknown): string => {
+  if (typeof raw !== "string") return "";
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (!trimmed.startsWith("[")) return trimmed;
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed) && typeof parsed[0] === "string") {
+      return parsed[0];
+    }
+  } catch {
+    return "";
+  }
+  return "";
+};
 
 const getAspectProcessingLabel = (tab: string | null | undefined) => {
   if (tab === "9:16") return "9:16 portrait";
@@ -43,20 +72,39 @@ interface Asset {
   source?: "asset" | "timeline";
 }
 
+type LibraryTab =
+  | "16:9"
+  | "9:16"
+  | "1:1"
+  | "original"
+  | "custom"
+  | "VIDEO"
+  | "STORYBOARD"
+  | "3DX_FRAME"
+  | "TIMELINE";
+
+type AutoProcessTaskStatus = "PROCESSING" | "READY" | "FAILED";
+
+type AutoProcessTask = {
+  id: string;
+  title?: string;
+  status: AutoProcessTaskStatus;
+  progress?: number;
+  error?: string;
+  mediaUrl?: string;
+  createdAt?: string;
+  generationParams?: {
+    aspectRatio?: "16:9" | "9:16" | "1:1";
+    originalAssetId?: string;
+  };
+};
+
 interface AssetLibraryProps {
   onSelect?: (file: File, url: string, aspectRatio?: string) => void;
   onClose: () => void;
   initialAspectRatio?: string;
   initialTab?:
-    | "16:9"
-    | "9:16"
-    | "1:1"
-    | "original"
-    | "custom"
-    | "VIDEO"
-    | "STORYBOARD"
-    | "3DX_FRAME"
-    | "TIMELINE";
+    | LibraryTab;
   isSequencerMode?: boolean;
   isPickerMode?: boolean;
   onEditAsset?: (asset: Asset) => void;
@@ -75,9 +123,7 @@ export function AssetLibrary({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<
-    "16:9" | "9:16" | "1:1" | "original" | "custom" | "VIDEO" | "STORYBOARD" | "3DX_FRAME" | "TIMELINE"
-  >("original");
+  const [activeTab, setActiveTab] = useState<LibraryTab>("original");
   const [originalMediaTab, setOriginalMediaTab] = useState<"images" | "videos">(
     "images",
   );
@@ -151,6 +197,7 @@ export function AssetLibrary({
     null,
   );
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+  const [isTaskPanelMinimized, setIsTaskPanelMinimized] = useState(false);
   const isLibraryFocusMode =
     selectedAsset !== null || editingAsset !== null || viewingVideoAsset !== null;
 
@@ -226,15 +273,7 @@ export function AssetLibrary({
   const [processingCount, setProcessingCount] = useState(0);
   const [targetAssetCount, setTargetAssetCount] = useState(0);
   const [processingTab, setProcessingTab] = useState<
-    | "16:9"
-    | "9:16"
-    | "1:1"
-    | "original"
-    | "custom"
-    | "VIDEO"
-    | "STORYBOARD"
-    | "3DX_FRAME"
-    | "TIMELINE"
+    | LibraryTab
     | null
   >(null);
   const [activeDriftIds, setActiveDriftIds] = useState<Set<string>>(new Set());
@@ -245,6 +284,30 @@ export function AssetLibrary({
     setTargetAssetCount(0);
     setProcessingTab(null);
   };
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(ASSET_TASK_PANEL_STATE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { minimized?: boolean };
+      if (typeof parsed.minimized === "boolean") {
+        setIsTaskPanelMinimized(parsed.minimized);
+      }
+    } catch {
+      // no-op
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        ASSET_TASK_PANEL_STATE_KEY,
+        JSON.stringify({ minimized: isTaskPanelMinimized }),
+      );
+    } catch {
+      // no-op
+    }
+  }, [isTaskPanelMinimized]);
 
   // 1. Fetch Assets
   const {
@@ -277,66 +340,104 @@ export function AssetLibrary({
     enabled: !!user,
     staleTime: 5000,
     refetchInterval: () => {
+      const cachedPosts = queryClient.getQueryData([
+        "library-timeline-videos",
+        activeProject,
+      ]) as any[] | undefined;
+      const hasAutoProcessInFlight =
+        Array.isArray(cachedPosts) &&
+        cachedPosts.some(
+          (post) =>
+            post?.mediaProvider === "asset-auto-process" &&
+            post?.status === "PROCESSING",
+        );
       if (activeTab === "TIMELINE") return 8000;
       if (["16:9", "9:16", "1:1"].includes(activeTab)) return 4000;
+      if (hasAutoProcessInFlight) return 4000;
       return false;
     },
     refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
   });
 
-  const activeAutoProcessTasks = useMemo(() => {
-    const parseParams = (raw: any) => {
-      if (!raw) return {};
-      if (typeof raw === "object") return raw;
-      if (typeof raw === "string") {
-        try {
-          return JSON.parse(raw);
-        } catch {
-          return {};
-        }
+  const parseAutoProcessParams = (raw: any) => {
+    if (!raw) return {};
+    if (typeof raw === "object") return raw;
+    if (typeof raw === "string") {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return {};
       }
-      return {};
-    };
+    }
+    return {};
+  };
 
+  const autoProcessTasks = useMemo<AutoProcessTask[]>(() => {
+    return (timelinePosts as any[])
+      .filter((post) => post?.mediaProvider === "asset-auto-process")
+      .map((post) => {
+        const params = parseAutoProcessParams(post?.generationParams);
+        const statusRaw =
+          typeof post?.status === "string" ? post.status.toUpperCase() : "";
+        const status: AutoProcessTaskStatus =
+          statusRaw === "READY" || statusRaw === "COMPLETED"
+            ? "READY"
+            : statusRaw === "FAILED"
+              ? "FAILED"
+              : "PROCESSING";
+        return {
+          id: String(post?.id || ""),
+          title: typeof post?.title === "string" ? post.title : undefined,
+          status,
+          progress:
+            typeof post?.progress === "number"
+              ? Math.max(0, Math.min(100, Math.round(post.progress)))
+              : undefined,
+          error: typeof post?.error === "string" ? post.error : undefined,
+          mediaUrl: extractFirstMediaUrl(post?.mediaUrl),
+          createdAt: typeof post?.createdAt === "string" ? post.createdAt : undefined,
+          generationParams: {
+            aspectRatio:
+              params?.aspectRatio === "16:9" ||
+              params?.aspectRatio === "9:16" ||
+              params?.aspectRatio === "1:1"
+                ? params.aspectRatio
+                : undefined,
+            originalAssetId:
+              typeof params?.originalAssetId === "string"
+                ? params.originalAssetId
+                : undefined,
+          },
+        };
+      })
+      .sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bTime - aTime;
+      });
+  }, [timelinePosts]);
+
+  const activeAutoProcessTasks = useMemo(() => {
     if (!["16:9", "9:16", "1:1"].includes(activeTab)) return [];
-
-    return (timelinePosts as any[]).filter((post) => {
-      if (post?.mediaProvider !== "asset-auto-process") return false;
-      if (post?.status !== "PROCESSING") return false;
-      const params = parseParams(post?.generationParams);
-      return params?.aspectRatio === activeTab;
-    });
-  }, [activeTab, timelinePosts]);
+    return autoProcessTasks.filter(
+      (task) =>
+        task.status === "PROCESSING" && task.generationParams?.aspectRatio === activeTab,
+    );
+  }, [activeTab, autoProcessTasks]);
 
   const timelineVideoAssets = useMemo(() => {
-    const extractMediaUrl = (raw: unknown): string => {
-      if (typeof raw !== "string") return "";
-      const trimmed = raw.trim();
-      if (!trimmed.startsWith("[")) return trimmed;
-
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed) && typeof parsed[0] === "string") {
-          return parsed[0];
-        }
-      } catch {
-        return "";
-      }
-      return "";
-    };
-
     return (timelinePosts as any[])
       .filter((post) => {
         const isVideo =
           post?.mediaType === "VIDEO" || post?.mediaProvider?.includes("kling");
-        const mediaUrl = extractMediaUrl(post?.mediaUrl);
+        const mediaUrl = extractFirstMediaUrl(post?.mediaUrl);
         const isDone = post?.status === "READY" || post?.status === "COMPLETED";
         return isVideo && isDone && mediaUrl.length > 0;
       })
       .map((post) => ({
         id: `timeline_${post.id}`,
-        url: extractMediaUrl(post.mediaUrl),
+        url: extractFirstMediaUrl(post.mediaUrl),
         aspectRatio: "custom" as const,
         type: "VIDEO" as const,
         createdAt: post.createdAt || new Date().toISOString(),
@@ -417,6 +518,17 @@ export function AssetLibrary({
     localProcessingCardCount,
     activeAutoProcessTasks.length,
   );
+  const recentAutoProcessTasks = autoProcessTasks.slice(0, 10);
+  const activeTaskCount = autoProcessTasks.filter(
+    (task) => task.status === "PROCESSING",
+  ).length;
+  const readyTaskCount = autoProcessTasks.filter(
+    (task) => task.status === "READY",
+  ).length;
+  const failedTaskCount = autoProcessTasks.filter(
+    (task) => task.status === "FAILED",
+  ).length;
+  const hasTaskPanelItems = recentAutoProcessTasks.length > 0;
   const uploadLimitText =
     activeTab === "VIDEO" || (activeTab === "original" && originalMediaTab === "videos")
       ? "Video upload limit: 25MB"
@@ -762,6 +874,53 @@ export function AssetLibrary({
     else if (latestVersion.aspectRatio === "1:1") setActiveTab("1:1");
 
     setSelectedAsset(latestVersion);
+  };
+
+  const handleOpenAutoProcessTask = (task: AutoProcessTask) => {
+    const taskAspect = task.generationParams?.aspectRatio;
+    if (taskAspect) {
+      setActiveTab(taskAspect);
+    }
+
+    if (task.status === "PROCESSING") {
+      notify.info("Task is still processing. You can return anytime.");
+      return;
+    }
+
+    if (task.status === "FAILED") {
+      notify.error(task.error || "Task failed before completion.");
+      return;
+    }
+
+    const mediaUrlNormalized = normalizeAssetUrl(task.mediaUrl);
+    let matchedAsset: Asset | undefined;
+    if (mediaUrlNormalized) {
+      matchedAsset = (assets as Asset[]).find(
+        (asset) => normalizeAssetUrl(asset.url) === mediaUrlNormalized,
+      );
+    }
+
+    if (!matchedAsset && task.generationParams?.originalAssetId && taskAspect) {
+      const candidates = (assets as Asset[])
+        .filter(
+          (asset) =>
+            asset.originalAssetId === task.generationParams?.originalAssetId &&
+            asset.aspectRatio === taskAspect,
+        )
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        );
+      matchedAsset = candidates[0];
+    }
+
+    if (!matchedAsset) {
+      queryClient.invalidateQueries({ queryKey: ["assets"] });
+      notify.warning("Task completed. Asset is syncing, try again in a moment.");
+      return;
+    }
+
+    setSelectedAsset(matchedAsset);
   };
 
   // Keyboard Navigation
@@ -1110,6 +1269,98 @@ export function AssetLibrary({
           )}
         </div>
       </div>
+
+      {!isLibraryFocusMode &&
+        hasTaskPanelItems &&
+        (isTaskPanelMinimized ? (
+          <button
+            type="button"
+            onClick={() => setIsTaskPanelMinimized(false)}
+            className="fixed bottom-5 right-5 z-[135] rounded-2xl border border-cyan-400/35 bg-gray-950/95 px-4 py-3 text-left shadow-[0_14px_42px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-colors hover:border-cyan-300/60"
+          >
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-200">
+              Tasks
+            </div>
+            <div className="mt-1 text-xs font-semibold text-white">
+              {activeTaskCount} active · {readyTaskCount} ready
+            </div>
+          </button>
+        ) : (
+          <div className="fixed bottom-5 right-5 z-[135] w-[min(92vw,360px)] overflow-hidden rounded-2xl border border-white/15 bg-gray-950/95 shadow-[0_16px_54px_rgba(0,0,0,0.62)] backdrop-blur-xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200">
+                  Unified Tasks
+                </p>
+                <p className="mt-1 text-xs text-gray-400">
+                  {activeTaskCount} active · {readyTaskCount} ready · {failedTaskCount} failed
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTaskPanelMinimized(true)}
+                className="rounded-md border border-white/10 bg-white/[0.05] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-300 transition-colors hover:bg-white/[0.1]"
+              >
+                Minimize
+              </button>
+            </div>
+
+            <div className="max-h-[42vh] overflow-y-auto px-3 py-2 custom-scrollbar">
+              {recentAutoProcessTasks.map((task) => {
+                const statusTone =
+                  task.status === "READY"
+                    ? "border-emerald-500/40 bg-emerald-500/12 text-emerald-200"
+                    : task.status === "FAILED"
+                      ? "border-rose-500/40 bg-rose-500/12 text-rose-200"
+                      : "border-cyan-500/40 bg-cyan-500/12 text-cyan-200";
+                const taskLabel =
+                  typeof task.title === "string" && task.title.trim().length > 0
+                    ? task.title
+                    : `Generating ${getAspectProcessingLabel(task.generationParams?.aspectRatio)}`;
+                const progressText =
+                  task.status === "PROCESSING"
+                    ? `${Math.max(5, task.progress || 10)}%`
+                    : task.status;
+                return (
+                  <button
+                    key={task.id}
+                    type="button"
+                    onClick={() => handleOpenAutoProcessTask(task)}
+                    className="mb-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-left transition-colors hover:bg-white/[0.07]"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="line-clamp-2 text-xs font-semibold leading-relaxed text-gray-100">
+                        {taskLabel}
+                      </p>
+                      <span
+                        className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${statusTone}`}
+                      >
+                        {progressText}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[10px] uppercase tracking-[0.12em] text-gray-500">
+                        {task.generationParams?.aspectRatio || "Asset"}
+                      </span>
+                      <span className="text-[10px] font-semibold text-cyan-300">
+                        {task.status === "READY"
+                          ? "Open result"
+                          : task.status === "FAILED"
+                            ? "View issue"
+                            : "Track progress"}
+                      </span>
+                    </div>
+                    {task.status === "FAILED" && task.error && (
+                      <p className="mt-2 line-clamp-2 text-[11px] text-rose-300/90">
+                        {task.error}
+                      </p>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
 
       {/* --- IMAGE DETAILS MODAL --- */}
       {selectedAsset && (
