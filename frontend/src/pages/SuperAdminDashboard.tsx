@@ -1746,8 +1746,8 @@ export default function SuperAdminDashboard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-              <div className={`${adminUi.panel} p-6 sm:p-8`}>
+            <div className="grid grid-cols-1 gap-8 xl:grid-cols-12">
+              <div className={`${adminUi.panel} p-6 sm:p-8 xl:col-span-8`}>
                 <div className="mb-6">
                   <h4 className={adminUi.sectionTitle}>
                     Actual Provider Cost
@@ -1832,12 +1832,12 @@ export default function SuperAdminDashboard() {
                 </div>
               </div>
 
-              <div className={`${adminUi.panel} p-6 sm:p-8`}>
+              <div className={`${adminUi.panel} p-6 sm:p-7 xl:col-span-4`}>
                 <h4 className={`${adminUi.sectionTitle} mb-6 border-b border-white/10 pb-2`}>
                   Platform Render Credit Cost
                 </h4>
-                <div className="grid grid-cols-1 gap-6">
-                  <div className={`${adminUi.mutedCard} p-6`}>
+                <div className="grid grid-cols-1 gap-4">
+                  <div className={`${adminUi.mutedCard} p-5`}>
                     <h5 className={`${adminUi.sectionTitle} mb-4`}>PicDrift Engine</h5>
                     <div className="space-y-4">
                       {[
@@ -1864,7 +1864,7 @@ export default function SuperAdminDashboard() {
                     </div>
                   </div>
 
-                  <div className={`${adminUi.mutedCard} p-6`}>
+                  <div className={`${adminUi.mutedCard} p-5`}>
                     <h5 className={`${adminUi.sectionTitle} mb-4`}>Studio & Editor</h5>
                     <div className="space-y-4">
                       {["pricePicFX_Standard", "pricePicFX_Carousel", "pricePicFX_Batch", "priceEditor_Pro", "priceEditor_Enhance", "priceEditor_Convert"].map(key => (
@@ -1883,7 +1883,7 @@ export default function SuperAdminDashboard() {
                     </div>
                   </div>
 
-                  <div className={`${adminUi.mutedCard} p-6`}>
+                  <div className={`${adminUi.mutedCard} p-5`}>
                     <h5 className={`${adminUi.sectionTitle} mb-4`}>Video FX Engines</h5>
                     <div className="space-y-4">
                       {[
