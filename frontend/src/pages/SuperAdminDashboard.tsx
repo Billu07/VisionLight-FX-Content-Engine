@@ -303,6 +303,8 @@ export default function SuperAdminDashboard() {
     useState<ProvisionEmailStatus | null>(null);
   const [checkingTeamMemberEmail, setCheckingTeamMemberEmail] = useState(false);
   const [welcomeVideoUploading, setWelcomeVideoUploading] = useState(false);
+  const [welcomePreviewVisible, setWelcomePreviewVisible] = useState(false);
+  const [welcomePreviewReady, setWelcomePreviewReady] = useState(false);
   const [variantCostUsd, setVariantCostUsd] = useState<
     Record<CoverageVariantId, number>
   >({
@@ -491,6 +493,12 @@ export default function SuperAdminDashboard() {
 
     return () => clearInterval(interval);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== "lab") return;
+    setWelcomePreviewVisible(false);
+    setWelcomePreviewReady(false);
+  }, [activeTab, globalSettings?.welcomeVideoUrl]);
 
   const fetchInitialData = async () => {
     setLoading(true);
@@ -1419,152 +1427,234 @@ export default function SuperAdminDashboard() {
 
         {/* TAB CONTENT: LAB */}
         {activeTab === "lab" && globalSettings && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-            <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-6 shadow-[0_18px_42px_rgba(2,8,23,0.24)] backdrop-blur-xl">
-              <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-amber-200">
-                Experimental Lab
-              </h3>
-              <p className="text-xs text-gray-300 italic">
-                Controlled rollout and testing tools for platform experiments.
-              </p>
-            </div>
-
-            <div className={`${adminUi.panel} flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between`}>
-              <div>
-                <h4 className={`${adminUi.sectionTitle} mb-1`}>Video Editor Rollout</h4>
-                <p className="text-xs text-gray-500">
-                  Keep editor restricted to SuperAdmin during testing, then switch once ready.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={async () => {
-                  const nextValue = !Boolean(globalSettings.featureVideoEditorForAll);
-                  try {
-                    const res = await apiEndpoints.superadminUpdateGlobalSettings({
-                      featureVideoEditorForAll: nextValue,
-                    });
-                    if (res.data?.success) {
-                      setGlobalSettings(res.data.settings);
-                      setMsg(
-                        nextValue
-                          ? "Video Editor rollout enabled for all users."
-                          : "Video Editor restricted to SuperAdmin.",
-                      );
-                    }
-                  } catch (err: any) {
-                    setMsg("Error: " + err.message);
-                  }
-                }}
-                className={`px-4 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest border transition-colors ${
-                  globalSettings.featureVideoEditorForAll
-                    ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30"
-                    : "bg-white/[0.055] border-white/10 text-gray-300 hover:bg-white/10"
-                }`}
-              >
-                {globalSettings.featureVideoEditorForAll
-                  ? "Enabled For All Users"
-                  : "SuperAdmin Only"}
-              </button>
-            </div>
-
-            <div className={`${adminUi.panel} p-6`}>
-              <h4 className={`${adminUi.sectionTitle} mb-2`}>Carousel Access Policy</h4>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                Carousel generation is hidden for tenant admins and users. Only SuperAdmin
-                sessions can access it.
-              </p>
-            </div>
-
-            <div className={`${adminUi.panel} p-6`}>
-              <div className="mb-4">
-                <h4 className={`${adminUi.sectionTitle} mb-1`}>Default Welcome Video</h4>
-                <p className="text-xs text-gray-500">
-                  This video appears as a read-only system item in every user's timeline.
-                  Uploading stores it in your configured storage.
-                </p>
-              </div>
-              <div className="mb-4 rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-3">
-                <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.045] px-4 py-3 text-sm font-semibold text-cyan-200 hover:bg-white/10">
-                  <span>{welcomeVideoUploading ? "Uploading welcome video..." : "Upload welcome video to storage"}</span>
-                  {welcomeVideoUploading ? (
-                    <LoadingSpinner size="sm" variant="light" />
-                  ) : (
-                    <span className="text-xs uppercase tracking-widest text-cyan-300">Choose</span>
-                  )}
-                  <input
-                    type="file"
-                    accept="video/*"
-                    className="hidden"
-                    disabled={welcomeVideoUploading}
-                    onChange={async (event) => {
-                      const file = event.currentTarget.files?.[0];
-                      event.currentTarget.value = "";
-                      if (!file) return;
-                      if (!file.type.startsWith("video/")) {
-                        setMsg("Error: Welcome media must be a video file.");
-                        return;
-                      }
-                      setWelcomeVideoUploading(true);
-                      try {
-                        const payload = new FormData();
-                        payload.append("video", file);
-                        const res = await apiEndpoints.superadminUploadWelcomeVideo(payload);
-                        if (res.data?.success) {
-                          setGlobalSettings(res.data.settings);
-                          setMsg("Welcome video uploaded and updated.");
-                        }
-                      } catch (err: any) {
-                        setMsg("Error: " + (err?.message || "Welcome video upload failed."));
-                      } finally {
-                        setWelcomeVideoUploading(false);
-                      }
-                    }}
-                  />
-                </label>
-              </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
-                <input
-                  type="url"
-                  placeholder="https://..."
-                  value={globalSettings.welcomeVideoUrl || ""}
-                  onChange={(e) =>
-                    setGlobalSettings({
-                      ...globalSettings,
-                      welcomeVideoUrl: e.target.value,
-                    })
-                  }
-                  className={`${adminUi.input} w-full p-3 text-sm`}
-                />
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      const res = await apiEndpoints.superadminUpdateGlobalSettings({
-                        welcomeVideoUrl: globalSettings.welcomeVideoUrl || "",
-                      });
-                      if (res.data?.success) {
-                        setGlobalSettings(res.data.settings);
-                        setMsg("Welcome video updated.");
-                      }
-                    } catch (err: any) {
-                      setMsg("Error: " + err.message);
-                    }
-                  }}
-                  className={adminUi.primaryButton}
-                >
-                  Save Video
-                </button>
-              </div>
-              {globalSettings.welcomeVideoUrl ? (
-                <div className="mt-4 rounded-xl border border-white/10 bg-black/25 p-3">
-                  <video
-                    src={globalSettings.welcomeVideoUrl}
-                    controls
-                    className="w-full rounded-lg border border-white/10"
-                  />
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            <div className="rounded-2xl border border-cyan-400/15 bg-gradient-to-r from-cyan-500/10 via-sky-500/5 to-transparent p-6 shadow-[0_18px_42px_rgba(2,8,23,0.24)] backdrop-blur-xl">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-cyan-200">
+                    Experimental Lab
+                  </h3>
+                  <p className="text-xs text-gray-300">
+                    Controlled feature switches and system media, organized for low-noise operations.
+                  </p>
                 </div>
-              ) : null}
+                <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-200">
+                  SuperAdmin
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+              <div className="space-y-6 xl:col-span-7">
+                <div className={`${adminUi.panel} p-6`}>
+                  <h4 className={`${adminUi.sectionTitle} mb-4`}>Feature Controls</h4>
+                  <div className="space-y-3">
+                    <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4">
+                      <div className="mb-3 flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-white">Video Editor Rollout</p>
+                          <p className="mt-1 text-xs text-gray-500">
+                            Keep editor access restricted while testing, then expand globally.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const nextValue = !Boolean(globalSettings.featureVideoEditorForAll);
+                            try {
+                              const res = await apiEndpoints.superadminUpdateGlobalSettings({
+                                featureVideoEditorForAll: nextValue,
+                              });
+                              if (res.data?.success) {
+                                setGlobalSettings(res.data.settings);
+                                setMsg(
+                                  nextValue
+                                    ? "Video Editor rollout enabled for all users."
+                                    : "Video Editor restricted to SuperAdmin.",
+                                );
+                              }
+                            } catch (err: any) {
+                              setMsg("Error: " + err.message);
+                            }
+                          }}
+                          className={`rounded-lg border px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                            globalSettings.featureVideoEditorForAll
+                              ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
+                              : "border-white/10 bg-white/[0.055] text-gray-300 hover:bg-white/10"
+                          }`}
+                        >
+                          {globalSettings.featureVideoEditorForAll
+                            ? "Enabled For All"
+                            : "SuperAdmin Only"}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4">
+                      <div className="mb-2 flex items-center gap-2">
+                        <span className="rounded-md border border-amber-400/30 bg-amber-400/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-200">
+                          Locked
+                        </span>
+                        <p className="text-sm font-semibold text-white">Carousel Access Policy</p>
+                      </div>
+                      <p className="text-xs leading-relaxed text-gray-500">
+                        Carousel creation remains hidden for tenant admins and users. Access is reserved
+                        for SuperAdmin sessions only.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`${adminUi.panel} p-6`}>
+                  <div className="mb-4">
+                    <h4 className={`${adminUi.sectionTitle} mb-1`}>Default Welcome Video</h4>
+                    <p className="text-xs text-gray-500">
+                      This appears as a read-only system item in user timelines.
+                    </p>
+                  </div>
+
+                  <label className="group flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 transition-colors hover:bg-cyan-400/10">
+                    <div>
+                      <p className="text-sm font-semibold text-cyan-200">
+                        {welcomeVideoUploading ? "Uploading welcome video..." : "Replace welcome video"}
+                      </p>
+                      <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-cyan-300/80">
+                        Storage-managed upload
+                      </p>
+                    </div>
+                    {welcomeVideoUploading ? (
+                      <LoadingSpinner size="sm" variant="light" />
+                    ) : (
+                      <span className="rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-200">
+                        Choose File
+                      </span>
+                    )}
+                    <input
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      disabled={welcomeVideoUploading}
+                      onChange={async (event) => {
+                        const file = event.currentTarget.files?.[0];
+                        event.currentTarget.value = "";
+                        if (!file) return;
+                        if (!file.type.startsWith("video/")) {
+                          setMsg("Error: Welcome media must be a video file.");
+                          return;
+                        }
+                        setWelcomeVideoUploading(true);
+                        try {
+                          const payload = new FormData();
+                          payload.append("video", file);
+                          const res = await apiEndpoints.superadminUploadWelcomeVideo(payload);
+                          if (res.data?.success) {
+                            setGlobalSettings(res.data.settings);
+                            setWelcomePreviewReady(false);
+                            setWelcomePreviewVisible(false);
+                            setMsg("Welcome video uploaded and updated.");
+                          }
+                        } catch (err: any) {
+                          setMsg("Error: " + (err?.message || "Welcome video upload failed."));
+                        } finally {
+                          setWelcomeVideoUploading(false);
+                        }
+                      }}
+                    />
+                  </label>
+
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    {globalSettings.welcomeVideoUrl ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (welcomePreviewVisible) {
+                              setWelcomePreviewVisible(false);
+                              return;
+                            }
+                            setWelcomePreviewReady(false);
+                            setWelcomePreviewVisible(true);
+                          }}
+                          className="rounded-lg border border-white/15 bg-white/[0.04] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-300 transition-colors hover:bg-white/10"
+                        >
+                          {welcomePreviewVisible ? "Hide Preview" : "Load Preview"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const res = await apiEndpoints.superadminUpdateGlobalSettings({
+                                welcomeVideoUrl: "",
+                              });
+                              if (res.data?.success) {
+                                setGlobalSettings(res.data.settings);
+                                setWelcomePreviewVisible(false);
+                                setWelcomePreviewReady(false);
+                                setMsg("Welcome video cleared.");
+                              }
+                            } catch (err: any) {
+                              setMsg("Error: " + err.message);
+                            }
+                          }}
+                          className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-red-300 transition-colors hover:bg-red-500/20"
+                        >
+                          Clear Video
+                        </button>
+                      </>
+                    ) : (
+                      <span className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500">
+                        No welcome video configured
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="xl:col-span-5">
+                <div className={`${adminUi.panel} h-full p-5`}>
+                  <div className="mb-3 flex items-center justify-between">
+                    <h4 className={`${adminUi.sectionTitle}`}>Preview Monitor</h4>
+                    <span className="text-[10px] uppercase tracking-[0.14em] text-gray-500">
+                      On demand
+                    </span>
+                  </div>
+
+                  {!globalSettings.welcomeVideoUrl ? (
+                    <div className="flex aspect-video items-center justify-center rounded-xl border border-white/10 bg-white/[0.025] text-xs text-gray-500">
+                      Upload a video to enable preview.
+                    </div>
+                  ) : !welcomePreviewVisible ? (
+                    <div className="flex aspect-video items-center justify-center rounded-xl border border-white/10 bg-white/[0.025] p-6 text-center">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-200">Preview is paused</p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Load preview only when needed to keep this panel responsive.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-black/35">
+                      {!welcomePreviewReady && (
+                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-gray-950/70">
+                          <div className="flex items-center gap-2 text-xs text-cyan-200">
+                            <LoadingSpinner size="sm" variant="light" />
+                            Loading preview
+                          </div>
+                        </div>
+                      )}
+                      <video
+                        key={globalSettings.welcomeVideoUrl}
+                        src={globalSettings.welcomeVideoUrl}
+                        controls
+                        preload="metadata"
+                        onLoadedData={() => setWelcomePreviewReady(true)}
+                        onWaiting={() => setWelcomePreviewReady(false)}
+                        className="aspect-video w-full"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
