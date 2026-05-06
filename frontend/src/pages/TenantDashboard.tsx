@@ -478,6 +478,13 @@ export default function TenantDashboard() {
     { fal: 0, total: 0 },
   );
 
+  const getUserCoverageUsd = (user: User) =>
+    visibleCoverageWallets.reduce((sum, wallet) => {
+      const credits = Number(user[wallet.key]) || 0;
+      const usdPerCredit = walletUsdPerCredit[wallet.key] || 0;
+      return sum + credits * usdPerCredit;
+    }, 0);
+
   const formatUsd = (value: number) =>
     value.toLocaleString("en-US", {
       style: "currency",
@@ -662,8 +669,9 @@ export default function TenantDashboard() {
                     </th>
                     <th className="p-5 text-center">PicFX</th>
                     {!isPicdriftTenant && (
-                      <th className="p-5 text-center">Topaz / FAL / Veo 3.1</th>
+                      <th className="p-5 text-center">Topaz / Seedance / Veo 3.1</th>
                     )}
+                    <th className="p-5 text-right">Coverage (USD)</th>
                     <th className="p-5 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -705,6 +713,9 @@ export default function TenantDashboard() {
                           </div>
                         </td>
                       )}
+                      <td className="p-5 text-right text-sm font-semibold text-brand-accent">
+                        {formatUsd(getUserCoverageUsd(u))}
+                      </td>
                       <td className="p-5 text-right">
                         <div className="flex gap-2 justify-end">
                           {canEnterDashboard(u.id) ? (

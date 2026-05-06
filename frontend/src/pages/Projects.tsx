@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
 import { apiEndpoints, stopReadOnlyImpersonation } from "../lib/api";
-import { notify } from "../lib/notifications";
+import { confirmAction, notify } from "../lib/notifications";
 
 export default function Projects() {
   const { user, logout, profiles } = useAuth();
@@ -90,6 +90,20 @@ export default function Projects() {
     navigate("/app");
   };
 
+  const handleLogout = async () => {
+    const confirmed = await confirmAction("Log out from this account?", {
+      confirmLabel: "Logout",
+      cancelLabel: "Stay",
+    });
+    if (!confirmed) return;
+    logout();
+  };
+
+  const projectLimit = Number(user?.maxProjects || 0);
+  const totalProjects = Array.isArray(projectsData) ? projectsData.length : 0;
+  const remainingProjects =
+    projectLimit > 0 ? Math.max(0, projectLimit - totalProjects) : null;
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -104,9 +118,16 @@ export default function Projects() {
 
       <div className="relative mx-auto w-full max-w-6xl">
         <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            Your Projects
-          </h1>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+              Your Projects
+            </h1>
+            {remainingProjects !== null && (
+              <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-300/90">
+                Remaining Quota: {remainingProjects} / {projectLimit}
+              </p>
+            )}
+          </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             {!isReadOnlyAccess && profiles.length > 1 && (
@@ -149,7 +170,7 @@ export default function Projects() {
             )}
             <button
               type="button"
-              onClick={logout}
+              onClick={handleLogout}
               className="rounded-lg border border-gray-600 bg-gray-800 px-4 py-2 text-xs font-semibold text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
             >
               Logout

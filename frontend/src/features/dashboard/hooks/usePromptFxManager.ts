@@ -65,16 +65,18 @@ export function usePromptFxManager() {
     e.preventDefault();
     if (!newPromptFxName.trim() || !newPromptFxText.trim()) return;
 
+    const savedItem = {
+      name: newPromptFxName.trim(),
+      prompt: newPromptFxText.trim(),
+    };
     const newList = [...promptFxList];
     if (editingPromptFxIndex !== null) {
-      newList[editingPromptFxIndex] = {
-        name: newPromptFxName.trim(),
-        prompt: newPromptFxText.trim(),
-      };
+      newList[editingPromptFxIndex] = savedItem;
     } else {
-      newList.push({ name: newPromptFxName.trim(), prompt: newPromptFxText.trim() });
+      newList.push(savedItem);
     }
 
+    setRecentPromptFxKeys(storePromptFxUsage(savedItem));
     savePromptFxMutation.mutate(newList);
   };
 

@@ -863,6 +863,13 @@ export default function SuperAdminDashboard() {
     );
   }, [walletCoverageRows]);
 
+  const getUserCoverageUsd = (user: User) =>
+    COVERAGE_WALLETS.reduce((sum, wallet) => {
+      const credits = Number(user[wallet.key]) || 0;
+      const usdPerCredit = walletUsdPerCredit[wallet.key] || 0;
+      return sum + credits * usdPerCredit;
+    }, 0);
+
   const sortedTenants = useMemo(() => {
     return [...tenants].sort((a, b) => {
       if (a.isDefault && !b.isDefault) return -1;
@@ -1313,7 +1320,8 @@ export default function SuperAdminDashboard() {
                     <th className="p-6 text-center">View</th>
                     <th className="p-6 text-center">PicDrift / Kling 3.0</th>
                     <th className="p-6 text-center">PicFX</th>
-                    <th className="p-6 text-center">Topaz / FAL / Veo 3.1</th>
+                    <th className="p-6 text-center">Topaz / Seedance / Veo 3.1</th>
+                    <th className="p-6 text-right">Coverage (USD)</th>
                     <th className="p-6 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -1350,6 +1358,9 @@ export default function SuperAdminDashboard() {
                           <input type="number" step="1" min="0" title="Seedance 2.0" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2, creditType: "creditsVideoFX2" })} />
                           <input type="number" step="1" min="0" title="Veo 3.1" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3, creditType: "creditsVideoFX3" })} />
                         </div>
+                      </td>
+                      <td className="p-6 text-right text-sm font-semibold text-brand-accent">
+                        {formatUsd(getUserCoverageUsd(u))}
                       </td>
                       <td className="p-6 text-right">
                         <div className="flex gap-2 justify-end">
@@ -1843,9 +1854,20 @@ export default function SuperAdminDashboard() {
                   <div className={`${adminUi.mutedCard} p-6`}>
                     <h5 className={`${adminUi.sectionTitle} mb-4`}>Video FX Engines</h5>
                     <div className="space-y-4">
-                      {["priceVideoFX1_10s", "priceVideoFX1_15s", "priceVideoFX2_4s", "priceVideoFX2_8s", "priceVideoFX2_12s", "priceVideoFX3_4s", "priceVideoFX3_6s", "priceVideoFX3_8s"].map(key => (
+                      {[
+                        { key: "priceVideoFX1_10s", label: "Topaz Upscale 2x" },
+                        { key: "priceVideoFX1_15s", label: "Topaz Upscale 4x" },
+                        { key: "priceVideoFX2_4s", label: "Seedance 2.0 · 4s" },
+                        { key: "priceVideoFX2_8s", label: "Seedance 2.0 · 8s" },
+                        { key: "priceVideoFX2_12s", label: "Seedance 2.0 · 12s" },
+                        { key: "priceVideoFX3_4s", label: "Veo 3.1 · 4s" },
+                        { key: "priceVideoFX3_6s", label: "Veo 3.1 · 6s" },
+                        { key: "priceVideoFX3_8s", label: "Veo 3.1 · 8s" },
+                      ].map(({ key, label }) => (
                         <div key={key} className="flex justify-between items-center">
-                          <span className="text-[10px] text-gray-400 uppercase font-bold">{key.replace('price', '').replace(/_/g, ' ')}</span>
+                          <span className="text-[10px] text-gray-400 uppercase font-bold">
+                            {label}
+                          </span>
                           <input
                             type="number"
                             step="1"

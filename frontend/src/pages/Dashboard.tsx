@@ -102,6 +102,9 @@ function Dashboard() {
     getPromptFxOriginalIndex,
     isSavingPromptFx,
   } = usePromptFxManager();
+  const [promptFxSection, setPromptFxSection] = useState<"custom" | "fx">(
+    "custom",
+  );
 
   const [activeLibrarySlot, setActiveLibrarySlot] = useState<
     "start" | "end" | "generic" | "sequencer" | "storyline" | null
@@ -2087,7 +2090,12 @@ function Dashboard() {
     generateMediaMutation.mutate(buildFormData());
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const confirmed = await confirmAction("Log out from this account?", {
+      confirmLabel: "Logout",
+      cancelLabel: "Stay",
+    });
+    if (!confirmed) return;
     logout();
     navigate("/");
   };
@@ -2978,17 +2986,6 @@ function Dashboard() {
                         <div className="text-xs text-gray-400 uppercase tracking-widest font-bold">Options</div>
                       </div>
 
-                      <button
-                        onClick={() => {
-                          setShowUserMenu(false);
-                          setShowReserveModal(true);
-                        }}
-                        className="w-full text-left px-4 py-2 text-yellow-400 hover:bg-yellow-500/10 text-sm font-medium transition-colors flex items-center gap-2"
-                      >
-                        <span>Balance</span>
-                        <span>Render Reserve</span>
-                      </button>
-
                       {isAdmin && (
                         <button
                           onClick={() => {
@@ -2998,29 +2995,6 @@ function Dashboard() {
                           className="w-full text-left px-4 py-2 text-red-400 hover:bg-red-500/10 text-sm font-medium transition-colors"
                         >
                           Admin Panel
-                        </button>
-                      )}
-
-                      {canUseExternalCreditLink ? (
-                        <a
-                          href={creditLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={() => setShowUserMenu(false)}
-                          className="w-full text-left px-4 py-2 text-green-400 hover:bg-green-500/10 text-sm font-medium transition-colors block"
-                        >
-                          {creditBtnText}
-                        </a>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setShowUserMenu(false);
-                            handleRequestCredits();
-                          }}
-                          disabled={isRequesting}
-                          className="w-full text-left px-4 py-2 text-purple-400 hover:bg-purple-500/10 text-sm font-medium transition-colors"
-                        >
-                          {isRequesting ? "Sending..." : "Request Renders"}
                         </button>
                       )}
 
@@ -3034,6 +3008,40 @@ function Dashboard() {
                       >
                         Projects
                       </button>
+
+                      <button
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          setShowReserveModal(true);
+                        }}
+                        className="w-full text-left px-4 py-2 text-yellow-400 hover:bg-yellow-500/10 text-sm font-medium transition-colors"
+                      >
+                        Render Reserve
+                      </button>
+
+                      {!isAdmin &&
+                        (canUseExternalCreditLink ? (
+                          <a
+                            href={creditLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={() => setShowUserMenu(false)}
+                            className="w-full text-left px-4 py-2 text-green-400 hover:bg-green-500/10 text-sm font-medium transition-colors block"
+                          >
+                            {creditBtnText}
+                          </a>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setShowUserMenu(false);
+                              handleRequestCredits();
+                            }}
+                            disabled={isRequesting}
+                            className="w-full text-left px-4 py-2 text-purple-400 hover:bg-purple-500/10 text-sm font-medium transition-colors"
+                          >
+                            {isRequesting ? "Sending..." : "Request Render"}
+                          </button>
+                        ))}
 
                       <button
                         onClick={() => {
@@ -3095,39 +3103,17 @@ function Dashboard() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      setShowReserveModal(true);
-                    }}
-                    className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs font-semibold text-yellow-300"
-                  >
-                    Render Reserve
-                  </button>
-
-                  {canUseExternalCreditLink ? (
-                    <a
-                      href={creditLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={() => setShowUserMenu(false)}
-                      className="rounded-xl border border-green-500/30 bg-green-500/10 px-3 py-2 text-center text-xs font-semibold text-green-300"
-                    >
-                      {creditBtnText}
-                    </a>
-                  ) : (
+                <div className="grid grid-cols-1 gap-2">
+                  {isAdmin && (
                     <button
                       type="button"
                       onClick={() => {
                         setShowUserMenu(false);
-                        handleRequestCredits();
+                        navigate("/admin");
                       }}
-                      disabled={isRequesting}
-                      className="rounded-xl border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-xs font-semibold text-purple-300 disabled:opacity-60"
+                      className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-left text-xs font-semibold text-rose-300"
                     >
-                      {isRequesting ? "Sending..." : "Request Renders"}
+                      Admin Panel
                     </button>
                   )}
 
@@ -3138,7 +3124,7 @@ function Dashboard() {
                       localStorage.removeItem("visionlight_active_project");
                       navigate("/projects");
                     }}
-                    className="rounded-xl border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-blue-300"
+                    className="rounded-xl border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-left text-xs font-semibold text-blue-300"
                   >
                     Projects
                   </button>
@@ -3147,24 +3133,37 @@ function Dashboard() {
                     type="button"
                     onClick={() => {
                       setShowUserMenu(false);
-                      setLibrarySource("top");
-                      setActiveLibrarySlot("generic");
+                      setShowReserveModal(true);
                     }}
-                    className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-300"
+                    className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-left text-xs font-semibold text-yellow-300"
                   >
-                    Open Library
+                    Render Reserve
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      setShowStockModal(true);
-                    }}
-                    className="rounded-xl border border-slate-500/30 bg-slate-500/10 px-3 py-2 text-xs font-semibold text-slate-200"
-                  >
-                    Stock Photos
-                  </button>
+                  {!isAdmin &&
+                    (canUseExternalCreditLink ? (
+                      <a
+                        href={creditLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={() => setShowUserMenu(false)}
+                        className="rounded-xl border border-green-500/30 bg-green-500/10 px-3 py-2 text-left text-xs font-semibold text-green-300"
+                      >
+                        {creditBtnText}
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowUserMenu(false);
+                          handleRequestCredits();
+                        }}
+                        disabled={isRequesting}
+                        className="rounded-xl border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-left text-xs font-semibold text-purple-300 disabled:opacity-60"
+                      >
+                        {isRequesting ? "Sending..." : "Request Render"}
+                      </button>
+                    ))}
 
                   <button
                     type="button"
@@ -3172,47 +3171,10 @@ function Dashboard() {
                       setShowUserMenu(false);
                       setShowBrandModal(true);
                     }}
-                    className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-300"
+                    className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-left text-xs font-semibold text-sky-300"
                   >
                     Edit Dashboard
                   </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      toggleDashboardBackground();
-                    }}
-                    className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-xs font-semibold text-indigo-300"
-                  >
-                    BG: {isOriginalDashboardBg ? "Original" : "Current"}
-                  </button>
-
-                  {canUseVideoEditor && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        setViewMode("sequencer");
-                      }}
-                      className="rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/10 px-3 py-2 text-xs font-semibold text-fuchsia-300"
-                    >
-                      Video Editor
-                    </button>
-                  )}
-
-                  {isAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        navigate("/admin");
-                      }}
-                      className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300"
-                    >
-                      Admin Panel
-                    </button>
-                  )}
                 </div>
 
                 <button
@@ -3755,6 +3717,9 @@ function Dashboard() {
                                     type="button"
                                     onClick={() => {
                                       if (activeEngine === "topaz") return;
+                                      if (!showPromptFxMenu) {
+                                        setPromptFxSection("custom");
+                                      }
                                       setShowPromptFxMenu(!showPromptFxMenu);
                                     }}
                                     disabled={activeEngine === "topaz"}
@@ -3776,7 +3741,10 @@ function Dashboard() {
                                         <div className="flex gap-2">
                                           <button
                                             type="button"
-                                            onClick={() => setIsAddingPromptFx(!isAddingPromptFx)}
+                                            onClick={() => {
+                                              setPromptFxSection("custom");
+                                              setIsAddingPromptFx(!isAddingPromptFx);
+                                            }}
                                             className="text-[10px] bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-white transition-colors"
                                           >
                                             {isAddingPromptFx ? "Cancel" : "+ Add New"}
@@ -3817,39 +3785,68 @@ function Dashboard() {
                                         </div>
                                       )}
 
-                                      <div className="max-h-60 overflow-y-auto custom-scrollbar">
-                                        {/* Global System Presets */}
-                                        {systemPresets && systemPresets.length > 0 && (
-                                          <div className="bg-cyan-900/10">
-                                            <div className="px-3 py-1 bg-gray-950/50 text-[8px] font-black text-cyan-400 uppercase tracking-[0.2em] border-b border-gray-800">System Presets</div>
-                                            {systemPresets.map((pf: any) => (
-                                              <div key={pf.id} className="group relative border-b border-gray-800/50 last:border-0 hover:bg-cyan-900/20 transition-colors">
-                                                <button
-                                                  type="button"
-                                                  onClick={() => {
-                                                    markPromptFxUsed({
-                                                      name: pf.name,
-                                                      prompt: pf.prompt,
-                                                    });
-                                                    setPrompt(pf.prompt);
-                                                    setShowPromptFxMenu(false);
-                                                  }}
-                                                  className="w-full text-left p-3 pr-20 flex flex-col gap-1"
-                                                >
-                                                  <div className="flex justify-between items-start">
-                                                    <span className="text-sm font-bold text-cyan-100">{pf.name}</span>
-                                                    <span className="text-[8px] bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded uppercase font-bold">Global</span>
-                                                  </div>
-                                                  <span className="text-xs text-gray-500 truncate">{pf.prompt}</span>
-                                                </button>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        )}
+                                      <div className="px-3 py-2 border-b border-gray-800 bg-gray-900/70">
+                                        <div className="grid grid-cols-2 gap-2 rounded-lg border border-white/10 bg-gray-950/70 p-1">
+                                          <button
+                                            type="button"
+                                            onClick={() => setPromptFxSection("custom")}
+                                            className={`rounded-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                                              promptFxSection === "custom"
+                                                ? "bg-cyan-600 text-white"
+                                                : "text-gray-400 hover:text-white hover:bg-white/5"
+                                            }`}
+                                          >
+                                            Custom
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => setPromptFxSection("fx")}
+                                            className={`rounded-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                                              promptFxSection === "fx"
+                                                ? "bg-violet-600 text-white"
+                                                : "text-gray-400 hover:text-white hover:bg-white/5"
+                                            }`}
+                                          >
+                                            FX
+                                          </button>
+                                        </div>
+                                      </div>
 
-                                        {promptFxList.length === 0 && !isAddingPromptFx && (!systemPresets || systemPresets.length === 0) ? (
+                                      <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                                        {promptFxSection === "fx" ? (
+                                          systemPresets && systemPresets.length > 0 ? (
+                                            <div className="bg-cyan-900/10">
+                                              {systemPresets.map((pf: any) => (
+                                                <div key={pf.id} className="group relative border-b border-gray-800/50 last:border-0 hover:bg-cyan-900/20 transition-colors">
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      markPromptFxUsed({
+                                                        name: pf.name,
+                                                        prompt: pf.prompt,
+                                                      });
+                                                      setPrompt(pf.prompt);
+                                                      setShowPromptFxMenu(false);
+                                                    }}
+                                                    className="w-full text-left p-3 pr-20 flex flex-col gap-1"
+                                                  >
+                                                    <div className="flex justify-between items-start">
+                                                      <span className="text-sm font-bold text-cyan-100">{pf.name}</span>
+                                                      <span className="text-[8px] bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded uppercase font-bold">Global</span>
+                                                    </div>
+                                                    <span className="text-xs text-gray-500 truncate">{pf.prompt}</span>
+                                                  </button>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <div className="p-4 text-center text-xs text-gray-500">
+                                              No FX presets available.
+                                            </div>
+                                          )
+                                        ) : promptFxList.length === 0 && !isAddingPromptFx ? (
                                           <div className="p-4 text-center text-xs text-gray-500">
-                                            No saved prompts yet.
+                                            No saved custom prompts yet.
                                           </div>
                                         ) : (
                                           promptFxList.map((pf: any, idx: number) => (
@@ -3880,6 +3877,7 @@ function Dashboard() {
                                                       getPromptFxOriginalIndex(pf),
                                                     );
                                                     setIsAddingPromptFx(true);
+                                                    setPromptFxSection("custom");
                                                   }}
                                                   className="w-7 h-7 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded flex items-center justify-center text-xs"
                                                   title="Edit"
@@ -3897,7 +3895,7 @@ function Dashboard() {
                                                   className="w-7 h-7 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded flex items-center justify-center text-xs"
                                                   title="Delete"
                                                 >
-                                                  ×
+                                                  x
                                                 </button>
                                               </div>
                                             </div>
@@ -5011,7 +5009,7 @@ function Dashboard() {
                                         : currentVisualTab === "picdrift"
                                           ? "Generating Drift"
                                           : currentVisualTab === "studio"
-                                            ? "Painting Your Image"
+                                            ? "Generating Image"
                                             : "Creating Your Video"}
                                       ...
                                     </span>
