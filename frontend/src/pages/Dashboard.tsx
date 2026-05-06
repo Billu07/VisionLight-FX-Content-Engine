@@ -46,6 +46,12 @@ const DASHBOARD_TASK_INDICATOR_STATE_KEY =
 const BYOK_INFO_BANNER_DISMISS_KEY = "visionlight_byok_info_banner_dismissed_v1";
 const FAL_KEYS_URL = "https://fal.ai/dashboard/keys";
 const BYOK_PRICING_URL = "https://www.picdrift.com/pricing-plans/byok";
+const BYOK_ACTIVATION_HINTS = [
+  "Verifying payment confirmation...",
+  "Syncing your package entitlement...",
+  "Unlocking your studio limits...",
+  "Applying access rules and routing...",
+];
 type DashboardBgMode = "current" | "original";
 type VeoMode =
   | "image_to_video"
@@ -253,6 +259,8 @@ function Dashboard() {
   const [showByokUpgradeModal, setShowByokUpgradeModal] = useState(false);
   const [showByokKeyModal, setShowByokKeyModal] = useState(false);
   const [showByokInfoBanner, setShowByokInfoBanner] = useState(true);
+  const [isByokActivationPolling, setIsByokActivationPolling] = useState(false);
+  const [byokActivationHintIndex, setByokActivationHintIndex] = useState(0);
   const [byokFalKeyInput, setByokFalKeyInput] = useState("");
   const [isSubmittingByokFalKey, setIsSubmittingByokFalKey] = useState(false);
   const [byokFalGuideShown, setByokFalGuideShown] = useState(false);
@@ -335,6 +343,7 @@ function Dashboard() {
   } = useProjectEditorState();
 
   const [previewCarouselIndex, setPreviewCarouselIndex] = useState(0);
+  const byokActivationPollRef = useRef(false);
 
   // State for Magic Edit Asset
   const [editingAsset, setEditingAsset] = useState<any | null>(null);
@@ -589,6 +598,44 @@ function Dashboard() {
       setShowByokInfoBanner(true);
     }
   }, [isByokWorkspace, user?.email]);
+
+  useEffect(() => {
+    if (!isByokActivationPolling) return;
+    const hintInterval = window.setInterval(() => {
+      setByokActivationHintIndex(
+        (prev) => (prev + 1) % BYOK_ACTIVATION_HINTS.length,
+      );
+    }, 1600);
+    return () => window.clearInterval(hintInterval);
+  }, [isByokActivationPolling]);
+
+  useEffect(() => {
+    return () => {
+      byokActivationPollRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!showByokUpgradeModal || !isByokWorkspace || isByokActivationPolling) {
+      return;
+    }
+
+    const handleWindowFocus = async () => {
+      try {
+        const statusResponse = await apiEndpoints.byokGetStatus();
+        if (statusResponse?.data?.status?.upgradeRequired === false) {
+          await checkAuth();
+          setShowByokUpgradeModal(false);
+          notify.success("Payment confirmed. Your package is now active.");
+        }
+      } catch {
+        // no-op: keep modal available and allow manual recheck
+      }
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+    return () => window.removeEventListener("focus", handleWindowFocus);
+  }, [showByokUpgradeModal, isByokWorkspace, isByokActivationPolling, checkAuth]);
 
   useEffect(() => {
     try {
@@ -2196,6 +2243,42 @@ function Dashboard() {
     setShowMissingFalKeyModal(false);
     navigate("/admin?tab=integrations");
   };
+  const closeByokUpgradeModal = () => {
+    byokActivationPollRef.current = false;
+    setIsByokActivationPolling(false);
+    setShowByokUpgradeModal(false);
+  };
+  const handleStartByokActivationCheck = async () => {
+    if (isByokActivationPolling) return;
+
+    setByokActivationHintIndex(0);
+    setIsByokActivationPolling(true);
+    byokActivationPollRef.current = true;
+
+    const timeoutAt = Date.now() + 120000;
+    try {
+      while (byokActivationPollRef.current && Date.now() < timeoutAt) {
+        try {
+          const statusResponse = await apiEndpoints.byokGetStatus();
+          if (statusResponse?.data?.status?.upgradeRequired === false) {
+            await checkAuth();
+            setShowByokUpgradeModal(false);
+            notify.success("Payment confirmed. Your package is now active.");
+            return;
+          }
+        } catch {
+          // no-op
+        }
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+      }
+      notify.warning(
+        "Still waiting for payment confirmation. Keep this screen open for a few more seconds, then recheck.",
+      );
+    } finally {
+      byokActivationPollRef.current = false;
+      setIsByokActivationPolling(false);
+    }
+  };
   const dismissByokInfoBanner = () => {
     setShowByokInfoBanner(false);
     try {
@@ -2974,39 +3057,71 @@ function Dashboard() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowByokUpgradeModal(false)}
+                  onClick={closeByokUpgradeModal}
+                  disabled={isByokActivationPolling}
                   className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-bold uppercase tracking-widest text-gray-200 hover:bg-white/10"
                 >
                   Close
                 </button>
               </div>
 
-              <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
-                <iframe
-                  title="BYOK Pricing Plans"
-                  src={BYOK_PRICING_URL}
-                  className="h-[72vh] min-h-[520px] w-full"
-                  loading="lazy"
-                />
-              </div>
+              {isByokActivationPolling ? (
+                <div className="mt-5 rounded-2xl border border-cyan-300/25 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.22),rgba(2,6,23,0.9)_62%)] p-8 text-center">
+                  <div className="mx-auto mb-6 h-24 w-24">
+                    <div className="relative h-full w-full">
+                      <span className="absolute inset-0 animate-ping rounded-full border border-cyan-300/60" />
+                      <span className="absolute inset-2 animate-spin rounded-full border-2 border-cyan-300/60 border-t-transparent" />
+                      <span className="absolute inset-5 animate-pulse rounded-full bg-cyan-300/70 blur-[1px]" />
+                    </div>
+                  </div>
+                  <h4 className="text-xl font-black text-white">Activating Your Studio</h4>
+                  <p className="mt-2 text-sm text-cyan-100/90">
+                    {BYOK_ACTIVATION_HINTS[byokActivationHintIndex]}
+                  </p>
+                  <p className="mt-2 text-xs text-slate-300">
+                    This usually completes within 5-20 seconds after successful payment.
+                  </p>
+                  <div className="mt-5 inline-flex rounded-xl border border-cyan-200/30 bg-cyan-300/15 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-100">
+                    Waiting For Webhook Confirmation...
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
+                    <iframe
+                      title="BYOK Pricing Plans"
+                      src={BYOK_PRICING_URL}
+                      className="h-[72vh] min-h-[520px] w-full"
+                      loading="lazy"
+                    />
+                  </div>
 
-              <div className="mt-4 flex flex-wrap gap-3">
-                <a
-                  href={BYOK_PRICING_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-white"
-                >
-                  Open in New Tab
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setShowByokUpgradeModal(false)}
-                  className="rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-gray-200"
-                >
-                  I'll upgrade later
-                </button>
-              </div>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={handleStartByokActivationCheck}
+                      className="rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-white"
+                    >
+                      I Completed Payment
+                    </button>
+                    <a
+                      href={BYOK_PRICING_URL}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-white"
+                    >
+                      Open in New Tab
+                    </a>
+                    <button
+                      type="button"
+                      onClick={closeByokUpgradeModal}
+                      className="rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-gray-200"
+                    >
+                      I&apos;ll upgrade later
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
