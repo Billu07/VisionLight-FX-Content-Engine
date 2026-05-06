@@ -43,6 +43,7 @@ const DASHBOARD_BG_MODE_KEY = "visionlight_dashboard_bg_mode";
 const ASSET_TASK_PANEL_STATE_KEY = "visionlight_asset_task_panel_state_v1";
 const DASHBOARD_TASK_INDICATOR_STATE_KEY =
   "visionlight_dashboard_task_indicator_state_v1";
+const BYOK_INFO_BANNER_DISMISS_KEY = "visionlight_byok_info_banner_dismissed_v1";
 const FAL_KEYS_URL = "https://fal.ai/dashboard/keys";
 type DashboardBgMode = "current" | "original";
 type VeoMode =
@@ -250,6 +251,7 @@ function Dashboard() {
   const [showReserveModal, setShowReserveModal] = useState(false);
   const [showByokUpgradeModal, setShowByokUpgradeModal] = useState(false);
   const [showByokKeyModal, setShowByokKeyModal] = useState(false);
+  const [showByokInfoBanner, setShowByokInfoBanner] = useState(true);
   const [byokFalKeyInput, setByokFalKeyInput] = useState("");
   const [isSubmittingByokFalKey, setIsSubmittingByokFalKey] = useState(false);
   const [byokFalGuideShown, setByokFalGuideShown] = useState(false);
@@ -573,6 +575,19 @@ function Dashboard() {
     }
     setShowByokKeyModal(false);
   }, [byokNeedsFalKey]);
+
+  useEffect(() => {
+    if (!isByokWorkspace) {
+      setShowByokInfoBanner(true);
+      return;
+    }
+    try {
+      const key = `${BYOK_INFO_BANNER_DISMISS_KEY}_${user?.email || "unknown"}`;
+      setShowByokInfoBanner(localStorage.getItem(key) !== "1");
+    } catch {
+      setShowByokInfoBanner(true);
+    }
+  }, [isByokWorkspace, user?.email]);
 
   useEffect(() => {
     try {
@@ -2188,6 +2203,15 @@ function Dashboard() {
     setShowMissingFalKeyModal(false);
     navigate("/admin?tab=integrations");
   };
+  const dismissByokInfoBanner = () => {
+    setShowByokInfoBanner(false);
+    try {
+      const key = `${BYOK_INFO_BANNER_DISMISS_KEY}_${user?.email || "unknown"}`;
+      localStorage.setItem(key, "1");
+    } catch {
+      // no-op
+    }
+  };
   const handleSubmitByokFalKey = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!byokFalKeyInput.trim()) return;
@@ -3071,32 +3095,34 @@ function Dashboard() {
                 </div>
               </div>
             )}
-            {isByokWorkspace && (
-              <div className="rounded-2xl border border-cyan-400/25 bg-cyan-500/10 p-4 text-sm text-cyan-100 shadow-xl">
+            {isByokWorkspace && showByokInfoBanner && (
+              <div className="rounded-2xl border border-cyan-400/25 bg-cyan-500/10 p-3 text-sm text-cyan-100 shadow-xl">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-300">
-                      BYOK Workspace
-                    </div>
-                    <p className="mt-1 text-xs text-cyan-100/85">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-lg border border-cyan-300/40 bg-cyan-400/15 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-100">
+                      BYOK
+                    </span>
+                    <span className="text-xs text-cyan-100/90">
                       {byokStatus?.packageTitle || byokStatus?.packageCode || "BYOK"}
-                      {typeof byokStatus?.dailyUsage?.limit === "number"
-                        ? ` • Daily renders: ${byokStatus?.dailyUsage?.used || 0}/${byokStatus.dailyUsage.limit}`
-                        : ""}
-                      {byokStatus?.trialEndsAt
-                        ? ` • Trial ends ${new Date(byokStatus.trialEndsAt).toLocaleDateString()}`
-                        : ""}
-                    </p>
+                    </span>
+                    {typeof byokStatus?.dailyUsage?.limit === "number" && (
+                      <span className="text-xs text-cyan-100/85">
+                        Daily: {byokStatus?.dailyUsage?.used || 0}/{byokStatus.dailyUsage.limit}
+                      </span>
+                    )}
+                    {byokStatus?.trialEndsAt && (
+                      <span className="text-xs text-cyan-100/80">
+                        Trial ends {new Date(byokStatus.trialEndsAt).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
-                  {(byokStatus?.upgradeRequired || adminPanelLocked) && (
-                    <button
-                      type="button"
-                      onClick={() => setShowByokUpgradeModal(true)}
-                      className="rounded-xl border border-cyan-300/40 bg-cyan-400/15 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-cyan-100 hover:bg-cyan-400/25"
-                    >
-                      {byokStatus?.upgradeRequired ? "Upgrade Package" : "View Packages"}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={dismissByokInfoBanner}
+                    className="self-start rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-gray-200 hover:bg-white/10 sm:self-auto"
+                  >
+                    Hide
+                  </button>
                 </div>
               </div>
             )}
@@ -3256,6 +3282,15 @@ function Dashboard() {
 
               {!isMobile && (
                 <div className="relative flex items-center gap-2" ref={userMenuRef}>
+                  {isByokWorkspace && (
+                    <button
+                      type="button"
+                      onClick={() => setShowByokUpgradeModal(true)}
+                      className="rounded-2xl border border-cyan-300/45 bg-cyan-400/15 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-cyan-100 transition-all hover:bg-cyan-400/25"
+                    >
+                      Upgrade
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={toggleDashboardBackground}
@@ -3402,13 +3437,24 @@ function Dashboard() {
               )}
 
               {isMobile && (
-                <button
-                  type="button"
-                  onClick={() => setShowUserMenu(true)}
-                  className="w-full rounded-xl border border-white/10 bg-gray-800/40 px-4 py-3 text-sm font-semibold text-gray-200 hover:bg-gray-700/40 transition-colors"
-                >
-                  Open Menu & Actions
-                </button>
+                <div className="flex w-full flex-col gap-2">
+                  {isByokWorkspace && (
+                    <button
+                      type="button"
+                      onClick={() => setShowByokUpgradeModal(true)}
+                      className="w-full rounded-xl border border-cyan-300/45 bg-cyan-400/15 px-4 py-3 text-sm font-semibold text-cyan-100 hover:bg-cyan-400/25 transition-colors"
+                    >
+                      Upgrade
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowUserMenu(true)}
+                    className="w-full rounded-xl border border-white/10 bg-gray-800/40 px-4 py-3 text-sm font-semibold text-gray-200 hover:bg-gray-700/40 transition-colors"
+                  >
+                    Open Menu & Actions
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -5672,4 +5718,5 @@ function Dashboard() {
 }
 
 export default Dashboard;
+
 
