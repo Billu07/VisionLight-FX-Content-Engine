@@ -2104,7 +2104,21 @@ function Dashboard() {
     setLibraryInitialTab(latestAutoProcessTaskAspect || "original");
     setActiveLibrarySlot("generic");
   };
-  const closeTaskIndicator = () => {
+  const closeTaskIndicator = async () => {
+    if (activeAutoProcessTaskCount > 0) {
+      const confirmed = await confirmAction(
+        `You still have ${activeAutoProcessTaskCount} running asset task${activeAutoProcessTaskCount > 1 ? "s" : ""}. Close this indicator anyway?`,
+        {
+          confirmLabel: "Close indicator",
+          cancelLabel: "Keep visible",
+          description:
+            "Processing will continue in background. You can reopen from Asset Library later.",
+          critical: true,
+          confirmationText: "CLOSE",
+        },
+      );
+      if (!confirmed) return;
+    }
     if (latestAutoProcessTaskId) {
       setDismissedTaskIndicatorForId(latestAutoProcessTaskId);
     } else {
@@ -2326,13 +2340,13 @@ function Dashboard() {
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
-                  closeTaskIndicator();
+                  void closeTaskIndicator();
                 }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
                     event.stopPropagation();
-                    closeTaskIndicator();
+                    void closeTaskIndicator();
                   }
                 }}
                 className="absolute right-2 top-2 rounded-md border border-white/15 bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-bold text-gray-300 transition-colors hover:bg-white/[0.1]"
