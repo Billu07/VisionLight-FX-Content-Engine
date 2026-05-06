@@ -246,6 +246,7 @@ function Dashboard() {
   const [mainPanelHeight, setMainPanelHeight] = useState(0);
   const [showQueuedModal, setShowQueuedModal] = useState(false);
   const [showNoCreditsModal, setShowNoCreditsModal] = useState(false);
+  const [showMissingFalKeyModal, setShowMissingFalKeyModal] = useState(false);
   const [showReserveModal, setShowReserveModal] = useState(false);
   const [showByokUpgradeModal, setShowByokUpgradeModal] = useState(false);
   const [showByokKeyModal, setShowByokKeyModal] = useState(false);
@@ -738,6 +739,15 @@ function Dashboard() {
     ? "https://picdrift.com/fx-credits"
     : "https://picdrift.com/renders";
   const creditBtnText = canUseExternalCreditLink ? "Buy Credit" : "Request Renders";
+  const shouldRouteNoCreditsToAdmin = isAdmin && !adminPanelLocked;
+  const noCreditsPrimaryLabel = shouldRouteNoCreditsToAdmin
+    ? "Go to Admin Top Up"
+    : canUseExternalCreditLink
+      ? creditBtnText
+      : "Request Render";
+  const noCreditsMessage = shouldRouteNoCreditsToAdmin
+    ? "Your render balance is empty. Open Admin Panel and top up to continue rendering."
+    : "You need more credits to start this generation.";
 
   // 5. Background job polling
   useQuery({
@@ -808,6 +818,8 @@ function Dashboard() {
         alert(
           "Upload too large. Increase VPS upload limit (for nginx: client_max_body_size) or use smaller references.",
         );
+      } else if (err?.code === "MISSING_FAL_KEY") {
+        setShowMissingFalKeyModal(true);
       } else if (err?.status === 403) {
         setShowNoCreditsModal(true);
       } else {
@@ -848,6 +860,8 @@ function Dashboard() {
           error:
             "Upload too large for server limit. Increase VPS upload limit (e.g. nginx client_max_body_size) or reduce reference file sizes.",
         });
+      } else if (err?.code === "MISSING_FAL_KEY") {
+        setShowMissingFalKeyModal(true);
       } else if (err?.status === 403) {
         setShowNoCreditsModal(true);
       } else {
@@ -2139,6 +2153,11 @@ function Dashboard() {
     else if (activeEngine === "veo") hasBalance = credits.creditsVideoFX3 > 0;
     else if (activeEngine === "topaz") hasBalance = credits.creditsVideoFX1 > 0;
 
+    if (byokNeedsFalKey) {
+      setShowMissingFalKeyModal(true);
+      return;
+    }
+
     if (!hasBalance) {
       setShowNoCreditsModal(true);
       return;
@@ -2163,6 +2182,11 @@ function Dashboard() {
       return;
     }
     navigate("/admin");
+  };
+  const handleOpenApiIntegration = () => {
+    setShowByokKeyModal(false);
+    setShowMissingFalKeyModal(false);
+    navigate("/admin?tab=integrations");
   };
   const handleSubmitByokFalKey = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -2681,17 +2705,27 @@ function Dashboard() {
                 Insufficient Credits
               </h3>
               <p className="text-sm text-gray-300 mb-6">
-                You need more credits to start this generation.
+                {noCreditsMessage}
               </p>
               <div className="flex flex-col gap-3">
-                {canUseExternalCreditLink ? (
+                {shouldRouteNoCreditsToAdmin ? (
+                  <button
+                    onClick={() => {
+                      setShowNoCreditsModal(false);
+                      navigate("/admin");
+                    }}
+                    className="w-full py-3 bg-rose-600 rounded-xl font-bold"
+                  >
+                    {noCreditsPrimaryLabel}
+                  </button>
+                ) : canUseExternalCreditLink ? (
                   <a
                     href={creditLink}
                     target="_blank"
                     rel="noreferrer"
                     className="w-full py-3 bg-green-600 rounded-xl font-bold"
                   >
-                    {creditBtnText}
+                    {noCreditsPrimaryLabel}
                   </a>
                 ) : (
                   <button
@@ -2699,7 +2733,7 @@ function Dashboard() {
                     disabled={isRequesting}
                     className="w-full py-3 bg-purple-600 rounded-xl font-bold"
                   >
-                    {isRequesting ? "Sending..." : "Request Renders"}
+                    {isRequesting ? "Sending..." : noCreditsPrimaryLabel}
                   </button>
                 )}
                 <button
@@ -2877,6 +2911,43 @@ function Dashboard() {
               </button>
             </div>
           </div>
+        )}
+
+        {showMissingFalKeyModal && (
+          <div className="fixed inset-0 z-[215] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl border border-rose-400/35 bg-[#1a0713] p-6 shadow-[0_26px_80px_rgba(0,0,0,0.75)]">
+              <h3 className="text-xl font-black text-white">Fal API Key Required</h3>
+              <p className="mt-3 text-sm leading-relaxed text-rose-100/90">
+                Rendering is blocked until you connect a Fal API key. Open API Integration and add your key to continue.
+              </p>
+              <div className="mt-5 flex flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={handleOpenApiIntegration}
+                  className="w-full rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-white"
+                >
+                  Go to API Integration
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowMissingFalKeyModal(false)}
+                  className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-gray-300 hover:bg-white/10"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isByokWorkspace && byokNeedsFalKey && !showByokKeyModal && (
+          <button
+            type="button"
+            onClick={handleOpenApiIntegration}
+            className="fixed bottom-5 right-5 z-[205] rounded-2xl border border-rose-300/45 bg-gradient-to-r from-rose-600 to-pink-600 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-white shadow-[0_20px_45px_rgba(190,24,93,0.45)] hover:from-rose-500 hover:to-pink-500"
+          >
+            Link Fal Key
+          </button>
         )}
 
         {showByokUpgradeModal && (
