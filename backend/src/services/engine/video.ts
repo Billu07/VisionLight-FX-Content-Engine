@@ -2,6 +2,7 @@ import axios from "axios";
 import sharp from "sharp";
 import { dbService as airtableService, Post, CreditPool } from "../database";
 import { ROIService } from "../roi";
+import { storageQuotaService } from "../storageQuota";
 import { processVideoAssetBackground } from "./processor";
 import {
   uploadToCloudinary,
@@ -1088,13 +1089,16 @@ export const videoLogic = {
       const params = post.generationParams as any;
       if (params?.source === "DRIFT_EDITOR") {
         try {
+          const detectedSizeBytes =
+            await storageQuotaService.detectRemoteFileSizeBytes(url);
           const newAsset = await airtableService.createAsset(
             userId,
             url,
             params.aspectRatio || "16:9",
             "VIDEO",
             undefined,
-            post.projectId || undefined
+            post.projectId || undefined,
+            detectedSizeBytes ?? undefined,
           );
           // Trigger background processing for proxy and sprite sheet
           processVideoAssetBackground(newAsset.id, url, userId).catch(e => console.error("Processor failure", e));

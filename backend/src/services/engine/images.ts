@@ -292,7 +292,8 @@ export const imageLogic = {
         aspectRatio,
         "IMAGE",
         originalAssetId,
-        projectId
+        projectId,
+        editedBuffer.length,
       );
     } catch (e: any) {
       const wrapped: any = new Error(`Edit failed: ${e.message}`);
@@ -352,7 +353,8 @@ export const imageLogic = {
         "original",
         "IMAGE",
         originalAssetId,
-        projectId
+        projectId,
+        optimizedBuffer.length,
       );
     } catch (e: any) {
       console.error("Enhance Error:", e.message);

@@ -4,6 +4,7 @@ import { dbService as airtableService, prisma } from "../services/database";
 import { AuthService } from "../services/auth";
 import { supportHandoffService } from "../services/supportHandoff";
 import { ROIService } from "../services/roi";
+import { storageQuotaService } from "../services/storageQuota";
 import { getTenantSettings, isOrganizationExpired } from "../lib/app-runtime";
 import { upload } from "../utils/fileUpload";
 import {
@@ -545,9 +546,10 @@ router.get(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const [user, settings] = await Promise.all([
+      const [user, settings, storageSummary] = await Promise.all([
         airtableService.findUserById(req.user!.id),
         getTenantSettings(req.user!.id),
+        storageQuotaService.getUserOrganizationStorageSummary(req.user!.id),
       ]);
 
       if (!user) return res.json({ credits: 0 });
@@ -562,6 +564,7 @@ router.get(
         creditsVideoFX2: u.creditsVideoFX2,
         creditsVideoFX3: u.creditsVideoFX3,
         prices: settings,
+        storage: storageSummary,
       });
     } catch (error: any) {
       res.status(500).json({ error: "Failed to fetch credits" });

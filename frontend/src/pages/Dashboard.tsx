@@ -560,6 +560,16 @@ function Dashboard() {
     if (user?.view === "PICDRIFT" || isTenantScopedAccount) return `${Math.floor(val)}`;
     return isCommercial ? `$${val.toFixed(2)}` : `${val}`;
   };
+  const storageSummary = (credits as any)?.storage;
+  const storageLimitMb = Number(storageSummary?.limitMb || 0);
+  const storageUsedMb = Number(storageSummary?.usedMb || 0);
+  const storageRemainingMb = Number(storageSummary?.remainingMb || 0);
+  const storageUsagePercent =
+    storageLimitMb > 0
+      ? Math.max(0, Math.min(100, (storageUsedMb / storageLimitMb) * 100))
+      : 0;
+  const formatStorageMb = (value: number) =>
+    `${Math.max(0, Number(value || 0)).toFixed(1)} MB`;
   const [isRequesting, setIsRequesting] = useState(false);
   const creditLink = canUseExternalCreditLink
     ? "https://picdrift.com/fx-credits"
@@ -2606,6 +2616,31 @@ function Dashboard() {
                     </div>
                   )}
                 </div>
+                {storageSummary && (
+                  <div className="mt-4 border-t border-gray-700/60 pt-3">
+                    <div className="flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                      <span>Storage</span>
+                      <span className="text-cyan-300">
+                        {formatStorageMb(storageUsedMb)} / {formatStorageMb(storageLimitMb)}
+                      </span>
+                    </div>
+                    <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-900/90">
+                      <div
+                        className={`h-full rounded-full ${
+                          storageUsagePercent >= 90
+                            ? "bg-rose-400"
+                            : storageUsagePercent >= 75
+                              ? "bg-amber-400"
+                              : "bg-cyan-400"
+                        }`}
+                        style={{ width: `${storageUsagePercent}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 text-[10px] text-gray-500">
+                      Remaining: {formatStorageMb(storageRemainingMb)}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {!isMobile && (

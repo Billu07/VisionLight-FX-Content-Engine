@@ -1,6 +1,7 @@
 import express from "express";
 import { dbService, prisma } from "../services/database";
 import { AuthService } from "../services/auth";
+import { storageQuotaService } from "../services/storageQuota";
 import { authenticateToken, requireSuperAdmin, AuthenticatedRequest } from "../middleware/auth";
 import { encryptionUtils } from "../utils/encryption";
 import { upload } from "../utils/fileUpload";
@@ -100,7 +101,30 @@ router.get("/organizations", async (req: AuthenticatedRequest, res) => {
     const orgs = await prisma.organization.findMany({
       orderBy: { createdAt: "desc" },
     });
-    res.json({ success: true, organizations: orgs });
+    const usageMap = await storageQuotaService.getStorageUsageMapForOrganizations(
+      orgs.map((org) => org.id),
+    );
+    const organizations = orgs.map((org) => {
+      const usedBytes = usageMap[org.id] || 0;
+      const limitBytes = Math.max(0, org.maxStorageMb) * 1024 * 1024;
+      const remainingBytes = Math.max(0, limitBytes - usedBytes);
+      return {
+        ...org,
+        storageSummary: {
+          organizationId: org.id,
+          limitMb: org.maxStorageMb,
+          limitBytes,
+          usedBytes,
+          usedMb: usedBytes / (1024 * 1024),
+          remainingBytes,
+          remainingMb: remainingBytes / (1024 * 1024),
+          usagePercent:
+            limitBytes > 0 ? Math.min(100, (usedBytes / limitBytes) * 100) : 0,
+          isOverLimit: usedBytes > limitBytes,
+        },
+      };
+    });
+    res.json({ success: true, organizations });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -308,6 +332,17 @@ router.put("/organizations/:id/limits", async (req: AuthenticatedRequest, res) =
       if (parsedMaxProjectsTotal < allocated) {
         return res.status(400).json({
           error: `Cannot set maxProjectsTotal below current allocated quota (${allocated}).`,
+        });
+      }
+    }
+
+    if (parsedMaxStorageMb !== undefined && parsedMaxStorageMb !== null) {
+      const storageSummary = await storageQuotaService.getOrganizationStorageSummary(
+        req.params.id,
+      );
+      if (storageSummary && parsedMaxStorageMb < storageSummary.usedMb) {
+        return res.status(400).json({
+          error: `Cannot set maxStorageMb below current usage (${storageSummary.usedMb.toFixed(2)}MB).`,
         });
       }
     }

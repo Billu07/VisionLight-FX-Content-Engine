@@ -16,6 +16,12 @@ interface Tenant {
   maxUsers: number;
   maxProjectsTotal: number;
   maxStorageMb: number;
+  storageSummary?: {
+    limitMb: number;
+    usedMb: number;
+    remainingMb: number;
+    usagePercent: number;
+  };
   createdAt: string;
 }
 
@@ -268,6 +274,7 @@ export default function SuperAdminDashboard() {
     adminName: "",
     maxUsers: 5,
     maxProjectsTotal: 20,
+    maxStorageMb: 500,
     tenantPlan: "PAID",
     trialDays: 14,
     view: "VISIONLIGHT"
@@ -363,6 +370,7 @@ export default function SuperAdminDashboard() {
       adminName: "",
       maxUsers: 5,
       maxProjectsTotal: 20,
+      maxStorageMb: 500,
       tenantPlan: "PAID",
       trialDays: 14,
       view: "VISIONLIGHT",
@@ -1063,7 +1071,7 @@ export default function SuperAdminDashboard() {
                   <tr>
                     <th className="p-6">Organization</th>
                     <th className="p-6 text-center">Status</th>
-                    <th className="p-6 text-center">Users / Projects</th>
+                    <th className="p-6 text-center">Users / Projects / Storage</th>
                     <th className="p-6 text-right">Operations</th>
                   </tr>
                 </thead>
@@ -1126,6 +1134,29 @@ export default function SuperAdminDashboard() {
                         <td className="p-6 text-center">
                           <div className="text-sm font-semibold text-gray-200">{t.maxUsers} users</div>
                           <div className="mt-1 text-xs text-gray-500">{t.maxProjectsTotal} projects</div>
+                          <div className="mt-2 text-xs text-gray-400">
+                            {Number(t.storageSummary?.usedMb || 0).toFixed(1)}MB / {Number(t.maxStorageMb || 0).toFixed(0)}MB
+                          </div>
+                          <div className="mx-auto mt-2 h-1.5 w-36 overflow-hidden rounded-full bg-gray-900/90">
+                            <div
+                              className={`h-full rounded-full ${
+                                Number(t.storageSummary?.usagePercent || 0) >= 90
+                                  ? "bg-rose-400"
+                                  : Number(t.storageSummary?.usagePercent || 0) >= 75
+                                    ? "bg-amber-400"
+                                    : "bg-cyan-400"
+                              }`}
+                              style={{
+                                width: `${Math.max(
+                                  0,
+                                  Math.min(
+                                    100,
+                                    Number(t.storageSummary?.usagePercent || 0),
+                                  ),
+                                )}%`,
+                              }}
+                            />
+                          </div>
                         </td>
                         <td className="p-6 text-right">
                           <div className="flex gap-2 justify-end">
@@ -1743,7 +1774,7 @@ export default function SuperAdminDashboard() {
                 </div>
                 <div className="space-y-2">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Storage Limit (MB)</label>
-                    <input type="number" className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white" defaultValue={500} onChange={e => setNewTenant({ ...newTenant, maxStorageMb: parseInt(e.target.value) } as any)} />
+                    <input type="number" className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white" defaultValue={500} onChange={e => setNewTenant({ ...newTenant, maxStorageMb: parseInt(e.target.value) })} />
                 </div>
                 <div className="space-y-2">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform View</label>
@@ -1927,6 +1958,19 @@ export default function SuperAdminDashboard() {
                   onChange={e => setTenantUpdates({ ...tenantUpdates, maxStorageMb: parseInt(e.target.value) })}
                 />
               </div>
+              {editingTenant.storageSummary && (
+                <div className="rounded-xl border border-gray-800 bg-gray-950/60 p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                    Current Storage Usage
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-white">
+                    {Number(editingTenant.storageSummary.usedMb || 0).toFixed(2)}MB used
+                  </p>
+                  <p className="mt-1 text-[10px] uppercase tracking-widest text-gray-500">
+                    Remaining {Number(editingTenant.storageSummary.remainingMb || 0).toFixed(2)}MB
+                  </p>
+                </div>
+              )}
 
               {editingTenant.isDefault ? (
                 <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-xs leading-relaxed text-emerald-100">

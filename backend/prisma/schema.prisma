@@ -16,7 +16,7 @@ model Organization {
   trialEndsAt      DateTime?
   maxUsers         Int     @default(5)
   maxProjectsTotal Int     @default(20)
-  maxStorageMb     Int     @default(500) // SuperAdmin defined storage limit in MB for the entire tenant
+  maxStorageMb     Int     @default(500) // SuperAdmin-defined storage limit in MB for the entire tenant organization
 
   // Custom API Keys
   falApiKey    String?
@@ -192,7 +192,7 @@ model Asset {
   spriteSheetUrl String? // Timeline thumbnail sprite sheet URL
   aspectRatio String
   type        String   @default("IMAGE")
-  sizeBytes   Int?     // To track the 500mb limit per project
+  sizeBytes   Int?     // Stored object size for tenant-level storage quota accounting
   createdAt   DateTime @default(now())
 
   organizationId String?

@@ -1,6 +1,7 @@
 import sharp from "sharp";
 import { dbService as airtableService, Asset } from "../database";
 import { processVideoAssetBackground } from "./processor";
+import { storageQuotaService } from "../storageQuota";
 import {
   uploadToCloudinary,
   resizeStrict,
@@ -146,6 +147,7 @@ export const assetsLogic = {
         "IMAGE",
         originalAssetId,
         projectId,
+        processedBuffer.length,
       );
     } catch (e: any) {
       console.error("Asset processing failed:", e.message);
@@ -178,6 +180,10 @@ export const assetsLogic = {
       type = "VIDEO";
     }
 
+    const detectedSizeBytes = await storageQuotaService.detectRemoteFileSizeBytes(
+      targetUrl,
+    );
+
     const newAsset = await airtableService.createAsset(
       userId,
       targetUrl,
@@ -185,6 +191,7 @@ export const assetsLogic = {
       type,
       undefined,
       post.projectId || undefined,
+      detectedSizeBytes ?? undefined,
     );
 
     if (type === "VIDEO") {

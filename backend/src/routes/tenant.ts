@@ -2,6 +2,7 @@ import express from "express";
 import axios from "axios";
 import { dbService, prisma } from "../services/database";
 import { AuthService } from "../services/auth";
+import { storageQuotaService } from "../services/storageQuota";
 import { authenticateToken, requireAdmin, AuthenticatedRequest } from "../middleware/auth";
 import { encryptionUtils } from "../utils/encryption";
 import { PRICE_KEYS } from "../config/pricing";
@@ -533,6 +534,9 @@ router.get("/config", async (req: AuthenticatedRequest, res) => {
   try {
     const org = await getOrg(req);
     const requestingUser = await dbService.findUserById(req.user!.id);
+    const storageSummary = await storageQuotaService.getOrganizationStorageSummary(
+      org.id,
+    );
     const requesterView = normalizeView(requestingUser?.view);
     const isSuperAdminRequester = requestingUser?.role === "SUPERADMIN";
     const canReadKieApiKey =
@@ -569,7 +573,8 @@ router.get("/config", async (req: AuthenticatedRequest, res) => {
           priceVideoFX3_4s: org.priceVideoFX3_4s,
           priceVideoFX3_6s: org.priceVideoFX3_6s,
           priceVideoFX3_8s: org.priceVideoFX3_8s,
-        }
+        },
+        storage: storageSummary,
       }
     });
   } catch (error: any) {

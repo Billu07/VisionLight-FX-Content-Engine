@@ -76,7 +76,7 @@ export const dbService = {
         name: data.name,
         maxUsers: data.maxUsers,
         maxProjectsTotal: data.maxProjectsTotal,
-        maxStorageMb: data.maxStorageMb || 500,
+        maxStorageMb: data.maxStorageMb ?? 500,
         isDefault: data.isDefault || false,
         tenantPlan: data.tenantPlan || "PAID",
         trialEndsAt: data.trialEndsAt || null,
@@ -437,19 +437,81 @@ export const dbService = {
     projectId?: string,
     sizeBytes?: number
   ) {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    return prisma.asset.create({
-      data: {
-        userId,
-        url,
-        aspectRatio,
-        type: type as any,
-        originalAssetId: originalAssetId || undefined,
-        projectId: projectId || undefined,
-        sizeBytes: sizeBytes || null,
-        organizationId: user?.organizationId,
-      },
-    });
+    const normalizedIncomingBytes =
+      sizeBytes !== undefined && Number.isFinite(Number(sizeBytes))
+        ? Math.max(0, Math.floor(Number(sizeBytes)))
+        : null;
+    const maxRetries = 3;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await prisma.$transaction(
+          async (tx) => {
+            const user = await tx.user.findUnique({
+              where: { id: userId },
+              select: { organizationId: true },
+            });
+
+            if (!user) {
+              throw new Error("USER_NOT_FOUND");
+            }
+
+            if (user.organizationId && normalizedIncomingBytes !== null) {
+              const org = await tx.organization.findUnique({
+                where: { id: user.organizationId },
+                select: { maxStorageMb: true },
+              });
+
+              if (org) {
+                const usage = await tx.asset.aggregate({
+                  where: {
+                    organizationId: user.organizationId,
+                    sizeBytes: { not: null },
+                  },
+                  _sum: { sizeBytes: true },
+                });
+
+                const usedBytes = Number(usage._sum.sizeBytes || 0);
+                const limitBytes = Math.max(0, org.maxStorageMb) * 1024 * 1024;
+                if (usedBytes + normalizedIncomingBytes > limitBytes) {
+                  const remainingBytes = Math.max(0, limitBytes - usedBytes);
+                  const toMb = (bytes: number) => bytes / (1024 * 1024);
+                  throw new Error(
+                    `Storage limit exceeded. Tried to add ${toMb(
+                      normalizedIncomingBytes,
+                    ).toFixed(2)}MB, remaining ${toMb(remainingBytes).toFixed(
+                      2,
+                    )}MB.`,
+                  );
+                }
+              }
+            }
+
+            return tx.asset.create({
+              data: {
+                userId,
+                url,
+                aspectRatio,
+                type: type as any,
+                originalAssetId: originalAssetId || undefined,
+                projectId: projectId || undefined,
+                sizeBytes: normalizedIncomingBytes,
+                organizationId: user.organizationId,
+              },
+            });
+          },
+          { isolationLevel: "Serializable" },
+        );
+      } catch (error: any) {
+        const isSerializationError = error?.code === "P2034";
+        if (isSerializationError && attempt < maxRetries) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw new Error("ASSET_CREATE_FAILED");
   },
   async getUserAssets(userId: string, projectId?: string) {
     return prisma.asset.findMany({

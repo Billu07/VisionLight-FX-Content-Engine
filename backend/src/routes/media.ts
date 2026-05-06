@@ -6,6 +6,7 @@ import { authenticateToken, AuthenticatedRequest } from "../middleware/auth";
 import { dbService as airtableService, prisma, CreditPool } from "../services/database";
 import { contentEngine } from "../services/engine";
 import { extractLastFrameAsJpeg } from "../services/frameExtractor";
+import { storageQuotaService } from "../services/storageQuota";
 import { upload, uploadToCloudinary } from "../utils/fileUpload";
 import {
   getTenantApiKeys,
@@ -407,29 +408,6 @@ router.post(
         const project = await airtableService.getProjectById(projectId);
         if (!project || project.userId !== req.user!.id) {
           return res.status(403).json({ error: "Access denied" });
-        }
-      }
-
-      if (projectId && req.user!.organizationId) {
-        const org = await prisma.organization.findUnique({
-          where: { id: req.user!.organizationId },
-        });
-        if (org) {
-          const projectAssets = await prisma.asset.findMany({
-            where: { projectId },
-            select: { sizeBytes: true },
-          });
-          const currentTotalBytes = projectAssets.reduce(
-            (acc, a) => acc + (a.sizeBytes || 0),
-            0,
-          );
-          const maxBytes = org.maxStorageMb * 1024 * 1024;
-
-          if (currentTotalBytes + fileSizeBytes > maxBytes) {
-            return res.status(400).json({
-              error: `Storage Limit Exceeded. Your organization is limited to ${org.maxStorageMb}MB per project.`,
-            });
-          }
         }
       }
 
@@ -853,6 +831,16 @@ router.post(
         }
       }
 
+      const detectedSizeBytes = await storageQuotaService.detectRemoteFileSizeBytes(
+        url,
+      );
+      if (detectedSizeBytes === null) {
+        return res.status(400).json({
+          error:
+            "Could not verify remote file size. Use a direct file URL or upload the file instead.",
+        });
+      }
+
       const asset = await airtableService.createAsset(
         req.user!.id,
         url,
@@ -860,6 +848,7 @@ router.post(
         type || "IMAGE",
         undefined,
         projectId,
+        detectedSizeBytes,
       );
 
       res.json({ success: true, asset });

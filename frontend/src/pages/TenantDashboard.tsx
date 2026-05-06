@@ -26,6 +26,12 @@ interface Config {
   falApiKey: string;
   kieApiKey: string;
   pricing: any;
+  storage?: {
+    limitMb: number;
+    usedMb: number;
+    remainingMb: number;
+    usagePercent: number;
+  } | null;
 }
 
 interface CreditRequest {
@@ -235,12 +241,14 @@ export default function TenantDashboard() {
     setLoading(true);
     try {
       if (activeTab === "team") {
-        const [teamRes, requestsRes] = await Promise.all([
+        const [teamRes, requestsRes, configRes] = await Promise.all([
           apiEndpoints.tenantGetTeam(),
           apiEndpoints.tenantGetRequests(),
+          apiEndpoints.tenantGetConfig(),
         ]);
         if (teamRes.data.success) setUsers(teamRes.data.users);
         if (requestsRes.data.success) setCreditRequests(requestsRes.data.requests || []);
+        if (configRes.data.success) setConfig(configRes.data.config);
       } else if (activeTab === "pricing") {
         const [configRes, teamRes] = await Promise.all([
           apiEndpoints.tenantGetConfig(),
@@ -478,6 +486,17 @@ export default function TenantDashboard() {
       maximumFractionDigits: 2,
     });
 
+  const storage = config?.storage;
+  const storageLimitMb = Number(storage?.limitMb || 0);
+  const storageUsedMb = Number(storage?.usedMb || 0);
+  const storageRemainingMb = Number(storage?.remainingMb || 0);
+  const storageUsagePercent =
+    storageLimitMb > 0
+      ? Math.max(0, Math.min(100, (storageUsedMb / storageLimitMb) * 100))
+      : 0;
+  const formatStorageMb = (value: number) =>
+    `${Math.max(0, Number(value || 0)).toFixed(1)} MB`;
+
   return (
     <div className={`${adminUi.page} font-sans`}>
       <div className={adminUi.backdrop} />
@@ -539,6 +558,37 @@ export default function TenantDashboard() {
           <div className="mb-8 flex items-center justify-between rounded-xl border border-brand-accent/20 bg-brand-accent/10 p-4 text-[10px] font-bold uppercase tracking-[0.14em] text-brand-accent">
             {msg}
             <button onClick={() => setMsg("")} className="text-lg">x</button>
+          </div>
+        )}
+
+        {storage && (
+          <div className={`${adminUi.metricCard} mb-6`}>
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-gray-500 font-bold">
+                Organization Storage
+              </p>
+              <p className="text-[10px] uppercase tracking-[0.14em] text-brand-accent font-bold">
+                {formatStorageMb(storageUsedMb)} / {formatStorageMb(storageLimitMb)}
+              </p>
+            </div>
+            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-gray-900/90">
+              <div
+                className={`h-full rounded-full ${
+                  storageUsagePercent >= 90
+                    ? "bg-rose-400"
+                    : storageUsagePercent >= 75
+                      ? "bg-amber-400"
+                      : "bg-cyan-400"
+                }`}
+                style={{ width: `${storageUsagePercent}%` }}
+              />
+            </div>
+            <div className="mt-3 text-xs text-gray-400">
+              Remaining:{" "}
+              <span className="font-semibold text-gray-200">
+                {formatStorageMb(storageRemainingMb)}
+              </span>
+            </div>
           </div>
         )}
 
