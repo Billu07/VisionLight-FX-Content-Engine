@@ -1219,18 +1219,28 @@ export function AssetLibrary({
                     )}
                     {asset.type === "VIDEO" ? (
                       <div className="w-full h-full relative aspect-square bg-black/20">
+                        {(() => {
+                          const videoSrc = getCORSProxyVideoUrl(
+                            asset.url || asset.proxyUrl || asset.hlsUrl || "",
+                          );
+                          const isTimelinePreview = asset.source === "timeline";
+                          return (
                         <video
-                          src={getCORSProxyVideoUrl(asset.url || asset.proxyUrl || asset.hlsUrl || "")}
+                          src={videoSrc}
                           poster={
                             asset.spriteSheetUrl
                               ? getCORSProxyUrl(asset.spriteSheetUrl, 400, 65)
                               : undefined
                           }
-                          className="w-full h-full object-contain opacity-80"
-                          preload="none"
+                          className={`w-full h-full object-contain ${isTimelinePreview ? "opacity-100" : "opacity-80"}`}
+                          preload={isTimelinePreview ? "metadata" : "none"}
+                          autoPlay={isTimelinePreview}
+                          loop={isTimelinePreview}
                           playsInline
                           muted
                         />
+                          );
+                        })()}
                         <div className="absolute inset-0 flex items-center justify-center">
                           <div className="w-12 h-12 bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-full flex items-center justify-center transition-all shadow-lg text-white">
                             <svg className="w-6 h-6 ml-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3" /></svg>

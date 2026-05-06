@@ -331,7 +331,9 @@ api.interceptors.request.use((config) => {
  * Proxy R2-hosted videos through backend with range support to keep seeking/scrubbing reliable.
  */
 export const getCORSProxyVideoUrl = (url: string) => {
-  if (!url || !url.includes("r2.dev") || url.includes(".m3u8") || url.includes(".ts")) {
+  if (!url) return url;
+  if (url.includes("/api/proxy-video?url=")) return url;
+  if (!url.includes("r2.dev") || url.includes(".m3u8") || url.includes(".ts")) {
     return url;
   }
   return `${API_BASE_URL}/api/proxy-video?url=${encodeURIComponent(url)}`;
