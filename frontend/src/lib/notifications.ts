@@ -23,16 +23,16 @@ const CRITICAL_ACTION_PATTERN =
 
 const toastClassByType = {
   success:
-    "!border-emerald-400/35 !bg-emerald-500/12 !text-emerald-100 !shadow-[0_10px_30px_rgba(16,185,129,0.18)]",
+    "!border-emerald-400/40 !bg-emerald-950/65 !text-emerald-100 !shadow-[0_10px_30px_rgba(16,185,129,0.22)]",
   error:
-    "!border-rose-400/35 !bg-rose-500/14 !text-rose-100 !shadow-[0_10px_30px_rgba(244,63,94,0.22)]",
+    "!border-rose-400/40 !bg-rose-950/65 !text-rose-100 !shadow-[0_10px_30px_rgba(244,63,94,0.24)]",
   warning:
-    "!border-amber-400/35 !bg-amber-500/14 !text-amber-100 !shadow-[0_10px_30px_rgba(245,158,11,0.22)]",
-  info: "!border-cyan-400/30 !bg-cyan-500/12 !text-cyan-100 !shadow-[0_10px_30px_rgba(6,182,212,0.2)]",
+    "!border-amber-400/40 !bg-amber-950/65 !text-amber-100 !shadow-[0_10px_30px_rgba(245,158,11,0.24)]",
+  info: "!border-cyan-400/40 !bg-cyan-950/65 !text-cyan-100 !shadow-[0_10px_30px_rgba(6,182,212,0.24)]",
 } as const;
 
 const baseToastClass =
-  "!rounded-xl !backdrop-blur-xl !ring-1 !ring-white/10 !font-medium";
+  "!rounded-xl !backdrop-blur-xl !ring-1 !ring-white/10 !font-medium !text-[13px]";
 
 const resolveCriticalConfirmationText = (message: string, explicit?: string) => {
   if (explicit?.trim()) return explicit.trim();

@@ -201,7 +201,17 @@ function App() {
           gap={10}
           toastOptions={{
             className:
-              "!w-[min(92vw,420px)] !bg-gray-950/92 !text-gray-100 !border !border-white/15 !backdrop-blur-xl !shadow-[0_18px_50px_rgba(2,8,23,0.45)]",
+              "!w-[min(92vw,430px)] !bg-gray-950/96 !text-gray-100 !border !border-white/15 !backdrop-blur-xl !shadow-[0_18px_50px_rgba(2,8,23,0.52)]",
+            classNames: {
+              title: "!text-gray-100",
+              description: "!text-gray-300",
+              actionButton:
+                "!bg-cyan-300 !text-gray-950 !border !border-cyan-200/70 !font-semibold hover:!bg-cyan-200",
+              cancelButton:
+                "!bg-white/10 !text-gray-200 !border !border-white/20 hover:!bg-white/15",
+              closeButton:
+                "!bg-gray-900/95 !text-gray-200 !border !border-white/20 hover:!bg-gray-800",
+            },
           }}
         />
         <Router>
