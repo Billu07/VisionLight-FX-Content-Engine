@@ -2964,16 +2964,6 @@ function Dashboard() {
           </div>
         )}
 
-        {isByokWorkspace && byokNeedsFalKey && !showByokKeyModal && (
-          <button
-            type="button"
-            onClick={handleOpenApiIntegration}
-            className="fixed bottom-5 right-5 z-[205] rounded-2xl border border-rose-300/45 bg-gradient-to-r from-rose-600 to-pink-600 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-white shadow-[0_20px_45px_rgba(190,24,93,0.45)] hover:from-rose-500 hover:to-pink-500"
-          >
-            Link Fal Key
-          </button>
-        )}
-
         {showByokUpgradeModal && (
           <div className="fixed inset-0 z-[220] flex items-center justify-center bg-gray-950/90 p-4 backdrop-blur-md">
             <div className="w-full max-w-4xl rounded-3xl border border-cyan-400/25 bg-[#060b1f] p-6 shadow-[0_30px_90px_rgba(2,8,23,0.82)] sm:p-8">
@@ -3282,6 +3272,15 @@ function Dashboard() {
 
               {!isMobile && (
                 <div className="relative flex items-center gap-2" ref={userMenuRef}>
+                  {isByokWorkspace && byokNeedsFalKey && !showByokKeyModal && (
+                    <button
+                      type="button"
+                      onClick={handleOpenApiIntegration}
+                      className="rounded-2xl border border-rose-300/45 bg-gradient-to-r from-rose-600 to-pink-600 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white transition-all hover:from-rose-500 hover:to-pink-500"
+                    >
+                      Link Fal Key
+                    </button>
+                  )}
                   {isByokWorkspace && (
                     <button
                       type="button"
@@ -3438,6 +3437,15 @@ function Dashboard() {
 
               {isMobile && (
                 <div className="flex w-full flex-col gap-2">
+                  {isByokWorkspace && byokNeedsFalKey && !showByokKeyModal && (
+                    <button
+                      type="button"
+                      onClick={handleOpenApiIntegration}
+                      className="w-full rounded-xl border border-rose-300/45 bg-gradient-to-r from-rose-600 to-pink-600 px-4 py-3 text-sm font-semibold text-white hover:from-rose-500 hover:to-pink-500 transition-colors"
+                    >
+                      Link Fal Key
+                    </button>
+                  )}
                   {isByokWorkspace && (
                     <button
                       type="button"
