@@ -43,6 +43,7 @@ const DASHBOARD_BG_MODE_KEY = "visionlight_dashboard_bg_mode";
 const ASSET_TASK_PANEL_STATE_KEY = "visionlight_asset_task_panel_state_v1";
 const DASHBOARD_TASK_INDICATOR_STATE_KEY =
   "visionlight_dashboard_task_indicator_state_v1";
+const FAL_KEYS_URL = "https://fal.ai/dashboard/keys";
 type DashboardBgMode = "current" | "original";
 type VeoMode =
   | "image_to_video"
@@ -247,6 +248,10 @@ function Dashboard() {
   const [showNoCreditsModal, setShowNoCreditsModal] = useState(false);
   const [showReserveModal, setShowReserveModal] = useState(false);
   const [showByokUpgradeModal, setShowByokUpgradeModal] = useState(false);
+  const [showByokKeyModal, setShowByokKeyModal] = useState(false);
+  const [byokFalKeyInput, setByokFalKeyInput] = useState("");
+  const [isSubmittingByokFalKey, setIsSubmittingByokFalKey] = useState(false);
+  const [byokFalGuideShown, setByokFalGuideShown] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
   const [showPromptInfo, setShowPromptInfo] = useState<string | null>(null);
   const [isTaskIndicatorMinimized, setIsTaskIndicatorMinimized] = useState(false);
@@ -346,10 +351,11 @@ function Dashboard() {
     previewMedia !== null;
 
   const queryClient = useQueryClient();
-  const { user, isLoading: authLoading, logout } = useAuth();
+  const { user, isLoading: authLoading, logout, checkAuth } = useAuth();
   const byokStatus = user?.byok;
   const isByokWorkspace = byokStatus?.isByok === true;
   const adminPanelLocked = byokStatus?.adminPanelLocked === true;
+  const byokNeedsFalKey = isByokWorkspace && byokStatus?.hasFalKey === false;
   const navigate = useNavigate();
   const canUseVideoEditor =
     user?.role === "SUPERADMIN" || user?.videoEditorEnabledForAll === true;
@@ -558,6 +564,14 @@ function Dashboard() {
       setShowByokUpgradeModal(true);
     }
   }, [byokStatus?.upgradeRequired]);
+
+  useEffect(() => {
+    if (byokNeedsFalKey) {
+      setShowByokKeyModal(true);
+      return;
+    }
+    setShowByokKeyModal(false);
+  }, [byokNeedsFalKey]);
 
   useEffect(() => {
     try {
@@ -2150,6 +2164,26 @@ function Dashboard() {
     }
     navigate("/admin");
   };
+  const handleSubmitByokFalKey = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!byokFalKeyInput.trim()) return;
+
+    setIsSubmittingByokFalKey(true);
+    try {
+      await apiEndpoints.byokLinkKey(byokFalKeyInput.trim());
+      setByokFalKeyInput("");
+      setShowByokKeyModal(false);
+      setByokFalGuideShown(false);
+      notify.success(
+        "Welcome to your 14 day trial. Trial is limited to 5 renders/day.",
+      );
+      await checkAuth();
+    } catch (error: any) {
+      notify.error(error?.message || "Failed to link Fal API key.");
+    } finally {
+      setIsSubmittingByokFalKey(false);
+    }
+  };
   const openLibraryFromTaskIndicator = () => {
     try {
       localStorage.setItem(
@@ -2718,7 +2752,7 @@ function Dashboard() {
         )}
 
         {/* Activation overlay (for inactive tenants) */}
-        {user?.needsActivation && (
+        {user?.needsActivation && !isByokWorkspace && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-gray-950/90 backdrop-blur-xl p-4">
             <div className="bg-gray-900 border border-white/10 rounded-[2.5rem] p-8 sm:p-12 max-w-xl w-full shadow-[0_0_50px_rgba(0,0,0,0.5)] text-center animate-in zoom-in-95 duration-300">
               <div className="w-24 h-24 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-8 border border-rose-500/20">
@@ -2774,6 +2808,73 @@ function Dashboard() {
                   Switch Account / Logout
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {showByokKeyModal && (
+          <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-2xl border border-cyan-400/25 bg-[#050b1f] p-7 shadow-[0_30px_90px_rgba(2,8,23,0.8)]">
+              <h3 className="text-2xl font-black text-white">Bring Your Own Key</h3>
+              <p className="mt-3 text-sm leading-relaxed text-slate-300">
+                Pay direct. Total control. 1-2 minute Fal signup.
+              </p>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setByokFalGuideShown(true);
+                    window.open(FAL_KEYS_URL, "_blank", "noopener,noreferrer");
+                  }}
+                  className="rounded-xl border border-cyan-300/40 bg-cyan-400/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-cyan-100 hover:bg-cyan-400/20"
+                >
+                  Signup Fal
+                </button>
+                <a
+                  href={FAL_KEYS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white hover:bg-white/10"
+                >
+                  Fal API Key Link
+                </a>
+              </div>
+
+              {byokFalGuideShown && (
+                <p className="mt-3 text-xs text-cyan-200">
+                  Fal will open in a new window. Signup and return to this window.
+                </p>
+              )}
+
+              <form className="mt-5 space-y-3" onSubmit={handleSubmitByokFalKey}>
+                <label className="block text-xs font-bold uppercase tracking-[0.12em] text-slate-300">
+                  Fal Key
+                </label>
+                <input
+                  type="password"
+                  value={byokFalKeyInput}
+                  onChange={(e) => setByokFalKeyInput(e.target.value)}
+                  placeholder="Paste your Fal API key"
+                  className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-3 text-sm text-white outline-none focus:border-cyan-300"
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={isSubmittingByokFalKey}
+                  className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-white disabled:opacity-60"
+                >
+                  {isSubmittingByokFalKey ? "Submitting..." : "Submitted"}
+                </button>
+              </form>
+
+              <button
+                type="button"
+                onClick={() => setShowByokKeyModal(false)}
+                className="mt-3 w-full rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-300 hover:bg-white/10"
+              >
+                Do This Later
+              </button>
             </div>
           </div>
         )}
