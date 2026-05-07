@@ -35,6 +35,18 @@ const BYOK_WIX_SIGNATURE_MAX_FUTURE_SKEW_SECONDS = Math.max(
     10,
   ) || 90,
 );
+const BYOK_WEBHOOK_RATE_LIMIT_WINDOW_MS = Math.max(
+  1000,
+  Number.parseInt(process.env.BYOK_WEBHOOK_RATE_LIMIT_WINDOW_MS || "60000", 10) || 60000,
+);
+const BYOK_WEBHOOK_RATE_LIMIT_MAX = Math.max(
+  1,
+  Number.parseInt(process.env.BYOK_WEBHOOK_RATE_LIMIT_MAX || "90", 10) || 90,
+);
+const BYOK_STALE_PENDING_MINUTES = Math.max(
+  5,
+  Number.parseInt(process.env.BYOK_STALE_PENDING_MINUTES || "15", 10) || 15,
+);
 
 const WEBHOOK_PROVIDER_WIX = "WIX";
 const WEBHOOK_PROVIDER_CHECKOUT = "WIX_CHECKOUT_SESSION";
@@ -64,6 +76,13 @@ const CHECKOUT_INTENT_MATCH_WINDOW_MINUTES = Math.max(
   Number.parseInt(process.env.BYOK_CHECKOUT_INTENT_MATCH_WINDOW_MINUTES || "90", 10) ||
     90,
 );
+const webhookRateWindow = new Map<
+  string,
+  {
+    windowStart: number;
+    count: number;
+  }
+>();
 
 const sanitizeDomain = (raw?: string | null): string | null => {
   if (!raw) return null;
@@ -84,6 +103,43 @@ const resolveIncomingHost = (req: Request): string | null => {
   const firstHost = candidate.toString().split(",")[0];
   return sanitizeDomain(firstHost);
 };
+
+const resolveClientIp = (req: Request): string => {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.trim()) {
+    return forwarded.split(",")[0].trim();
+  }
+  if (Array.isArray(forwarded) && forwarded[0]) {
+    return String(forwarded[0]).split(",")[0].trim();
+  }
+  return req.socket.remoteAddress || "unknown";
+};
+
+const isWebhookRateLimited = (ip: string) => {
+  const now = Date.now();
+  const current = webhookRateWindow.get(ip);
+  if (!current || now - current.windowStart >= BYOK_WEBHOOK_RATE_LIMIT_WINDOW_MS) {
+    webhookRateWindow.set(ip, {
+      windowStart: now,
+      count: 1,
+    });
+    return false;
+  }
+  current.count += 1;
+  webhookRateWindow.set(ip, current);
+  if (current.count > BYOK_WEBHOOK_RATE_LIMIT_MAX) {
+    return true;
+  }
+  return false;
+};
+
+const sendError = (
+  res: Response,
+  status: number,
+  error: string,
+  code: string,
+  details?: Record<string, unknown>,
+) => res.status(status).json({ error, code, ...(details ? { details } : {}) });
 
 const getRequestProtocol = (req: Request) => {
   const forwardedProto = req.headers["x-forwarded-proto"];
@@ -790,26 +846,37 @@ router.get(
 );
 
 const handleWixWebhook = async (req: Request, res: Response) => {
+  const clientIp = resolveClientIp(req);
+  if (isWebhookRateLimited(clientIp)) {
+    return sendError(res, 429, "Webhook rate limit exceeded.", "WEBHOOK_RATE_LIMITED", {
+      ip: clientIp,
+      windowMs: BYOK_WEBHOOK_RATE_LIMIT_WINDOW_MS,
+      max: BYOK_WEBHOOK_RATE_LIMIT_MAX,
+    });
+  }
+
   const payload = parseWebhookPayload(req.body);
   if (!isWebhookAuthorized(req, payload)) {
-    return res.status(401).json({ error: "Unauthorized webhook." });
+    return sendError(res, 401, "Unauthorized webhook.", "UNAUTHORIZED_WEBHOOK");
   }
 
   if (!payload || typeof payload !== "object") {
-    return res.status(400).json({ error: "Invalid webhook payload." });
+    return sendError(res, 400, "Invalid webhook payload.", "INVALID_WEBHOOK_PAYLOAD");
   }
 
   const signatureCheck = evaluateWebhookSignature(req, payload);
   if (BYOK_WIX_REQUIRE_SIGNATURE) {
     if (!signatureCheck.configured) {
-      return res
-        .status(503)
-        .json({ error: "Webhook signature validation misconfigured." });
+      return sendError(
+        res,
+        503,
+        "Webhook signature validation misconfigured.",
+        "WEBHOOK_SIGNATURE_MISCONFIGURED",
+      );
     }
     if (!signatureCheck.valid) {
-      return res.status(401).json({
-        error: "Invalid webhook signature.",
-        code: signatureCheck.reason,
+      return sendError(res, 401, "Invalid webhook signature.", "INVALID_WEBHOOK_SIGNATURE", {
+        reason: signatureCheck.reason,
       });
     }
   } else if (
@@ -817,9 +884,8 @@ const handleWixWebhook = async (req: Request, res: Response) => {
     signatureCheck.present &&
     !signatureCheck.valid
   ) {
-    return res.status(401).json({
-      error: "Invalid webhook signature.",
-      code: signatureCheck.reason,
+    return sendError(res, 401, "Invalid webhook signature.", "INVALID_WEBHOOK_SIGNATURE", {
+      reason: signatureCheck.reason,
     });
   }
 
@@ -1324,6 +1390,174 @@ router.get(
       return res
         .status(500)
         .json({ error: error?.message || "Failed to fetch webhook events." });
+    }
+  },
+);
+
+router.get(
+  "/api/superadmin/byok/ops-health",
+  authenticateToken,
+  requireSuperAdmin,
+  async (_req, res) => {
+    try {
+      const now = Date.now();
+      const lastHour = new Date(now - 60 * 60 * 1000);
+      const last24h = new Date(now - 24 * 60 * 60 * 1000);
+      const staleCutoff = new Date(now - BYOK_STALE_PENDING_MINUTES * 60 * 1000);
+
+      const [hourEvents, dayEvents, stalePending, orgs] = await Promise.all([
+        prisma.webhookEvent.findMany({
+          where: {
+            provider: { in: [WEBHOOK_PROVIDER_WIX, WEBHOOK_PROVIDER_CHECKOUT] },
+            createdAt: { gte: lastHour },
+          },
+          select: { status: true, error: true, payload: true },
+        }),
+        prisma.webhookEvent.findMany({
+          where: {
+            provider: { in: [WEBHOOK_PROVIDER_WIX, WEBHOOK_PROVIDER_CHECKOUT] },
+            createdAt: { gte: last24h },
+          },
+          select: { status: true, error: true, payload: true },
+        }),
+        prisma.webhookEvent.findMany({
+          where: {
+            provider: WEBHOOK_PROVIDER_CHECKOUT,
+            status: { in: ["PENDING", "RECEIVED", "VERIFIED"] },
+            createdAt: { lte: staleCutoff },
+          },
+          orderBy: [{ createdAt: "asc" }],
+          take: 200,
+          select: {
+            id: true,
+            eventKey: true,
+            status: true,
+            organizationId: true,
+            createdAt: true,
+            payload: true,
+          },
+        }),
+        prisma.organization.findMany({
+          where: { provisioningSource: "BYOK" },
+          include: { entitlement: true },
+          orderBy: [{ createdAt: "desc" }],
+        }),
+      ]);
+
+      const summarize = (events: Array<{ status: string; error: string | null; payload: any }>) => {
+        const total = events.length;
+        const errorCount = events.filter((e) => (e.status || "").toUpperCase() === "ERROR").length;
+        const processed = events.filter((e) => (e.status || "").toUpperCase() === "PROCESSED").length;
+        const pending = events.filter((e) =>
+          ["PENDING", "RECEIVED", "VERIFIED"].includes((e.status || "").toUpperCase()),
+        ).length;
+        const ignored = events.filter((e) => (e.status || "").toUpperCase() === "IGNORED").length;
+        const errorRate = total > 0 ? Number(((errorCount / total) * 100).toFixed(2)) : 0;
+
+        const errorByCode: Record<string, number> = {};
+        for (const event of events) {
+          if ((event.status || "").toUpperCase() !== "ERROR") continue;
+          const payload = (event.payload || {}) as any;
+          const signatureReason = payload?.signature?.reason;
+          const code = String(signatureReason || event.error || "UNKNOWN_ERROR");
+          errorByCode[code] = (errorByCode[code] || 0) + 1;
+        }
+
+        return {
+          total,
+          processed,
+          pending,
+          ignored,
+          errorCount,
+          errorRate,
+          errorByCode,
+        };
+      };
+
+      const routingDrift: Array<{
+        organizationId: string;
+        organizationName: string;
+        expectedRoutingDomain: string;
+        actualRoutingDomain: string | null;
+        expectedPackageCode: string;
+      }> = [];
+      const entitlementDrift: Array<{
+        organizationId: string;
+        organizationName: string;
+        expectedPackageCode: string;
+        organizationEntitlementCode: string | null;
+        entitlementPackageCode: string | null;
+        entitlementStatus: string | null;
+      }> = [];
+
+      for (const org of orgs) {
+        const entitlementCode = toByokPlanCode(org.entitlement?.packageCode || null);
+        const orgCode = toByokPlanCode(org.entitlementCode || null);
+        const expectedPackage = entitlementCode || orgCode || "BYOK_TRIAL";
+        const expectedConfig = BYOK_PACKAGE_CONFIG[expectedPackage];
+
+        if ((org.routingDomain || null) !== (expectedConfig.routingDomain || null)) {
+          routingDrift.push({
+            organizationId: org.id,
+            organizationName: org.name,
+            expectedRoutingDomain: expectedConfig.routingDomain,
+            actualRoutingDomain: org.routingDomain || null,
+            expectedPackageCode: expectedPackage,
+          });
+        }
+
+        const hasEntitlementDrift =
+          org.entitlementCode !== expectedPackage ||
+          org.entitlement?.packageCode !== expectedPackage ||
+          (org.entitlement?.status || "ACTIVE") !== "ACTIVE";
+
+        if (hasEntitlementDrift) {
+          entitlementDrift.push({
+            organizationId: org.id,
+            organizationName: org.name,
+            expectedPackageCode: expectedPackage,
+            organizationEntitlementCode: org.entitlementCode || null,
+            entitlementPackageCode: org.entitlement?.packageCode || null,
+            entitlementStatus: org.entitlement?.status || null,
+          });
+        }
+      }
+
+      return res.json({
+        success: true,
+        generatedAt: new Date().toISOString(),
+        stalePendingMinutes: BYOK_STALE_PENDING_MINUTES,
+        windows: {
+          lastHour: summarize(hourEvents),
+          last24Hours: summarize(dayEvents),
+        },
+        stalePendingActivations: {
+          count: stalePending.length,
+          events: stalePending.map((event) => {
+            const payload = (event.payload || {}) as any;
+            return {
+              id: event.id,
+              checkoutSessionId: event.eventKey,
+              status: event.status,
+              createdAt: event.createdAt,
+              organizationId: event.organizationId || payload.organizationId || null,
+              packageCode: payload.packageCode || null,
+              customerEmail: payload.customerEmail || null,
+              orderId: payload.orderId || null,
+            };
+          }),
+        },
+        routingDrift: {
+          count: routingDrift.length,
+          organizations: routingDrift,
+        },
+        entitlementDrift: {
+          count: entitlementDrift.length,
+          organizations: entitlementDrift,
+        },
+      });
+    } catch (error: any) {
+      return res.status(500).json({ error: error?.message || "Failed to build ops health summary." });
     }
   },
 );

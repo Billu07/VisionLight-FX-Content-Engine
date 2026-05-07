@@ -134,6 +134,7 @@ export const apiEndpoints = {
     to?: string;
     limit?: number;
   }) => api.get("/api/superadmin/byok/webhook-events", { params }),
+  superadminGetByokOpsHealth: () => api.get("/api/superadmin/byok/ops-health"),
   superadminUploadWelcomeVideo: (formData: FormData) =>
     api.post("/api/superadmin/settings/welcome-video/upload", formData, {
       headers: { "Content-Type": "multipart/form-data" },

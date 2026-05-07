@@ -35,6 +35,8 @@ export const adminUi = {
   mutedCard: "rounded-xl border border-white/10 bg-white/[0.045]",
   input:
     "rounded-lg border border-white/10 bg-gray-950/70 text-white outline-none focus:border-brand-accent",
+  select:
+    "rounded-lg border border-white/10 bg-gray-950/80 px-3 py-2 text-[11px] text-gray-200 outline-none focus:border-brand-accent",
   primaryButton:
     "rounded-lg bg-brand-accent px-5 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-950 transition-colors hover:bg-cyan-300 disabled:opacity-50",
   softButton:

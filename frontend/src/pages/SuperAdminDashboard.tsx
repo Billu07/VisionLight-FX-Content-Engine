@@ -233,6 +233,18 @@ export default function SuperAdminDashboard() {
   >("platform");
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [byokOrganizations, setByokOrganizations] = useState<any[]>([]);
+  const [byokWebhookEvents, setByokWebhookEvents] = useState<any[]>([]);
+  const [byokOpsHealth, setByokOpsHealth] = useState<any>(null);
+  const [byokEventsLoading, setByokEventsLoading] = useState(false);
+  const [byokEventFilters, setByokEventFilters] = useState<{
+    status: string;
+    packageCode: string;
+    limit: number;
+  }>({
+    status: "",
+    packageCode: "",
+    limit: 80,
+  });
   const [users, setUsers] = useState<User[]>([]);
   const [creditRequests, setCreditRequests] = useState<CreditRequest[]>([]);
   const [globalSettings, setGlobalSettings] = useState<any>(null);
@@ -503,6 +515,15 @@ export default function SuperAdminDashboard() {
     setWelcomePreviewReady(false);
   }, [activeTab, globalSettings?.welcomeVideoUrl]);
 
+  useEffect(() => {
+    if (activeTab !== "byok") return;
+    void fetchByokOpsData();
+    const interval = setInterval(() => {
+      void fetchByokOpsData();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [activeTab, byokEventFilters.status, byokEventFilters.packageCode, byokEventFilters.limit]);
+
   const fetchInitialData = async () => {
     setLoading(true);
     try {
@@ -521,10 +542,35 @@ export default function SuperAdminDashboard() {
       if (presetsRes.data.success) setPresets(presetsRes.data.presets);
       if (requestsRes.data.success) setCreditRequests(requestsRes.data.requests || []);
       if (byokRes.data.success) setByokOrganizations(byokRes.data.organizations || []);
+      await fetchByokOpsData();
     } catch (err: any) {
       setMsg("Error loading data: " + err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchByokOpsData = async () => {
+    setByokEventsLoading(true);
+    try {
+      const [eventsRes, healthRes] = await Promise.all([
+        apiEndpoints.superadminGetByokWebhookEvents({
+          status: byokEventFilters.status || undefined,
+          packageCode: byokEventFilters.packageCode || undefined,
+          limit: byokEventFilters.limit || 80,
+        }),
+        apiEndpoints.superadminGetByokOpsHealth(),
+      ]);
+      if (eventsRes.data?.success) {
+        setByokWebhookEvents(eventsRes.data.events || []);
+      }
+      if (healthRes.data?.success) {
+        setByokOpsHealth(healthRes.data);
+      }
+    } catch (error: any) {
+      setMsg("Error loading BYOK ops data: " + (error?.message || "unknown"));
+    } finally {
+      setByokEventsLoading(false);
     }
   };
 
@@ -539,6 +585,40 @@ export default function SuperAdminDashboard() {
       await fetchInitialData();
     } catch (error: any) {
       setMsg("Error: " + (error?.message || "Failed to activate package."));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleResetByokTrial = async (organizationId: string) => {
+    setActionLoading(true);
+    try {
+      await apiEndpoints.superadminResetByokTrial({ organizationId, reason: "ops_reset" });
+      setMsg("BYOK trial reset completed.");
+      await fetchInitialData();
+    } catch (error: any) {
+      setMsg("Error: " + (error?.message || "Failed to reset trial."));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReconcileByok = async (organizationId?: string) => {
+    setActionLoading(true);
+    try {
+      const res = await apiEndpoints.superadminReconcileByok(
+        organizationId ? { organizationId } : {},
+      );
+      const repaired = Number(res.data?.repaired || 0);
+      const count = Number(res.data?.count || 0);
+      setMsg(
+        organizationId
+          ? "BYOK organization reconciled."
+          : `BYOK reconcile done. Repaired ${repaired}/${count}.`,
+      );
+      await fetchInitialData();
+    } catch (error: any) {
+      setMsg("Error: " + (error?.message || "Failed to reconcile BYOK organizations."));
     } finally {
       setActionLoading(false);
     }
@@ -1342,6 +1422,70 @@ export default function SuperAdminDashboard() {
         {activeTab === "byok" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
             <div className={adminUi.tablePanel}>
+              <div className={`${adminUi.panelHeader} flex flex-wrap items-center justify-between gap-3`}>
+                <div>
+                  <h2 className={adminUi.sectionTitle}>BYOK Ops Health</h2>
+                  <p className={adminUi.sectionCopy}>
+                    Webhook reliability, stale activations, routing drift, and entitlement drift.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className={adminUi.cyanButton}
+                    onClick={() => void fetchByokOpsData()}
+                    disabled={byokEventsLoading}
+                  >
+                    Refresh Ops
+                  </button>
+                  <button
+                    type="button"
+                    className={adminUi.primaryButton}
+                    onClick={() => void handleReconcileByok()}
+                    disabled={actionLoading}
+                  >
+                    Reconcile All
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 p-5 md:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-gray-400">Errors (1h)</div>
+                  <div className="mt-1 text-2xl font-black text-rose-300">
+                    {byokOpsHealth?.windows?.lastHour?.errorCount ?? 0}
+                  </div>
+                  <div className="mt-1 text-[11px] text-gray-500">
+                    Rate: {byokOpsHealth?.windows?.lastHour?.errorRate ?? 0}%
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-gray-400">Stale Pending</div>
+                  <div className="mt-1 text-2xl font-black text-amber-300">
+                    {byokOpsHealth?.stalePendingActivations?.count ?? 0}
+                  </div>
+                  <div className="mt-1 text-[11px] text-gray-500">
+                    &gt; {byokOpsHealth?.stalePendingMinutes ?? 0} minutes
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-gray-400">Routing Drift</div>
+                  <div className="mt-1 text-2xl font-black text-cyan-200">
+                    {byokOpsHealth?.routingDrift?.count ?? 0}
+                  </div>
+                  <div className="mt-1 text-[11px] text-gray-500">Expected vs org routing domain</div>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="text-[10px] uppercase tracking-[0.16em] text-gray-400">Entitlement Drift</div>
+                  <div className="mt-1 text-2xl font-black text-fuchsia-200">
+                    {byokOpsHealth?.entitlementDrift?.count ?? 0}
+                  </div>
+                  <div className="mt-1 text-[11px] text-gray-500">Org + entitlement mismatch</div>
+                </div>
+              </div>
+            </div>
+
+            <div className={adminUi.tablePanel}>
               <div className={adminUi.panelHeader}>
                 <h2 className={adminUi.sectionTitle}>BYOK Organizations</h2>
                 <p className={adminUi.sectionCopy}>
@@ -1424,11 +1568,137 @@ export default function SuperAdminDashboard() {
                                 >
                                   Activate Package
                                 </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleResetByokTrial(org.id)}
+                                  className={adminUi.amberButton}
+                                  disabled={actionLoading}
+                                >
+                                  Reset Trial
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleReconcileByok(org.id)}
+                                  className={adminUi.primaryButton}
+                                  disabled={actionLoading}
+                                >
+                                  Reconcile
+                                </button>
                               </div>
                             </td>
                           </tr>
                         );
                       })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className={adminUi.tablePanel}>
+              <div className={`${adminUi.panelHeader} flex flex-wrap items-center justify-between gap-3`}>
+                <div>
+                  <h2 className={adminUi.sectionTitle}>BYOK Webhook Events</h2>
+                  <p className={adminUi.sectionCopy}>
+                    Filter by status/package and inspect activation lifecycle.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={byokEventFilters.status}
+                    onChange={(e) =>
+                      setByokEventFilters((prev) => ({ ...prev, status: e.target.value }))
+                    }
+                    className={adminUi.select}
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="PENDING">PENDING</option>
+                    <option value="RECEIVED">RECEIVED</option>
+                    <option value="VERIFIED">VERIFIED</option>
+                    <option value="PROCESSED">PROCESSED</option>
+                    <option value="ERROR">ERROR</option>
+                    <option value="IGNORED">IGNORED</option>
+                  </select>
+                  <select
+                    value={byokEventFilters.packageCode}
+                    onChange={(e) =>
+                      setByokEventFilters((prev) => ({ ...prev, packageCode: e.target.value }))
+                    }
+                    className={adminUi.select}
+                  >
+                    <option value="">All Packages</option>
+                    <option value="PD_APP">PD_APP</option>
+                    <option value="VFX_APP">VFX_APP</option>
+                    <option value="PD_STUDIO">PD_STUDIO</option>
+                    <option value="VFX_STUDIO">VFX_STUDIO</option>
+                    <option value="VFX_STUDIO_AGENCY">VFX_STUDIO_AGENCY</option>
+                  </select>
+                  <select
+                    value={String(byokEventFilters.limit)}
+                    onChange={(e) =>
+                      setByokEventFilters((prev) => ({
+                        ...prev,
+                        limit: Number.parseInt(e.target.value, 10) || 80,
+                      }))
+                    }
+                    className={adminUi.select}
+                  >
+                    <option value="50">50</option>
+                    <option value="80">80</option>
+                    <option value="120">120</option>
+                    <option value="200">200</option>
+                  </select>
+                  <button
+                    type="button"
+                    className={adminUi.cyanButton}
+                    onClick={() => void fetchByokOpsData()}
+                    disabled={byokEventsLoading}
+                  >
+                    {byokEventsLoading ? "Loading..." : "Refresh"}
+                  </button>
+                </div>
+              </div>
+
+              {byokWebhookEvents.length === 0 ? (
+                <div className="p-6 text-xs text-gray-500 italic">No webhook events for current filter.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[1250px] text-left">
+                    <thead className={adminUi.tableHead}>
+                      <tr>
+                        <th className="p-4">Time</th>
+                        <th className="p-4">Provider</th>
+                        <th className="p-4">Status</th>
+                        <th className="p-4">Package</th>
+                        <th className="p-4">Email</th>
+                        <th className="p-4">Checkout Session</th>
+                        <th className="p-4">Order</th>
+                        <th className="p-4">Error</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {byokWebhookEvents.map((event) => (
+                        <tr key={event.id} className={adminUi.tableRow}>
+                          <td className="p-4 text-xs text-gray-300">
+                            {event.createdAt ? new Date(event.createdAt).toLocaleString() : "n/a"}
+                          </td>
+                          <td className="p-4 text-[11px] font-semibold text-cyan-200">
+                            {event.provider}
+                          </td>
+                          <td className="p-4">
+                            <span className="rounded border border-white/15 bg-white/[0.04] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-gray-200">
+                              {event.status}
+                            </span>
+                          </td>
+                          <td className="p-4 text-[11px] text-gray-200">{event.packageCode || "n/a"}</td>
+                          <td className="p-4 text-[11px] text-gray-300">{event.customerEmail || "n/a"}</td>
+                          <td className="p-4 font-mono text-[10px] text-gray-400">
+                            {event.checkoutSessionId || "n/a"}
+                          </td>
+                          <td className="p-4 text-[11px] text-gray-300">{event.orderId || "n/a"}</td>
+                          <td className="p-4 text-[11px] text-rose-300">{event.error || "-"}</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
