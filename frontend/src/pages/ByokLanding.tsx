@@ -17,6 +17,33 @@ export const ByokLanding = () => {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const finalizeByokSession = async (profileLabel: string) => {
+    const initialAuth = await checkAuth();
+    if (initialAuth.profileSelectionRequired) {
+      navigate("/studios", { replace: true });
+      return;
+    }
+
+    try {
+      const bootstrap = await apiEndpoints.byokBootstrap();
+      const profileId = bootstrap.data?.profileId;
+      if (typeof profileId === "string" && profileId.trim()) {
+        setActiveProfile(profileId, profileLabel);
+      }
+    } catch (error: any) {
+      if (error?.status === 409 && error?.code === "PROFILE_SELECTION_REQUIRED") {
+        navigate("/studios", { replace: true });
+        return;
+      }
+      throw error;
+    }
+
+    const finalAuth = await checkAuth();
+    navigate(finalAuth.profileSelectionRequired ? "/studios" : "/projects", {
+      replace: true,
+    });
+  };
+
   useEffect(() => {
     const run = async () => {
       const {
@@ -25,15 +52,7 @@ export const ByokLanding = () => {
       if (!session?.access_token) return;
       setAuthToken(session.access_token);
       try {
-        const bootstrap = await apiEndpoints.byokBootstrap();
-        const profileId = bootstrap.data?.profileId;
-        if (typeof profileId === "string" && profileId.trim()) {
-          setActiveProfile(profileId, email || "BYOK Workspace");
-        }
-        const authResult = await checkAuth();
-        navigate(authResult.profileSelectionRequired ? "/studios" : "/projects", {
-          replace: true,
-        });
+        await finalizeByokSession(email || "BYOK Workspace");
       } catch {
         // silent
       }
@@ -78,16 +97,13 @@ export const ByokLanding = () => {
         setAuthToken(data.session.access_token);
       }
 
-      const bootstrap = await apiEndpoints.byokBootstrap();
-      const profileId = bootstrap.data?.profileId;
-      if (typeof profileId === "string" && profileId.trim()) {
-        setActiveProfile(profileId, email.trim().toLowerCase());
-      }
-
-      await checkAuth();
-      navigate("/projects", { replace: true });
+      await finalizeByokSession(email.trim().toLowerCase());
     } catch (error: any) {
-      notify.error(error?.message || "Authentication failed.");
+      if (error?.status === 409 && error?.code === "PROFILE_SELECTION_REQUIRED") {
+        navigate("/studios", { replace: true });
+      } else {
+        notify.error(error?.message || "Authentication failed.");
+      }
     } finally {
       setIsSubmitting(false);
     }
