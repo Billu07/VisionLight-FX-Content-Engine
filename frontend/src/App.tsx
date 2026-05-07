@@ -42,6 +42,9 @@ const queryClient = new QueryClient({
 // --- Admin Dashboard Switcher ---
 const AdminDashboardSwitcher = () => {
   const { user } = useAuth();
+  // In BYOK workspaces, always use the tenant admin surface so integrations
+  // (Fal key link) and org-scoped controls are available.
+  if (user?.byok?.isByok) return <TenantDashboard />;
   if (user?.role === "SUPERADMIN") return <SuperAdminDashboard />;
   return <TenantDashboard />;
 };
