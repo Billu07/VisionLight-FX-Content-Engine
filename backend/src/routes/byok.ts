@@ -679,6 +679,90 @@ const resolveFallbackCheckoutSessionId = async (params: {
   return null;
 };
 
+const getCheckoutSessionSnapshot = async (checkoutSessionId: string) => {
+  const sessionEvent = await prisma.webhookEvent.findUnique({
+    where: {
+      provider_eventKey: {
+        provider: WEBHOOK_PROVIDER_CHECKOUT,
+        eventKey: checkoutSessionId,
+      },
+    },
+  });
+  if (!sessionEvent) return null;
+
+  const sessionPayload = (sessionEvent.payload || {}) as any;
+  const eventOrgId =
+    sessionEvent.organizationId ||
+    (typeof sessionPayload.organizationId === "string"
+      ? sessionPayload.organizationId
+      : null);
+  const requestedPackage = toByokPlanCode(sessionPayload.packageCode) || null;
+
+  let org: {
+    id: string;
+    routingDomain: string | null;
+    entitlementCode: string | null;
+    entitlement: { packageCode: string } | null;
+  } | null = null;
+  if (eventOrgId) {
+    org = await prisma.organization.findUnique({
+      where: { id: eventOrgId },
+      select: {
+        id: true,
+        routingDomain: true,
+        entitlementCode: true,
+        entitlement: {
+          select: {
+            packageCode: true,
+          },
+        },
+      },
+    });
+  }
+
+  const resolvedPackage =
+    toByokPlanCode(org?.entitlement?.packageCode || org?.entitlementCode || null) ||
+    requestedPackage;
+  const activation = mapEventStatusToActivation(sessionEvent.status);
+  const activationConfirmed =
+    activation === "PROCESSED" &&
+    !!resolvedPackage &&
+    resolvedPackage !== "BYOK_TRIAL" &&
+    (!requestedPackage || requestedPackage === resolvedPackage);
+  const status: ActivationStatus = activationConfirmed
+    ? "PROCESSED"
+    : activation === "ERROR"
+      ? "ERROR"
+      : "PENDING";
+
+  return {
+    statusCode: 200,
+    eventOrgId,
+    payload: {
+      success: true,
+      status,
+      checkoutSessionId,
+      packageCode: resolvedPackage,
+      requestedPackageCode: requestedPackage,
+      routingDomain:
+        org?.routingDomain ||
+        (resolvedPackage ? BYOK_PACKAGE_CONFIG[resolvedPackage].routingDomain : null),
+      entitlementCode: org?.entitlementCode || null,
+      lifecycle: sessionEvent.status,
+      webhookEventId: sessionPayload.eventKey || null,
+      orderId: sessionPayload.orderId || null,
+      updatedAt: sessionEvent.updatedAt,
+      activationConfirmed,
+      message:
+        status === "PROCESSED"
+          ? "Activation complete."
+          : status === "ERROR"
+            ? sessionEvent.error || "Activation failed."
+            : "Waiting for payment confirmation.",
+    },
+  } as const;
+};
+
 router.get("/api/byok/packages", async (_req, res) => {
   const packages = await byokService.getPackageCatalog();
   res.json({
@@ -776,67 +860,22 @@ router.get(
         return res.status(403).json({ error: "BYOK workspace required." });
       }
 
-      const sessionEvent = await prisma.webhookEvent.findUnique({
-        where: {
-          provider_eventKey: {
-            provider: WEBHOOK_PROVIDER_CHECKOUT,
-            eventKey: checkoutSessionId,
-          },
-        },
-      });
-
-      if (!sessionEvent) {
+      const snapshot = await getCheckoutSessionSnapshot(checkoutSessionId);
+      if (!snapshot) {
         return res.status(404).json({ error: "Checkout session not found." });
       }
-
-      const eventOrgId =
-        sessionEvent.organizationId ||
-        (((sessionEvent.payload || {}) as any).organizationId as string | undefined) ||
-        null;
-      if (eventOrgId && eventOrgId !== status.organizationId) {
+      if (!snapshot.eventOrgId) {
+        return res.status(409).json({
+          error:
+            "Checkout session is missing organization binding. Start checkout again.",
+        });
+      }
+      if (snapshot.eventOrgId !== status.organizationId) {
         return res.status(403).json({
           error: "Checkout session does not belong to current workspace.",
         });
       }
-
-      const sessionPayload = (sessionEvent.payload || {}) as any;
-      const requestedPackage = toByokPlanCode(sessionPayload.packageCode) || null;
-      const resolvedPackage =
-        toByokPlanCode(status.packageCode || status.entitlementCode || null) || null;
-      const activation = mapEventStatusToActivation(sessionEvent.status);
-
-      const activationConfirmed =
-        activation === "PROCESSED" &&
-        !!resolvedPackage &&
-        resolvedPackage !== "BYOK_TRIAL" &&
-        (!requestedPackage || requestedPackage === resolvedPackage);
-
-      const responseStatus: ActivationStatus = activationConfirmed
-        ? "PROCESSED"
-        : activation === "ERROR"
-          ? "ERROR"
-          : "PENDING";
-
-      return res.json({
-        success: true,
-        status: responseStatus,
-        checkoutSessionId,
-        packageCode: resolvedPackage,
-        requestedPackageCode: requestedPackage,
-        routingDomain: status.routingDomain || null,
-        entitlementCode: status.entitlementCode || null,
-        lifecycle: sessionEvent.status,
-        webhookEventId: sessionPayload.eventKey || null,
-        orderId: sessionPayload.orderId || null,
-        updatedAt: sessionEvent.updatedAt,
-        activationConfirmed,
-        message:
-          responseStatus === "PROCESSED"
-            ? "Activation complete."
-            : responseStatus === "ERROR"
-              ? sessionEvent.error || "Activation failed."
-              : "Waiting for payment confirmation.",
-      });
+      return res.json(snapshot.payload);
     } catch (error: any) {
       return res
         .status(500)
@@ -844,6 +883,27 @@ router.get(
     }
   },
 );
+
+router.get("/api/byok/activation-status-public", async (req, res) => {
+  try {
+    const checkoutSessionId =
+      typeof req.query.checkoutSessionId === "string"
+        ? req.query.checkoutSessionId.trim()
+        : "";
+    if (!checkoutSessionId) {
+      return res.status(400).json({ error: "checkoutSessionId is required." });
+    }
+    const snapshot = await getCheckoutSessionSnapshot(checkoutSessionId);
+    if (!snapshot) {
+      return res.status(404).json({ error: "Checkout session not found." });
+    }
+    return res.json(snapshot.payload);
+  } catch (error: any) {
+    return res
+      .status(500)
+      .json({ error: error?.message || "Failed to fetch activation status." });
+  }
+});
 
 const handleWixWebhook = async (req: Request, res: Response) => {
   const clientIp = resolveClientIp(req);
@@ -1031,12 +1091,44 @@ const handleWixWebhook = async (req: Request, res: Response) => {
   }
 
   try {
-    const activation = await byokService.activatePackageForEmail(customerEmail, packageCode, {
-      wixOrderId: orderId ? String(orderId) : null,
-      wixTransactionId: transactionId ? String(transactionId) : null,
-      source: "wix_webhook",
-      raw: payload,
-    });
+    let targetOrganizationId: string | null = null;
+    if (checkoutSessionId) {
+      const checkoutSession = await prisma.webhookEvent.findUnique({
+        where: {
+          provider_eventKey: {
+            provider: WEBHOOK_PROVIDER_CHECKOUT,
+            eventKey: checkoutSessionId,
+          },
+        },
+        select: {
+          organizationId: true,
+          payload: true,
+        },
+      });
+      const boundOrgId =
+        checkoutSession?.organizationId ||
+        (typeof (checkoutSession?.payload as any)?.organizationId === "string"
+          ? ((checkoutSession?.payload as any).organizationId as string)
+          : null);
+      if (boundOrgId) {
+        targetOrganizationId = boundOrgId;
+      }
+    }
+
+    const activation = targetOrganizationId
+      ? await byokService.activatePackageForOrganization(targetOrganizationId, packageCode, {
+          customerEmail: customerEmail || null,
+          wixOrderId: orderId ? String(orderId) : null,
+          wixTransactionId: transactionId ? String(transactionId) : null,
+          source: "wix_webhook",
+          raw: payload,
+        })
+      : await byokService.activatePackageForEmail(customerEmail, packageCode, {
+          wixOrderId: orderId ? String(orderId) : null,
+          wixTransactionId: transactionId ? String(transactionId) : null,
+          source: "wix_webhook",
+          raw: payload,
+        });
 
     await prisma.webhookEvent.update({
       where: { provider_eventKey: { provider: WEBHOOK_PROVIDER_WIX, eventKey } },

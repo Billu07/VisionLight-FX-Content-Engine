@@ -66,7 +66,9 @@ export default function BillingReturn() {
       const startedAt = Date.now();
       while (!stopRef.current && Date.now() - startedAt < 120000) {
         try {
-          const response = await apiEndpoints.byokGetActivationStatus(checkoutSessionId);
+          const response = await apiEndpoints.byokGetActivationStatusPublic(
+            checkoutSessionId,
+          );
           const status = response.data?.status as "PENDING" | "PROCESSED" | "ERROR" | undefined;
           const lifecycle = String(response.data?.lifecycle || "").toUpperCase();
           const routingDomain = sanitizeDomain(response.data?.routingDomain || null);
@@ -193,4 +195,3 @@ export default function BillingReturn() {
     </div>
   );
 }
-

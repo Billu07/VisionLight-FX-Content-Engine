@@ -173,7 +173,6 @@ router.use(authenticateToken);
 router.use(requireAdmin);
 router.use(async (req: AuthenticatedRequest, res, next) => {
   try {
-    if (req.user?.role === "SUPERADMIN") return next();
     const orgId = req.user?.organizationId;
     if (!orgId) return next();
     const org = await dbService.getOrganization(orgId);

@@ -201,7 +201,7 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   if (!isAdmin) {
     return <Navigate to="/app" replace />;
   }
-  if (user.byok?.adminPanelLocked && user.role !== "SUPERADMIN") {
+  if (user.byok?.adminPanelLocked) {
     return <Navigate to="/projects" replace />;
   }
 
@@ -253,11 +253,7 @@ function App() {
             <Route path="/support-handoff" element={<SupportHandoff />} />
             <Route
               path="/billing/return"
-              element={
-                <ProtectedRoute>
-                  <BillingReturn />
-                </ProtectedRoute>
-              }
+              element={<BillingReturn />}
             />
             {/* --------------------------- */}
 

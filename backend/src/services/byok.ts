@@ -485,6 +485,13 @@ export const byokService = {
   ) {
     const pkg = BYOK_PACKAGE_CONFIG[packageCode];
     if (!pkg) throw new Error("Unsupported package code.");
+    const org = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { id: true, provisioningSource: true },
+    });
+    if (!org || org.provisioningSource !== "BYOK") {
+      throw new Error("BYOK organization not found.");
+    }
 
     await applyPackageToOrganization(organizationId, packageCode);
     const entitlement = await prisma.organizationEntitlement.upsert({

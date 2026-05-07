@@ -87,6 +87,8 @@ export const apiEndpoints = {
     api.post("/api/byok/checkout-intent", { packageCode }),
   byokGetActivationStatus: (checkoutSessionId: string) =>
     api.get("/api/byok/activation-status", { params: { checkoutSessionId } }),
+  byokGetActivationStatusPublic: (checkoutSessionId: string) =>
+    api.get("/api/byok/activation-status-public", { params: { checkoutSessionId } }),
   byokBootstrap: () => api.post("/api/byok/bootstrap"),
   byokLinkKey: (falApiKey: string) => api.post("/api/byok/link-key", { falApiKey }),
   byokGetStatus: () => api.get("/api/byok/status"),
