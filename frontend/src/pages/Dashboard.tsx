@@ -43,7 +43,6 @@ const DASHBOARD_BG_MODE_KEY = "visionlight_dashboard_bg_mode";
 const ASSET_TASK_PANEL_STATE_KEY = "visionlight_asset_task_panel_state_v1";
 const DASHBOARD_TASK_INDICATOR_STATE_KEY =
   "visionlight_dashboard_task_indicator_state_v1";
-const BYOK_INFO_BANNER_DISMISS_KEY = "visionlight_byok_info_banner_dismissed_v1";
 const FAL_KEYS_URL = "https://fal.ai/dashboard/keys";
 const BYOK_PRICING_URL = "https://www.picdrift.com/pricing-plans/byok";
 const BYOK_ACTIVATION_HINTS = [
@@ -52,88 +51,79 @@ const BYOK_ACTIVATION_HINTS = [
   "Unlocking your studio limits...",
   "Applying access rules and routing...",
 ];
-const BYOK_CHECKOUT_PLANS = [
+type ByokPlanCode =
+  | "PD_APP"
+  | "VFX_APP"
+  | "PD_STUDIO"
+  | "VFX_STUDIO"
+  | "VFX_STUDIO_AGENCY";
+
+type ByokPackageCatalogItem = {
+  code: ByokPlanCode;
+  title: string;
+  routingDomain: string;
+  maxUsers: number;
+  maxProjectsTotal: number;
+  maxStorageMb: number;
+  storageRetentionDays: number | null;
+  adminPanelLocked: boolean;
+};
+
+const BYOK_CHECKOUT_PLAN_META: Record<
+  ByokPlanCode,
   {
-    code: "PD_APP",
-    title: "PicDrift App",
-    price: "$9",
-    period: "/month",
-    blurb: "Focused solo workspace for PicDrift.",
-    domain: "picdrift.app",
-    admin: "Admin Panel Locked",
-    users: "1 user",
-    projects: "3 projects",
-    storage: "10 GB shared storage",
-    retention: "7-day media retention",
-    featured: false,
+    annualPrice: string;
+    monthlyEquivalent: string;
+    blurb: string;
+    checkoutUrl: string;
+    highlight?: string;
+    featured?: boolean;
+    modelLine: string;
+  }
+> = {
+  PD_APP: {
+    annualPrice: "$108",
+    monthlyEquivalent: "$9/mo billed annually",
+    blurb: "Focused solo PicDrift workflow with clean BYOK routing.",
+    modelLine: "Nano Banana, GPT-2, Kling 2.6",
     checkoutUrl:
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=df674622-e11f-4e88-8564-4bb12365d5e5&checkoutFlowId=0ca462cc-de89-4e2c-b02e-bb83d3c7ee98",
   },
-  {
-    code: "VFX_APP",
-    title: "VisualFX App",
-    price: "$14",
-    period: "/month",
-    blurb: "Focused solo workspace for VisualFX.",
-    domain: "visualfx.app",
-    admin: "Admin Panel Locked",
-    users: "1 user",
-    projects: "3 projects",
-    storage: "10 GB shared storage",
-    retention: "7-day media retention",
-    featured: false,
+  VFX_APP: {
+    annualPrice: "$168",
+    monthlyEquivalent: "$14/mo billed annually",
+    blurb: "Solo VisualFX workflow with top video model access.",
+    modelLine: "VisualFX video models",
     checkoutUrl:
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=8351c366-2837-44cd-8522-65ec3fecb56d&checkoutFlowId=05b75b73-c0ed-4ae2-ab13-130ab4628ca6",
   },
-  {
-    code: "PD_STUDIO",
-    title: "PicDrift Studio",
-    price: "$49",
-    period: "/month",
-    blurb: "Team-ready PicDrift studio setup.",
-    domain: "picdrift.studio",
-    admin: "Admin Panel Enabled",
-    users: "5 users",
-    projects: "20 projects",
-    storage: "Full studio storage policy",
-    retention: "Standard retention",
+  PD_STUDIO: {
+    annualPrice: "$588",
+    monthlyEquivalent: "$49/mo billed annually",
+    blurb: "Team-ready PicDrift studio for collaboration and management.",
+    modelLine: "Nano Banana, GPT-2, Kling 2.6 + Studio Admin",
+    highlight: "Most Popular",
+    featured: true,
     checkoutUrl:
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=dc751744-5641-4086-a510-7d203e187a79&checkoutFlowId=b5b1614d-e4d5-4352-804a-19d57d5225d0",
-    featured: true,
   },
-  {
-    code: "VFX_STUDIO",
-    title: "VisualFX Studio",
-    price: "$99",
-    period: "/month",
-    blurb: "High-capacity VisualFX studio workspace.",
-    domain: "visualfx.studio",
-    admin: "Admin Panel Enabled",
-    users: "5 users",
-    projects: "20 projects",
-    storage: "Full studio storage policy",
-    retention: "Standard retention",
-    featured: false,
+  VFX_STUDIO: {
+    annualPrice: "$1,188",
+    monthlyEquivalent: "$99/mo billed annually",
+    blurb: "High-capacity VisualFX studio with admin and shared workflows.",
+    modelLine: "PicDrift + FX models + Studio Admin",
     checkoutUrl:
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=a97eb2df-59b6-4500-ba93-618171001d4b&checkoutFlowId=e90e22a5-29ed-4093-b268-7838c0fca777",
   },
-  {
-    code: "VFX_STUDIO_AGENCY",
-    title: "VisualFX Studio Agency",
-    price: "$197",
-    period: "/month",
-    blurb: "Agency-scale control and operational limits.",
-    domain: "visualfx.studio",
-    admin: "Admin Panel Enabled",
-    users: "20 users",
-    projects: "200 projects",
-    storage: "Agency storage profile",
-    retention: "Standard retention",
-    featured: false,
+  VFX_STUDIO_AGENCY: {
+    annualPrice: "$2,364",
+    monthlyEquivalent: "$197/mo billed annually",
+    blurb: "Agency-scale operations with expanded seats and project capacity.",
+    modelLine: "PicDrift + FX models + Agency controls",
     checkoutUrl:
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=4785cf91-670a-416f-8bb1-637b926bf2a0&checkoutFlowId=893f469b-9e21-4baa-bb7b-3217b96aa285",
   },
-] as const;
+};
 type DashboardBgMode = "current" | "original";
 type VeoMode =
   | "image_to_video"
@@ -340,12 +330,20 @@ function Dashboard() {
   const [showReserveModal, setShowReserveModal] = useState(false);
   const [showByokUpgradeModal, setShowByokUpgradeModal] = useState(false);
   const [showByokKeyModal, setShowByokKeyModal] = useState(false);
-  const [showByokInfoBanner, setShowByokInfoBanner] = useState(true);
   const [isByokActivationPolling, setIsByokActivationPolling] = useState(false);
   const [byokActivationHintIndex, setByokActivationHintIndex] = useState(0);
   const [byokFalKeyInput, setByokFalKeyInput] = useState("");
   const [isSubmittingByokFalKey, setIsSubmittingByokFalKey] = useState(false);
   const [byokFalGuideShown, setByokFalGuideShown] = useState(false);
+  const [byokCheckoutState, setByokCheckoutState] = useState<{
+    initiated: boolean;
+    selectedPlanCode: ByokPlanCode | null;
+    returnSeen: boolean;
+  }>({
+    initiated: false,
+    selectedPlanCode: null,
+    returnSeen: false,
+  });
   const [showStockModal, setShowStockModal] = useState(false);
   const [showPromptInfo, setShowPromptInfo] = useState<string | null>(null);
   const [isTaskIndicatorMinimized, setIsTaskIndicatorMinimized] = useState(false);
@@ -461,11 +459,48 @@ function Dashboard() {
   const adminPanelLocked = byokStatus?.adminPanelLocked === true;
   const byokNeedsFalKey = isByokWorkspace && byokStatus?.hasFalKey === false;
   const currentByokPackageCode = byokStatus?.packageCode || null;
+  const byokPlanLabel = byokStatus?.packageTitle || byokStatus?.packageCode || "BYOK";
   const navigate = useNavigate();
   const canUseVideoEditor =
     user?.role === "SUPERADMIN" || user?.videoEditorEnabledForAll === true;
   const canUseCarousel =
     user?.isSuperAdmin === true || user?.carouselEnabledForAll === true;
+  const { data: byokPackagesResponse } = useQuery({
+    queryKey: ["byok-packages"],
+    queryFn: async () => (await apiEndpoints.byokGetPackages()).data,
+    enabled: isByokWorkspace,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+  const byokPlanCards = useMemo(() => {
+    const packages = Array.isArray(byokPackagesResponse?.packages)
+      ? (byokPackagesResponse.packages as ByokPackageCatalogItem[])
+      : [];
+    return packages
+      .filter((pkg) => pkg && pkg.code in BYOK_CHECKOUT_PLAN_META)
+      .map((pkg) => {
+        const meta = BYOK_CHECKOUT_PLAN_META[pkg.code as ByokPlanCode];
+        const storageGb = Math.max(0, pkg.maxStorageMb) / 1024;
+        const storageLabel =
+          storageGb >= 1
+            ? `${storageGb % 1 === 0 ? storageGb.toFixed(0) : storageGb.toFixed(1)}GB shared storage`
+            : `${Math.max(0, pkg.maxStorageMb)}MB shared storage`;
+        const retentionLabel =
+          typeof pkg.storageRetentionDays === "number" && pkg.storageRetentionDays > 0
+            ? `${pkg.storageRetentionDays}-day media retention`
+            : "Standard retention policy";
+        return {
+          ...pkg,
+          ...meta,
+          usersLabel: `${pkg.maxUsers} ${pkg.maxUsers === 1 ? "user" : "users"}`,
+          projectsLabel: `${pkg.maxProjectsTotal} projects`,
+          adminLabel: pkg.adminPanelLocked ? "Admin panel locked" : "Admin panel enabled",
+          storageLabel,
+          retentionLabel,
+          isCurrentPlan: currentByokPackageCode === pkg.code,
+        };
+      });
+  }, [byokPackagesResponse?.packages, currentByokPackageCode]);
 
   // Helper to determine the current "Visual Tab"
   const currentVisualTab: VisualTab =
@@ -679,19 +714,6 @@ function Dashboard() {
   }, [byokNeedsFalKey]);
 
   useEffect(() => {
-    if (!isByokWorkspace) {
-      setShowByokInfoBanner(true);
-      return;
-    }
-    try {
-      const key = `${BYOK_INFO_BANNER_DISMISS_KEY}_${user?.email || "unknown"}`;
-      setShowByokInfoBanner(localStorage.getItem(key) !== "1");
-    } catch {
-      setShowByokInfoBanner(true);
-    }
-  }, [isByokWorkspace, user?.email]);
-
-  useEffect(() => {
     if (!isByokActivationPolling) return;
     const hintInterval = window.setInterval(() => {
       setByokActivationHintIndex(
@@ -713,12 +735,16 @@ function Dashboard() {
       !showByokUpgradeModal ||
       !isByokWorkspace ||
       isByokActivationPolling ||
+      !byokCheckoutState.initiated ||
       !byokActivationContextRef.current.armed
     ) {
       return;
     }
 
     const handleWindowFocus = async () => {
+      setByokCheckoutState((prev) =>
+        prev.initiated ? { ...prev, returnSeen: true } : prev,
+      );
       try {
         const statusResponse = await apiEndpoints.byokGetStatus();
         const status = statusResponse?.data?.status;
@@ -733,6 +759,11 @@ function Dashboard() {
           byokActivationContextRef.current.armed = false;
           await checkAuth();
           setShowByokUpgradeModal(false);
+          setByokCheckoutState({
+            initiated: false,
+            selectedPlanCode: null,
+            returnSeen: false,
+          });
           notify.success("Payment confirmed. Your package is now active.");
         }
       } catch {
@@ -742,7 +773,13 @@ function Dashboard() {
 
     window.addEventListener("focus", handleWindowFocus);
     return () => window.removeEventListener("focus", handleWindowFocus);
-  }, [showByokUpgradeModal, isByokWorkspace, isByokActivationPolling, checkAuth]);
+  }, [
+    showByokUpgradeModal,
+    isByokWorkspace,
+    isByokActivationPolling,
+    byokCheckoutState.initiated,
+    checkAuth,
+  ]);
 
   useEffect(() => {
     try {
@@ -2154,6 +2191,12 @@ function Dashboard() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (user?.orgLockReason === "SEAT_LOCKED") {
+      notify.warning(
+        "Your seat is locked for the current package. Ask your workspace owner to upgrade or unlock your seat.",
+      );
+      return;
+    }
     const isPromptRequired = activeEngine !== "topaz";
     if (currentVisualTab === "3dx") {
       if (!referenceImageUrls.length) {
@@ -2354,10 +2397,23 @@ function Dashboard() {
     byokActivationPollRef.current = false;
     byokActivationContextRef.current.armed = false;
     setIsByokActivationPolling(false);
+    setByokCheckoutState({
+      initiated: false,
+      selectedPlanCode: null,
+      returnSeen: false,
+    });
     setShowByokUpgradeModal(false);
   };
   const handleStartByokActivationCheck = async () => {
     if (isByokActivationPolling) return;
+    if (!byokCheckoutState.initiated) {
+      notify.warning("Select a package and open checkout first.");
+      return;
+    }
+    if (!byokCheckoutState.returnSeen) {
+      notify.warning("Return from checkout tab first, then confirm activation.");
+      return;
+    }
 
     if (!byokActivationContextRef.current.armed) {
       byokActivationContextRef.current = {
@@ -2388,6 +2444,11 @@ function Dashboard() {
             byokActivationContextRef.current.armed = false;
             await checkAuth();
             setShowByokUpgradeModal(false);
+            setByokCheckoutState({
+              initiated: false,
+              selectedPlanCode: null,
+              returnSeen: false,
+            });
             notify.success("Payment confirmed. Your package is now active.");
             return;
           }
@@ -2404,23 +2465,28 @@ function Dashboard() {
       setIsByokActivationPolling(false);
     }
   };
-  const handleOpenByokCheckout = (url: string) => {
+  const handleOpenByokCheckout = (planCode: ByokPlanCode, url: string) => {
     byokActivationContextRef.current = {
       armed: true,
       baselinePackageCode: currentByokPackageCode,
       baselineUpgradeRequired: byokStatus?.upgradeRequired === true,
     };
-    window.open(url, "_blank", "noopener,noreferrer");
-    notify.info("Complete payment, then return and click 'I Completed Payment'.");
-  };
-  const dismissByokInfoBanner = () => {
-    setShowByokInfoBanner(false);
-    try {
-      const key = `${BYOK_INFO_BANNER_DISMISS_KEY}_${user?.email || "unknown"}`;
-      localStorage.setItem(key, "1");
-    } catch {
-      // no-op
+    setByokCheckoutState({
+      initiated: true,
+      selectedPlanCode: planCode,
+      returnSeen: false,
+    });
+    const checkoutWindow = window.open(url, "_blank", "noopener,noreferrer");
+    if (!checkoutWindow) {
+      setByokCheckoutState({
+        initiated: false,
+        selectedPlanCode: null,
+        returnSeen: false,
+      });
+      notify.error("Checkout popup was blocked by browser. Allow popups and try again.");
+      return;
     }
+    notify.info("Complete payment in the new tab, then return here to confirm activation.");
   };
   const handleSubmitByokFalKey = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -3222,15 +3288,32 @@ function Dashboard() {
                   </div>
                 ) : (
                   <>
-                    <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-                      {BYOK_CHECKOUT_PLANS.map((plan) => {
-                        const isCurrentPlan = currentByokPackageCode === plan.code;
-                        return (
+                    <div className="mb-4 grid gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-xs text-slate-200 sm:grid-cols-3">
+                      <div>
+                        <p className="font-black uppercase tracking-[0.12em] text-cyan-200">1. Choose Plan</p>
+                        <p className="mt-1 text-slate-300">Open secure checkout in a new tab.</p>
+                      </div>
+                      <div>
+                        <p className="font-black uppercase tracking-[0.12em] text-cyan-200">2. Complete Payment</p>
+                        <p className="mt-1 text-slate-300">Wix sends order data to your BYOK webhook.</p>
+                      </div>
+                      <div>
+                        <p className="font-black uppercase tracking-[0.12em] text-cyan-200">3. Confirm Activation</p>
+                        <p className="mt-1 text-slate-300">Return here and run activation check.</p>
+                      </div>
+                    </div>
+                    {byokPlanCards.length === 0 ? (
+                      <div className="rounded-2xl border border-amber-300/25 bg-amber-500/10 p-4 text-sm text-amber-100">
+                        Package catalog is temporarily unavailable. Open pricing page or try again in a few seconds.
+                      </div>
+                    ) : (
+                      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                        {byokPlanCards.map((plan) => (
                           <article
                             key={plan.code}
                             className={`relative rounded-2xl border p-5 shadow-xl transition-all ${
                               plan.featured
-                                ? "border-cyan-300/45 bg-[linear-gradient(165deg,rgba(8,47,73,0.72),rgba(3,7,18,0.92))]"
+                                ? "border-amber-300/40 bg-[linear-gradient(165deg,rgba(120,53,15,0.4),rgba(3,7,18,0.94))]"
                                 : "border-white/12 bg-[linear-gradient(165deg,rgba(15,23,42,0.82),rgba(2,6,23,0.9))]"
                             }`}
                           >
@@ -3241,57 +3324,66 @@ function Dashboard() {
                                 </p>
                                 <h4 className="mt-1 text-lg font-black text-white">{plan.title}</h4>
                               </div>
-                              {plan.featured && (
-                                <span className="rounded-lg border border-cyan-300/40 bg-cyan-300/15 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-cyan-100">
-                                  Popular
+                              {plan.highlight && (
+                                <span className="rounded-lg border border-amber-300/45 bg-amber-300/15 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-amber-100">
+                                  {plan.highlight}
                                 </span>
                               )}
                             </div>
 
                             <p className="mt-2 text-xs text-slate-300">{plan.blurb}</p>
+                            <p className="mt-1 text-[11px] text-cyan-200">{plan.modelLine}</p>
 
-                            <div className="mt-4 flex items-end gap-1">
-                              <span className="text-3xl font-black text-white">{plan.price}</span>
+                            <div className="mt-4 flex items-end gap-2">
+                              <span className="text-4xl font-black text-white">{plan.annualPrice}</span>
                               <span className="pb-1 text-xs font-semibold uppercase tracking-wide text-slate-300">
-                                {plan.period}
+                                /year
                               </span>
                             </div>
+                            <p className="mt-1 text-[11px] text-slate-300">{plan.monthlyEquivalent}</p>
 
-                            <div className="mt-4 space-y-2 rounded-xl border border-white/10 bg-black/25 p-3">
-                              <p className="text-[11px] text-slate-200">{plan.users}</p>
-                              <p className="text-[11px] text-slate-200">{plan.projects}</p>
-                              <p className="text-[11px] text-slate-200">{plan.storage}</p>
-                              <p className="text-[11px] text-slate-200">{plan.admin}</p>
-                              <p className="text-[11px] text-slate-200">{plan.retention}</p>
-                              <p className="text-[11px] text-cyan-200">Domain: {plan.domain}</p>
+                            <div className="mt-4 grid grid-cols-1 gap-2 rounded-xl border border-white/10 bg-black/25 p-3">
+                              <p className="text-[11px] text-slate-200">{plan.usersLabel}</p>
+                              <p className="text-[11px] text-slate-200">{plan.projectsLabel}</p>
+                              <p className="text-[11px] text-slate-200">{plan.storageLabel}</p>
+                              <p className="text-[11px] text-slate-200">{plan.adminLabel}</p>
+                              <p className="text-[11px] text-slate-200">{plan.retentionLabel}</p>
+                              <p className="text-[11px] text-cyan-200">Domain: {plan.routingDomain}</p>
                             </div>
 
                             <div className="mt-4 flex flex-col gap-2">
                               <button
                                 type="button"
-                                onClick={() => handleOpenByokCheckout(plan.checkoutUrl)}
-                                className="w-full rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white"
+                                onClick={() => handleOpenByokCheckout(plan.code, plan.checkoutUrl)}
+                                className="w-full rounded-xl bg-gradient-to-r from-orange-500 via-rose-500 to-fuchsia-600 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(249,115,22,0.32)] transition-all hover:brightness-110"
                               >
                                 Choose {plan.title}
                               </button>
-                              {isCurrentPlan && (
+                              {plan.isCurrentPlan && (
                                 <span className="rounded-lg border border-emerald-300/35 bg-emerald-400/15 px-3 py-1.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-100">
                                   Current Active Package
                                 </span>
                               )}
+                              {byokCheckoutState.initiated &&
+                                byokCheckoutState.selectedPlanCode === plan.code && (
+                                  <span className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-3 py-1.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-100">
+                                    Checkout opened for this plan
+                                  </span>
+                                )}
                             </div>
                           </article>
-                        );
-                      })}
-                    </div>
+                        ))}
+                      </div>
+                    )}
 
                     <div className="mt-5 flex flex-wrap gap-3">
                       <button
                         type="button"
                         onClick={handleStartByokActivationCheck}
-                        className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-white sm:w-auto"
+                        disabled={!byokCheckoutState.initiated || !byokCheckoutState.returnSeen}
+                        className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-white disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                       >
-                        I Completed Payment
+                        Check Activation Now
                       </button>
                       <a
                         href={BYOK_PRICING_URL}
@@ -3309,6 +3401,17 @@ function Dashboard() {
                         I&apos;ll upgrade later
                       </button>
                     </div>
+                    {!byokCheckoutState.initiated && (
+                      <p className="mt-3 text-xs text-slate-300">
+                        Select a package first. Activation check is enabled after opening checkout.
+                      </p>
+                    )}
+                    {byokCheckoutState.initiated && !byokCheckoutState.returnSeen && (
+                      <p className="mt-3 text-xs text-cyan-200">
+                        Finish checkout in the new tab, then return here. We will auto-check on focus and you can also press
+                        &nbsp;Check Activation Now.
+                      </p>
+                    )}
                   </>
                 )}
               </div>
@@ -3361,35 +3464,34 @@ function Dashboard() {
                 </div>
               </div>
             )}
-            {isByokWorkspace && showByokInfoBanner && (
-              <div className="rounded-2xl border border-cyan-400/25 bg-cyan-500/10 p-3 text-sm text-cyan-100 shadow-xl">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-lg border border-cyan-300/40 bg-cyan-400/15 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-100">
-                      BYOK
-                    </span>
-                    <span className="text-xs text-cyan-100/90">
-                      {byokStatus?.packageTitle || byokStatus?.packageCode || "BYOK"}
-                    </span>
-                    {typeof byokStatus?.dailyUsage?.limit === "number" && (
-                      <span className="text-xs text-cyan-100/85">
-                        Daily: {byokStatus?.dailyUsage?.used || 0}/{byokStatus.dailyUsage.limit}
-                      </span>
-                    )}
-                    {byokStatus?.trialEndsAt && (
-                      <span className="text-xs text-cyan-100/80">
-                        Trial ends {new Date(byokStatus.trialEndsAt).toLocaleDateString()}
-                      </span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={dismissByokInfoBanner}
-                    className="self-start rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-gray-200 hover:bg-white/10 sm:self-auto"
-                  >
-                    Hide
-                  </button>
-                </div>
+            {isByokWorkspace && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-xl border border-cyan-300/35 bg-cyan-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-100">
+                  BYOK
+                </span>
+                {byokStatus?.packageCode === "BYOK_TRIAL" && (
+                  <span className="rounded-xl border border-amber-300/40 bg-amber-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200">
+                    Demo
+                  </span>
+                )}
+                <span className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-200">
+                  {byokPlanLabel}
+                </span>
+                {typeof byokStatus?.dailyUsage?.limit === "number" && (
+                  <span className="rounded-xl border border-fuchsia-300/30 bg-fuchsia-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-fuchsia-100">
+                    {byokStatus?.dailyUsage?.used || 0}/{byokStatus.dailyUsage.limit} renders today
+                  </span>
+                )}
+                {user?.orgLockReason === "SEAT_LOCKED" && (
+                  <span className="rounded-xl border border-rose-300/45 bg-rose-500/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-rose-100">
+                    Seat Locked
+                  </span>
+                )}
+                {byokStatus?.trialEndsAt && (
+                  <span className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-300">
+                    Trial ends {new Date(byokStatus.trialEndsAt).toLocaleDateString()}
+                  </span>
+                )}
               </div>
             )}
             <div className="flex items-center justify-between">
@@ -3561,9 +3663,9 @@ function Dashboard() {
                     <button
                       type="button"
                       onClick={() => setShowByokUpgradeModal(true)}
-                      className="rounded-2xl border border-cyan-300/45 bg-cyan-400/15 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-cyan-100 transition-all hover:bg-cyan-400/25"
+                      className="rounded-2xl border border-orange-200/45 bg-gradient-to-r from-orange-500 via-rose-500 to-fuchsia-600 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white shadow-[0_12px_35px_rgba(249,115,22,0.36)] transition-all hover:brightness-110"
                     >
-                      Upgrade
+                      Upgrade Plan
                     </button>
                   )}
                   <button
@@ -3726,9 +3828,9 @@ function Dashboard() {
                     <button
                       type="button"
                       onClick={() => setShowByokUpgradeModal(true)}
-                      className="w-full rounded-xl border border-cyan-300/45 bg-cyan-400/15 px-4 py-3 text-sm font-semibold text-cyan-100 hover:bg-cyan-400/25 transition-colors"
+                      className="w-full rounded-xl border border-orange-200/45 bg-gradient-to-r from-orange-500 via-rose-500 to-fuchsia-600 px-4 py-3 text-sm font-black uppercase tracking-[0.12em] text-white shadow-[0_12px_35px_rgba(249,115,22,0.35)] transition-all hover:brightness-110"
                     >
-                      Upgrade
+                      Upgrade Plan
                     </button>
                   )}
                   <button

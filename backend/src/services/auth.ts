@@ -140,6 +140,7 @@ export class AuthService {
       organizationIsDefault: user.organization?.isDefault === true,
       view: user.view || "VISIONLIGHT",
       maxProjects: user.maxProjects || 3,
+      seatLocked: user.seatLocked === true,
     };
   }
 
@@ -157,6 +158,7 @@ export class AuthService {
       organizationName,
       organizationIsDefault: user.organization?.isDefault === true,
       isOrgActive: user.organization?.isActive !== false,
+      seatLocked: user.seatLocked === true,
       canonicalDomain:
         view === "PICDRIFT" ? PICDRIFT_CANONICAL_DOMAIN : VISIONLIGHT_CANONICAL_DOMAIN,
     };

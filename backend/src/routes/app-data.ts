@@ -296,9 +296,10 @@ router.get(
 
       let isOrgActive = true;
       let needsActivation = false;
-      let orgLockReason: "DEACTIVATED" | "MISSING_FAL_KEY" | null = null;
+      let orgLockReason: "DEACTIVATED" | "MISSING_FAL_KEY" | "SEAT_LOCKED" | null = null;
 
       if (org && !isDefaultOrg) {
+        const seatLocked = req.user?.seatLocked === true;
         const isDeactivated = org.isActive === false || isOrganizationExpired(org);
         if (isOrganizationExpired(org) && org.isActive !== false) {
           void airtableService.updateOrganizationStatus(org.id, false).catch((error: any) =>
@@ -306,7 +307,11 @@ router.get(
           );
         }
         const hasFalKey = !!org.falApiKey;
-        if (isDeactivated) {
+        if (seatLocked) {
+          isOrgActive = false;
+          needsActivation = true;
+          orgLockReason = "SEAT_LOCKED";
+        } else if (isDeactivated) {
           isOrgActive = false;
           needsActivation = true;
           orgLockReason = "DEACTIVATED";

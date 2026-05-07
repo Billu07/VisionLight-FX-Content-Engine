@@ -77,6 +77,22 @@ export const authenticateToken = async (
       req.user = sessionUser;
     }
 
+    const isSuperAdminSession =
+      req.user?.role === "SUPERADMIN" ||
+      req.user?.impersonator?.role === "SUPERADMIN";
+    if (
+      req.user?.seatLocked === true &&
+      !req.user?.readOnlyImpersonation &&
+      !isSuperAdminSession &&
+      !["GET", "HEAD", "OPTIONS"].includes(req.method)
+    ) {
+      return res.status(403).json({
+        error:
+          "Your seat is locked for the current package. Ask the workspace owner to upgrade or unlock your access.",
+        code: "SEAT_LOCKED",
+      });
+    }
+
     if (
       req.user?.readOnlyImpersonation &&
       !["GET", "HEAD", "OPTIONS"].includes(req.method)

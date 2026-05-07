@@ -58,7 +58,7 @@ export const BYOK_PACKAGE_CONFIG: Record<ByokPackageCode, ByokPackageConfig> = {
     view: "VISIONLIGHT",
     routingDomain: BYOK_DOMAINS.byok,
     maxUsers: 5,
-    maxProjectsTotal: 20,
+    maxProjectsTotal: 3,
     ownerMaxProjects: 3,
     maxStorageMb: 10240,
     storageRetentionDays: null,

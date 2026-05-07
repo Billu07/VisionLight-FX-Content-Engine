@@ -23,7 +23,7 @@ interface User {
   organizationTenantPlan?: string | null;
   isOrgActive?: boolean;
   needsActivation?: boolean;
-  orgLockReason?: "DEACTIVATED" | "MISSING_FAL_KEY" | null;
+  orgLockReason?: "DEACTIVATED" | "MISSING_FAL_KEY" | "SEAT_LOCKED" | null;
   videoEditorEnabledForAll?: boolean;
   carouselEnabledForAll?: boolean;
   view?: "VISIONLIGHT" | "PICDRIFT";
