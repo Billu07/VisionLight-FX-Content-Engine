@@ -307,23 +307,12 @@ export const byokService = {
     });
     if (!sessionUser) return null;
 
-    if (sessionUser.organization?.provisioningSource === "BYOK") {
-      return sessionUser;
+    // Scope BYOK state to the currently selected workspace profile.
+    // Never infer BYOK status from sibling profiles that share auth/email.
+    if (sessionUser.organization?.provisioningSource !== "BYOK") {
+      return null;
     }
-
-    const email = sessionUser.email.trim().toLowerCase();
-    const byokProfile = await prisma.user.findFirst({
-      where: {
-        OR: [
-          ...(sessionUser.authUserId ? [{ authUserId: sessionUser.authUserId }] : []),
-          { email: { equals: email, mode: "insensitive" } },
-        ],
-        organization: { provisioningSource: "BYOK" },
-      },
-      include: { organization: true },
-      orderBy: [{ createdAt: "asc" }],
-    });
-    return byokProfile || null;
+    return sessionUser;
   },
 
   async linkFalKey(sessionUserId: string, falApiKeyRaw: string) {
