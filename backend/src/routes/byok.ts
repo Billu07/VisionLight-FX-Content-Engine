@@ -59,6 +59,11 @@ const BYOK_CHECKOUT_URLS: Record<ByokPackageCode, string> = {
 };
 
 type ActivationStatus = "PENDING" | "PROCESSED" | "ERROR";
+const CHECKOUT_INTENT_MATCH_WINDOW_MINUTES = Math.max(
+  5,
+  Number.parseInt(process.env.BYOK_CHECKOUT_INTENT_MATCH_WINDOW_MINUTES || "90", 10) ||
+    90,
+);
 
 const sanitizeDomain = (raw?: string | null): string | null => {
   if (!raw) return null;
@@ -551,6 +556,73 @@ const upsertCheckoutSessionEvent = async (
   });
 };
 
+const resolveFallbackCheckoutSessionId = async (params: {
+  customerEmail: string;
+  packageCode: ByokPackageCode;
+  orderId?: string | null;
+}) => {
+  const customerEmail = params.customerEmail.trim().toLowerCase();
+  if (!customerEmail) return null;
+
+  const profile = await prisma.user.findFirst({
+    where: {
+      email: { equals: customerEmail, mode: "insensitive" },
+      organization: { provisioningSource: "BYOK" },
+    },
+    select: { organizationId: true },
+    orderBy: [{ createdAt: "asc" }],
+  });
+  if (!profile?.organizationId) return null;
+
+  const cutoff = new Date(
+    Date.now() - CHECKOUT_INTENT_MATCH_WINDOW_MINUTES * 60 * 1000,
+  );
+  const candidates = await prisma.webhookEvent.findMany({
+    where: {
+      provider: WEBHOOK_PROVIDER_CHECKOUT,
+      status: { in: ["PENDING", "RECEIVED", "VERIFIED"] },
+      createdAt: { gte: cutoff },
+      OR: [
+        { organizationId: profile.organizationId },
+        { organizationId: null },
+      ],
+    },
+    orderBy: [{ createdAt: "desc" }],
+    take: 80,
+    select: {
+      eventKey: true,
+      organizationId: true,
+      payload: true,
+    },
+  });
+
+  const normalizedOrderId = params.orderId ? String(params.orderId).trim() : "";
+  for (const candidate of candidates) {
+    const payload = (candidate.payload || {}) as any;
+    const candidatePackage =
+      toByokPlanCode(payload.packageCode || payload.requestedPackageCode || payload.plan) ||
+      null;
+    if (candidatePackage !== params.packageCode) continue;
+
+    const payloadEmail = String(payload.customerEmail || "").trim().toLowerCase();
+    if (!payloadEmail || payloadEmail !== customerEmail) continue;
+
+    const candidateOrderId = String(payload.orderId || "").trim();
+    if (normalizedOrderId && candidateOrderId && normalizedOrderId !== candidateOrderId) {
+      continue;
+    }
+
+    const orgMatches =
+      candidate.organizationId === profile.organizationId ||
+      payload.organizationId === profile.organizationId;
+    if (!orgMatches) continue;
+
+    return candidate.eventKey;
+  }
+
+  return null;
+};
+
 router.get("/api/byok/packages", async (_req, res) => {
   const packages = await byokService.getPackageCatalog();
   res.json({
@@ -755,10 +827,17 @@ const handleWixWebhook = async (req: Request, res: Response) => {
   const customerEmail = resolveCustomerEmail(payload);
   const eventKey = resolveEventKey(payload);
   const eventType = String(payload?.eventType || payload?.event_type || "wix_event");
-  const checkoutSessionId = resolveCheckoutSessionIdFromPayload(req, payload);
+  let checkoutSessionId = resolveCheckoutSessionIdFromPayload(req, payload);
   const orderId = payload?.orderId || payload?.order_id || payload?.order?.id || null;
   const transactionId =
     payload?.transactionId || payload?.transaction_id || payload?.payment?.id || null;
+  if (!checkoutSessionId && packageCode && customerEmail) {
+    checkoutSessionId = await resolveFallbackCheckoutSessionId({
+      customerEmail,
+      packageCode,
+      orderId: orderId ? String(orderId) : null,
+    });
+  }
 
   const lifecycleBasePayload = {
     packageCode,
