@@ -124,6 +124,14 @@ const BYOK_CHECKOUT_PLAN_META: Record<
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=4785cf91-670a-416f-8bb1-637b926bf2a0&checkoutFlowId=893f469b-9e21-4baa-bb7b-3217b96aa285",
   },
 };
+
+const HIDE_STORAGE_IN_CARD: Record<ByokPlanCode, boolean> = {
+  PD_APP: true,
+  VFX_APP: true,
+  PD_STUDIO: false,
+  VFX_STUDIO: false,
+  VFX_STUDIO_AGENCY: false,
+};
 type DashboardBgMode = "current" | "original";
 type VeoMode =
   | "image_to_video"
@@ -495,7 +503,7 @@ function Dashboard() {
           usersLabel: `${pkg.maxUsers} ${pkg.maxUsers === 1 ? "user" : "users"}`,
           projectsLabel: `${pkg.maxProjectsTotal} projects`,
           adminLabel: pkg.adminPanelLocked ? "Admin panel locked" : "Admin panel enabled",
-          storageLabel,
+          storageLabel: HIDE_STORAGE_IN_CARD[pkg.code as ByokPlanCode] ? "" : storageLabel,
           retentionLabel,
           isCurrentPlan: currentByokPackageCode === pkg.code,
         };
@@ -3345,7 +3353,9 @@ function Dashboard() {
                             <div className="mt-4 grid grid-cols-1 gap-2 rounded-xl border border-white/10 bg-black/25 p-3">
                               <p className="text-[11px] text-slate-200">{plan.usersLabel}</p>
                               <p className="text-[11px] text-slate-200">{plan.projectsLabel}</p>
-                              <p className="text-[11px] text-slate-200">{plan.storageLabel}</p>
+                              {plan.storageLabel && (
+                                <p className="text-[11px] text-slate-200">{plan.storageLabel}</p>
+                              )}
                               <p className="text-[11px] text-slate-200">{plan.adminLabel}</p>
                               <p className="text-[11px] text-slate-200">{plan.retentionLabel}</p>
                               <p className="text-[11px] text-cyan-200">Domain: {plan.routingDomain}</p>
