@@ -147,6 +147,7 @@ export class AuthService {
   private static toProfileOption(user: any) {
     const view = user.view === "PICDRIFT" ? "PICDRIFT" : "VISIONLIGHT";
     const organizationName = user.organization?.name || "Personal Workspace";
+    const orgRoutingDomain = sanitizeDomain(user.organization?.routingDomain || null);
     return {
       id: user.id,
       authUserId: user.authUserId || null,
@@ -160,7 +161,8 @@ export class AuthService {
       isOrgActive: user.organization?.isActive !== false,
       seatLocked: user.seatLocked === true,
       canonicalDomain:
-        view === "PICDRIFT" ? PICDRIFT_CANONICAL_DOMAIN : VISIONLIGHT_CANONICAL_DOMAIN,
+        orgRoutingDomain ||
+        (view === "PICDRIFT" ? PICDRIFT_CANONICAL_DOMAIN : VISIONLIGHT_CANONICAL_DOMAIN),
     };
   }
 
