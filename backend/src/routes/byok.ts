@@ -1,9 +1,17 @@
 import express, { Request, Response } from "express";
 import crypto from "node:crypto";
-import { authenticateToken, AuthenticatedRequest, requireSuperAdmin } from "../middleware/auth";
+import {
+  authenticateToken,
+  AuthenticatedRequest,
+  requireSuperAdmin,
+} from "../middleware/auth";
 import { byokService } from "../services/byok";
 import { prisma } from "../services/database";
-import { BYOK_PACKAGE_ORDER, BYOK_PACKAGE_CONFIG, ByokPackageCode } from "../config/byok";
+import {
+  BYOK_PACKAGE_ORDER,
+  BYOK_PACKAGE_CONFIG,
+  ByokPackageCode,
+} from "../config/byok";
 
 const router = express.Router();
 
@@ -17,19 +25,50 @@ const BYOK_WIX_REQUIRE_SIGNATURE =
   (process.env.BYOK_WIX_REQUIRE_SIGNATURE ?? "false").toLowerCase() === "true";
 const BYOK_WIX_SIGNATURE_MAX_AGE_SECONDS = Math.max(
   30,
-  Number.parseInt(process.env.BYOK_WIX_SIGNATURE_MAX_AGE_SECONDS || "300", 10) || 300,
+  Number.parseInt(process.env.BYOK_WIX_SIGNATURE_MAX_AGE_SECONDS || "300", 10) ||
+    300,
 );
 const BYOK_WIX_SIGNATURE_MAX_FUTURE_SKEW_SECONDS = Math.max(
   0,
-  Number.parseInt(process.env.BYOK_WIX_SIGNATURE_MAX_FUTURE_SKEW_SECONDS || "90", 10) || 90,
+  Number.parseInt(
+    process.env.BYOK_WIX_SIGNATURE_MAX_FUTURE_SKEW_SECONDS || "90",
+    10,
+  ) || 90,
 );
+
+const WEBHOOK_PROVIDER_WIX = "WIX";
+const WEBHOOK_PROVIDER_CHECKOUT = "WIX_CHECKOUT_SESSION";
+
+const BYOK_CHECKOUT_URLS: Record<ByokPackageCode, string> = {
+  BYOK_TRIAL: "",
+  PD_APP:
+    process.env.BYOK_WIX_CHECKOUT_URL_PD_APP ||
+    "https://www.picdrift.com/pricing-plans/checkout-1?planId=df674622-e11f-4e88-8564-4bb12365d5e5&checkoutFlowId=0ca462cc-de89-4e2c-b02e-bb83d3c7ee98",
+  VFX_APP:
+    process.env.BYOK_WIX_CHECKOUT_URL_VFX_APP ||
+    "https://www.picdrift.com/pricing-plans/checkout-1?planId=8351c366-2837-44cd-8522-65ec3fecb56d&checkoutFlowId=05b75b73-c0ed-4ae2-ab13-130ab4628ca6",
+  PD_STUDIO:
+    process.env.BYOK_WIX_CHECKOUT_URL_PD_STUDIO ||
+    "https://www.picdrift.com/pricing-plans/checkout-1?planId=dc751744-5641-4086-a510-7d203e187a79&checkoutFlowId=b5b1614d-e4d5-4352-804a-19d57d5225d0",
+  VFX_STUDIO:
+    process.env.BYOK_WIX_CHECKOUT_URL_VFX_STUDIO ||
+    "https://www.picdrift.com/pricing-plans/checkout-1?planId=a97eb2df-59b6-4500-ba93-618171001d4b&checkoutFlowId=e90e22a5-29ed-4093-b268-7838c0fca777",
+  VFX_STUDIO_AGENCY:
+    process.env.BYOK_WIX_CHECKOUT_URL_VFX_STUDIO_AGENCY ||
+    "https://www.picdrift.com/pricing-plans/checkout-1?planId=4785cf91-670a-416f-8bb1-637b926bf2a0&checkoutFlowId=893f469b-9e21-4baa-bb7b-3217b96aa285",
+};
+
+type ActivationStatus = "PENDING" | "PROCESSED" | "ERROR";
 
 const sanitizeDomain = (raw?: string | null): string | null => {
   if (!raw) return null;
   const trimmed = raw.trim().toLowerCase();
   if (!trimmed) return null;
   const withoutProtocol = trimmed.replace(/^https?:\/\//, "");
-  const host = withoutProtocol.split("/")[0]?.replace(/:\d+$/, "").replace(/\.$/, "");
+  const host = withoutProtocol
+    .split("/")[0]
+    ?.replace(/:\d+$/, "")
+    .replace(/\.$/, "");
   return host || null;
 };
 
@@ -41,22 +80,29 @@ const resolveIncomingHost = (req: Request): string | null => {
   return sanitizeDomain(firstHost);
 };
 
-const parseWebhookPayload = (body: any) => {
+const getRequestProtocol = (req: Request) => {
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  const rawProto = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto;
+  if (typeof rawProto === "string" && rawProto.trim()) {
+    const proto = rawProto.split(",")[0]?.trim().toLowerCase();
+    if (proto === "http" || proto === "https") return proto;
+  }
+  return req.protocol === "https" ? "https" : "http";
+};
+
+const parseWebhookPayload = (body: unknown) => {
   if (!body) return null;
-  if (typeof body === "object") return body;
+  if (typeof body === "object") return body as Record<string, unknown>;
   if (typeof body === "string") {
     const trimmed = body.trim();
     if (!trimmed) return null;
     try {
-      return JSON.parse(trimmed);
+      return JSON.parse(trimmed) as Record<string, unknown>;
     } catch {
       const jwtParts = trimmed.split(".");
       if (jwtParts.length === 3) {
         try {
-          const payload = JSON.parse(
-            Buffer.from(jwtParts[1], "base64url").toString("utf8"),
-          );
-          return payload;
+          return JSON.parse(Buffer.from(jwtParts[1], "base64url").toString("utf8"));
         } catch {
           return null;
         }
@@ -73,6 +119,8 @@ const resolvePackageCodeFromPayload = (payload: any): ByokPackageCode | null => 
     payload?.planCode,
     payload?.plan_code,
     payload?.plan?.code,
+    payload?.metadata?.packageCode,
+    payload?.metadata?.package_code,
     payload?.lineItem?.name,
     payload?.lineItems?.[0]?.name,
     payload?.lineItems?.[0]?.productName,
@@ -129,6 +177,37 @@ const resolveEventKey = (payload: any): string => {
     payload?.order_id ||
     crypto.randomUUID();
   return String(raw);
+};
+
+const resolveCheckoutSessionIdFromPayload = (
+  req: Request,
+  payload: any,
+): string | null => {
+  const candidates = [
+    payload?.checkoutSessionId,
+    payload?.checkout_session_id,
+    payload?.sessionId,
+    payload?.session_id,
+    payload?.metadata?.checkoutSessionId,
+    payload?.metadata?.checkout_session_id,
+    payload?.customData?.checkoutSessionId,
+    payload?.customData?.checkout_session_id,
+    payload?.customFields?.checkoutSessionId,
+    payload?.customFields?.checkout_session_id,
+    payload?.order?.metadata?.checkoutSessionId,
+    payload?.order?.metadata?.checkout_session_id,
+    typeof req.query.checkoutSessionId === "string" ? req.query.checkoutSessionId : "",
+    typeof req.query.checkout_session_id === "string"
+      ? req.query.checkout_session_id
+      : "",
+  ]
+    .filter((value) => typeof value === "string")
+    .map((value: string) => value.trim())
+    .filter(Boolean);
+
+  const raw = candidates[0] || "";
+  if (!raw) return null;
+  return raw.slice(0, 128);
 };
 
 const secureEqual = (a: string, b: string) => {
@@ -232,9 +311,7 @@ const resolveWebhookSignatureParts = (req: Request, payload: any) => {
     normalizeProvidedSignature(
       typeof req.query.signature === "string" ? req.query.signature : "",
     ) ||
-    normalizeProvidedSignature(
-      typeof req.query.sig === "string" ? req.query.sig : "",
-    ) ||
+    normalizeProvidedSignature(typeof req.query.sig === "string" ? req.query.sig : "") ||
     normalizeProvidedSignature(
       typeof payload?.signature === "string" ? payload.signature : "",
     ) ||
@@ -242,7 +319,9 @@ const resolveWebhookSignatureParts = (req: Request, payload: any) => {
       typeof payload?.webhookSignature === "string" ? payload.webhookSignature : "",
     ) ||
     normalizeProvidedSignature(
-      typeof payload?.webhook_signature === "string" ? payload.webhook_signature : "",
+      typeof payload?.webhook_signature === "string"
+        ? payload.webhook_signature
+        : "",
     ) ||
     normalizeProvidedSignature(
       typeof payload?.byokSignature === "string" ? payload.byokSignature : "",
@@ -384,12 +463,92 @@ const isWebhookAuthorized = (req: Request, payload: any) => {
   }
 
   if (BYOK_WEBHOOK_ALLOW_QUERY_SECRET) {
-    const querySecret = typeof req.query.secret === "string" ? req.query.secret.trim() : "";
+    const querySecret =
+      typeof req.query.secret === "string" ? req.query.secret.trim() : "";
     if (querySecret && secureEqual(querySecret, BYOK_WEBHOOK_SECRET)) {
       return true;
     }
   }
   return false;
+};
+
+const toByokPlanCode = (raw: unknown): ByokPackageCode | null => {
+  if (typeof raw !== "string") return null;
+  const normalized = raw.trim().toUpperCase();
+  if (!normalized) return null;
+  if (normalized === "BYOK_TRIAL") return "BYOK_TRIAL";
+  return BYOK_PACKAGE_ORDER.includes(normalized as ByokPackageCode)
+    ? (normalized as ByokPackageCode)
+    : null;
+};
+
+const buildCheckoutUrl = (
+  baseCheckoutUrl: string,
+  params: Record<string, string>,
+) => {
+  const url = new URL(baseCheckoutUrl);
+  for (const [key, value] of Object.entries(params)) {
+    if (value) {
+      url.searchParams.set(key, value);
+    }
+  }
+  return url.toString();
+};
+
+const buildReturnUrlForDomain = (
+  req: Request,
+  targetDomain: string,
+  checkoutSessionId: string,
+  packageCode: ByokPackageCode,
+) => {
+  const protocol = getRequestProtocol(req);
+  const url = new URL(`${protocol}://${targetDomain}/billing/return`);
+  url.searchParams.set("checkoutSessionId", checkoutSessionId);
+  url.searchParams.set("plan", packageCode);
+  return url.toString();
+};
+
+const mapEventStatusToActivation = (status?: string | null): ActivationStatus => {
+  const normalized = (status || "").trim().toUpperCase();
+  if (normalized === "PROCESSED") return "PROCESSED";
+  if (normalized === "ERROR") return "ERROR";
+  return "PENDING";
+};
+
+const upsertCheckoutSessionEvent = async (
+  checkoutSessionId: string,
+  fields: {
+    status: string;
+    eventType?: string | null;
+    organizationId?: string | null;
+    error?: string | null;
+    payload?: any;
+  },
+) => {
+  await prisma.webhookEvent.upsert({
+    where: {
+      provider_eventKey: {
+        provider: WEBHOOK_PROVIDER_CHECKOUT,
+        eventKey: checkoutSessionId,
+      },
+    },
+    update: {
+      status: fields.status,
+      eventType: fields.eventType || undefined,
+      organizationId: fields.organizationId || undefined,
+      error: fields.error ?? null,
+      payload: fields.payload,
+    },
+    create: {
+      provider: WEBHOOK_PROVIDER_CHECKOUT,
+      eventKey: checkoutSessionId,
+      status: fields.status,
+      eventType: fields.eventType || undefined,
+      organizationId: fields.organizationId || undefined,
+      error: fields.error ?? null,
+      payload: fields.payload,
+    },
+  });
 };
 
 router.get("/api/byok/packages", async (_req, res) => {
@@ -400,6 +559,163 @@ router.get("/api/byok/packages", async (_req, res) => {
     trial: BYOK_PACKAGE_CONFIG.BYOK_TRIAL,
   });
 });
+
+router.post(
+  "/api/byok/checkout-intent",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const packageCode = toByokPlanCode(req.body?.packageCode);
+      if (!packageCode || packageCode === "BYOK_TRIAL") {
+        return res.status(400).json({ error: "Invalid package code." });
+      }
+
+      const status = await byokService.getStatusForSessionUser(req.user!.id);
+      if (!status?.isByok || !status.organizationId) {
+        return res.status(403).json({ error: "BYOK workspace required." });
+      }
+
+      const packageConfig = BYOK_PACKAGE_CONFIG[packageCode];
+      const baseCheckoutUrl = BYOK_CHECKOUT_URLS[packageCode];
+      if (!baseCheckoutUrl) {
+        return res
+          .status(503)
+          .json({ error: "Checkout URL is not configured for this package." });
+      }
+
+      const checkoutSessionId = crypto.randomUUID();
+      const returnUrl = buildReturnUrlForDomain(
+        req,
+        packageConfig.routingDomain,
+        checkoutSessionId,
+        packageCode,
+      );
+      const checkoutUrl = buildCheckoutUrl(baseCheckoutUrl, {
+        checkoutSessionId,
+        package: packageCode,
+        plan: packageCode,
+        returnUrl,
+        callbackUrl: returnUrl,
+      });
+
+      await upsertCheckoutSessionEvent(checkoutSessionId, {
+        status: "PENDING",
+        eventType: "checkout_intent",
+        organizationId: status.organizationId,
+        payload: {
+          checkoutSessionId,
+          packageCode,
+          organizationId: status.organizationId,
+          customerEmail: status.email || null,
+          returnUrl,
+          checkoutUrl,
+          sourceDomain: resolveIncomingHost(req),
+          createdByUserId: req.user!.id,
+          createdAt: new Date().toISOString(),
+        },
+      });
+
+      return res.json({
+        success: true,
+        checkoutSessionId,
+        packageCode,
+        returnUrl,
+        checkoutUrl,
+      });
+    } catch (error: any) {
+      return res
+        .status(500)
+        .json({ error: error?.message || "Failed to create checkout intent." });
+    }
+  },
+);
+
+router.get(
+  "/api/byok/activation-status",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const checkoutSessionId =
+        typeof req.query.checkoutSessionId === "string"
+          ? req.query.checkoutSessionId.trim()
+          : "";
+      if (!checkoutSessionId) {
+        return res.status(400).json({ error: "checkoutSessionId is required." });
+      }
+
+      const status = await byokService.getStatusForSessionUser(req.user!.id);
+      if (!status?.isByok || !status.organizationId) {
+        return res.status(403).json({ error: "BYOK workspace required." });
+      }
+
+      const sessionEvent = await prisma.webhookEvent.findUnique({
+        where: {
+          provider_eventKey: {
+            provider: WEBHOOK_PROVIDER_CHECKOUT,
+            eventKey: checkoutSessionId,
+          },
+        },
+      });
+
+      if (!sessionEvent) {
+        return res.status(404).json({ error: "Checkout session not found." });
+      }
+
+      const eventOrgId =
+        sessionEvent.organizationId ||
+        (((sessionEvent.payload || {}) as any).organizationId as string | undefined) ||
+        null;
+      if (eventOrgId && eventOrgId !== status.organizationId) {
+        return res.status(403).json({
+          error: "Checkout session does not belong to current workspace.",
+        });
+      }
+
+      const sessionPayload = (sessionEvent.payload || {}) as any;
+      const requestedPackage = toByokPlanCode(sessionPayload.packageCode) || null;
+      const resolvedPackage =
+        toByokPlanCode(status.packageCode || status.entitlementCode || null) || null;
+      const activation = mapEventStatusToActivation(sessionEvent.status);
+
+      const activationConfirmed =
+        activation === "PROCESSED" &&
+        !!resolvedPackage &&
+        resolvedPackage !== "BYOK_TRIAL" &&
+        (!requestedPackage || requestedPackage === resolvedPackage);
+
+      const responseStatus: ActivationStatus = activationConfirmed
+        ? "PROCESSED"
+        : activation === "ERROR"
+          ? "ERROR"
+          : "PENDING";
+
+      return res.json({
+        success: true,
+        status: responseStatus,
+        checkoutSessionId,
+        packageCode: resolvedPackage,
+        requestedPackageCode: requestedPackage,
+        routingDomain: status.routingDomain || null,
+        entitlementCode: status.entitlementCode || null,
+        lifecycle: sessionEvent.status,
+        webhookEventId: sessionPayload.eventKey || null,
+        orderId: sessionPayload.orderId || null,
+        updatedAt: sessionEvent.updatedAt,
+        activationConfirmed,
+        message:
+          responseStatus === "PROCESSED"
+            ? "Activation complete."
+            : responseStatus === "ERROR"
+              ? sessionEvent.error || "Activation failed."
+              : "Waiting for payment confirmation.",
+      });
+    } catch (error: any) {
+      return res
+        .status(500)
+        .json({ error: error?.message || "Failed to fetch activation status." });
+    }
+  },
+);
 
 const handleWixWebhook = async (req: Request, res: Response) => {
   const payload = parseWebhookPayload(req.body);
@@ -414,7 +730,9 @@ const handleWixWebhook = async (req: Request, res: Response) => {
   const signatureCheck = evaluateWebhookSignature(req, payload);
   if (BYOK_WIX_REQUIRE_SIGNATURE) {
     if (!signatureCheck.configured) {
-      return res.status(503).json({ error: "Webhook signature validation misconfigured." });
+      return res
+        .status(503)
+        .json({ error: "Webhook signature validation misconfigured." });
     }
     if (!signatureCheck.valid) {
       return res.status(401).json({
@@ -422,7 +740,11 @@ const handleWixWebhook = async (req: Request, res: Response) => {
         code: signatureCheck.reason,
       });
     }
-  } else if (signatureCheck.configured && signatureCheck.present && !signatureCheck.valid) {
+  } else if (
+    signatureCheck.configured &&
+    signatureCheck.present &&
+    !signatureCheck.valid
+  ) {
     return res.status(401).json({
       error: "Invalid webhook signature.",
       code: signatureCheck.reason,
@@ -433,148 +755,242 @@ const handleWixWebhook = async (req: Request, res: Response) => {
   const customerEmail = resolveCustomerEmail(payload);
   const eventKey = resolveEventKey(payload);
   const eventType = String(payload?.eventType || payload?.event_type || "wix_event");
-  const orderId =
-    payload?.orderId || payload?.order_id || payload?.order?.id || null;
+  const checkoutSessionId = resolveCheckoutSessionIdFromPayload(req, payload);
+  const orderId = payload?.orderId || payload?.order_id || payload?.order?.id || null;
   const transactionId =
-    payload?.transactionId ||
-    payload?.transaction_id ||
-    payload?.payment?.id ||
-    null;
+    payload?.transactionId || payload?.transaction_id || payload?.payment?.id || null;
+
+  const lifecycleBasePayload = {
+    packageCode,
+    customerEmail,
+    orderId: orderId ? String(orderId) : null,
+    transactionId: transactionId ? String(transactionId) : null,
+    checkoutSessionId,
+    signature: {
+      configured: signatureCheck.configured,
+      valid: signatureCheck.valid,
+      reason: signatureCheck.reason,
+      timestampMs: signatureCheck.timestampMs || null,
+    },
+    receivedAt: new Date().toISOString(),
+    payload,
+  };
 
   const existingEvent = await prisma.webhookEvent.findUnique({
-    where: { provider_eventKey: { provider: "WIX", eventKey } },
+    where: { provider_eventKey: { provider: WEBHOOK_PROVIDER_WIX, eventKey } },
     select: { status: true },
   });
+
+  await prisma.webhookEvent.upsert({
+    where: { provider_eventKey: { provider: WEBHOOK_PROVIDER_WIX, eventKey } },
+    update: {
+      eventType,
+      payload: lifecycleBasePayload,
+      status: "RECEIVED",
+      error: null,
+    },
+    create: {
+      provider: WEBHOOK_PROVIDER_WIX,
+      eventKey,
+      eventType,
+      payload: lifecycleBasePayload,
+      status: "RECEIVED",
+    },
+  });
+
+  if (checkoutSessionId) {
+    await upsertCheckoutSessionEvent(checkoutSessionId, {
+      status: "RECEIVED",
+      eventType,
+      payload: {
+        ...lifecycleBasePayload,
+        eventKey,
+      },
+    });
+  }
+
   if (existingEvent?.status === "PROCESSED") {
+    if (checkoutSessionId) {
+      await upsertCheckoutSessionEvent(checkoutSessionId, {
+        status: "PROCESSED",
+        eventType,
+        payload: {
+          ...lifecycleBasePayload,
+          eventKey,
+          duplicate: true,
+        },
+      });
+    }
     return res.json({ success: true, processed: true, duplicate: true });
   }
 
   if (!packageCode) {
-    await prisma.webhookEvent.upsert({
-      where: { provider_eventKey: { provider: "WIX", eventKey } },
-      update: {
-        eventType,
-        payload,
+    const error = "Unsupported or missing package code.";
+    await prisma.webhookEvent.update({
+      where: { provider_eventKey: { provider: WEBHOOK_PROVIDER_WIX, eventKey } },
+      data: {
         status: "IGNORED",
-        error: "Unsupported or missing package code.",
-      },
-      create: {
-        provider: "WIX",
-        eventKey,
-        eventType,
-        payload,
-        status: "IGNORED",
-        error: "Unsupported or missing package code.",
+        error,
       },
     });
+    if (checkoutSessionId) {
+      await upsertCheckoutSessionEvent(checkoutSessionId, {
+        status: "ERROR",
+        eventType,
+        error,
+        payload: {
+          ...lifecycleBasePayload,
+          eventKey,
+        },
+      });
+    }
     return res.json({ success: true, ignored: true });
   }
 
   if (!customerEmail) {
-    await prisma.webhookEvent.upsert({
-      where: { provider_eventKey: { provider: "WIX", eventKey } },
-      update: {
-        eventType,
-        payload,
+    const error = "Customer email missing.";
+    await prisma.webhookEvent.update({
+      where: { provider_eventKey: { provider: WEBHOOK_PROVIDER_WIX, eventKey } },
+      data: {
         status: "ERROR",
-        error: "Customer email missing.",
-      },
-      create: {
-        provider: "WIX",
-        eventKey,
-        eventType,
-        payload,
-        status: "ERROR",
-        error: "Customer email missing.",
+        error,
       },
     });
-    return res.status(400).json({ error: "Customer email missing." });
+    if (checkoutSessionId) {
+      await upsertCheckoutSessionEvent(checkoutSessionId, {
+        status: "ERROR",
+        eventType,
+        error,
+        payload: {
+          ...lifecycleBasePayload,
+          eventKey,
+        },
+      });
+    }
+    return res.status(400).json({ error });
+  }
+
+  await prisma.webhookEvent.update({
+    where: { provider_eventKey: { provider: WEBHOOK_PROVIDER_WIX, eventKey } },
+    data: { status: "VERIFIED", error: null },
+  });
+  if (checkoutSessionId) {
+    await upsertCheckoutSessionEvent(checkoutSessionId, {
+      status: "VERIFIED",
+      eventType,
+      payload: {
+        ...lifecycleBasePayload,
+        eventKey,
+      },
+    });
   }
 
   try {
-    await byokService.activatePackageForEmail(customerEmail, packageCode, {
+    const activation = await byokService.activatePackageForEmail(customerEmail, packageCode, {
       wixOrderId: orderId ? String(orderId) : null,
       wixTransactionId: transactionId ? String(transactionId) : null,
       source: "wix_webhook",
       raw: payload,
     });
 
-    await prisma.webhookEvent.upsert({
-      where: { provider_eventKey: { provider: "WIX", eventKey } },
-      update: {
-        eventType,
-        payload,
+    await prisma.webhookEvent.update({
+      where: { provider_eventKey: { provider: WEBHOOK_PROVIDER_WIX, eventKey } },
+      data: {
         status: "PROCESSED",
+        organizationId: activation.organization?.id || undefined,
+        payload: {
+          ...lifecycleBasePayload,
+          eventKey,
+          organizationId: activation.organization?.id || null,
+          processedAt: new Date().toISOString(),
+        },
         error: null,
-      },
-      create: {
-        provider: "WIX",
-        eventKey,
-        eventType,
-        payload,
-        status: "PROCESSED",
       },
     });
 
-    return res.json({ success: true, processed: true });
+    if (checkoutSessionId) {
+      await upsertCheckoutSessionEvent(checkoutSessionId, {
+        status: "PROCESSED",
+        eventType,
+        organizationId: activation.organization?.id || null,
+        payload: {
+          ...lifecycleBasePayload,
+          eventKey,
+          organizationId: activation.organization?.id || null,
+          processedAt: new Date().toISOString(),
+        },
+      });
+    }
+
+    return res.json({ success: true, processed: true, checkoutSessionId });
   } catch (error: any) {
-    await prisma.webhookEvent.upsert({
-      where: { provider_eventKey: { provider: "WIX", eventKey } },
-      update: {
-        eventType,
-        payload,
+    const message = error?.message || "Webhook processing failed.";
+    await prisma.webhookEvent.update({
+      where: { provider_eventKey: { provider: WEBHOOK_PROVIDER_WIX, eventKey } },
+      data: {
         status: "ERROR",
-        error: error?.message || "Webhook processing failed.",
-      },
-      create: {
-        provider: "WIX",
-        eventKey,
-        eventType,
-        payload,
-        status: "ERROR",
-        error: error?.message || "Webhook processing failed.",
+        error: message,
       },
     });
-    return res.status(500).json({ error: error?.message || "Webhook processing failed." });
+    if (checkoutSessionId) {
+      await upsertCheckoutSessionEvent(checkoutSessionId, {
+        status: "ERROR",
+        eventType,
+        error: message,
+        payload: {
+          ...lifecycleBasePayload,
+          eventKey,
+        },
+      });
+    }
+    return res.status(500).json({ error: message });
   }
 };
 
 router.post("/api/byok/wix/webhook", handleWixWebhook);
 router.post("/api/webhooks/wix", handleWixWebhook);
 
-router.post("/api/byok/bootstrap", authenticateToken, async (req: AuthenticatedRequest, res) => {
-  try {
-    const result = await byokService.ensureByokTrialWorkspace(req.user!.id);
-    const status = await byokService.getStatusForSessionUser(result.user.id);
-    return res.json({
-      success: true,
-      profileId: result.user.id,
-      created: result.created,
-      status,
-    });
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message });
-  }
-});
-
-router.post("/api/byok/link-key", authenticateToken, async (req: AuthenticatedRequest, res) => {
-  try {
-    const falApiKey = typeof req.body?.falApiKey === "string" ? req.body.falApiKey : "";
-    if (!falApiKey.trim()) {
-      return res.status(400).json({ error: "Fal API key is required." });
+router.post(
+  "/api/byok/bootstrap",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const result = await byokService.ensureByokTrialWorkspace(req.user!.id);
+      const status = await byokService.getStatusForSessionUser(result.user.id);
+      return res.json({
+        success: true,
+        profileId: result.user.id,
+        created: result.created,
+        status,
+      });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
     }
-    await byokService.linkFalKey(req.user!.id, falApiKey);
-    const status = await byokService.getStatusForSessionUser(req.user!.id);
-    return res.json({
-      success: true,
-      message:
-        "Welcome to your 14 day trial. Trial includes 5 renders/day. Upgrade anytime for no daily limit.",
-      status,
-    });
-  } catch (error: any) {
-    return res.status(400).json({ error: error.message });
-  }
-});
+  },
+);
+
+router.post(
+  "/api/byok/link-key",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const falApiKey = typeof req.body?.falApiKey === "string" ? req.body.falApiKey : "";
+      if (!falApiKey.trim()) {
+        return res.status(400).json({ error: "Fal API key is required." });
+      }
+      await byokService.linkFalKey(req.user!.id, falApiKey);
+      const status = await byokService.getStatusForSessionUser(req.user!.id);
+      return res.json({
+        success: true,
+        message:
+          "Welcome to your 14 day trial. Trial includes 5 renders/day. Upgrade anytime for no daily limit.",
+        status,
+      });
+    } catch (error: any) {
+      return res.status(400).json({ error: error.message });
+    }
+  },
+);
 
 router.get("/api/byok/status", authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
@@ -626,9 +1042,14 @@ router.post(
   requireSuperAdmin,
   async (req, res) => {
     try {
-      const organizationId = typeof req.body?.organizationId === "string" ? req.body.organizationId : "";
+      const organizationId =
+        typeof req.body?.organizationId === "string" ? req.body.organizationId : "";
       const packageCode = typeof req.body?.packageCode === "string" ? req.body.packageCode : "";
-      if (!organizationId || !packageCode || !BYOK_PACKAGE_ORDER.includes(packageCode as ByokPackageCode)) {
+      if (
+        !organizationId ||
+        !packageCode ||
+        !BYOK_PACKAGE_ORDER.includes(packageCode as ByokPackageCode)
+      ) {
         return res.status(400).json({ error: "Invalid activation payload." });
       }
 
@@ -643,6 +1064,187 @@ router.post(
       return res.json({ success: true, result });
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.post(
+  "/api/superadmin/byok/reset-trial",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const organizationId =
+        typeof req.body?.organizationId === "string" ? req.body.organizationId.trim() : "";
+      const email =
+        typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+      const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+
+      if (!organizationId && !email) {
+        return res.status(400).json({ error: "organizationId or email is required." });
+      }
+
+      const result = organizationId
+        ? await byokService.resetTrialForOrganization(organizationId, {
+            by: req.user?.email || "superadmin",
+            reason,
+          })
+        : await byokService.resetTrialForEmail(email, {
+            by: req.user?.email || "superadmin",
+            reason,
+          });
+
+      return res.json({ success: true, result });
+    } catch (error: any) {
+      return res.status(500).json({ error: error?.message || "Failed to reset trial." });
+    }
+  },
+);
+
+router.post(
+  "/api/superadmin/byok/reconcile",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req, res) => {
+    try {
+      const organizationId =
+        typeof req.body?.organizationId === "string" ? req.body.organizationId.trim() : "";
+
+      if (organizationId) {
+        const result = await byokService.reconcileOrganization(organizationId);
+        return res.json({ success: true, organizationId, result, count: 1 });
+      }
+
+      const orgs = await prisma.organization.findMany({
+        where: { provisioningSource: "BYOK" },
+        select: { id: true },
+        orderBy: [{ createdAt: "desc" }],
+      });
+
+      const results: any[] = [];
+      for (const org of orgs) {
+        try {
+          const result = await byokService.reconcileOrganization(org.id);
+          results.push(result);
+        } catch (error: any) {
+          results.push({
+            organizationId: org.id,
+            repaired: false,
+            error: error?.message || "reconcile_failed",
+          });
+        }
+      }
+
+      return res.json({
+        success: true,
+        count: results.length,
+        repaired: results.filter((entry) => entry.repaired === true).length,
+        results,
+      });
+    } catch (error: any) {
+      return res.status(500).json({
+        error: error?.message || "Failed to reconcile BYOK organizations.",
+      });
+    }
+  },
+);
+
+router.get(
+  "/api/superadmin/byok/webhook-events",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req, res) => {
+    try {
+      const status =
+        typeof req.query.status === "string" ? req.query.status.trim().toUpperCase() : "";
+      const packageCode =
+        typeof req.query.packageCode === "string"
+          ? req.query.packageCode.trim().toUpperCase()
+          : "";
+      const organizationId =
+        typeof req.query.organizationId === "string" ? req.query.organizationId.trim() : "";
+      const from = typeof req.query.from === "string" ? req.query.from.trim() : "";
+      const to = typeof req.query.to === "string" ? req.query.to.trim() : "";
+      const limitRaw =
+        typeof req.query.limit === "string" ? Number.parseInt(req.query.limit, 10) : 100;
+      const limit = Math.max(
+        1,
+        Math.min(500, Number.isFinite(limitRaw) ? limitRaw : 100),
+      );
+
+      const where: any = {
+        provider: { in: [WEBHOOK_PROVIDER_WIX, WEBHOOK_PROVIDER_CHECKOUT] },
+      };
+      if (status) {
+        where.status = status;
+      }
+      if (organizationId) {
+        where.organizationId = organizationId;
+      }
+      if (from || to) {
+        where.createdAt = {};
+        if (from) {
+          const fromDate = new Date(from);
+          if (!Number.isNaN(fromDate.getTime())) {
+            where.createdAt.gte = fromDate;
+          }
+        }
+        if (to) {
+          const toDate = new Date(to);
+          if (!Number.isNaN(toDate.getTime())) {
+            where.createdAt.lte = toDate;
+          }
+        }
+      }
+
+      const events = await prisma.webhookEvent.findMany({
+        where,
+        orderBy: [{ createdAt: "desc" }],
+        take: limit,
+      });
+
+      const filtered = packageCode
+        ? events.filter((event) => {
+            const payload = (event.payload || {}) as any;
+            const resolved = toByokPlanCode(
+              payload.packageCode || payload.requestedPackageCode || payload.plan,
+            );
+            return resolved === packageCode;
+          })
+        : events;
+
+      const mapped = filtered.map((event) => {
+        const payload = (event.payload || {}) as any;
+        const resolvedPackage =
+          toByokPlanCode(payload.packageCode || payload.requestedPackageCode || payload.plan) ||
+          null;
+        return {
+          id: event.id,
+          provider: event.provider,
+          eventKey: event.eventKey,
+          eventType: event.eventType,
+          status: event.status,
+          organizationId: event.organizationId,
+          packageCode: resolvedPackage,
+          checkoutSessionId: payload.checkoutSessionId || null,
+          orderId: payload.orderId || null,
+          customerEmail: payload.customerEmail || null,
+          error: event.error,
+          createdAt: event.createdAt,
+          updatedAt: event.updatedAt,
+          payload,
+        };
+      });
+
+      return res.json({
+        success: true,
+        count: mapped.length,
+        events: mapped,
+      });
+    } catch (error: any) {
+      return res
+        .status(500)
+        .json({ error: error?.message || "Failed to fetch webhook events." });
     }
   },
 );

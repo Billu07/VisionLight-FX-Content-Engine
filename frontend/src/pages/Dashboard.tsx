@@ -346,11 +346,13 @@ function Dashboard() {
   const [byokCheckoutState, setByokCheckoutState] = useState<{
     initiated: boolean;
     selectedPlanCode: ByokPlanCode | null;
-    returnSeen: boolean;
+    checkoutSessionId: string | null;
+    phase: "IDLE" | "REDIRECTING" | "WAITING" | "ACTIVATING" | "DELAYED";
   }>({
     initiated: false,
     selectedPlanCode: null,
-    returnSeen: false,
+    checkoutSessionId: null,
+    phase: "IDLE",
   });
   const [showStockModal, setShowStockModal] = useState(false);
   const [showPromptInfo, setShowPromptInfo] = useState<string | null>(null);
@@ -432,15 +434,6 @@ function Dashboard() {
 
   const [previewCarouselIndex, setPreviewCarouselIndex] = useState(0);
   const byokActivationPollRef = useRef(false);
-  const byokActivationContextRef = useRef<{
-    armed: boolean;
-    baselinePackageCode: string | null;
-    baselineUpgradeRequired: boolean;
-  }>({
-    armed: false,
-    baselinePackageCode: null,
-    baselineUpgradeRequired: false,
-  });
 
   // State for Magic Edit Asset
   const [editingAsset, setEditingAsset] = useState<any | null>(null);
@@ -734,7 +727,6 @@ function Dashboard() {
   useEffect(() => {
     return () => {
       byokActivationPollRef.current = false;
-      byokActivationContextRef.current.armed = false;
     };
   }, []);
 
@@ -744,38 +736,35 @@ function Dashboard() {
       !isByokWorkspace ||
       isByokActivationPolling ||
       !byokCheckoutState.initiated ||
-      !byokActivationContextRef.current.armed
+      !byokCheckoutState.checkoutSessionId
     ) {
       return;
     }
 
     const handleWindowFocus = async () => {
-      setByokCheckoutState((prev) =>
-        prev.initiated ? { ...prev, returnSeen: true } : prev,
-      );
+      const sessionId = byokCheckoutState.checkoutSessionId;
+      if (!sessionId) return;
       try {
-        const statusResponse = await apiEndpoints.byokGetStatus();
-        const status = statusResponse?.data?.status;
-        const ctx = byokActivationContextRef.current;
-        const confirmed =
-          !!status &&
-          ((ctx.baselineUpgradeRequired && status.upgradeRequired === false) ||
-            (typeof status.packageCode === "string" &&
-              status.packageCode !== "BYOK_TRIAL" &&
-              status.packageCode !== ctx.baselinePackageCode));
-        if (confirmed) {
-          byokActivationContextRef.current.armed = false;
+        const statusResponse = await apiEndpoints.byokGetActivationStatus(sessionId);
+        const activation = statusResponse?.data?.status;
+        if (activation === "PROCESSED") {
           await checkAuth();
           setShowByokUpgradeModal(false);
           setByokCheckoutState({
             initiated: false,
             selectedPlanCode: null,
-            returnSeen: false,
+            checkoutSessionId: null,
+            phase: "IDLE",
           });
           notify.success("Payment confirmed. Your package is now active.");
+          return;
         }
+        setByokCheckoutState((prev) => ({
+          ...prev,
+          phase: activation === "ERROR" ? "DELAYED" : "WAITING",
+        }));
       } catch {
-        // no-op: keep modal available and allow manual recheck
+        setByokCheckoutState((prev) => ({ ...prev, phase: "WAITING" }));
       }
     };
 
@@ -786,6 +775,7 @@ function Dashboard() {
     isByokWorkspace,
     isByokActivationPolling,
     byokCheckoutState.initiated,
+    byokCheckoutState.checkoutSessionId,
     checkAuth,
   ]);
 
@@ -2403,98 +2393,138 @@ function Dashboard() {
   };
   const closeByokUpgradeModal = () => {
     byokActivationPollRef.current = false;
-    byokActivationContextRef.current.armed = false;
     setIsByokActivationPolling(false);
     setByokCheckoutState({
       initiated: false,
       selectedPlanCode: null,
-      returnSeen: false,
+      checkoutSessionId: null,
+      phase: "IDLE",
     });
     setShowByokUpgradeModal(false);
   };
   const handleStartByokActivationCheck = async () => {
     if (isByokActivationPolling) return;
     if (!byokCheckoutState.initiated) {
-      notify.warning("Select a package and open checkout first.");
+      notify.warning("Select a package and start checkout first.");
       return;
     }
-    if (!byokCheckoutState.returnSeen) {
-      notify.warning("Return from checkout tab first, then confirm activation.");
+    if (!byokCheckoutState.checkoutSessionId) {
+      notify.warning("Checkout session missing. Start checkout again.");
       return;
-    }
-
-    if (!byokActivationContextRef.current.armed) {
-      byokActivationContextRef.current = {
-        armed: true,
-        baselinePackageCode: currentByokPackageCode,
-        baselineUpgradeRequired: byokStatus?.upgradeRequired === true,
-      };
     }
 
     setByokActivationHintIndex(0);
     setIsByokActivationPolling(true);
+    setByokCheckoutState((prev) => ({ ...prev, phase: "WAITING" }));
     byokActivationPollRef.current = true;
 
     const timeoutAt = Date.now() + 120000;
+    const sessionId = byokCheckoutState.checkoutSessionId;
+    if (!sessionId) {
+      setIsByokActivationPolling(false);
+      byokActivationPollRef.current = false;
+      return;
+    }
     try {
       while (byokActivationPollRef.current && Date.now() < timeoutAt) {
         try {
-          const statusResponse = await apiEndpoints.byokGetStatus();
-          const status = statusResponse?.data?.status;
-          const ctx = byokActivationContextRef.current;
-          const confirmed =
-            !!status &&
-            ((ctx.baselineUpgradeRequired && status.upgradeRequired === false) ||
-              (typeof status.packageCode === "string" &&
-                status.packageCode !== "BYOK_TRIAL" &&
-                status.packageCode !== ctx.baselinePackageCode));
-          if (confirmed) {
-            byokActivationContextRef.current.armed = false;
+          const statusResponse = await apiEndpoints.byokGetActivationStatus(sessionId);
+          const activation = statusResponse?.data?.status;
+          const lifecycle = String(statusResponse?.data?.lifecycle || "").toUpperCase();
+          if (activation === "PROCESSED") {
             await checkAuth();
             setShowByokUpgradeModal(false);
             setByokCheckoutState({
               initiated: false,
               selectedPlanCode: null,
-              returnSeen: false,
+              checkoutSessionId: null,
+              phase: "IDLE",
             });
             notify.success("Payment confirmed. Your package is now active.");
             return;
           }
+          setByokCheckoutState((prev) => ({
+            ...prev,
+            phase:
+              activation === "ERROR"
+                ? "DELAYED"
+                : lifecycle === "RECEIVED" || lifecycle === "VERIFIED"
+                  ? "ACTIVATING"
+                  : "WAITING",
+          }));
         } catch {
-          // no-op
+          setByokCheckoutState((prev) => ({ ...prev, phase: "WAITING" }));
         }
         await new Promise((resolve) => setTimeout(resolve, 3000));
       }
+      setByokCheckoutState((prev) => ({ ...prev, phase: "DELAYED" }));
       notify.warning(
-        "Still waiting for payment confirmation. Keep this screen open for a few more seconds, then recheck.",
+        "Activation is delayed. Keep this screen open and retry in a few seconds.",
       );
     } finally {
       byokActivationPollRef.current = false;
       setIsByokActivationPolling(false);
     }
   };
-  const handleOpenByokCheckout = (planCode: ByokPlanCode, url: string) => {
-    byokActivationContextRef.current = {
-      armed: true,
-      baselinePackageCode: currentByokPackageCode,
-      baselineUpgradeRequired: byokStatus?.upgradeRequired === true,
-    };
-    setByokCheckoutState({
-      initiated: true,
-      selectedPlanCode: planCode,
-      returnSeen: false,
-    });
-    const checkoutWindow = window.open(url, "_blank", "noopener,noreferrer");
+  const handleOpenByokCheckout = async (planCode: ByokPlanCode) => {
+    const checkoutWindow = window.open("about:blank", "_blank");
     if (!checkoutWindow) {
-      setByokCheckoutState({
-        initiated: false,
-        selectedPlanCode: null,
-        returnSeen: false,
-      });
       notify.error("Checkout popup was blocked by browser. Allow popups and try again.");
       return;
     }
-    notify.info("Complete payment in the new tab, then return here to confirm activation.");
+    checkoutWindow.opener = null;
+
+    setByokCheckoutState({
+      initiated: true,
+      selectedPlanCode: planCode,
+      checkoutSessionId: null,
+      phase: "REDIRECTING",
+    });
+
+    let checkoutSessionId = "";
+    let checkoutUrl = "";
+    try {
+      const intentResponse = await apiEndpoints.byokCreateCheckoutIntent(planCode);
+      checkoutSessionId =
+        typeof intentResponse.data?.checkoutSessionId === "string"
+          ? intentResponse.data.checkoutSessionId
+          : "";
+      checkoutUrl =
+        typeof intentResponse.data?.checkoutUrl === "string"
+          ? intentResponse.data.checkoutUrl
+          : "";
+    } catch (error: any) {
+      checkoutWindow.close();
+      setByokCheckoutState({
+        initiated: false,
+        selectedPlanCode: null,
+        checkoutSessionId: null,
+        phase: "IDLE",
+      });
+      notify.error(error?.message || "Failed to start checkout.");
+      return;
+    }
+
+    if (!checkoutSessionId || !checkoutUrl) {
+      checkoutWindow.close();
+      setByokCheckoutState({
+        initiated: false,
+        selectedPlanCode: null,
+        checkoutSessionId: null,
+        phase: "IDLE",
+      });
+      notify.error("Checkout initialization failed. Try again.");
+      return;
+    }
+
+    checkoutWindow.location.href = checkoutUrl;
+    setByokCheckoutState({
+      initiated: true,
+      selectedPlanCode: planCode,
+      checkoutSessionId,
+      phase: "WAITING",
+    });
+    notify.info("Checkout opened. Complete payment, then return via callback for activation.");
   };
   const handleSubmitByokFalKey = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -3306,8 +3336,8 @@ function Dashboard() {
                         <p className="mt-1 text-slate-300">Wix sends order data to your BYOK webhook.</p>
                       </div>
                       <div>
-                        <p className="font-black uppercase tracking-[0.12em] text-cyan-200">3. Confirm Activation</p>
-                        <p className="mt-1 text-slate-300">Return here and run activation check.</p>
+                        <p className="font-black uppercase tracking-[0.12em] text-cyan-200">3. Activation Callback</p>
+                        <p className="mt-1 text-slate-300">Callback route verifies webhook before success.</p>
                       </div>
                     </div>
                     {byokPlanCards.length === 0 ? (
@@ -3364,7 +3394,7 @@ function Dashboard() {
                             <div className="mt-4 flex flex-col gap-2">
                               <button
                                 type="button"
-                                onClick={() => handleOpenByokCheckout(plan.code, plan.checkoutUrl)}
+                                onClick={() => handleOpenByokCheckout(plan.code)}
                                 className="w-full rounded-xl bg-gradient-to-r from-orange-500 via-rose-500 to-fuchsia-600 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(249,115,22,0.32)] transition-all hover:brightness-110"
                               >
                                 Choose {plan.title}
@@ -3390,10 +3420,10 @@ function Dashboard() {
                       <button
                         type="button"
                         onClick={handleStartByokActivationCheck}
-                        disabled={!byokCheckoutState.initiated || !byokCheckoutState.returnSeen}
+                        disabled={!byokCheckoutState.initiated || !byokCheckoutState.checkoutSessionId}
                         className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-white disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
                       >
-                        Check Activation Now
+                        Retry Activation Check
                       </button>
                       <a
                         href={BYOK_PRICING_URL}
@@ -3413,13 +3443,22 @@ function Dashboard() {
                     </div>
                     {!byokCheckoutState.initiated && (
                       <p className="mt-3 text-xs text-slate-300">
-                        Select a package first. Activation check is enabled after opening checkout.
+                        Select a package first. Checkout callback will verify payment automatically.
                       </p>
                     )}
-                    {byokCheckoutState.initiated && !byokCheckoutState.returnSeen && (
+                    {byokCheckoutState.initiated && byokCheckoutState.phase !== "DELAYED" && (
                       <p className="mt-3 text-xs text-cyan-200">
-                        Finish checkout in the new tab, then return here. We will auto-check on focus and you can also press
-                        &nbsp;Check Activation Now.
+                        Status:{" "}
+                        {byokCheckoutState.phase === "REDIRECTING"
+                          ? "Redirecting to checkout"
+                          : byokCheckoutState.phase === "ACTIVATING"
+                            ? "Activating package"
+                            : "Waiting for payment confirmation"}
+                      </p>
+                    )}
+                    {byokCheckoutState.phase === "DELAYED" && (
+                      <p className="mt-3 text-xs text-amber-200">
+                        Activation delayed. Use Retry Activation Check or revisit callback URL.
                       </p>
                     )}
                   </>

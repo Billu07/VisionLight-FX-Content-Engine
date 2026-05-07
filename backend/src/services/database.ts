@@ -372,6 +372,34 @@ export const dbService = {
       orderBy: { createdAt: "desc" },
     });
   },
+  async getProjectsForUserWorkspace(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { organization: true },
+    });
+    if (!user) return [];
+
+    const isByokOrg = user.organization?.provisioningSource === "BYOK";
+    if (!isByokOrg || !user.organizationId) {
+      return prisma.project.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+      });
+    }
+
+    return prisma.project.findMany({
+      where: {
+        OR: [
+          { organizationId: user.organizationId },
+          {
+            organizationId: null,
+            user: { organizationId: user.organizationId },
+          },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  },
   async getProjectById(id: string) {
     return prisma.project.findUnique({
       where: { id },

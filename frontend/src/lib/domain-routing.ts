@@ -4,6 +4,11 @@ type DomainScopedUser = {
   domainRoutingEnabled?: boolean;
 };
 
+const REDIRECT_MARKER_PARAM = "__drh";
+const REDIRECT_BUDGET_KEY = "visionlight_domain_redirect_budget_v1";
+const REDIRECT_BUDGET_WINDOW_MS = 60 * 1000;
+const MAX_REDIRECT_HOPS = 3;
+
 const sanitizeDomain = (raw?: string | null): string | null => {
   if (!raw) return null;
   const trimmed = raw.trim().toLowerCase();
@@ -40,10 +45,14 @@ const isLocalOrPrivateHost = (host: string): boolean => {
   return isPrivateIpv4(host);
 };
 
-export const getCanonicalDomainRedirectUrl = (user: DomainScopedUser | null): string | null => {
+export const getCanonicalDomainRedirectUrl = (
+  user: DomainScopedUser | null,
+  options?: { suspendRedirect?: boolean },
+): string | null => {
   if (!user || user.domainRoutingEnabled === false) {
     return null;
   }
+  if (options?.suspendRedirect) return null;
 
   const canonicalDomain = sanitizeDomain(user.canonicalDomain);
   if (!canonicalDomain) return null;
@@ -51,7 +60,67 @@ export const getCanonicalDomainRedirectUrl = (user: DomainScopedUser | null): st
   const currentHost = sanitizeDomain(window.location.host);
   if (!currentHost) return null;
   if (isLocalOrPrivateHost(currentHost)) return null;
-  if (currentHost === canonicalDomain) return null;
+  if (currentHost === canonicalDomain) {
+    try {
+      sessionStorage.removeItem(REDIRECT_BUDGET_KEY);
+    } catch {
+      // no-op
+    }
+    return null;
+  }
 
-  return `${window.location.protocol}//${canonicalDomain}${window.location.pathname}${window.location.search}${window.location.hash}`;
+  const nextUrl = new URL(window.location.href);
+  const queryHopRaw = Number.parseInt(
+    nextUrl.searchParams.get(REDIRECT_MARKER_PARAM) || "0",
+    10,
+  );
+  const queryHop = Number.isFinite(queryHopRaw) ? Math.max(0, queryHopRaw) : 0;
+  const now = Date.now();
+
+  let sessionHop = 0;
+  try {
+    const raw = sessionStorage.getItem(REDIRECT_BUDGET_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as {
+        from?: string;
+        to?: string;
+        ts?: number;
+        hops?: number;
+      };
+      if (
+        parsed?.from === currentHost &&
+        parsed?.to === canonicalDomain &&
+        typeof parsed.ts === "number" &&
+        now - parsed.ts < REDIRECT_BUDGET_WINDOW_MS &&
+        typeof parsed.hops === "number"
+      ) {
+        sessionHop = Math.max(0, Math.floor(parsed.hops));
+      }
+    }
+  } catch {
+    // no-op
+  }
+
+  const nextHop = Math.max(queryHop, sessionHop) + 1;
+  if (nextHop > MAX_REDIRECT_HOPS) {
+    return null;
+  }
+
+  nextUrl.hostname = canonicalDomain;
+  nextUrl.searchParams.set(REDIRECT_MARKER_PARAM, String(nextHop));
+  try {
+    sessionStorage.setItem(
+      REDIRECT_BUDGET_KEY,
+      JSON.stringify({
+        from: currentHost,
+        to: canonicalDomain,
+        hops: nextHop,
+        ts: now,
+      }),
+    );
+  } catch {
+    // no-op
+  }
+
+  return nextUrl.toString();
 };

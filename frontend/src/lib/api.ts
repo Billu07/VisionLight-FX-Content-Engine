@@ -83,6 +83,10 @@ export const apiEndpoints = {
   consumeSupportHandoff: (token: string) =>
     api.post("/api/auth/support-handoff/consume", { token }),
   byokGetPackages: () => api.get("/api/byok/packages"),
+  byokCreateCheckoutIntent: (packageCode: string) =>
+    api.post("/api/byok/checkout-intent", { packageCode }),
+  byokGetActivationStatus: (checkoutSessionId: string) =>
+    api.get("/api/byok/activation-status", { params: { checkoutSessionId } }),
   byokBootstrap: () => api.post("/api/byok/bootstrap"),
   byokLinkKey: (falApiKey: string) => api.post("/api/byok/link-key", { falApiKey }),
   byokGetStatus: () => api.get("/api/byok/status"),
@@ -115,6 +119,21 @@ export const apiEndpoints = {
   superadminGetByokOrganizations: () => api.get("/api/superadmin/byok/organizations"),
   superadminActivateByokPackage: (data: { organizationId: string; packageCode: string }) =>
     api.post("/api/superadmin/byok/activate", data),
+  superadminResetByokTrial: (data: {
+    organizationId?: string;
+    email?: string;
+    reason?: string;
+  }) => api.post("/api/superadmin/byok/reset-trial", data),
+  superadminReconcileByok: (data: { organizationId?: string } = {}) =>
+    api.post("/api/superadmin/byok/reconcile", data),
+  superadminGetByokWebhookEvents: (params?: {
+    status?: string;
+    packageCode?: string;
+    organizationId?: string;
+    from?: string;
+    to?: string;
+    limit?: number;
+  }) => api.get("/api/superadmin/byok/webhook-events", { params }),
   superadminUploadWelcomeVideo: (formData: FormData) =>
     api.post("/api/superadmin/settings/welcome-video/upload", formData, {
       headers: { "Content-Type": "multipart/form-data" },

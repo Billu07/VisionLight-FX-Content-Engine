@@ -18,6 +18,7 @@ import Projects from "./pages/Projects";
 import StudioChooser from "./pages/StudioChooser";
 import { SupportHandoff } from "./pages/SupportHandoff";
 import ResetPassword from "./pages/ResetPassword";
+import BillingReturn from "./pages/BillingReturn";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { BrandProvider } from "./contexts/BrandContext";
 import { useAuth } from "./hooks/useAuth";
@@ -82,7 +83,9 @@ const DeactivatedAccountScreen = () => {
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading, checkAuth, profileSelectionRequired } = useAuth();
   const location = useLocation();
-  const redirectUrl = getCanonicalDomainRedirectUrl(user);
+  const redirectUrl = getCanonicalDomainRedirectUrl(user, {
+    suspendRedirect: location.pathname === "/billing/return",
+  });
   const hasRedirectedRef = useRef(false);
 
   useEffect(() => {
@@ -90,11 +93,18 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (isLoading || !user || !redirectUrl || hasRedirectedRef.current) return;
+    if (
+      isLoading ||
+      profileSelectionRequired ||
+      !user ||
+      !redirectUrl ||
+      hasRedirectedRef.current
+    )
+      return;
 
     hasRedirectedRef.current = true;
     window.location.replace(redirectUrl);
-  }, [isLoading, user, redirectUrl]);
+  }, [isLoading, profileSelectionRequired, user, redirectUrl]);
 
   if (isLoading)
     return (
@@ -135,7 +145,10 @@ const ProjectRoute = ({ children }: { children: React.ReactNode }) => {
 // --- 🔒 Admin Only Route ---
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading, checkAuth, profileSelectionRequired } = useAuth();
-  const redirectUrl = getCanonicalDomainRedirectUrl(user);
+  const location = useLocation();
+  const redirectUrl = getCanonicalDomainRedirectUrl(user, {
+    suspendRedirect: location.pathname === "/billing/return",
+  });
   const hasRedirectedRef = useRef(false);
 
   useEffect(() => {
@@ -143,11 +156,18 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    if (isLoading || !user || !redirectUrl || hasRedirectedRef.current) return;
+    if (
+      isLoading ||
+      profileSelectionRequired ||
+      !user ||
+      !redirectUrl ||
+      hasRedirectedRef.current
+    )
+      return;
 
     hasRedirectedRef.current = true;
     window.location.replace(redirectUrl);
-  }, [isLoading, user, redirectUrl]);
+  }, [isLoading, profileSelectionRequired, user, redirectUrl]);
 
   if (isLoading)
     return (
@@ -228,6 +248,14 @@ function App() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/studios" element={<StudioChooser />} />
             <Route path="/support-handoff" element={<SupportHandoff />} />
+            <Route
+              path="/billing/return"
+              element={
+                <ProtectedRoute>
+                  <BillingReturn />
+                </ProtectedRoute>
+              }
+            />
             {/* --------------------------- */}
 
             <Route

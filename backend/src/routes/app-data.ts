@@ -88,6 +88,11 @@ const buildPublicProfileOption = (user: any) => {
   };
 };
 
+const ADMIN_ROLES = new Set(["ADMIN", "SUPERADMIN"]);
+
+const isByokOrganizationUser = (user: any) =>
+  user?.organization?.provisioningSource === "BYOK" && !!user?.organizationId;
+
 router.post("/api/auth/resolve-domain", async (req, res) => {
   try {
     const rawEmail = req.body?.email;
@@ -424,7 +429,7 @@ router.get(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
-      const projects = await airtableService.getUserProjects(req.user!.id);
+      const projects = await airtableService.getProjectsForUserWorkspace(req.user!.id);
       res.json({ success: true, projects });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -438,8 +443,29 @@ router.patch(
   async (req: AuthenticatedRequest, res) => {
     try {
       const { name, editorState } = req.body;
+      const currentUser = await airtableService.findUserById(req.user!.id);
+      if (!currentUser) return res.status(404).json({ error: "User not found" });
       const project = await airtableService.getProjectById(req.params.id);
-      if (!project || project.userId !== req.user!.id) {
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      const isOwner = project.userId === req.user!.id;
+      const isByokMember = isByokOrganizationUser(currentUser);
+      const sameOrg =
+        isByokMember &&
+        !!currentUser.organizationId &&
+        (project.organizationId === currentUser.organizationId ||
+          (project.organizationId === null &&
+            (
+              await prisma.user.findUnique({
+                where: { id: project.userId },
+                select: { organizationId: true },
+              })
+            )?.organizationId === currentUser.organizationId));
+      const isAdmin = ADMIN_ROLES.has(currentUser.role || "USER");
+
+      if (!isOwner && !(sameOrg && isAdmin)) {
         return res.status(403).json({ error: "Unauthorized" });
       }
       const updated = await airtableService.updateProject(req.params.id, {
@@ -458,10 +484,31 @@ router.delete(
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
     try {
+      const currentUser = await airtableService.findUserById(req.user!.id);
+      if (!currentUser) return res.status(404).json({ error: "User not found" });
       const project = await airtableService.getProjectById(req.params.id);
-      if (!project || project.userId !== req.user!.id) {
+      if (!project) {
+        return res.status(404).json({ error: "Project not found" });
+      }
+
+      const isOwner = project.userId === req.user!.id;
+      const isByokMember = isByokOrganizationUser(currentUser);
+      const projectOwner = await prisma.user.findUnique({
+        where: { id: project.userId },
+        select: { organizationId: true },
+      });
+      const sameOrg =
+        isByokMember &&
+        !!currentUser.organizationId &&
+        (project.organizationId === currentUser.organizationId ||
+          (project.organizationId === null &&
+            projectOwner?.organizationId === currentUser.organizationId));
+      const isAdmin = ADMIN_ROLES.has(currentUser.role || "USER");
+
+      if (!isOwner && !(sameOrg && isAdmin)) {
         return res.status(403).json({ error: "Denied" });
       }
+
       await airtableService.deleteProject(req.params.id);
       res.json({ success: true });
     } catch (error: any) {

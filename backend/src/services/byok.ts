@@ -145,6 +145,17 @@ const getUsageSnapshot = async (organizationId: string, dailyLimit: number | nul
   };
 };
 
+const toByokPackageCode = (raw?: string | null): ByokPackageCode | null => {
+  if (!raw) return null;
+  const normalized = raw.trim().toUpperCase();
+  if (!normalized) return null;
+  if ((BYOK_PACKAGE_ORDER as string[]).includes(normalized)) {
+    return normalized as ByokPackageCode;
+  }
+  if (normalized === "BYOK_TRIAL") return "BYOK_TRIAL";
+  return null;
+};
+
 export const byokService = {
   async getPackageCatalog() {
     return BYOK_PACKAGE_ORDER.map((code) => ({
@@ -551,5 +562,159 @@ export const byokService = {
       source: metadata.source,
       raw: metadata.raw,
     });
+  },
+
+  async resetTrialForOrganization(
+    organizationId: string,
+    metadata?: {
+      by?: string;
+      reason?: string;
+    },
+  ) {
+    const org = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      include: { users: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] } },
+    });
+    if (!org || org.provisioningSource !== "BYOK") {
+      throw new Error("BYOK organization not found.");
+    }
+
+    const primaryUser = org.users[0] || null;
+    const trialDays = BYOK_PACKAGE_CONFIG.BYOK_TRIAL.trialDays || 14;
+    const trialEndsAt = new Date(Date.now() + trialDays * DAILY_USAGE_DAY_MS);
+    await applyPackageToOrganization(org.id, "BYOK_TRIAL", { trialEndsAt });
+
+    const entitlement = await prisma.organizationEntitlement.upsert({
+      where: { organizationId: org.id },
+      update: {
+        packageCode: "BYOK_TRIAL",
+        status: "ACTIVE",
+        customerEmail: primaryUser?.email || undefined,
+        activatedAt: new Date(),
+        expiresAt: trialEndsAt,
+        lastWebhookAt: new Date(),
+        metadata: {
+          source: "superadmin_reset_trial",
+          by: metadata?.by || "superadmin",
+          reason: metadata?.reason || "manual_reset",
+        },
+      },
+      create: {
+        organizationId: org.id,
+        packageCode: "BYOK_TRIAL",
+        status: "ACTIVE",
+        customerEmail: primaryUser?.email || undefined,
+        activatedAt: new Date(),
+        expiresAt: trialEndsAt,
+        lastWebhookAt: new Date(),
+        metadata: {
+          source: "superadmin_reset_trial",
+          by: metadata?.by || "superadmin",
+          reason: metadata?.reason || "manual_reset",
+        },
+      },
+    });
+
+    return {
+      organizationId: org.id,
+      packageCode: "BYOK_TRIAL" as const,
+      trialEndsAt: trialEndsAt.toISOString(),
+      entitlementId: entitlement.id,
+    };
+  },
+
+  async resetTrialForEmail(
+    emailRaw: string,
+    metadata?: {
+      by?: string;
+      reason?: string;
+    },
+  ) {
+    const email = emailRaw.trim().toLowerCase();
+    if (!email) {
+      throw new Error("Email is required.");
+    }
+    const profile = await prisma.user.findFirst({
+      where: {
+        email: { equals: email, mode: "insensitive" },
+        organization: { provisioningSource: "BYOK" },
+      },
+      orderBy: [{ createdAt: "asc" }],
+    });
+    if (!profile?.organizationId) {
+      throw new Error("BYOK organization not found for email.");
+    }
+    return this.resetTrialForOrganization(profile.organizationId, metadata);
+  },
+
+  async reconcileOrganization(organizationId: string) {
+    const org = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      include: {
+        entitlement: true,
+      },
+    });
+    if (!org || org.provisioningSource !== "BYOK") {
+      throw new Error("BYOK organization not found.");
+    }
+
+    const entitlementCode = toByokPackageCode(org.entitlement?.packageCode || null);
+    const orgCode = toByokPackageCode(org.entitlementCode || null);
+    const expectedPackageCode = entitlementCode || orgCode || "BYOK_TRIAL";
+    const config = BYOK_PACKAGE_CONFIG[expectedPackageCode];
+
+    const mismatches: string[] = [];
+    if (org.entitlementCode !== expectedPackageCode) mismatches.push("organization.entitlementCode");
+    if (org.routingDomain !== config.routingDomain) mismatches.push("organization.routingDomain");
+    if (org.adminPanelLocked !== config.adminPanelLocked) mismatches.push("organization.adminPanelLocked");
+    if ((org.renderDailyLimit ?? null) !== (config.renderDailyLimit ?? null)) {
+      mismatches.push("organization.renderDailyLimit");
+    }
+    if ((org.storageRetentionDays ?? null) !== (config.storageRetentionDays ?? null)) {
+      mismatches.push("organization.storageRetentionDays");
+    }
+    if (org.maxUsers !== config.maxUsers) mismatches.push("organization.maxUsers");
+    if (org.maxProjectsTotal !== config.maxProjectsTotal) mismatches.push("organization.maxProjectsTotal");
+    if (org.maxStorageMb !== config.maxStorageMb) mismatches.push("organization.maxStorageMb");
+    if ((org.entitlement?.status || "ACTIVE") !== "ACTIVE") mismatches.push("entitlement.status");
+    if (org.entitlement?.packageCode !== expectedPackageCode) mismatches.push("entitlement.packageCode");
+
+    if (mismatches.length === 0) {
+      return {
+        organizationId: org.id,
+        packageCode: expectedPackageCode,
+        repaired: false,
+        mismatches,
+      };
+    }
+
+    await applyPackageToOrganization(org.id, expectedPackageCode);
+    await prisma.organizationEntitlement.upsert({
+      where: { organizationId: org.id },
+      update: {
+        packageCode: expectedPackageCode,
+        status: "ACTIVE",
+        metadata: {
+          source: "superadmin_reconcile",
+          reconciledAt: new Date().toISOString(),
+        },
+      },
+      create: {
+        organizationId: org.id,
+        packageCode: expectedPackageCode,
+        status: "ACTIVE",
+        metadata: {
+          source: "superadmin_reconcile",
+          reconciledAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    return {
+      organizationId: org.id,
+      packageCode: expectedPackageCode,
+      repaired: true,
+      mismatches,
+    };
   },
 };
