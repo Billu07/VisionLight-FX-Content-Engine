@@ -3,6 +3,8 @@ import { getSiteBrand } from "../lib/branding";
 
 type DashboardEntryLoaderProps = {
   organizationName?: string | null;
+  playMode?: "loop" | "once";
+  durationMs?: number;
 };
 
 const BRAND_META = {
@@ -31,9 +33,23 @@ const BRAND_META = {
 
 export const DashboardEntryLoader = ({
   organizationName,
+  playMode = "loop",
+  durationMs = 2400,
 }: DashboardEntryLoaderProps) => {
   const siteBrand = getSiteBrand();
   const brand = BRAND_META[siteBrand];
+  const pulseAnimation =
+    playMode === "once"
+      ? `loaderPulse ${durationMs}ms ease-out 1 forwards`
+      : "loaderPulse 2.4s ease-in-out infinite";
+  const fillAnimation =
+    playMode === "once"
+      ? `logoFillRise ${Math.max(1500, durationMs - 300)}ms ease-out 1 forwards`
+      : "logoFillRise 3.2s ease-in-out infinite alternate";
+  const waveAnimation =
+    playMode === "once"
+      ? `waveDrift ${Math.max(1400, durationMs - 500)}ms linear 1 forwards`
+      : "waveDrift 2.1s linear infinite";
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#060b1d] px-4 text-gray-100">
@@ -60,7 +76,7 @@ export const DashboardEntryLoader = ({
           Entering Studio
         </div>
 
-        <div className="relative mx-auto mb-7 h-40 w-40 animate-[loaderPulse_2.4s_ease-in-out_infinite]">
+        <div className="relative mx-auto mb-7 h-40 w-40" style={{ animation: pulseAnimation }}>
           <div className={`absolute inset-0 rounded-[1.5rem] bg-gradient-to-b ${brand.glow} blur-xl`} />
           <div className="absolute inset-0 rounded-[1.5rem] border border-white/10 bg-[#070f2d]/80" />
 
@@ -72,14 +88,17 @@ export const DashboardEntryLoader = ({
             />
           </div>
 
-          <div className="absolute inset-0 overflow-hidden rounded-[1.5rem] p-5 [animation:logoFillRise_3.2s_ease-in-out_infinite_alternate]">
+          <div className="absolute inset-0 overflow-hidden rounded-[1.5rem] p-5" style={{ animation: fillAnimation }}>
             <img
               src={brand.logo}
               alt={`${brand.title} filled`}
               className="h-full w-full object-contain brightness-125 saturate-125"
             />
             <div className="absolute left-0 right-0 top-0 h-6 overflow-hidden">
-              <div className="h-full w-[190%] [animation:waveDrift_2.1s_linear_infinite] bg-[radial-gradient(45%_95%_at_12%_100%,rgba(226,232,240,0.55),rgba(226,232,240,0.06)_72%),radial-gradient(45%_95%_at_40%_100%,rgba(125,211,252,0.55),rgba(125,211,252,0.08)_74%),radial-gradient(45%_95%_at_70%_100%,rgba(34,211,238,0.52),rgba(34,211,238,0.07)_75%)]" />
+              <div
+                className="h-full w-[190%] bg-[radial-gradient(45%_95%_at_12%_100%,rgba(226,232,240,0.55),rgba(226,232,240,0.06)_72%),radial-gradient(45%_95%_at_40%_100%,rgba(125,211,252,0.55),rgba(125,211,252,0.08)_74%),radial-gradient(45%_95%_at_70%_100%,rgba(34,211,238,0.52),rgba(34,211,238,0.07)_75%)]"
+                style={{ animation: waveAnimation }}
+              />
             </div>
           </div>
         </div>

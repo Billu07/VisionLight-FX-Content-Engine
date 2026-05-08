@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
 import { LoadingSpinner } from "./LoadingSpinner";
+import { DashboardEntryLoader } from "./DashboardEntryLoader";
 import { apiEndpoints, clearActiveProfile, setActiveProfile } from "../lib/api";
 
 interface LoginModalProps {
@@ -94,12 +95,14 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [error, setError] = useState("");
   const [resetMessage, setResetMessage] = useState("");
+  const [showStudioLoader, setShowStudioLoader] = useState(false);
 
   const navigate = useNavigate();
   const { checkAuth } = useAuth();
 
   useEffect(() => {
     if (!isOpen) return;
+    setShowStudioLoader(false);
     const url = new URL(window.location.href);
     const prefilledEmail = url.searchParams.get("login_email");
     const preselectedProfile = url.searchParams.get("login_profile");
@@ -242,7 +245,7 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
       if (authError) throw authError;
 
       const authResult = await checkAuth();
-      onClose();
+      const nextPath = authResult.profileSelectionRequired ? "/studios" : "/app";
 
       const url = new URL(window.location.href);
       if (url.searchParams.has("login_email") || url.searchParams.has("login_profile")) {
@@ -251,15 +254,28 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
         window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
       }
 
-      navigate(authResult.profileSelectionRequired ? "/studios" : "/app");
+      setShowStudioLoader(true);
+      await new Promise((resolve) => setTimeout(resolve, 2400));
+      onClose();
+      navigate(nextPath);
     } catch (err: any) {
       setError(err.message || "Invalid login credentials");
+      setShowStudioLoader(false);
     } finally {
       setIsLoading(false);
     }
   };
 
   if (!isOpen) return null;
+  if (showStudioLoader) {
+    return (
+      <DashboardEntryLoader
+        organizationName={email.trim().toLowerCase() || null}
+        playMode="once"
+        durationMs={2200}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
