@@ -10,6 +10,7 @@ import {
 } from "../lib/api";
 import { confirmAction, notify } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
+import { DashboardEntryLoader } from "../components/DashboardEntryLoader";
 import { ErrorAlert } from "../components/ErrorAlert";
 import { PostCard } from "../components/PostCard";
 import { BrandConfigModal } from "../components/BrandConfigModal";
@@ -2612,9 +2613,7 @@ function Dashboard() {
 
   if (authLoading)
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <LoadingSpinner size="lg" variant="neon" />
-      </div>
+      <DashboardEntryLoader playMode="loop" />
     );
   if (!user) return null;
 

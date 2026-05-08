@@ -26,6 +26,7 @@ import { useAuth } from "./hooks/useAuth";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import { installAlertBridge } from "./lib/notifications";
 import { getCanonicalDomainRedirectUrl } from "./lib/domain-routing";
+import { DashboardEntryLoader } from "./components/DashboardEntryLoader";
 
 // --- NEW IMPORTS (Add these) ---
 import { Terms } from "./pages/Terms";
@@ -87,6 +88,7 @@ const DeactivatedAccountScreen = () => {
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading, checkAuth, profileSelectionRequired } = useAuth();
   const location = useLocation();
+  const isDashboardPath = location.pathname === "/app";
   const redirectUrl = getCanonicalDomainRedirectUrl(user, {
     suspendRedirect: location.pathname === "/billing/return",
   });
@@ -111,7 +113,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }, [isLoading, profileSelectionRequired, user, redirectUrl]);
 
   if (isLoading)
-    return (
+    return isDashboardPath ? (
+      <DashboardEntryLoader playMode="loop" overlay />
+    ) : (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <LoadingSpinner size="lg" variant="neon" />
       </div>
@@ -121,7 +125,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (!user) return <Navigate to="/" state={{ from: location }} replace />;
 
   if (redirectUrl) {
-    return (
+    return isDashboardPath ? (
+      <DashboardEntryLoader playMode="loop" overlay />
+    ) : (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <LoadingSpinner size="lg" variant="neon" />
       </div>
