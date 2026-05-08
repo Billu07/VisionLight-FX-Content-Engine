@@ -89,11 +89,6 @@ export const DashboardEntryLoader = ({
       ? `loaderRevealFill ${Math.max(1500, onceDuration - 250)}ms cubic-bezier(.2,.85,.2,1) 1 forwards`
       : "loaderRevealFill 3.4s cubic-bezier(.22,.76,.21,1) infinite alternate";
 
-  const waveLiftAnimation =
-    playMode === "once"
-      ? `loaderWaveLift ${Math.max(1500, onceDuration - 250)}ms cubic-bezier(.2,.85,.2,1) 1 forwards`
-      : "loaderWaveLift 3.4s cubic-bezier(.22,.76,.21,1) infinite alternate";
-
   const waveAnimation =
     playMode === "once"
       ? `loaderWaveDrift ${Math.max(1200, onceDuration - 450)}ms linear 1 forwards`
@@ -128,16 +123,9 @@ export const DashboardEntryLoader = ({
           50% { transform: scale(1.025); opacity: 1; }
         }
         @keyframes loaderRevealFill {
-          0% { clip-path: inset(92% 0 0 0 round 0.6rem); }
-          44% { clip-path: inset(36% 0 0 0 round 0.6rem); }
-          78% { clip-path: inset(12% 0 0 0 round 0.6rem); }
+          0% { clip-path: inset(100% 0 0 0 round 0.6rem); }
+          70% { clip-path: inset(22% 0 0 0 round 0.6rem); }
           100% { clip-path: inset(0% 0 0 0 round 0.6rem); }
-        }
-        @keyframes loaderWaveLift {
-          0% { transform: translateY(92%); }
-          44% { transform: translateY(36%); }
-          78% { transform: translateY(12%); }
-          100% { transform: translateY(0%); }
         }
         @keyframes loaderWaveDrift {
           0% { transform: translateX(0); }
@@ -196,20 +184,17 @@ export const DashboardEntryLoader = ({
                   alt={`${brand.title} loaded`}
                   className="h-full w-full object-contain brightness-125 saturate-150"
                 />
-              </div>
 
-              <div
-                className="pointer-events-none absolute left-5 right-5 top-5 h-7 overflow-hidden"
-                style={{ animation: waveLiftAnimation }}
-              >
-                <div
-                  className={`h-full w-[200%] bg-gradient-to-r ${brand.liquidGradient} opacity-85`}
-                  style={{ animation: waveAnimation }}
-                />
-                <div
-                  className="absolute inset-0 h-full w-[200%] bg-[radial-gradient(45%_90%_at_14%_100%,rgba(226,232,240,0.52),rgba(226,232,240,0.06)_72%),radial-gradient(45%_90%_at_38%_100%,rgba(125,211,252,0.5),rgba(125,211,252,0.06)_74%),radial-gradient(45%_90%_at_64%_100%,rgba(16,185,129,0.45),rgba(16,185,129,0.05)_74%)]"
-                  style={{ animation: waveAnimation }}
-                />
+                <div className="pointer-events-none absolute left-0 right-0 top-0 h-7 overflow-hidden">
+                  <div
+                    className={`h-full w-[200%] bg-gradient-to-r ${brand.liquidGradient} opacity-85`}
+                    style={{ animation: waveAnimation }}
+                  />
+                  <div
+                    className="absolute inset-0 h-full w-[200%] bg-[radial-gradient(45%_90%_at_14%_100%,rgba(226,232,240,0.52),rgba(226,232,240,0.06)_72%),radial-gradient(45%_90%_at_38%_100%,rgba(125,211,252,0.5),rgba(125,211,252,0.06)_74%),radial-gradient(45%_90%_at_64%_100%,rgba(16,185,129,0.45),rgba(16,185,129,0.05)_74%)]"
+                    style={{ animation: waveAnimation }}
+                  />
+                </div>
               </div>
             </div>
 
