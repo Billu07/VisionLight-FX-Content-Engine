@@ -22,6 +22,7 @@ import { RenderReserveModal } from "../components/RenderReserveModal";
 import { StockPhotosModal } from "../components/StockPhotosModal";
 import { FullscreenVideoEditor, type SequenceItem } from "../components/FullscreenVideoEditor";
 import { MobileNavbar } from "../components/MobileNavbar";
+import { DashboardEntryLoader } from "../components/DashboardEntryLoader";
 import { dashboardAssets } from "../features/dashboard/assets";
 import { usePromptFxManager } from "../features/dashboard/hooks/usePromptFxManager";
 import { useProjectEditorState } from "../features/dashboard/hooks/useProjectEditorState";
@@ -2612,9 +2613,7 @@ function Dashboard() {
 
   if (authLoading)
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <LoadingSpinner size="lg" variant="neon" />
-      </div>
+      <DashboardEntryLoader organizationName={user?.organizationName} />
     );
   if (!user) return null;
 
