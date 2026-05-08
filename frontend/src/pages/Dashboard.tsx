@@ -362,6 +362,7 @@ function Dashboard() {
     string | null
   >(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [showMobileCreditDetails, setShowMobileCreditDetails] = useState(false);
   const [dashboardBgMode, setDashboardBgMode] = useState<DashboardBgMode>(() => {
     const stored =
       typeof window !== "undefined"
@@ -435,6 +436,7 @@ function Dashboard() {
 
   const [previewCarouselIndex, setPreviewCarouselIndex] = useState(0);
   const byokActivationPollRef = useRef(false);
+  const byokTrialPromptShownRef = useRef(false);
 
   // State for Magic Edit Asset
   const [editingAsset, setEditingAsset] = useState<any | null>(null);
@@ -461,7 +463,10 @@ function Dashboard() {
   const adminPanelLocked = byokStatus?.adminPanelLocked === true;
   const byokNeedsFalKey = isByokWorkspace && byokStatus?.hasFalKey === false;
   const currentByokPackageCode = byokStatus?.packageCode || null;
-  const byokPlanLabel = byokStatus?.packageTitle || byokStatus?.packageCode || "BYOK";
+  const isByokPremium =
+    isByokWorkspace &&
+    typeof currentByokPackageCode === "string" &&
+    currentByokPackageCode !== "BYOK_TRIAL";
   const navigate = useNavigate();
   const canUseVideoEditor =
     user?.role === "SUPERADMIN" || user?.videoEditorEnabledForAll === true;
@@ -634,6 +639,12 @@ function Dashboard() {
   }, []);
 
   useEffect(() => {
+    if (!isMobile || !isByokWorkspace) {
+      setShowMobileCreditDetails(false);
+    }
+  }, [isMobile, isByokWorkspace]);
+
+  useEffect(() => {
     localStorage.setItem(DASHBOARD_BG_MODE_KEY, dashboardBgMode);
   }, [dashboardBgMode]);
 
@@ -706,6 +717,16 @@ function Dashboard() {
       setShowByokUpgradeModal(true);
     }
   }, [byokStatus?.upgradeRequired]);
+
+  useEffect(() => {
+    if (!isByokWorkspace || currentByokPackageCode !== "BYOK_TRIAL") {
+      byokTrialPromptShownRef.current = false;
+      return;
+    }
+    if (showByokKeyModal || byokTrialPromptShownRef.current) return;
+    byokTrialPromptShownRef.current = true;
+    setShowByokUpgradeModal(true);
+  }, [isByokWorkspace, currentByokPackageCode, showByokKeyModal]);
 
   useEffect(() => {
     if (byokNeedsFalKey) {
@@ -3512,36 +3533,6 @@ function Dashboard() {
                 </div>
               </div>
             )}
-            {isByokWorkspace && (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-xl border border-cyan-300/35 bg-cyan-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-100">
-                  BYOK
-                </span>
-                {byokStatus?.packageCode === "BYOK_TRIAL" && (
-                  <span className="rounded-xl border border-amber-300/40 bg-amber-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200">
-                    Demo
-                  </span>
-                )}
-                <span className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-200">
-                  {byokPlanLabel}
-                </span>
-                {typeof byokStatus?.dailyUsage?.limit === "number" && (
-                  <span className="rounded-xl border border-fuchsia-300/30 bg-fuchsia-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-fuchsia-100">
-                    {byokStatus?.dailyUsage?.used || 0}/{byokStatus.dailyUsage.limit} renders today
-                  </span>
-                )}
-                {user?.orgLockReason === "SEAT_LOCKED" && (
-                  <span className="rounded-xl border border-rose-300/45 bg-rose-500/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-rose-100">
-                    Seat Locked
-                  </span>
-                )}
-                {byokStatus?.trialEndsAt && (
-                  <span className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-300">
-                    Trial ends {new Date(byokStatus.trialEndsAt).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
-            )}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {loadedBrandLogoUrl && (
@@ -3559,8 +3550,30 @@ function Dashboard() {
               </div>
             </div>
             <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3 xl:gap-4">
-              <div className="bg-gradient-to-r from-gray-900/80 to-gray-800/80 backdrop-blur-xl rounded-xl p-3 sm:p-4 lg:px-6 lg:py-3 border border-gray-700/50 shadow-xl w-full xl:w-auto">
-                <div className="grid grid-cols-2 gap-y-4 gap-x-2 sm:flex sm:items-center sm:gap-4 md:gap-5 lg:gap-6">
+              <div
+                className={`w-full rounded-xl border shadow-xl backdrop-blur-xl xl:w-auto ${
+                  isByokWorkspace && isMobile
+                    ? "border-gray-700/45 bg-gray-900/80 p-2.5"
+                    : "border-gray-700/50 bg-gradient-to-r from-gray-900/80 to-gray-800/80 p-3 sm:p-4 lg:px-6 lg:py-3"
+                }`}
+              >
+                {isByokWorkspace && isMobile && (
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">
+                      Credit Balances
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowMobileCreditDetails((prev) => !prev)}
+                      className="rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-200 hover:bg-white/10"
+                    >
+                      {showMobileCreditDetails ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                )}
+                {(!isByokWorkspace || !isMobile || showMobileCreditDetails) && (
+                  <>
+                    <div className="grid grid-cols-2 gap-y-4 gap-x-2 sm:flex sm:items-center sm:gap-4 md:gap-5 lg:gap-6">
                   {!creditsLoading ? (
                     user?.view === "PICDRIFT" ? (
                       <>
@@ -3669,7 +3682,7 @@ function Dashboard() {
                     </div>
                   )}
                 </div>
-                {storageSummary && (
+                {storageSummary && (!isByokWorkspace || !isMobile) && (
                   <div className="mt-4 border-t border-gray-700/60 pt-3">
                     <div className="flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest text-gray-400">
                       <span>Organization Shared Storage</span>
@@ -3694,6 +3707,8 @@ function Dashboard() {
                     </div>
                   </div>
                 )}
+                  </>
+                )}
               </div>
 
               {!isMobile && (
@@ -3702,19 +3717,33 @@ function Dashboard() {
                     <button
                       type="button"
                       onClick={handleOpenApiIntegration}
-                      className="rounded-2xl border border-rose-300/45 bg-gradient-to-r from-rose-600 to-pink-600 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white transition-all hover:from-rose-500 hover:to-pink-500"
+                      className="rounded-2xl border border-blue-300/45 bg-gradient-to-r from-blue-600 to-cyan-600 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white transition-all hover:from-blue-500 hover:to-cyan-500"
                     >
                       Link Fal Key
                     </button>
                   )}
                   {isByokWorkspace && (
-                    <button
-                      type="button"
-                      onClick={() => setShowByokUpgradeModal(true)}
-                      className="rounded-2xl border border-orange-200/45 bg-gradient-to-r from-orange-500 via-rose-500 to-fuchsia-600 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white shadow-[0_12px_35px_rgba(249,115,22,0.36)] transition-all hover:brightness-110"
+                    <div
+                      className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] ${
+                        isByokPremium
+                          ? "border-emerald-300/45 bg-emerald-500/10 text-emerald-100"
+                          : "border-rose-300/45 bg-rose-500/10 text-rose-100"
+                      }`}
                     >
-                      Upgrade Plan
-                    </button>
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span
+                          className={`absolute inline-flex h-full w-full animate-ping rounded-full ${
+                            isByokPremium ? "bg-emerald-300/80" : "bg-rose-300/80"
+                          }`}
+                        />
+                        <span
+                          className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
+                            isByokPremium ? "bg-emerald-300" : "bg-rose-300"
+                          }`}
+                        />
+                      </span>
+                      {isByokPremium ? "Premium" : "Demo"}
+                    </div>
                   )}
                   <button
                     type="button"
@@ -3762,7 +3791,7 @@ function Dashboard() {
                   </button>
 
                   {showUserMenu && (
-                    <div className="absolute right-0 top-full mt-2 w-56 bg-gray-900 border border-gray-700/80 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                    <div className="absolute right-0 top-full z-50 mt-2 w-64 animate-in slide-in-from-top-2 rounded-2xl border border-gray-700/80 bg-gray-900 py-2 shadow-2xl fade-in">
                       <button
                         onClick={() => setShowUserMenu(false)}
                         className="absolute top-2 right-2 w-7 h-7 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center"
@@ -3774,6 +3803,18 @@ function Dashboard() {
                         <div className="text-xs text-gray-400 uppercase tracking-widest font-bold">Options</div>
                       </div>
 
+                      {isByokWorkspace && (
+                        <button
+                          onClick={() => {
+                            setShowUserMenu(false);
+                            setShowByokUpgradeModal(true);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm font-medium text-gray-200 transition-colors hover:bg-white/10"
+                        >
+                          Upgrade Package
+                        </button>
+                      )}
+
                       {isAdmin && (
                         <button
                           onClick={() => {
@@ -3782,8 +3823,8 @@ function Dashboard() {
                           }}
                           className={`w-full text-left px-4 py-2 text-sm font-medium transition-colors ${
                             adminPanelLocked
-                              ? "text-gray-500 hover:bg-gray-500/10"
-                              : "text-red-400 hover:bg-red-500/10"
+                              ? "text-gray-500 hover:bg-white/5"
+                              : "text-gray-200 hover:bg-white/10"
                           }`}
                         >
                           {adminPanelLocked ? "Admin Panel (Locked)" : "Admin Panel"}
@@ -3796,7 +3837,7 @@ function Dashboard() {
                           localStorage.removeItem("visionlight_active_project");
                           navigate("/projects");
                         }}
-                        className="w-full text-left px-4 py-2 text-blue-400 hover:bg-blue-500/10 text-sm font-medium transition-colors"
+                        className="w-full text-left px-4 py-2 text-sm font-medium text-gray-200 transition-colors hover:bg-white/10"
                       >
                         Projects
                       </button>
@@ -3806,7 +3847,7 @@ function Dashboard() {
                           setShowUserMenu(false);
                           setShowReserveModal(true);
                         }}
-                        className="w-full text-left px-4 py-2 text-yellow-400 hover:bg-yellow-500/10 text-sm font-medium transition-colors"
+                        className="w-full text-left px-4 py-2 text-sm font-medium text-gray-200 transition-colors hover:bg-white/10"
                       >
                         Render Reserve
                       </button>
@@ -3818,7 +3859,7 @@ function Dashboard() {
                             target="_blank"
                             rel="noreferrer"
                             onClick={() => setShowUserMenu(false)}
-                            className="w-full text-left px-4 py-2 text-green-400 hover:bg-green-500/10 text-sm font-medium transition-colors block"
+                            className="block w-full px-4 py-2 text-left text-sm font-medium text-gray-200 transition-colors hover:bg-white/10"
                           >
                             {creditBtnText}
                           </a>
@@ -3829,7 +3870,7 @@ function Dashboard() {
                               handleRequestCredits();
                             }}
                             disabled={isRequesting}
-                            className="w-full text-left px-4 py-2 text-purple-400 hover:bg-purple-500/10 text-sm font-medium transition-colors"
+                            className="w-full text-left px-4 py-2 text-sm font-medium text-gray-200 transition-colors hover:bg-white/10"
                           >
                             {isRequesting ? "Sending..." : "Request Render"}
                           </button>
@@ -3840,7 +3881,7 @@ function Dashboard() {
                           setShowUserMenu(false);
                           setShowBrandModal(true);
                         }}
-                        className="w-full text-left px-4 py-2 text-cyan-400 hover:bg-cyan-500/10 text-sm font-medium transition-colors"
+                        className="w-full text-left px-4 py-2 text-sm font-medium text-gray-200 transition-colors hover:bg-white/10"
                       >
                         Edit Dashboard
                       </button>
@@ -3867,19 +3908,33 @@ function Dashboard() {
                     <button
                       type="button"
                       onClick={handleOpenApiIntegration}
-                      className="w-full rounded-xl border border-rose-300/45 bg-gradient-to-r from-rose-600 to-pink-600 px-4 py-3 text-sm font-semibold text-white hover:from-rose-500 hover:to-pink-500 transition-colors"
+                      className="w-full rounded-xl border border-blue-300/45 bg-gradient-to-r from-blue-600 to-cyan-600 px-4 py-3 text-sm font-semibold text-white hover:from-blue-500 hover:to-cyan-500 transition-colors"
                     >
                       Link Fal Key
                     </button>
                   )}
                   {isByokWorkspace && (
-                    <button
-                      type="button"
-                      onClick={() => setShowByokUpgradeModal(true)}
-                      className="w-full rounded-xl border border-orange-200/45 bg-gradient-to-r from-orange-500 via-rose-500 to-fuchsia-600 px-4 py-3 text-sm font-black uppercase tracking-[0.12em] text-white shadow-[0_12px_35px_rgba(249,115,22,0.35)] transition-all hover:brightness-110"
+                    <div
+                      className={`flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-black uppercase tracking-[0.12em] ${
+                        isByokPremium
+                          ? "border-emerald-300/45 bg-emerald-500/10 text-emerald-100"
+                          : "border-rose-300/45 bg-rose-500/10 text-rose-100"
+                      }`}
                     >
-                      Upgrade Plan
-                    </button>
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span
+                          className={`absolute inline-flex h-full w-full animate-ping rounded-full ${
+                            isByokPremium ? "bg-emerald-300/80" : "bg-rose-300/80"
+                          }`}
+                        />
+                        <span
+                          className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
+                            isByokPremium ? "bg-emerald-300" : "bg-rose-300"
+                          }`}
+                        />
+                      </span>
+                      {isByokPremium ? "Premium" : "Demo"}
+                    </div>
                   )}
                   <button
                     type="button"
@@ -3916,6 +3971,19 @@ function Dashboard() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-2">
+                  {isByokWorkspace && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        setShowByokUpgradeModal(true);
+                      }}
+                      className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-left text-xs font-semibold text-gray-200 hover:bg-white/10"
+                    >
+                      Upgrade Package
+                    </button>
+                  )}
+
                   {isAdmin && (
                     <button
                       type="button"
@@ -3926,7 +3994,7 @@ function Dashboard() {
                       className={`rounded-xl px-3 py-2 text-left text-xs font-semibold ${
                         adminPanelLocked
                           ? "border border-white/15 bg-white/5 text-gray-400"
-                          : "border border-rose-500/30 bg-rose-500/10 text-rose-300"
+                          : "border border-white/15 bg-white/5 text-gray-200 hover:bg-white/10"
                       }`}
                     >
                       {adminPanelLocked ? "Admin Panel (Locked)" : "Admin Panel"}
@@ -3940,7 +4008,7 @@ function Dashboard() {
                       localStorage.removeItem("visionlight_active_project");
                       navigate("/projects");
                     }}
-                    className="rounded-xl border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-left text-xs font-semibold text-blue-300"
+                    className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-left text-xs font-semibold text-gray-200 hover:bg-white/10"
                   >
                     Projects
                   </button>
@@ -3951,7 +4019,7 @@ function Dashboard() {
                       setShowUserMenu(false);
                       setShowReserveModal(true);
                     }}
-                    className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-left text-xs font-semibold text-yellow-300"
+                    className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-left text-xs font-semibold text-gray-200 hover:bg-white/10"
                   >
                     Render Reserve
                   </button>
@@ -3963,7 +4031,7 @@ function Dashboard() {
                         target="_blank"
                         rel="noreferrer"
                         onClick={() => setShowUserMenu(false)}
-                        className="rounded-xl border border-green-500/30 bg-green-500/10 px-3 py-2 text-left text-xs font-semibold text-green-300"
+                        className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-left text-xs font-semibold text-gray-200 hover:bg-white/10"
                       >
                         {creditBtnText}
                       </a>
@@ -3975,7 +4043,7 @@ function Dashboard() {
                           handleRequestCredits();
                         }}
                         disabled={isRequesting}
-                        className="rounded-xl border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-left text-xs font-semibold text-purple-300 disabled:opacity-60"
+                        className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-left text-xs font-semibold text-gray-200 hover:bg-white/10 disabled:opacity-60"
                       >
                         {isRequesting ? "Sending..." : "Request Render"}
                       </button>
@@ -3987,7 +4055,7 @@ function Dashboard() {
                       setShowUserMenu(false);
                       setShowBrandModal(true);
                     }}
-                    className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-left text-xs font-semibold text-sky-300"
+                    className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-left text-xs font-semibold text-gray-200 hover:bg-white/10"
                   >
                     Edit Dashboard
                   </button>

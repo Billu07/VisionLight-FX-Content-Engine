@@ -6,13 +6,17 @@ import { useAuth } from "../hooks/useAuth";
 import { notify } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { DashboardEntryLoader } from "../components/DashboardEntryLoader";
+import picdriftLogo from "../assets/picdrift.png";
+import fxLogo from "../assets/fx.png";
 
 type AuthMode = "signup" | "login";
 
 export const ByokLanding = () => {
+  const BYOK_PRICING_URL = "https://www.picdrift.com/pricing-plans/byok";
   const navigate = useNavigate();
   const { checkAuth } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
+  const [showPackageSheet, setShowPackageSheet] = useState(true);
   const [authMode, setAuthMode] = useState<AuthMode>("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -126,9 +130,46 @@ export const ByokLanding = () => {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#050616] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(215,70,239,0.28),transparent_38%),radial-gradient(circle_at_82%_22%,rgba(59,130,246,0.24),transparent_45%),radial-gradient(circle_at_42%_72%,rgba(11,18,46,0.9),transparent_62%)]" />
-      <div className="absolute inset-y-0 right-[-18%] w-[68%] bg-[radial-gradient(circle_at_40%_50%,rgba(236,72,153,0.38),transparent_40%),radial-gradient(circle_at_58%_46%,rgba(56,189,248,0.32),transparent_42%)] blur-2xl" />
+    <div className="relative min-h-screen overflow-hidden bg-[#070a20] text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.35),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.65),transparent_62%)]" />
+      <div className="absolute inset-x-0 top-0 h-[52%] bg-gradient-to-r from-[#170316] via-[#1a164f] to-[#0d2f59]" />
+      <div
+        className="absolute inset-x-0 bottom-[-140px] h-[68%] bg-gradient-to-r from-[#2f58df] via-[#5364f2] to-[#3f58dd]"
+        style={{ clipPath: "polygon(0 16%, 100% 0, 100% 100%, 0 100%)" }}
+      />
+
+      <header className="relative z-20 border-b border-white/10 bg-[#120f2b]/65 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6">
+          <a
+            href="https://picdrift.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3"
+          >
+            <img
+              src={picdriftLogo}
+              alt="PicDrift"
+              className="h-9 w-auto object-contain sm:h-10"
+            />
+            <span className="h-7 w-px bg-white/20" />
+            <img
+              src={fxLogo}
+              alt="FX"
+              className="h-7 w-auto object-contain opacity-95"
+            />
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              setAuthMode("login");
+              setShowAuth(true);
+            }}
+            className="rounded-full border border-white/35 bg-white/5 px-5 py-1.5 text-sm font-semibold text-white transition hover:bg-white/12"
+          >
+            Login
+          </button>
+        </div>
+      </header>
 
       <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col justify-center px-6 py-10 lg:flex-row lg:items-center lg:justify-between lg:px-12">
         <section className="max-w-2xl">
@@ -171,7 +212,10 @@ export const ByokLanding = () => {
               Login
             </button>
           </div>
-          <p className="mt-5 text-sm text-cyan-200/85">
+          <p className="mt-5 text-sm font-semibold text-cyan-100">
+            Packages start from $9/mo (annual billing).
+          </p>
+          <p className="mt-2 text-sm text-cyan-200/85">
             14-day trial: full dashboard access, max 5 renders/day.
           </p>
         </section>
@@ -198,6 +242,65 @@ export const ByokLanding = () => {
           </div>
         </section>
       </main>
+
+      {showPackageSheet && (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-3xl rounded-3xl border border-white/10 bg-[#0a102b]/95 p-6 shadow-[0_30px_90px_rgba(8,10,34,0.75)] sm:p-7">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-2xl font-black text-white">BYOK Packages</h3>
+                <p className="mt-1 text-sm text-cyan-100">Starting from $9/mo billed annually.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPackageSheet(false)}
+                className="rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-gray-200 hover:bg-white/10"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              {[
+                ["Solo App", "$9/mo", "Focused solo workflow"],
+                ["Studio", "$49/mo", "Team-ready collaboration"],
+                ["Agency", "$197/mo", "Scale with expanded limits"],
+              ].map(([plan, price, note]) => (
+                <div key={plan} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                  <div className="text-xs font-bold uppercase tracking-[0.14em] text-slate-300">{plan}</div>
+                  <div className="mt-2 text-2xl font-black text-white">{price}</div>
+                  <div className="mt-1 text-xs text-slate-300">{note}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setShowPackageSheet(false)}
+                className="rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white"
+              >
+                Continue to BYOK
+              </button>
+              <a
+                href={BYOK_PRICING_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-xs font-bold uppercase tracking-[0.12em] text-gray-200 hover:bg-white/10"
+              >
+                View Full Pricing
+              </a>
+              <button
+                type="button"
+                onClick={() => setShowPackageSheet(false)}
+                className="rounded-xl border border-white/10 px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-slate-300"
+              >
+                Skip for now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAuth && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
