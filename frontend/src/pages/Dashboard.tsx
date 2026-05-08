@@ -3235,16 +3235,16 @@ function Dashboard() {
 
         {showByokUpgradeModal && (
           <div className="fixed inset-0 z-[220] flex items-center justify-center bg-gray-950/90 p-4 backdrop-blur-md">
-            <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-cyan-400/25 bg-[#060b1f] p-5 shadow-[0_30px_90px_rgba(2,8,23,0.82)] sm:p-6">
+            <div className="flex max-h-[94vh] w-full max-w-7xl flex-col overflow-hidden rounded-3xl border border-cyan-400/25 bg-[#060b1f] p-6 shadow-[0_30px_90px_rgba(2,8,23,0.82)] sm:p-8">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-300">
                     BYOK Packages
                   </p>
-                  <h3 className="mt-1 text-2xl font-black text-white">
+                  <h3 className="mt-2 text-3xl font-black text-white">
                     Upgrade Anytime
                   </h3>
-                  <p className="mt-2 text-sm text-slate-300">
+                  <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300">
                     Choose a package that matches your production scale.
                   </p>
                 </div>
@@ -3258,7 +3258,7 @@ function Dashboard() {
                 </button>
               </div>
 
-              <div className="mt-5 overflow-y-auto pr-1">
+              <div className="mt-8 overflow-y-auto pr-1 sm:pr-2">
                 {isByokActivationPolling ? (
                   <div className="rounded-2xl border border-cyan-300/25 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.22),rgba(2,6,23,0.9)_62%)] p-8 text-center">
                     <div className="mx-auto mb-6 h-24 w-24">
@@ -3281,18 +3281,18 @@ function Dashboard() {
                   </div>
                 ) : (
                   <>
-                    <div className="mb-4 grid gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-xs text-slate-200 sm:grid-cols-3">
+                    <div className="mb-8 grid gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-xs text-slate-200 sm:grid-cols-3 sm:p-6">
                       <div>
                         <p className="font-black uppercase tracking-[0.12em] text-cyan-200">1. Choose Plan</p>
-                        <p className="mt-1 text-slate-300">Open secure checkout in a new tab.</p>
+                        <p className="mt-2 leading-relaxed text-slate-300">Open secure checkout in a new tab.</p>
                       </div>
                       <div>
                         <p className="font-black uppercase tracking-[0.12em] text-cyan-200">2. Complete Payment</p>
-                        <p className="mt-1 text-slate-300">Wix sends order data to your BYOK webhook.</p>
+                        <p className="mt-2 leading-relaxed text-slate-300">Wix sends order data to your BYOK webhook.</p>
                       </div>
                       <div>
                         <p className="font-black uppercase tracking-[0.12em] text-cyan-200">3. Activation Callback</p>
-                        <p className="mt-1 text-slate-300">Callback route verifies webhook before success.</p>
+                        <p className="mt-2 leading-relaxed text-slate-300">Callback route verifies webhook before success.</p>
                       </div>
                     </div>
                     {byokPlanCards.length === 0 ? (
@@ -3300,11 +3300,11 @@ function Dashboard() {
                         Package catalog is temporarily unavailable. Open pricing page or try again in a few seconds.
                       </div>
                     ) : (
-                      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                      <div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-3">
                         {byokPlanCards.map((plan) => (
                           <article
                             key={plan.code}
-                            className={`relative rounded-2xl border p-5 shadow-xl transition-all ${
+                            className={`relative flex h-full flex-col rounded-2xl border p-6 shadow-xl transition-all ${
                               plan.featured
                                 ? "border-amber-300/40 bg-[linear-gradient(165deg,rgba(120,53,15,0.4),rgba(3,7,18,0.94))]"
                                 : "border-white/12 bg-[linear-gradient(165deg,rgba(15,23,42,0.82),rgba(2,6,23,0.9))]"
@@ -3315,7 +3315,7 @@ function Dashboard() {
                                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-300">
                                   {plan.code.replaceAll("_", " ")}
                                 </p>
-                                <h4 className="mt-1 text-lg font-black text-white">{plan.title}</h4>
+                                <h4 className="mt-2 text-xl font-black text-white">{plan.title}</h4>
                               </div>
                               {plan.highlight && (
                                 <span className="rounded-lg border border-amber-300/45 bg-amber-300/15 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-amber-100">
@@ -3324,33 +3324,33 @@ function Dashboard() {
                               )}
                             </div>
 
-                            <p className="mt-2 text-xs text-slate-300">{plan.blurb}</p>
-                            <p className="mt-1 text-[11px] text-cyan-200">{plan.modelLine}</p>
+                            <p className="mt-4 text-sm leading-relaxed text-slate-300">{plan.blurb}</p>
+                            <p className="mt-2 text-xs text-cyan-200">{plan.modelLine}</p>
 
-                            <div className="mt-4 flex items-end gap-2">
+                            <div className="mt-6 flex items-end gap-2">
                               <span className="text-4xl font-black text-white">{plan.annualPrice}</span>
                               <span className="pb-1 text-xs font-semibold uppercase tracking-wide text-slate-300">
                                 /year
                               </span>
                             </div>
-                            <p className="mt-1 text-[11px] text-slate-300">{plan.monthlyEquivalent}</p>
+                            <p className="mt-2 text-xs text-slate-300">{plan.monthlyEquivalent}</p>
 
-                            <div className="mt-4 grid grid-cols-1 gap-2 rounded-xl border border-white/10 bg-black/25 p-3">
-                              <p className="text-[11px] text-slate-200">{plan.usersLabel}</p>
-                              <p className="text-[11px] text-slate-200">{plan.projectsLabel}</p>
+                            <div className="mt-6 grid grid-cols-1 gap-2 rounded-xl border border-white/10 bg-black/25 p-4">
+                              <p className="text-xs text-slate-200">{plan.usersLabel}</p>
+                              <p className="text-xs text-slate-200">{plan.projectsLabel}</p>
                               {plan.storageLabel && (
-                                <p className="text-[11px] text-slate-200">{plan.storageLabel}</p>
+                                <p className="text-xs text-slate-200">{plan.storageLabel}</p>
                               )}
-                              <p className="text-[11px] text-slate-200">{plan.adminLabel}</p>
-                              <p className="text-[11px] text-slate-200">{plan.retentionLabel}</p>
-                              <p className="text-[11px] text-cyan-200">Domain: {plan.routingDomain}</p>
+                              <p className="text-xs text-slate-200">{plan.adminLabel}</p>
+                              <p className="text-xs text-slate-200">{plan.retentionLabel}</p>
+                              <p className="text-xs text-cyan-200">Domain: {plan.routingDomain}</p>
                             </div>
 
-                            <div className="mt-4 flex flex-col gap-2">
+                            <div className="mt-6 flex flex-col gap-2">
                               <button
                                 type="button"
                                 onClick={() => handleOpenByokCheckout(plan.code)}
-                                className="w-full rounded-xl bg-gradient-to-r from-orange-500 via-rose-500 to-fuchsia-600 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(249,115,22,0.32)] transition-all hover:brightness-110"
+                                className="w-full rounded-xl bg-gradient-to-r from-orange-500 via-rose-500 to-fuchsia-600 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(249,115,22,0.32)] transition-all hover:brightness-110"
                               >
                                 Choose {plan.title}
                               </button>
@@ -3371,7 +3371,7 @@ function Dashboard() {
                       </div>
                     )}
 
-                    <div className="mt-5 flex flex-wrap gap-3">
+                    <div className="mt-7 flex flex-wrap gap-3 border-t border-white/10 pt-5">
                       <button
                         type="button"
                         onClick={closeByokUpgradeModal}
@@ -3726,7 +3726,7 @@ function Dashboard() {
                             setShowUserMenu(false);
                             setShowByokUpgradeModal(true);
                           }}
-                          className="w-full text-left px-4 py-2 text-sm font-bold text-orange-200 transition-colors hover:bg-orange-500/15 hover:text-orange-100"
+                          className="w-full rounded-lg border border-orange-300/40 bg-gradient-to-r from-orange-500/25 via-rose-500/25 to-fuchsia-500/25 px-4 py-2 text-left text-sm font-black text-orange-100 shadow-[0_8px_20px_rgba(249,115,22,0.22)] transition-all hover:from-orange-500/35 hover:via-rose-500/35 hover:to-fuchsia-500/35"
                         >
                           Upgrade Package
                         </button>
@@ -3741,7 +3741,7 @@ function Dashboard() {
                           className={`w-full text-left px-4 py-2 text-sm font-medium transition-colors ${
                             adminPanelLocked
                               ? "text-gray-500 hover:bg-white/5"
-                              : "text-rose-300 hover:bg-rose-500/15"
+                              : "rounded-lg border border-rose-300/35 bg-rose-500/20 text-rose-100 hover:bg-rose-500/30"
                           }`}
                         >
                           {adminPanelLocked ? "Admin Panel (Locked)" : "Admin Panel"}
@@ -3893,7 +3893,7 @@ function Dashboard() {
                         setShowUserMenu(false);
                         setShowByokUpgradeModal(true);
                       }}
-                      className="rounded-xl border border-orange-300/30 bg-orange-500/10 px-3 py-2 text-left text-xs font-bold text-orange-200 hover:bg-orange-500/20"
+                      className="rounded-xl border border-orange-300/40 bg-gradient-to-r from-orange-500/25 via-rose-500/25 to-fuchsia-500/25 px-3 py-2 text-left text-xs font-black text-orange-100 shadow-[0_8px_18px_rgba(249,115,22,0.22)] hover:from-orange-500/35 hover:via-rose-500/35 hover:to-fuchsia-500/35"
                     >
                       Upgrade Package
                     </button>
@@ -3909,7 +3909,7 @@ function Dashboard() {
                       className={`rounded-xl px-3 py-2 text-left text-xs font-semibold ${
                         adminPanelLocked
                           ? "border border-white/15 bg-white/5 text-gray-400"
-                          : "border border-rose-300/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+                          : "border border-rose-300/35 bg-rose-500/20 text-rose-100 hover:bg-rose-500/30"
                       }`}
                     >
                       {adminPanelLocked ? "Admin Panel (Locked)" : "Admin Panel"}
