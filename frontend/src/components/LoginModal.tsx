@@ -272,7 +272,8 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
       <DashboardEntryLoader
         organizationName={email.trim().toLowerCase() || null}
         playMode="once"
-        durationMs={2200}
+        durationMs={2400}
+        overlay
       />
     );
   }

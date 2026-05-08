@@ -5,6 +5,7 @@ type DashboardEntryLoaderProps = {
   organizationName?: string | null;
   playMode?: "loop" | "once";
   durationMs?: number;
+  overlay?: boolean;
 };
 
 const BRAND_META = {
@@ -35,6 +36,7 @@ export const DashboardEntryLoader = ({
   organizationName,
   playMode = "loop",
   durationMs = 2400,
+  overlay = false,
 }: DashboardEntryLoaderProps) => {
   const siteBrand = getSiteBrand();
   const brand = BRAND_META[siteBrand];
@@ -52,7 +54,9 @@ export const DashboardEntryLoader = ({
       : "waveDrift 2.1s linear infinite";
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#060b1d] px-4 text-gray-100">
+    <div
+      className={`${overlay ? "fixed inset-0 z-[999]" : "relative min-h-screen"} flex items-center justify-center overflow-hidden bg-[#060b1d] px-4 text-gray-100`}
+    >
       <style>{`
         @keyframes logoFillRise {
           0% { height: 14%; }

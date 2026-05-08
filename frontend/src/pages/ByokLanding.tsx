@@ -5,6 +5,7 @@ import { apiEndpoints, setActiveProfile, setAuthToken } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { notify } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
+import { DashboardEntryLoader } from "../components/DashboardEntryLoader";
 
 type AuthMode = "signup" | "login";
 
@@ -16,6 +17,7 @@ export const ByokLanding = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showStudioLoader, setShowStudioLoader] = useState(false);
 
   const finalizeByokSession = async (profileLabel: string) => {
     const initialAuth = await checkAuth();
@@ -39,7 +41,10 @@ export const ByokLanding = () => {
     }
 
     const finalAuth = await checkAuth();
-    navigate(finalAuth.profileSelectionRequired ? "/studios" : "/projects", {
+    const nextPath = finalAuth.profileSelectionRequired ? "/studios" : "/projects";
+    setShowStudioLoader(true);
+    await new Promise((resolve) => setTimeout(resolve, 2400));
+    navigate(nextPath, {
       replace: true,
     });
   };
@@ -103,11 +108,22 @@ export const ByokLanding = () => {
         navigate("/studios", { replace: true });
       } else {
         notify.error(error?.message || "Authentication failed.");
+        setShowStudioLoader(false);
       }
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (showStudioLoader) {
+    return (
+      <DashboardEntryLoader
+        organizationName={email.trim().toLowerCase() || "BYOK Workspace"}
+        playMode="once"
+        durationMs={2400}
+      />
+    );
+  }
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#050616] text-white">
