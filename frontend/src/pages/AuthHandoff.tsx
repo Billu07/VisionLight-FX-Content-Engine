@@ -4,12 +4,22 @@ import { LoadingSpinner } from "../components/LoadingSpinner";
 import { apiEndpoints, setSupportSessionToken } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 
-const parseTokenFromHash = () => {
+const parsePayloadFromHash = () => {
   const hash = window.location.hash || "";
   const raw = hash.startsWith("#") ? hash.slice(1) : hash;
   const params = new URLSearchParams(raw);
   const token = params.get("token");
-  return typeof token === "string" ? token.trim() : "";
+  const nextRaw = params.get("next");
+  const nextPath =
+    typeof nextRaw === "string" &&
+    /^\/[A-Za-z0-9/_-]*$/.test(nextRaw) &&
+    !nextRaw.startsWith("//")
+      ? nextRaw
+      : "/projects";
+  return {
+    token: typeof token === "string" ? token.trim() : "",
+    nextPath,
+  };
 };
 
 export function AuthHandoff() {
@@ -21,7 +31,7 @@ export function AuthHandoff() {
     let mounted = true;
     const run = async () => {
       try {
-        const token = parseTokenFromHash();
+        const { token, nextPath } = parsePayloadFromHash();
         if (!token) {
           throw new Error("Missing handoff token.");
         }
@@ -37,7 +47,7 @@ export function AuthHandoff() {
         setSupportSessionToken(sessionToken, label);
         window.history.replaceState(null, "", "/auth/handoff");
         await checkAuth();
-        navigate("/projects", { replace: true });
+        navigate(nextPath, { replace: true });
       } catch (err: any) {
         if (!mounted) return;
         setError(err?.message || "Failed to establish workspace handoff session.");

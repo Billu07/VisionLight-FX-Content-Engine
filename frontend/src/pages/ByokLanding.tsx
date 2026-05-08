@@ -152,11 +152,43 @@ export const ByokLanding = () => {
     await new Promise((resolve) => setTimeout(resolve, 2400));
 
     const resolvedUser = useAuth.getState().user;
+    if (resolvedUser?.id) {
+      try {
+        const handoffResponse = await apiEndpoints.startWorkspaceHandoff(resolvedUser.id);
+        const handoffUrl = handoffResponse.data?.handoffUrl;
+        const domainSwitchRequired = handoffResponse.data?.domainSwitchRequired === true;
+        if (
+          domainSwitchRequired &&
+          typeof handoffUrl === "string" &&
+          handoffUrl.trim()
+        ) {
+          const targetUrl = new URL(handoffUrl);
+          const hashParams = new URLSearchParams(
+            targetUrl.hash.startsWith("#") ? targetUrl.hash.slice(1) : "",
+          );
+          hashParams.set("next", nextPath);
+          targetUrl.hash = hashParams.toString();
+          window.location.replace(targetUrl.toString());
+          return;
+        }
+      } catch {
+        // Fall through to canonical fallback below.
+      }
+    }
+
     const redirectUrl = getCanonicalDomainRedirectUrl(resolvedUser ?? null);
     if (redirectUrl) {
       const targetUrl = new URL(redirectUrl);
-      targetUrl.pathname = nextPath;
+      targetUrl.pathname = "/";
       targetUrl.hash = "";
+      targetUrl.search = "";
+      const prefillEmail = email.trim().toLowerCase() || resolvedUser?.email || "";
+      if (prefillEmail) {
+        targetUrl.searchParams.set("login_email", prefillEmail);
+      }
+      if (resolvedUser?.id) {
+        targetUrl.searchParams.set("login_profile", resolvedUser.id);
+      }
       window.location.replace(targetUrl.toString());
       return;
     }
