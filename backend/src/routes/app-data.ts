@@ -93,6 +93,20 @@ const ADMIN_ROLES = new Set(["ADMIN", "SUPERADMIN"]);
 const isByokOrganizationUser = (user: any) =>
   user?.organization?.provisioningSource === "BYOK" && !!user?.organizationId;
 
+const normalizeEmail = (raw?: string | null) =>
+  typeof raw === "string" ? raw.trim().toLowerCase() : "";
+
+const isSameAuthIdentity = (left: any, right: any) => {
+  if (!left || !right) return false;
+  if (left.authUserId && right.authUserId) {
+    return left.authUserId === right.authUserId;
+  }
+  return (
+    normalizeEmail(left.email).length > 0 &&
+    normalizeEmail(left.email) === normalizeEmail(right.email)
+  );
+};
+
 router.post("/api/auth/resolve-domain", async (req, res) => {
   try {
     const rawEmail = req.body?.email;
@@ -134,6 +148,128 @@ router.post("/api/auth/resolve-domain", async (req, res) => {
     });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
+  }
+});
+
+router.post(
+  "/api/auth/workspace-handoff/start",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const rawTargetUserId = req.body?.targetUserId;
+      if (typeof rawTargetUserId !== "string" || !rawTargetUserId.trim()) {
+        return res.status(400).json({ error: "targetUserId is required" });
+      }
+      const targetUserId = rawTargetUserId.trim();
+
+      if (req.user?.readOnlyImpersonation) {
+        return res.status(403).json({
+          error: "Read-only sessions cannot initiate workspace handoff.",
+        });
+      }
+
+      const requester = await airtableService.findUserById(req.user!.id);
+      if (!requester) {
+        return res.status(401).json({ error: "Requester not found" });
+      }
+
+      const target = await airtableService.findUserById(targetUserId);
+      if (!target) {
+        return res.status(404).json({ error: "Target profile not found" });
+      }
+
+      const identityProfiles = await airtableService.findUsersForAuthIdentity(
+        requester.authUserId || "",
+        requester.email,
+      );
+      const targetInIdentity = identityProfiles.some(
+        (profile: any) => profile.id === targetUserId,
+      );
+      if (!targetInIdentity || !isSameAuthIdentity(requester, target)) {
+        return res.status(403).json({
+          error: "Target profile is outside your auth identity.",
+        });
+      }
+
+      const canonicalDomain = getCanonicalDomainForUser(target);
+      const incomingHost = resolveIncomingHost(req);
+      const currentHostMatches = incomingHost === canonicalDomain;
+      if (currentHostMatches) {
+        return res.json({
+          success: true,
+          domainSwitchRequired: false,
+          canonicalDomain,
+        });
+      }
+
+      const token = supportHandoffService.issueWorkspaceHandoffToken({
+        issuerUserId: requester.id,
+        targetUserId: target.id,
+        audienceDomain: canonicalDomain,
+        sourceDomain: incomingHost,
+      });
+      const protocol = getRequestProtocol(req);
+      const handoffUrl = `${protocol}://${canonicalDomain}/auth/handoff#token=${encodeURIComponent(token)}`;
+
+      return res.json({
+        success: true,
+        domainSwitchRequired: true,
+        canonicalDomain,
+        handoffUrl,
+      });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.post("/api/auth/workspace-handoff/consume", async (req, res) => {
+  try {
+    const rawToken = req.body?.token;
+    if (typeof rawToken !== "string" || !rawToken.trim()) {
+      return res.status(400).json({ error: "token is required" });
+    }
+
+    const incomingHost = resolveIncomingHost(req);
+    const handoff = supportHandoffService.consumeWorkspaceHandoffToken(
+      rawToken.trim(),
+      incomingHost,
+    );
+
+    const [issuer, target] = await Promise.all([
+      airtableService.findUserById(handoff.issuerUserId),
+      airtableService.findUserById(handoff.targetUserId),
+    ]);
+    if (!issuer || !target) {
+      return res.status(401).json({
+        error: "Workspace handoff users are no longer available.",
+      });
+    }
+
+    if (!isSameAuthIdentity(issuer, target)) {
+      return res.status(403).json({
+        error: "Workspace handoff identity mismatch.",
+      });
+    }
+
+    const sessionToken = supportHandoffService.issueWorkspaceSessionToken({
+      issuerUserId: issuer.id,
+      targetUserId: target.id,
+      audienceDomain: handoff.audienceDomain,
+    });
+
+    return res.json({
+      success: true,
+      sessionToken,
+      target: {
+        id: target.id,
+        email: target.email,
+        name: target.name,
+      },
+    });
+  } catch (error: any) {
+    const message = error?.message || "Failed to consume workspace handoff token.";
+    return res.status(400).json({ error: message });
   }
 });
 

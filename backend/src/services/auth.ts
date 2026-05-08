@@ -417,6 +417,16 @@ export class AuthService {
     return this.getReadOnlyImpersonationTarget(issuer, target.id);
   }
 
+  static async validateWorkspaceSessionToken(token: string, incomingHost?: string) {
+    const payload = supportHandoffService.parseWorkspaceSessionToken(token, incomingHost);
+    if (!payload) return null;
+
+    const target = await airtableService.findUserById(payload.sub);
+    if (!target) return null;
+
+    return this.toSessionUser(target);
+  }
+
   static async deleteSession(token: string) {
     return;
   }

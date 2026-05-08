@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth, type WorkspaceProfile } from "../hooks/useAuth";
-import { setActiveProfile } from "../lib/api";
+import { apiEndpoints, setActiveProfile } from "../lib/api";
 
 const sanitizeDomain = (raw?: string | null): string | null => {
   if (!raw) return null;
@@ -44,6 +44,17 @@ export default function StudioChooser() {
       currentHost !== canonicalDomain &&
       !isLocalHost(currentHost)
     ) {
+      try {
+        const handoff = await apiEndpoints.startWorkspaceHandoff(profile.id);
+        const handoffUrl = handoff.data?.handoffUrl;
+        if (typeof handoffUrl === "string" && handoffUrl.trim()) {
+          window.location.replace(handoffUrl);
+          return;
+        }
+      } catch {
+        // Fall back to legacy login-prefill redirect if handoff fails.
+      }
+
       const redirectUrl = new URL(window.location.href);
       redirectUrl.hostname = canonicalDomain;
       redirectUrl.pathname = "/";

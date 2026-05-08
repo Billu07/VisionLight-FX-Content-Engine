@@ -21,8 +21,31 @@ type SupportSessionPayload = {
   exp: number;
 };
 
+type WorkspaceHandoffPayload = {
+  typ: "workspace_handoff";
+  jti: string;
+  iss: string;
+  sub: string;
+  aud: string;
+  src?: string;
+  iat: number;
+  exp: number;
+};
+
+type WorkspaceSessionPayload = {
+  typ: "workspace_session";
+  jti: string;
+  iss: string;
+  sub: string;
+  aud: string;
+  iat: number;
+  exp: number;
+};
+
 const HANDOFF_TTL_SECONDS = 60;
 const SUPPORT_SESSION_TTL_SECONDS = 15 * 60;
+const WORKSPACE_HANDOFF_TTL_SECONDS = 60;
+const WORKSPACE_SESSION_TTL_SECONDS = 15 * 60;
 
 const secret = (() => {
   const configured =
@@ -39,6 +62,17 @@ const secret = (() => {
 })();
 
 const handoffStore = new Map<
+  string,
+  {
+    issuerUserId: string;
+    targetUserId: string;
+    audienceDomain: string;
+    expiresAt: number;
+    consumedAt: number | null;
+  }
+>();
+
+const workspaceHandoffStore = new Map<
   string,
   {
     issuerUserId: string;
@@ -120,6 +154,12 @@ const pruneExpired = () => {
     const consumedTooOld = item.consumedAt !== null && now - item.consumedAt > 5 * 60 * 1000;
     if (item.expiresAt <= now || consumedTooOld) {
       handoffStore.delete(jti);
+    }
+  }
+  for (const [jti, item] of workspaceHandoffStore.entries()) {
+    const consumedTooOld = item.consumedAt !== null && now - item.consumedAt > 5 * 60 * 1000;
+    if (item.expiresAt <= now || consumedTooOld) {
+      workspaceHandoffStore.delete(jti);
     }
   }
 };
@@ -233,5 +273,118 @@ export const supportHandoffService = {
     }
     return payload;
   },
-};
 
+  issueWorkspaceHandoffToken(input: {
+    issuerUserId: string;
+    targetUserId: string;
+    audienceDomain: string;
+    sourceDomain?: string | null;
+  }) {
+    pruneExpired();
+    const audienceDomain = normalizeHost(input.audienceDomain);
+    if (!audienceDomain) {
+      throw new Error("Invalid workspace handoff audience.");
+    }
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const jti = crypto.randomUUID();
+    const payload: WorkspaceHandoffPayload = {
+      typ: "workspace_handoff",
+      jti,
+      iss: input.issuerUserId,
+      sub: input.targetUserId,
+      aud: audienceDomain,
+      src: normalizeHost(input.sourceDomain || null) || undefined,
+      iat: nowSeconds,
+      exp: nowSeconds + WORKSPACE_HANDOFF_TTL_SECONDS,
+    };
+
+    workspaceHandoffStore.set(jti, {
+      issuerUserId: input.issuerUserId,
+      targetUserId: input.targetUserId,
+      audienceDomain,
+      expiresAt: payload.exp * 1000,
+      consumedAt: null,
+    });
+
+    return issueToken(payload);
+  },
+
+  consumeWorkspaceHandoffToken(token: string, incomingHost?: string | null) {
+    pruneExpired();
+    const payload = parseAndVerify<WorkspaceHandoffPayload>(
+      token,
+      "workspace_handoff",
+    );
+    if (!payload) {
+      throw new Error("Invalid or expired workspace handoff token.");
+    }
+
+    const expectedHost = normalizeHost(payload.aud);
+    const requestHost = normalizeHost(incomingHost || null);
+    if (!expectedHost || !requestHost || expectedHost !== requestHost) {
+      throw new Error("Workspace handoff audience mismatch.");
+    }
+
+    const record = workspaceHandoffStore.get(payload.jti);
+    if (!record) {
+      throw new Error("Workspace handoff token is not recognized.");
+    }
+    if (record.consumedAt !== null) {
+      throw new Error("Workspace handoff token has already been consumed.");
+    }
+    if (
+      record.issuerUserId !== payload.iss ||
+      record.targetUserId !== payload.sub ||
+      record.audienceDomain !== expectedHost
+    ) {
+      throw new Error("Workspace handoff token state mismatch.");
+    }
+
+    record.consumedAt = Date.now();
+    workspaceHandoffStore.set(payload.jti, record);
+
+    return {
+      issuerUserId: payload.iss,
+      targetUserId: payload.sub,
+      audienceDomain: expectedHost,
+      sourceDomain: payload.src || null,
+    };
+  },
+
+  issueWorkspaceSessionToken(input: {
+    issuerUserId: string;
+    targetUserId: string;
+    audienceDomain: string;
+  }) {
+    const audienceDomain = normalizeHost(input.audienceDomain);
+    if (!audienceDomain) {
+      throw new Error("Invalid workspace session audience.");
+    }
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const payload: WorkspaceSessionPayload = {
+      typ: "workspace_session",
+      jti: crypto.randomUUID(),
+      iss: input.issuerUserId,
+      sub: input.targetUserId,
+      aud: audienceDomain,
+      iat: nowSeconds,
+      exp: nowSeconds + WORKSPACE_SESSION_TTL_SECONDS,
+    };
+    return issueToken(payload);
+  },
+
+  parseWorkspaceSessionToken(token: string, incomingHost?: string | null) {
+    const payload = parseAndVerify<WorkspaceSessionPayload>(
+      token,
+      "workspace_session",
+    );
+    if (!payload) return null;
+    const expectedHost = normalizeHost(payload.aud);
+    const requestHost = normalizeHost(incomingHost || null);
+    if (!expectedHost || !requestHost || expectedHost !== requestHost) {
+      return null;
+    }
+    return payload;
+  },
+};

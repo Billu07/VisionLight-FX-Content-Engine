@@ -19,6 +19,7 @@ import StudioChooser from "./pages/StudioChooser";
 import { SupportHandoff } from "./pages/SupportHandoff";
 import ResetPassword from "./pages/ResetPassword";
 import BillingReturn from "./pages/BillingReturn";
+import AuthHandoff from "./pages/AuthHandoff";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { BrandProvider } from "./contexts/BrandContext";
 import { useAuth } from "./hooks/useAuth";
@@ -251,6 +252,7 @@ function App() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/studios" element={<StudioChooser />} />
             <Route path="/support-handoff" element={<SupportHandoff />} />
+            <Route path="/auth/handoff" element={<AuthHandoff />} />
             <Route
               path="/billing/return"
               element={<BillingReturn />}

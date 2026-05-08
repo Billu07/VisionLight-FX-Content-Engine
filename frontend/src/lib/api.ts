@@ -78,6 +78,10 @@ export const apiEndpoints = {
   getMe: () => api.get("/api/auth/me"),
   resolveAuthDomain: (email: string) =>
     api.post("/api/auth/resolve-domain", { email }),
+  startWorkspaceHandoff: (targetUserId: string) =>
+    api.post("/api/auth/workspace-handoff/start", { targetUserId }),
+  consumeWorkspaceHandoff: (token: string) =>
+    api.post("/api/auth/workspace-handoff/consume", { token }),
   startSupportHandoff: (targetUserId: string) =>
     api.post("/api/auth/support-handoff/start", { targetUserId }),
   consumeSupportHandoff: (token: string) =>
