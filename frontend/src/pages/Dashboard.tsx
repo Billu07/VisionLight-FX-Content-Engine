@@ -45,7 +45,6 @@ const ASSET_TASK_PANEL_STATE_KEY = "visionlight_asset_task_panel_state_v1";
 const DASHBOARD_TASK_INDICATOR_STATE_KEY =
   "visionlight_dashboard_task_indicator_state_v1";
 const FAL_KEYS_URL = "https://fal.ai/dashboard/keys";
-const BYOK_PRICING_URL = "https://www.picdrift.com/pricing-plans/byok";
 const BYOK_ACTIVATION_HINTS = [
   "Verifying payment confirmation...",
   "Syncing your package entitlement...",
@@ -2424,70 +2423,6 @@ function Dashboard() {
     });
     setShowByokUpgradeModal(false);
   };
-  const handleStartByokActivationCheck = async () => {
-    if (isByokActivationPolling) return;
-    if (!byokCheckoutState.initiated) {
-      notify.warning("Select a package and start checkout first.");
-      return;
-    }
-    if (!byokCheckoutState.checkoutSessionId) {
-      notify.warning("Checkout session missing. Start checkout again.");
-      return;
-    }
-
-    setByokActivationHintIndex(0);
-    setIsByokActivationPolling(true);
-    setByokCheckoutState((prev) => ({ ...prev, phase: "WAITING" }));
-    byokActivationPollRef.current = true;
-
-    const timeoutAt = Date.now() + 120000;
-    const sessionId = byokCheckoutState.checkoutSessionId;
-    if (!sessionId) {
-      setIsByokActivationPolling(false);
-      byokActivationPollRef.current = false;
-      return;
-    }
-    try {
-      while (byokActivationPollRef.current && Date.now() < timeoutAt) {
-        try {
-          const statusResponse = await apiEndpoints.byokGetActivationStatus(sessionId);
-          const activation = statusResponse?.data?.status;
-          const lifecycle = String(statusResponse?.data?.lifecycle || "").toUpperCase();
-          if (activation === "PROCESSED") {
-            await checkAuth();
-            setShowByokUpgradeModal(false);
-            setByokCheckoutState({
-              initiated: false,
-              selectedPlanCode: null,
-              checkoutSessionId: null,
-              phase: "IDLE",
-            });
-            notify.success("Payment confirmed. Your package is now active.");
-            return;
-          }
-          setByokCheckoutState((prev) => ({
-            ...prev,
-            phase:
-              activation === "ERROR"
-                ? "DELAYED"
-                : lifecycle === "RECEIVED" || lifecycle === "VERIFIED"
-                  ? "ACTIVATING"
-                  : "WAITING",
-          }));
-        } catch {
-          setByokCheckoutState((prev) => ({ ...prev, phase: "WAITING" }));
-        }
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-      }
-      setByokCheckoutState((prev) => ({ ...prev, phase: "DELAYED" }));
-      notify.warning(
-        "Activation is delayed. Keep this screen open and retry in a few seconds.",
-      );
-    } finally {
-      byokActivationPollRef.current = false;
-      setIsByokActivationPolling(false);
-    }
-  };
   const handleOpenByokCheckout = async (planCode: ByokPlanCode) => {
     const checkoutWindow = window.open("about:blank", "_blank");
     if (!checkoutWindow) {
@@ -3439,22 +3374,6 @@ function Dashboard() {
                     <div className="mt-5 flex flex-wrap gap-3">
                       <button
                         type="button"
-                        onClick={handleStartByokActivationCheck}
-                        disabled={!byokCheckoutState.initiated || !byokCheckoutState.checkoutSessionId}
-                        className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-5 py-3 text-xs font-black uppercase tracking-[0.14em] text-white disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
-                      >
-                        Retry Activation Check
-                      </button>
-                      <a
-                        href={BYOK_PRICING_URL}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="w-full rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-center text-xs font-bold uppercase tracking-[0.14em] text-gray-200 sm:w-auto"
-                      >
-                        View Full Pricing Page
-                      </a>
-                      <button
-                        type="button"
                         onClick={closeByokUpgradeModal}
                         className="w-full rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-gray-200 sm:w-auto"
                       >
@@ -3478,7 +3397,7 @@ function Dashboard() {
                     )}
                     {byokCheckoutState.phase === "DELAYED" && (
                       <p className="mt-3 text-xs text-amber-200">
-                        Activation delayed. Use Retry Activation Check or revisit callback URL.
+                        Activation is taking longer than expected. Keep this tab open; status sync will continue automatically.
                       </p>
                     )}
                   </>
