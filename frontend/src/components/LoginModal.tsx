@@ -5,6 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { DashboardEntryLoader } from "./DashboardEntryLoader";
 import { apiEndpoints, clearActiveProfile, setActiveProfile } from "../lib/api";
+import { getCanonicalDomainRedirectUrl } from "../lib/domain-routing";
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -246,6 +247,45 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
 
       const authResult = await checkAuth();
       const nextPath = authResult.profileSelectionRequired ? "/studios" : "/app";
+      const resolvedUser = useAuth.getState().user;
+
+      if (resolvedUser?.id) {
+        try {
+          const handoffResponse = await apiEndpoints.startWorkspaceHandoff(resolvedUser.id);
+          const handoffUrl = handoffResponse.data?.handoffUrl;
+          const domainSwitchRequired = handoffResponse.data?.domainSwitchRequired === true;
+          if (
+            domainSwitchRequired &&
+            typeof handoffUrl === "string" &&
+            handoffUrl.trim()
+          ) {
+            const targetUrl = new URL(handoffUrl);
+            const hashParams = new URLSearchParams(
+              targetUrl.hash.startsWith("#") ? targetUrl.hash.slice(1) : "",
+            );
+            hashParams.set("next", nextPath);
+            targetUrl.hash = hashParams.toString();
+            window.location.replace(targetUrl.toString());
+            return;
+          }
+        } catch {
+          // Fall through to canonical fallback.
+        }
+      }
+
+      const redirectUrl = getCanonicalDomainRedirectUrl(resolvedUser ?? null);
+      if (redirectUrl) {
+        const targetUrl = new URL(redirectUrl);
+        targetUrl.pathname = "/";
+        targetUrl.hash = "";
+        targetUrl.search = "";
+        targetUrl.searchParams.set("login_email", normalizedEmail);
+        if (resolvedUser?.id) {
+          targetUrl.searchParams.set("login_profile", resolvedUser.id);
+        }
+        window.location.replace(targetUrl.toString());
+        return;
+      }
 
       const url = new URL(window.location.href);
       if (url.searchParams.has("login_email") || url.searchParams.has("login_profile")) {

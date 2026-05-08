@@ -2398,7 +2398,7 @@ function Dashboard() {
       cancelLabel: "Stay",
     });
     if (!confirmed) return;
-    logout();
+    await logout();
     navigate("/");
   };
   const handleOpenAdminPanel = () => {
@@ -3724,10 +3724,8 @@ function Dashboard() {
                   )}
                   {isByokWorkspace && (
                     <div
-                      className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] ${
-                        isByokPremium
-                          ? "border-emerald-300/45 bg-emerald-500/10 text-emerald-100"
-                          : "border-rose-300/45 bg-rose-500/10 text-rose-100"
+                      className={`inline-flex items-center gap-2 px-1 py-1 text-xs font-black uppercase tracking-[0.12em] ${
+                        isByokPremium ? "text-emerald-200" : "text-rose-200"
                       }`}
                     >
                       <span className="relative flex h-2.5 w-2.5">
@@ -3809,7 +3807,7 @@ function Dashboard() {
                             setShowUserMenu(false);
                             setShowByokUpgradeModal(true);
                           }}
-                          className="w-full text-left px-4 py-2 text-sm font-medium text-gray-200 transition-colors hover:bg-white/10"
+                          className="w-full text-left px-4 py-2 text-sm font-bold text-orange-200 transition-colors hover:bg-orange-500/15 hover:text-orange-100"
                         >
                           Upgrade Package
                         </button>
@@ -3824,7 +3822,7 @@ function Dashboard() {
                           className={`w-full text-left px-4 py-2 text-sm font-medium transition-colors ${
                             adminPanelLocked
                               ? "text-gray-500 hover:bg-white/5"
-                              : "text-gray-200 hover:bg-white/10"
+                              : "text-rose-300 hover:bg-rose-500/15"
                           }`}
                         >
                           {adminPanelLocked ? "Admin Panel (Locked)" : "Admin Panel"}
@@ -3915,10 +3913,8 @@ function Dashboard() {
                   )}
                   {isByokWorkspace && (
                     <div
-                      className={`flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-black uppercase tracking-[0.12em] ${
-                        isByokPremium
-                          ? "border-emerald-300/45 bg-emerald-500/10 text-emerald-100"
-                          : "border-rose-300/45 bg-rose-500/10 text-rose-100"
+                      className={`flex w-full items-center justify-center gap-2 px-2 py-2 text-sm font-black uppercase tracking-[0.12em] ${
+                        isByokPremium ? "text-emerald-200" : "text-rose-200"
                       }`}
                     >
                       <span className="relative flex h-2.5 w-2.5">
@@ -3978,7 +3974,7 @@ function Dashboard() {
                         setShowUserMenu(false);
                         setShowByokUpgradeModal(true);
                       }}
-                      className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-left text-xs font-semibold text-gray-200 hover:bg-white/10"
+                      className="rounded-xl border border-orange-300/30 bg-orange-500/10 px-3 py-2 text-left text-xs font-bold text-orange-200 hover:bg-orange-500/20"
                     >
                       Upgrade Package
                     </button>
@@ -3994,7 +3990,7 @@ function Dashboard() {
                       className={`rounded-xl px-3 py-2 text-left text-xs font-semibold ${
                         adminPanelLocked
                           ? "border border-white/15 bg-white/5 text-gray-400"
-                          : "border border-white/15 bg-white/5 text-gray-200 hover:bg-white/10"
+                          : "border border-rose-300/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
                       }`}
                     >
                       {adminPanelLocked ? "Admin Panel (Locked)" : "Admin Panel"}

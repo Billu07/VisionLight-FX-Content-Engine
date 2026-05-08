@@ -148,8 +148,6 @@ export const ByokLanding = () => {
 
     const finalAuth = await checkAuth();
     const nextPath = finalAuth.profileSelectionRequired ? "/studios" : "/projects";
-    setShowStudioLoader(true);
-    await new Promise((resolve) => setTimeout(resolve, 2400));
 
     const resolvedUser = useAuth.getState().user;
     if (resolvedUser?.id) {
@@ -193,6 +191,8 @@ export const ByokLanding = () => {
       return;
     }
 
+    setShowStudioLoader(true);
+    await new Promise((resolve) => setTimeout(resolve, 2400));
     navigate(nextPath, {
       replace: true,
     });

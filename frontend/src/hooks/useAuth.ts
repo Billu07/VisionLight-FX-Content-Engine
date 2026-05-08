@@ -174,7 +174,11 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   logout: async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut({ scope: "global" });
+    } catch {
+      // Continue local cleanup even if upstream signout call fails.
+    }
     setAuthToken(null);
     clearSupportSessionToken();
     clearActiveProfile();
