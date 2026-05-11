@@ -57,6 +57,7 @@ type ByokPlanCode =
   | "PD_STUDIO"
   | "VFX_STUDIO"
   | "VFX_STUDIO_AGENCY";
+type BillingCycle = "monthly" | "annual";
 
 type ByokPackageCatalogItem = {
   code: ByokPlanCode;
@@ -73,6 +74,7 @@ const BYOK_CHECKOUT_PLAN_META: Record<
   ByokPlanCode,
   {
     monthlyPrice: string;
+    annualPrice: string;
     blurb: string;
     checkoutUrl: string;
     highlight?: string;
@@ -82,6 +84,7 @@ const BYOK_CHECKOUT_PLAN_META: Record<
 > = {
   PD_APP: {
     monthlyPrice: "$9/mo",
+    annualPrice: "$108/yr",
     blurb: "Focused solo PicDrift workflow with clean BYOK routing.",
     modelLine: "Nano Banana, GPT-2, Kling 2.6",
     checkoutUrl:
@@ -89,6 +92,7 @@ const BYOK_CHECKOUT_PLAN_META: Record<
   },
   VFX_APP: {
     monthlyPrice: "$14/mo",
+    annualPrice: "$168/yr",
     blurb: "Solo VisualFX workflow with top video model access.",
     modelLine: "VisualFX video models",
     checkoutUrl:
@@ -96,6 +100,7 @@ const BYOK_CHECKOUT_PLAN_META: Record<
   },
   PD_STUDIO: {
     monthlyPrice: "$49/mo",
+    annualPrice: "$588/yr",
     blurb: "Team-ready PicDrift studio for collaboration and management.",
     modelLine: "Nano Banana, GPT-2, Kling 2.6 + Studio Admin",
     highlight: "Most Popular",
@@ -105,6 +110,7 @@ const BYOK_CHECKOUT_PLAN_META: Record<
   },
   VFX_STUDIO: {
     monthlyPrice: "$99/mo",
+    annualPrice: "$1,188/yr",
     blurb: "High-capacity VisualFX studio with admin and shared workflows.",
     modelLine: "PicDrift + FX models + Studio Admin",
     checkoutUrl:
@@ -112,6 +118,7 @@ const BYOK_CHECKOUT_PLAN_META: Record<
   },
   VFX_STUDIO_AGENCY: {
     monthlyPrice: "$197/mo",
+    annualPrice: "$2,364/yr",
     blurb: "Agency-scale operations with expanded seats and project capacity.",
     modelLine: "PicDrift + FX models + Agency controls",
     checkoutUrl:
@@ -331,6 +338,7 @@ function Dashboard() {
   const [showMissingFalKeyModal, setShowMissingFalKeyModal] = useState(false);
   const [showReserveModal, setShowReserveModal] = useState(false);
   const [showByokUpgradeModal, setShowByokUpgradeModal] = useState(false);
+  const [byokPackageBillingCycle, setByokPackageBillingCycle] = useState<BillingCycle>("monthly");
   const [showByokKeyModal, setShowByokKeyModal] = useState(false);
   const [isByokActivationPolling, setIsByokActivationPolling] = useState(false);
   const [byokActivationHintIndex, setByokActivationHintIndex] = useState(0);
@@ -3241,6 +3249,30 @@ function Dashboard() {
                   <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
                     Choose a package that matches your production scale.
                   </p>
+                  <div className="mt-4 inline-flex rounded-xl border border-white/15 bg-[#0b1629] p-1">
+                    <button
+                      type="button"
+                      onClick={() => setByokPackageBillingCycle("monthly")}
+                      className={`rounded-lg px-4 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
+                        byokPackageBillingCycle === "monthly"
+                          ? "bg-cyan-300/20 text-cyan-100"
+                          : "text-slate-300 hover:text-white"
+                      }`}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setByokPackageBillingCycle("annual")}
+                      className={`rounded-lg px-4 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
+                        byokPackageBillingCycle === "annual"
+                          ? "bg-cyan-300/20 text-cyan-100"
+                          : "text-slate-300 hover:text-white"
+                      }`}
+                    >
+                      Annually
+                    </button>
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -3281,11 +3313,18 @@ function Dashboard() {
                         Package catalog is temporarily unavailable. Open pricing page or try again in a few seconds.
                       </div>
                     ) : (
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {byokPlanCards.map((plan) => (
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+                        {byokPlanCards.map((plan, index) => {
+                          const centeredRowClass =
+                            byokPlanCards.length === 5 && index === 3
+                              ? "lg:col-start-2"
+                              : byokPlanCards.length === 5 && index === 4
+                                ? "lg:col-start-4"
+                                : "";
+                          return (
                           <article
                             key={plan.code}
-                            className={`relative flex h-full flex-col rounded-2xl border bg-[#0e1729] p-5 shadow-[0_14px_32px_rgba(2,10,26,0.45)] transition-all ${
+                            className={`relative flex h-full flex-col rounded-2xl border bg-[#0e1729] p-5 shadow-[0_14px_32px_rgba(2,10,26,0.45)] transition-all lg:col-span-2 ${centeredRowClass} ${
                               plan.featured
                                 ? "border-cyan-300/45"
                                 : "border-white/12"
@@ -3308,12 +3347,31 @@ function Dashboard() {
                             <p className="mt-4 text-sm leading-relaxed text-slate-300">{plan.blurb}</p>
                             <p className="mt-2 text-xs text-slate-400">{plan.modelLine}</p>
 
-                            <div className="mt-6">
-                              <span className="text-3xl font-extrabold text-white">{plan.monthlyPrice}</span>
-                            </div>
-                            <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                              Billed Annually
-                            </p>
+                            <div className="relative mt-6 h-11 overflow-hidden">
+                              <span
+                                className={`absolute left-0 top-0 text-3xl font-extrabold text-white transition-all duration-300 ${
+                                  byokPackageBillingCycle === "monthly"
+                                    ? "translate-y-0 opacity-100"
+                                    : "translate-y-2 opacity-0"
+                                }`}
+                              >
+                                {plan.monthlyPrice}
+                              </span>
+                              <span
+                                className={`absolute left-0 top-0 text-3xl font-extrabold text-white transition-all duration-300 ${
+                                  byokPackageBillingCycle === "annual"
+                                    ? "translate-y-0 opacity-100"
+                                    : "translate-y-2 opacity-0"
+                                }`}
+                              >
+                                {plan.annualPrice}
+                              </span>
+                              </div>
+                              <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                {byokPackageBillingCycle === "monthly"
+                                  ? "Monthly View"
+                                  : "Annual View"}
+                              </p>
 
                             <div className="mt-5 grid grid-cols-1 divide-y divide-white/10 rounded-xl border border-white/10 bg-[#0a1222]">
                               <p className="px-3 py-2 text-xs text-slate-200">{plan.usersLabel}</p>
@@ -3347,7 +3405,8 @@ function Dashboard() {
                                 )}
                             </div>
                           </article>
-                        ))}
+                        );
+                        })}
                       </div>
                     )}
 

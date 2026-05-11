@@ -9,11 +9,13 @@ import { DashboardEntryLoader } from "../components/DashboardEntryLoader";
 import { getCanonicalDomainRedirectUrl } from "../lib/domain-routing";
 
 type AuthMode = "signup" | "login";
+type BillingCycle = "monthly" | "annual";
 
 type ByokLandingPlan = {
   code: string;
   title: string;
   monthlyPrice: string;
+  annualPrice: string;
   blurb: string;
   modelLine: string;
   checkoutUrl: string;
@@ -32,6 +34,7 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
     code: "PD_APP",
     title: "PicDrift App",
     monthlyPrice: "$9/mo",
+    annualPrice: "$108/yr",
     blurb: "Focused solo PicDrift workflow with clean BYOK routing.",
     modelLine: "Nano Banana, GPT-2, Kling 2.6",
     checkoutUrl:
@@ -46,6 +49,7 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
     code: "VFX_APP",
     title: "VisualFX App",
     monthlyPrice: "$14/mo",
+    annualPrice: "$168/yr",
     blurb: "Solo VisualFX workflow with top video model access.",
     modelLine: "VisualFX video models",
     checkoutUrl:
@@ -60,6 +64,7 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
     code: "PD_STUDIO",
     title: "PicDrift Studio",
     monthlyPrice: "$49/mo",
+    annualPrice: "$588/yr",
     blurb: "Team-ready PicDrift studio for collaboration and management.",
     modelLine: "Nano Banana, GPT-2, Kling 2.6 + Studio Admin",
     checkoutUrl:
@@ -77,6 +82,7 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
     code: "VFX_STUDIO",
     title: "VisualFX Studio",
     monthlyPrice: "$99/mo",
+    annualPrice: "$1,188/yr",
     blurb: "High-capacity VisualFX studio with admin and shared workflows.",
     modelLine: "PicDrift + FX models + Studio Admin",
     checkoutUrl:
@@ -92,6 +98,7 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
     code: "VFX_STUDIO_AGENCY",
     title: "VisualFX Agency",
     monthlyPrice: "$197/mo",
+    annualPrice: "$2,364/yr",
     blurb: "Agency-scale operations with expanded seats and project capacity.",
     modelLine: "PicDrift + FX models + Agency controls",
     checkoutUrl:
@@ -110,6 +117,7 @@ export const ByokLanding = () => {
   const { checkAuth } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [showPackageSheet, setShowPackageSheet] = useState(false);
+  const [packageBillingCycle, setPackageBillingCycle] = useState<BillingCycle>("monthly");
   const [authMode, setAuthMode] = useState<AuthMode>("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -380,8 +388,32 @@ export const ByokLanding = () => {
                 </p>
                 <h3 className="mt-2 text-2xl font-extrabold text-white">Upgrade Anytime</h3>
                 <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
-                  Choose a package that matches your production scale. Starting from $9/mo billed annually.
+                  Choose a package that matches your production scale.
                 </p>
+                <div className="mt-4 inline-flex rounded-xl border border-white/15 bg-[#0b1629] p-1">
+                  <button
+                    type="button"
+                    onClick={() => setPackageBillingCycle("monthly")}
+                    className={`rounded-lg px-4 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
+                      packageBillingCycle === "monthly"
+                        ? "bg-cyan-300/20 text-cyan-100"
+                        : "text-slate-300 hover:text-white"
+                    }`}
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPackageBillingCycle("annual")}
+                    className={`rounded-lg px-4 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
+                      packageBillingCycle === "annual"
+                        ? "bg-cyan-300/20 text-cyan-100"
+                        : "text-slate-300 hover:text-white"
+                    }`}
+                  >
+                    Annually
+                  </button>
+                </div>
               </div>
               <button
                 type="button"
@@ -394,63 +426,88 @@ export const ByokLanding = () => {
             <div className="mt-5 border-t border-white/10" />
 
             <div className="mt-6 overflow-y-auto pr-1 sm:pr-2">
-              <div className="grid gap-4 sm:grid-cols-2">
-                {BYOK_LANDING_PLANS.map((plan) => (
-                  <article
-                    key={plan.code}
-                    className={`relative flex h-full flex-col rounded-2xl border bg-[#0e1729] p-5 shadow-[0_14px_32px_rgba(2,10,26,0.45)] transition-all ${
-                      plan.featured
-                        ? "border-cyan-300/45"
-                        : "border-white/12"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-300">
-                          {plan.code.replaceAll("_", " ")}
-                        </p>
-                        <h4 className="mt-1.5 text-xl font-extrabold text-white">{plan.title}</h4>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+                {BYOK_LANDING_PLANS.map((plan, index) => {
+                  const centeredRowClass =
+                    BYOK_LANDING_PLANS.length === 5 && index === 3
+                      ? "lg:col-start-2"
+                      : BYOK_LANDING_PLANS.length === 5 && index === 4
+                        ? "lg:col-start-4"
+                        : "";
+                  return (
+                    <article
+                      key={plan.code}
+                      className={`relative flex h-full flex-col rounded-2xl border bg-[#0e1729] p-5 shadow-[0_14px_32px_rgba(2,10,26,0.45)] transition-all lg:col-span-2 ${centeredRowClass} ${
+                        plan.featured
+                          ? "border-cyan-300/45"
+                          : "border-white/12"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-300">
+                            {plan.code.replaceAll("_", " ")}
+                          </p>
+                          <h4 className="mt-1.5 text-xl font-extrabold text-white">{plan.title}</h4>
+                        </div>
+                        {plan.highlight && (
+                          <span className="rounded-lg border border-cyan-300/40 bg-cyan-300/10 px-2 py-1 text-[9px] font-semibold uppercase tracking-widest text-cyan-100">
+                            {plan.highlight}
+                          </span>
+                        )}
                       </div>
-                      {plan.highlight && (
-                        <span className="rounded-lg border border-cyan-300/40 bg-cyan-300/10 px-2 py-1 text-[9px] font-semibold uppercase tracking-widest text-cyan-100">
-                          {plan.highlight}
+
+                      <p className="mt-4 text-sm leading-relaxed text-slate-300">{plan.blurb}</p>
+                      <p className="mt-2 text-xs text-slate-400">{plan.modelLine}</p>
+
+                      <div className="relative mt-6 h-11 overflow-hidden">
+                        <span
+                          className={`absolute left-0 top-0 text-3xl font-extrabold text-white transition-all duration-300 ${
+                            packageBillingCycle === "monthly"
+                              ? "translate-y-0 opacity-100"
+                              : "translate-y-2 opacity-0"
+                          }`}
+                        >
+                          {plan.monthlyPrice}
                         </span>
-                      )}
-                    </div>
+                        <span
+                          className={`absolute left-0 top-0 text-3xl font-extrabold text-white transition-all duration-300 ${
+                            packageBillingCycle === "annual"
+                              ? "translate-y-0 opacity-100"
+                              : "translate-y-2 opacity-0"
+                          }`}
+                        >
+                          {plan.annualPrice}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                        {packageBillingCycle === "monthly" ? "Monthly View" : "Annual View"}
+                      </p>
 
-                    <p className="mt-4 text-sm leading-relaxed text-slate-300">{plan.blurb}</p>
-                    <p className="mt-2 text-xs text-slate-400">{plan.modelLine}</p>
+                      <div className="mt-5 grid grid-cols-1 divide-y divide-white/10 rounded-xl border border-white/10 bg-[#0a1222]">
+                        <p className="px-3 py-2 text-xs text-slate-200">{plan.usersLabel}</p>
+                        <p className="px-3 py-2 text-xs text-slate-200">{plan.projectsLabel}</p>
+                        {plan.storageLabel && (
+                          <p className="px-3 py-2 text-xs text-slate-200">{plan.storageLabel}</p>
+                        )}
+                        <p className="px-3 py-2 text-xs text-slate-200">{plan.adminLabel}</p>
+                        <p className="px-3 py-2 text-xs text-slate-200">{plan.retentionLabel}</p>
+                        <p className="px-3 py-2 text-xs text-slate-300">Domain: {plan.routingDomain}</p>
+                      </div>
 
-                    <div className="mt-6">
-                      <span className="text-3xl font-extrabold text-white">{plan.monthlyPrice}</span>
-                    </div>
-                    <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                      Billed Annually
-                    </p>
-
-                    <div className="mt-5 grid grid-cols-1 divide-y divide-white/10 rounded-xl border border-white/10 bg-[#0a1222]">
-                      <p className="px-3 py-2 text-xs text-slate-200">{plan.usersLabel}</p>
-                      <p className="px-3 py-2 text-xs text-slate-200">{plan.projectsLabel}</p>
-                      {plan.storageLabel && (
-                        <p className="px-3 py-2 text-xs text-slate-200">{plan.storageLabel}</p>
-                      )}
-                      <p className="px-3 py-2 text-xs text-slate-200">{plan.adminLabel}</p>
-                      <p className="px-3 py-2 text-xs text-slate-200">{plan.retentionLabel}</p>
-                      <p className="px-3 py-2 text-xs text-slate-300">Domain: {plan.routingDomain}</p>
-                    </div>
-
-                    <div className="mt-5">
-                      <a
-                        href={plan.checkoutUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block w-full rounded-xl border border-cyan-300/40 bg-cyan-300/10 px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-cyan-300/20"
-                      >
-                        Choose {plan.title}
-                      </a>
-                    </div>
-                  </article>
-                ))}
+                      <div className="mt-5">
+                        <a
+                          href={plan.checkoutUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block w-full rounded-xl border border-cyan-300/40 bg-cyan-300/10 px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-cyan-300/20"
+                        >
+                          Choose {plan.title}
+                        </a>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             </div>
 
