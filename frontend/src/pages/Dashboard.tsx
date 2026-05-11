@@ -72,8 +72,7 @@ type ByokPackageCatalogItem = {
 const BYOK_CHECKOUT_PLAN_META: Record<
   ByokPlanCode,
   {
-    annualPrice: string;
-    monthlyEquivalent: string;
+    monthlyPrice: string;
     blurb: string;
     checkoutUrl: string;
     highlight?: string;
@@ -82,24 +81,21 @@ const BYOK_CHECKOUT_PLAN_META: Record<
   }
 > = {
   PD_APP: {
-    annualPrice: "$108",
-    monthlyEquivalent: "$9/mo billed annually",
+    monthlyPrice: "$9/mo",
     blurb: "Focused solo PicDrift workflow with clean BYOK routing.",
     modelLine: "Nano Banana, GPT-2, Kling 2.6",
     checkoutUrl:
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=df674622-e11f-4e88-8564-4bb12365d5e5&checkoutFlowId=0ca462cc-de89-4e2c-b02e-bb83d3c7ee98",
   },
   VFX_APP: {
-    annualPrice: "$168",
-    monthlyEquivalent: "$14/mo billed annually",
+    monthlyPrice: "$14/mo",
     blurb: "Solo VisualFX workflow with top video model access.",
     modelLine: "VisualFX video models",
     checkoutUrl:
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=8351c366-2837-44cd-8522-65ec3fecb56d&checkoutFlowId=05b75b73-c0ed-4ae2-ab13-130ab4628ca6",
   },
   PD_STUDIO: {
-    annualPrice: "$588",
-    monthlyEquivalent: "$49/mo billed annually",
+    monthlyPrice: "$49/mo",
     blurb: "Team-ready PicDrift studio for collaboration and management.",
     modelLine: "Nano Banana, GPT-2, Kling 2.6 + Studio Admin",
     highlight: "Most Popular",
@@ -108,16 +104,14 @@ const BYOK_CHECKOUT_PLAN_META: Record<
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=dc751744-5641-4086-a510-7d203e187a79&checkoutFlowId=b5b1614d-e4d5-4352-804a-19d57d5225d0",
   },
   VFX_STUDIO: {
-    annualPrice: "$1,188",
-    monthlyEquivalent: "$99/mo billed annually",
+    monthlyPrice: "$99/mo",
     blurb: "High-capacity VisualFX studio with admin and shared workflows.",
     modelLine: "PicDrift + FX models + Studio Admin",
     checkoutUrl:
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=a97eb2df-59b6-4500-ba93-618171001d4b&checkoutFlowId=e90e22a5-29ed-4093-b268-7838c0fca777",
   },
   VFX_STUDIO_AGENCY: {
-    annualPrice: "$2,364",
-    monthlyEquivalent: "$197/mo billed annually",
+    monthlyPrice: "$197/mo",
     blurb: "Agency-scale operations with expanded seats and project capacity.",
     modelLine: "PicDrift + FX models + Agency controls",
     checkoutUrl:
@@ -3235,16 +3229,16 @@ function Dashboard() {
 
         {showByokUpgradeModal && (
           <div className="fixed inset-0 z-[220] flex items-center justify-center bg-gray-950/90 p-4 backdrop-blur-md">
-            <div className="flex max-h-[94vh] w-full max-w-7xl flex-col overflow-hidden rounded-3xl border border-cyan-400/25 bg-[#060b1f] p-6 shadow-[0_30px_90px_rgba(2,8,23,0.82)] sm:p-8">
+            <div className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-600/45 bg-[#070f1f] p-5 shadow-[0_26px_70px_rgba(2,8,23,0.72)] sm:p-7">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-300">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300">
                     BYOK Packages
                   </p>
-                  <h3 className="mt-2 text-3xl font-black text-white">
+                  <h3 className="mt-2 text-2xl font-extrabold text-white">
                     Upgrade Anytime
                   </h3>
-                  <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300">
+                  <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
                     Choose a package that matches your production scale.
                   </p>
                 </div>
@@ -3252,13 +3246,14 @@ function Dashboard() {
                   type="button"
                   onClick={closeByokUpgradeModal}
                   disabled={isByokActivationPolling}
-                  className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-bold uppercase tracking-widest text-gray-200 hover:bg-white/10"
+                  className="rounded-xl border border-slate-500/50 bg-slate-900/70 px-3 py-2 text-xs font-semibold uppercase tracking-widest text-slate-200 transition hover:border-slate-400 hover:bg-slate-800/80"
                 >
                   Close
                 </button>
               </div>
+              <div className="mt-5 border-t border-white/10" />
 
-              <div className="mt-8 overflow-y-auto pr-1 sm:pr-2">
+              <div className="mt-6 overflow-y-auto pr-1 sm:pr-2">
                 {isByokActivationPolling ? (
                   <div className="rounded-2xl border border-cyan-300/25 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.22),rgba(2,6,23,0.9)_62%)] p-8 text-center">
                     <div className="mx-auto mb-6 h-24 w-24">
@@ -3281,76 +3276,61 @@ function Dashboard() {
                   </div>
                 ) : (
                   <>
-                    <div className="mb-8 grid gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-xs text-slate-200 sm:grid-cols-3 sm:p-6">
-                      <div>
-                        <p className="font-black uppercase tracking-[0.12em] text-cyan-200">1. Choose Plan</p>
-                        <p className="mt-2 leading-relaxed text-slate-300">Open secure checkout in a new tab.</p>
-                      </div>
-                      <div>
-                        <p className="font-black uppercase tracking-[0.12em] text-cyan-200">2. Complete Payment</p>
-                        <p className="mt-2 leading-relaxed text-slate-300">Wix sends order data to your BYOK webhook.</p>
-                      </div>
-                      <div>
-                        <p className="font-black uppercase tracking-[0.12em] text-cyan-200">3. Activation Callback</p>
-                        <p className="mt-2 leading-relaxed text-slate-300">Callback route verifies webhook before success.</p>
-                      </div>
-                    </div>
                     {byokPlanCards.length === 0 ? (
                       <div className="rounded-2xl border border-amber-300/25 bg-amber-500/10 p-4 text-sm text-amber-100">
                         Package catalog is temporarily unavailable. Open pricing page or try again in a few seconds.
                       </div>
                     ) : (
-                      <div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+                      <div className="grid gap-4 sm:grid-cols-2">
                         {byokPlanCards.map((plan) => (
                           <article
                             key={plan.code}
-                            className={`relative flex h-full flex-col rounded-2xl border p-6 shadow-xl transition-all ${
+                            className={`relative flex h-full flex-col rounded-2xl border bg-[#0e1729] p-5 shadow-[0_14px_32px_rgba(2,10,26,0.45)] transition-all ${
                               plan.featured
-                                ? "border-amber-300/40 bg-[linear-gradient(165deg,rgba(120,53,15,0.4),rgba(3,7,18,0.94))]"
-                                : "border-white/12 bg-[linear-gradient(165deg,rgba(15,23,42,0.82),rgba(2,6,23,0.9))]"
+                                ? "border-cyan-300/45"
+                                : "border-white/12"
                             }`}
                           >
-                            <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start justify-between gap-3">
                               <div>
-                                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-300">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-300">
                                   {plan.code.replaceAll("_", " ")}
                                 </p>
-                                <h4 className="mt-2 text-xl font-black text-white">{plan.title}</h4>
+                                <h4 className="mt-1.5 text-xl font-extrabold text-white">{plan.title}</h4>
                               </div>
                               {plan.highlight && (
-                                <span className="rounded-lg border border-amber-300/45 bg-amber-300/15 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-amber-100">
+                                <span className="rounded-lg border border-cyan-300/40 bg-cyan-300/10 px-2 py-1 text-[9px] font-semibold uppercase tracking-widest text-cyan-100">
                                   {plan.highlight}
                                 </span>
                               )}
                             </div>
 
                             <p className="mt-4 text-sm leading-relaxed text-slate-300">{plan.blurb}</p>
-                            <p className="mt-2 text-xs text-cyan-200">{plan.modelLine}</p>
+                            <p className="mt-2 text-xs text-slate-400">{plan.modelLine}</p>
 
-                            <div className="mt-6 flex items-end gap-2">
-                              <span className="text-4xl font-black text-white">{plan.annualPrice}</span>
-                              <span className="pb-1 text-xs font-semibold uppercase tracking-wide text-slate-300">
-                                /year
-                              </span>
+                            <div className="mt-6">
+                              <span className="text-3xl font-extrabold text-white">{plan.monthlyPrice}</span>
                             </div>
-                            <p className="mt-2 text-xs text-slate-300">{plan.monthlyEquivalent}</p>
+                            <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                              Billed Annually
+                            </p>
 
-                            <div className="mt-6 grid grid-cols-1 gap-2 rounded-xl border border-white/10 bg-black/25 p-4">
-                              <p className="text-xs text-slate-200">{plan.usersLabel}</p>
-                              <p className="text-xs text-slate-200">{plan.projectsLabel}</p>
+                            <div className="mt-5 grid grid-cols-1 divide-y divide-white/10 rounded-xl border border-white/10 bg-[#0a1222]">
+                              <p className="px-3 py-2 text-xs text-slate-200">{plan.usersLabel}</p>
+                              <p className="px-3 py-2 text-xs text-slate-200">{plan.projectsLabel}</p>
                               {plan.storageLabel && (
-                                <p className="text-xs text-slate-200">{plan.storageLabel}</p>
+                                <p className="px-3 py-2 text-xs text-slate-200">{plan.storageLabel}</p>
                               )}
-                              <p className="text-xs text-slate-200">{plan.adminLabel}</p>
-                              <p className="text-xs text-slate-200">{plan.retentionLabel}</p>
-                              <p className="text-xs text-cyan-200">Domain: {plan.routingDomain}</p>
+                              <p className="px-3 py-2 text-xs text-slate-200">{plan.adminLabel}</p>
+                              <p className="px-3 py-2 text-xs text-slate-200">{plan.retentionLabel}</p>
+                              <p className="px-3 py-2 text-xs text-slate-300">Domain: {plan.routingDomain}</p>
                             </div>
 
-                            <div className="mt-6 flex flex-col gap-2">
+                            <div className="mt-5 flex flex-col gap-2">
                               <button
                                 type="button"
                                 onClick={() => handleOpenByokCheckout(plan.code)}
-                                className="w-full rounded-xl bg-gradient-to-r from-orange-500 via-rose-500 to-fuchsia-600 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(249,115,22,0.32)] transition-all hover:brightness-110"
+                                className="w-full rounded-xl border border-cyan-300/40 bg-cyan-300/10 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-cyan-300/20"
                               >
                                 Choose {plan.title}
                               </button>
@@ -3375,7 +3355,7 @@ function Dashboard() {
                       <button
                         type="button"
                         onClick={closeByokUpgradeModal}
-                        className="w-full rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-gray-200 sm:w-auto"
+                        className="w-full rounded-xl border border-slate-500/50 bg-slate-900/70 px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-200 transition hover:border-slate-400 hover:bg-slate-800/80 sm:w-auto"
                       >
                         I&apos;ll upgrade later
                       </button>

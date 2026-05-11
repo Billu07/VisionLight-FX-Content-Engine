@@ -6,8 +6,6 @@ import { useAuth } from "../hooks/useAuth";
 import { notify } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { DashboardEntryLoader } from "../components/DashboardEntryLoader";
-import picdriftLogo from "../assets/picdrift.png";
-import fxLogo from "../assets/fx.png";
 import { getCanonicalDomainRedirectUrl } from "../lib/domain-routing";
 
 type AuthMode = "signup" | "login";
@@ -15,8 +13,7 @@ type AuthMode = "signup" | "login";
 type ByokLandingPlan = {
   code: string;
   title: string;
-  annualPrice: string;
-  monthlyEquivalent: string;
+  monthlyPrice: string;
   blurb: string;
   modelLine: string;
   checkoutUrl: string;
@@ -34,8 +31,7 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
   {
     code: "PD_APP",
     title: "PicDrift App",
-    annualPrice: "$108",
-    monthlyEquivalent: "$9/mo billed annually",
+    monthlyPrice: "$9/mo",
     blurb: "Focused solo PicDrift workflow with clean BYOK routing.",
     modelLine: "Nano Banana, GPT-2, Kling 2.6",
     checkoutUrl:
@@ -49,8 +45,7 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
   {
     code: "VFX_APP",
     title: "VisualFX App",
-    annualPrice: "$168",
-    monthlyEquivalent: "$14/mo billed annually",
+    monthlyPrice: "$14/mo",
     blurb: "Solo VisualFX workflow with top video model access.",
     modelLine: "VisualFX video models",
     checkoutUrl:
@@ -64,8 +59,7 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
   {
     code: "PD_STUDIO",
     title: "PicDrift Studio",
-    annualPrice: "$588",
-    monthlyEquivalent: "$49/mo billed annually",
+    monthlyPrice: "$49/mo",
     blurb: "Team-ready PicDrift studio for collaboration and management.",
     modelLine: "Nano Banana, GPT-2, Kling 2.6 + Studio Admin",
     checkoutUrl:
@@ -82,8 +76,7 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
   {
     code: "VFX_STUDIO",
     title: "VisualFX Studio",
-    annualPrice: "$1,188",
-    monthlyEquivalent: "$99/mo billed annually",
+    monthlyPrice: "$99/mo",
     blurb: "High-capacity VisualFX studio with admin and shared workflows.",
     modelLine: "PicDrift + FX models + Studio Admin",
     checkoutUrl:
@@ -98,8 +91,7 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
   {
     code: "VFX_STUDIO_AGENCY",
     title: "VisualFX Agency",
-    annualPrice: "$2,364",
-    monthlyEquivalent: "$197/mo billed annually",
+    monthlyPrice: "$197/mo",
     blurb: "Agency-scale operations with expanded seats and project capacity.",
     modelLine: "PicDrift + FX models + Agency controls",
     checkoutUrl:
@@ -117,7 +109,7 @@ export const ByokLanding = () => {
   const navigate = useNavigate();
   const { checkAuth } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
-  const [showPackageSheet, setShowPackageSheet] = useState(true);
+  const [showPackageSheet, setShowPackageSheet] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -278,57 +270,6 @@ export const ByokLanding = () => {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.35),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.65),transparent_62%)]" />
       <div className="absolute inset-0 bg-gradient-to-r from-[#170316] via-[#1a164f] to-[#0d2f59]" />
 
-      <header className="relative z-20 border-b border-white/10 bg-[#120f2b]/65 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6">
-          <a
-            href="https://picdrift.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3"
-          >
-            <img
-              src={picdriftLogo}
-              alt="PicDrift"
-              className="h-9 w-auto object-contain sm:h-10"
-            />
-            <span className="h-7 w-px bg-white/20" />
-            <img
-              src={fxLogo}
-              alt="FX"
-              className="h-7 w-auto object-contain opacity-95"
-            />
-          </a>
-          <div className="flex items-center gap-4">
-            <div className="hidden items-center gap-4 text-sm text-slate-200/85 md:flex">
-              <Link to="/terms" className="transition-colors hover:text-white">
-                Terms
-              </Link>
-              <Link to="/privacy" className="transition-colors hover:text-white">
-                Privacy
-              </Link>
-              <a
-                href="https://www.picdrift.com/contact"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="transition-colors hover:text-white"
-              >
-                Contact
-              </a>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setAuthMode("login");
-                setShowAuth(true);
-              }}
-              className="rounded-full border border-white/35 bg-white/5 px-5 py-1.5 text-sm font-semibold text-white transition hover:bg-white/12"
-            >
-              Login
-            </button>
-          </div>
-        </div>
-      </header>
-
       <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col justify-center px-6 py-10 lg:flex-row lg:items-center lg:justify-between lg:px-12">
         <section className="max-w-2xl">
           <div className="inline-flex items-center gap-3 rounded-full border border-fuchsia-400/40 bg-fuchsia-500/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-fuchsia-200">
@@ -369,6 +310,13 @@ export const ByokLanding = () => {
             >
               Login
             </button>
+            <button
+              type="button"
+              onClick={() => setShowPackageSheet(true)}
+              className="rounded-2xl border border-cyan-300/35 bg-cyan-400/10 px-8 py-4 text-sm font-bold uppercase tracking-[0.14em] text-cyan-100 transition hover:bg-cyan-400/20"
+            >
+              Dashboard Pricing
+            </button>
           </div>
           <p className="mt-5 text-sm font-semibold text-cyan-100">
             Packages start from $9/mo (annual billing).
@@ -401,96 +349,102 @@ export const ByokLanding = () => {
         </section>
       </main>
 
+      <footer className="relative z-10 mx-auto w-full max-w-7xl px-6 pb-7 text-xs text-slate-200/90 lg:px-12">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <Link to="/terms" className="transition-colors hover:text-white">
+            Terms
+          </Link>
+          <span className="text-white/35">|</span>
+          <Link to="/privacy" className="transition-colors hover:text-white">
+            Privacy
+          </Link>
+          <span className="text-white/35">|</span>
+          <a
+            href="https://www.picdrift.com/contact"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="transition-colors hover:text-white"
+          >
+            Contact
+          </a>
+        </div>
+      </footer>
+
       {showPackageSheet && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-gray-950/90 p-4 backdrop-blur-md">
-          <div className="flex max-h-[94vh] w-full max-w-7xl flex-col overflow-hidden rounded-3xl border border-cyan-400/25 bg-[#060b1f] p-6 shadow-[0_30px_90px_rgba(2,8,23,0.82)] sm:p-8">
+          <div className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-600/45 bg-[#070f1f] p-5 shadow-[0_26px_70px_rgba(2,8,23,0.72)] sm:p-7">
             <div className="flex items-start justify-between gap-6">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-300">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300">
                   BYOK Packages
                 </p>
-                <h3 className="mt-2 text-3xl font-black text-white">Upgrade Anytime</h3>
-                <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300">
+                <h3 className="mt-2 text-2xl font-extrabold text-white">Upgrade Anytime</h3>
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
                   Choose a package that matches your production scale. Starting from $9/mo billed annually.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowPackageSheet(false)}
-                className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-bold uppercase tracking-widest text-gray-200 hover:bg-white/10"
+                className="rounded-xl border border-slate-500/50 bg-slate-900/70 px-3 py-2 text-xs font-semibold uppercase tracking-widest text-slate-200 transition hover:border-slate-400 hover:bg-slate-800/80"
               >
                 Close
               </button>
             </div>
+            <div className="mt-5 border-t border-white/10" />
 
-            <div className="mt-8 overflow-y-auto pr-1 sm:pr-2">
-              <div className="mb-8 grid gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-xs text-slate-200 sm:grid-cols-3 sm:p-6">
-                <div>
-                  <p className="font-black uppercase tracking-[0.12em] text-cyan-200">1. Choose Plan</p>
-                  <p className="mt-2 leading-relaxed text-slate-300">Open secure checkout in a new tab.</p>
-                </div>
-                <div>
-                  <p className="font-black uppercase tracking-[0.12em] text-cyan-200">2. Complete Payment</p>
-                  <p className="mt-2 leading-relaxed text-slate-300">Checkout confirms your selected package.</p>
-                </div>
-                <div>
-                  <p className="font-black uppercase tracking-[0.12em] text-cyan-200">3. Start Rendering</p>
-                  <p className="mt-2 leading-relaxed text-slate-300">Log in and link your Fal key in dashboard.</p>
-                </div>
-              </div>
-
-              <div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+            <div className="mt-6 overflow-y-auto pr-1 sm:pr-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 {BYOK_LANDING_PLANS.map((plan) => (
                   <article
                     key={plan.code}
-                    className={`relative flex h-full flex-col rounded-2xl border p-6 shadow-xl transition-all ${
+                    className={`relative flex h-full flex-col rounded-2xl border bg-[#0e1729] p-5 shadow-[0_14px_32px_rgba(2,10,26,0.45)] transition-all ${
                       plan.featured
-                        ? "border-amber-300/40 bg-[linear-gradient(165deg,rgba(120,53,15,0.4),rgba(3,7,18,0.94))]"
-                        : "border-white/12 bg-[linear-gradient(165deg,rgba(15,23,42,0.82),rgba(2,6,23,0.9))]"
+                        ? "border-cyan-300/45"
+                        : "border-white/12"
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-300">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-300">
                           {plan.code.replaceAll("_", " ")}
                         </p>
-                        <h4 className="mt-2 text-xl font-black text-white">{plan.title}</h4>
+                        <h4 className="mt-1.5 text-xl font-extrabold text-white">{plan.title}</h4>
                       </div>
                       {plan.highlight && (
-                        <span className="rounded-lg border border-amber-300/45 bg-amber-300/15 px-2 py-1 text-[9px] font-bold uppercase tracking-widest text-amber-100">
+                        <span className="rounded-lg border border-cyan-300/40 bg-cyan-300/10 px-2 py-1 text-[9px] font-semibold uppercase tracking-widest text-cyan-100">
                           {plan.highlight}
                         </span>
                       )}
                     </div>
 
                     <p className="mt-4 text-sm leading-relaxed text-slate-300">{plan.blurb}</p>
-                    <p className="mt-2 text-xs text-cyan-200">{plan.modelLine}</p>
-
-                    <div className="mt-6 flex items-end gap-2">
-                      <span className="text-4xl font-black text-white">{plan.annualPrice}</span>
-                      <span className="pb-1 text-xs font-semibold uppercase tracking-wide text-slate-300">
-                        /year
-                      </span>
-                    </div>
-                    <p className="mt-2 text-xs text-slate-300">{plan.monthlyEquivalent}</p>
-
-                    <div className="mt-6 grid grid-cols-1 gap-2 rounded-xl border border-white/10 bg-black/25 p-4">
-                      <p className="text-xs text-slate-200">{plan.usersLabel}</p>
-                      <p className="text-xs text-slate-200">{plan.projectsLabel}</p>
-                      {plan.storageLabel && (
-                        <p className="text-xs text-slate-200">{plan.storageLabel}</p>
-                      )}
-                      <p className="text-xs text-slate-200">{plan.adminLabel}</p>
-                      <p className="text-xs text-slate-200">{plan.retentionLabel}</p>
-                      <p className="text-xs text-cyan-200">Domain: {plan.routingDomain}</p>
-                    </div>
+                    <p className="mt-2 text-xs text-slate-400">{plan.modelLine}</p>
 
                     <div className="mt-6">
+                      <span className="text-3xl font-extrabold text-white">{plan.monthlyPrice}</span>
+                    </div>
+                    <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      Billed Annually
+                    </p>
+
+                    <div className="mt-5 grid grid-cols-1 divide-y divide-white/10 rounded-xl border border-white/10 bg-[#0a1222]">
+                      <p className="px-3 py-2 text-xs text-slate-200">{plan.usersLabel}</p>
+                      <p className="px-3 py-2 text-xs text-slate-200">{plan.projectsLabel}</p>
+                      {plan.storageLabel && (
+                        <p className="px-3 py-2 text-xs text-slate-200">{plan.storageLabel}</p>
+                      )}
+                      <p className="px-3 py-2 text-xs text-slate-200">{plan.adminLabel}</p>
+                      <p className="px-3 py-2 text-xs text-slate-200">{plan.retentionLabel}</p>
+                      <p className="px-3 py-2 text-xs text-slate-300">Domain: {plan.routingDomain}</p>
+                    </div>
+
+                    <div className="mt-5">
                       <a
                         href={plan.checkoutUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="block w-full rounded-xl bg-gradient-to-r from-orange-500 via-rose-500 to-fuchsia-600 px-4 py-3 text-center text-xs font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(249,115,22,0.32)] transition-all hover:brightness-110"
+                        className="block w-full rounded-xl border border-cyan-300/40 bg-cyan-300/10 px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-cyan-300/20"
                       >
                         Choose {plan.title}
                       </a>
@@ -504,7 +458,7 @@ export const ByokLanding = () => {
               <button
                 type="button"
                 onClick={() => setShowPackageSheet(false)}
-                className="w-full rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-xs font-bold uppercase tracking-[0.14em] text-gray-200 sm:w-auto"
+                className="w-full rounded-xl border border-slate-500/50 bg-slate-900/70 px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-200 transition hover:border-slate-400 hover:bg-slate-800/80 sm:w-auto"
               >
                 I&apos;ll upgrade later
               </button>
