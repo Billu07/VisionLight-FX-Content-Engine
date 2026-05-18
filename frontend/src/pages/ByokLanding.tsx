@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import { apiEndpoints, setActiveProfile, setAuthToken } from "../lib/api";
+import {
+  apiEndpoints,
+  clearActiveProfile,
+  clearSupportSessionToken,
+  setActiveProfile,
+  setAuthToken,
+} from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { notify } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
@@ -123,6 +129,21 @@ export const ByokLanding = () => {
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showStudioLoader, setShowStudioLoader] = useState(false);
+  const shouldStayOnLanding = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("stay") === "1" || params.get("landing") === "1";
+  }, []);
+
+  const clearSourceDomainSession = async () => {
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch {
+      // no-op
+    }
+    clearSupportSessionToken();
+    clearActiveProfile();
+    setAuthToken(null);
+  };
 
   const finalizeByokSession = async (profileLabel: string) => {
     const initialAuth = await checkAuth();
@@ -165,6 +186,7 @@ export const ByokLanding = () => {
           );
           hashParams.set("next", nextPath);
           targetUrl.hash = hashParams.toString();
+          await clearSourceDomainSession();
           window.location.replace(targetUrl.toString());
           return;
         }
@@ -186,6 +208,7 @@ export const ByokLanding = () => {
       if (resolvedUser?.id) {
         targetUrl.searchParams.set("login_profile", resolvedUser.id);
       }
+      await clearSourceDomainSession();
       window.location.replace(targetUrl.toString());
       return;
     }
@@ -199,6 +222,7 @@ export const ByokLanding = () => {
 
   useEffect(() => {
     const run = async () => {
+      if (shouldStayOnLanding) return;
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -211,7 +235,7 @@ export const ByokLanding = () => {
       }
     };
     void run();
-  }, []);
+  }, [shouldStayOnLanding]);
 
   const ctaLabel = useMemo(
     () => (authMode === "signup" ? "Create BYOK Account" : "Login"),
@@ -370,61 +394,116 @@ export const ByokLanding = () => {
               Clean by Default. Ready Instantly.
             </h2>
             <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300">
-              Everything opens in a focused layout, so you can create faster without setup clutter.
+              Same platform feel, now shown with real dashboard-style previews and model coverage.
             </p>
           </div>
 
-          <div className="relative mt-7 grid gap-4 lg:grid-cols-3">
-            <article className="rounded-2xl border border-fuchsia-300/25 bg-[#0b1428]/92 p-5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fuchsia-200">
-                PicDrift
-              </p>
-              <h3 className="mt-2 text-xl font-extrabold text-white">Image Workspace</h3>
-              <p className="mt-2 text-sm text-slate-300">
-                Quick generation, smart edits, and clean visual organization.
-              </p>
+          <div className="relative mt-6 grid gap-3 rounded-2xl border border-white/10 bg-[#09142a]/85 p-4 text-sm text-slate-200 sm:grid-cols-3 sm:p-5">
+            <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">Use your own Fal key</p>
+            <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">No platform credit markup</p>
+            <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">Cancel or upgrade anytime</p>
+          </div>
+
+          <div className="relative mt-6 grid gap-4 lg:grid-cols-12">
+            <article className="rounded-2xl border border-fuchsia-300/25 bg-[#0b1428]/92 p-4 lg:col-span-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fuchsia-200">
+                    PicDrift
+                  </p>
+                  <h3 className="mt-1 text-xl font-extrabold text-white">Image & Animation</h3>
+                </div>
+                <span className="rounded-lg border border-fuchsia-300/30 bg-fuchsia-300/10 px-2 py-1 text-[10px] font-semibold uppercase text-fuchsia-100">
+                  App
+                </span>
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                <img src="/login-previews/optimized/preview_character_1-sm.webp" alt="Character preview" className="h-20 w-full rounded-lg border border-white/10 object-cover" />
+                <img src="/login-previews/optimized/preview_abstract_1-sm.webp" alt="Abstract preview" className="h-20 w-full rounded-lg border border-white/10 object-cover" />
+                <img src="/login-previews/optimized/preview_landscape_1-sm.webp" alt="Landscape preview" className="h-20 w-full rounded-lg border border-white/10 object-cover" />
+              </div>
               <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-slate-200">
-                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Prompt helper</span>
-                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Batch-friendly</span>
-                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Fast history</span>
+                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Nano Banana</span>
+                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">GPT-2</span>
+                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Kling</span>
               </div>
             </article>
 
-            <article className="rounded-2xl border border-cyan-300/25 bg-[#0b1428]/92 p-5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200">
-                VisualFX
-              </p>
-              <h3 className="mt-2 text-xl font-extrabold text-white">Video Workspace</h3>
-              <p className="mt-2 text-sm text-slate-300">
-                Smooth video flow with strong model coverage and practical controls.
-              </p>
+            <article className="rounded-2xl border border-cyan-300/25 bg-[#0b1428]/92 p-4 lg:col-span-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200">
+                    VisualFX
+                  </p>
+                  <h3 className="mt-1 text-xl font-extrabold text-white">Video Models</h3>
+                </div>
+                <span className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-[10px] font-semibold uppercase text-cyan-100">
+                  Pro
+                </span>
+              </div>
+              <img
+                src="/login-previews/optimized/cinematic_futuristic-poster.webp"
+                alt="VisualFX cinematic preview"
+                className="mt-4 h-32 w-full rounded-xl border border-white/10 object-cover"
+              />
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <img src="/login-previews/optimized/d3-poster.webp" alt="Video preview 1" className="h-16 w-full rounded-lg border border-white/10 object-cover" />
+                <img src="/login-previews/optimized/d4-poster.webp" alt="Video preview 2" className="h-16 w-full rounded-lg border border-white/10 object-cover" />
+                <img src="/login-previews/optimized/d5-poster.webp" alt="Video preview 3" className="h-16 w-full rounded-lg border border-white/10 object-cover" />
+              </div>
               <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-slate-200">
-                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Frame controls</span>
-                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Model switch</span>
-                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Export ready</span>
+                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Seedance 2.0</span>
+                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Kling 3.0</span>
+                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Veo 3.1</span>
+                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Topaz</span>
               </div>
             </article>
 
-            <article className="rounded-2xl border border-emerald-300/25 bg-[#0b1428]/92 p-5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-200">
-                Studio
-              </p>
-              <h3 className="mt-2 text-xl font-extrabold text-white">Team Workspace</h3>
-              <p className="mt-2 text-sm text-slate-300">
-                Shared projects, cleaner handoff, and management tools when you scale.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-slate-200">
-                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Team folders</span>
-                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Role controls</span>
-                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Usage visibility</span>
+            <article className="rounded-2xl border border-emerald-300/25 bg-[#0b1428]/92 p-4 lg:col-span-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-200">
+                    Studio
+                  </p>
+                  <h3 className="mt-1 text-xl font-extrabold text-white">Team & Management</h3>
+                </div>
+                <span className="rounded-lg border border-emerald-300/30 bg-emerald-300/10 px-2 py-1 text-[10px] font-semibold uppercase text-emerald-100">
+                  Studio
+                </span>
+              </div>
+              <img
+                src="/login-previews/optimized/preview_night_street-md.webp"
+                alt="Studio preview panel"
+                className="mt-4 h-32 w-full rounded-xl border border-white/10 object-cover"
+              />
+              <div className="mt-4 space-y-2 text-sm text-slate-200">
+                <p>Team members and shared folders</p>
+                <p>More storage and cleaner project flow</p>
+                <p>Central controls for scaling work</p>
+              </div>
+              <div className="mt-4 rounded-xl border border-emerald-300/30 bg-emerald-300/10 px-3 py-2 text-sm font-semibold text-emerald-100">
+                Full Studio access during trial
               </div>
             </article>
           </div>
 
-          <div className="relative mt-6 grid gap-3 rounded-2xl border border-white/10 bg-[#09142a]/90 p-4 text-sm text-slate-200 sm:grid-cols-3 sm:p-5">
-            <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">Use your own Fal key</p>
-            <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">No platform credit markup</p>
-            <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">Upgrade whenever needed</p>
+          <div className="relative mt-6 grid gap-3 rounded-2xl border border-white/10 bg-[#09142a]/90 p-4 sm:grid-cols-3 sm:p-5">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fuchsia-200">Apps</p>
+              <p className="mt-2 text-2xl font-extrabold text-white">From $9/mo</p>
+              <p className="mt-1 text-sm text-slate-300">Direct usage. No markup.</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200">BYOK</p>
+              <p className="mt-2 text-sm text-slate-200">Use your own Fal key</p>
+              <p className="mt-1 text-sm text-slate-200">Pay provider directly</p>
+              <p className="mt-1 text-sm text-slate-200">No platform credit markup</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-200">Studio</p>
+              <p className="mt-2 text-xl font-extrabold text-white">Upgrade Anytime</p>
+              <p className="mt-1 text-sm text-slate-300">Scale seats, storage, and admin flow when needed.</p>
+            </div>
           </div>
         </div>
       </section>
@@ -461,6 +540,9 @@ export const ByokLanding = () => {
                 <h3 className="mt-2 text-2xl font-extrabold text-white">Upgrade Anytime</h3>
                 <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
                   Choose a package that matches your production scale.
+                </p>
+                <p className="mt-3 max-w-2xl rounded-xl border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-100">
+                  Important: use the same email for checkout and BYOK login so your package activates instantly.
                 </p>
                 <div className="mt-4 inline-flex rounded-xl border border-white/15 bg-[#0b1629] p-1">
                   <button

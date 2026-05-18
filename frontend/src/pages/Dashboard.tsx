@@ -3284,6 +3284,10 @@ function Dashboard() {
                   <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
                     Choose a package that matches your production scale.
                   </p>
+                  <p className="mt-3 max-w-2xl rounded-xl border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-100">
+                    Important: complete checkout using your dashboard email
+                    {user?.email ? ` (${user.email})` : ""} so package activation maps to your workspace instantly.
+                  </p>
                   <div className="mt-4 inline-flex rounded-xl border border-white/15 bg-[#0b1629] p-1">
                     <button
                       type="button"
