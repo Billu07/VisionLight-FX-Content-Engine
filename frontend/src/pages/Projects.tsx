@@ -3,11 +3,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
-import { apiEndpoints, stopReadOnlyImpersonation } from "../lib/api";
+import {
+  apiEndpoints,
+  stopReadOnlyImpersonation,
+  clearSupportSessionToken,
+} from "../lib/api";
 import { confirmAction, notify } from "../lib/notifications";
 
 export default function Projects() {
-  const { user, logout, profiles } = useAuth();
+  const { user, logout, profiles, checkAuth } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -99,6 +103,40 @@ export default function Projects() {
     if (!confirmed) return;
     logout();
   };
+  const handleExitReadOnly = async () => {
+    const impersonatorId = user?.impersonator?.id;
+
+    try {
+      if (impersonatorId) {
+        const handoffRes = await apiEndpoints.startSupportHandoff(impersonatorId);
+        const handoffUrl =
+          typeof handoffRes.data?.handoffUrl === "string"
+            ? handoffRes.data.handoffUrl.trim()
+            : "";
+        if (handoffRes.data?.domainSwitchRequired && handoffUrl) {
+          stopReadOnlyImpersonation();
+          clearSupportSessionToken();
+          window.location.replace(handoffUrl);
+          return;
+        }
+      }
+    } catch {
+      // Fall through to local recovery path below.
+    }
+
+    stopReadOnlyImpersonation();
+    clearSupportSessionToken();
+    const authState = await checkAuth();
+    if (!authState.hasUser) {
+      navigate("/", { replace: true });
+      return;
+    }
+
+    const restoredUser = useAuth.getState().user;
+    const isAdminProfile =
+      restoredUser?.role === "ADMIN" || restoredUser?.role === "SUPERADMIN";
+    navigate(isAdminProfile ? "/admin" : "/projects", { replace: true });
+  };
 
   const projectLimit = Number(user?.maxProjects || 0);
   const totalProjects = Array.isArray(projectsData) ? projectsData.length : 0;
@@ -171,8 +209,7 @@ export default function Projects() {
               <button
                 type="button"
                 onClick={() => {
-                  stopReadOnlyImpersonation();
-                  navigate("/admin");
+                  void handleExitReadOnly();
                 }}
                 className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/20"
               >

@@ -5,6 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import {
   apiEndpoints,
   stopReadOnlyImpersonation,
+  clearSupportSessionToken,
   getCORSProxyUrl,
   getCORSProxyVideoUrl,
 } from "../lib/api";
@@ -2402,6 +2403,40 @@ function Dashboard() {
     await logout();
     navigate("/");
   };
+  const handleExitReadOnly = async () => {
+    const impersonatorId = user?.impersonator?.id;
+
+    try {
+      if (impersonatorId) {
+        const handoffRes = await apiEndpoints.startSupportHandoff(impersonatorId);
+        const handoffUrl =
+          typeof handoffRes.data?.handoffUrl === "string"
+            ? handoffRes.data.handoffUrl.trim()
+            : "";
+        if (handoffRes.data?.domainSwitchRequired && handoffUrl) {
+          stopReadOnlyImpersonation();
+          clearSupportSessionToken();
+          window.location.replace(handoffUrl);
+          return;
+        }
+      }
+    } catch {
+      // Fall through to local recovery path below.
+    }
+
+    stopReadOnlyImpersonation();
+    clearSupportSessionToken();
+    const authState = await checkAuth();
+    if (!authState.hasUser) {
+      navigate("/", { replace: true });
+      return;
+    }
+
+    const restoredUser = useAuth.getState().user;
+    const isAdminProfile =
+      restoredUser?.role === "ADMIN" || restoredUser?.role === "SUPERADMIN";
+    navigate(isAdminProfile ? "/admin" : "/projects", { replace: true });
+  };
   const handleOpenAdminPanel = () => {
     if (adminPanelLocked) {
       notify.warning("Admin panel is locked for your current package.");
@@ -3481,8 +3516,7 @@ function Dashboard() {
                   <button
                     type="button"
                     onClick={() => {
-                      stopReadOnlyImpersonation();
-                      navigate("/admin");
+                      void handleExitReadOnly();
                     }}
                     className="rounded-xl border border-amber-400/30 bg-amber-400/15 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-amber-100 hover:bg-amber-400/25"
                   >

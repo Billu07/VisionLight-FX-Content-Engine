@@ -603,27 +603,6 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const handleReconcileByok = async (organizationId?: string) => {
-    setActionLoading(true);
-    try {
-      const res = await apiEndpoints.superadminReconcileByok(
-        organizationId ? { organizationId } : {},
-      );
-      const repaired = Number(res.data?.repaired || 0);
-      const count = Number(res.data?.count || 0);
-      setMsg(
-        organizationId
-          ? "BYOK organization reconciled."
-          : `BYOK reconcile done. Repaired ${repaired}/${count}.`,
-      );
-      await fetchInitialData();
-    } catch (error: any) {
-      setMsg("Error: " + (error?.message || "Failed to reconcile BYOK organizations."));
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   const handleResolveCreditRequest = async (requestId: string) => {
     try {
       await apiEndpoints.superadminResolveRequest(requestId);
@@ -1438,14 +1417,6 @@ export default function SuperAdminDashboard() {
                   >
                     Refresh Ops
                   </button>
-                  <button
-                    type="button"
-                    className={adminUi.primaryButton}
-                    onClick={() => void handleReconcileByok()}
-                    disabled={actionLoading}
-                  >
-                    Reconcile All
-                  </button>
                 </div>
               </div>
 
@@ -1575,14 +1546,6 @@ export default function SuperAdminDashboard() {
                                   disabled={actionLoading}
                                 >
                                   Reset Trial
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => void handleReconcileByok(org.id)}
-                                  className={adminUi.primaryButton}
-                                  disabled={actionLoading}
-                                >
-                                  Reconcile
                                 </button>
                               </div>
                             </td>

@@ -330,7 +330,7 @@ export const ByokLanding = () => {
             Packages start from $9/mo (annual billing).
           </p>
           <p className="mt-2 text-sm text-cyan-200/85">
-            14-day trial: full dashboard access, max 5 renders/day.
+            14-day trial with full dashboard access.
           </p>
         </section>
 
@@ -356,6 +356,78 @@ export const ByokLanding = () => {
           </div>
         </section>
       </main>
+
+      <section className="relative z-10 mx-auto w-full max-w-7xl px-6 pb-12 lg:px-12">
+        <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#081126]/82 p-6 shadow-[0_28px_80px_rgba(2,8,23,0.55)] backdrop-blur-xl sm:p-8">
+          <div className="pointer-events-none absolute -left-24 -top-20 h-56 w-56 rounded-full bg-fuchsia-500/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -right-20 h-64 w-64 rounded-full bg-cyan-400/18 blur-3xl" />
+
+          <div className="relative">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-200/85">
+              Prebuilt Dashboards
+            </p>
+            <h2 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">
+              Clean by Default. Ready Instantly.
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300">
+              Everything opens in a focused layout, so you can create faster without setup clutter.
+            </p>
+          </div>
+
+          <div className="relative mt-7 grid gap-4 lg:grid-cols-3">
+            <article className="rounded-2xl border border-fuchsia-300/25 bg-[#0b1428]/92 p-5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fuchsia-200">
+                PicDrift
+              </p>
+              <h3 className="mt-2 text-xl font-extrabold text-white">Image Workspace</h3>
+              <p className="mt-2 text-sm text-slate-300">
+                Quick generation, smart edits, and clean visual organization.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-slate-200">
+                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Prompt helper</span>
+                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Batch-friendly</span>
+                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Fast history</span>
+              </div>
+            </article>
+
+            <article className="rounded-2xl border border-cyan-300/25 bg-[#0b1428]/92 p-5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-200">
+                VisualFX
+              </p>
+              <h3 className="mt-2 text-xl font-extrabold text-white">Video Workspace</h3>
+              <p className="mt-2 text-sm text-slate-300">
+                Smooth video flow with strong model coverage and practical controls.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-slate-200">
+                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Frame controls</span>
+                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Model switch</span>
+                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Export ready</span>
+              </div>
+            </article>
+
+            <article className="rounded-2xl border border-emerald-300/25 bg-[#0b1428]/92 p-5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-200">
+                Studio
+              </p>
+              <h3 className="mt-2 text-xl font-extrabold text-white">Team Workspace</h3>
+              <p className="mt-2 text-sm text-slate-300">
+                Shared projects, cleaner handoff, and management tools when you scale.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-slate-200">
+                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Team folders</span>
+                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Role controls</span>
+                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Usage visibility</span>
+              </div>
+            </article>
+          </div>
+
+          <div className="relative mt-6 grid gap-3 rounded-2xl border border-white/10 bg-[#09142a]/90 p-4 text-sm text-slate-200 sm:grid-cols-3 sm:p-5">
+            <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">Use your own Fal key</p>
+            <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">No platform credit markup</p>
+            <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">Upgrade whenever needed</p>
+          </div>
+        </div>
+      </section>
 
       <footer className="relative z-10 mx-auto w-full max-w-7xl px-6 pb-7 text-xs text-slate-200/90 lg:px-12">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
