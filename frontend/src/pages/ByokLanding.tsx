@@ -81,8 +81,6 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
     storageLabel: "10GB shared storage",
     adminLabel: "Admin panel enabled",
     retentionLabel: "30-day media retention",
-    highlight: "Most Popular",
-    featured: true,
   },
   {
     code: "VFX_STUDIO",
@@ -99,6 +97,8 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
     storageLabel: "30GB shared storage",
     adminLabel: "Admin panel enabled",
     retentionLabel: "45-day media retention",
+    highlight: "Most Popular",
+    featured: true,
   },
   {
     code: "VFX_STUDIO_AGENCY",
@@ -117,6 +117,14 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
     retentionLabel: "90-day media retention",
   },
 ];
+
+const BYOK_PLAN_BUTTON_CLASSES: Record<string, string> = {
+  PD_APP: "border-indigo-300/45 bg-indigo-500/85 text-indigo-50 hover:bg-indigo-400/90",
+  VFX_APP: "border-sky-300/45 bg-sky-500/85 text-sky-50 hover:bg-sky-400/90",
+  PD_STUDIO: "border-emerald-300/45 bg-emerald-500/85 text-emerald-50 hover:bg-emerald-400/90",
+  VFX_STUDIO: "border-blue-300/60 bg-blue-500 text-white hover:bg-blue-400",
+  VFX_STUDIO_AGENCY: "border-amber-300/45 bg-amber-500/85 text-amber-50 hover:bg-amber-400/90",
+};
 
 export const ByokLanding = () => {
   const navigate = useNavigate();
@@ -531,24 +539,23 @@ export const ByokLanding = () => {
 
       {showPackageSheet && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-gray-950/90 p-4 backdrop-blur-md">
-          <div className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-600/45 bg-[#070f1f] p-5 shadow-[0_26px_70px_rgba(2,8,23,0.72)] sm:p-7">
-            <div className="flex items-start justify-between gap-6">
-              <div>
+          <div className="flex max-h-[86vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-600/45 bg-[#070f1f] p-4 shadow-[0_26px_70px_rgba(2,8,23,0.72)] sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300">
                   BYOK Packages
                 </p>
-                <h3 className="mt-2 text-2xl font-extrabold text-white">Upgrade Anytime</h3>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-300">
-                  Choose a package that matches your production scale.
-                </p>
-                <p className="mt-3 max-w-2xl rounded-xl border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-100">
+                <h3 className="mt-1 text-xl font-extrabold text-white">Choose Your Package</h3>
+                <p className="mt-2 max-w-2xl rounded-lg border border-amber-300/40 bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-semibold leading-relaxed text-amber-100">
                   Important: use the same email for checkout and BYOK login so your package activates instantly.
                 </p>
-                <div className="mt-4 inline-flex rounded-xl border border-white/15 bg-[#0b1629] p-1">
+              </div>
+              <div className="ml-auto flex items-center gap-2">
+                <div className="inline-flex rounded-lg border border-white/15 bg-[#0b1629] p-1">
                   <button
                     type="button"
                     onClick={() => setPackageBillingCycle("monthly")}
-                    className={`rounded-lg px-4 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
+                    className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition ${
                       packageBillingCycle === "monthly"
                         ? "bg-cyan-300/20 text-cyan-100"
                         : "text-slate-300 hover:text-white"
@@ -559,7 +566,7 @@ export const ByokLanding = () => {
                   <button
                     type="button"
                     onClick={() => setPackageBillingCycle("annual")}
-                    className={`rounded-lg px-4 py-1.5 text-xs font-semibold uppercase tracking-wide transition ${
+                    className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition ${
                       packageBillingCycle === "annual"
                         ? "bg-cyan-300/20 text-cyan-100"
                         : "text-slate-300 hover:text-white"
@@ -568,19 +575,19 @@ export const ByokLanding = () => {
                     Annually
                   </button>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPackageSheet(false)}
+                  className="rounded-lg border border-slate-500/50 bg-slate-900/70 px-3 py-2 text-[11px] font-semibold uppercase tracking-widest text-slate-200 transition hover:border-slate-400 hover:bg-slate-800/80"
+                >
+                  Close
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowPackageSheet(false)}
-                className="rounded-xl border border-slate-500/50 bg-slate-900/70 px-3 py-2 text-xs font-semibold uppercase tracking-widest text-slate-200 transition hover:border-slate-400 hover:bg-slate-800/80"
-              >
-                Close
-              </button>
             </div>
-            <div className="mt-5 border-t border-white/10" />
+            <div className="mt-3 border-t border-white/10" />
 
-            <div className="mt-6 overflow-y-auto pr-1 sm:pr-2">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+            <div className="mt-4 overflow-y-auto pr-1 sm:pr-2">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
                 {BYOK_LANDING_PLANS.map((plan, index) => {
                   const centeredRowClass =
                     BYOK_LANDING_PLANS.length === 5 && index === 3
@@ -591,9 +598,9 @@ export const ByokLanding = () => {
                   return (
                     <article
                       key={plan.code}
-                      className={`relative flex h-full flex-col rounded-2xl border bg-[#0e1729] p-5 shadow-[0_14px_32px_rgba(2,10,26,0.45)] transition-all lg:col-span-2 ${centeredRowClass} ${
+                      className={`relative flex h-full flex-col rounded-xl border bg-[#0e1729] p-4 shadow-[0_12px_28px_rgba(2,10,26,0.42)] transition-all lg:col-span-2 ${centeredRowClass} ${
                         plan.featured
-                          ? "border-cyan-300/45"
+                          ? "border-blue-300/55"
                           : "border-white/12"
                       }`}
                     >
@@ -602,21 +609,21 @@ export const ByokLanding = () => {
                           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-300">
                             {plan.code.replaceAll("_", " ")}
                           </p>
-                          <h4 className="mt-1.5 text-xl font-extrabold text-white">{plan.title}</h4>
+                          <h4 className="mt-1 text-lg font-extrabold text-white">{plan.title}</h4>
                         </div>
                         {plan.highlight && (
-                          <span className="rounded-lg border border-cyan-300/40 bg-cyan-300/10 px-2 py-1 text-[9px] font-semibold uppercase tracking-widest text-cyan-100">
+                          <span className="rounded-lg border border-blue-300/40 bg-blue-300/10 px-2 py-1 text-[9px] font-semibold uppercase tracking-widest text-blue-100">
                             {plan.highlight}
                           </span>
                         )}
                       </div>
 
-                      <p className="mt-4 text-sm leading-relaxed text-slate-300">{plan.blurb}</p>
-                      <p className="mt-2 text-xs text-slate-400">{plan.modelLine}</p>
+                      <p className="mt-3 text-[13px] leading-relaxed text-slate-300">{plan.blurb}</p>
+                      <p className="mt-1 text-[11px] text-slate-400">{plan.modelLine}</p>
 
-                      <div className="relative mt-6 h-11 overflow-hidden">
+                      <div className="relative mt-5 h-10 overflow-hidden">
                         <span
-                          className={`absolute left-0 top-0 text-3xl font-extrabold text-white transition-all duration-300 ${
+                          className={`absolute left-0 top-0 text-[28px] font-extrabold text-white transition-all duration-300 ${
                             packageBillingCycle === "monthly"
                               ? "translate-y-0 opacity-100"
                               : "translate-y-2 opacity-0"
@@ -625,7 +632,7 @@ export const ByokLanding = () => {
                           {plan.monthlyPrice}
                         </span>
                         <span
-                          className={`absolute left-0 top-0 text-3xl font-extrabold text-white transition-all duration-300 ${
+                          className={`absolute left-0 top-0 text-[28px] font-extrabold text-white transition-all duration-300 ${
                             packageBillingCycle === "annual"
                               ? "translate-y-0 opacity-100"
                               : "translate-y-2 opacity-0"
@@ -638,7 +645,7 @@ export const ByokLanding = () => {
                         {packageBillingCycle === "monthly" ? "Monthly View" : "Annual View"}
                       </p>
 
-                      <div className="mt-5 grid grid-cols-1 divide-y divide-white/10 rounded-xl border border-white/10 bg-[#0a1222]">
+                      <div className="mt-4 grid grid-cols-1 divide-y divide-white/10 rounded-xl border border-white/10 bg-[#0a1222]">
                         <p className="px-3 py-2 text-xs text-slate-200">{plan.usersLabel}</p>
                         <p className="px-3 py-2 text-xs text-slate-200">{plan.projectsLabel}</p>
                         {plan.storageLabel && (
@@ -649,12 +656,12 @@ export const ByokLanding = () => {
                         <p className="px-3 py-2 text-xs text-slate-300">Domain: {plan.routingDomain}</p>
                       </div>
 
-                      <div className="mt-5">
+                      <div className="mt-4">
                         <a
                           href={plan.checkoutUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="block w-full rounded-xl border border-cyan-300/40 bg-cyan-300/10 px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-cyan-300/20"
+                          className={`block w-full rounded-xl border px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.12em] transition ${BYOK_PLAN_BUTTON_CLASSES[plan.code] || "border-blue-300/60 bg-blue-500 text-white hover:bg-blue-400"}`}
                         >
                           Choose {plan.title}
                         </a>
