@@ -350,11 +350,6 @@ export default function SuperAdminDashboard() {
     if (!Number.isFinite(n)) return fallback;
     return Math.max(0, Math.round(n));
   };
-  const toPrice = (value: string, fallback = 0) => {
-    const n = Number(value);
-    if (!Number.isFinite(n)) return fallback;
-    return Math.max(0, Number(n.toFixed(4)));
-  };
   const MB_PER_GB = 1024;
   const mbToGb = (mb: number) => Math.max(0, Number(mb || 0)) / MB_PER_GB;
   const gbToMb = (gb: string, fallbackMb = 0) => {
@@ -1693,9 +1688,9 @@ export default function SuperAdminDashboard() {
                   <tr>
                     <th className="p-6">User</th>
                     <th className="p-6 text-center">View</th>
-                    <th className="p-6 text-center">PicDrift / Kling 3.0</th>
+                    <th className="p-6 text-center">PicDrift</th>
                     <th className="p-6 text-center">PicFX</th>
-                    <th className="p-6 text-center">Topaz / Seedance / Veo 3.1</th>
+                    <th className="p-6 text-center">Video Engines (Kling / Topaz / Seedance / Veo 3.1)</th>
                     <th className="p-6 text-right">Coverage (USD)</th>
                     <th className="p-6 text-right">Actions</th>
                   </tr>
@@ -1713,22 +1708,14 @@ export default function SuperAdminDashboard() {
                         </span>
                       </td>
                       <td className="p-6 text-center">
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center justify-center gap-2">
-                            <span className="text-[10px] text-gray-500">Std:</span>
-                            <input type="number" step="1" min="0" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDrift} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsPicDrift) - u.creditsPicDrift, creditType: "creditsPicDrift" })} />
-                          </div>
-                          <div className="flex items-center justify-center gap-2">
-                            <span className="text-[10px] text-gray-500">Kling:</span>
-                            <input type="number" step="1" min="0" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsPicDriftPlus) - u.creditsPicDriftPlus, creditType: "creditsPicDriftPlus" })} />
-                          </div>
-                        </div>
+                        <input type="number" step="1" min="0" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDrift} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsPicDrift) - u.creditsPicDrift, creditType: "creditsPicDrift" })} />
                       </td>
                       <td className="p-6 text-center">
                         <input type="number" step="1" min="0" className="w-16 bg-gray-950 border border-gray-800 rounded p-1 text-center text-xs text-white" defaultValue={u.creditsImageFX} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsImageFX) - u.creditsImageFX, creditType: "creditsImageFX" })} />
                       </td>
                       <td className="p-6 text-center">
                         <div className="flex gap-2 justify-center">
+                          <input type="number" step="1" min="0" title="Kling 3.0" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsPicDriftPlus) - u.creditsPicDriftPlus, creditType: "creditsPicDriftPlus" })} />
                           <input type="number" step="1" min="0" title="Topaz Upscale" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1, creditType: "creditsVideoFX1" })} />
                           <input type="number" step="1" min="0" title="Seedance 2.0" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2, creditType: "creditsVideoFX2" })} />
                           <input type="number" step="1" min="0" title="Veo 3.1" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3, creditType: "creditsVideoFX3" })} />
@@ -2132,7 +2119,7 @@ export default function SuperAdminDashboard() {
                             {row.provider}
                           </td>
                           <td className="py-3 text-sm text-right text-gray-200">
-                            {row.deductionCredits.toFixed(2)}
+                            {row.deductionCredits.toFixed(0)}
                           </td>
                           <td className="py-3 text-right">
                             <input
@@ -2200,8 +2187,6 @@ export default function SuperAdminDashboard() {
                       {[
                         { key: "pricePicDrift_5s", label: "Standard 5s" },
                         { key: "pricePicDrift_10s", label: "Standard 10s" },
-                        { key: "pricePicDrift_Plus_5s", label: "Kling 3.0 5s" },
-                        { key: "pricePicDrift_Plus_10s", label: "Kling 3.0 10s" },
                         { key: "priceAsset_DriftPath", label: "3DX Drift Path" },
                       ].map(({ key, label }) => (
                         <div key={key} className="flex justify-between items-center">
@@ -2210,13 +2195,16 @@ export default function SuperAdminDashboard() {
                           </span>
                           <input
                             type="number"
-                            step="0.01"
+                            step="1"
                             min="0"
                             className={`${adminUi.input} w-16 p-1 text-center text-xs`}
-                            defaultValue={globalSettings[key]}
+                            defaultValue={toInt(String(globalSettings[key]), 0)}
                             onBlur={(e) =>
                               apiEndpoints.superadminUpdateGlobalSettings({
-                                [key]: toPrice(e.target.value, globalSettings[key]),
+                                [key]: toInt(
+                                  e.target.value,
+                                  toInt(String(globalSettings[key]), 0),
+                                ),
                               })
                             }
                           />
@@ -2233,13 +2221,16 @@ export default function SuperAdminDashboard() {
                           <span className="text-[10px] text-gray-400 uppercase font-bold truncate max-w-[120px]" title={key}>{key.replace('price', '').replace(/_/g, ' ')}</span>
                           <input
                             type="number"
-                            step="0.01"
+                            step="1"
                             min="0"
                             className={`${adminUi.input} w-16 p-1 text-center text-xs`}
-                            defaultValue={globalSettings[key]}
+                            defaultValue={toInt(String(globalSettings[key]), 0)}
                             onBlur={(e) =>
                               apiEndpoints.superadminUpdateGlobalSettings({
-                                [key]: toPrice(e.target.value, globalSettings[key]),
+                                [key]: toInt(
+                                  e.target.value,
+                                  toInt(String(globalSettings[key]), 0),
+                                ),
                               })
                             }
                           />
@@ -2249,9 +2240,11 @@ export default function SuperAdminDashboard() {
                   </div>
 
                   <div className={`${adminUi.mutedCard} p-5`}>
-                    <h5 className={`${adminUi.sectionTitle} mb-4`}>Video FX Engines</h5>
+                    <h5 className={`${adminUi.sectionTitle} mb-4`}>Video Engines</h5>
                     <div className="space-y-4">
                       {[
+                        { key: "pricePicDrift_Plus_5s", label: "Kling 3.0 · 5s" },
+                        { key: "pricePicDrift_Plus_10s", label: "Kling 3.0 · 10s" },
                         { key: "priceVideoFX1_10s", label: "Topaz Upscale 2x" },
                         { key: "priceVideoFX1_15s", label: "Topaz Upscale 4x" },
                         { key: "priceVideoFX2_4s", label: "Seedance 2.0 · 4s" },
@@ -2267,13 +2260,16 @@ export default function SuperAdminDashboard() {
                           </span>
                           <input
                             type="number"
-                            step="0.01"
+                            step="1"
                             min="0"
                             className={`${adminUi.input} w-16 p-1 text-center text-xs`}
-                            defaultValue={globalSettings[key]}
+                            defaultValue={toInt(String(globalSettings[key]), 0)}
                             onBlur={(e) =>
                               apiEndpoints.superadminUpdateGlobalSettings({
-                                [key]: toPrice(e.target.value, globalSettings[key]),
+                                [key]: toInt(
+                                  e.target.value,
+                                  toInt(String(globalSettings[key]), 0),
+                                ),
                               })
                             }
                           />

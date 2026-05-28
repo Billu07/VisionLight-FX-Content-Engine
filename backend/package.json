@@ -8,6 +8,7 @@
     "build": "prisma generate && tsc",
     "start": "node dist/index.js",
     "db:seed": "tsx src/scripts/seed-airtable.ts",
+    "db:apply-credit-pricing-defaults": "tsx src/scripts/apply-fal-pricing-defaults.ts",
     "db:apply-fal-pricing-defaults": "tsx src/scripts/apply-fal-pricing-defaults.ts",
     "db:backfill-demo-users": "tsx src/scripts/backfill-demo-users.ts",
     "db:repair-default-org-views": "tsx src/scripts/repair-default-org-views.ts",

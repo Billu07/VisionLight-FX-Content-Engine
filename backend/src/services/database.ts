@@ -41,12 +41,6 @@ const normalizeNonNegativeInt = (value: any, fallback = 0) => {
   return Math.max(0, Math.round(n));
 };
 
-const normalizeNonNegativeAmount = (value: any, fallback = 0) => {
-  const n = toFiniteNumber(value);
-  if (n === null) return fallback;
-  return Math.max(0, Math.round(n * 10000) / 10000);
-};
-
 export const dbService = {
   // === NEW: GLOBAL SETTINGS (PRICING CONTROL) ===
   async getGlobalSettings() {
@@ -451,7 +445,7 @@ export const dbService = {
     pool: CreditPool,
     amount: number,
   ) {
-    const delta = normalizeNonNegativeAmount(amount);
+    const delta = normalizeNonNegativeInt(amount);
     if (delta <= 0) return prisma.user.findUnique({ where: { id: userId } });
     return prisma.user.update({
       where: { id: userId },
@@ -464,7 +458,7 @@ export const dbService = {
     pool: CreditPool,
     amount: number,
   ) {
-    const delta = normalizeNonNegativeAmount(amount);
+    const delta = normalizeNonNegativeInt(amount);
     if (delta <= 0) return prisma.user.findUnique({ where: { id: userId } });
     return prisma.user.update({
       where: { id: userId },
@@ -653,9 +647,7 @@ export const dbService = {
                 })()
               : paramsRaw;
           const chargedPool = (parsedParams as any)?.chargedPool;
-          const chargedCost = normalizeNonNegativeAmount(
-            (parsedParams as any)?.cost,
-          );
+          const chargedCost = normalizeNonNegativeInt((parsedParams as any)?.cost);
 
           if (
             typeof chargedPool === "string" &&

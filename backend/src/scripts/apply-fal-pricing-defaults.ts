@@ -4,7 +4,7 @@ import { DEFAULT_FAL_PRICING } from "../config/pricing";
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("Applying Fal pricing defaults to global settings...");
+  console.log("Applying render credit defaults to global settings...");
 
   const globalSettings = await prisma.globalSettings.upsert({
     where: { id: "singleton" },
@@ -28,15 +28,14 @@ async function main() {
   });
 
   console.log(`Updated pricing defaults for ${orgSync.count} organizations.`);
-  console.log("Fal pricing defaults applied successfully.");
+  console.log("Render credit defaults applied successfully.");
 }
 
 main()
   .catch((error) => {
-    console.error("Failed to apply Fal pricing defaults:", error);
+    console.error("Failed to apply render credit defaults:", error);
     process.exit(1);
   })
   .finally(async () => {
     await prisma.$disconnect();
   });
-
