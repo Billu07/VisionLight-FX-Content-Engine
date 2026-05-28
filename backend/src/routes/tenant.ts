@@ -65,6 +65,28 @@ const hasUserStoragePayload = (payload: any) =>
 const normalizeView = (raw: unknown): "PICDRIFT" | "VISIONLIGHT" =>
   raw === "PICDRIFT" ? "PICDRIFT" : "VISIONLIGHT";
 
+const mapProviderCosts = (settings: any) => ({
+  picdrift_5s: Number(settings?.costPicDrift_5s || 0),
+  picdrift_10s: Number(settings?.costPicDrift_10s || 0),
+  picdrift_plus_5s: Number(settings?.costPicDrift_Plus_5s || 0),
+  picdrift_plus_10s: Number(settings?.costPicDrift_Plus_10s || 0),
+  picfx_standard: Number(settings?.costPicFX_Standard || 0),
+  picfx_carousel: Number(settings?.costPicFX_Carousel || 0),
+  picfx_batch: Number(settings?.costPicFX_Batch || 0),
+  editor_pro: Number(settings?.costEditor_Pro || 0),
+  editor_enhance: Number(settings?.costEditor_Enhance || 0),
+  editor_convert: Number(settings?.costEditor_Convert || 0),
+  asset_drift_path: Number(settings?.costAsset_DriftPath || 0),
+  topaz_upscale_2x: Number(settings?.costVideoFX1_10s || 0),
+  topaz_upscale_4x: Number(settings?.costVideoFX1_15s || 0),
+  seedance_fal_4s: Number(settings?.costVideoFX2_4s || 0),
+  seedance_fal_8s: Number(settings?.costVideoFX2_8s || 0),
+  seedance_fal_12s: Number(settings?.costVideoFX2_12s || 0),
+  veo3_4s: Number(settings?.costVideoFX3_4s || 0),
+  veo3_6s: Number(settings?.costVideoFX3_6s || 0),
+  veo3_8s: Number(settings?.costVideoFX3_8s || 0),
+});
+
 type ProviderBalanceStatus =
   | "ok"
   | "missing_key"
@@ -633,6 +655,7 @@ router.put("/requests/:id/resolve", async (req: AuthenticatedRequest, res) => {
 router.get("/config", async (req: AuthenticatedRequest, res) => {
   try {
     const org = await getOrg(req);
+    const globalSettings = await dbService.getGlobalSettings();
     const requestingUser = await dbService.findUserById(req.user!.id);
     const storageSummary = await storageQuotaService.getOrganizationStorageSummary(
       org.id,
@@ -674,6 +697,7 @@ router.get("/config", async (req: AuthenticatedRequest, res) => {
           priceVideoFX3_6s: org.priceVideoFX3_6s,
           priceVideoFX3_8s: org.priceVideoFX3_8s,
         },
+        providerCosts: mapProviderCosts(globalSettings),
         storage: storageSummary,
       }
     });

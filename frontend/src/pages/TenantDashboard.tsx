@@ -28,6 +28,7 @@ interface Config {
   falApiKey: string;
   kieApiKey: string;
   pricing: any;
+  providerCosts?: Record<string, number>;
   storage?: {
     limitMb: number;
     usedMb: number;
@@ -73,6 +74,7 @@ const COVERAGE_VARIANTS = [
   { id: "picdrift_plus_5s", label: "Kling 3.0 5s", provider: "fal", wallet: "creditsPicDriftPlus", deductionKey: "pricePicDrift_Plus_5s" },
   { id: "picdrift_plus_10s", label: "Kling 3.0 10s", provider: "fal", wallet: "creditsPicDriftPlus", deductionKey: "pricePicDrift_Plus_10s" },
   { id: "picfx_standard", label: "Pic FX Standard (Nano/GPT 2)", provider: "fal", wallet: "creditsImageFX", deductionKey: "pricePicFX_Standard" },
+  { id: "picfx_carousel", label: "Pic FX Carousel", provider: "fal", wallet: "creditsImageFX", deductionKey: "pricePicFX_Carousel" },
   { id: "picfx_batch", label: "Pic FX Batch", provider: "fal", wallet: "creditsImageFX", deductionKey: "pricePicFX_Batch" },
   { id: "editor_pro", label: "Pic FX Editor", provider: "fal", wallet: "creditsImageFX", deductionKey: "priceEditor_Pro" },
   { id: "editor_enhance", label: "Image Enhance/Upscale", provider: "fal", wallet: "creditsImageFX", deductionKey: "priceEditor_Enhance" },
@@ -87,29 +89,6 @@ const COVERAGE_VARIANTS = [
   { id: "veo3_6s", label: "Veo 3.1 6s", provider: "fal", wallet: "creditsVideoFX3", deductionKey: "priceVideoFX3_6s" },
   { id: "veo3_8s", label: "Veo 3.1 8s", provider: "fal", wallet: "creditsVideoFX3", deductionKey: "priceVideoFX3_8s" },
 ] as const;
-
-type CoverageVariantId = (typeof COVERAGE_VARIANTS)[number]["id"];
-
-const DEFAULT_VARIANT_COST_USD: Record<CoverageVariantId, number> = {
-  picdrift_5s: 0.1,
-  picdrift_10s: 0.2,
-  picdrift_plus_5s: 0.2,
-  picdrift_plus_10s: 0.3,
-  picfx_standard: 0.08,
-  picfx_batch: 0.08,
-  editor_pro: 0.1,
-  editor_enhance: 0.12,
-  editor_convert: 0.08,
-  asset_drift_path: 0.08,
-  topaz_upscale_2x: 0.45,
-  topaz_upscale_4x: 0.7,
-  seedance_fal_4s: 0.2,
-  seedance_fal_8s: 0.35,
-  seedance_fal_12s: 0.5,
-  veo3_4s: 0.25,
-  veo3_6s: 0.38,
-  veo3_8s: 0.5,
-};
 
 const PICDRIFT_PRICING_KEYS = [
   "pricePicDrift_5s",
@@ -457,7 +436,7 @@ export default function TenantDashboard() {
     );
     const providerCostPerRender = Math.max(
       0,
-      Number(DEFAULT_VARIANT_COST_USD[variant.id]) || 0,
+      Number(config?.providerCosts?.[variant.id]) || 0,
     );
     const impliedUsdPerCredit =
       deductionCredits > 0 ? providerCostPerRender / deductionCredits : 0;

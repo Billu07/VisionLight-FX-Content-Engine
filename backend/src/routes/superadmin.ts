@@ -6,7 +6,7 @@ import { authenticateToken, requireSuperAdmin, AuthenticatedRequest } from "../m
 import { encryptionUtils } from "../utils/encryption";
 import { upload } from "../utils/fileUpload";
 import { uploadManagedBuffer } from "../utils/managedStorage";
-import { PRICE_KEYS } from "../config/pricing";
+import { COST_KEYS, PRICE_KEYS } from "../config/pricing";
 
 const router = express.Router();
 
@@ -14,6 +14,12 @@ const toNonNegativeInt = (value: any) => {
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
   return Math.max(0, Math.round(n));
+};
+
+const toNonNegativeDecimal = (value: any) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.round(n * 10000) / 10000);
 };
 
 const toPositiveInt = (value: any) => {
@@ -65,6 +71,14 @@ const sanitizePricingUpdate = (payload: any) => {
   for (const key of PRICE_KEYS) {
     if (payload?.[key] === undefined) continue;
     const parsed = toNonNegativeInt(payload[key]);
+    if (parsed === null) {
+      throw new Error(`INVALID_PRICING_VALUE:${key}`);
+    }
+    updates[key] = parsed;
+  }
+  for (const key of COST_KEYS) {
+    if (payload?.[key] === undefined) continue;
+    const parsed = toNonNegativeDecimal(payload[key]);
     if (parsed === null) {
       throw new Error(`INVALID_PRICING_VALUE:${key}`);
     }

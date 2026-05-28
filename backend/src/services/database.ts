@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { DEFAULT_FAL_PRICING } from "../config/pricing";
+import { DEFAULT_FAL_PRICING, DEFAULT_PROVIDER_COSTS } from "../config/pricing";
 
 export const prisma = new PrismaClient();
 export type {
@@ -52,6 +52,7 @@ export const dbService = {
         data: {
           id: "singleton",
           ...DEFAULT_FAL_PRICING,
+          ...DEFAULT_PROVIDER_COSTS,
         },
       });
     }

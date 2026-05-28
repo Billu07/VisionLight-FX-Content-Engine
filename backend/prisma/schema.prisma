@@ -158,6 +158,33 @@ model GlobalSettings {
   priceVideoFX3_8s Float @default(6)
 
   priceAsset_DriftPath Float @default(2)
+
+  // Provider USD cost reference per render (managed by SuperAdmin)
+  costPicDrift_5s       Float @default(0.35)
+  costPicDrift_10s      Float @default(0.7)
+  costPicDrift_Plus_5s  Float @default(0.56)
+  costPicDrift_Plus_10s Float @default(1.12)
+
+  costPicFX_Standard Float @default(0.08)
+  costPicFX_Carousel Float @default(0.2)
+  costPicFX_Batch    Float @default(0.08)
+
+  costEditor_Pro     Float @default(0.1)
+  costEditor_Enhance Float @default(0.12)
+  costEditor_Convert Float @default(0.08)
+
+  costVideoFX1_10s Float @default(0.2)
+  costVideoFX1_15s Float @default(0.3)
+
+  costVideoFX2_4s  Float @default(1.21)
+  costVideoFX2_8s  Float @default(2.42)
+  costVideoFX2_12s Float @default(3.63)
+
+  costVideoFX3_4s Float @default(1.6)
+  costVideoFX3_6s Float @default(2.4)
+  costVideoFX3_8s Float @default(3.2)
+
+  costAsset_DriftPath Float @default(0.35)
   featureVideoEditorForAll Boolean @default(false)
   welcomeVideoUrl String?
 

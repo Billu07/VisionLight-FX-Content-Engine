@@ -218,6 +218,50 @@ const COVERAGE_VARIANTS = [
 
 type CoverageVariantId = (typeof COVERAGE_VARIANTS)[number]["id"];
 
+const COST_FIELD_BY_VARIANT: Record<CoverageVariantId, string> = {
+  picdrift_5s: "costPicDrift_5s",
+  picdrift_10s: "costPicDrift_10s",
+  picdrift_plus_5s: "costPicDrift_Plus_5s",
+  picdrift_plus_10s: "costPicDrift_Plus_10s",
+  picfx_standard: "costPicFX_Standard",
+  picfx_carousel: "costPicFX_Carousel",
+  picfx_batch: "costPicFX_Batch",
+  editor_pro: "costEditor_Pro",
+  editor_enhance: "costEditor_Enhance",
+  editor_convert: "costEditor_Convert",
+  asset_drift_path: "costAsset_DriftPath",
+  topaz_upscale_2x: "costVideoFX1_10s",
+  topaz_upscale_4x: "costVideoFX1_15s",
+  seedance_fal_4s: "costVideoFX2_4s",
+  seedance_fal_8s: "costVideoFX2_8s",
+  seedance_fal_12s: "costVideoFX2_12s",
+  veo3_4s: "costVideoFX3_4s",
+  veo3_6s: "costVideoFX3_6s",
+  veo3_8s: "costVideoFX3_8s",
+};
+
+const DEFAULT_VARIANT_COST_USD: Record<CoverageVariantId, number> = {
+  picdrift_5s: 0.35,
+  picdrift_10s: 0.7,
+  picdrift_plus_5s: 0.56,
+  picdrift_plus_10s: 1.12,
+  picfx_standard: 0.08,
+  picfx_carousel: 0.2,
+  picfx_batch: 0.08,
+  editor_pro: 0.1,
+  editor_enhance: 0.12,
+  editor_convert: 0.08,
+  asset_drift_path: 0.35,
+  topaz_upscale_2x: 0.2,
+  topaz_upscale_4x: 0.3,
+  seedance_fal_4s: 1.21,
+  seedance_fal_8s: 2.42,
+  seedance_fal_12s: 3.63,
+  veo3_4s: 1.6,
+  veo3_6s: 2.4,
+  veo3_8s: 3.2,
+};
+
 export default function SuperAdminDashboard() {
   const { user: adminUser } = useAuth();
   const navigate = useNavigate();
@@ -323,32 +367,17 @@ export default function SuperAdminDashboard() {
   const [welcomePreviewReady, setWelcomePreviewReady] = useState(false);
   const [variantCostUsd, setVariantCostUsd] = useState<
     Record<CoverageVariantId, number>
-  >({
-    picdrift_5s: 0.35,
-    picdrift_10s: 0.7,
-    picdrift_plus_5s: 0.56,
-    picdrift_plus_10s: 1.12,
-    picfx_standard: 0.08,
-    picfx_carousel: 0.2,
-    picfx_batch: 0.08,
-    editor_pro: 0.1,
-    editor_enhance: 0.12,
-    editor_convert: 0.08,
-    asset_drift_path: 0.35,
-    topaz_upscale_2x: 0.2,
-    topaz_upscale_4x: 0.3,
-    seedance_fal_4s: 1.21,
-    seedance_fal_8s: 2.42,
-    seedance_fal_12s: 3.63,
-    veo3_4s: 1.6,
-    veo3_6s: 2.4,
-    veo3_8s: 3.2,
-  });
+  >({ ...DEFAULT_VARIANT_COST_USD });
 
   const toInt = (value: string, fallback = 0) => {
     const n = Number(value);
     if (!Number.isFinite(n)) return fallback;
     return Math.max(0, Math.round(n));
+  };
+  const toUsdCost = (value: string, fallback = 0) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(0, Number(n.toFixed(4)));
   };
   const MB_PER_GB = 1024;
   const mbToGb = (mb: number) => Math.max(0, Number(mb || 0)) / MB_PER_GB;
@@ -514,6 +543,22 @@ export default function SuperAdminDashboard() {
     if (activeTab !== "lab") return;
     setWelcomePreviewReady(false);
   }, [activeTab, globalSettings?.welcomeVideoUrl]);
+
+  useEffect(() => {
+    if (!globalSettings) return;
+    const next = { ...DEFAULT_VARIANT_COST_USD } as Record<
+      CoverageVariantId,
+      number
+    >;
+    for (const variant of COVERAGE_VARIANTS) {
+      const costField = COST_FIELD_BY_VARIANT[variant.id];
+      const value = Number((globalSettings as any)?.[costField]);
+      if (Number.isFinite(value) && value >= 0) {
+        next[variant.id] = value;
+      }
+    }
+    setVariantCostUsd(next);
+  }, [globalSettings]);
 
   useEffect(() => {
     if (activeTab !== "byok") return;
@@ -994,6 +1039,26 @@ export default function SuperAdminDashboard() {
       ...prev,
       [key]: Number.isFinite(parsed) && parsed >= 0 ? parsed : 0,
     }));
+  };
+
+  const handleVariantCostCommit = async (key: CoverageVariantId) => {
+    const costField = COST_FIELD_BY_VARIANT[key];
+    if (!costField) return;
+    const fallback = Number((globalSettings as any)?.[costField]) || 0;
+    const nextValue = toUsdCost(String(variantCostUsd[key] ?? 0), fallback);
+    const currentValue = Number((globalSettings as any)?.[costField]) || 0;
+    if (Math.abs(nextValue - currentValue) < 0.0001) return;
+
+    try {
+      const res = await apiEndpoints.superadminUpdateGlobalSettings({
+        [costField]: nextValue,
+      });
+      if (res.data?.success) {
+        setGlobalSettings(res.data.settings);
+      }
+    } catch (err: any) {
+      setMsg("Error: " + (err?.message || "Failed to update provider cost."));
+    }
   };
 
   if (loading) return (
@@ -2128,6 +2193,7 @@ export default function SuperAdminDashboard() {
                               min="0"
                               value={row.providerCostPerRender}
                               onChange={(e) => handleVariantCostChange(row.id, e.target.value)}
+                              onBlur={() => void handleVariantCostCommit(row.id)}
                               className={`${adminUi.input} w-24 p-2 text-right text-xs`}
                             />
                           </td>

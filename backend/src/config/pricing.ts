@@ -23,6 +23,28 @@ export const PRICE_KEYS = [
   "priceAsset_DriftPath",
 ] as const;
 
+export const COST_KEYS = [
+  "costPicDrift_5s",
+  "costPicDrift_10s",
+  "costPicDrift_Plus_5s",
+  "costPicDrift_Plus_10s",
+  "costPicFX_Standard",
+  "costPicFX_Carousel",
+  "costPicFX_Batch",
+  "costEditor_Pro",
+  "costEditor_Enhance",
+  "costEditor_Convert",
+  "costVideoFX1_10s",
+  "costVideoFX1_15s",
+  "costVideoFX2_4s",
+  "costVideoFX2_8s",
+  "costVideoFX2_12s",
+  "costVideoFX3_4s",
+  "costVideoFX3_6s",
+  "costVideoFX3_8s",
+  "costAsset_DriftPath",
+] as const;
+
 export const DEFAULT_FAL_PRICING: Record<
   (typeof PRICE_KEYS)[number],
   number
@@ -47,6 +69,31 @@ export const DEFAULT_FAL_PRICING: Record<
   priceVideoFX3_6s: 5,
   priceVideoFX3_8s: 6,
   priceAsset_DriftPath: 2,
+};
+
+export const DEFAULT_PROVIDER_COSTS: Record<
+  (typeof COST_KEYS)[number],
+  number
+> = {
+  costPicDrift_5s: 0.35,
+  costPicDrift_10s: 0.7,
+  costPicDrift_Plus_5s: 0.56,
+  costPicDrift_Plus_10s: 1.12,
+  costPicFX_Standard: 0.08,
+  costPicFX_Carousel: 0.2,
+  costPicFX_Batch: 0.08,
+  costEditor_Pro: 0.1,
+  costEditor_Enhance: 0.12,
+  costEditor_Convert: 0.08,
+  costVideoFX1_10s: 0.2,
+  costVideoFX1_15s: 0.3,
+  costVideoFX2_4s: 1.21,
+  costVideoFX2_8s: 2.42,
+  costVideoFX2_12s: 3.63,
+  costVideoFX3_4s: 1.6,
+  costVideoFX3_6s: 2.4,
+  costVideoFX3_8s: 3.2,
+  costAsset_DriftPath: 0.35,
 };
 
 const normalizeCost = (value: any) => {
