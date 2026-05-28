@@ -347,6 +347,7 @@ function Dashboard() {
   const [showMissingFalKeyModal, setShowMissingFalKeyModal] = useState(false);
   const [showReserveModal, setShowReserveModal] = useState(false);
   const [showByokUpgradeModal, setShowByokUpgradeModal] = useState(false);
+  const [byokUpgradeModalIntent, setByokUpgradeModalIntent] = useState(false);
   const [byokPackageBillingCycle, setByokPackageBillingCycle] = useState<BillingCycle>("monthly");
   const [showByokKeyModal, setShowByokKeyModal] = useState(false);
   const [isByokActivationPolling, setIsByokActivationPolling] = useState(false);
@@ -735,6 +736,16 @@ function Dashboard() {
   }, [byokNeedsFalKey]);
 
   useEffect(() => {
+    if (!showByokUpgradeModal) return;
+    if (byokUpgradeModalIntent || byokCheckoutState.initiated) return;
+    setShowByokUpgradeModal(false);
+  }, [
+    showByokUpgradeModal,
+    byokUpgradeModalIntent,
+    byokCheckoutState.initiated,
+  ]);
+
+  useEffect(() => {
     if (!isByokActivationPolling) return;
     const hintInterval = window.setInterval(() => {
       setByokActivationHintIndex(
@@ -769,6 +780,7 @@ function Dashboard() {
         const activation = statusResponse?.data?.status;
         if (activation === "PROCESSED") {
           await checkAuth();
+          setByokUpgradeModalIntent(false);
           setShowByokUpgradeModal(false);
           setByokCheckoutState({
             initiated: false,
@@ -2468,9 +2480,14 @@ function Dashboard() {
     setShowMissingFalKeyModal(false);
     navigate("/admin?tab=integrations");
   };
+  const openByokUpgradeModal = () => {
+    setByokUpgradeModalIntent(true);
+    setShowByokUpgradeModal(true);
+  };
   const closeByokUpgradeModal = () => {
     byokActivationPollRef.current = false;
     setIsByokActivationPolling(false);
+    setByokUpgradeModalIntent(false);
     setByokCheckoutState({
       initiated: false,
       selectedPlanCode: null,
@@ -3445,7 +3462,7 @@ function Dashboard() {
                                 onClick={() => handleOpenByokCheckout(plan.code)}
                                 className={`w-full rounded-xl border px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] transition ${BYOK_PLAN_BUTTON_CLASSES[plan.code]}`}
                               >
-                                Choose {plan.title}
+                                Buy Now
                               </button>
                               {plan.isCurrentPlan && (
                                 <span className="rounded-lg border border-emerald-300/35 bg-emerald-400/15 px-3 py-1.5 text-center text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-100">
@@ -3829,7 +3846,7 @@ function Dashboard() {
                         <button
                           onClick={() => {
                             setShowUserMenu(false);
-                            setShowByokUpgradeModal(true);
+                            openByokUpgradeModal();
                           }}
                           className="w-full rounded-lg border border-orange-300/40 bg-gradient-to-r from-orange-500/25 via-rose-500/25 to-fuchsia-500/25 px-4 py-2 text-left text-sm font-black text-orange-100 shadow-[0_8px_20px_rgba(249,115,22,0.22)] transition-all hover:from-orange-500/35 hover:via-rose-500/35 hover:to-fuchsia-500/35"
                         >
@@ -3996,7 +4013,7 @@ function Dashboard() {
                       type="button"
                       onClick={() => {
                         setShowUserMenu(false);
-                        setShowByokUpgradeModal(true);
+                        openByokUpgradeModal();
                       }}
                       className="rounded-xl border border-orange-300/40 bg-gradient-to-r from-orange-500/25 via-rose-500/25 to-fuchsia-500/25 px-3 py-2 text-left text-xs font-black text-orange-100 shadow-[0_8px_18px_rgba(249,115,22,0.22)] hover:from-orange-500/35 hover:via-rose-500/35 hover:to-fuchsia-500/35"
                     >

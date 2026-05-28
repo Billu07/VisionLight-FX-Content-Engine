@@ -695,7 +695,7 @@ export const ByokLanding = () => {
                           rel="noreferrer"
                           className={`block w-full rounded-xl border px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.12em] transition ${BYOK_PLAN_BUTTON_CLASSES[plan.code] || "border-blue-300/60 bg-blue-500 text-white hover:bg-blue-400"}`}
                         >
-                          Choose {plan.title}
+                          Buy Now
                         </a>
                       </div>
                     </article>
