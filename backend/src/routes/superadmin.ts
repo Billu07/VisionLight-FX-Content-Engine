@@ -16,6 +16,12 @@ const toNonNegativeInt = (value: any) => {
   return Math.max(0, Math.round(n));
 };
 
+const toNonNegativePrice = (value: any) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.round(n * 10000) / 10000);
+};
+
 const toPositiveInt = (value: any) => {
   const n = toNonNegativeInt(value);
   if (n === null || n < 1) return null;
@@ -64,7 +70,7 @@ const sanitizePricingUpdate = (payload: any) => {
   const updates: Record<string, number | boolean | string> = {};
   for (const key of PRICE_KEYS) {
     if (payload?.[key] === undefined) continue;
-    const parsed = toNonNegativeInt(payload[key]);
+    const parsed = toNonNegativePrice(payload[key]);
     if (parsed === null) {
       throw new Error(`INVALID_PRICING_VALUE:${key}`);
     }

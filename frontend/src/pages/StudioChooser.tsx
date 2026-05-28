@@ -131,11 +131,30 @@ export default function StudioChooser() {
                     {isPicdrift ? "PicDrift" : "VisualFX"}
                   </span>
                 </div>
-                <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                  <span className="rounded-lg border border-white/10 bg-black/30 px-3 py-2">
+                <div className="flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 ${
+                      profile.role === "SUPERADMIN"
+                        ? "bg-violet-400/18 text-violet-100"
+                        : profile.role === "ADMIN"
+                          ? "bg-cyan-400/15 text-cyan-100"
+                          : "bg-white/8 text-gray-300"
+                    }`}
+                  >
                     {profile.role || "USER"}
                   </span>
-                  <span className="rounded-lg border border-white/10 bg-black/30 px-3 py-2">
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 ${
+                      profile.isOrgActive === false
+                        ? "bg-rose-400/16 text-rose-100"
+                        : "bg-emerald-400/20 text-emerald-100"
+                    }`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        profile.isOrgActive === false ? "bg-rose-300" : "bg-emerald-300"
+                      }`}
+                    />
                     {profile.isOrgActive === false ? "Inactive" : "Active"}
                   </span>
                 </div>

@@ -31,31 +31,31 @@ model Organization {
   kieApiKey    String?
 
   // Pricing Settings (Tenant specific)
-  pricePicDrift_5s       Float @default(1)
-  pricePicDrift_10s      Float @default(2)
-  pricePicDrift_Plus_5s  Float @default(2)
-  pricePicDrift_Plus_10s Float @default(3)
+  pricePicDrift_5s       Float @default(0.35)
+  pricePicDrift_10s      Float @default(0.7)
+  pricePicDrift_Plus_5s  Float @default(0.56)
+  pricePicDrift_Plus_10s Float @default(1.12)
 
-  pricePicFX_Standard Float @default(1)
-  pricePicFX_Carousel Float @default(3)
-  pricePicFX_Batch    Float @default(1)
+  pricePicFX_Standard Float @default(0.08)
+  pricePicFX_Carousel Float @default(0.2)
+  pricePicFX_Batch    Float @default(0.08)
 
-  priceEditor_Pro     Float @default(4)
-  priceEditor_Enhance Float @default(1)
-  priceEditor_Convert Float @default(1)
+  priceEditor_Pro     Float @default(0.1)
+  priceEditor_Enhance Float @default(0.12)
+  priceEditor_Convert Float @default(0.08)
 
-  priceVideoFX1_10s Float @default(4)
-  priceVideoFX1_15s Float @default(3)
+  priceVideoFX1_10s Float @default(0.2)
+  priceVideoFX1_15s Float @default(0.3)
 
-  priceVideoFX2_4s   Float @default(6)
-  priceVideoFX2_8s   Float @default(4)
-  priceVideoFX2_12s  Float @default(6)
+  priceVideoFX2_4s   Float @default(1.21)
+  priceVideoFX2_8s   Float @default(2.42)
+  priceVideoFX2_12s  Float @default(3.63)
 
-  priceVideoFX3_4s   Float @default(4)
-  priceVideoFX3_6s   Float @default(5)
-  priceVideoFX3_8s   Float @default(6)
+  priceVideoFX3_4s   Float @default(1.6)
+  priceVideoFX3_6s   Float @default(2.4)
+  priceVideoFX3_8s   Float @default(3.2)
 
-  priceAsset_DriftPath Float @default(2)
+  priceAsset_DriftPath Float @default(0.35)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -133,31 +133,31 @@ model Project {
 model GlobalSettings {
   id String @id @default("singleton")
 
-  pricePicDrift_5s       Float @default(1)
-  pricePicDrift_10s      Float @default(2)
-  pricePicDrift_Plus_5s  Float @default(2)
-  pricePicDrift_Plus_10s Float @default(3)
+  pricePicDrift_5s       Float @default(0.35)
+  pricePicDrift_10s      Float @default(0.7)
+  pricePicDrift_Plus_5s  Float @default(0.56)
+  pricePicDrift_Plus_10s Float @default(1.12)
 
-  pricePicFX_Standard Float @default(1)
-  pricePicFX_Carousel Float @default(3)
-  pricePicFX_Batch    Float @default(1)
+  pricePicFX_Standard Float @default(0.08)
+  pricePicFX_Carousel Float @default(0.2)
+  pricePicFX_Batch    Float @default(0.08)
 
-  priceEditor_Pro     Float @default(4)
-  priceEditor_Enhance Float @default(1)
-  priceEditor_Convert Float @default(1)
+  priceEditor_Pro     Float @default(0.1)
+  priceEditor_Enhance Float @default(0.12)
+  priceEditor_Convert Float @default(0.08)
 
-  priceVideoFX1_10s Float @default(4)
-  priceVideoFX1_15s Float @default(3)
+  priceVideoFX1_10s Float @default(0.2)
+  priceVideoFX1_15s Float @default(0.3)
 
-  priceVideoFX2_4s  Float @default(6)
-  priceVideoFX2_8s  Float @default(4)
-  priceVideoFX2_12s Float @default(6)
+  priceVideoFX2_4s  Float @default(1.21)
+  priceVideoFX2_8s  Float @default(2.42)
+  priceVideoFX2_12s Float @default(3.63)
 
-  priceVideoFX3_4s Float @default(4)
-  priceVideoFX3_6s Float @default(5)
-  priceVideoFX3_8s Float @default(6)
+  priceVideoFX3_4s Float @default(1.6)
+  priceVideoFX3_6s Float @default(2.4)
+  priceVideoFX3_8s Float @default(3.2)
 
-  priceAsset_DriftPath Float @default(2)
+  priceAsset_DriftPath Float @default(0.35)
   featureVideoEditorForAll Boolean @default(false)
   welcomeVideoUrl String?
 

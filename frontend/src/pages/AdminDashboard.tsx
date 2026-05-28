@@ -208,19 +208,19 @@ export default function AdminDashboard() {
   const [variantCostUsd, setVariantCostUsd] = useState<
     Record<CoverageVariantId, number>
   >({
-    picdrift_5s: 0.1,
-    picdrift_10s: 0.2,
-    picdrift_plus_5s: 0.2,
-    picdrift_plus_10s: 0.3,
-    asset_drift_path: 0.08,
-    topaz_upscale_2x: 0.45,
-    topaz_upscale_4x: 0.7,
-    seedance_fal_4s: 0.2,
-    seedance_fal_8s: 0.35,
-    seedance_fal_12s: 0.5,
-    veo3_4s: 0.25,
-    veo3_6s: 0.38,
-    veo3_8s: 0.5,
+    picdrift_5s: 0.35,
+    picdrift_10s: 0.7,
+    picdrift_plus_5s: 0.56,
+    picdrift_plus_10s: 1.12,
+    asset_drift_path: 0.35,
+    topaz_upscale_2x: 0.2,
+    topaz_upscale_4x: 0.3,
+    seedance_fal_4s: 1.21,
+    seedance_fal_8s: 2.42,
+    seedance_fal_12s: 3.63,
+    veo3_4s: 1.6,
+    veo3_6s: 2.4,
+    veo3_8s: 3.2,
   });
 
   useEffect(() => {
@@ -776,8 +776,6 @@ export default function AdminDashboard() {
                   items: [
                     { label: "Standard 5s", key: "pricePicDrift_5s" },
                     { label: "Standard 10s", key: "pricePicDrift_10s" },
-                    { label: "Kling 3.0 5s", key: "pricePicDrift_Plus_5s" },
-                    { label: "Kling 3.0 10s", key: "pricePicDrift_Plus_10s" },
                     { label: "3DX Drift Path", key: "priceAsset_DriftPath" },
                   ],
                 },
@@ -787,6 +785,13 @@ export default function AdminDashboard() {
                     { label: "Standard Image", key: "pricePicFX_Standard" },
                     { label: "Carousel Batch", key: "pricePicFX_Carousel" },
                     { label: "Mass Processing", key: "pricePicFX_Batch" },
+                  ],
+                },
+                {
+                  title: "Video Engine - Kling 3.0",
+                  items: [
+                    { label: "Kling 3.0 5s", key: "pricePicDrift_Plus_5s" },
+                    { label: "Kling 3.0 10s", key: "pricePicDrift_Plus_10s" },
                   ],
                 },
                 {
@@ -837,16 +842,16 @@ export default function AdminDashboard() {
                           {item.label}
                         </span>
                         <input
-                          step="1"
+                          step="0.01"
                           min="0"
                           type="number"
                           className="w-24 bg-gray-950 border border-gray-700 rounded-md p-2 text-center text-xs font-semibold text-white outline-none focus:border-brand-accent transition-colors"
                           defaultValue={(settings as any)[item.key]}
                           onBlur={(e) => {
-                            const val = Math.round(Number(e.target.value));
+                            const val = Number(e.target.value);
                             if (!isNaN(val)) {
                               handleUpdateGlobalSettings({
-                                [item.key]: val,
+                                [item.key]: Math.max(0, Number(val.toFixed(4))),
                               });
                             }
                           }}
@@ -886,7 +891,7 @@ export default function AdminDashboard() {
                           {row.provider}
                         </td>
                         <td className="py-3 text-sm text-right text-gray-200">
-                          {row.deductionCredits.toFixed(0)}
+                          {row.deductionCredits.toFixed(2)}
                         </td>
                         <td className="py-3 text-right">
                           <input
@@ -1127,8 +1132,8 @@ export default function AdminDashboard() {
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                       {[
                         { id: "creditsPicDrift", label: "PD Standard" },
-                        { id: "creditsPicDriftPlus", label: "Kling 3.0" },
                         { id: "creditsImageFX", label: "Pic FX" },
+                        { id: "creditsPicDriftPlus", label: "Video - Kling 3.0" },
                         { id: "creditsVideoFX1", label: "Topaz Upscale" },
                         { id: "creditsVideoFX2", label: "Seedance 2.0" },
                         { id: "creditsVideoFX3", label: "Veo 3.1" },
@@ -1174,12 +1179,18 @@ export default function AdminDashboard() {
                           value={targetCreditPool}
                           onChange={(e) => setTargetCreditPool(e.target.value)}
                         >
-                          <option value="creditsPicDrift">PicDrift Standard</option>
-                          <option value="creditsPicDriftPlus">Kling 3.0</option>
-                          <option value="creditsImageFX">PicFX</option>
-                          <option value="creditsVideoFX1">Topaz Upscale</option>
-                          <option value="creditsVideoFX2">Seedance 2.0</option>
-                          <option value="creditsVideoFX3">Veo 3.1</option>
+                          <optgroup label="PicDrift">
+                            <option value="creditsPicDrift">PicDrift Standard</option>
+                          </optgroup>
+                          <optgroup label="Pic FX">
+                            <option value="creditsImageFX">PicFX</option>
+                          </optgroup>
+                          <optgroup label="Video Engines">
+                            <option value="creditsPicDriftPlus">Kling 3.0</option>
+                            <option value="creditsVideoFX1">Topaz Upscale</option>
+                            <option value="creditsVideoFX2">Seedance 2.0</option>
+                            <option value="creditsVideoFX3">Veo 3.1</option>
+                          </optgroup>
                         </select>
                       </div>
                       <div>

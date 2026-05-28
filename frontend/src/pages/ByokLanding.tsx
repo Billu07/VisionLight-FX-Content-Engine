@@ -228,6 +228,12 @@ export const ByokLanding = () => {
     });
   };
 
+  const scrollToFeatureSection = () => {
+    const section = document.getElementById("byok-dashboard-features");
+    if (!section) return;
+    section.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   useEffect(() => {
     const run = async () => {
       if (shouldStayOnLanding) return;
@@ -364,6 +370,16 @@ export const ByokLanding = () => {
           <p className="mt-2 text-sm text-cyan-200/85">
             14-day trial with full dashboard access.
           </p>
+          <button
+            type="button"
+            onClick={scrollToFeatureSection}
+            className="mt-6 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200/80 transition hover:text-cyan-100"
+          >
+            Scroll For Dashboard Preview
+            <span className="inline-flex h-5 w-5 animate-bounce items-center justify-center rounded-full border border-cyan-300/35 bg-cyan-300/10 text-cyan-100">
+              ↓
+            </span>
+          </button>
         </section>
 
         <section className="mt-12 w-full max-w-xl rounded-[2rem] border border-white/10 bg-[#0a0f2a]/75 p-7 shadow-[0_30px_80px_rgba(6,8,28,0.65)] backdrop-blur-xl lg:mt-0">
@@ -389,7 +405,10 @@ export const ByokLanding = () => {
         </section>
       </main>
 
-      <section className="relative z-10 mx-auto w-full max-w-7xl px-6 pb-12 lg:px-12">
+      <section
+        id="byok-dashboard-features"
+        className="relative z-10 mx-auto w-full max-w-7xl px-6 pb-12 lg:px-12"
+      >
         <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[#081126]/82 p-6 shadow-[0_28px_80px_rgba(2,8,23,0.55)] backdrop-blur-xl sm:p-8">
           <div className="pointer-events-none absolute -left-24 -top-20 h-56 w-56 rounded-full bg-fuchsia-500/20 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-24 -right-20 h-64 w-64 rounded-full bg-cyan-400/18 blur-3xl" />
@@ -513,6 +532,19 @@ export const ByokLanding = () => {
               <p className="mt-1 text-sm text-slate-300">Scale seats, storage, and admin flow when needed.</p>
             </div>
           </div>
+
+          <div className="relative mt-7 flex justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("signup");
+                setShowAuth(true);
+              }}
+              className="rounded-xl border border-cyan-300/45 bg-cyan-400/12 px-7 py-3 text-xs font-bold uppercase tracking-[0.14em] text-cyan-100 transition hover:bg-cyan-400/22"
+            >
+              Start Your BYOK Workspace
+            </button>
+          </div>
         </div>
       </section>
 
@@ -538,8 +570,8 @@ export const ByokLanding = () => {
       </footer>
 
       {showPackageSheet && (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-gray-950/90 p-4 backdrop-blur-md">
-          <div className="flex max-h-[86vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-600/45 bg-[#070f1f] p-4 shadow-[0_26px_70px_rgba(2,8,23,0.72)] sm:p-5">
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-gray-950/90 p-0 backdrop-blur-md sm:p-4">
+          <div className="flex h-full w-full max-w-none flex-col overflow-hidden rounded-none border-0 bg-[#070f1f] p-4 shadow-[0_26px_70px_rgba(2,8,23,0.72)] sm:max-h-[86vh] sm:max-w-5xl sm:rounded-3xl sm:border sm:border-slate-600/45 sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300">

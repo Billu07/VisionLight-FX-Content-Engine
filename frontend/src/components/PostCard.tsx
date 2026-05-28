@@ -143,6 +143,14 @@ export function PostCard({
   }, [post.id, post.mediaUrl, post.mediaType, post.mediaProvider, isVideoPost]);
 
   useEffect(() => {
+    if (!isVideoPost || !shouldLoadVideo || !videoLoading) return;
+    const stallTimer = window.setTimeout(() => {
+      setVideoLoading(false);
+    }, 7000);
+    return () => window.clearTimeout(stallTimer);
+  }, [isVideoPost, shouldLoadVideo, videoLoading, post.id]);
+
+  useEffect(() => {
     if (
       (post.status === "PROCESSING" || post.status === "NEW") &&
       (post.progress || 0) < 10
@@ -458,6 +466,9 @@ export function PostCard({
               poster={post.generatedEndFrame || undefined}
               className={`w-full h-full ${compact ? "object-contain bg-black" : "object-cover"}`}
               onLoadedData={handleVideoLoad}
+              onLoadedMetadata={handleVideoLoad}
+              onCanPlay={handleVideoLoad}
+              onPlaying={handleVideoLoad}
               onError={handleMediaError}
               playsInline
               preload="metadata"

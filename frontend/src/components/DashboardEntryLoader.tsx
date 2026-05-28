@@ -17,6 +17,7 @@ type BrandMeta = {
   haloGradient: string;
   liquidGradient: string;
   logo: string;
+  wordmark?: string;
 };
 
 const BRAND_META: Record<"picdrift" | "visualfx" | "byok", BrandMeta> = {
@@ -58,6 +59,7 @@ const BRAND_META: Record<"picdrift" | "visualfx" | "byok", BrandMeta> = {
     liquidGradient:
       "from-emerald-300 via-cyan-300 to-sky-300",
     logo: dashboardAssets.driftLogo,
+    wordmark: "BYOK",
   },
 };
 
@@ -72,6 +74,7 @@ export const DashboardEntryLoader = ({
 }: DashboardEntryLoaderProps) => {
   const siteBrand = getSiteBrand();
   const brand = BRAND_META[siteBrand];
+  const usesWordmark = typeof brand.wordmark === "string" && brand.wordmark.trim().length > 0;
   const onceDuration = clamp(durationMs, 1800, 4200);
 
   const cardAnimation =
@@ -170,20 +173,36 @@ export const DashboardEntryLoader = ({
             <div className="absolute inset-0 rounded-[1.65rem] border border-white/12 bg-[#061233]/84" />
 
             <div className="absolute inset-0 overflow-hidden rounded-[1.65rem] p-5">
-              <img
-                src={brand.logo}
-                alt={brand.title}
-                className="h-full w-full object-contain opacity-22 grayscale"
-              />
+              {usesWordmark ? (
+                <div className="flex h-full w-full items-center justify-center">
+                  <span className="text-5xl font-black uppercase tracking-[0.3em] text-white/20 sm:text-6xl">
+                    {brand.wordmark}
+                  </span>
+                </div>
+              ) : (
+                <img
+                  src={brand.logo}
+                  alt={brand.title}
+                  className="h-full w-full object-contain opacity-22 grayscale"
+                />
+              )}
             </div>
 
             <div className="absolute inset-0 overflow-hidden rounded-[1.65rem] p-5">
               <div className="relative h-full w-full" style={{ animation: fillAnimation }}>
-                <img
-                  src={brand.logo}
-                  alt={`${brand.title} loaded`}
-                  className="h-full w-full object-contain brightness-125 saturate-150"
-                />
+                {usesWordmark ? (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <span className="bg-gradient-to-r from-emerald-200 via-cyan-100 to-sky-100 bg-clip-text text-5xl font-black uppercase tracking-[0.3em] text-transparent drop-shadow-[0_0_16px_rgba(125,211,252,0.45)] sm:text-6xl">
+                      {brand.wordmark}
+                    </span>
+                  </div>
+                ) : (
+                  <img
+                    src={brand.logo}
+                    alt={`${brand.title} loaded`}
+                    className="h-full w-full object-contain brightness-125 saturate-150"
+                  />
+                )}
 
                 <div className="pointer-events-none absolute left-0 right-0 top-0 h-7 overflow-hidden">
                   <div

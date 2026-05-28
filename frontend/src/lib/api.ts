@@ -397,7 +397,11 @@ api.interceptors.request.use((config) => {
 export const getCORSProxyVideoUrl = (url: string) => {
   if (!url) return url;
   if (url.includes("/api/proxy-video?url=")) return url;
-  if (!url.includes("r2.dev") || url.includes(".m3u8") || url.includes(".ts")) {
+  const shouldProxy =
+    (url.includes("r2.dev") || url.includes("cloudinary.com")) &&
+    !url.includes(".m3u8") &&
+    !url.includes(".ts");
+  if (!shouldProxy) {
     return url;
   }
   return `${API_BASE_URL}/api/proxy-video?url=${encodeURIComponent(url)}`;

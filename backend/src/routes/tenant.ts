@@ -15,11 +15,17 @@ const toNonNegativeInt = (value: any) => {
   return Math.max(0, Math.round(n));
 };
 
+const toNonNegativePrice = (value: any) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.round(n * 10000) / 10000);
+};
+
 const sanitizePricingUpdate = (pricing: any) => {
   const updates: Record<string, number> = {};
   for (const key of PRICE_KEYS) {
     if (pricing?.[key] === undefined) continue;
-    const parsed = toNonNegativeInt(pricing[key]);
+    const parsed = toNonNegativePrice(pricing[key]);
     if (parsed === null) {
       throw new Error(`INVALID_PRICING_VALUE:${key}`);
     }

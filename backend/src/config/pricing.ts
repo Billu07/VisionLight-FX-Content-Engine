@@ -23,10 +23,35 @@ export const PRICE_KEYS = [
   "priceAsset_DriftPath",
 ] as const;
 
+export const DEFAULT_FAL_PRICING: Record<
+  (typeof PRICE_KEYS)[number],
+  number
+> = {
+  pricePicDrift_5s: 0.35,
+  pricePicDrift_10s: 0.7,
+  pricePicDrift_Plus_5s: 0.56,
+  pricePicDrift_Plus_10s: 1.12,
+  pricePicFX_Standard: 0.08,
+  pricePicFX_Carousel: 0.2,
+  pricePicFX_Batch: 0.08,
+  priceEditor_Pro: 0.1,
+  priceEditor_Enhance: 0.12,
+  priceEditor_Convert: 0.08,
+  priceVideoFX1_10s: 0.2,
+  priceVideoFX1_15s: 0.3,
+  priceVideoFX2_4s: 1.21,
+  priceVideoFX2_8s: 2.42,
+  priceVideoFX2_12s: 3.63,
+  priceVideoFX3_4s: 1.6,
+  priceVideoFX3_6s: 2.4,
+  priceVideoFX3_8s: 3.2,
+  priceAsset_DriftPath: 0.35,
+};
+
 const normalizeCost = (value: any) => {
   const n = Number(value);
   if (!Number.isFinite(n)) return 1;
-  return Math.max(0, Math.round(n));
+  return Math.max(0, Math.round(n * 10000) / 10000);
 };
 
 const isDemoPicdriftUser = (user: any) =>

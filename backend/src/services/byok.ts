@@ -5,6 +5,7 @@ import {
   ByokPackageCode,
   getByokPackageConfig,
 } from "../config/byok";
+import { DEFAULT_FAL_PRICING } from "../config/pricing";
 import { encryptionUtils } from "../utils/encryption";
 
 const DAILY_USAGE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -219,6 +220,7 @@ export const byokService = {
         maxStorageMb: trialConfig.maxStorageMb,
         isDefault: false,
         isActive: true,
+        ...DEFAULT_FAL_PRICING,
       } as any,
     });
 

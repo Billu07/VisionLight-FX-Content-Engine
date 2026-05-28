@@ -324,31 +324,36 @@ export default function SuperAdminDashboard() {
   const [variantCostUsd, setVariantCostUsd] = useState<
     Record<CoverageVariantId, number>
   >({
-    picdrift_5s: 0.1,
-    picdrift_10s: 0.2,
-    picdrift_plus_5s: 0.2,
-    picdrift_plus_10s: 0.3,
+    picdrift_5s: 0.35,
+    picdrift_10s: 0.7,
+    picdrift_plus_5s: 0.56,
+    picdrift_plus_10s: 1.12,
     picfx_standard: 0.08,
     picfx_carousel: 0.2,
     picfx_batch: 0.08,
     editor_pro: 0.1,
     editor_enhance: 0.12,
     editor_convert: 0.08,
-    asset_drift_path: 0.08,
-    topaz_upscale_2x: 0.45,
-    topaz_upscale_4x: 0.7,
-    seedance_fal_4s: 0.2,
-    seedance_fal_8s: 0.35,
-    seedance_fal_12s: 0.5,
-    veo3_4s: 0.25,
-    veo3_6s: 0.38,
-    veo3_8s: 0.5,
+    asset_drift_path: 0.35,
+    topaz_upscale_2x: 0.2,
+    topaz_upscale_4x: 0.3,
+    seedance_fal_4s: 1.21,
+    seedance_fal_8s: 2.42,
+    seedance_fal_12s: 3.63,
+    veo3_4s: 1.6,
+    veo3_6s: 2.4,
+    veo3_8s: 3.2,
   });
 
   const toInt = (value: string, fallback = 0) => {
     const n = Number(value);
     if (!Number.isFinite(n)) return fallback;
     return Math.max(0, Math.round(n));
+  };
+  const toPrice = (value: string, fallback = 0) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(0, Number(n.toFixed(4)));
   };
   const MB_PER_GB = 1024;
   const mbToGb = (mb: number) => Math.max(0, Number(mb || 0)) / MB_PER_GB;
@@ -2127,7 +2132,7 @@ export default function SuperAdminDashboard() {
                             {row.provider}
                           </td>
                           <td className="py-3 text-sm text-right text-gray-200">
-                            {row.deductionCredits.toFixed(0)}
+                            {row.deductionCredits.toFixed(2)}
                           </td>
                           <td className="py-3 text-right">
                             <input
@@ -2205,11 +2210,15 @@ export default function SuperAdminDashboard() {
                           </span>
                           <input
                             type="number"
-                            step="1"
+                            step="0.01"
                             min="0"
                             className={`${adminUi.input} w-16 p-1 text-center text-xs`}
                             defaultValue={globalSettings[key]}
-                            onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: toInt(e.target.value, globalSettings[key]) })}
+                            onBlur={(e) =>
+                              apiEndpoints.superadminUpdateGlobalSettings({
+                                [key]: toPrice(e.target.value, globalSettings[key]),
+                              })
+                            }
                           />
                         </div>
                       ))}
@@ -2224,11 +2233,15 @@ export default function SuperAdminDashboard() {
                           <span className="text-[10px] text-gray-400 uppercase font-bold truncate max-w-[120px]" title={key}>{key.replace('price', '').replace(/_/g, ' ')}</span>
                           <input
                             type="number"
-                            step="1"
+                            step="0.01"
                             min="0"
                             className={`${adminUi.input} w-16 p-1 text-center text-xs`}
                             defaultValue={globalSettings[key]}
-                            onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: toInt(e.target.value, globalSettings[key]) })}
+                            onBlur={(e) =>
+                              apiEndpoints.superadminUpdateGlobalSettings({
+                                [key]: toPrice(e.target.value, globalSettings[key]),
+                              })
+                            }
                           />
                         </div>
                       ))}
@@ -2254,11 +2267,15 @@ export default function SuperAdminDashboard() {
                           </span>
                           <input
                             type="number"
-                            step="1"
+                            step="0.01"
                             min="0"
                             className={`${adminUi.input} w-16 p-1 text-center text-xs`}
                             defaultValue={globalSettings[key]}
-                            onBlur={(e) => apiEndpoints.superadminUpdateGlobalSettings({ [key]: toInt(e.target.value, globalSettings[key]) })}
+                            onBlur={(e) =>
+                              apiEndpoints.superadminUpdateGlobalSettings({
+                                [key]: toPrice(e.target.value, globalSettings[key]),
+                              })
+                            }
                           />
                         </div>
                       ))}

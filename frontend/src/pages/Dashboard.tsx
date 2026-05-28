@@ -421,7 +421,12 @@ function Dashboard() {
   }, [showUserMenu]);
 
   // === SEQUENCER STATE ===
-  const [viewMode, setViewMode] = useState<"create" | "sequencer" | "history">("create");
+  const [viewMode, setViewMode] = useState<"create" | "sequencer" | "history">(
+    () =>
+      typeof window !== "undefined" && window.innerWidth < 1024
+        ? "history"
+        : "create",
+  );
   const activeProject =
     localStorage.getItem("visionlight_active_project") || undefined;
   const activeProjectId = activeProject || "default";
@@ -446,7 +451,6 @@ function Dashboard() {
 
   const [previewCarouselIndex, setPreviewCarouselIndex] = useState(0);
   const byokActivationPollRef = useRef(false);
-  const byokTrialPromptShownRef = useRef(false);
 
   // State for Magic Edit Asset
   const [editingAsset, setEditingAsset] = useState<any | null>(null);
@@ -697,7 +701,7 @@ function Dashboard() {
 
   useEffect(() => {
     const handleUpgradeRequired = () => {
-      setShowByokUpgradeModal(true);
+      notify.warning("Upgrade is required for that action. Open Menu and click Upgrade Package.");
     };
     const handleAdminLocked = () => {
       notify.warning("Admin panel is locked for your current package.");
@@ -721,22 +725,6 @@ function Dashboard() {
       );
     };
   }, []);
-
-  useEffect(() => {
-    if (byokStatus?.upgradeRequired) {
-      setShowByokUpgradeModal(true);
-    }
-  }, [byokStatus?.upgradeRequired]);
-
-  useEffect(() => {
-    if (!isByokWorkspace || currentByokPackageCode !== "BYOK_TRIAL") {
-      byokTrialPromptShownRef.current = false;
-      return;
-    }
-    if (showByokKeyModal || byokTrialPromptShownRef.current) return;
-    byokTrialPromptShownRef.current = true;
-    setShowByokUpgradeModal(true);
-  }, [isByokWorkspace, currentByokPackageCode, showByokKeyModal]);
 
   useEffect(() => {
     if (byokNeedsFalKey) {
@@ -939,6 +927,7 @@ function Dashboard() {
   const isCommercial = user?.creditSystem !== "INTERNAL" && !isTenantScopedAccount;
   const canUseExternalCreditLink = user?.role === "SUPERADMIN" && isCommercial;
   const isAdmin = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
+  const hideTopCreditBalances = user?.role === "SUPERADMIN";
 
   // 3. Virtual sum (fixes timeline build errors)
   const userCredits =
@@ -2413,6 +2402,10 @@ function Dashboard() {
   };
   const handleExitReadOnly = async () => {
     const impersonatorId = user?.impersonator?.id;
+    const impersonatorEmail =
+      typeof user?.impersonator?.email === "string"
+        ? user.impersonator.email.trim().toLowerCase()
+        : "";
 
     try {
       if (impersonatorId) {
@@ -2436,6 +2429,24 @@ function Dashboard() {
     clearSupportSessionToken();
     const authState = await checkAuth();
     if (!authState.hasUser) {
+      if (impersonatorEmail) {
+        try {
+          const domainRes = await apiEndpoints.resolveAuthDomain(impersonatorEmail);
+          const canonicalDomainRaw = domainRes.data?.canonicalDomain;
+          const canonicalDomain =
+            typeof canonicalDomainRaw === "string"
+              ? canonicalDomainRaw.trim().toLowerCase()
+              : "";
+          if (canonicalDomain && canonicalDomain !== window.location.hostname.toLowerCase()) {
+            const targetUrl = new URL(`${window.location.protocol}//${canonicalDomain}/admin`);
+            targetUrl.searchParams.set("login_email", impersonatorEmail);
+            window.location.replace(targetUrl.toString());
+            return;
+          }
+        } catch {
+          // Fall through to default auth route.
+        }
+      }
       navigate("/", { replace: true });
       return;
     }
@@ -3279,8 +3290,8 @@ function Dashboard() {
         )}
 
         {showByokUpgradeModal && (
-          <div className="fixed inset-0 z-[220] flex items-center justify-center bg-gray-950/90 p-4 backdrop-blur-md">
-            <div className="flex max-h-[86vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-slate-600/45 bg-[#070f1f] p-4 shadow-[0_26px_70px_rgba(2,8,23,0.72)] sm:p-5">
+          <div className="fixed inset-0 z-[220] flex items-center justify-center bg-gray-950/90 p-0 backdrop-blur-md sm:p-4">
+            <div className="flex h-full w-full max-w-none flex-col overflow-hidden rounded-none border-0 bg-[#070f1f] p-4 shadow-[0_26px_70px_rgba(2,8,23,0.72)] sm:max-h-[86vh] sm:max-w-5xl sm:rounded-3xl sm:border sm:border-slate-600/45 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300">
@@ -3558,7 +3569,7 @@ function Dashboard() {
                     : "border-gray-700/50 bg-gradient-to-r from-gray-900/80 to-gray-800/80 p-3 sm:p-4 lg:px-6 lg:py-3"
                 }`}
               >
-                {isByokWorkspace && isMobile && (
+                {!hideTopCreditBalances && isByokWorkspace && isMobile && (
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-300">
                       Credit Balances
@@ -3572,7 +3583,8 @@ function Dashboard() {
                     </button>
                   </div>
                 )}
-                {(!isByokWorkspace || !isMobile || showMobileCreditDetails) && (
+                {!hideTopCreditBalances &&
+                  (!isByokWorkspace || !isMobile || showMobileCreditDetails) && (
                   <>
                     <div className="grid grid-cols-2 gap-y-4 gap-x-2 sm:flex sm:items-center sm:gap-4 md:gap-5 lg:gap-6">
                   {!creditsLoading ? (
@@ -3683,8 +3695,21 @@ function Dashboard() {
                     </div>
                   )}
                 </div>
-                {storageSummary && (!isByokWorkspace || !isMobile) && (
-                  <div className="mt-4 border-t border-gray-700/60 pt-3">
+                  </>
+                )}
+                {storageSummary &&
+                  (!isByokWorkspace ||
+                    !isMobile ||
+                    showMobileCreditDetails ||
+                    hideTopCreditBalances) && (
+                  <div
+                    className={`${
+                      !hideTopCreditBalances &&
+                      (!isByokWorkspace || !isMobile || showMobileCreditDetails)
+                        ? "mt-4 border-t border-gray-700/60 pt-3"
+                        : "pt-1"
+                    }`}
+                  >
                     <div className="flex items-center justify-between gap-3 text-[10px] font-bold uppercase tracking-widest text-gray-400">
                       <span>Organization Shared Storage</span>
                       <span className="text-cyan-300">
@@ -3707,8 +3732,6 @@ function Dashboard() {
                       Remaining (shared across your tenant): {formatStorageGb(storageRemainingMb)}
                     </div>
                   </div>
-                )}
-                  </>
                 )}
               </div>
 

@@ -105,6 +105,10 @@ export default function Projects() {
   };
   const handleExitReadOnly = async () => {
     const impersonatorId = user?.impersonator?.id;
+    const impersonatorEmail =
+      typeof user?.impersonator?.email === "string"
+        ? user.impersonator.email.trim().toLowerCase()
+        : "";
 
     try {
       if (impersonatorId) {
@@ -128,6 +132,24 @@ export default function Projects() {
     clearSupportSessionToken();
     const authState = await checkAuth();
     if (!authState.hasUser) {
+      if (impersonatorEmail) {
+        try {
+          const domainRes = await apiEndpoints.resolveAuthDomain(impersonatorEmail);
+          const canonicalDomainRaw = domainRes.data?.canonicalDomain;
+          const canonicalDomain =
+            typeof canonicalDomainRaw === "string"
+              ? canonicalDomainRaw.trim().toLowerCase()
+              : "";
+          if (canonicalDomain && canonicalDomain !== window.location.hostname.toLowerCase()) {
+            const targetUrl = new URL(`${window.location.protocol}//${canonicalDomain}/admin`);
+            targetUrl.searchParams.set("login_email", impersonatorEmail);
+            window.location.replace(targetUrl.toString());
+            return;
+          }
+        } catch {
+          // Fall through to default auth route.
+        }
+      }
       navigate("/", { replace: true });
       return;
     }
