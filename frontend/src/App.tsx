@@ -27,6 +27,7 @@ import { LoadingSpinner } from "./components/LoadingSpinner";
 import { installAlertBridge } from "./lib/notifications";
 import { getCanonicalDomainRedirectUrl } from "./lib/domain-routing";
 import { DashboardEntryLoader } from "./components/DashboardEntryLoader";
+import { useAutoAppRefresh } from "./hooks/useAutoAppRefresh";
 
 // --- NEW IMPORTS (Add these) ---
 import { Terms } from "./pages/Terms";
@@ -216,6 +217,8 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 function App() {
+  useAutoAppRefresh();
+
   useEffect(() => {
     const restore = installAlertBridge();
     return restore;
