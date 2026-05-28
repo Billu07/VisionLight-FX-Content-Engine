@@ -7,6 +7,7 @@ import {
   apiEndpoints,
   stopReadOnlyImpersonation,
   clearSupportSessionToken,
+  setSupportSessionToken,
 } from "../lib/api";
 import { confirmAction, notify } from "../lib/notifications";
 
@@ -20,6 +21,7 @@ export default function Projects() {
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [openMenuProjectId, setOpenMenuProjectId] = useState<string | null>(null);
+  const [exitingReadOnly, setExitingReadOnly] = useState(false);
   const isReadOnlyAccess = user?.readOnlyImpersonation === true;
   const adminPanelLocked = user?.byok?.adminPanelLocked === true;
   const canOpenAdmin =
@@ -104,6 +106,8 @@ export default function Projects() {
     logout();
   };
   const handleExitReadOnly = async () => {
+    if (exitingReadOnly) return;
+    setExitingReadOnly(true);
     const impersonatorId = user?.impersonator?.id;
     const impersonatorEmail =
       typeof user?.impersonator?.email === "string"
@@ -111,53 +115,75 @@ export default function Projects() {
         : "";
 
     try {
-      if (impersonatorId) {
-        const handoffRes = await apiEndpoints.startSupportHandoff(impersonatorId);
-        const handoffUrl =
-          typeof handoffRes.data?.handoffUrl === "string"
-            ? handoffRes.data.handoffUrl.trim()
-            : "";
-        if (handoffRes.data?.domainSwitchRequired && handoffUrl) {
-          stopReadOnlyImpersonation();
-          clearSupportSessionToken();
-          window.location.replace(handoffUrl);
-          return;
-        }
-      }
-    } catch {
-      // Fall through to local recovery path below.
-    }
-
-    stopReadOnlyImpersonation();
-    clearSupportSessionToken();
-    const authState = await checkAuth();
-    if (!authState.hasUser) {
-      if (impersonatorEmail) {
-        try {
-          const domainRes = await apiEndpoints.resolveAuthDomain(impersonatorEmail);
-          const canonicalDomainRaw = domainRes.data?.canonicalDomain;
-          const canonicalDomain =
-            typeof canonicalDomainRaw === "string"
-              ? canonicalDomainRaw.trim().toLowerCase()
+      try {
+        if (impersonatorId) {
+          const handoffRes = await apiEndpoints.startWorkspaceHandoff(
+            impersonatorId,
+            "/admin",
+          );
+          const handoffUrl =
+            typeof handoffRes.data?.handoffUrl === "string"
+              ? handoffRes.data.handoffUrl.trim()
               : "";
-          if (canonicalDomain && canonicalDomain !== window.location.hostname.toLowerCase()) {
-            const targetUrl = new URL(`${window.location.protocol}//${canonicalDomain}/admin`);
-            targetUrl.searchParams.set("login_email", impersonatorEmail);
-            window.location.replace(targetUrl.toString());
+          const sessionToken =
+            typeof handoffRes.data?.sessionToken === "string"
+              ? handoffRes.data.sessionToken.trim()
+              : "";
+          const sessionLabel =
+            handoffRes.data?.target?.email ||
+            handoffRes.data?.target?.name ||
+            "Workspace Session";
+          if (handoffRes.data?.domainSwitchRequired && handoffUrl) {
+            stopReadOnlyImpersonation();
+            clearSupportSessionToken();
+            window.location.replace(handoffUrl);
             return;
           }
-        } catch {
-          // Fall through to default auth route.
+          if (sessionToken) {
+            stopReadOnlyImpersonation();
+            setSupportSessionToken(sessionToken, sessionLabel);
+            await checkAuth();
+            navigate("/admin", { replace: true });
+            return;
+          }
         }
+      } catch {
+        // Fall through to local recovery path below.
       }
-      navigate("/", { replace: true });
-      return;
-    }
 
-    const restoredUser = useAuth.getState().user;
-    const isAdminProfile =
-      restoredUser?.role === "ADMIN" || restoredUser?.role === "SUPERADMIN";
-    navigate(isAdminProfile ? "/admin" : "/projects", { replace: true });
+      stopReadOnlyImpersonation();
+      clearSupportSessionToken();
+      const authState = await checkAuth();
+      if (!authState.hasUser) {
+        if (impersonatorEmail) {
+          try {
+            const domainRes = await apiEndpoints.resolveAuthDomain(impersonatorEmail);
+            const canonicalDomainRaw = domainRes.data?.canonicalDomain;
+            const canonicalDomain =
+              typeof canonicalDomainRaw === "string"
+                ? canonicalDomainRaw.trim().toLowerCase()
+                : "";
+            if (canonicalDomain && canonicalDomain !== window.location.hostname.toLowerCase()) {
+              const targetUrl = new URL(`${window.location.protocol}//${canonicalDomain}/admin`);
+              targetUrl.searchParams.set("login_email", impersonatorEmail);
+              window.location.replace(targetUrl.toString());
+              return;
+            }
+          } catch {
+            // Fall through to default auth route.
+          }
+        }
+        navigate("/", { replace: true });
+        return;
+      }
+
+      const restoredUser = useAuth.getState().user;
+      const isAdminProfile =
+        restoredUser?.role === "ADMIN" || restoredUser?.role === "SUPERADMIN";
+      navigate(isAdminProfile ? "/admin" : "/projects", { replace: true });
+    } finally {
+      setExitingReadOnly(false);
+    }
   };
 
   const projectLimit = Number(user?.maxProjects || 0);
@@ -233,9 +259,15 @@ export default function Projects() {
                 onClick={() => {
                   void handleExitReadOnly();
                 }}
-                className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/20"
+                disabled={exitingReadOnly}
+                className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/20 disabled:cursor-wait disabled:opacity-70"
               >
-                Exit Read-only
+                <span className="inline-flex items-center gap-2">
+                  {exitingReadOnly && (
+                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  )}
+                  {exitingReadOnly ? "Exiting..." : "Exit Read-only"}
+                </span>
               </button>
             )}
             <button

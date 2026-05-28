@@ -117,6 +117,7 @@ export default function TenantDashboard() {
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [enteringDashboardUserId, setEnteringDashboardUserId] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
 
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -377,6 +378,8 @@ export default function TenantDashboard() {
   };
 
   const handleEnterReadOnlyDashboard = async (target: User) => {
+    if (!target?.id || enteringDashboardUserId) return;
+    setEnteringDashboardUserId(target.id);
     try {
       startReadOnlyImpersonation(target.id, target.email);
       const res = await apiEndpoints.getProjects();
@@ -389,6 +392,10 @@ export default function TenantDashboard() {
       navigate("/projects");
     } catch (err: any) {
       setMsg("Error: " + (err?.message || "Failed to enter dashboard."));
+    } finally {
+      setEnteringDashboardUserId((current) =>
+        current === target.id ? null : current,
+      );
     }
   };
 
@@ -716,9 +723,17 @@ export default function TenantDashboard() {
                           {canEnterDashboard(u.id) ? (
                             <button
                               onClick={() => handleEnterReadOnlyDashboard(u)}
-                              className={adminUi.amberButton}
+                              disabled={!!enteringDashboardUserId}
+                              className={`${adminUi.amberButton} disabled:cursor-wait disabled:opacity-70`}
                             >
-                              Enter Dashboard
+                              <span className="inline-flex items-center gap-2">
+                                {enteringDashboardUserId === u.id && (
+                                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                )}
+                                {enteringDashboardUserId === u.id
+                                  ? "Opening..."
+                                  : "Enter Dashboard"}
+                              </span>
                             </button>
                           ) : (
                             <span className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500">

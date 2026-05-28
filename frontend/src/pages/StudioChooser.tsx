@@ -159,7 +159,12 @@ export default function StudioChooser() {
                   </span>
                 </div>
                 <div className="mt-6 text-xs font-bold uppercase tracking-widest text-cyan-200 opacity-80 transition-opacity group-hover:opacity-100">
-                  {selectingId === profile.id ? "Opening..." : "Enter Dashboard"}
+                  <span className="inline-flex items-center gap-2">
+                    {selectingId === profile.id && (
+                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    )}
+                    {selectingId === profile.id ? "Opening..." : "Enter Dashboard"}
+                  </span>
                 </div>
               </button>
             );

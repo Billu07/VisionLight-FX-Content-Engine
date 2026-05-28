@@ -162,13 +162,38 @@ router.post(
       }
       const targetUserId = rawTargetUserId.trim();
 
-      if (req.user?.readOnlyImpersonation) {
-        return res.status(403).json({
-          error: "Read-only sessions cannot initiate workspace handoff.",
-        });
+      const isReadOnlySupportSession = req.user?.readOnlyImpersonation === true;
+      const readOnlyImpersonatorId =
+        typeof req.user?.impersonator?.id === "string"
+          ? req.user.impersonator.id.trim()
+          : "";
+      const readOnlyImpersonatorRole =
+        typeof req.user?.impersonator?.role === "string"
+          ? req.user.impersonator.role.trim()
+          : "";
+
+      if (isReadOnlySupportSession) {
+        if (
+          readOnlyImpersonatorRole !== "SUPERADMIN" ||
+          !readOnlyImpersonatorId
+        ) {
+          return res.status(403).json({
+            error: "Read-only session cannot restore workspace identity.",
+          });
+        }
+        if (targetUserId !== readOnlyImpersonatorId) {
+          return res.status(403).json({
+            error:
+              "Read-only session can only return to the original superadmin workspace.",
+          });
+        }
       }
 
-      const requester = await airtableService.findUserById(req.user!.id);
+      const requesterId =
+        isReadOnlySupportSession && readOnlyImpersonatorId
+          ? readOnlyImpersonatorId
+          : req.user!.id;
+      const requester = await airtableService.findUserById(requesterId);
       if (!requester) {
         return res.status(401).json({ error: "Requester not found" });
       }
@@ -178,23 +203,52 @@ router.post(
         return res.status(404).json({ error: "Target profile not found" });
       }
 
-      const identityProfiles = await airtableService.findUsersForAuthIdentity(
-        requester.authUserId || "",
-        requester.email,
-      );
-      const targetInIdentity = identityProfiles.some(
-        (profile: any) => profile.id === targetUserId,
-      );
-      if (!targetInIdentity || !isSameAuthIdentity(requester, target)) {
-        return res.status(403).json({
-          error: "Target profile is outside your auth identity.",
-        });
+      if (!isReadOnlySupportSession) {
+        const identityProfiles = await airtableService.findUsersForAuthIdentity(
+          requester.authUserId || "",
+          requester.email,
+        );
+        const targetInIdentity = identityProfiles.some(
+          (profile: any) => profile.id === targetUserId,
+        );
+        if (!targetInIdentity || !isSameAuthIdentity(requester, target)) {
+          return res.status(403).json({
+            error: "Target profile is outside your auth identity.",
+          });
+        }
       }
+
+      const rawNextPath = req.body?.nextPath;
+      const nextPath =
+        typeof rawNextPath === "string" &&
+        /^\/[A-Za-z0-9/_-]*$/.test(rawNextPath) &&
+        !rawNextPath.startsWith("//")
+          ? rawNextPath
+          : "/projects";
 
       const canonicalDomain = getCanonicalDomainForUser(target);
       const incomingHost = resolveIncomingHost(req);
       const currentHostMatches = incomingHost === canonicalDomain;
       if (currentHostMatches) {
+        if (isReadOnlySupportSession) {
+          const sessionToken = supportHandoffService.issueWorkspaceSessionToken({
+            issuerUserId: requester.id,
+            targetUserId: target.id,
+            audienceDomain: canonicalDomain,
+          });
+          return res.json({
+            success: true,
+            domainSwitchRequired: false,
+            canonicalDomain,
+            sessionToken,
+            target: {
+              id: target.id,
+              email: target.email,
+              name: target.name,
+            },
+            nextPath,
+          });
+        }
         return res.json({
           success: true,
           domainSwitchRequired: false,
@@ -209,13 +263,14 @@ router.post(
         sourceDomain: incomingHost,
       });
       const protocol = getRequestProtocol(req);
-      const handoffUrl = `${protocol}://${canonicalDomain}/auth/handoff#token=${encodeURIComponent(token)}`;
+      const handoffUrl = `${protocol}://${canonicalDomain}/auth/handoff#token=${encodeURIComponent(token)}&next=${encodeURIComponent(nextPath)}`;
 
       return res.json({
         success: true,
         domainSwitchRequired: true,
         canonicalDomain,
         handoffUrl,
+        nextPath,
       });
     } catch (error: any) {
       return res.status(500).json({ error: error.message });

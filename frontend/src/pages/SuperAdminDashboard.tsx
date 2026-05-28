@@ -295,6 +295,7 @@ export default function SuperAdminDashboard() {
   const [presets, setPresets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [enteringDashboardUserId, setEnteringDashboardUserId] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
 
   // Modals
@@ -901,6 +902,8 @@ export default function SuperAdminDashboard() {
   }
 
   const handleEnterReadOnlyDashboard = async (target: User) => {
+    if (!target?.id || enteringDashboardUserId) return;
+    setEnteringDashboardUserId(target.id);
     try {
       const handoffRes = await apiEndpoints.startSupportHandoff(target.id);
       if (handoffRes.data?.domainSwitchRequired && handoffRes.data?.handoffUrl) {
@@ -919,6 +922,10 @@ export default function SuperAdminDashboard() {
       navigate("/projects");
     } catch (err: any) {
       alert(err?.message || "Failed to enter dashboard.");
+    } finally {
+      setEnteringDashboardUserId((current) =>
+        current === target.id ? null : current,
+      );
     }
   };
 
@@ -1288,6 +1295,9 @@ export default function SuperAdminDashboard() {
                         adminCandidates.find((u) => u.role === "ADMIN")
                       : adminCandidates.find((u) => u.role === "ADMIN") ||
                         adminCandidates.find((u) => u.role === "SUPERADMIN");
+                    const isEnteringOrganizationAdminDashboard =
+                      !!organizationAdmin &&
+                      enteringDashboardUserId === organizationAdmin.id;
                     return (
                       <tr key={t.id} className={adminUi.tableRow}>
                         <td className="p-6">
@@ -1357,14 +1367,21 @@ export default function SuperAdminDashboard() {
                           <div className="flex gap-2 justify-end">
                             {canEnterDashboard(organizationAdmin?.id) ? (
                               <button
-                                className={adminUi.amberButton}
+                                className={`${adminUi.amberButton} disabled:cursor-wait disabled:opacity-70`}
                                 onClick={() =>
                                   organizationAdmin &&
                                   handleEnterReadOnlyDashboard(organizationAdmin)
                                 }
-                                disabled={!organizationAdmin}
+                                disabled={!organizationAdmin || !!enteringDashboardUserId}
                               >
-                                Enter Dashboard
+                                <span className="inline-flex items-center gap-2">
+                                  {isEnteringOrganizationAdminDashboard && (
+                                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                  )}
+                                  {isEnteringOrganizationAdminDashboard
+                                    ? "Opening..."
+                                    : "Enter Dashboard"}
+                                </span>
                               </button>
                             ) : (
                               <span className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500">
@@ -1433,9 +1450,17 @@ export default function SuperAdminDashboard() {
                               {canEnterDashboard(u.id) ? (
                                 <button
                                   onClick={() => handleEnterReadOnlyDashboard(u)}
-                                  className={adminUi.amberButton}
+                                  disabled={!!enteringDashboardUserId}
+                                  className={`${adminUi.amberButton} disabled:cursor-wait disabled:opacity-70`}
                                 >
-                                  Enter Dashboard
+                                  <span className="inline-flex items-center gap-2">
+                                    {enteringDashboardUserId === u.id && (
+                                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                    )}
+                                    {enteringDashboardUserId === u.id
+                                      ? "Opening..."
+                                      : "Enter Dashboard"}
+                                  </span>
                                 </button>
                               ) : (
                                 <span className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500">
@@ -1794,9 +1819,17 @@ export default function SuperAdminDashboard() {
                           {canEnterDashboard(u.id) ? (
                             <button
                               onClick={() => handleEnterReadOnlyDashboard(u)}
-                              className={adminUi.amberButton}
+                              disabled={!!enteringDashboardUserId}
+                              className={`${adminUi.amberButton} disabled:cursor-wait disabled:opacity-70`}
                             >
-                              Enter Dashboard
+                              <span className="inline-flex items-center gap-2">
+                                {enteringDashboardUserId === u.id && (
+                                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                )}
+                                {enteringDashboardUserId === u.id
+                                  ? "Opening..."
+                                  : "Enter Dashboard"}
+                              </span>
                             </button>
                           ) : (
                             <span className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500">
@@ -1862,7 +1895,18 @@ export default function SuperAdminDashboard() {
                         {u.view}
                       </span>
                       {canEnterDashboard(u.id) ? (
-                        <button onClick={() => handleEnterReadOnlyDashboard(u)} className="text-[8px] text-amber-300 hover:text-amber-100 uppercase font-bold tracking-tighter">Enter Dashboard</button>
+                        <button
+                          onClick={() => handleEnterReadOnlyDashboard(u)}
+                          disabled={!!enteringDashboardUserId}
+                          className="inline-flex items-center gap-1 text-[8px] text-amber-300 hover:text-amber-100 uppercase font-bold tracking-tighter disabled:cursor-wait disabled:opacity-70"
+                        >
+                          {enteringDashboardUserId === u.id && (
+                            <span className="h-2.5 w-2.5 animate-spin rounded-full border border-current border-t-transparent" />
+                          )}
+                          {enteringDashboardUserId === u.id
+                            ? "Opening..."
+                            : "Enter Dashboard"}
+                        </button>
                       ) : (
                         <span className="text-[8px] text-gray-500 uppercase font-bold tracking-tighter">Own Profile</span>
                       )}
