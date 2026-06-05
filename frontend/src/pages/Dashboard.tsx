@@ -976,7 +976,9 @@ function Dashboard() {
   // credit limits (item 8), which brings their credit panel back.
   const adminCreditLimitsEnabled = user?.adminCreditLimitsEnabled === true;
   const showCreditUi = !isAdmin || adminCreditLimitsEnabled;
-  const hideTopCreditBalances = user?.role === "SUPERADMIN";
+  // Admins/superadmins are unlimited by default, so hide the credit balance
+  // panel for them; it returns only when they enable their own credit limits.
+  const hideTopCreditBalances = !showCreditUi;
   // Manually-created (non-BYOK) tenants: instead of a hard "Platform Inactive"
   // lock, let the tenant admin enter the dashboard and add their own Fal key via
   // the same BYOK key panel. Generation stays gated until the key is saved.
@@ -3869,6 +3871,16 @@ function Dashboard() {
                       Add Fal Key
                     </button>
                   )}
+                  {isAdmin && !showCreditUi && (
+                    <a
+                      href="https://fal.ai/dashboard/usage-billing/credits"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-2xl border border-pink-400/40 bg-pink-600 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white transition-colors hover:bg-pink-500"
+                    >
+                      Check Your Credit
+                    </a>
+                  )}
                   {isByokWorkspace && (
                     <div className="inline-flex items-center gap-2">
                       {!isByokPremium && (
@@ -4008,18 +4020,6 @@ function Dashboard() {
                         Reserve Controls
                       </button>
 
-                      {isAdmin && !showCreditUi && (
-                        <a
-                          href="https://fal.ai/dashboard/usage-billing/credits"
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={() => setShowUserMenu(false)}
-                          className="block w-full px-4 py-2 text-left text-sm font-medium text-gray-200 transition-colors hover:bg-white/10"
-                        >
-                          Check Your Credit
-                        </a>
-                      )}
-
                       {showCreditUi &&
                         (canUseExternalCreditLink ? (
                           <a
@@ -4089,6 +4089,16 @@ function Dashboard() {
                     >
                       Add Fal Key
                     </button>
+                  )}
+                  {isAdmin && !showCreditUi && (
+                    <a
+                      href="https://fal.ai/dashboard/usage-billing/credits"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full rounded-xl border border-pink-400/40 bg-pink-600 px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-pink-500"
+                    >
+                      Check Your Credit
+                    </a>
                   )}
                   {isByokWorkspace && (
                     <div className="flex w-full items-center justify-center gap-2">
@@ -4209,18 +4219,6 @@ function Dashboard() {
                   >
                     Reserve Controls
                   </button>
-
-                  {isAdmin && !showCreditUi && (
-                    <a
-                      href="https://fal.ai/dashboard/usage-billing/credits"
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={() => setShowUserMenu(false)}
-                      className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-left text-xs font-semibold text-gray-200 hover:bg-white/10"
-                    >
-                      Check Your Credit
-                    </a>
-                  )}
 
                   {showCreditUi &&
                     (canUseExternalCreditLink ? (

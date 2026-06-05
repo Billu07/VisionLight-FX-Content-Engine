@@ -1148,7 +1148,8 @@ export default function AdminDashboard() {
                           <input
                             type="number"
                             step="1"
-                            className="w-full bg-gray-950 border border-gray-800 rounded-md px-4 py-2 text-sm font-semibold text-white outline-none focus:border-brand-accent transition-colors"
+                            disabled={!isUserCreditLimited(editingUser)}
+                            className="w-full bg-gray-950 border border-gray-800 rounded-md px-4 py-2 text-sm font-semibold text-white outline-none focus:border-brand-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             defaultValue={Math.floor(
                               (editingUser as any)[pool.id] || 0,
                             )}
@@ -1204,7 +1205,8 @@ export default function AdminDashboard() {
                           <input
                             type="number"
                             step="0.01"
-                            className="flex-1 bg-gray-900 border border-gray-700 rounded-md p-2.5 text-sm text-white font-semibold outline-none focus:border-brand-accent transition-colors"
+                            disabled={!isUserCreditLimited(editingUser)}
+                            className="flex-1 bg-gray-900 border border-gray-700 rounded-md p-2.5 text-sm text-white font-semibold outline-none focus:border-brand-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             value={customCreditAmount}
                             onChange={(e) =>
                               setCustomCreditAmount(e.target.value)
@@ -1218,8 +1220,8 @@ export default function AdminDashboard() {
                                 customCreditAmount,
                               )
                             }
-                            disabled={actionLoading}
-                            className="px-6 bg-gray-800 hover:bg-gray-700 text-brand-accent border border-gray-700 rounded-md font-bold text-[10px] uppercase tracking-widest transition-colors"
+                            disabled={actionLoading || !isUserCreditLimited(editingUser)}
+                            className="px-6 bg-gray-800 hover:bg-gray-700 text-brand-accent border border-gray-700 rounded-md font-bold text-[10px] uppercase tracking-widest transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             Assign
                           </button>

@@ -739,20 +739,20 @@ export default function TenantDashboard() {
                         <div className="flex flex-col gap-1 items-center">
                           <div className="flex items-center gap-2">
                             <span className="text-[9px] text-gray-500">Std:</span>
-                            <input type="number" step="1" min="0" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDrift} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsPicDrift", (toInt(e.target.value, u.creditsPicDrift) - u.creditsPicDrift).toString())} />
+                            <input type="number" step="1" min="0" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsPicDrift} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsPicDrift", (toInt(e.target.value, u.creditsPicDrift) - u.creditsPicDrift).toString())} />
                           </div>
                         </div>
                       </td>
                       <td className="p-5 text-center">
-                        <input type="number" step="1" min="0" className="w-16 bg-gray-950 border border-gray-800 rounded p-1 text-center text-xs" defaultValue={u.creditsImageFX} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsImageFX", (toInt(e.target.value, u.creditsImageFX) - u.creditsImageFX).toString())} />
+                        <input type="number" step="1" min="0" className="w-16 bg-gray-950 border border-gray-800 rounded p-1 text-center text-xs" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsImageFX} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsImageFX", (toInt(e.target.value, u.creditsImageFX) - u.creditsImageFX).toString())} />
                       </td>
                       {!isPicdriftTenant && (
                         <td className="p-5 text-center">
                           <div className="flex gap-1 justify-center">
-                            <input type="number" step="1" min="0" title="Kling 3.0" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsPicDriftPlus", (toInt(e.target.value, u.creditsPicDriftPlus) - u.creditsPicDriftPlus).toString())} />
-                            <input type="number" step="1" min="0" title="Topaz Upscale" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX1", (toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1).toString())} />
-                            <input type="number" step="1" min="0" title="Seedance 2.0" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX2", (toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2).toString())} />
-                            <input type="number" step="1" min="0" title="Veo 3.1" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX3", (toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3).toString())} />
+                            <input type="number" step="1" min="0" title="Kling 3.0" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsPicDriftPlus", (toInt(e.target.value, u.creditsPicDriftPlus) - u.creditsPicDriftPlus).toString())} />
+                            <input type="number" step="1" min="0" title="Topaz Upscale" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX1", (toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1).toString())} />
+                            <input type="number" step="1" min="0" title="Seedance 2.0" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX2", (toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2).toString())} />
+                            <input type="number" step="1" min="0" title="Veo 3.1" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX3", (toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3).toString())} />
                           </div>
                         </td>
                       )}
