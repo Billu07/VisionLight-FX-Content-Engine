@@ -30,6 +30,7 @@ interface User {
   orgViewType?: "VISIONLIGHT" | "PICDRIFT";
   maxProjects?: number;
   isSuperAdmin?: boolean;
+  adminCreditLimitsEnabled?: boolean;
   canonicalDomain?: string | null;
   domainRoutingEnabled?: boolean;
   domainRedirectRequired?: boolean;

@@ -83,6 +83,9 @@ export function PostCard({
   const [editedTitle, setEditedTitle] = useState(post.title || "");
   const [isSavingTitle, setIsSavingTitle] = useState(false);
   const [isPossiblyStuck, setIsPossiblyStuck] = useState(false);
+  const [displayProgress, setDisplayProgress] = useState(
+    Math.max(0, Math.min(100, Number(post.progress || 0))),
+  );
 
   // Separate loading states for the two download buttons
   const [isDownloadingVideo, setIsDownloadingVideo] = useState(false);
@@ -106,6 +109,10 @@ export function PostCard({
   useEffect(() => {
     setEditedTitle(post.title || "");
   }, [post.title]);
+
+  useEffect(() => {
+    setDisplayProgress(Math.max(0, Math.min(100, Number(post.progress || 0))));
+  }, [post.id]);
 
   useEffect(() => {
     if (!isVideoPost) return;
@@ -160,6 +167,32 @@ export function PostCard({
     } else {
       setIsPossiblyStuck(false);
     }
+  }, [post.status, post.progress]);
+
+  useEffect(() => {
+    const isActive = post.status === "PROCESSING" || post.status === "NEW";
+    const realProgress = Math.max(0, Math.min(100, Number(post.progress || 0)));
+    if (!isActive) {
+      setDisplayProgress(realProgress);
+      return;
+    }
+
+    setDisplayProgress((current) => Math.max(current, realProgress, 5));
+    // Ease continuously toward a ceiling so the bar always feels like it is
+    // moving, instead of sticking at a backend-reported value (e.g. 25%) and
+    // then jumping. Frequent small steps + a width transition read as smooth.
+    const CEILING = 95;
+    const timer = window.setInterval(() => {
+      setDisplayProgress((current) => {
+        const floor = Math.max(current, realProgress);
+        if (floor >= CEILING) return CEILING;
+        const remaining = CEILING - floor;
+        const step = Math.max(0.25, remaining * 0.012);
+        return Math.min(CEILING, floor + step);
+      });
+    }, 250);
+
+    return () => window.clearInterval(timer);
   }, [post.status, post.progress]);
 
   const handleVideoLoad = () => setVideoLoading(false);
@@ -294,7 +327,12 @@ export function PostCard({
     }
   };
 
-  const progress = post.progress || 0;
+  const progressExact = Math.max(
+    0,
+    Math.min(100, displayProgress || post.progress || 0),
+  );
+  const progress = Math.round(progressExact);
+  const progressWidth = progressExact.toFixed(1);
   const isProcessing = post.status === "PROCESSING" || post.status === "NEW";
   const hasMedia = !!post.mediaUrl && post.mediaUrl.length > 5;
   const isContentVisible = hasMedia && !isProcessing;
@@ -341,8 +379,8 @@ export function PostCard({
                       </div>
                       <div className="w-full bg-gray-700 rounded-full h-1.5 overflow-hidden">
                         <div
-                          className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full rounded-full transition-all duration-500 ease-out"
-                          style={{ width: `${progress}%` }}
+                          className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full rounded-full transition-all duration-300 ease-linear"
+                          style={{ width: `${progressWidth}%` }}
                         ></div>
                       </div>
                     </div>

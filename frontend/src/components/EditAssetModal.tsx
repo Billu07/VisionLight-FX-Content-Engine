@@ -1169,7 +1169,7 @@ export function EditAssetModal({
               {[
                 { id: "pro", label: "PicFX" },
                 { id: "convert", label: "Convert" },
-                { id: "drift", label: <div className="flex items-center gap-2"><img src={drift_icon} alt="3DX" className="h-3 w-auto" /></div> },
+                { id: "drift", label: <img src={drift_icon} alt="3DX" className="h-4 w-auto" /> },
               ].map((mode) => (
                 <button
                   key={mode.id}
@@ -1177,7 +1177,7 @@ export function EditAssetModal({
                     setActiveTab(mode.id as any);
                     setIsCropping(false);
                   }}
-                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex flex-col items-center gap-1 ${activeTab === mode.id
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 leading-none ${activeTab === mode.id
                     ? "bg-purple-600 text-white shadow-lg"
                     : "text-gray-400 hover:text-white hover:bg-gray-800"
                     }`}
@@ -1480,9 +1480,9 @@ export function EditAssetModal({
                           e.stopPropagation();
                           setShowPromptFxMenu(!showPromptFxMenu);
                         }}
-                        className="text-[10px] bg-indigo-900/50 hover:bg-indigo-800 text-indigo-300 px-3 py-1.5 rounded-md border border-indigo-500/30 flex items-center gap-1 transition-colors"
+                        className="text-[10px] bg-cyan-900/40 hover:bg-cyan-800/60 text-cyan-300 px-3 py-1.5 rounded-lg border border-cyan-500/50 flex items-center gap-1.5 transition-colors shadow-sm"
                       >
-                        <span className="text-lg">*</span> PromptFX
+                        PromptFX
                       </button>
 
                       {/* PROMPT FX DROPDOWN */}
@@ -1564,7 +1564,7 @@ export function EditAssetModal({
                                       <span className="text-xs font-bold text-indigo-200">
                                         {pfx.name}
                                       </span>
-                                      <span className="text-[8px] bg-indigo-500/20 text-indigo-400 px-1.5 py-0.5 rounded uppercase font-bold">Global</span>
+                                      <span className="text-[8px] bg-indigo-500/20 text-indigo-400 px-1.5 py-0.5 rounded uppercase font-bold">FX</span>
                                     </div>
                                     <span className="text-[10px] text-gray-500 line-clamp-2">
                                       {pfx.prompt}
@@ -1710,7 +1710,7 @@ export function EditAssetModal({
                 className="w-full py-4 bg-gradient-to-r from-violet-900 to-violet-900 rounded-xl text-white font-bold hover:shadow-lg flex items-center justify-center gap-3 disabled:opacity-50"
               >
                   <>
-                    <img src={drift_icon} alt="Logo" className="h-2 w-auto" />
+                    <img src={drift_icon} alt="Logo" className="h-6 w-auto" />
                     <span>Generate Path</span>
                   </>
               </button>

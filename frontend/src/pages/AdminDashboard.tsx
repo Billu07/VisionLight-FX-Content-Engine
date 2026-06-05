@@ -4,6 +4,7 @@ import { apiEndpoints } from "../lib/api";
 import { confirmAction } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
+import { isUserCreditLimited } from "../lib/adminCredits";
 
 interface User {
   id: string;
@@ -20,6 +21,7 @@ interface User {
   view: "VISIONLIGHT" | "PICDRIFT";
   maxProjects: number;
   organizationId?: string | null;
+  adminNotes?: string | null;
 }
 
 interface GlobalSettings {
@@ -460,7 +462,8 @@ export default function AdminDashboard() {
   const walletCoverageRows = useMemo(() => {
     return COVERAGE_WALLETS.map((wallet) => {
       const allocatedCredits = ownedOrgUsers.reduce(
-        (sum, user) => sum + (Number(user[wallet.key]) || 0),
+        (sum, user) =>
+          sum + (isUserCreditLimited(user) ? Number(user[wallet.key]) || 0 : 0),
         0,
       );
       const usdPerCredit = walletUsdPerCredit[wallet.key] || 0;

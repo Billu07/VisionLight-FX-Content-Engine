@@ -23,6 +23,7 @@ import { EditAssetModal } from "../components/EditAssetModal";
 import { DriftFrameExtractor } from "../components/DriftFrameExtractor";
 import { RenderReserveModal } from "../components/RenderReserveModal";
 import { StockPhotosModal } from "../components/StockPhotosModal";
+import { ByokKeySetupPanel } from "../components/ByokKeySetupPanel";
 import { FullscreenVideoEditor, type SequenceItem } from "../components/FullscreenVideoEditor";
 import { MobileNavbar } from "../components/MobileNavbar";
 import { dashboardAssets } from "../features/dashboard/assets";
@@ -46,7 +47,6 @@ const DASHBOARD_BG_MODE_KEY = "visionlight_dashboard_bg_mode";
 const ASSET_TASK_PANEL_STATE_KEY = "visionlight_asset_task_panel_state_v1";
 const DASHBOARD_TASK_INDICATOR_STATE_KEY =
   "visionlight_dashboard_task_indicator_state_v1";
-const FAL_KEYS_URL = "https://fal.ai/dashboard/keys";
 const BYOK_ACTIVATION_HINTS = [
   "Verifying payment confirmation...",
   "Syncing your package entitlement...",
@@ -136,13 +136,6 @@ const BYOK_PLAN_BUTTON_CLASSES: Record<ByokPlanCode, string> = {
   VFX_STUDIO_AGENCY: "border-amber-300/45 bg-amber-500/85 text-amber-50 hover:bg-amber-400/90",
 };
 
-const HIDE_STORAGE_IN_CARD: Record<ByokPlanCode, boolean> = {
-  PD_APP: true,
-  VFX_APP: true,
-  PD_STUDIO: false,
-  VFX_STUDIO: false,
-  VFX_STUDIO_AGENCY: false,
-};
 type DashboardBgMode = "current" | "original";
 type VeoMode =
   | "image_to_video"
@@ -351,6 +344,10 @@ function Dashboard() {
   const [showByokUpgradeModal, setShowByokUpgradeModal] = useState(false);
   const [byokUpgradeModalIntent, setByokUpgradeModalIntent] = useState(false);
   const [byokPackageBillingCycle, setByokPackageBillingCycle] = useState<BillingCycle>("monthly");
+  const [byokCheckoutConfirmPlan, setByokCheckoutConfirmPlan] =
+    useState<ByokPlanCode | null>(null);
+  const [byokCheckoutConfirmStep, setByokCheckoutConfirmStep] =
+    useState<"email" | "redirect" | null>(null);
   const [showByokKeyModal, setShowByokKeyModal] = useState(false);
   const [isByokActivationPolling, setIsByokActivationPolling] = useState(false);
   const [byokActivationHintIndex, setByokActivationHintIndex] = useState(0);
@@ -504,23 +501,57 @@ function Dashboard() {
       .filter((pkg) => pkg && pkg.code in BYOK_CHECKOUT_PLAN_META)
       .map((pkg) => {
         const meta = BYOK_CHECKOUT_PLAN_META[pkg.code as ByokPlanCode];
-        const storageGb = Math.max(0, pkg.maxStorageMb) / 1024;
-        const storageLabel =
-          storageGb >= 1
-            ? `${storageGb % 1 === 0 ? storageGb.toFixed(0) : storageGb.toFixed(1)}GB shared storage`
-            : `${Math.max(0, pkg.maxStorageMb)}MB shared storage`;
-        const retentionLabel =
-          typeof pkg.storageRetentionDays === "number" && pkg.storageRetentionDays > 0
-            ? `${pkg.storageRetentionDays}-day media retention`
-            : "Standard retention policy";
+        const featureRows: Record<
+          ByokPlanCode,
+          {
+            usersLabel: string;
+            projectsLabel: string;
+            adminLabel: string;
+            storageLabel: string;
+            retentionLabel: string;
+          }
+        > = {
+          PD_APP: {
+            usersLabel: "1 User",
+            projectsLabel: "3 Project Timelines",
+            adminLabel: "Kling 2.6 Animation",
+            storageLabel: "",
+            retentionLabel: "7 Day Storage",
+          },
+          VFX_APP: {
+            usersLabel: "1 User",
+            projectsLabel: "3 Project Timelines",
+            adminLabel: "FX Video Models",
+            storageLabel: "",
+            retentionLabel: "7 Day Storage",
+          },
+          PD_STUDIO: {
+            usersLabel: "5 Team Members",
+            projectsLabel: "20 Project Timelines",
+            adminLabel: "Studio Admin Panel",
+            storageLabel: "1GB Storage",
+            retentionLabel: "Kling 2.6 Animation",
+          },
+          VFX_STUDIO: {
+            usersLabel: "5 Team Members",
+            projectsLabel: "20 Project Timelines",
+            adminLabel: "Studio",
+            storageLabel: "1GB Storage",
+            retentionLabel: "FX Models",
+          },
+          VFX_STUDIO_AGENCY: {
+            usersLabel: "20 Team Members",
+            projectsLabel: "200 Project Timelines",
+            adminLabel: "Studio Admin Panel",
+            storageLabel: "5GB Storage",
+            retentionLabel: "FX Models",
+          },
+        };
+        const rows = featureRows[pkg.code as ByokPlanCode];
         return {
           ...pkg,
           ...meta,
-          usersLabel: `${pkg.maxUsers} ${pkg.maxUsers === 1 ? "user" : "users"}`,
-          projectsLabel: `${pkg.maxProjectsTotal} projects`,
-          adminLabel: pkg.adminPanelLocked ? "Admin panel locked" : "Admin panel enabled",
-          storageLabel: HIDE_STORAGE_IN_CARD[pkg.code as ByokPlanCode] ? "" : storageLabel,
-          retentionLabel,
+          ...rows,
           isCurrentPlan: currentByokPackageCode === pkg.code,
         };
       });
@@ -941,7 +972,25 @@ function Dashboard() {
   const isCommercial = user?.creditSystem !== "INTERNAL" && !isTenantScopedAccount;
   const canUseExternalCreditLink = user?.role === "SUPERADMIN" && isCommercial;
   const isAdmin = user?.role === "ADMIN" || user?.role === "SUPERADMIN";
+  // Admins are unlimited by default and hide credit UI; they can opt back into
+  // credit limits (item 8), which brings their credit panel back.
+  const adminCreditLimitsEnabled = user?.adminCreditLimitsEnabled === true;
+  const showCreditUi = !isAdmin || adminCreditLimitsEnabled;
   const hideTopCreditBalances = user?.role === "SUPERADMIN";
+  // Manually-created (non-BYOK) tenants: instead of a hard "Platform Inactive"
+  // lock, let the tenant admin enter the dashboard and add their own Fal key via
+  // the same BYOK key panel. Generation stays gated until the key is saved.
+  const manualTenantNeedsFalKey =
+    !isByokWorkspace &&
+    isAdmin &&
+    user?.organizationIsDefault !== true &&
+    user?.orgLockReason === "MISSING_FAL_KEY";
+
+  useEffect(() => {
+    if (manualTenantNeedsFalKey) {
+      setShowMissingFalKeyModal(true);
+    }
+  }, [manualTenantNeedsFalKey]);
 
   // 3. Virtual sum (fixes timeline build errors)
   const userCredits =
@@ -2520,7 +2569,27 @@ function Dashboard() {
       checkoutSessionId: null,
       phase: "IDLE",
     });
+    setByokCheckoutConfirmPlan(null);
+    setByokCheckoutConfirmStep(null);
     setShowByokUpgradeModal(false);
+  };
+  const beginByokCheckoutConfirm = (planCode: ByokPlanCode) => {
+    setByokCheckoutConfirmPlan(planCode);
+    setByokCheckoutConfirmStep("email");
+  };
+  const cancelByokCheckoutConfirm = () => {
+    setByokCheckoutConfirmPlan(null);
+    setByokCheckoutConfirmStep(null);
+  };
+  const proceedByokCheckoutConfirm = () => {
+    if (!byokCheckoutConfirmPlan) return;
+    if (byokCheckoutConfirmStep === "email") {
+      setByokCheckoutConfirmStep("redirect");
+      return;
+    }
+    const planCode = byokCheckoutConfirmPlan;
+    cancelByokCheckoutConfirm();
+    void handleOpenByokCheckout(planCode);
   };
   const handleOpenByokCheckout = async (planCode: ByokPlanCode) => {
     const checkoutWindow = window.open("about:blank", "_blank");
@@ -2588,16 +2657,33 @@ function Dashboard() {
 
     setIsSubmittingByokFalKey(true);
     try {
-      await apiEndpoints.byokLinkKey(byokFalKeyInput.trim());
-      setByokFalKeyInput("");
-      setShowByokKeyModal(false);
-      setByokFalGuideShown(false);
-      notify.success(
-        "Welcome to your 14 day trial. Trial is limited to 5 renders/day.",
-      );
+      if (isByokWorkspace) {
+        await apiEndpoints.byokLinkKey(byokFalKeyInput.trim());
+        setByokFalKeyInput("");
+        setShowByokKeyModal(false);
+        setShowMissingFalKeyModal(false);
+        setByokFalGuideShown(false);
+        notify.successAction(
+          "Welcome to your 14 day trial. Trial is limited to 5 renders/day.",
+          {
+            label: "Upgrade",
+            onClick: openByokUpgradeModal,
+          },
+        );
+      } else {
+        // Manually-created tenant admin: store the key on the organization
+        // (same place the Integrations panel saves it), then re-check auth so the
+        // MISSING_FAL_KEY lock clears and generation unlocks.
+        await apiEndpoints.tenantUpdateConfig({ falApiKey: byokFalKeyInput.trim() });
+        setByokFalKeyInput("");
+        setShowByokKeyModal(false);
+        setShowMissingFalKeyModal(false);
+        setByokFalGuideShown(false);
+        notify.success("Fal API key saved. You can now generate.");
+      }
       await checkAuth();
     } catch (error: any) {
-      notify.error(error?.message || "Failed to link Fal API key.");
+      notify.error(error?.message || "Failed to save Fal API key.");
     } finally {
       setIsSubmittingByokFalKey(false);
     }
@@ -3178,7 +3264,7 @@ function Dashboard() {
         )}
 
         {/* Activation overlay (for inactive tenants) */}
-        {user?.needsActivation && !isByokWorkspace && (
+        {user?.needsActivation && !isByokWorkspace && !manualTenantNeedsFalKey && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-gray-950/90 backdrop-blur-xl p-4">
             <div className="bg-gray-900 border border-white/10 rounded-[2.5rem] p-8 sm:p-12 max-w-xl w-full shadow-[0_0_50px_rgba(0,0,0,0.5)] text-center animate-in zoom-in-95 duration-300">
               <div className="w-24 h-24 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-8 border border-rose-500/20">
@@ -3240,95 +3326,30 @@ function Dashboard() {
 
         {showByokKeyModal && (
           <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-lg rounded-2xl border border-cyan-400/25 bg-[#050b1f] p-7 shadow-[0_30px_90px_rgba(2,8,23,0.8)]">
-              <h3 className="text-2xl font-black text-white">Bring Your Own Key</h3>
-              <p className="mt-3 text-sm leading-relaxed text-slate-300">
-                Pay direct. Total control. 1-2 minute Fal signup.
-              </p>
-
-              <div className="mt-5 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setByokFalGuideShown(true);
-                    window.open(FAL_KEYS_URL, "_blank", "noopener,noreferrer");
-                  }}
-                  className="rounded-xl border border-cyan-300/40 bg-cyan-400/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-cyan-100 hover:bg-cyan-400/20"
-                >
-                  Signup Fal
-                </button>
-                <a
-                  href={FAL_KEYS_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white hover:bg-white/10"
-                >
-                  Fal API Key Link
-                </a>
-              </div>
-
-              {byokFalGuideShown && (
-                <p className="mt-3 text-xs text-cyan-200">
-                  Fal will open in a new window. Signup and return to this window.
-                </p>
-              )}
-
-              <form className="mt-5 space-y-3" onSubmit={handleSubmitByokFalKey}>
-                <label className="block text-xs font-bold uppercase tracking-[0.12em] text-slate-300">
-                  Fal Key
-                </label>
-                <input
-                  type="password"
-                  value={byokFalKeyInput}
-                  onChange={(e) => setByokFalKeyInput(e.target.value)}
-                  placeholder="Paste your Fal API key"
-                  className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-3 text-sm text-white outline-none focus:border-cyan-300"
-                  required
-                />
-                <button
-                  type="submit"
-                  disabled={isSubmittingByokFalKey}
-                  className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-white disabled:opacity-60"
-                >
-                  {isSubmittingByokFalKey ? "Submitting..." : "Submitted"}
-                </button>
-              </form>
-
-              <button
-                type="button"
-                onClick={() => setShowByokKeyModal(false)}
-                className="mt-3 w-full rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-300 hover:bg-white/10"
-              >
-                Do This Later
-              </button>
-            </div>
+            <ByokKeySetupPanel
+              falKey={byokFalKeyInput}
+              onFalKeyChange={setByokFalKeyInput}
+              onSubmit={handleSubmitByokFalKey}
+              isSubmitting={isSubmittingByokFalKey}
+              guideShown={byokFalGuideShown}
+              onGuideShown={() => setByokFalGuideShown(true)}
+              onClose={() => setShowByokKeyModal(false)}
+            />
           </div>
         )}
 
         {showMissingFalKeyModal && (
           <div className="fixed inset-0 z-[215] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl border border-rose-400/35 bg-[#1a0713] p-6 shadow-[0_26px_80px_rgba(0,0,0,0.75)]">
-              <h3 className="text-xl font-black text-white">Fal API Key Required</h3>
-              <p className="mt-3 text-sm leading-relaxed text-rose-100/90">
-                Rendering is blocked until you connect a Fal API key. Open API Integration and add your key to continue.
-              </p>
-              <div className="mt-5 flex flex-col gap-3">
-                <button
-                  type="button"
-                  onClick={handleOpenApiIntegration}
-                  className="w-full rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-white"
-                >
-                  Go to API Integration
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowMissingFalKeyModal(false)}
-                  className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-gray-300 hover:bg-white/10"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
+            <ByokKeySetupPanel
+              falKey={byokFalKeyInput}
+              onFalKeyChange={setByokFalKeyInput}
+              onSubmit={handleSubmitByokFalKey}
+              isSubmitting={isSubmittingByokFalKey}
+              guideShown={byokFalGuideShown}
+              onGuideShown={() => setByokFalGuideShown(true)}
+              onClose={() => setShowMissingFalKeyModal(false)}
+              closeLabel="Close"
+            />
           </div>
         )}
 
@@ -3430,9 +3451,6 @@ function Dashboard() {
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div>
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-300">
-                                  {plan.code.replaceAll("_", " ")}
-                                </p>
                                 <h4 className="mt-1 text-lg font-extrabold text-white">{plan.title}</h4>
                               </div>
                               {plan.highlight && (
@@ -3485,7 +3503,7 @@ function Dashboard() {
                             <div className="mt-4 flex flex-col gap-2">
                               <button
                                 type="button"
-                                onClick={() => handleOpenByokCheckout(plan.code)}
+                                onClick={() => beginByokCheckoutConfirm(plan.code)}
                                 className={`w-full rounded-xl border px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] transition ${BYOK_PLAN_BUTTON_CLASSES[plan.code]}`}
                               >
                                 Buy Now
@@ -3539,6 +3557,53 @@ function Dashboard() {
                     )}
                   </>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {byokCheckoutConfirmPlan && byokCheckoutConfirmStep && (
+          <div className="fixed inset-0 z-[230] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#081126] p-6 shadow-2xl">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200">
+                {byokPlanCards.find((plan) => plan.code === byokCheckoutConfirmPlan)
+                  ?.title || "BYOK Package"}
+              </p>
+              {byokCheckoutConfirmStep === "email" ? (
+                <>
+                  <h3 className="mt-2 text-xl font-black text-white">
+                    Use Your Dashboard Email
+                  </h3>
+                  <p className="mt-3 text-sm leading-relaxed text-slate-300">
+                    Complete checkout using your dashboard email
+                    {user?.email ? ` (${user.email})` : ""} so your package activates automatically.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3 className="mt-2 text-xl font-black text-white">
+                    You Will Be Redirected To PicDrift For Checkout
+                  </h3>
+                  <p className="mt-3 text-sm leading-relaxed text-slate-300">
+                    PicDrift handles the secure payment page. Return here after payment to finish activation.
+                  </p>
+                </>
+              )}
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={cancelByokCheckoutConfirm}
+                  className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-200 hover:bg-white/10"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={proceedByokCheckoutConfirm}
+                  className="flex-1 rounded-xl bg-cyan-500 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-white hover:bg-cyan-400"
+                >
+                  Proceed
+                </button>
               </div>
             </div>
           </div>
@@ -3795,25 +3860,45 @@ function Dashboard() {
                       Link Fal Key
                     </button>
                   )}
-                  {isByokWorkspace && (
-                    <div
-                      className={`inline-flex items-center gap-2 px-1 py-1 text-xs font-black uppercase tracking-[0.12em] ${
-                        isByokPremium ? "text-emerald-200" : "text-rose-200"
-                      }`}
+                  {manualTenantNeedsFalKey && !showMissingFalKeyModal && (
+                    <button
+                      type="button"
+                      onClick={() => setShowMissingFalKeyModal(true)}
+                      className="rounded-2xl border border-blue-300/45 bg-gradient-to-r from-blue-600 to-cyan-600 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white transition-all hover:from-blue-500 hover:to-cyan-500"
                     >
-                      <span className="relative flex h-2.5 w-2.5">
-                        <span
-                          className={`absolute inline-flex h-full w-full animate-ping rounded-full ${
-                            isByokPremium ? "bg-emerald-300/80" : "bg-rose-300/80"
-                          }`}
-                        />
-                        <span
-                          className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
-                            isByokPremium ? "bg-emerald-300" : "bg-rose-300"
-                          }`}
-                        />
-                      </span>
-                      {isByokPremium ? "Premium" : "Demo"}
+                      Add Fal Key
+                    </button>
+                  )}
+                  {isByokWorkspace && (
+                    <div className="inline-flex items-center gap-2">
+                      {!isByokPremium && (
+                        <button
+                          type="button"
+                          onClick={openByokUpgradeModal}
+                          className="rounded-xl border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-cyan-400/20"
+                        >
+                          Upgrade
+                        </button>
+                      )}
+                      <div
+                        className={`inline-flex items-center gap-2 px-1 py-1 text-xs font-black uppercase tracking-[0.12em] ${
+                          isByokPremium ? "text-emerald-200" : "text-rose-200"
+                        }`}
+                      >
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span
+                            className={`absolute inline-flex h-full w-full animate-ping rounded-full ${
+                              isByokPremium ? "bg-emerald-300/80" : "bg-rose-300/80"
+                            }`}
+                          />
+                          <span
+                            className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
+                              isByokPremium ? "bg-emerald-300" : "bg-rose-300"
+                            }`}
+                          />
+                        </span>
+                        {isByokPremium ? "Premium" : "Demo"}
+                      </div>
                     </div>
                   )}
                   <button
@@ -3920,10 +4005,22 @@ function Dashboard() {
                         }}
                         className="w-full text-left px-4 py-2 text-sm font-medium text-gray-200 transition-colors hover:bg-white/10"
                       >
-                        Render Reserve
+                        Reserve Controls
                       </button>
 
-                      {!isAdmin &&
+                      {isAdmin && !showCreditUi && (
+                        <a
+                          href="https://fal.ai/dashboard/usage-billing/credits"
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={() => setShowUserMenu(false)}
+                          className="block w-full px-4 py-2 text-left text-sm font-medium text-gray-200 transition-colors hover:bg-white/10"
+                        >
+                          Check Your Credit
+                        </a>
+                      )}
+
+                      {showCreditUi &&
                         (canUseExternalCreditLink ? (
                           <a
                             href={creditLink}
@@ -3984,25 +4081,45 @@ function Dashboard() {
                       Link Fal Key
                     </button>
                   )}
-                  {isByokWorkspace && (
-                    <div
-                      className={`flex w-full items-center justify-center gap-2 px-2 py-2 text-sm font-black uppercase tracking-[0.12em] ${
-                        isByokPremium ? "text-emerald-200" : "text-rose-200"
-                      }`}
+                  {manualTenantNeedsFalKey && !showMissingFalKeyModal && (
+                    <button
+                      type="button"
+                      onClick={() => setShowMissingFalKeyModal(true)}
+                      className="w-full rounded-xl border border-blue-300/45 bg-gradient-to-r from-blue-600 to-cyan-600 px-4 py-3 text-sm font-semibold text-white hover:from-blue-500 hover:to-cyan-500 transition-colors"
                     >
-                      <span className="relative flex h-2.5 w-2.5">
-                        <span
-                          className={`absolute inline-flex h-full w-full animate-ping rounded-full ${
-                            isByokPremium ? "bg-emerald-300/80" : "bg-rose-300/80"
-                          }`}
-                        />
-                        <span
-                          className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
-                            isByokPremium ? "bg-emerald-300" : "bg-rose-300"
-                          }`}
-                        />
-                      </span>
-                      {isByokPremium ? "Premium" : "Demo"}
+                      Add Fal Key
+                    </button>
+                  )}
+                  {isByokWorkspace && (
+                    <div className="flex w-full items-center justify-center gap-2">
+                      {!isByokPremium && (
+                        <button
+                          type="button"
+                          onClick={openByokUpgradeModal}
+                          className="rounded-xl border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-cyan-400/20"
+                        >
+                          Upgrade
+                        </button>
+                      )}
+                      <div
+                        className={`flex items-center justify-center gap-2 px-2 py-2 text-sm font-black uppercase tracking-[0.12em] ${
+                          isByokPremium ? "text-emerald-200" : "text-rose-200"
+                        }`}
+                      >
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span
+                            className={`absolute inline-flex h-full w-full animate-ping rounded-full ${
+                              isByokPremium ? "bg-emerald-300/80" : "bg-rose-300/80"
+                            }`}
+                          />
+                          <span
+                            className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
+                              isByokPremium ? "bg-emerald-300" : "bg-rose-300"
+                            }`}
+                          />
+                        </span>
+                        {isByokPremium ? "Premium" : "Demo"}
+                      </div>
                     </div>
                   )}
                   <button
@@ -4090,10 +4207,22 @@ function Dashboard() {
                     }}
                     className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-left text-xs font-semibold text-gray-200 hover:bg-white/10"
                   >
-                    Render Reserve
+                    Reserve Controls
                   </button>
 
-                  {!isAdmin &&
+                  {isAdmin && !showCreditUi && (
+                    <a
+                      href="https://fal.ai/dashboard/usage-billing/credits"
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => setShowUserMenu(false)}
+                      className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-left text-xs font-semibold text-gray-200 hover:bg-white/10"
+                    >
+                      Check Your Credit
+                    </a>
+                  )}
+
+                  {showCreditUi &&
                     (canUseExternalCreditLink ? (
                       <a
                         href={creditLink}
@@ -4785,7 +4914,7 @@ function Dashboard() {
                                                   >
                                                     <div className="flex justify-between items-start">
                                                       <span className="text-sm font-bold text-cyan-100">{pf.name}</span>
-                                                      <span className="text-[8px] bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded uppercase font-bold">Global</span>
+                                                      <span className="text-[8px] bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded uppercase font-bold">FX</span>
                                                     </div>
                                                     <span className="text-xs text-gray-500 truncate">{pf.prompt}</span>
                                                   </button>
@@ -5387,6 +5516,11 @@ function Dashboard() {
                                       </span>
                                     )}
                                   </div>
+                                  {activeEngine !== "veo" && activeEngine !== "topaz" && (
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-500">
+                                      Max image size: 10MB
+                                    </p>
+                                  )}
 
                                   {activeEngine === "veo" ? (
                                     veoMode === "first_last_frame" ? (
@@ -5760,7 +5894,7 @@ function Dashboard() {
                                           </button>
                                         </div>
                                         <p className="text-[10px] text-gray-500 text-center mt-3">
-                                          Mix image, video, and audio references in one request.
+                                          Mix image, video, and audio references in one request. Images up to 10MB.
                                         </p>
                                       </div>
                                       {videoFxExtraUrls.length > 0 && (
@@ -5873,10 +6007,10 @@ function Dashboard() {
                                           {activeEngine === "studio" &&
                                             studioMode === "carousel"
                                             ? picFxModel === "gpt-image-2"
-                                              ? `Up to ${MAX_PICFX_REFERENCE_IMAGES} images (GPT 2)`
-                                              : "Up to 14 images"
+                                              ? `Up to ${MAX_PICFX_REFERENCE_IMAGES} images (10MB each)`
+                                              : "Up to 14 images (10MB each)"
                                             : activeEngine === "studio"
-                                              ? `Up to ${MAX_PICFX_REFERENCE_IMAGES} reference images`
+                                              ? `Up to ${MAX_PICFX_REFERENCE_IMAGES} reference images (10MB each)`
                                               : activeEngine === "topaz"
                                                 ? "One source video"
                                               : activeEngine === "openai"

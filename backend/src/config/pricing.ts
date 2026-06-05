@@ -110,6 +110,14 @@ const isDemoPicdriftUser = (user: any) =>
   user?.creditSystem === "INTERNAL" &&
   (user?.organization?.isDefault === true || !user?.organizationId);
 
+export const ADMIN_CREDIT_LIMITS_MARKER = "[ADMIN_CREDIT_LIMITS_ENABLED]";
+
+export const hasAdminCreditLimitsEnabled = (user: any) => {
+  const role = String(user?.role || "").toUpperCase();
+  if (role !== "ADMIN" && role !== "SUPERADMIN") return true;
+  return String(user?.adminNotes || "").includes(ADMIN_CREDIT_LIMITS_MARKER);
+};
+
 export const calculateGranularCost = (
   params: {
     mediaType: string;
@@ -179,6 +187,9 @@ export const calculateGranularCost = (
 };
 
 export const getCost = (user: any, params: any, settings: any) => {
+  if (!hasAdminCreditLimitsEnabled(user)) {
+    return 0;
+  }
   if (isDemoPicdriftUser(user)) {
     // For Demo Users, PicDrift Plus (kling-3) costs 2, everything else costs 1
     if (params.model === "kling-3") return 2;

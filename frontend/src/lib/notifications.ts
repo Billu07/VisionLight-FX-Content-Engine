@@ -168,6 +168,14 @@ export const notify = {
     toast.success(normalizeMessage(message), {
       className: `${baseToastClass} ${toastClassByType.success}`,
     }),
+  successAction: (
+    message: unknown,
+    action: { label: string; onClick: () => void },
+  ) =>
+    toast.success(normalizeMessage(message), {
+      className: `${baseToastClass} ${toastClassByType.success}`,
+      action,
+    }),
   error: (message: unknown) =>
     toast.error(normalizeMessage(message), {
       className: `${baseToastClass} ${toastClassByType.error}`,

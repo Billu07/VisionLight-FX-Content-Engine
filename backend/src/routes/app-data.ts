@@ -7,6 +7,10 @@ import { ROIService } from "../services/roi";
 import { storageQuotaService } from "../services/storageQuota";
 import { byokService } from "../services/byok";
 import { getTenantSettings, isOrganizationExpired } from "../lib/app-runtime";
+import {
+  ADMIN_CREDIT_LIMITS_MARKER,
+  hasAdminCreditLimitsEnabled,
+} from "../config/pricing";
 import { upload } from "../utils/fileUpload";
 import {
   copyExternalImageToManagedStorage,
@@ -570,6 +574,7 @@ router.get(
           needsActivation,
           orgLockReason,
           byok: byokStatus,
+          adminCreditLimitsEnabled: hasAdminCreditLimitsEnabled(user),
           organizationName: org?.name,
           videoEditorEnabledForAll,
           carouselEnabledForAll,
@@ -622,6 +627,49 @@ router.get(
     try {
       const projects = await airtableService.getProjectsForUserWorkspace(req.user!.id);
       res.json({ success: true, projects });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// Admins/superadmins are unlimited by default. This lets an admin opt back into
+// credit limits for their own account (stored as a marker in adminNotes, so no
+// schema change). When enabled, getCost charges them and their allocated credits
+// are counted toward coverage.
+router.patch(
+  "/api/auth/credit-limits",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: req.user!.id },
+        select: { id: true, role: true, adminNotes: true },
+      });
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const role = String(user.role || "").toUpperCase();
+      if (role !== "ADMIN" && role !== "SUPERADMIN") {
+        return res
+          .status(403)
+          .json({ error: "Only admins can change credit limits." });
+      }
+
+      const enabled = req.body?.enabled === true;
+      const baseNotes = String(user.adminNotes || "")
+        .split(ADMIN_CREDIT_LIMITS_MARKER)
+        .join("")
+        .trim();
+      const nextNotes = enabled
+        ? `${baseNotes} ${ADMIN_CREDIT_LIMITS_MARKER}`.trim()
+        : baseNotes;
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { adminNotes: nextNotes.length > 0 ? nextNotes : null },
+      });
+
+      res.json({ success: true, adminCreditLimitsEnabled: enabled });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

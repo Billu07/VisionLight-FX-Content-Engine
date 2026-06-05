@@ -144,10 +144,10 @@ export default function StudioChooser() {
                     {profile.role || "USER"}
                   </span>
                   <span
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 ${
+                    className={`inline-flex items-center gap-1.5 px-1 py-1.5 ${
                       profile.isOrgActive === false
-                        ? "bg-rose-400/16 text-rose-100"
-                        : "bg-emerald-400/20 text-emerald-100"
+                        ? "text-rose-200"
+                        : "text-emerald-200"
                     }`}
                   >
                     <span

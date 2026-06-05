@@ -201,6 +201,17 @@ const resolvePackageCodeFromPayload = (payload: any): ByokPackageCode | null => 
     VFX_STUDIO: "VFX_STUDIO",
     VISUALFX_STUDIO_AGENCY: "VFX_STUDIO_AGENCY",
     VFX_STUDIO_AGENCY: "VFX_STUDIO_AGENCY",
+    // Safety net: legacy / spaced Wix product-name variants that normalize here
+    // (e.g. a product still named "VisualFX Agency" rather than the new
+    // "VisualFX Studio Agency"). Keeps webhook activation resilient to naming.
+    VISUALFX_AGENCY: "VFX_STUDIO_AGENCY",
+    VFX_AGENCY: "VFX_STUDIO_AGENCY",
+    VISUAL_FX_AGENCY: "VFX_STUDIO_AGENCY",
+    VISUAL_FX_STUDIO_AGENCY: "VFX_STUDIO_AGENCY",
+    VISUAL_FX_APP: "VFX_APP",
+    VISUAL_FX_STUDIO: "VFX_STUDIO",
+    PIC_DRIFT_APP: "PD_APP",
+    PIC_DRIFT_STUDIO: "PD_STUDIO",
   };
 
   for (const raw of values) {

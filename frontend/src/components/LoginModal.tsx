@@ -212,7 +212,7 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
       );
       if (resetError) throw resetError;
       setResetMessage(
-        "If this email has an account, a password reset link has been sent.",
+        "If this email has an account, a password reset link has been sent by Supabase",
       );
     } catch (err: any) {
       setError(err.message || "Failed to send password reset link.");
@@ -415,7 +415,7 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
             <p className="text-sm text-gray-400">
               Need a Login?{" "}
               <a
-                href="https://www.picdrift.com/studio-signup"
+                href="https://picdrift.com/sign-up"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-cyan-400 hover:text-cyan-300 font-semibold transition-colors"

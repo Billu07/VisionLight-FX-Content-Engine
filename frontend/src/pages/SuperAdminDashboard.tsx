@@ -5,6 +5,7 @@ import { adminUi } from "../lib/adminUi";
 import { confirmAction } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
+import { isUserCreditLimited } from "../lib/adminCredits";
 
 interface Tenant {
   id: string;
@@ -42,6 +43,7 @@ interface User {
   isOrganizationOwner?: boolean;
   isProtectedFromRemoval?: boolean;
   protectionReason?: "SUPERADMIN" | "TENANT_OWNER" | null;
+  adminNotes?: string | null;
 }
 
 interface CreditRequest {
@@ -263,7 +265,9 @@ const DEFAULT_VARIANT_COST_USD: Record<CoverageVariantId, number> = {
 };
 
 export default function SuperAdminDashboard() {
-  const { user: adminUser } = useAuth();
+  const { user: adminUser, checkAuth } = useAuth();
+  const adminCreditLimitsEnabled = adminUser?.adminCreditLimitsEnabled === true;
+  const [creditLimitsBusy, setCreditLimitsBusy] = useState(false);
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<
@@ -973,7 +977,8 @@ export default function SuperAdminDashboard() {
   const walletCoverageRows = useMemo(() => {
     return COVERAGE_WALLETS.map((wallet) => {
       const allocatedCredits = myAgencyUsers.reduce(
-        (sum, user) => sum + (Number(user[wallet.key]) || 0),
+        (sum, user) =>
+          sum + (isUserCreditLimited(user) ? Number(user[wallet.key]) || 0 : 0),
         0,
       );
       const usdPerCredit = walletUsdPerCredit[wallet.key] || 0;
@@ -997,12 +1002,14 @@ export default function SuperAdminDashboard() {
     );
   }, [walletCoverageRows]);
 
-  const getUserCoverageUsd = (user: User) =>
-    COVERAGE_WALLETS.reduce((sum, wallet) => {
+  const getUserCoverageUsd = (user: User) => {
+    if (!isUserCreditLimited(user)) return 0;
+    return COVERAGE_WALLETS.reduce((sum, wallet) => {
       const credits = Number(user[wallet.key]) || 0;
       const usdPerCredit = walletUsdPerCredit[wallet.key] || 0;
       return sum + credits * usdPerCredit;
     }, 0);
+  };
 
   const sortedTenants = useMemo(() => {
     return [...tenants].sort((a, b) => {
@@ -1124,6 +1131,38 @@ export default function SuperAdminDashboard() {
             >
               Check Your Credit
             </a>
+            <button
+              type="button"
+              disabled={creditLimitsBusy}
+              onClick={async () => {
+                setCreditLimitsBusy(true);
+                try {
+                  await apiEndpoints.setAdminCreditLimits(!adminCreditLimitsEnabled);
+                  await checkAuth();
+                  setMsg(
+                    !adminCreditLimitsEnabled
+                      ? "Credit limits enabled for your account. Your credits now count toward coverage."
+                      : "Credit limits disabled. Your account is unlimited again.",
+                  );
+                } catch (err: any) {
+                  setMsg("Error: " + (err?.message || "Failed to update credit limits."));
+                } finally {
+                  setCreditLimitsBusy(false);
+                }
+              }}
+              title="When enabled, your account uses credit limits and your allocated credits count toward Needed Coverage."
+              className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                adminCreditLimitsEnabled
+                  ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25"
+                  : "border-gray-600/50 bg-gray-800/70 text-gray-300 hover:bg-gray-700/70"
+              }`}
+            >
+              {creditLimitsBusy ? (
+                <LoadingSpinner size="sm" />
+              ) : (
+                <>My Credit Limits: {adminCreditLimitsEnabled ? "On" : "Off"}</>
+              )}
+            </button>
           </div>
         </div>
 

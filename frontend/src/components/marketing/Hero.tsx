@@ -418,7 +418,7 @@ export const Hero = () => {
 
               <div className="mt-8 flex flex-wrap gap-3">
                 <a
-                  href="https://www.picdrift.com/studio-signup"
+                  href="https://picdrift.com/sign-up"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 px-7 py-3 text-sm font-black text-white transition hover:from-cyan-400 hover:to-blue-400"

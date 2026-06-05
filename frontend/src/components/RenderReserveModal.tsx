@@ -37,7 +37,7 @@ export function RenderReserveModal({
     const compact = Number.isInteger(numeric)
       ? numeric.toString()
       : numeric.toFixed(2);
-    return `${compact} renders`;
+    return `${compact} ${numeric === 1 ? "credit" : "credits"}`;
   };
 
   const Section = ({
@@ -225,7 +225,7 @@ export function RenderReserveModal({
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.2em] text-cyan-300 font-black">
-                    Render Reserve
+                    Reserve Controls
                   </div>
                   <h2 className="mt-2 text-2xl sm:text-3xl font-black text-white tracking-tight">
                     Cost Matrix
@@ -250,7 +250,7 @@ export function RenderReserveModal({
                     Billing Mode
                   </div>
                   <div className="text-sm text-white font-semibold mt-1">
-                    {isCommercial ? "Commercial (USD pricing)" : "Render Reserve (unit pricing)"}
+                    {isCommercial ? "Commercial (USD pricing)" : "Reserve Controls (credit pricing)"}
                   </div>
                 </div>
                 <div className="rounded-xl border border-indigo-400/20 bg-indigo-500/5 px-4 py-3">

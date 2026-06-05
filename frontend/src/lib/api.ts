@@ -76,6 +76,8 @@ api.interceptors.response.use(
 export const apiEndpoints = {
   // === Auth ===
   getMe: () => api.get("/api/auth/me"),
+  setAdminCreditLimits: (enabled: boolean) =>
+    api.patch("/api/auth/credit-limits", { enabled }),
   resolveAuthDomain: (email: string) =>
     api.post("/api/auth/resolve-domain", { email }),
   startWorkspaceHandoff: (targetUserId: string, nextPath?: string) =>

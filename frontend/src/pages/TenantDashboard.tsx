@@ -4,7 +4,9 @@ import { apiEndpoints, startReadOnlyImpersonation } from "../lib/api";
 import { adminUi } from "../lib/adminUi";
 import { confirmAction, notify } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
+import { ByokKeySetupPanel } from "../components/ByokKeySetupPanel";
 import { useAuth } from "../hooks/useAuth";
+import { isUserCreditLimited } from "../lib/adminCredits";
 
 interface User {
   id: string;
@@ -21,6 +23,7 @@ interface User {
   creditsVideoFX3: number;
   isProtectedFromRemoval?: boolean;
   protectionReason?: "SUPERADMIN" | "TENANT_OWNER" | null;
+  adminNotes?: string | null;
 }
 
 interface Config {
@@ -102,8 +105,10 @@ const PICDRIFT_PRICING_KEYS = [
 ] as const;
 
 export default function TenantDashboard() {
-  const { user: adminUser } = useAuth();
+  const { user: adminUser, checkAuth } = useAuth();
   const navigate = useNavigate();
+  const adminCreditLimitsEnabled = adminUser?.adminCreditLimitsEnabled === true;
+  const [creditLimitsBusy, setCreditLimitsBusy] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const isDefaultOrgAdmin = adminUser?.organizationIsDefault === true;
   const isPicdriftTenant = !isDefaultOrgAdmin && adminUser?.view === "PICDRIFT";
@@ -118,6 +123,7 @@ export default function TenantDashboard() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [enteringDashboardUserId, setEnteringDashboardUserId] = useState<string | null>(null);
+  const [falGuideShown, setFalGuideShown] = useState(false);
   const [msg, setMsg] = useState("");
 
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -466,7 +472,8 @@ export default function TenantDashboard() {
 
   const walletCoverageRows = visibleCoverageWallets.map((wallet) => {
     const allocatedCredits = users.reduce(
-      (sum, user) => sum + (Number(user[wallet.key]) || 0),
+      (sum, user) =>
+        sum + (isUserCreditLimited(user) ? Number(user[wallet.key]) || 0 : 0),
       0,
     );
     const usdPerCredit = walletUsdPerCredit[wallet.key] || 0;
@@ -487,12 +494,14 @@ export default function TenantDashboard() {
     { fal: 0, total: 0 },
   );
 
-  const getUserCoverageUsd = (user: User) =>
-    visibleCoverageWallets.reduce((sum, wallet) => {
+  const getUserCoverageUsd = (user: User) => {
+    if (!isUserCreditLimited(user)) return 0;
+    return visibleCoverageWallets.reduce((sum, wallet) => {
       const credits = Number(user[wallet.key]) || 0;
       const usdPerCredit = walletUsdPerCredit[wallet.key] || 0;
       return sum + credits * usdPerCredit;
     }, 0);
+  };
 
   const formatUsd = (value: number) =>
     value.toLocaleString("en-US", {
@@ -567,6 +576,38 @@ export default function TenantDashboard() {
             >
               Check Your Credit
             </a>
+            <button
+              type="button"
+              disabled={creditLimitsBusy}
+              onClick={async () => {
+                setCreditLimitsBusy(true);
+                try {
+                  await apiEndpoints.setAdminCreditLimits(!adminCreditLimitsEnabled);
+                  await checkAuth();
+                  setMsg(
+                    !adminCreditLimitsEnabled
+                      ? "Credit limits enabled for your admin account. Your credits now count toward coverage."
+                      : "Credit limits disabled. Your admin account is unlimited again.",
+                  );
+                } catch (err: any) {
+                  notify.error(err?.message || "Failed to update credit limits.");
+                } finally {
+                  setCreditLimitsBusy(false);
+                }
+              }}
+              title="When enabled, your admin account uses credit limits and your allocated credits count toward Needed Coverage."
+              className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                adminCreditLimitsEnabled
+                  ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25"
+                  : "border-gray-600/50 bg-gray-800/70 text-gray-300 hover:bg-gray-700/70"
+              }`}
+            >
+              {creditLimitsBusy ? (
+                <LoadingSpinner size="sm" />
+              ) : (
+                <>My Credit Limits: {adminCreditLimitsEnabled ? "On" : "Off"}</>
+              )}
+            </button>
           </div>
         </div>
 
@@ -899,7 +940,7 @@ export default function TenantDashboard() {
           <div className="max-w-xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4">
             <div className={`${adminUi.panel} p-6 sm:p-8`}>
               <h2 className="text-lg font-bold text-white mb-6 uppercase tracking-tight">Organization Profile</h2>
-              <form onSubmit={handleUpdateConfig} className="space-y-6">
+              <div className="space-y-6">
                 <div className="space-y-2">
                   <label className={adminUi.sectionTitle}>Agency Name</label>
                   <input
@@ -909,40 +950,26 @@ export default function TenantDashboard() {
                     onChange={e => setConfig({ ...config, name: e.target.value })}
                   />
                 </div>
-                <div className="mt-6 border-t border-white/10 pt-6">
-                  <h3 className={`${adminUi.sectionTitle} mb-6`}>API Credentials</h3>
-                  <div className="space-y-6">
-                    <div className="space-y-2">
-                      <label className={adminUi.sectionTitle}>Fal AI Key</label>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
-                        <input
-                          type="password"
-                          className={`${adminUi.input} w-full p-3 font-mono text-sm`}
-                          value={config.falApiKey}
-                          onChange={e => setConfig({ ...config, falApiKey: e.target.value })}
-                        />
-                        <a
-                          href="https://fal.ai/dashboard/keys"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center rounded-lg border border-cyan-400/35 bg-cyan-500/15 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-200 transition-colors hover:bg-cyan-500/25"
-                        >
-                          Get Your Key
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-                </div>
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={(event) => void handleUpdateConfig(event as any)}
                   disabled={actionLoading}
-                  className={`${adminUi.primaryButton} w-full py-4 text-[11px]`}
+                  className={`${adminUi.softButton} w-full py-3 text-[11px]`}
                 >
-                  {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : "Save Configuration"}
+                  {actionLoading ? <LoadingSpinner size="sm" /> : "Save Organization Name"}
                 </button>
-              </form>
+              </div>
             </div>
-          </div>
+            <ByokKeySetupPanel
+              embedded
+              falKey={config.falApiKey}
+              onFalKeyChange={(value) => setConfig({ ...config, falApiKey: value })}
+              onSubmit={handleUpdateConfig}
+              isSubmitting={actionLoading}
+              guideShown={falGuideShown}
+              onGuideShown={() => setFalGuideShown(true)}
+            />
+            </div>
         )}
 
       </div>
@@ -1040,6 +1067,21 @@ export default function TenantDashboard() {
                   <p className="text-[10px] leading-relaxed text-gray-500">
                     Passwords are account-level and may be shared across multiple studios. Members reset their own password from the login page.
                   </p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const loginUrl = window.location.origin;
+                      try {
+                        await navigator.clipboard.writeText(loginUrl);
+                        setMsg("Login URL copied to clipboard.");
+                      } catch {
+                        notify.error(`Copy failed. Login URL: ${loginUrl}`);
+                      }
+                    }}
+                    className="w-full rounded-lg border border-gray-700 bg-gray-900/70 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-gray-300 transition-colors hover:border-brand-accent hover:text-white"
+                  >
+                    Copy Login URL
+                  </button>
                 </div>
                 <p className="text-[10px] text-gray-500 uppercase font-bold mb-4 tracking-widest">Credit Top-ups handled via table view.</p>
                 <button onClick={() => setEditingUser(null)} className="w-full py-3 bg-gray-800 hover:bg-gray-700 text-white rounded-lg font-bold uppercase text-xs tracking-widest transition-all">

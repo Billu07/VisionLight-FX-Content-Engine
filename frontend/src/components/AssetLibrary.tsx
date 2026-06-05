@@ -192,6 +192,7 @@ export function AssetLibrary({
   const [uploadingFileName, setUploadingFileName] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [isPreviewImageLoading, setIsPreviewImageLoading] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [viewingVideoAsset, setViewingVideoAsset] = useState<Asset | null>(
     null,
@@ -238,7 +239,8 @@ export function AssetLibrary({
     try {
       setIsDownloading(true);
       const ext = asset.url.split('.').pop()?.split('?')[0] || 'jpg';
-      const filename = `visionlight-${asset.id}.${ext}`;
+      const prefix = user?.view === "PICDRIFT" ? "picdrift" : "visualfx";
+      const filename = `${prefix}-${asset.id}.${ext}`;
       const downloadUrl = getDirectDownloadImageUrl(asset.url, filename) || asset.url;
       const link = document.createElement('a');
       link.href = downloadUrl;
@@ -533,7 +535,11 @@ export function AssetLibrary({
   const uploadLimitText =
     activeTab === "VIDEO" || (activeTab === "original" && originalMediaTab === "videos")
       ? "Video upload limit: 25MB"
-      : "Image upload limit: 10MB";
+      : "Image Size Limit: 10MB";
+  const uploadButtonLabel =
+    activeTab === "16:9" || activeTab === "9:16" || activeTab === "1:1"
+      ? "Bulk Convert Media"
+      : "Upload Media";
   const processingTabAssetCount = useMemo(() => {
     if (!processingTab || !Array.isArray(assets)) return 0;
 
@@ -568,6 +574,7 @@ export function AssetLibrary({
       (a) => a.id === selectedAsset.id,
     );
     if (currentIndex < filteredAssets.length - 1) {
+      setIsPreviewImageLoading(true);
       setSelectedAsset(filteredAssets[currentIndex + 1]);
     }
   };
@@ -578,6 +585,7 @@ export function AssetLibrary({
       (a) => a.id === selectedAsset.id,
     );
     if (currentIndex > 0) {
+      setIsPreviewImageLoading(true);
       setSelectedAsset(filteredAssets[currentIndex - 1]);
     }
   };
@@ -853,6 +861,7 @@ export function AssetLibrary({
 
     if (original) {
       setActiveTab("original");
+      setIsPreviewImageLoading(true);
       setSelectedAsset(original);
     } else {
       alert("Original asset not found (it may have been deleted).");
@@ -874,6 +883,7 @@ export function AssetLibrary({
     else if (latestVersion.aspectRatio === "9:16") setActiveTab("9:16");
     else if (latestVersion.aspectRatio === "1:1") setActiveTab("1:1");
 
+    setIsPreviewImageLoading(true);
     setSelectedAsset(latestVersion);
   };
 
@@ -921,6 +931,7 @@ export function AssetLibrary({
       return;
     }
 
+    setIsPreviewImageLoading(true);
     setSelectedAsset(matchedAsset);
   };
 
@@ -1064,7 +1075,7 @@ export function AssetLibrary({
                   <span className="text-sm font-extrabold">{uploadProgressPercent}%</span>
                 </div>
               ) : (
-                <span>Upload Media</span>
+                <span>{uploadButtonLabel}</span>
               )}
             </button>
             <p className="w-full text-[10px] font-semibold uppercase tracking-widest text-gray-500 sm:w-auto">
@@ -1165,6 +1176,7 @@ export function AssetLibrary({
                           handleUseImage(asset);
                           return;
                         }
+                        setIsPreviewImageLoading(true);
                         setSelectedAsset(asset);
                       }
                     }}
@@ -1441,7 +1453,14 @@ export function AssetLibrary({
                   loading="eager"
                   decoding="async"
                   fetchPriority="high"
+                  onLoad={() => setIsPreviewImageLoading(false)}
+                  onError={() => setIsPreviewImageLoading(false)}
                 />
+                {isPreviewImageLoading && (
+                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/45 backdrop-blur-[1px]">
+                    <LoadingSpinner size="lg" variant="neon" />
+                  </div>
+                )}
 
                 {/* Navigation Arrows (HIDDEN ON MOBILE for better touch experience) */}
                 <button

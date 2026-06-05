@@ -31,6 +31,7 @@ type ByokLandingPlan = {
   storageLabel?: string;
   adminLabel: string;
   retentionLabel: string;
+  features: string[];
   highlight?: string;
   featured?: boolean;
 };
@@ -47,9 +48,16 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=df674622-e11f-4e88-8564-4bb12365d5e5&checkoutFlowId=0ca462cc-de89-4e2c-b02e-bb83d3c7ee98",
     routingDomain: "byok.link",
     usersLabel: "1 user",
-    projectsLabel: "5 projects",
+    projectsLabel: "3 Project Timelines",
     adminLabel: "Admin panel locked",
-    retentionLabel: "Standard retention policy",
+    retentionLabel: "7 Day Storage",
+    features: [
+      "Nano Banana + GPT-2",
+      "Kling 2.6 Animation",
+      "1 User",
+      "3 Project Timelines",
+      "7 Day Storage",
+    ],
   },
   {
     code: "VFX_APP",
@@ -62,9 +70,16 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=8351c366-2837-44cd-8522-65ec3fecb56d&checkoutFlowId=05b75b73-c0ed-4ae2-ab13-130ab4628ca6",
     routingDomain: "byok.visionlight.app",
     usersLabel: "1 user",
-    projectsLabel: "5 projects",
+    projectsLabel: "3 Project Timelines",
     adminLabel: "Admin panel locked",
-    retentionLabel: "Standard retention policy",
+    retentionLabel: "7 Day Storage",
+    features: [
+      "PicDrift App",
+      "FX Video Models",
+      "1 User",
+      "3 Project Timelines",
+      "7 Day Storage",
+    ],
   },
   {
     code: "PD_STUDIO",
@@ -76,11 +91,19 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
     checkoutUrl:
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=dc751744-5641-4086-a510-7d203e187a79&checkoutFlowId=b5b1614d-e4d5-4352-804a-19d57d5225d0",
     routingDomain: "studio.byok.link",
-    usersLabel: "5 users",
-    projectsLabel: "120 projects",
-    storageLabel: "10GB shared storage",
+    usersLabel: "5 Team Members",
+    projectsLabel: "20 Project Timelines",
+    storageLabel: "1GB Storage",
     adminLabel: "Admin panel enabled",
-    retentionLabel: "30-day media retention",
+    retentionLabel: "Nano Banana + GPT-2",
+    features: [
+      "Nano Banana + GPT-2",
+      "Kling 2.6 Animation",
+      "Studio Admin Panel",
+      "5 Team Members",
+      "20 Project Timelines",
+      "1GB Storage",
+    ],
   },
   {
     code: "VFX_STUDIO",
@@ -92,17 +115,25 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
     checkoutUrl:
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=a97eb2df-59b6-4500-ba93-618171001d4b&checkoutFlowId=e90e22a5-29ed-4093-b268-7838c0fca777",
     routingDomain: "vfx.byok.link",
-    usersLabel: "10 users",
-    projectsLabel: "300 projects",
-    storageLabel: "30GB shared storage",
-    adminLabel: "Admin panel enabled",
-    retentionLabel: "45-day media retention",
+    usersLabel: "5 Team Members",
+    projectsLabel: "20 Project Timelines",
+    storageLabel: "1GB Storage",
+    adminLabel: "Studio",
+    retentionLabel: "PicDrift + FX Models",
+    features: [
+      "PicDrift",
+      "FX Models",
+      "Studio",
+      "5 Team Members",
+      "20 Project Timelines",
+      "1GB Storage",
+    ],
     highlight: "Most Popular",
     featured: true,
   },
   {
     code: "VFX_STUDIO_AGENCY",
-    title: "VisualFX Agency",
+    title: "VisualFX Studio Agency",
     monthlyPrice: "$197/mo",
     annualPrice: "$2,364/yr",
     blurb: "Agency-scale operations with expanded seats and project capacity.",
@@ -110,11 +141,19 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
     checkoutUrl:
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=4785cf91-670a-416f-8bb1-637b926bf2a0&checkoutFlowId=893f469b-9e21-4baa-bb7b-3217b96aa285",
     routingDomain: "agency.byok.link",
-    usersLabel: "25 users",
-    projectsLabel: "900 projects",
-    storageLabel: "80GB shared storage",
-    adminLabel: "Advanced admin controls",
-    retentionLabel: "90-day media retention",
+    usersLabel: "20 Team Members",
+    projectsLabel: "200 Project Timelines",
+    storageLabel: "5GB Storage",
+    adminLabel: "Studio Admin Panel",
+    retentionLabel: "PicDrift + FX Models",
+    features: [
+      "PicDrift",
+      "FX Models",
+      "Studio Admin Panel",
+      "20 Team Members",
+      "200 Project Timelines",
+      "5GB Storage",
+    ],
   },
 ];
 
@@ -132,10 +171,14 @@ export const ByokLanding = () => {
   const [showAuth, setShowAuth] = useState(false);
   const [showPackageSheet, setShowPackageSheet] = useState(false);
   const [packageBillingCycle, setPackageBillingCycle] = useState<BillingCycle>("monthly");
+  const [checkoutPlan, setCheckoutPlan] = useState<ByokLandingPlan | null>(null);
+  const [checkoutConfirmStep, setCheckoutConfirmStep] =
+    useState<"email" | "redirect" | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [showStudioLoader, setShowStudioLoader] = useState(false);
   const shouldStayOnLanding = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -301,6 +344,52 @@ export const ByokLanding = () => {
     }
   };
 
+  const handlePasswordResetRequest = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      notify.warning("Enter your email first.");
+      return;
+    }
+
+    setIsResettingPassword(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        normalizedEmail,
+        {
+          redirectTo: `${window.location.origin}/reset-password`,
+        },
+      );
+      if (error) throw error;
+      notify.success(
+        "If this email has an account, a password reset link has been sent by Supabase",
+      );
+    } catch (error: any) {
+      notify.error(error?.message || "Failed to send password reset link.");
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
+  const beginCheckout = (plan: ByokLandingPlan) => {
+    setCheckoutPlan(plan);
+    setCheckoutConfirmStep("email");
+  };
+
+  const closeCheckoutConfirm = () => {
+    setCheckoutPlan(null);
+    setCheckoutConfirmStep(null);
+  };
+
+  const proceedCheckoutConfirm = () => {
+    if (!checkoutPlan) return;
+    if (checkoutConfirmStep === "email") {
+      setCheckoutConfirmStep("redirect");
+      return;
+    }
+    window.open(checkoutPlan.checkoutUrl, "_blank", "noopener,noreferrer");
+    closeCheckoutConfirm();
+  };
+
   if (showStudioLoader) {
     return (
       <DashboardEntryLoader
@@ -344,7 +433,7 @@ export const ByokLanding = () => {
               }}
               className="rounded-2xl bg-gradient-to-r from-fuchsia-500 to-blue-500 px-8 py-4 text-sm font-black uppercase tracking-[0.14em] text-white shadow-[0_18px_45px_rgba(59,130,246,0.45)] transition hover:brightness-110"
             >
-              Link Key: Start Now
+              14 Day Free Trial: Start Now
             </button>
             <button
               type="button"
@@ -386,10 +475,10 @@ export const ByokLanding = () => {
           <h2 className="text-2xl font-black tracking-tight text-white">How It Works</h2>
           <div className="mt-6 grid gap-4">
             {[
-              ["1", "Signup", "Use email + password"],
-              ["2", "Link Fal Key", "Paste API key from Fal"],
-              ["3", "Render", "Trial starts immediately"],
-            ].map(([step, title, copy]) => (
+              ["1", "Start Trial", ""],
+              ["2", "Easy Setup", "Get Api Key from Fal.ai", "2 minutes"],
+              ["3", "Start Generating", ""],
+            ].map(([step, title, copy, meta]) => (
               <div
                 key={step}
                 className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
@@ -398,7 +487,12 @@ export const ByokLanding = () => {
                   Step {step}
                 </div>
                 <div className="mt-1 text-lg font-bold text-white">{title}</div>
-                <div className="text-sm text-slate-300">{copy}</div>
+                {copy && <div className="text-sm text-slate-300">{copy}</div>}
+                {meta && (
+                  <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">
+                    {meta}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -414,15 +508,34 @@ export const ByokLanding = () => {
           <div className="pointer-events-none absolute -bottom-24 -right-20 h-64 w-64 rounded-full bg-cyan-400/18 blur-3xl" />
 
           <div className="relative">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-200/85">
-              Prebuilt Dashboards
-            </p>
-            <h2 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">
-              Clean by Default. Ready Instantly.
-            </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300">
-              Same platform feel, now shown with real dashboard-style previews and model coverage.
-            </p>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-200/85">
+                  Prebuilt Dashboards
+                </p>
+                <h2 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">
+                  Clean by Default. Ready Instantly.
+                </h2>
+                <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300">
+                  Stop Paying Credit Markups.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode("signup");
+                  setShowAuth(true);
+                }}
+                className="rounded-xl border border-cyan-300/45 bg-cyan-400/12 px-5 py-3 text-left transition hover:bg-cyan-400/22 sm:min-w-56"
+              >
+                <span className="block text-xs font-black uppercase tracking-[0.14em] text-cyan-100">
+                  Start Free Trial
+                </span>
+                <span className="mt-1 block text-[11px] font-semibold text-cyan-200/85">
+                  14 Day Full Studio Access
+                </span>
+              </button>
+            </div>
           </div>
 
           <div className="relative mt-6 grid gap-3 rounded-2xl border border-white/10 bg-[#09142a]/85 p-4 text-sm text-slate-200 sm:grid-cols-3 sm:p-5">
@@ -533,18 +646,6 @@ export const ByokLanding = () => {
             </div>
           </div>
 
-          <div className="relative mt-7 flex justify-center">
-            <button
-              type="button"
-              onClick={() => {
-                setAuthMode("signup");
-                setShowAuth(true);
-              }}
-              className="rounded-xl border border-cyan-300/45 bg-cyan-400/12 px-7 py-3 text-xs font-bold uppercase tracking-[0.14em] text-cyan-100 transition hover:bg-cyan-400/22"
-            >
-              Start Your BYOK Workspace
-            </button>
-          </div>
         </div>
       </section>
 
@@ -638,9 +739,6 @@ export const ByokLanding = () => {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-300">
-                            {plan.code.replaceAll("_", " ")}
-                          </p>
                           <h4 className="mt-1 text-lg font-extrabold text-white">{plan.title}</h4>
                         </div>
                         {plan.highlight && (
@@ -649,9 +747,6 @@ export const ByokLanding = () => {
                           </span>
                         )}
                       </div>
-
-                      <p className="mt-3 text-[13px] leading-relaxed text-slate-300">{plan.blurb}</p>
-                      <p className="mt-1 text-[11px] text-slate-400">{plan.modelLine}</p>
 
                       <div className="relative mt-5 h-10 overflow-hidden">
                         <span
@@ -678,25 +773,24 @@ export const ByokLanding = () => {
                       </p>
 
                       <div className="mt-4 grid grid-cols-1 divide-y divide-white/10 rounded-xl border border-white/10 bg-[#0a1222]">
-                        <p className="px-3 py-2 text-xs text-slate-200">{plan.usersLabel}</p>
-                        <p className="px-3 py-2 text-xs text-slate-200">{plan.projectsLabel}</p>
-                        {plan.storageLabel && (
-                          <p className="px-3 py-2 text-xs text-slate-200">{plan.storageLabel}</p>
-                        )}
-                        <p className="px-3 py-2 text-xs text-slate-200">{plan.adminLabel}</p>
-                        <p className="px-3 py-2 text-xs text-slate-200">{plan.retentionLabel}</p>
-                        <p className="px-3 py-2 text-xs text-slate-300">Domain: {plan.routingDomain}</p>
+                        {plan.features.map((feature) => (
+                          <p
+                            key={feature}
+                            className="px-3 py-2 text-center text-xs text-slate-200"
+                          >
+                            {feature}
+                          </p>
+                        ))}
                       </div>
 
                       <div className="mt-4">
-                        <a
-                          href={plan.checkoutUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => beginCheckout(plan)}
                           className={`block w-full rounded-xl border px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.12em] transition ${BYOK_PLAN_BUTTON_CLASSES[plan.code] || "border-blue-300/60 bg-blue-500 text-white hover:bg-blue-400"}`}
                         >
                           Buy Now
-                        </a>
+                        </button>
                       </div>
                     </article>
                   );
@@ -711,6 +805,51 @@ export const ByokLanding = () => {
                 className="w-full rounded-xl border border-slate-500/50 bg-slate-900/70 px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-200 transition hover:border-slate-400 hover:bg-slate-800/80 sm:w-auto"
               >
                 I&apos;ll upgrade later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {checkoutPlan && checkoutConfirmStep && (
+        <div className="fixed inset-0 z-[45] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#081126] p-6 shadow-2xl">
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200">
+              {checkoutPlan.title}
+            </p>
+            {checkoutConfirmStep === "email" ? (
+              <>
+                <h3 className="mt-2 text-xl font-black text-white">
+                  Use Your Dashboard Email
+                </h3>
+                <p className="mt-3 text-sm leading-relaxed text-slate-300">
+                  Complete checkout using the same email you use for this BYOK dashboard so your package activates automatically.
+                </p>
+              </>
+            ) : (
+              <>
+                <h3 className="mt-2 text-xl font-black text-white">
+                  You Will Be Redirected To PicDrift For Checkout
+                </h3>
+                <p className="mt-3 text-sm leading-relaxed text-slate-300">
+                  PicDrift handles the secure payment page. Return to your dashboard after payment to finish activation.
+                </p>
+              </>
+            )}
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={closeCheckoutConfirm}
+                className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-200 hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={proceedCheckoutConfirm}
+                className="flex-1 rounded-xl bg-cyan-500 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-white hover:bg-cyan-400"
+              >
+                Proceed
               </button>
             </div>
           </div>
@@ -744,6 +883,16 @@ export const ByokLanding = () => {
                 className="w-full rounded-xl border border-white/15 bg-black/35 px-3 py-3 text-sm text-white outline-none focus:border-cyan-300"
                 required
               />
+              {authMode === "login" && (
+                <button
+                  type="button"
+                  onClick={handlePasswordResetRequest}
+                  disabled={isResettingPassword}
+                  className="text-xs font-semibold text-cyan-300 transition-colors hover:text-cyan-200 disabled:opacity-60"
+                >
+                  {isResettingPassword ? "Sending reset link..." : "Forgot password?"}
+                </button>
+              )}
               <div className="flex gap-2 pt-1">
                 <button
                   type="button"
