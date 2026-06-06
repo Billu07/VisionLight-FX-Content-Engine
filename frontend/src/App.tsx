@@ -11,6 +11,7 @@ import { Toaster } from "sonner";
 
 // --- EXISTING IMPORTS ---
 import { MarketingSite } from "./pages/MarketingSite";
+import { Pricing } from "./pages/Pricing";
 import Dashboard from "./pages/Dashboard";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import TenantDashboard from "./pages/TenantDashboard";
@@ -254,6 +255,7 @@ function App() {
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<MarketingSite />} />
+            <Route path="/pricing" element={<Pricing />} />
 
             {/* --- ADD THESE NEW ROUTES --- */}
             <Route path="/terms" element={<Terms />} />

@@ -327,6 +327,12 @@ const MarketingHeader = ({
         </a>
 
         <div className="hidden items-center gap-5 text-sm text-slate-200/85 md:flex">
+          <Link
+            to="/pricing"
+            className="font-semibold text-white transition-colors hover:text-cyan-200"
+          >
+            Pricing
+          </Link>
           <Link to="/terms" className="transition-colors hover:text-white">
             Terms
           </Link>
@@ -343,12 +349,20 @@ const MarketingHeader = ({
           </a>
         </div>
 
-        <button
-          onClick={onLogin}
-          className="rounded-full border border-white/35 bg-white/5 px-5 py-1.5 text-sm font-semibold text-white transition hover:bg-white/12"
-        >
-          Login
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/pricing"
+            className="text-sm font-semibold text-white transition-colors hover:text-cyan-200 md:hidden"
+          >
+            Pricing
+          </Link>
+          <button
+            onClick={onLogin}
+            className="rounded-full border border-white/35 bg-white/5 px-5 py-1.5 text-sm font-semibold text-white transition hover:bg-white/12"
+          >
+            Login
+          </button>
+        </div>
       </div>
     </header>
   );
