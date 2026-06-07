@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
+import { apiEndpoints } from "../lib/api";
 import { getSiteBrand } from "../lib/branding";
 import {
   STUDIO_PRICING_PLANS,
@@ -14,6 +15,24 @@ export const Pricing = () => {
   const [checkoutPlan, setCheckoutPlan] = useState<PricingPlan | null>(null);
   const [checkoutConfirmStep, setCheckoutConfirmStep] =
     useState<"email" | "redirect" | null>(null);
+  const [checkoutUrlOverrides, setCheckoutUrlOverrides] = useState<
+    Record<string, string>
+  >({});
+
+  useEffect(() => {
+    let active = true;
+    apiEndpoints
+      .byokGetCheckoutUrls()
+      .then((res) => {
+        if (active && res.data?.urls) setCheckoutUrlOverrides(res.data.urls);
+      })
+      .catch(() => {
+        // Keep the bundled fallback URLs if the endpoint is unreachable.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // BYOK domain keeps its own dedicated landing/package sheet.
   if (siteBrand === "byok") {
@@ -38,7 +57,9 @@ export const Pricing = () => {
       setCheckoutConfirmStep("redirect");
       return;
     }
-    window.open(checkoutPlan.checkoutUrl, "_blank", "noopener,noreferrer");
+    const checkoutUrl =
+      checkoutUrlOverrides[checkoutPlan.code] || checkoutPlan.checkoutUrl;
+    window.open(checkoutUrl, "_blank", "noopener,noreferrer");
     closeCheckoutConfirm();
   };
 

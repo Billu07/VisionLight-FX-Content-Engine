@@ -47,7 +47,7 @@ export const STUDIO_PRICING_PLANS: PricingPlan[] = [
       "Studio",
       "5 Team Members",
       "20 Project Timelines",
-      "1GB Storage",
+      "2GB Storage",
     ],
     highlight: "Most Popular",
     featured: true,

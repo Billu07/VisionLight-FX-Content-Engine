@@ -120,7 +120,7 @@ export const BYOK_PACKAGE_CONFIG: Record<ByokPackageCode, ByokPackageConfig> = {
     maxUsers: 5,
     maxProjectsTotal: 20,
     ownerMaxProjects: 3,
-    maxStorageMb: 1024,
+    maxStorageMb: 2048,
     storageRetentionDays: null,
     adminPanelLocked: false,
     renderDailyLimit: null,

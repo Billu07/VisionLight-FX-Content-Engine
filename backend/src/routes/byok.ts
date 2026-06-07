@@ -70,6 +70,18 @@ const BYOK_CHECKOUT_URLS: Record<ByokPackageCode, string> = {
     "https://www.picdrift.com/pricing-plans/checkout-1?planId=4785cf91-670a-416f-8bb1-637b926bf2a0&checkoutFlowId=893f469b-9e21-4baa-bb7b-3217b96aa285",
 };
 
+// Public source of truth for package checkout URLs. The landing and /pricing
+// pages fetch these so their checkout links can never drift from the backend
+// config (which is env-overridable). No auth: these are the same URLs already
+// embedded in the public marketing pages.
+router.get("/api/byok/checkout-urls", (_req, res) => {
+  const urls: Record<string, string> = {};
+  for (const [code, url] of Object.entries(BYOK_CHECKOUT_URLS)) {
+    if (url) urls[code] = url;
+  }
+  res.json({ success: true, urls });
+});
+
 type ActivationStatus = "PENDING" | "PROCESSED" | "ERROR";
 const CHECKOUT_INTENT_MATCH_WINDOW_MINUTES = Math.max(
   5,

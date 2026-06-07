@@ -117,7 +117,7 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
     routingDomain: "vfx.byok.link",
     usersLabel: "5 Team Members",
     projectsLabel: "20 Project Timelines",
-    storageLabel: "1GB Storage",
+    storageLabel: "2GB Storage",
     adminLabel: "Studio",
     retentionLabel: "PicDrift + FX Models",
     features: [
@@ -126,7 +126,7 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
       "Studio",
       "5 Team Members",
       "20 Project Timelines",
-      "1GB Storage",
+      "2GB Storage",
     ],
     highlight: "Most Popular",
     featured: true,
@@ -174,6 +174,9 @@ export const ByokLanding = () => {
   const [checkoutPlan, setCheckoutPlan] = useState<ByokLandingPlan | null>(null);
   const [checkoutConfirmStep, setCheckoutConfirmStep] =
     useState<"email" | "redirect" | null>(null);
+  const [checkoutUrlOverrides, setCheckoutUrlOverrides] = useState<
+    Record<string, string>
+  >({});
   const [authMode, setAuthMode] = useState<AuthMode>("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -276,6 +279,21 @@ export const ByokLanding = () => {
     if (!section) return;
     section.scrollIntoView({ behavior: "smooth", block: "start" });
   };
+
+  useEffect(() => {
+    let active = true;
+    apiEndpoints
+      .byokGetCheckoutUrls()
+      .then((res) => {
+        if (active && res.data?.urls) setCheckoutUrlOverrides(res.data.urls);
+      })
+      .catch(() => {
+        // Keep the bundled fallback URLs if the endpoint is unreachable.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const run = async () => {
@@ -386,7 +404,9 @@ export const ByokLanding = () => {
       setCheckoutConfirmStep("redirect");
       return;
     }
-    window.open(checkoutPlan.checkoutUrl, "_blank", "noopener,noreferrer");
+    const checkoutUrl =
+      checkoutUrlOverrides[checkoutPlan.code] || checkoutPlan.checkoutUrl;
+    window.open(checkoutUrl, "_blank", "noopener,noreferrer");
     closeCheckoutConfirm();
   };
 
