@@ -671,56 +671,72 @@ export const ByokLanding = () => {
       </footer>
 
       {showPackageSheet && (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-gray-950/90 p-0 backdrop-blur-md sm:p-4">
-          <div className="flex h-full w-full max-w-none flex-col overflow-hidden rounded-none border-0 bg-[#070f1f] p-4 shadow-[0_26px_70px_rgba(2,8,23,0.72)] sm:max-h-[86vh] sm:max-w-5xl sm:rounded-3xl sm:border sm:border-slate-600/45 sm:p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300">
-                  BYOK Packages
-                </p>
-                <h3 className="mt-1 text-xl font-extrabold text-white">Choose Your Package</h3>
-                <p className="mt-2 max-w-2xl rounded-lg border border-amber-300/40 bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-semibold leading-relaxed text-amber-100">
-                  Important: use the same email for checkout and BYOK login so your package activates instantly.
-                </p>
-              </div>
-              <div className="ml-auto flex items-center gap-2">
-                <div className="inline-flex rounded-lg border border-white/15 bg-[#0b1629] p-1">
-                  <button
-                    type="button"
-                    onClick={() => setPackageBillingCycle("monthly")}
-                    className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition ${
-                      packageBillingCycle === "monthly"
-                        ? "bg-cyan-300/20 text-cyan-100"
-                        : "text-slate-300 hover:text-white"
-                    }`}
-                  >
-                    Monthly
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPackageBillingCycle("annual")}
-                    className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition ${
-                      packageBillingCycle === "annual"
-                        ? "bg-cyan-300/20 text-cyan-100"
-                        : "text-slate-300 hover:text-white"
-                    }`}
-                  >
-                    Annually
-                  </button>
-                </div>
+        <div className="fixed inset-0 z-30 overflow-hidden bg-[#070a20] text-white">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.35),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.65),transparent_62%)]" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#170316] via-[#1a164f] to-[#0d2f59]" />
+
+          <div className="relative z-10 flex h-full w-full flex-col">
+            <header className="border-b border-white/10 bg-[#120f2b]/65 backdrop-blur-xl">
+              <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
+                <span className="text-lg font-black tracking-tight text-white">
+                  BYOK
+                  <span className="ml-1 bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent">
+                    Packages
+                  </span>
+                </span>
                 <button
                   type="button"
                   onClick={() => setShowPackageSheet(false)}
-                  className="rounded-lg border border-slate-500/50 bg-slate-900/70 px-3 py-2 text-[11px] font-semibold uppercase tracking-widest text-slate-200 transition hover:border-slate-400 hover:bg-slate-800/80"
+                  className="rounded-full border border-white/35 bg-white/5 px-5 py-1.5 text-sm font-semibold text-white transition hover:bg-white/12"
                 >
                   Close
                 </button>
               </div>
-            </div>
-            <div className="mt-3 border-t border-white/10" />
+            </header>
 
-            <div className="mt-4 flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 [-webkit-overflow-scrolling:touch] sm:pr-2">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
+              <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:py-14">
+                <div className="text-center">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-200/85">
+                    Bring Your Own Key
+                  </p>
+                  <h1 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
+                    Choose Your Package
+                  </h1>
+                  <p className="mx-auto mt-4 max-w-2xl text-base text-slate-300">
+                    Use your own Fal key and pay the provider directly. Cancel or upgrade anytime.
+                  </p>
+                  <p className="mx-auto mt-4 max-w-xl rounded-lg border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-[12px] font-semibold leading-relaxed text-amber-100">
+                    Important: use the same email for checkout and BYOK login so your package activates instantly.
+                  </p>
+
+                  <div className="mt-7 inline-flex rounded-xl border border-white/15 bg-[#0b1629] p-1">
+                    <button
+                      type="button"
+                      onClick={() => setPackageBillingCycle("monthly")}
+                      className={`rounded-lg px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+                        packageBillingCycle === "monthly"
+                          ? "bg-cyan-300/20 text-cyan-100"
+                          : "text-slate-300 hover:text-white"
+                      }`}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPackageBillingCycle("annual")}
+                      className={`rounded-lg px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+                        packageBillingCycle === "annual"
+                          ? "bg-cyan-300/20 text-cyan-100"
+                          : "text-slate-300 hover:text-white"
+                      }`}
+                    >
+                      Annually
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
                 {BYOK_LANDING_PLANS.map((plan, index) => {
                   const centeredRowClass =
                     BYOK_LANDING_PLANS.length === 5 && index === 3
@@ -795,17 +811,17 @@ export const ByokLanding = () => {
                     </article>
                   );
                 })}
+                </div>
+                <div className="mt-8 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowPackageSheet(false)}
+                    className="rounded-xl border border-slate-500/50 bg-slate-900/70 px-6 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-200 transition hover:border-slate-400 hover:bg-slate-800/80"
+                  >
+                    I&apos;ll upgrade later
+                  </button>
+                </div>
               </div>
-            </div>
-
-            <div className="mt-7 flex flex-wrap gap-3 border-t border-white/10 pt-5">
-              <button
-                type="button"
-                onClick={() => setShowPackageSheet(false)}
-                className="w-full rounded-xl border border-slate-500/50 bg-slate-900/70 px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-200 transition hover:border-slate-400 hover:bg-slate-800/80 sm:w-auto"
-              >
-                I&apos;ll upgrade later
-              </button>
             </div>
           </div>
         </div>
