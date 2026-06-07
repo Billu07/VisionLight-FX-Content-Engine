@@ -501,50 +501,54 @@ function Dashboard() {
       .filter((pkg) => pkg && pkg.code in BYOK_CHECKOUT_PLAN_META)
       .map((pkg) => {
         const meta = BYOK_CHECKOUT_PLAN_META[pkg.code as ByokPlanCode];
-        const featureRows: Record<
-          ByokPlanCode,
-          {
-            usersLabel: string;
-            projectsLabel: string;
-            adminLabel: string;
-            storageLabel: string;
-            retentionLabel: string;
-          }
-        > = {
+        const featureRows: Record<ByokPlanCode, { features: string[] }> = {
           PD_APP: {
-            usersLabel: "1 User",
-            projectsLabel: "3 Project Timelines",
-            adminLabel: "Kling 2.6 Animation",
-            storageLabel: "",
-            retentionLabel: "7 Day Storage",
+            features: [
+              "Nano Banana + GPT-2",
+              "Kling 2.6 Animation",
+              "1 User",
+              "3 Project Timelines",
+              "7 Day Storage",
+            ],
           },
           VFX_APP: {
-            usersLabel: "1 User",
-            projectsLabel: "3 Project Timelines",
-            adminLabel: "FX Video Models",
-            storageLabel: "",
-            retentionLabel: "7 Day Storage",
+            features: [
+              "PicDrift App",
+              "FX Video Models",
+              "1 User",
+              "3 Project Timelines",
+              "7 Day Storage",
+            ],
           },
           PD_STUDIO: {
-            usersLabel: "5 Team Members",
-            projectsLabel: "20 Project Timelines",
-            adminLabel: "Studio Admin Panel",
-            storageLabel: "1GB Storage",
-            retentionLabel: "Kling 2.6 Animation",
+            features: [
+              "Nano Banana + GPT-2",
+              "Kling 2.6 Animation",
+              "Studio Admin Panel",
+              "5 Team Members",
+              "20 Project Timelines",
+              "1GB Storage",
+            ],
           },
           VFX_STUDIO: {
-            usersLabel: "5 Team Members",
-            projectsLabel: "20 Project Timelines",
-            adminLabel: "Studio",
-            storageLabel: "1GB Storage",
-            retentionLabel: "FX Models",
+            features: [
+              "PicDrift",
+              "FX Models",
+              "Studio",
+              "5 Team Members",
+              "20 Project Timelines",
+              "1GB Storage",
+            ],
           },
           VFX_STUDIO_AGENCY: {
-            usersLabel: "20 Team Members",
-            projectsLabel: "200 Project Timelines",
-            adminLabel: "Studio Admin Panel",
-            storageLabel: "5GB Storage",
-            retentionLabel: "FX Models",
+            features: [
+              "PicDrift",
+              "FX Models",
+              "Studio Admin Panel",
+              "20 Team Members",
+              "200 Project Timelines",
+              "5GB Storage",
+            ],
           },
         };
         const rows = featureRows[pkg.code as ByokPlanCode];
@@ -3356,57 +3360,71 @@ function Dashboard() {
         )}
 
         {showByokUpgradeModal && (
-          <div className="fixed inset-0 z-[220] flex items-center justify-center bg-gray-950/90 p-0 backdrop-blur-md sm:p-4">
-            <div className="flex h-full w-full max-w-none flex-col overflow-hidden rounded-none border-0 bg-[#070f1f] p-4 shadow-[0_26px_70px_rgba(2,8,23,0.72)] sm:max-h-[86vh] sm:max-w-5xl sm:rounded-3xl sm:border sm:border-slate-600/45 sm:p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300">
-                    BYOK Packages
-                  </p>
-                  <h3 className="mt-1 text-xl font-extrabold text-white">Choose Your Package</h3>
-                  <p className="mt-2 max-w-2xl rounded-lg border border-amber-300/40 bg-amber-500/10 px-2.5 py-1.5 text-[11px] font-semibold leading-relaxed text-amber-100">
-                    Important: complete checkout using your dashboard email
-                    {user?.email ? ` (${user.email})` : ""} so package activation maps to your workspace instantly.
-                  </p>
-                </div>
-                <div className="ml-auto flex items-center gap-2">
-                  <div className="inline-flex rounded-lg border border-white/15 bg-[#0b1629] p-1">
-                    <button
-                      type="button"
-                      onClick={() => setByokPackageBillingCycle("monthly")}
-                      className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition ${
-                        byokPackageBillingCycle === "monthly"
-                          ? "bg-cyan-300/20 text-cyan-100"
-                          : "text-slate-300 hover:text-white"
-                      }`}
-                    >
-                      Monthly
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setByokPackageBillingCycle("annual")}
-                      className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition ${
-                        byokPackageBillingCycle === "annual"
-                          ? "bg-cyan-300/20 text-cyan-100"
-                          : "text-slate-300 hover:text-white"
-                      }`}
-                    >
-                      Annually
-                    </button>
-                  </div>
+          <div className="fixed inset-0 z-[220] overflow-hidden bg-[#070a20] text-white">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.35),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.65),transparent_62%)]" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#170316] via-[#1a164f] to-[#0d2f59]" />
+
+            <div className="relative z-10 flex h-full w-full flex-col">
+              <header className="border-b border-white/10 bg-[#120f2b]/65 backdrop-blur-xl">
+                <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
+                  <span className="text-lg font-black tracking-tight text-white">
+                    BYOK
+                    <span className="ml-1 bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent">
+                      Packages
+                    </span>
+                  </span>
                   <button
                     type="button"
                     onClick={closeByokUpgradeModal}
                     disabled={isByokActivationPolling}
-                    className="rounded-lg border border-slate-500/50 bg-slate-900/70 px-3 py-2 text-[11px] font-semibold uppercase tracking-widest text-slate-200 transition hover:border-slate-400 hover:bg-slate-800/80"
+                    className="rounded-full border border-white/35 bg-white/5 px-5 py-1.5 text-sm font-semibold text-white transition hover:bg-white/12 disabled:opacity-50"
                   >
                     Close
                   </button>
                 </div>
-              </div>
-              <div className="mt-3 border-t border-white/10" />
+              </header>
 
-              <div className="mt-4 flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 [-webkit-overflow-scrolling:touch] sm:pr-2">
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
+                <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:py-14">
+                  <div className="text-center">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-200/85">
+                      Upgrade Your Studio
+                    </p>
+                    <h1 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
+                      Choose Your Package
+                    </h1>
+                    <p className="mx-auto mt-4 max-w-xl rounded-lg border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-[12px] font-semibold leading-relaxed text-amber-100">
+                      Important: complete checkout using your dashboard email
+                      {user?.email ? ` (${user.email})` : ""} so package activation maps to your workspace instantly.
+                    </p>
+
+                    <div className="mt-7 inline-flex rounded-xl border border-white/15 bg-[#0b1629] p-1">
+                      <button
+                        type="button"
+                        onClick={() => setByokPackageBillingCycle("monthly")}
+                        className={`rounded-lg px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+                          byokPackageBillingCycle === "monthly"
+                            ? "bg-cyan-300/20 text-cyan-100"
+                            : "text-slate-300 hover:text-white"
+                        }`}
+                      >
+                        Monthly
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setByokPackageBillingCycle("annual")}
+                        className={`rounded-lg px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+                          byokPackageBillingCycle === "annual"
+                            ? "bg-cyan-300/20 text-cyan-100"
+                            : "text-slate-300 hover:text-white"
+                        }`}
+                      >
+                        Annually
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-10">
                 {isByokActivationPolling ? (
                   <div className="rounded-2xl border border-cyan-300/25 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.22),rgba(2,6,23,0.9)_62%)] p-8 text-center">
                     <div className="mx-auto mb-6 h-24 w-24">
@@ -3462,9 +3480,6 @@ function Dashboard() {
                               )}
                             </div>
 
-                            <p className="mt-3 text-[13px] leading-relaxed text-slate-300">{plan.blurb}</p>
-                            <p className="mt-1 text-[11px] text-slate-400">{plan.modelLine}</p>
-
                             <div className="relative mt-5 h-10 overflow-hidden">
                               <span
                                 className={`absolute left-0 top-0 text-[28px] font-extrabold text-white transition-all duration-300 ${
@@ -3492,14 +3507,14 @@ function Dashboard() {
                               </p>
 
                             <div className="mt-4 grid grid-cols-1 divide-y divide-white/10 rounded-xl border border-white/10 bg-[#0a1222]">
-                              <p className="px-3 py-2 text-xs text-slate-200">{plan.usersLabel}</p>
-                              <p className="px-3 py-2 text-xs text-slate-200">{plan.projectsLabel}</p>
-                              {plan.storageLabel && (
-                                <p className="px-3 py-2 text-xs text-slate-200">{plan.storageLabel}</p>
-                              )}
-                              <p className="px-3 py-2 text-xs text-slate-200">{plan.adminLabel}</p>
-                              <p className="px-3 py-2 text-xs text-slate-200">{plan.retentionLabel}</p>
-                              <p className="px-3 py-2 text-xs text-slate-300">Domain: {plan.routingDomain}</p>
+                              {plan.features.map((feature) => (
+                                <p
+                                  key={feature}
+                                  className="px-3 py-2 text-center text-xs text-slate-200"
+                                >
+                                  {feature}
+                                </p>
+                              ))}
                             </div>
 
                             <div className="mt-4 flex flex-col gap-2">
@@ -3528,11 +3543,11 @@ function Dashboard() {
                       </div>
                     )}
 
-                    <div className="mt-7 flex flex-wrap gap-3 border-t border-white/10 pt-5">
+                    <div className="mt-8 text-center">
                       <button
                         type="button"
                         onClick={closeByokUpgradeModal}
-                        className="w-full rounded-xl border border-slate-500/50 bg-slate-900/70 px-5 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-200 transition hover:border-slate-400 hover:bg-slate-800/80 sm:w-auto"
+                        className="rounded-xl border border-slate-500/50 bg-slate-900/70 px-6 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-200 transition hover:border-slate-400 hover:bg-slate-800/80"
                       >
                         I&apos;ll upgrade later
                       </button>
@@ -3559,6 +3574,8 @@ function Dashboard() {
                     )}
                   </>
                 )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
