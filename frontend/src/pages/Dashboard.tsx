@@ -3406,7 +3406,7 @@ function Dashboard() {
               </div>
               <div className="mt-3 border-t border-white/10" />
 
-              <div className="mt-4 overflow-y-auto pr-1 sm:pr-2">
+              <div className="mt-4 flex-1 min-h-0 overflow-y-auto overscroll-contain pr-1 [-webkit-overflow-scrolling:touch] sm:pr-2">
                 {isByokActivationPolling ? (
                   <div className="rounded-2xl border border-cyan-300/25 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.22),rgba(2,6,23,0.9)_62%)] p-8 text-center">
                     <div className="mx-auto mb-6 h-24 w-24">
