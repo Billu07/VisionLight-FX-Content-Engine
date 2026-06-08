@@ -14,8 +14,6 @@
     "db:repair-default-org-views": "tsx src/scripts/repair-default-org-views.ts",
     "jobs:byok-retention-cleanup": "tsx src/scripts/byok-retention-cleanup.ts",
     "jobs:byok-reconcile-report": "tsx src/scripts/byok-reconcile-report.ts",
-    "jobs:sync-studio-storage": "tsx src/scripts/sync-studio-storage.ts",
-    "jobs:list-byok-orgs": "tsx src/scripts/list-byok-orgs.ts",
     "jobs:byok-ops-alert-check": "tsx src/scripts/byok-ops-alert-check.ts",
     "jobs:recover-video": "tsx src/scripts/recover-video-jobs.ts",
     "vercel-build": "npm run build"

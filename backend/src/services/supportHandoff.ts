@@ -43,9 +43,16 @@ type WorkspaceSessionPayload = {
 };
 
 const HANDOFF_TTL_SECONDS = 60;
-const SUPPORT_SESSION_TTL_SECONDS = 15 * 60;
+// Read-only support sessions are GET-only (writes are blocked in auth middleware),
+// so a longer window is safe and prevents the session from expiring mid-review and
+// dropping the superadmin at the login screen on exit. Override via env if needed.
+const SUPPORT_SESSION_TTL_SECONDS = Number(
+  process.env.SUPPORT_SESSION_TTL_SECONDS || 60 * 60,
+);
 const WORKSPACE_HANDOFF_TTL_SECONDS = 60;
-const WORKSPACE_SESSION_TTL_SECONDS = 15 * 60;
+const WORKSPACE_SESSION_TTL_SECONDS = Number(
+  process.env.WORKSPACE_SESSION_TTL_SECONDS || 60 * 60,
+);
 
 const secret = (() => {
   const configured =

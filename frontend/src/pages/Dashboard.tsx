@@ -7,9 +7,11 @@ import {
   stopReadOnlyImpersonation,
   clearSupportSessionToken,
   setSupportSessionToken,
+  setAuthToken,
   getCORSProxyUrl,
   getCORSProxyVideoUrl,
 } from "../lib/api";
+import { supabase } from "../lib/supabase";
 import { confirmAction, notify } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { DashboardEntryLoader } from "../components/DashboardEntryLoader";
@@ -2479,6 +2481,34 @@ function Dashboard() {
         : "";
 
     try {
+      // Same-domain read-only: the superadmin's own Supabase session is still
+      // present on this domain. It may have refreshed in the background while the
+      // read-only view sat idle, so re-sync the API token from it and restore the
+      // superadmin directly. This prevents a stale/expired API token from dropping
+      // us at the login screen on exit. (Cross-domain has no local Supabase
+      // session, so this is skipped and the workspace handoff below runs.)
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          setAuthToken(session.access_token);
+          stopReadOnlyImpersonation();
+          clearSupportSessionToken();
+          const directAuth = await checkAuth();
+          if (directAuth.hasUser) {
+            const restored = useAuth.getState().user;
+            const isAdmin =
+              restored?.role === "ADMIN" || restored?.role === "SUPERADMIN";
+            navigate(isAdmin ? "/admin" : "/projects", { replace: true });
+            return;
+          }
+        }
+      } catch {
+        // No usable local Supabase session (cross-domain) — fall through to the
+        // workspace handoff path below.
+      }
+
       try {
         if (impersonatorId) {
           const handoffRes = await apiEndpoints.startWorkspaceHandoff(
