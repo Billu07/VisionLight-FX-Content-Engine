@@ -1236,22 +1236,17 @@ export function AssetLibrary({
                             asset.url || asset.proxyUrl || asset.hlsUrl || "",
                           );
                           const isTimelinePreview = asset.source === "timeline";
-                          const posterUrl = asset.spriteSheetUrl
-                            ? getCORSProxyUrl(asset.spriteSheetUrl, 400, 65)
-                            : undefined;
-                          // Uploaded originals have no generated poster sprite. Seek
-                          // to an early frame via a media fragment so the browser
-                          // paints a real thumbnail instead of a black box.
-                          const needsFrameThumb = !isTimelinePreview && !posterUrl;
-                          const thumbSrc = needsFrameThumb
-                            ? `${videoSrc}#t=0.1`
-                            : videoSrc;
+                          // Static grid thumbnail: a single seeked frame (#t) is a
+                          // clean image. The sprite sheet is a wide tiled strip used
+                          // for editor hover-scrubbing, not a single-frame poster.
+                          const thumbSrc = isTimelinePreview
+                            ? videoSrc
+                            : `${videoSrc}#t=0.1`;
                           return (
                         <video
                           src={thumbSrc}
-                          poster={posterUrl}
                           className={`w-full h-full object-contain ${isTimelinePreview ? "opacity-100" : "opacity-80"}`}
-                          preload={isTimelinePreview || needsFrameThumb ? "metadata" : "none"}
+                          preload="metadata"
                           autoPlay={isTimelinePreview}
                           loop={isTimelinePreview}
                           playsInline

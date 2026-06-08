@@ -30,7 +30,7 @@ export const assetsLogic = {
         );
 
         const videoRatio = requestedRatio === "VIDEO" ? "VIDEO" : "original";
-        return await airtableService.createAsset(
+        const videoAsset = await airtableService.createAsset(
           userId,
           videoUrl,
           videoRatio,
@@ -39,6 +39,17 @@ export const assetsLogic = {
           projectId,
           fileSizeBytes,
         );
+
+        // Generate the lightweight HLS proxy + sprite sheet in the background so
+        // uploaded videos scrub smoothly in the editor, just like generated ones.
+        processVideoAssetBackground(videoAsset.id, videoUrl, userId).catch((e) =>
+          console.error(
+            "[uploadRawAsset] sprite/HLS processing failed:",
+            e?.message || e,
+          ),
+        );
+
+        return videoAsset;
       }
 
       const metadata = await sharp(fileBuffer).metadata();
