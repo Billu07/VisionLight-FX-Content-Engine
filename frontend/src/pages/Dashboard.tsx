@@ -335,6 +335,13 @@ function Dashboard() {
   // Modals & UI Flags
   const [showBrandModal, setShowBrandModal] = useState(false);
   const [showWelcomeTour, setShowWelcomeTour] = useState(false);
+  const [welcomePostHidden, setWelcomePostHidden] = useState(
+    () => localStorage.getItem("visionlight_welcome_post_hidden") === "1",
+  );
+  const handleHideWelcomePost = () => {
+    localStorage.setItem("visionlight_welcome_post_hidden", "1");
+    setWelcomePostHidden(true);
+  };
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const mainPanelRef = useRef<HTMLDivElement | null>(null);
@@ -2833,11 +2840,17 @@ function Dashboard() {
     if (!Array.isArray(posts)) return [];
     return posts
       .filter((post: any) => post.status !== "CANCELLED")
-      .sort(
-        (a: any, b: any) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      );
-  }, [posts]);
+      .filter((post: any) => !(post.isSystemWelcome && welcomePostHidden))
+      .sort((a: any, b: any) => {
+        // Keep the system welcome video pinned to the top of the timeline,
+        // regardless of how much newer content gets generated after it.
+        if (a.isSystemWelcome && !b.isSystemWelcome) return -1;
+        if (!a.isSystemWelcome && b.isSystemWelcome) return 1;
+        return (
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      });
+  }, [posts, welcomePostHidden]);
 
   const displayedTimelinePosts = useMemo(
     () => timelinePosts.slice(0, timelineVisibleCount),
@@ -6209,7 +6222,8 @@ function Dashboard() {
                   <>
                     <div className="flex-1 min-h-0 space-y-3 overflow-y-auto custom-scrollbar pr-1">
                       {displayedTimelinePosts.length > 0 ? (
-                        displayedTimelinePosts.map((post: any) => (
+                        displayedTimelinePosts.map((post: any) => {
+                          const card = (
                             <PostCard
                               key={post.id}
                               post={post}
@@ -6259,7 +6273,24 @@ function Dashboard() {
                               }}
                               onAddToSequence={() => handleAddToSequence(post)}
                             />
-                          ))
+                          );
+                          if (post.isSystemWelcome) {
+                            return (
+                              <div key={post.id} className="relative">
+                                <button
+                                  type="button"
+                                  onClick={handleHideWelcomePost}
+                                  className="absolute right-2 top-2 z-30 rounded-full border border-white/15 bg-black/60 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-gray-200 backdrop-blur transition-colors hover:bg-black/80 hover:text-white"
+                                  title="Hide welcome video"
+                                >
+                                  Hide
+                                </button>
+                                {card}
+                              </div>
+                            );
+                          }
+                          return card;
+                        })
                       ) : !postsLoading ? (
                         <div className="text-center py-8">
                           <div className="text-purple-300 text-sm mb-3">
