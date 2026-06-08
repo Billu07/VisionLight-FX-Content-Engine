@@ -113,20 +113,29 @@ export const extractLastFrameAsJpeg = async (videoUrl: string): Promise<Buffer> 
   let localError: unknown;
 
   try {
-    try {
-      return await extractFromSource(videoUrl, outputPath);
-    } catch (error) {
-      remoteError = error;
-    }
-
-    // If direct remote extraction fails (common with some CDNs/range handling),
-    // download once and retry extraction from a local file path.
     if (/^https?:\/\//i.test(videoUrl)) {
+      // Download to a complete local file FIRST. A direct remote -sseof against a
+      // streamed/CDN source (e.g. Cloudinary) often lands on the first frame but
+      // still produces a valid image, so it silently returns the wrong frame. A
+      // local file with proper container headers seeks from the end reliably.
       try {
         await downloadVideoToFile(videoUrl, downloadPath);
         return await extractFromSource(downloadPath, outputPath);
       } catch (error) {
         localError = error;
+      }
+
+      // Only fall back to direct remote extraction if the download path failed.
+      try {
+        return await extractFromSource(videoUrl, outputPath);
+      } catch (error) {
+        remoteError = error;
+      }
+    } else {
+      try {
+        return await extractFromSource(videoUrl, outputPath);
+      } catch (error) {
+        remoteError = error;
       }
     }
 
