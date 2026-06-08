@@ -229,25 +229,30 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrandProvider>
         <Toaster
+          theme="dark"
           position="top-center"
-          richColors
           closeButton
-          visibleToasts={5}
-          duration={5200}
-          offset={20}
-          gap={10}
+          visibleToasts={4}
+          duration={4800}
+          offset={18}
+          gap={12}
           toastOptions={{
-            className:
-              "!w-[min(92vw,430px)] !bg-gray-950/96 !text-gray-100 !border !border-white/15 !backdrop-blur-xl !shadow-[0_18px_50px_rgba(2,8,23,0.52)]",
             classNames: {
-              title: "!text-gray-100",
-              description: "!text-gray-300",
+              toast:
+                "!w-[min(92vw,420px)] !items-start !gap-3 !rounded-2xl !border !border-white/10 !bg-[#0b0f1c]/90 !px-4 !py-3.5 !text-gray-100 !backdrop-blur-2xl !ring-1 !ring-inset !ring-white/5 !shadow-[0_24px_60px_-15px_rgba(0,0,0,0.75)]",
+              title: "!text-[13.5px] !font-semibold !tracking-tight !text-white",
+              description: "!mt-0.5 !text-[12.5px] !leading-relaxed !text-gray-400",
+              icon: "!mt-0.5",
               actionButton:
-                "!bg-cyan-300 !text-gray-950 !border !border-cyan-200/70 !font-semibold hover:!bg-cyan-200",
+                "!rounded-lg !bg-white !px-3 !py-1.5 !text-[11px] !font-bold !text-gray-900 !transition-colors hover:!bg-gray-200",
               cancelButton:
-                "!bg-white/10 !text-gray-200 !border !border-white/20 hover:!bg-white/15",
+                "!rounded-lg !border !border-white/12 !bg-white/[0.06] !px-3 !py-1.5 !text-[11px] !font-semibold !text-gray-200 !transition-colors hover:!bg-white/[0.12]",
               closeButton:
-                "!bg-gray-900/95 !text-gray-200 !border !border-white/20 hover:!bg-gray-800",
+                "!border !border-white/12 !bg-white/[0.08] !text-gray-300 !backdrop-blur hover:!bg-white/[0.16] hover:!text-white",
+              success: "!border-l-[3px] !border-l-emerald-400/90",
+              error: "!border-l-[3px] !border-l-rose-400/90",
+              warning: "!border-l-[3px] !border-l-amber-400/90",
+              info: "!border-l-[3px] !border-l-cyan-400/90",
             },
           }}
         />

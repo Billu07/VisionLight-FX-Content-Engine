@@ -21,19 +21,6 @@ const normalizeMessage = (message: unknown): string => {
 const CRITICAL_ACTION_PATTERN =
   /\b(delete|remove|purge|destroy|wipe|deactivat|forever)\b/i;
 
-const toastClassByType = {
-  success:
-    "!border-emerald-400/40 !bg-emerald-950/65 !text-emerald-100 !shadow-[0_10px_30px_rgba(16,185,129,0.22)]",
-  error:
-    "!border-rose-400/40 !bg-rose-950/65 !text-rose-100 !shadow-[0_10px_30px_rgba(244,63,94,0.24)]",
-  warning:
-    "!border-amber-400/40 !bg-amber-950/65 !text-amber-100 !shadow-[0_10px_30px_rgba(245,158,11,0.24)]",
-  info: "!border-cyan-400/40 !bg-cyan-950/65 !text-cyan-100 !shadow-[0_10px_30px_rgba(6,182,212,0.24)]",
-} as const;
-
-const baseToastClass =
-  "!rounded-xl !backdrop-blur-xl !ring-1 !ring-white/10 !font-medium !text-[13px]";
-
 const resolveCriticalConfirmationText = (message: string, explicit?: string) => {
   if (explicit?.trim()) return explicit.trim();
   const quoted = message.match(/"([^"]+)"/)?.[1]?.trim();
@@ -164,30 +151,14 @@ const requestTypedConfirmation = async (
   });
 
 export const notify = {
-  success: (message: unknown) =>
-    toast.success(normalizeMessage(message), {
-      className: `${baseToastClass} ${toastClassByType.success}`,
-    }),
+  success: (message: unknown) => toast.success(normalizeMessage(message)),
   successAction: (
     message: unknown,
     action: { label: string; onClick: () => void },
-  ) =>
-    toast.success(normalizeMessage(message), {
-      className: `${baseToastClass} ${toastClassByType.success}`,
-      action,
-    }),
-  error: (message: unknown) =>
-    toast.error(normalizeMessage(message), {
-      className: `${baseToastClass} ${toastClassByType.error}`,
-    }),
-  warning: (message: unknown) =>
-    toast.warning(normalizeMessage(message), {
-      className: `${baseToastClass} ${toastClassByType.warning}`,
-    }),
-  info: (message: unknown) =>
-    toast(normalizeMessage(message), {
-      className: `${baseToastClass} ${toastClassByType.info}`,
-    }),
+  ) => toast.success(normalizeMessage(message), { action }),
+  error: (message: unknown) => toast.error(normalizeMessage(message)),
+  warning: (message: unknown) => toast.warning(normalizeMessage(message)),
+  info: (message: unknown) => toast.info(normalizeMessage(message)),
 };
 
 export const confirmAction = (
@@ -204,7 +175,6 @@ export const confirmAction = (
     const id = toast.warning(message, {
       description: options.description,
       duration: Infinity,
-      className: `${baseToastClass} ${toastClassByType.warning}`,
       action: {
         label: options.confirmLabel || "Confirm",
         onClick: async () => {
