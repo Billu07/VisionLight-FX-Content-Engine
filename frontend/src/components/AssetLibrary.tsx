@@ -1236,16 +1236,22 @@ export function AssetLibrary({
                             asset.url || asset.proxyUrl || asset.hlsUrl || "",
                           );
                           const isTimelinePreview = asset.source === "timeline";
+                          const posterUrl = asset.spriteSheetUrl
+                            ? getCORSProxyUrl(asset.spriteSheetUrl, 400, 65)
+                            : undefined;
+                          // Uploaded originals have no generated poster sprite. Seek
+                          // to an early frame via a media fragment so the browser
+                          // paints a real thumbnail instead of a black box.
+                          const needsFrameThumb = !isTimelinePreview && !posterUrl;
+                          const thumbSrc = needsFrameThumb
+                            ? `${videoSrc}#t=0.1`
+                            : videoSrc;
                           return (
                         <video
-                          src={videoSrc}
-                          poster={
-                            asset.spriteSheetUrl
-                              ? getCORSProxyUrl(asset.spriteSheetUrl, 400, 65)
-                              : undefined
-                          }
+                          src={thumbSrc}
+                          poster={posterUrl}
                           className={`w-full h-full object-contain ${isTimelinePreview ? "opacity-100" : "opacity-80"}`}
-                          preload={isTimelinePreview ? "metadata" : "none"}
+                          preload={isTimelinePreview || needsFrameThumb ? "metadata" : "none"}
                           autoPlay={isTimelinePreview}
                           loop={isTimelinePreview}
                           playsInline

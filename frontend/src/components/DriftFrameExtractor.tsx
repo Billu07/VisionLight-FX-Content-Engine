@@ -294,10 +294,13 @@ export function DriftFrameExtractor({
     } catch (error) {
       console.error("Server-side end frame extraction failed:", error);
       const resolvedDuration = getResolvedVideoDuration(videoRef.current);
+      // When the duration is known, seek just before the end. When it isn't
+      // (some streamed/uploaded videos report 0 or Infinity), seek to a very
+      // large time so the browser clamps to the seekable end — never the start.
       const fallbackTime =
         resolvedDuration > 0
           ? Math.max(0, resolvedDuration - END_FRAME_EPSILON_SECONDS)
-          : Math.max(0, videoRef.current?.currentTime || 0);
+          : Number.MAX_SAFE_INTEGER;
       setIsExtracting(false);
       void extractAtTime(fallbackTime, true);
       return;
