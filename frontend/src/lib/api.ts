@@ -219,6 +219,11 @@ export const apiEndpoints = {
       timeout: 600000,
     }),
 
+  stockSearch: (params: { q?: string; page?: number; perPage?: number }) =>
+    api.get("/api/stock/search", { params }),
+  stockSave: (data: { url: string; projectId?: string }) =>
+    api.post("/api/stock/save", data),
+
   autoProcessAsset: (data: {
     originalAssetId: string;
     aspectRatio: string;

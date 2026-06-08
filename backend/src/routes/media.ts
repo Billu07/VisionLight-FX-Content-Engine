@@ -16,9 +16,137 @@ import {
   normalizeHostname,
   normalizeAssetUrl,
 } from "../lib/app-runtime";
+import { copyExternalImageToManagedStorage } from "../utils/managedStorage";
 
 const router = express.Router();
 const MAX_GENERATION_REFERENCE_IMAGES = 14;
+const PEXELS_API_KEY = process.env.PEXELS_API_KEY || "";
+
+// ==================== STOCK MEDIA (PEXELS) ====================
+// Native gallery backing the "Stock Media Library". Search proxies the free
+// Pexels API; save copies the chosen photo into managed storage and creates it
+// as an "original" asset so it lands in the Asset Library Originals tab.
+router.get(
+  "/api/stock/search",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    if (!PEXELS_API_KEY) {
+      return res
+        .status(503)
+        .json({ error: "Stock library is not configured (missing PEXELS_API_KEY)." });
+    }
+
+    const query =
+      typeof req.query.q === "string" ? req.query.q.trim().slice(0, 100) : "";
+    const page = Math.min(50, Math.max(1, Number(req.query.page) || 1));
+    const perPage = Math.min(40, Math.max(1, Number(req.query.perPage) || 24));
+
+    try {
+      const endpoint = query
+        ? "https://api.pexels.com/v1/search"
+        : "https://api.pexels.com/v1/curated";
+      const params: Record<string, any> = { page, per_page: perPage };
+      if (query) params.query = query;
+
+      const pexelsRes = await axios.get(endpoint, {
+        params,
+        headers: { Authorization: PEXELS_API_KEY },
+        timeout: 15000,
+      });
+
+      const photos = Array.isArray(pexelsRes.data?.photos)
+        ? pexelsRes.data.photos.map((p: any) => ({
+            id: p.id,
+            width: p.width,
+            height: p.height,
+            alt: typeof p.alt === "string" ? p.alt : "",
+            avgColor: p.avg_color || "#1f2937",
+            photographer: p.photographer || "",
+            photographerUrl: p.photographer_url || "",
+            pexelsUrl: p.url || "",
+            preview: p?.src?.medium || p?.src?.large || p?.src?.original || "",
+            full: p?.src?.large2x || p?.src?.original || p?.src?.large || "",
+          }))
+        : [];
+
+      return res.json({
+        success: true,
+        page,
+        perPage,
+        totalResults: pexelsRes.data?.total_results ?? null,
+        hasMore: Boolean(pexelsRes.data?.next_page),
+        photos,
+      });
+    } catch (error: any) {
+      console.error("[stock/search] Pexels error:", error?.message || error);
+      return res.status(502).json({ error: "Failed to load stock photos." });
+    }
+  },
+);
+
+router.post(
+  "/api/stock/save",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    if (!PEXELS_API_KEY) {
+      return res
+        .status(503)
+        .json({ error: "Stock library is not configured (missing PEXELS_API_KEY)." });
+    }
+
+    try {
+      const { url, projectId } = req.body;
+      if (typeof url !== "string" || !url.trim()) {
+        return res.status(400).json({ error: "Image URL is required." });
+      }
+
+      let host = "";
+      try {
+        host = new URL(url).hostname.toLowerCase();
+      } catch {
+        host = "";
+      }
+      if (!host.endsWith("pexels.com")) {
+        return res
+          .status(400)
+          .json({ error: "Only Pexels images can be saved from the stock library." });
+      }
+
+      if (projectId) {
+        const project = await airtableService.getProjectById(projectId);
+        if (!project || project.userId !== req.user!.id) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+
+      const managedUrl = await copyExternalImageToManagedStorage({
+        rawUrl: url,
+        keyPrefix: `visionlight/user_${req.user!.id}/stock`,
+      });
+
+      const sizeBytes = await storageQuotaService.detectRemoteFileSizeBytes(
+        managedUrl,
+      );
+
+      const asset = await airtableService.createAsset(
+        req.user!.id,
+        managedUrl,
+        "original",
+        "IMAGE",
+        undefined,
+        projectId || undefined,
+        sizeBytes ?? undefined,
+      );
+
+      return res.json({ success: true, asset });
+    } catch (error: any) {
+      console.error("[stock/save] error:", error?.message || error);
+      return res
+        .status(500)
+        .json({ error: error?.message || "Failed to save stock photo." });
+    }
+  },
+);
 
 const forceHttpsUrl = (rawUrl: string): string => {
   try {
