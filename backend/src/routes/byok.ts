@@ -1261,6 +1261,30 @@ router.get("/api/byok/status", authenticateToken, async (req: AuthenticatedReque
   }
 });
 
+// Lets a BYOK owner name their workspace (e.g. the post-signup "Name your studio"
+// step). Available regardless of package tier / admin-panel lock.
+router.patch(
+  "/api/byok/workspace-name",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const name = String(req.body?.name || "").trim().slice(0, 60);
+      if (!name) return res.status(400).json({ error: "Name is required." });
+      const status = await byokService.getStatusForSessionUser(req.user!.id);
+      if (!status?.isByok || !status.organizationId) {
+        return res.status(403).json({ error: "BYOK workspace required." });
+      }
+      await prisma.organization.update({
+        where: { id: status.organizationId },
+        data: { name },
+      });
+      return res.json({ success: true, name });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  },
+);
+
 router.get(
   "/api/superadmin/byok/organizations",
   authenticateToken,

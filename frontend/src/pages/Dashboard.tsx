@@ -342,6 +342,31 @@ function Dashboard() {
     localStorage.setItem("visionlight_welcome_post_hidden", "1");
     setWelcomePostHidden(true);
   };
+  const [showNameStudio, setShowNameStudio] = useState(false);
+  const [studioNameInput, setStudioNameInput] = useState("");
+  const [savingStudioName, setSavingStudioName] = useState(false);
+  const handleSaveStudioName = async () => {
+    const name = studioNameInput.trim();
+    if (!name) return;
+    setSavingStudioName(true);
+    try {
+      await apiEndpoints.byokSetWorkspaceName(name);
+      localStorage.setItem("visionlight_studio_named", "1");
+      setShowNameStudio(false);
+      await checkAuth();
+      notify.success("Studio named. Welcome aboard!");
+    } catch (error: any) {
+      notify.error(
+        error?.response?.data?.error || error?.message || "Failed to save name.",
+      );
+    } finally {
+      setSavingStudioName(false);
+    }
+  };
+  const handleSkipStudioName = () => {
+    localStorage.setItem("visionlight_studio_named", "1");
+    setShowNameStudio(false);
+  };
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const mainPanelRef = useRef<HTMLDivElement | null>(null);
@@ -1003,6 +1028,19 @@ function Dashboard() {
       setShowMissingFalKeyModal(true);
     }
   }, [manualTenantNeedsFalKey]);
+
+  // One-time "Name your studio" prompt for fresh BYOK workspaces (which are
+  // auto-named like "<email> BYOK" until the owner names them).
+  useEffect(() => {
+    if (!isByokWorkspace) return;
+    if (localStorage.getItem("visionlight_studio_named") === "1") return;
+    const orgName = (user?.organizationName || "").trim();
+    const looksUnnamed = !orgName || /\sBYOK$/i.test(orgName);
+    if (looksUnnamed) {
+      setStudioNameInput(orgName.replace(/\s*BYOK$/i, "").trim());
+      setShowNameStudio(true);
+    }
+  }, [isByokWorkspace, user?.organizationName]);
 
   // 3. Virtual sum (fixes timeline build errors)
   const userCredits =
@@ -3396,6 +3434,51 @@ function Dashboard() {
               onClose={() => setShowMissingFalKeyModal(false)}
               closeLabel="Close"
             />
+          </div>
+        )}
+
+        {showNameStudio && (
+          <div className="fixed inset-0 z-[212] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0a102b] p-6 shadow-2xl">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200">
+                Welcome
+              </p>
+              <h3 className="mt-2 text-xl font-black text-white">Name Your Studio</h3>
+              <p className="mt-2 text-sm text-slate-300">
+                Give your dashboard a name. You can change it later in the Admin Panel.
+              </p>
+              <input
+                type="text"
+                value={studioNameInput}
+                onChange={(e) => setStudioNameInput(e.target.value)}
+                placeholder="e.g. Acme Creative Studio"
+                maxLength={60}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && studioNameInput.trim()) {
+                    void handleSaveStudioName();
+                  }
+                }}
+                className="mt-4 w-full rounded-xl border border-white/15 bg-black/35 px-3 py-3 text-sm text-white outline-none focus:border-cyan-300"
+              />
+              <div className="mt-5 flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleSkipStudioName}
+                  className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-gray-200 hover:bg-white/10"
+                >
+                  Skip
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleSaveStudioName()}
+                  disabled={!studioNameInput.trim() || savingStudioName}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-white disabled:opacity-60"
+                >
+                  {savingStudioName ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

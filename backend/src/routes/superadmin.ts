@@ -298,6 +298,69 @@ router.delete("/organizations/:id", async (req: AuthenticatedRequest, res) => {
   }
 });
 
+// Release a previously-deleted / stuck email so it can sign up again from
+// scratch. Removes any lingering local profiles + their (non-default) orgs and
+// the leftover Supabase auth identity. Does NOT restore any past data.
+router.post("/release-email", async (req: AuthenticatedRequest, res) => {
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: "Email is required." });
+
+    const profiles = await prisma.user.findMany({
+      where: { email },
+      include: { organization: true },
+    });
+
+    const isProtected = profiles.some(
+      (p) => p.role === "SUPERADMIN" || p.organization?.isDefault === true,
+    );
+    if (isProtected) {
+      return res.status(400).json({
+        error:
+          "This email belongs to a superadmin or the default organization and cannot be released.",
+      });
+    }
+
+    const orgIds = Array.from(
+      new Set(
+        profiles
+          .filter(
+            (p) => p.organizationId && p.organization && !p.organization.isDefault,
+          )
+          .map((p) => p.organizationId as string),
+      ),
+    );
+
+    if (profiles.length > 0) {
+      await prisma.user.deleteMany({ where: { email } });
+      for (const orgId of orgIds) {
+        const remaining = await prisma.user.count({
+          where: { organizationId: orgId },
+        });
+        if (remaining === 0) {
+          await prisma.organization
+            .delete({ where: { id: orgId } })
+            .catch(() => undefined);
+        }
+      }
+    }
+
+    // With no local profiles left, this removes the lingering Supabase auth
+    // identity so the email can register again from a clean slate.
+    const authDeleted = await AuthService.deleteSupabaseUserByEmail(email);
+
+    return res.json({
+      success: true,
+      email,
+      profilesRemoved: profiles.length,
+      organizationsRemoved: orgIds.length,
+      authDeleted,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // Update Organization Status (Active/Inactive)
 router.put("/organizations/:id/status", async (req: AuthenticatedRequest, res) => {
   const { isActive } = req.body;

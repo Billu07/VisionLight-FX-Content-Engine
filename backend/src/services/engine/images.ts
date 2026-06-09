@@ -3,6 +3,7 @@ import sharp from "sharp";
 import { dbService as airtableService, Asset, CreditPool } from "../database"; // Fixed path
 import { FalService } from "../fal";
 import { ROIService } from "../roi";
+import { storageQuotaService } from "../storageQuota";
 import {
   uploadToCloudinary,
   downloadAndOptimizeImages,
@@ -81,6 +82,25 @@ export const imageLogic = {
         progress: 100,
         generationStep: "COMPLETED",
       });
+
+      // Auto-save every PicFX render into the Asset Library "Originals" folder
+      // so users don't have to "Move to Assets" each one manually.
+      try {
+        const detectedSizeBytes =
+          await storageQuotaService.detectRemoteFileSizeBytes(cloudUrl);
+        await airtableService.createAsset(
+          params.userId,
+          cloudUrl,
+          "original",
+          "IMAGE",
+          undefined,
+          params.projectId || undefined,
+          detectedSizeBytes ?? undefined,
+        );
+      } catch (e: any) {
+        console.warn("[PicFX] auto-save to Originals failed:", e?.message || e);
+      }
+
       await ROIService.incrementMediaGenerated(params.userId);
     } catch (e: any) {
       console.error("Image Gen Error:", e);

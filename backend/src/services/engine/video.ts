@@ -1094,7 +1094,11 @@ export const videoLogic = {
           const newAsset = await airtableService.createAsset(
             userId,
             url,
-            params.aspectRatio || "16:9",
+            // 3DX path videos live in the "3DX Paths" folder, which filters on
+            // aspectRatio === "VIDEO". Using the visual ratio (16:9/9:16/1:1)
+            // here left the asset matching no tab at all (the ratio tabs require
+            // IMAGE), so the folder showed empty.
+            "VIDEO",
             "VIDEO",
             undefined,
             post.projectId || undefined,

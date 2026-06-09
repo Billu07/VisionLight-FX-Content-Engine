@@ -501,6 +501,11 @@ export function PostCard({
             <video
               muted={true}
               loop
+              src={
+                post.generatedEndFrame
+                  ? getCORSProxyVideoUrl(getCleanUrl(post.mediaUrl))
+                  : `${getCORSProxyVideoUrl(getCleanUrl(post.mediaUrl))}#t=0.1`
+              }
               poster={post.generatedEndFrame || undefined}
               className={`w-full h-full ${compact ? "object-contain bg-black" : "object-cover"}`}
               onLoadedData={handleVideoLoad}
@@ -512,9 +517,7 @@ export function PostCard({
               preload="metadata"
               onMouseOver={(e) => minimal && e.currentTarget.play()}
               onMouseOut={(e) => minimal && e.currentTarget.pause()}
-            >
-              <source src={getCORSProxyVideoUrl(getCleanUrl(post.mediaUrl))} type="video/mp4" />
-            </video>
+            />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80">
               <LoadingSpinner size="sm" variant="neon" />

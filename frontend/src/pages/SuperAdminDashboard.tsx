@@ -268,6 +268,39 @@ export default function SuperAdminDashboard() {
   const { user: adminUser, checkAuth } = useAuth();
   const adminCreditLimitsEnabled = adminUser?.adminCreditLimitsEnabled === true;
   const [creditLimitsBusy, setCreditLimitsBusy] = useState(false);
+  const [releaseEmailInput, setReleaseEmailInput] = useState("");
+  const [releaseEmailBusy, setReleaseEmailBusy] = useState(false);
+  const handleReleaseEmail = async () => {
+    const email = releaseEmailInput.trim().toLowerCase();
+    if (!email) {
+      setMsg("Enter an email to release.");
+      return;
+    }
+    if (
+      !(await confirmAction(
+        `Release ${email} so it can sign up again? This permanently removes any leftover account data for this email. No past data is restored.`,
+        { confirmLabel: "Release" },
+      ))
+    ) {
+      return;
+    }
+    setReleaseEmailBusy(true);
+    try {
+      const res = await apiEndpoints.superadminReleaseEmail(email);
+      const d = res.data || {};
+      setMsg(
+        `Released ${email}. Removed ${d.profilesRemoved ?? 0} profile(s), ${d.organizationsRemoved ?? 0} org(s); auth ${d.authDeleted ? "cleared" : "not found"}. They can sign up again now.`,
+      );
+      setReleaseEmailInput("");
+    } catch (err: any) {
+      setMsg(
+        "Error: " +
+          (err?.response?.data?.error || err?.message || "Failed to release email."),
+      );
+    } finally {
+      setReleaseEmailBusy(false);
+    }
+  };
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<
@@ -1172,6 +1205,33 @@ export default function SuperAdminDashboard() {
             <button onClick={() => setMsg("")} className="text-lg">x</button>
           </div>
         )}
+
+        <div className="mb-8 rounded-xl border border-amber-300/20 bg-amber-500/[0.06] p-4">
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-amber-200">
+            Release Email
+          </p>
+          <p className="mt-1 text-xs text-gray-400">
+            Free up a deleted or stuck email so it can sign up again from scratch.
+            Removes leftover profiles/orgs and the auth identity. No past data is restored.
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <input
+              type="email"
+              value={releaseEmailInput}
+              onChange={(e) => setReleaseEmailInput(e.target.value)}
+              placeholder="user@email.com"
+              className="flex-1 rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-brand-accent"
+            />
+            <button
+              type="button"
+              onClick={() => void handleReleaseEmail()}
+              disabled={releaseEmailBusy}
+              className="rounded-lg border border-amber-400/40 bg-amber-500/15 px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-amber-100 transition-colors hover:bg-amber-500/25 disabled:opacity-60"
+            >
+              {releaseEmailBusy ? "Releasing…" : "Release Email"}
+            </button>
+          </div>
+        </div>
 
         {/* TAB CONTENT: GLOBAL PRESETS */}
         {activeTab === "global-presets" && (

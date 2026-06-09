@@ -98,6 +98,8 @@ export const apiEndpoints = {
   byokBootstrap: () => api.post("/api/byok/bootstrap"),
   byokLinkKey: (falApiKey: string) => api.post("/api/byok/link-key", { falApiKey }),
   byokGetCheckoutUrls: () => api.get("/api/byok/checkout-urls"),
+  byokSetWorkspaceName: (name: string) =>
+    api.patch("/api/byok/workspace-name", { name }),
   byokGetStatus: () => api.get("/api/byok/status"),
   adminCreateUser: (data: any) => api.post("/api/admin/create-user", data),
   adminGetUsers: () => api.get("/api/admin/users"),
@@ -121,6 +123,8 @@ export const apiEndpoints = {
     api.put(`/api/superadmin/users/${userId}`, data),
   superadminCreateDemoUser: (data: any) => api.post("/api/superadmin/users/demo", data),
   superadminCreateSuperAdmin: (data: any) => api.post("/api/superadmin/users/superadmin", data),
+  superadminReleaseEmail: (email: string) =>
+    api.post("/api/superadmin/release-email", { email }),
   superadminGetRequests: () => api.get("/api/superadmin/requests"),
   superadminResolveRequest: (id: string) => api.put(`/api/superadmin/requests/${id}/resolve`),
   superadminGetGlobalSettings: () => api.get("/api/superadmin/settings/global"),

@@ -1552,6 +1552,7 @@ router.post(
         timestamp: new Date().toISOString(),
         title: title || "",
         userId: req.user!.id,
+        projectId: projectId || undefined,
         chargedPool: pool,
         cost,
       };
