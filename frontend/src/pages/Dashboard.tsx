@@ -3114,9 +3114,13 @@ function Dashboard() {
               localStorage.removeItem("visionlight_active_project");
               navigate("/projects");
             } else if (tab === "sequencer" && !canUseVideoEditor) {
+              setActiveLibrarySlot(null);
               setTimelinePanelMode("storyline");
               setViewMode("history");
             } else {
+              // Close the Library window if it's open so the bottom-bar tab
+              // switch actually changes the visible view.
+              setActiveLibrarySlot(null);
               setViewMode(tab);
             }
           }}
