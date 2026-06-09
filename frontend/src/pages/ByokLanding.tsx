@@ -38,6 +38,28 @@ type ByokLandingPlan = {
 
 const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
   {
+    code: "BYOK_TRIAL",
+    title: "Free Trial",
+    monthlyPrice: "Free",
+    annualPrice: "Free",
+    blurb: "Full studio access with no credit card.",
+    modelLine: "Try every model",
+    checkoutUrl: "",
+    routingDomain: "byok.link",
+    usersLabel: "",
+    projectsLabel: "",
+    adminLabel: "",
+    retentionLabel: "",
+    features: [
+      "Full Studio Access",
+      "Seedance 2.0, Kling 3.0, VEO 3.1",
+      "5 Renders / Day",
+      "3 Project Timelines",
+      "14 Day Trial",
+    ],
+    highlight: "No Card Needed",
+  },
+  {
     code: "PD_APP",
     title: "PicDrift App",
     monthlyPrice: "$9/mo",
@@ -99,7 +121,6 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
     features: [
       "Nano Banana + GPT-2",
       "Kling 2.6 Animation",
-      "Studio Admin Panel",
       "5 Team Members",
       "20 Project Timelines",
       "1GB Storage",
@@ -122,8 +143,7 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
     retentionLabel: "PicDrift + FX Models",
     features: [
       "PicDrift",
-      "FX Models",
-      "Studio",
+      "Seedance 2.0, Kling 3.0, VEO 3.1",
       "5 Team Members",
       "20 Project Timelines",
       "2GB Storage",
@@ -148,8 +168,7 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
     retentionLabel: "PicDrift + FX Models",
     features: [
       "PicDrift",
-      "FX Models",
-      "Studio Admin Panel",
+      "Seedance 2.0, Kling 3.0, VEO 3.1",
       "20 Team Members",
       "200 Project Timelines",
       "5GB Storage",
@@ -158,6 +177,7 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
 ];
 
 const BYOK_PLAN_BUTTON_CLASSES: Record<string, string> = {
+  BYOK_TRIAL: "border-cyan-300/55 bg-cyan-500/90 text-cyan-50 hover:bg-cyan-400/95",
   PD_APP: "border-indigo-300/45 bg-indigo-500/85 text-indigo-50 hover:bg-indigo-400/90",
   VFX_APP: "border-sky-300/45 bg-sky-500/85 text-sky-50 hover:bg-sky-400/90",
   PD_STUDIO: "border-emerald-300/45 bg-emerald-500/85 text-emerald-50 hover:bg-emerald-400/90",
@@ -477,7 +497,7 @@ export const ByokLanding = () => {
             Packages start from $9/mo (annual billing).
           </p>
           <p className="mt-2 text-sm text-cyan-200/85">
-            14-day trial with full dashboard access.
+            No Credit Card required.
           </p>
           <button
             type="button"
@@ -534,7 +554,7 @@ export const ByokLanding = () => {
                   Prebuilt Dashboards
                 </p>
                 <h2 className="mt-2 text-3xl font-black tracking-tight text-white sm:text-4xl">
-                  Clean by Default. Ready Instantly.
+                  Ready Instantly.
                 </h2>
                 <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-300">
                   Stop Paying Credit Markups.
@@ -546,12 +566,12 @@ export const ByokLanding = () => {
                   setAuthMode("signup");
                   setShowAuth(true);
                 }}
-                className="rounded-xl border border-cyan-300/45 bg-cyan-400/12 px-5 py-3 text-left transition hover:bg-cyan-400/22 sm:min-w-56"
+                className="rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 px-6 py-3.5 text-left shadow-[0_14px_35px_rgba(59,130,246,0.4)] transition hover:brightness-110 sm:min-w-56"
               >
-                <span className="block text-xs font-black uppercase tracking-[0.14em] text-cyan-100">
-                  Start Free Trial
+                <span className="block text-sm font-black uppercase tracking-[0.14em] text-white">
+                  Start Free Trial →
                 </span>
-                <span className="mt-1 block text-[11px] font-semibold text-cyan-200/85">
+                <span className="mt-0.5 block text-[11px] font-semibold text-cyan-50/90">
                   14 Day Full Studio Access
                 </span>
               </button>
@@ -701,7 +721,7 @@ export const ByokLanding = () => {
                 <span className="text-lg font-black tracking-tight text-white">
                   BYOK
                   <span className="ml-1 bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent">
-                    Packages
+                    Dashboards
                   </span>
                 </span>
                 <button
@@ -721,13 +741,10 @@ export const ByokLanding = () => {
                     Bring Your Own Key
                   </p>
                   <h1 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
-                    Choose Your Package
+                    Choose Your Dashboard
                   </h1>
                   <p className="mx-auto mt-4 max-w-2xl text-base text-slate-300">
                     Use your own Fal key and pay the provider directly. Cancel or upgrade anytime.
-                  </p>
-                  <p className="mx-auto mt-4 max-w-xl rounded-lg border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-[12px] font-semibold leading-relaxed text-amber-100">
-                    Important: use the same email for checkout and BYOK login so your package activates instantly.
                   </p>
 
                   <div className="mt-7 inline-flex rounded-xl border border-white/15 bg-[#0b1629] p-1">
@@ -822,10 +839,18 @@ export const ByokLanding = () => {
                       <div className="mt-4">
                         <button
                           type="button"
-                          onClick={() => beginCheckout(plan)}
+                          onClick={() => {
+                            if (plan.code === "BYOK_TRIAL") {
+                              setShowPackageSheet(false);
+                              setAuthMode("signup");
+                              setShowAuth(true);
+                              return;
+                            }
+                            beginCheckout(plan);
+                          }}
                           className={`block w-full rounded-xl border px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.12em] transition ${BYOK_PLAN_BUTTON_CLASSES[plan.code] || "border-blue-300/60 bg-blue-500 text-white hover:bg-blue-400"}`}
                         >
-                          Buy Now
+                          {plan.code === "BYOK_TRIAL" ? "Start Free Trial" : "Buy Now"}
                         </button>
                       </div>
                     </article>
@@ -885,7 +910,7 @@ export const ByokLanding = () => {
                 onClick={proceedCheckoutConfirm}
                 className="flex-1 rounded-xl bg-cyan-500 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-white hover:bg-cyan-400"
               >
-                Proceed
+                {checkoutConfirmStep === "email" ? "Next" : "Proceed"}
               </button>
             </div>
           </div>
