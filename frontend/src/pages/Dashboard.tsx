@@ -533,7 +533,6 @@ function Dashboard() {
             features: [
               "Nano Banana + GPT-2",
               "Kling 2.6 Animation",
-              "Studio Admin Panel",
               "5 Team Members",
               "20 Project Timelines",
               "1GB Storage",
@@ -542,8 +541,7 @@ function Dashboard() {
           VFX_STUDIO: {
             features: [
               "PicDrift",
-              "FX Models",
-              "Studio",
+              "Seedance 2.0, Kling 3.0, VEO 3.1",
               "5 Team Members",
               "20 Project Timelines",
               "2GB Storage",
@@ -552,8 +550,7 @@ function Dashboard() {
           VFX_STUDIO_AGENCY: {
             features: [
               "PicDrift",
-              "FX Models",
-              "Studio Admin Panel",
+              "Seedance 2.0, Kling 3.0, VEO 3.1",
               "20 Team Members",
               "200 Project Timelines",
               "5GB Storage",
@@ -3413,7 +3410,7 @@ function Dashboard() {
                   <span className="text-lg font-black tracking-tight text-white">
                     BYOK
                     <span className="ml-1 bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent">
-                      Packages
+                      Dashboards
                     </span>
                   </span>
                   <button
@@ -3434,12 +3431,8 @@ function Dashboard() {
                       Upgrade Your Studio
                     </p>
                     <h1 className="mt-3 text-4xl font-black tracking-tight text-white sm:text-5xl">
-                      Choose Your Package
+                      Choose Your Dashboard
                     </h1>
-                    <p className="mx-auto mt-4 max-w-xl rounded-lg border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-[12px] font-semibold leading-relaxed text-amber-100">
-                      Important: complete checkout using your dashboard email
-                      {user?.email ? ` (${user.email})` : ""} so package activation maps to your workspace instantly.
-                    </p>
 
                     <div className="mt-7 inline-flex rounded-xl border border-white/15 bg-[#0b1629] p-1">
                       <button
@@ -3664,7 +3657,7 @@ function Dashboard() {
                   onClick={proceedByokCheckoutConfirm}
                   className="flex-1 rounded-xl bg-cyan-500 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-white hover:bg-cyan-400"
                 >
-                  Proceed
+                  {byokCheckoutConfirmStep === "email" ? "Next" : "Proceed"}
                 </button>
               </div>
             </div>

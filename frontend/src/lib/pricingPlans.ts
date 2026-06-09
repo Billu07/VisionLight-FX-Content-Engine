@@ -28,7 +28,6 @@ export const STUDIO_PRICING_PLANS: PricingPlan[] = [
     features: [
       "Nano Banana + GPT-2",
       "Kling 2.6 Animation",
-      "Studio Admin Panel",
       "5 Team Members",
       "20 Project Timelines",
       "1GB Storage",
@@ -43,8 +42,7 @@ export const STUDIO_PRICING_PLANS: PricingPlan[] = [
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=a97eb2df-59b6-4500-ba93-618171001d4b&checkoutFlowId=e90e22a5-29ed-4093-b268-7838c0fca777",
     features: [
       "PicDrift",
-      "FX Models",
-      "Studio",
+      "Seedance 2.0, Kling 3.0, VEO 3.1",
       "5 Team Members",
       "20 Project Timelines",
       "2GB Storage",
@@ -61,8 +59,7 @@ export const STUDIO_PRICING_PLANS: PricingPlan[] = [
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=4785cf91-670a-416f-8bb1-637b926bf2a0&checkoutFlowId=893f469b-9e21-4baa-bb7b-3217b96aa285",
     features: [
       "PicDrift",
-      "FX Models",
-      "Studio Admin Panel",
+      "Seedance 2.0, Kling 3.0, VEO 3.1",
       "20 Team Members",
       "200 Project Timelines",
       "5GB Storage",
