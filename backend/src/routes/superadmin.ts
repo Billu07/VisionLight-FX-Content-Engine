@@ -381,6 +381,33 @@ router.put("/organizations/:id/status", async (req: AuthenticatedRequest, res) =
   }
 });
 
+// Toggle a tenant's Demo indicator. Demo on => tenantPlan DEMO with no trial
+// end date (a manual, non-expiring demo badge controlled by the superadmin).
+// Demo off => PAID.
+router.put("/organizations/:id/demo", async (req: AuthenticatedRequest, res) => {
+  try {
+    const isDemo = req.body?.isDemo === true;
+    const existingOrg = await dbService.getOrganization(req.params.id);
+    if (!existingOrg) {
+      return res.status(404).json({ error: "Organization not found." });
+    }
+    if (existingOrg.isDefault) {
+      return res.status(400).json({
+        error: "Default system organization cannot be set to demo.",
+      });
+    }
+    await prisma.organization.update({
+      where: { id: req.params.id },
+      data: isDemo
+        ? { tenantPlan: "DEMO", trialEndsAt: null }
+        : { tenantPlan: "PAID" },
+    });
+    res.json({ success: true, isDemo });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Update Organization Config/Limits
 router.put("/organizations/:id/limits", async (req: AuthenticatedRequest, res) => {
   const { maxUsers, maxProjectsTotal, maxStorageMb, name, view } = req.body;

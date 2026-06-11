@@ -43,6 +43,7 @@ interface User {
   isOrganizationOwner?: boolean;
   isProtectedFromRemoval?: boolean;
   protectionReason?: "SUPERADMIN" | "TENANT_OWNER" | null;
+  createdAt?: string;
   adminNotes?: string | null;
 }
 
@@ -270,6 +271,9 @@ export default function SuperAdminDashboard() {
   const [creditLimitsBusy, setCreditLimitsBusy] = useState(false);
   const [releaseEmailInput, setReleaseEmailInput] = useState("");
   const [releaseEmailBusy, setReleaseEmailBusy] = useState(false);
+  const [userView, setUserView] = useState<
+    "recent" | "oldest" | "alpha" | "demo" | "active"
+  >("recent");
   const handleReleaseEmail = async () => {
     const email = releaseEmailInput.trim().toLowerCase();
     if (!email) {
@@ -357,7 +361,8 @@ export default function SuperAdminDashboard() {
     maxProjectsTotal: 0,
     maxStorageMb: 10240,
     view: "VISIONLIGHT",
-    isActive: true
+    isActive: true,
+    isDemo: false,
   });
 
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -816,6 +821,12 @@ export default function SuperAdminDashboard() {
       if (!editingTenant.isDefault && editingTenant.isActive !== tenantUpdates.isActive) {
         await apiEndpoints.superadminUpdateOrgStatus(editingTenant.id, tenantUpdates.isActive);
       }
+      if (
+        !editingTenant.isDefault &&
+        ((editingTenant as any).tenantPlan === "DEMO") !== tenantUpdates.isDemo
+      ) {
+        await apiEndpoints.superadminSetOrgDemo(editingTenant.id, tenantUpdates.isDemo);
+      }
       setMsg(editingTenant.isDefault ? "Default organization updated." : "Tenant updated.");
       setEditingTenant(null);
       fetchInitialData();
@@ -840,7 +851,8 @@ export default function SuperAdminDashboard() {
       maxProjectsTotal: t.maxProjectsTotal,
       maxStorageMb: t.maxStorageMb || 10240,
       view: adminUser ? adminUser.view : "VISIONLIGHT",
-      isActive: t.isActive
+      isActive: t.isActive,
+      isDemo: (t as any).tenantPlan === "DEMO",
     });
   };
 
@@ -973,6 +985,31 @@ export default function SuperAdminDashboard() {
   const demoUsers = useMemo(() => {
     return users.filter(u => u.isDemo === true);
   }, [users]);
+
+  const visibleUsers = useMemo(() => {
+    let list = [...users];
+    if (userView === "demo") list = list.filter((u) => u.isDemo === true);
+    else if (userView === "active") list = list.filter((u) => u.isDemo !== true);
+
+    if (userView === "alpha") {
+      list.sort((a, b) =>
+        (a.name || a.email).localeCompare(b.name || b.email),
+      );
+    } else if (userView === "oldest") {
+      list.sort(
+        (a, b) =>
+          new Date(a.createdAt || 0).getTime() -
+          new Date(b.createdAt || 0).getTime(),
+      );
+    } else {
+      list.sort(
+        (a, b) =>
+          new Date(b.createdAt || 0).getTime() -
+          new Date(a.createdAt || 0).getTime(),
+      );
+    }
+    return list;
+  }, [users, userView]);
 
   const variantRows = useMemo(() => {
     return COVERAGE_VARIANTS.map((variant) => {
@@ -1516,10 +1553,25 @@ export default function SuperAdminDashboard() {
 
             <div className={adminUi.tablePanel}>
               <div className={adminUi.panelHeader}>
-                <h2 className={adminUi.sectionTitle}>All Platform Users</h2>
-                <p className={adminUi.sectionCopy}>
-                  Use read-only entry for support/debugging. Passwords can be reset from Manage.
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className={adminUi.sectionTitle}>All Platform Users</h2>
+                    <p className={adminUi.sectionCopy}>
+                      Use read-only entry for support/debugging. Passwords can be reset from Manage.
+                    </p>
+                  </div>
+                  <select
+                    value={userView}
+                    onChange={(e) => setUserView(e.target.value as any)}
+                    className="rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-xs font-semibold text-gray-200 outline-none focus:border-brand-accent"
+                  >
+                    <option value="recent">Recently Added</option>
+                    <option value="oldest">Oldest</option>
+                    <option value="alpha">Alphabetical</option>
+                    <option value="demo">Demo Users</option>
+                    <option value="active">Active</option>
+                  </select>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[900px] text-left">
@@ -1533,7 +1585,7 @@ export default function SuperAdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {users.map((u) => {
+                    {visibleUsers.map((u) => {
                       const org = tenants.find((t) => t.id === u.organizationId);
                       return (
                         <tr key={u.id} className={adminUi.tableRow}>
@@ -2783,6 +2835,33 @@ export default function SuperAdminDashboard() {
                         Deactivated
                       </button>
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Demo Indicator</label>
+                    <div className="flex gap-4">
+                      <button
+                        onClick={() => setTenantUpdates({ ...tenantUpdates, isDemo: true })}
+                        className={`flex-1 py-3 rounded-lg border text-xs font-bold uppercase tracking-widest transition-colors ${tenantUpdates.isDemo
+                            ? "bg-amber-500/10 border-amber-500/50 text-amber-400"
+                            : "bg-gray-950 border-gray-800 text-gray-500 hover:text-white"
+                          }`}
+                      >
+                        Demo On
+                      </button>
+                      <button
+                        onClick={() => setTenantUpdates({ ...tenantUpdates, isDemo: false })}
+                        className={`flex-1 py-3 rounded-lg border text-xs font-bold uppercase tracking-widest transition-colors ${!tenantUpdates.isDemo
+                            ? "bg-gray-700/30 border-gray-600 text-gray-200"
+                            : "bg-gray-950 border-gray-800 text-gray-500 hover:text-white"
+                          }`}
+                      >
+                        Demo Off
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-gray-500 leading-relaxed">
+                      Shows a "Demo" badge on this tenant's dashboard. Manual &mdash; it stays on until you turn it off (no auto-expiry).
+                    </p>
                   </div>
                 </>
               )}
