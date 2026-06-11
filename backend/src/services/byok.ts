@@ -483,15 +483,24 @@ export const byokService = {
       wixTransactionId?: string | null;
       source?: string;
       raw?: any;
+      // Superadmin manual assignment may convert a standard (non-BYOK) tenant
+      // into a managed package tenant. The webhook path never sets this.
+      allowNonByok?: boolean;
     },
   ) {
     const pkg = BYOK_PACKAGE_CONFIG[packageCode];
     if (!pkg) throw new Error("Unsupported package code.");
     const org = await prisma.organization.findUnique({
       where: { id: organizationId },
-      select: { id: true, provisioningSource: true },
+      select: { id: true, provisioningSource: true, isDefault: true },
     });
-    if (!org || org.provisioningSource !== "BYOK") {
+    if (!org) {
+      throw new Error("Organization not found.");
+    }
+    if (org.isDefault) {
+      throw new Error("The default organization cannot be assigned a package.");
+    }
+    if (org.provisioningSource !== "BYOK" && !metadata.allowNonByok) {
       throw new Error("BYOK organization not found.");
     }
 

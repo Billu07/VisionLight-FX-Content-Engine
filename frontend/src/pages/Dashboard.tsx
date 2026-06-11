@@ -3810,17 +3810,10 @@ function Dashboard() {
                     className="h-9 w-9 rounded-xl border border-white/10 bg-white/5 object-contain p-1 sm:h-11 sm:w-11"
                   />
                 )}
-                <div className="flex items-center gap-2">
+                <div>
                   <h1 className="text-xl sm:text-3xl md:text-4xl font-bold leading-tight brand-gradient-text">
                     {companyName}
                   </h1>
-                  {!isByokWorkspace &&
-                    user?.organizationTenantPlan === "DEMO" && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-amber-300">
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
-                        Demo
-                      </span>
-                    )}
                 </div>
               </div>
             </div>

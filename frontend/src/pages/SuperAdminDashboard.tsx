@@ -371,8 +371,8 @@ export default function SuperAdminDashboard() {
     maxStorageMb: 10240,
     view: "VISIONLIGHT",
     isActive: true,
-    isDemo: false,
   });
+  const [planPackageCode, setPlanPackageCode] = useState("VFX_STUDIO");
 
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [userUpdates, setUserUpdates] = useState({
@@ -830,17 +830,45 @@ export default function SuperAdminDashboard() {
       if (!editingTenant.isDefault && editingTenant.isActive !== tenantUpdates.isActive) {
         await apiEndpoints.superadminUpdateOrgStatus(editingTenant.id, tenantUpdates.isActive);
       }
-      if (
-        !editingTenant.isDefault &&
-        ((editingTenant as any).tenantPlan === "DEMO") !== tenantUpdates.isDemo
-      ) {
-        await apiEndpoints.superadminSetOrgDemo(editingTenant.id, tenantUpdates.isDemo);
-      }
       setMsg(editingTenant.isDefault ? "Default organization updated." : "Tenant updated.");
       setEditingTenant(null);
       fetchInitialData();
     } catch (err: any) {
       setMsg("Error: " + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Manual Demo/Paid control. "Demo" puts the tenant on the 14-day trial
+  // (BYOK_TRIAL); a package code makes them paid/premium. Both apply the
+  // package's limits and route the tenant through the BYOK lifecycle (badge,
+  // render gating, upgrade prompt on expiry) — works for BYOK and standard.
+  const handleSetTenantPlan = async (orgId: string, packageCode: string) => {
+    const isDemo = packageCode === "BYOK_TRIAL";
+    const label = isDemo ? "a 14-day Demo" : `the ${packageCode} package`;
+    if (
+      !window.confirm(
+        `Set this tenant to ${label}? This applies that plan's user / storage / project limits.`,
+      )
+    ) {
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await apiEndpoints.superadminActivateByokPackage({
+        organizationId: orgId,
+        packageCode,
+      });
+      setMsg(
+        isDemo
+          ? "Tenant set to a 14-day demo."
+          : `Tenant upgraded to ${packageCode}.`,
+      );
+      setEditingTenant(null);
+      fetchInitialData();
+    } catch (err: any) {
+      setMsg("Error: " + (err?.message || "Failed to update plan."));
     } finally {
       setActionLoading(false);
     }
@@ -861,7 +889,6 @@ export default function SuperAdminDashboard() {
       maxStorageMb: t.maxStorageMb || 10240,
       view: adminUser ? adminUser.view : "VISIONLIGHT",
       isActive: t.isActive,
-      isDemo: (t as any).tenantPlan === "DEMO",
     });
   };
 
@@ -2846,30 +2873,66 @@ export default function SuperAdminDashboard() {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Demo Indicator</label>
-                    <div className="flex gap-4">
-                      <button
-                        onClick={() => setTenantUpdates({ ...tenantUpdates, isDemo: true })}
-                        className={`flex-1 py-3 rounded-lg border text-xs font-bold uppercase tracking-widest transition-colors ${tenantUpdates.isDemo
-                            ? "bg-amber-500/10 border-amber-500/50 text-amber-400"
-                            : "bg-gray-950 border-gray-800 text-gray-500 hover:text-white"
-                          }`}
+                  <div className="space-y-3 rounded-lg border border-gray-800 bg-gray-950/60 p-4">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                        Plan &amp; Billing
+                      </label>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest border ${
+                          (editingTenant as any).tenantPlan === "DEMO"
+                            ? "border-amber-500/50 bg-amber-500/10 text-amber-400"
+                            : (editingTenant as any).tenantPlan === "PAID"
+                              ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
+                              : "border-gray-700 bg-gray-900 text-gray-400"
+                        }`}
                       >
-                        Demo On
-                      </button>
-                      <button
-                        onClick={() => setTenantUpdates({ ...tenantUpdates, isDemo: false })}
-                        className={`flex-1 py-3 rounded-lg border text-xs font-bold uppercase tracking-widest transition-colors ${!tenantUpdates.isDemo
-                            ? "bg-gray-700/30 border-gray-600 text-gray-200"
-                            : "bg-gray-950 border-gray-800 text-gray-500 hover:text-white"
-                          }`}
+                        {(editingTenant as any).tenantPlan === "DEMO"
+                          ? "Demo"
+                          : (editingTenant as any).tenantPlan === "PAID"
+                            ? `Premium${(editingTenant as any).entitlementCode ? ` · ${(editingTenant as any).entitlementCode}` : ""}`
+                            : "Standard"}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void handleSetTenantPlan(editingTenant.id, "BYOK_TRIAL")
+                      }
+                      disabled={actionLoading}
+                      className="w-full py-2.5 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs font-bold uppercase tracking-widest transition-colors hover:bg-amber-500/20 disabled:opacity-50"
+                    >
+                      Start 14-Day Demo
+                    </button>
+
+                    <div className="flex gap-2">
+                      <select
+                        value={planPackageCode}
+                        onChange={(e) => setPlanPackageCode(e.target.value)}
+                        className="flex-1 rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-xs font-semibold text-gray-200 outline-none focus:border-brand-accent"
                       >
-                        Demo Off
+                        <option value="PD_APP">PicDrift App</option>
+                        <option value="VFX_APP">VisualFX App</option>
+                        <option value="PD_STUDIO">PicDrift Studio</option>
+                        <option value="VFX_STUDIO">VisualFX Studio</option>
+                        <option value="VFX_STUDIO_AGENCY">Studio Agency</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleSetTenantPlan(editingTenant.id, planPackageCode)
+                        }
+                        disabled={actionLoading}
+                        className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-emerald-300 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
+                      >
+                        Make Paid
                       </button>
                     </div>
                     <p className="text-[10px] text-gray-500 leading-relaxed">
-                      Shows a "Demo" badge on this tenant's dashboard. Manual &mdash; it stays on until you turn it off (no auto-expiry).
+                      Demo = 14-day trial (Demo badge). After it ends, the tenant keeps
+                      their dashboard &amp; content but can&rsquo;t render until upgraded.
+                      Paid applies the chosen package&rsquo;s limits (Premium badge).
                     </p>
                   </div>
                 </>

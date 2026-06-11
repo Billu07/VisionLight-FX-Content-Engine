@@ -1329,10 +1329,13 @@ router.post(
       const organizationId =
         typeof req.body?.organizationId === "string" ? req.body.organizationId : "";
       const packageCode = typeof req.body?.packageCode === "string" ? req.body.packageCode : "";
+      // Superadmin can assign any paid package, or put a tenant on the 14-day
+      // demo (BYOK_TRIAL). This works for BYOK and standard tenants alike.
+      const allowedCodes: string[] = [...BYOK_PACKAGE_ORDER, "BYOK_TRIAL"];
       if (
         !organizationId ||
         !packageCode ||
-        !BYOK_PACKAGE_ORDER.includes(packageCode as ByokPackageCode)
+        !allowedCodes.includes(packageCode)
       ) {
         return res.status(400).json({ error: "Invalid activation payload." });
       }
@@ -1342,6 +1345,7 @@ router.post(
         packageCode as ByokPackageCode,
         {
           source: "superadmin_manual",
+          allowNonByok: true,
           raw: { by: "superadmin_manual", packageCode },
         },
       );
