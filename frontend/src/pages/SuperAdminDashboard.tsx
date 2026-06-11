@@ -1478,14 +1478,32 @@ export default function SuperAdminDashboard() {
                             {organizationAdmin?.email || "No admin email"}
                           </div>
                           <div className="mt-2 flex flex-wrap gap-2">
-                            <span className={adminUi.pill}>
-                              {t.isDefault
-                                ? "Default Org"
+                            {(() => {
+                              const demoExpired =
+                                t.tenantPlan === "DEMO" &&
+                                !!t.trialEndsAt &&
+                                new Date(t.trialEndsAt).getTime() <= Date.now();
+                              const badge = t.isDefault
+                                ? { label: "Default Org", cls: "border-emerald-400/25 bg-emerald-400/10 text-emerald-300" }
                                 : t.tenantPlan === "DEMO"
-                                  ? "Demo Tenant"
-                                  : "Paid Tenant"}
-                            </span>
-                            {t.trialEndsAt && (
+                                  ? demoExpired
+                                    ? { label: "Demo · Expired", cls: "border-red-500/40 bg-red-500/10 text-red-400" }
+                                    : { label: "Demo", cls: "border-amber-500/45 bg-amber-500/10 text-amber-400" }
+                                  : t.tenantPlan === "PAID"
+                                    ? {
+                                        label: `Premium${(t as any).entitlementCode ? ` · ${(t as any).entitlementCode}` : ""}`,
+                                        cls: "border-emerald-500/45 bg-emerald-500/10 text-emerald-400",
+                                      }
+                                    : { label: "Standard", cls: "border-gray-700 bg-gray-900 text-gray-400" };
+                              return (
+                                <span
+                                  className={`rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${badge.cls}`}
+                                >
+                                  {badge.label}
+                                </span>
+                              );
+                            })()}
+                            {t.trialEndsAt && t.tenantPlan === "DEMO" && (
                               <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-amber-300">
                                 Ends {new Date(t.trialEndsAt).toLocaleDateString()}
                               </span>
