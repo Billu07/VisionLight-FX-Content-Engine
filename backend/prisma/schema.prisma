@@ -166,6 +166,8 @@ model GlobalSettings {
   costPicDrift_Plus_10s Float @default(1.12)
 
   costPicFX_Standard Float @default(0.08)
+  costPicFX_Nano     Float @default(0.12)
+  costPicFX_Gpt2     Float @default(0.155)
   costPicFX_Carousel Float @default(0.2)
   costPicFX_Batch    Float @default(0.08)
 
