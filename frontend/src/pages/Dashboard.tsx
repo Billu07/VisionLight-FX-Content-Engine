@@ -3801,6 +3801,23 @@ function Dashboard() {
                 </div>
               </div>
             )}
+            {user?.demoExpired && !isByokWorkspace && (
+              <div className="rounded-2xl border border-amber-500/40 bg-gradient-to-r from-amber-500/15 to-rose-500/10 p-4 shadow-xl">
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 text-lg leading-none">⚠️</span>
+                  <div>
+                    <span className="font-bold uppercase tracking-widest text-amber-300">
+                      Demo period ended
+                    </span>
+                    <p className="mt-1 text-xs leading-relaxed text-amber-100/85">
+                      Your 14-day demo has ended. Your dashboard and content are still
+                      here, but you can&rsquo;t create or render anything until your plan
+                      is upgraded. Please contact your administrator to upgrade.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {loadedBrandLogoUrl && (
@@ -3810,10 +3827,27 @@ function Dashboard() {
                     className="h-9 w-9 rounded-xl border border-white/10 bg-white/5 object-contain p-1 sm:h-11 sm:w-11"
                   />
                 )}
-                <div>
+                <div className="flex items-center gap-2">
                   <h1 className="text-xl sm:text-3xl md:text-4xl font-bold leading-tight brand-gradient-text">
                     {companyName}
                   </h1>
+                  {!isByokWorkspace &&
+                    user?.organizationTenantPlan === "DEMO" && (
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest ${
+                          user?.demoExpired
+                            ? "border-rose-400/40 bg-rose-400/10 text-rose-300"
+                            : "border-amber-400/40 bg-amber-400/10 text-amber-300"
+                        }`}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            user?.demoExpired ? "bg-rose-300" : "bg-amber-300"
+                          }`}
+                        />
+                        {user?.demoExpired ? "Demo Ended" : "Demo"}
+                      </span>
+                    )}
                 </div>
               </div>
             </div>

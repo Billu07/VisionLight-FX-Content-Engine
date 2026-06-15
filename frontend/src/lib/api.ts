@@ -113,6 +113,8 @@ export const apiEndpoints = {
   superadminDeleteOrganization: (id: string) => api.delete(`/api/superadmin/organizations/${id}`),
   superadminUpdateOrgStatus: (id: string, isActive: boolean) => api.put(`/api/superadmin/organizations/${id}/status`, { isActive }),
   superadminUpdateOrgLimits: (id: string, data: any) => api.put(`/api/superadmin/organizations/${id}/limits`, data),
+  superadminSetOrgPlan: (id: string, plan: "DEMO" | "PAID", trialDays?: number) =>
+    api.put(`/api/superadmin/organizations/${id}/plan`, { plan, trialDays }),
   superadminGetUsers: () => api.get("/api/superadmin/users"),
   superadminCheckEmailStatus: (data: {
     email: string;

@@ -21,7 +21,12 @@ export async function getTenantApiKeys(userId: string) {
   const openAIKey = encryptionUtils.decrypt(org?.openaiApiKey);
 
   if (!isDefaultOrg && !noOrg) {
-    if (org?.isActive === false || isOrganizationExpired(org)) {
+    if (isOrganizationExpired(org) && org?.isActive !== false) {
+      throw new Error(
+        "Your 14-day demo has ended. Contact your administrator to upgrade and resume rendering.",
+      );
+    }
+    if (org?.isActive === false) {
       throw new Error(
         "Your organization is currently deactivated. Please contact your platform administrator.",
       );

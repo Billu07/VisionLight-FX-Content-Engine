@@ -497,24 +497,25 @@ router.get(
       let isOrgActive = true;
       let needsActivation = false;
       let orgLockReason: "DEACTIVATED" | "MISSING_FAL_KEY" | "SEAT_LOCKED" | null = null;
+      let demoExpired = false;
 
       if (org && !isDefaultOrg) {
         const seatLocked = req.user?.seatLocked === true;
-        const isDeactivated = org.isActive === false || isOrganizationExpired(org);
-        if (isOrganizationExpired(org) && org.isActive !== false) {
-          void airtableService.updateOrganizationStatus(org.id, false).catch((error: any) =>
-            console.warn("[auth/me] Failed to mark expired demo tenant inactive:", error?.message || error),
-          );
-        }
         const hasFalKey = !!org.falApiKey;
         if (seatLocked) {
           isOrgActive = false;
           needsActivation = true;
           orgLockReason = "SEAT_LOCKED";
-        } else if (isDeactivated) {
+        } else if (org.isActive === false) {
+          // Explicitly deactivated by a superadmin — full lockout.
           isOrgActive = false;
           needsActivation = true;
           orgLockReason = "DEACTIVATED";
+        } else if (isOrganizationExpired(org)) {
+          // Demo trial ended: the tenant keeps their dashboard + content, but
+          // rendering is blocked (enforced in getTenantApiKeys) with an upgrade
+          // prompt. We intentionally do NOT deactivate the org here.
+          demoExpired = true;
         } else if (!hasFalKey) {
           isOrgActive = false;
           needsActivation = true;
@@ -571,6 +572,7 @@ router.get(
           isOrgActive,
           organizationIsDefault: isDefaultOrg === true,
           organizationTenantPlan: org?.tenantPlan || null,
+          demoExpired,
           needsActivation,
           orgLockReason,
           byok: byokStatus,

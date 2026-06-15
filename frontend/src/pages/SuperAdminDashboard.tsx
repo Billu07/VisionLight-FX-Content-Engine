@@ -840,16 +840,38 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  // Manual Demo/Paid control. "Demo" puts the tenant on the 14-day trial
-  // (BYOK_TRIAL); a package code makes them paid/premium. Both apply the
-  // package's limits and route the tenant through the BYOK lifecycle (badge,
-  // render gating, upgrade prompt on expiry) — works for BYOK and standard.
-  const handleSetTenantPlan = async (orgId: string, packageCode: string) => {
-    const isDemo = packageCode === "BYOK_TRIAL";
-    const label = isDemo ? "a 14-day Demo" : `the ${packageCode} package`;
+  // Isolation-preserving plan flip for a (manual) tenant. Only changes
+  // tenantPlan / trial window — keeps their view, domain, and provisioning, so a
+  // view-specific manual tenant stays on picdrift.studio / visualfx.studio.
+  const handleSetManualPlan = async (orgId: string, plan: "DEMO" | "PAID") => {
+    const label = plan === "DEMO" ? "a 14-day Demo" : "Paid";
     if (
       !window.confirm(
-        `Set this tenant to ${label}? This applies that plan's user / storage / project limits.`,
+        `Set this tenant to ${label}? This keeps their view, domain, and limits — it only changes the plan status.`,
+      )
+    ) {
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await apiEndpoints.superadminSetOrgPlan(orgId, plan, 14);
+      setMsg(plan === "DEMO" ? "Tenant set to a 14-day demo." : "Tenant marked as paid.");
+      setEditingTenant(null);
+      fetchInitialData();
+    } catch (err: any) {
+      setMsg("Error: " + (err?.message || "Failed to update plan."));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Explicit package activation. This intentionally routes the tenant through
+  // the BYOK package lifecycle: it applies the package's limits AND its domain /
+  // view. Use this only when you want package-specific domain routing.
+  const handleActivatePackage = async (orgId: string, packageCode: string) => {
+    if (
+      !window.confirm(
+        `Activate the ${packageCode} package for this tenant? This applies the package's limits AND moves them onto that package's domain.`,
       )
     ) {
       return;
@@ -860,15 +882,11 @@ export default function SuperAdminDashboard() {
         organizationId: orgId,
         packageCode,
       });
-      setMsg(
-        isDemo
-          ? "Tenant set to a 14-day demo."
-          : `Tenant upgraded to ${packageCode}.`,
-      );
+      setMsg(`Tenant activated on ${packageCode}.`);
       setEditingTenant(null);
       fetchInitialData();
     } catch (err: any) {
-      setMsg("Error: " + (err?.message || "Failed to update plan."));
+      setMsg("Error: " + (err?.message || "Failed to activate package."));
     } finally {
       setActionLoading(false);
     }
@@ -2913,45 +2931,69 @@ export default function SuperAdminDashboard() {
                       </span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void handleSetTenantPlan(editingTenant.id, "BYOK_TRIAL")
-                      }
-                      disabled={actionLoading}
-                      className="w-full py-2.5 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs font-bold uppercase tracking-widest transition-colors hover:bg-amber-500/20 disabled:opacity-50"
-                    >
-                      Start 14-Day Demo
-                    </button>
-
+                    {/* Plan flip — keeps the tenant on their own view-based
+                        domain (no BYOK, no domain change). */}
                     <div className="flex gap-2">
-                      <select
-                        value={planPackageCode}
-                        onChange={(e) => setPlanPackageCode(e.target.value)}
-                        className="flex-1 rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-xs font-semibold text-gray-200 outline-none focus:border-brand-accent"
-                      >
-                        <option value="PD_APP">PicDrift App</option>
-                        <option value="VFX_APP">VisualFX App</option>
-                        <option value="PD_STUDIO">PicDrift Studio</option>
-                        <option value="VFX_STUDIO">VisualFX Studio</option>
-                        <option value="VFX_STUDIO_AGENCY">Studio Agency</option>
-                      </select>
                       <button
                         type="button"
                         onClick={() =>
-                          void handleSetTenantPlan(editingTenant.id, planPackageCode)
+                          void handleSetManualPlan(editingTenant.id, "DEMO")
                         }
                         disabled={actionLoading}
-                        className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-emerald-300 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
+                        className="flex-1 py-2.5 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs font-bold uppercase tracking-widest transition-colors hover:bg-amber-500/20 disabled:opacity-50"
                       >
-                        Make Paid
+                        Start 14-Day Demo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleSetManualPlan(editingTenant.id, "PAID")
+                        }
+                        disabled={actionLoading}
+                        className="flex-1 py-2.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 text-xs font-bold uppercase tracking-widest transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
+                      >
+                        Mark as Paid
                       </button>
                     </div>
                     <p className="text-[10px] text-gray-500 leading-relaxed">
-                      Demo = 14-day trial (Demo badge). After it ends, the tenant keeps
-                      their dashboard &amp; content but can&rsquo;t render until upgraded.
-                      Paid applies the chosen package&rsquo;s limits (Premium badge).
+                      Keeps their view &amp; {tenantUpdates.view === "PICDRIFT" ? "picdrift.studio" : "visualfx.studio"} domain.
+                      Demo = 14-day trial; after it ends they keep their dashboard &amp;
+                      content but can&rsquo;t render until upgraded.
                     </p>
+
+                    {/* Explicit package activation — intentionally applies the
+                        package's domain routing (moves them onto a BYOK domain). */}
+                    <div className="border-t border-gray-800 pt-3">
+                      <label className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">
+                        Activate a package (advanced)
+                      </label>
+                      <div className="mt-2 flex gap-2">
+                        <select
+                          value={planPackageCode}
+                          onChange={(e) => setPlanPackageCode(e.target.value)}
+                          className="flex-1 rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-xs font-semibold text-gray-200 outline-none focus:border-brand-accent"
+                        >
+                          <option value="PD_APP">PicDrift App</option>
+                          <option value="VFX_APP">VisualFX App</option>
+                          <option value="PD_STUDIO">PicDrift Studio</option>
+                          <option value="VFX_STUDIO">VisualFX Studio</option>
+                          <option value="VFX_STUDIO_AGENCY">Studio Agency</option>
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleActivatePackage(editingTenant.id, planPackageCode)
+                          }
+                          disabled={actionLoading}
+                          className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-cyan-300 transition-colors hover:bg-cyan-500/20 disabled:opacity-50"
+                        >
+                          Activate
+                        </button>
+                      </div>
+                      <p className="mt-2 text-[10px] text-amber-300/70 leading-relaxed">
+                        Moves the tenant onto the package&rsquo;s domain &amp; limits (BYOK lifecycle). Use only when you want package-specific routing.
+                      </p>
+                    </div>
                   </div>
                 </>
               )}

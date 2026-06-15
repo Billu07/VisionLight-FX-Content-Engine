@@ -381,6 +381,41 @@ router.put("/organizations/:id/status", async (req: AuthenticatedRequest, res) =
   }
 });
 
+// Isolation-preserving plan flip for a manually-created tenant. This ONLY
+// changes tenantPlan / trialEndsAt — it never touches provisioningSource,
+// routingDomain, or view, so a view-specific manual tenant stays on its own
+// picdrift.studio / visualfx.studio domain and out of BYOK. DEMO opens a trial
+// window; PAID clears it. (Package activation is a separate, explicit action.)
+router.put("/organizations/:id/plan", async (req: AuthenticatedRequest, res) => {
+  try {
+    const plan = String(req.body?.plan || "").toUpperCase() === "DEMO" ? "DEMO" : "PAID";
+    const trialDays = Math.max(1, Math.min(365, Number(req.body?.trialDays) || 14));
+    const existingOrg = await dbService.getOrganization(req.params.id);
+    if (!existingOrg) {
+      return res.status(404).json({ error: "Organization not found." });
+    }
+    if (existingOrg.isDefault) {
+      return res.status(400).json({
+        error: "The default organization plan cannot be changed.",
+      });
+    }
+    await prisma.organization.update({
+      where: { id: req.params.id },
+      data:
+        plan === "DEMO"
+          ? {
+              tenantPlan: "DEMO",
+              trialEndsAt: new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000),
+              isActive: true,
+            }
+          : { tenantPlan: "PAID", trialEndsAt: null, isActive: true },
+    });
+    res.json({ success: true, plan });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Update Organization Config/Limits
 router.put("/organizations/:id/limits", async (req: AuthenticatedRequest, res) => {
   const { maxUsers, maxProjectsTotal, maxStorageMb, name, view } = req.body;

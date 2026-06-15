@@ -21,6 +21,7 @@ interface User {
   organizationName?: string | null;
   organizationIsDefault?: boolean;
   organizationTenantPlan?: string | null;
+  demoExpired?: boolean;
   isOrgActive?: boolean;
   needsActivation?: boolean;
   orgLockReason?: "DEACTIVATED" | "MISSING_FAL_KEY" | "SEAT_LOCKED" | null;
