@@ -373,6 +373,7 @@ export default function SuperAdminDashboard() {
     isActive: true,
   });
   const [planPackageCode, setPlanPackageCode] = useState("VFX_STUDIO");
+  const [planDemoDays, setPlanDemoDays] = useState(14);
 
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [userUpdates, setUserUpdates] = useState({
@@ -843,8 +844,12 @@ export default function SuperAdminDashboard() {
   // Isolation-preserving plan flip for a (manual) tenant. Only changes
   // tenantPlan / trial window — keeps their view, domain, and provisioning, so a
   // view-specific manual tenant stays on picdrift.studio / visualfx.studio.
-  const handleSetManualPlan = async (orgId: string, plan: "DEMO" | "PAID") => {
-    const label = plan === "DEMO" ? "a 14-day Demo" : "Paid";
+  const handleSetManualPlan = async (
+    orgId: string,
+    plan: "DEMO" | "PAID",
+    days = 14,
+  ) => {
+    const label = plan === "DEMO" ? `a ${days}-day Demo` : "Paid";
     if (
       !window.confirm(
         `Set this tenant to ${label}? This keeps their view, domain, and limits — it only changes the plan status.`,
@@ -854,8 +859,12 @@ export default function SuperAdminDashboard() {
     }
     setActionLoading(true);
     try {
-      await apiEndpoints.superadminSetOrgPlan(orgId, plan, 14);
-      setMsg(plan === "DEMO" ? "Tenant set to a 14-day demo." : "Tenant marked as paid.");
+      await apiEndpoints.superadminSetOrgPlan(orgId, plan, days);
+      setMsg(
+        plan === "DEMO"
+          ? `Tenant set to a ${days}-day demo.`
+          : "Tenant marked as paid.",
+      );
       setEditingTenant(null);
       fetchInitialData();
     } catch (err: any) {
@@ -2940,16 +2949,33 @@ export default function SuperAdminDashboard() {
                     {/* Plan flip — keeps the tenant on their own view-based
                         domain (no BYOK, no domain change). */}
                     <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void handleSetManualPlan(editingTenant.id, "DEMO")
-                        }
-                        disabled={actionLoading}
-                        className="flex-1 py-2.5 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs font-bold uppercase tracking-widest transition-colors hover:bg-amber-500/20 disabled:opacity-50"
-                      >
-                        Start 14-Day Demo
-                      </button>
+                      <div className="flex items-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/10 pl-2">
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={planDemoDays}
+                          onChange={(e) =>
+                            setPlanDemoDays(Math.max(1, toInt(e.target.value, 14)))
+                          }
+                          className="w-12 bg-transparent py-2.5 text-center text-xs font-bold text-amber-200 outline-none"
+                          title="Demo length in days"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleSetManualPlan(
+                              editingTenant.id,
+                              "DEMO",
+                              planDemoDays,
+                            )
+                          }
+                          disabled={actionLoading}
+                          className="rounded-r-lg px-3 py-2.5 text-xs font-bold uppercase tracking-widest text-amber-300 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
+                        >
+                          Start Demo
+                        </button>
+                      </div>
                       <button
                         type="button"
                         onClick={() =>
@@ -2963,8 +2989,8 @@ export default function SuperAdminDashboard() {
                     </div>
                     <p className="text-[10px] text-gray-500 leading-relaxed">
                       Keeps their view &amp; {tenantUpdates.view === "PICDRIFT" ? "picdrift.studio" : "visualfx.studio"} domain.
-                      Demo = 14-day trial; after it ends they keep their dashboard &amp;
-                      content but can&rsquo;t render until upgraded.
+                      Demo runs for the days you set; after it ends they keep their
+                      dashboard &amp; content but can&rsquo;t render until upgraded.
                     </p>
 
                     {/* Explicit package activation — intentionally applies the
