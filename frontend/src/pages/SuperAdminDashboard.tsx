@@ -869,9 +869,11 @@ export default function SuperAdminDashboard() {
   // the BYOK package lifecycle: it applies the package's limits AND its domain /
   // view. Use this only when you want package-specific domain routing.
   const handleActivatePackage = async (orgId: string, packageCode: string) => {
+    const isTrial = packageCode === "BYOK_TRIAL";
+    const what = isTrial ? "the BYOK 14-day trial" : `the ${packageCode} package`;
     if (
       !window.confirm(
-        `Activate the ${packageCode} package for this tenant? This applies the package's limits AND moves them onto that package's domain.`,
+        `Activate ${what} for this tenant? This moves them into the BYOK lifecycle — it applies that plan's limits AND its domain (${isTrial ? "byok.link" : "the package's domain"}).`,
       )
     ) {
       return;
@@ -882,7 +884,11 @@ export default function SuperAdminDashboard() {
         organizationId: orgId,
         packageCode,
       });
-      setMsg(`Tenant activated on ${packageCode}.`);
+      setMsg(
+        isTrial
+          ? "Tenant activated on the BYOK 14-day trial."
+          : `Tenant activated on ${packageCode}.`,
+      );
       setEditingTenant(null);
       fetchInitialData();
     } catch (err: any) {
@@ -2973,6 +2979,7 @@ export default function SuperAdminDashboard() {
                           onChange={(e) => setPlanPackageCode(e.target.value)}
                           className="flex-1 rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-xs font-semibold text-gray-200 outline-none focus:border-brand-accent"
                         >
+                          <option value="BYOK_TRIAL">BYOK Trial (14-day · byok.link)</option>
                           <option value="PD_APP">PicDrift App</option>
                           <option value="VFX_APP">VisualFX App</option>
                           <option value="PD_STUDIO">PicDrift Studio</option>
