@@ -22,9 +22,11 @@ const makeDemoUser = (view: DemoView) => ({
   name: "Demo Studio",
   creditSystem: "COMMERCIAL",
   role: "USER",
-  organizationId: null,
+  // Tenant-scoped member (org set, not the default org) so credits render as
+  // plain numbers in both views — not USD, which is the commercial/owner display.
+  organizationId: "demo-org",
   organizationName: "Demo Studio",
-  organizationIsDefault: true,
+  organizationIsDefault: false,
   organizationTenantPlan: "PAID",
   demoExpired: false,
   isOrgActive: true,
