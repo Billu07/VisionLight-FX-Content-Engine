@@ -25,6 +25,99 @@ export const setAuthToken = (token: string | null) => {
   }
 };
 
+// ============================================================================
+// DEMO MODE — drives the REAL dashboard read-only on /demo.
+// While active, every `api` request is served from in-memory demo data (GET)
+// or blocked (any mutation), so the live dashboard renders with no auth token
+// and no real backend writes. Scoped to the /demo page session.
+// ============================================================================
+type DemoState = {
+  view: "PICDRIFT" | "VISIONLIGHT";
+  posts: any[];
+  assets: any[];
+  user: any;
+};
+let demoState: DemoState | null = null;
+
+export const setDemoMode = (state: DemoState) => {
+  demoState = state;
+};
+export const clearDemoMode = () => {
+  demoState = null;
+};
+export const isDemoMode = () => demoState !== null;
+
+const demoResponse = (config: any, data: any) =>
+  Promise.resolve({
+    data,
+    status: 200,
+    statusText: "OK",
+    headers: {},
+    config,
+    request: {},
+  });
+
+const demoAdapter = (config: any): Promise<any> => {
+  const method = String(config.method || "get").toLowerCase();
+  const url = String(config.url || "");
+  const s = demoState;
+  if (!s) return demoResponse(config, { success: true });
+
+  // Any attempt to DO something → surface the pricing page; never write.
+  if (method !== "get") {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("visionlight:demo-locked"));
+    }
+    // Resolve to nothing — the action no-ops and the pricing modal takes over.
+    return new Promise<any>(() => {});
+  }
+
+  if (url.includes("/api/auth/me")) {
+    return demoResponse(config, {
+      success: true,
+      user: s.user,
+      profiles: [],
+      systemPresets: [],
+    });
+  }
+  if (url.includes("/api/posts")) {
+    return demoResponse(config, { success: true, posts: s.posts });
+  }
+  if (url.includes("/api/assets")) {
+    return demoResponse(config, { success: true, assets: s.assets });
+  }
+  if (url.includes("/api/projects")) {
+    return demoResponse(config, {
+      success: true,
+      projects: [
+        { id: "demo", name: "Demo Studio", createdAt: new Date().toISOString() },
+      ],
+    });
+  }
+  if (url.includes("/api/brand-config")) {
+    return demoResponse(config, { success: true, config: null });
+  }
+  if (url.includes("/api/user-credits")) {
+    return demoResponse(config, {
+      success: true,
+      creditsPicDrift: 25,
+      creditsPicDriftPlus: 25,
+      creditsImageFX: 25,
+      creditsVideoFX1: 25,
+      creditsVideoFX2: 25,
+      creditsVideoFX3: 25,
+    });
+  }
+  if (url.includes("/api/user-prompt-fx")) {
+    return demoResponse(config, { success: true, promptFx: [] });
+  }
+  if (url.includes("/api/storyboard")) {
+    return demoResponse(config, { success: true, storyboard: [] });
+  }
+  // Everything else resolves empty so no query 401s or breaks the layout.
+  return demoResponse(config, { success: true });
+};
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -400,6 +493,12 @@ export const getActiveProfileLabel = () =>
   localStorage.getItem(ACTIVE_PROFILE_LABEL_KEY) || "";
 
 api.interceptors.request.use((config) => {
+  // In demo mode, serve/block this request locally instead of hitting the API.
+  if (demoState) {
+    (config as any).adapter = demoAdapter;
+    return config;
+  }
+
   const activeProfileId = localStorage.getItem(ACTIVE_PROFILE_ID_KEY);
   if (activeProfileId) {
     config.headers = config.headers || {};

@@ -72,3 +72,56 @@ export const STUDIO_PLAN_BUTTON_CLASSES: Record<string, string> = {
   VFX_STUDIO: "border-blue-300/60 bg-blue-500 text-white hover:bg-blue-400",
   VFX_STUDIO_AGENCY: "border-amber-300/45 bg-amber-500/85 text-amber-50 hover:bg-amber-400/90",
 };
+
+// Full BYOK package set shown on the byok.link surface (5 packages; the demo
+// pricing modal adds the 14-day Free Trial as the 6th option). Checkout URLs are
+// the same canonical PicDrift links used in the dashboard upgrade flow.
+export const BYOK_PRICING_PACKAGES: PricingPlan[] = [
+  {
+    code: "PD_APP",
+    title: "PicDrift App",
+    monthlyPrice: "$9/mo",
+    annualPrice: "$108/yr",
+    checkoutUrl:
+      "https://www.picdrift.com/pricing-plans/checkout-1?planId=df674622-e11f-4e88-8564-4bb12365d5e5&checkoutFlowId=0ca462cc-de89-4e2c-b02e-bb83d3c7ee98",
+    features: ["Nano Banana + GPT-2", "Kling 2.6 Animation", "Solo workspace", "Your own Fal key"],
+  },
+  {
+    code: "VFX_APP",
+    title: "VisualFX App",
+    monthlyPrice: "$14/mo",
+    annualPrice: "$168/yr",
+    checkoutUrl:
+      "https://www.picdrift.com/pricing-plans/checkout-1?planId=8351c366-2837-44cd-8522-65ec3fecb56d&checkoutFlowId=05b75b73-c0ed-4ae2-ab13-130ab4628ca6",
+    features: ["VisualFX video models", "Solo workspace", "Your own Fal key"],
+  },
+  {
+    code: "PD_STUDIO",
+    title: "PicDrift Studio",
+    monthlyPrice: "$49/mo",
+    annualPrice: "$588/yr",
+    checkoutUrl:
+      "https://www.picdrift.com/pricing-plans/checkout-1?planId=dc751744-5641-4086-a510-7d203e187a79&checkoutFlowId=b5b1614d-e4d5-4352-804a-19d57d5225d0",
+    features: ["Nano Banana + GPT-2", "Kling 2.6 Animation", "5 Team Members", "Studio Admin"],
+  },
+  {
+    code: "VFX_STUDIO",
+    title: "VisualFX Studio",
+    monthlyPrice: "$99/mo",
+    annualPrice: "$1,188/yr",
+    checkoutUrl:
+      "https://www.picdrift.com/pricing-plans/checkout-1?planId=a97eb2df-59b6-4500-ba93-618171001d4b&checkoutFlowId=e90e22a5-29ed-4093-b268-7838c0fca777",
+    features: ["PicDrift + FX models", "Seedance 2.0, Kling 3.0, VEO 3.1", "5 Team Members", "Studio Admin"],
+    highlight: "Most Popular",
+    featured: true,
+  },
+  {
+    code: "VFX_STUDIO_AGENCY",
+    title: "VisualFX Studio Agency",
+    monthlyPrice: "$197/mo",
+    annualPrice: "$2,364/yr",
+    checkoutUrl:
+      "https://www.picdrift.com/pricing-plans/checkout-1?planId=4785cf91-670a-416f-8bb1-637b926bf2a0&checkoutFlowId=893f469b-9e21-4baa-bb7b-3217b96aa285",
+    features: ["PicDrift + FX models", "Agency controls", "20 Team Members", "200 Timelines"],
+  },
+];
