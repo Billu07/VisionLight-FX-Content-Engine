@@ -60,7 +60,8 @@ function DemoPickTile({
   const video = isDemoVideo(clean, type);
   // Never mount a <video> in the picker — use a small poster image (or a
   // placeholder for videos without one) so hundreds of tiles stay fast.
-  const thumb = video ? demoThumbUrl(poster) : demoThumbUrl(clean);
+  const rawForThumb = video ? demoCleanUrl(poster) : clean;
+  const thumb = demoThumbUrl(rawForThumb);
   return (
     <button
       type="button"
@@ -78,6 +79,14 @@ function DemoPickTile({
           className="h-full w-full object-cover"
           loading="lazy"
           decoding="async"
+          onError={(e) => {
+            // If the resizing proxy can't serve this host, fall back to the
+            // original URL so legacy/edge content never shows broken.
+            const img = e.currentTarget;
+            if (img.dataset.fallback || !rawForThumb) return;
+            img.dataset.fallback = "1";
+            img.src = rawForThumb;
+          }}
         />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-gray-800 text-2xl text-gray-500">
