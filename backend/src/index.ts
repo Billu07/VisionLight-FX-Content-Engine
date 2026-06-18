@@ -7,6 +7,7 @@ import cors from "cors";
 import superadminRouter from "./routes/superadmin";
 import tenantRouter from "./routes/tenant";
 import publicRouter from "./routes/public";
+import demoRouter from "./routes/demo";
 import appDataRouter from "./routes/app-data";
 import mediaRouter from "./routes/media";
 import byokRouter from "./routes/byok";
@@ -37,6 +38,7 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 app.use(publicRouter);
+app.use(demoRouter);
 app.use("/api/superadmin", superadminRouter);
 app.use("/api/tenant", tenantRouter);
 app.use(appDataRouter);

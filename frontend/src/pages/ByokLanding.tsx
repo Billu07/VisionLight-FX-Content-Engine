@@ -492,6 +492,12 @@ export const ByokLanding = () => {
             >
               Dashboard Pricing
             </button>
+            <Link
+              to="/demo?view=VISIONLIGHT"
+              className="rounded-2xl border border-white/20 bg-white/5 px-8 py-4 text-sm font-bold uppercase tracking-[0.14em] text-white transition hover:bg-white/10"
+            >
+              Live Demo
+            </Link>
           </div>
           <p className="mt-5 text-sm font-semibold text-cyan-100">
             Packages start from $9/mo (annual billing).

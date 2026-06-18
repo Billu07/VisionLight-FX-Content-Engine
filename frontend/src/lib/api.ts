@@ -239,6 +239,10 @@ export const apiEndpoints = {
   // Video export
   exportVideo: (data: { editorState: any; projectId?: string; fps?: number }) =>
     api.post("/api/export/video", data),
+  // === Public Demo Preview (read-only, no auth required) ===
+  getDemoContent: (view: "PICDRIFT" | "VISIONLIGHT") =>
+    api.get("/api/demo/content", { params: { view } }),
+
   // === Asset Library ===
   getAssets: (projectId?: string) => api.get("/api/assets", { params: { projectId } }),
   getStoryboard: (projectId?: string) => api.get("/api/storyboard", { params: { projectId } }),

@@ -445,6 +445,12 @@ export const Hero = () => {
                 >
                   Login
                 </button>
+                <Link
+                  to={`/demo?view=${isVisualFxDomain ? "VISIONLIGHT" : "PICDRIFT"}`}
+                  className="rounded-full border border-cyan-300/45 bg-cyan-400/10 px-7 py-3 text-sm font-bold text-cyan-100 transition hover:bg-cyan-400/20"
+                >
+                  Live Demo
+                </Link>
               </div>
             </div>
 

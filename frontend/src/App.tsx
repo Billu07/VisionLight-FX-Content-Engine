@@ -16,6 +16,7 @@ import Dashboard from "./pages/Dashboard";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import TenantDashboard from "./pages/TenantDashboard";
 import Projects from "./pages/Projects";
+import DemoDashboard from "./pages/DemoDashboard";
 import StudioChooser from "./pages/StudioChooser";
 import { SupportHandoff } from "./pages/SupportHandoff";
 import ResetPassword from "./pages/ResetPassword";
@@ -309,7 +310,8 @@ function App() {
               }
             />
 
-            <Route path="/demo" element={<Navigate to="/app" replace />} />
+            {/* Public, read-only demo preview (no auth, no mutations) */}
+            <Route path="/demo" element={<DemoDashboard />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Router>
