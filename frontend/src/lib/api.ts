@@ -131,6 +131,11 @@ export const apiEndpoints = {
   superadminResolveRequest: (id: string) => api.put(`/api/superadmin/requests/${id}/resolve`),
   superadminGetGlobalSettings: () => api.get("/api/superadmin/settings/global"),
   superadminUpdateGlobalSettings: (data: any) => api.put("/api/superadmin/settings/global", data),
+  superadminGetDemoConfig: () => api.get("/api/superadmin/demo/config"),
+  superadminSaveDemoConfig: (config: {
+    PICDRIFT: { postIds: string[]; assetIds: string[] };
+    VISIONLIGHT: { postIds: string[]; assetIds: string[] };
+  }) => api.put("/api/superadmin/demo/config", config),
   superadminGetByokOrganizations: () => api.get("/api/superadmin/byok/organizations"),
   superadminActivateByokPackage: (data: { organizationId: string; packageCode: string }) =>
     api.post("/api/superadmin/byok/activate", data),

@@ -832,6 +832,73 @@ router.put("/settings/global", async (req, res) => {
   }
 });
 
+// === DEMO PREVIEW CURATION ===
+// Read the saved demo selection plus the superadmin's selectable content.
+router.get("/demo/config", async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const settings = await dbService.getGlobalSettings();
+    const [posts, assets] = await Promise.all([
+      prisma.post.findMany({
+        where: { userId, status: "READY", mediaUrl: { not: null } },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+        select: {
+          id: true,
+          title: true,
+          mediaUrl: true,
+          mediaType: true,
+          mediaProvider: true,
+          createdAt: true,
+        },
+      }),
+      prisma.asset.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+        select: {
+          id: true,
+          url: true,
+          type: true,
+          aspectRatio: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+    res.json({
+      success: true,
+      config: (settings as any).demoConfig || {},
+      posts,
+      assets,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Save the superadmin-curated demo selection (per view).
+router.put("/demo/config", async (req, res) => {
+  try {
+    const sanitizeView = (value: any) => ({
+      postIds: Array.isArray(value?.postIds)
+        ? value.postIds.filter((x: any) => typeof x === "string").slice(0, 120)
+        : [],
+      assetIds: Array.isArray(value?.assetIds)
+        ? value.assetIds.filter((x: any) => typeof x === "string").slice(0, 120)
+        : [],
+    });
+    const body = req.body || {};
+    const demoConfig = {
+      PICDRIFT: sanitizeView(body.PICDRIFT),
+      VISIONLIGHT: sanitizeView(body.VISIONLIGHT),
+    };
+    const settings = await dbService.updateGlobalSettings({ demoConfig });
+    res.json({ success: true, config: (settings as any).demoConfig });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post("/settings/welcome-video/upload", upload.single("video"), async (req, res) => {
   try {
     const file = req.file;

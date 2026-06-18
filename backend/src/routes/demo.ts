@@ -30,6 +30,19 @@ type DemoPayload = { posts: any[]; assets: any[] };
 const CACHE_TTL_MS = 60 * 1000;
 const cache = new Map<DemoView, { at: number; data: DemoPayload }>();
 
+type ViewSelection = { postIds: string[]; assetIds: string[] };
+
+function readSelection(demoConfig: unknown, view: DemoView): ViewSelection {
+  const cfg = (demoConfig as any)?.[view];
+  const postIds = Array.isArray(cfg?.postIds)
+    ? cfg.postIds.filter((id: unknown): id is string => typeof id === "string")
+    : [];
+  const assetIds = Array.isArray(cfg?.assetIds)
+    ? cfg.assetIds.filter((id: unknown): id is string => typeof id === "string")
+    : [];
+  return { postIds, assetIds };
+}
+
 async function resolveDemoUserId(): Promise<string | null> {
   const configuredEmail = process.env.DEMO_SUPERADMIN_EMAIL?.trim().toLowerCase();
   if (configuredEmail) {
@@ -64,6 +77,80 @@ router.get("/api/demo/content", async (req, res) => {
       return res.json({ success: true, view, ...cached.data });
     }
 
+    // 1) Preferred source: superadmin-curated selection (Demo Preview manager).
+    const settings = await prisma.globalSettings.findUnique({
+      where: { id: "singleton" },
+      select: { demoConfig: true },
+    });
+    const selection = readSelection(settings?.demoConfig, view);
+
+    if (selection.postIds.length > 0 || selection.assetIds.length > 0) {
+      const [postRows, assetRows] = await Promise.all([
+        selection.postIds.length
+          ? prisma.post.findMany({
+              where: {
+                id: { in: selection.postIds },
+                status: "READY",
+                mediaUrl: { not: null },
+                user: { role: "SUPERADMIN" },
+              },
+              select: {
+                id: true,
+                title: true,
+                mediaUrl: true,
+                mediaType: true,
+                mediaProvider: true,
+                createdAt: true,
+              },
+            })
+          : Promise.resolve([]),
+        selection.assetIds.length
+          ? prisma.asset.findMany({
+              where: {
+                id: { in: selection.assetIds },
+                user: { role: "SUPERADMIN" },
+              },
+              select: {
+                id: true,
+                url: true,
+                type: true,
+                aspectRatio: true,
+                createdAt: true,
+              },
+            })
+          : Promise.resolve([]),
+      ]);
+
+      // Preserve the superadmin's chosen ordering.
+      const orderedPosts = selection.postIds
+        .map((id) => postRows.find((p) => p.id === id))
+        .filter(Boolean) as typeof postRows;
+      const orderedAssets = selection.assetIds
+        .map((id) => assetRows.find((a) => a.id === id))
+        .filter(Boolean) as typeof assetRows;
+
+      const data: DemoPayload = {
+        posts: orderedPosts.map((p) => ({
+          id: p.id,
+          title: p.title || "",
+          mediaUrl: forceHttps(p.mediaUrl),
+          mediaType: p.mediaType || "IMAGE",
+          mediaProvider: p.mediaProvider || null,
+          createdAt: p.createdAt,
+        })),
+        assets: orderedAssets.map((a) => ({
+          id: a.id,
+          url: forceHttps(a.url),
+          type: a.type || "IMAGE",
+          aspectRatio: a.aspectRatio || "original",
+          createdAt: a.createdAt,
+        })),
+      };
+      cache.set(view, { at: Date.now(), data });
+      return res.json({ success: true, view, ...data });
+    }
+
+    // 2) Fallback: the superadmin's per-view demo project (name convention).
     const userId = await resolveDemoUserId();
     if (!userId) {
       return res.json({ success: true, view, posts: [], assets: [] });

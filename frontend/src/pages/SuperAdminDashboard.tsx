@@ -1,11 +1,89 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiEndpoints, startReadOnlyImpersonation } from "../lib/api";
+import {
+  apiEndpoints,
+  startReadOnlyImpersonation,
+  getCORSProxyUrl,
+  getCORSProxyVideoUrl,
+} from "../lib/api";
 import { adminUi } from "../lib/adminUi";
 import { confirmAction } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
 import { isUserCreditLimited } from "../lib/adminCredits";
+
+type DemoView = "VISIONLIGHT" | "PICDRIFT";
+
+// mediaUrl can be a JSON array (carousels) — take the first entry for the thumbnail.
+const demoCleanUrl = (url?: string): string => {
+  if (!url) return "";
+  const trimmed = url.trim();
+  if (trimmed.startsWith("[") && trimmed.includes("]")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed) && parsed.length > 0) return String(parsed[0]);
+    } catch {
+      /* ignore */
+    }
+  }
+  return trimmed;
+};
+
+function DemoPickTile({
+  url,
+  type,
+  selected,
+  onClick,
+}: {
+  url?: string;
+  type?: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const clean = demoCleanUrl(url);
+  if (!clean) return null;
+  const isVideo =
+    type === "VIDEO" || /\.(mp4|webm|mov|m4v)(\?|$)/i.test(clean);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative aspect-square overflow-hidden rounded-lg border-2 transition-all ${
+        selected
+          ? "border-emerald-400 ring-2 ring-emerald-400/40"
+          : "border-white/10 hover:border-white/30"
+      }`}
+    >
+      {isVideo ? (
+        <video
+          src={getCORSProxyVideoUrl(clean)}
+          className="h-full w-full object-cover"
+          muted
+          loop
+          playsInline
+          preload="metadata"
+        />
+      ) : (
+        <img
+          src={getCORSProxyUrl(clean, 240, 60)}
+          alt=""
+          className="h-full w-full object-cover"
+          loading="lazy"
+          decoding="async"
+        />
+      )}
+      <span
+        className={`absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-black ${
+          selected
+            ? "bg-emerald-400 text-gray-950"
+            : "bg-black/50 text-white opacity-0 group-hover:opacity-100"
+        }`}
+      >
+        {selected ? "✓" : "+"}
+      </span>
+    </button>
+  );
+}
 
 interface Tenant {
   id: string;
@@ -321,10 +399,24 @@ export default function SuperAdminDashboard() {
     | "byok"
     | "my-agency"
     | "demo-leads"
+    | "demo"
     | "global-settings"
     | "global-presets"
     | "lab"
   >("platform");
+
+  // Demo Preview curation state
+  const [demoLoading, setDemoLoading] = useState(false);
+  const [demoSaving, setDemoSaving] = useState(false);
+  const [demoView, setDemoView] = useState<DemoView>("VISIONLIGHT");
+  const [demoPosts, setDemoPosts] = useState<any[]>([]);
+  const [demoAssets, setDemoAssets] = useState<any[]>([]);
+  const [demoSelection, setDemoSelection] = useState<
+    Record<DemoView, { postIds: string[]; assetIds: string[] }>
+  >({
+    PICDRIFT: { postIds: [], assetIds: [] },
+    VISIONLIGHT: { postIds: [], assetIds: [] },
+  });
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [byokOrganizations, setByokOrganizations] = useState<any[]>([]);
   const [byokWebhookEvents, setByokWebhookEvents] = useState<any[]>([]);
@@ -621,6 +713,61 @@ export default function SuperAdminDashboard() {
     }, 30000);
     return () => clearInterval(interval);
   }, [activeTab, byokEventFilters.status, byokEventFilters.packageCode, byokEventFilters.limit]);
+
+  // Load demo curation data when the Demo Preview tab is opened.
+  useEffect(() => {
+    if (activeTab !== "demo") return;
+    let cancelled = false;
+    (async () => {
+      setDemoLoading(true);
+      try {
+        const res = await apiEndpoints.superadminGetDemoConfig();
+        if (cancelled) return;
+        const cfg = res.data?.config || {};
+        const norm = (v: any) => ({
+          postIds: Array.isArray(v?.postIds) ? v.postIds : [],
+          assetIds: Array.isArray(v?.assetIds) ? v.assetIds : [],
+        });
+        setDemoSelection({
+          PICDRIFT: norm(cfg.PICDRIFT),
+          VISIONLIGHT: norm(cfg.VISIONLIGHT),
+        });
+        setDemoPosts(res.data?.posts || []);
+        setDemoAssets(res.data?.assets || []);
+      } catch (e: any) {
+        if (!cancelled) setMsg("Error loading demo content: " + (e?.message || ""));
+      } finally {
+        if (!cancelled) setDemoLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
+
+  const toggleDemoItem = (kind: "post" | "asset", id: string) => {
+    setDemoSelection((prev) => {
+      const sel = prev[demoView];
+      const key = kind === "post" ? "postIds" : "assetIds";
+      const list = sel[key];
+      const next = list.includes(id)
+        ? list.filter((x) => x !== id)
+        : [...list, id];
+      return { ...prev, [demoView]: { ...sel, [key]: next } };
+    });
+  };
+
+  const saveDemoConfig = async () => {
+    setDemoSaving(true);
+    try {
+      await apiEndpoints.superadminSaveDemoConfig(demoSelection);
+      setMsg("Demo preview content saved.");
+    } catch (e: any) {
+      setMsg("Error saving demo content: " + (e?.message || ""));
+    } finally {
+      setDemoSaving(false);
+    }
+  };
 
   const fetchInitialData = async () => {
     setLoading(true);
@@ -1248,6 +1395,7 @@ export default function SuperAdminDashboard() {
                 { id: "byok", label: "byok" },
                 { id: "my-agency", label: "my agency" },
                 { id: "demo-leads", label: "demo leads" },
+                { id: "demo", label: "demo preview" },
                 { id: "global-settings", label: "global settings" },
                 { id: "global-presets", label: "global presets" },
                 { id: "lab", label: "lab" },
@@ -1338,6 +1486,131 @@ export default function SuperAdminDashboard() {
             </button>
           </div>
         </div>
+
+        {/* TAB CONTENT: DEMO PREVIEW */}
+        {activeTab === "demo" && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            <div className={adminUi.panel}>
+              <div
+                className={`${adminUi.panelHeader} flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}
+              >
+                <div>
+                  <h2 className={adminUi.sectionTitle}>Demo Preview Content</h2>
+                  <p className={adminUi.sectionCopy}>
+                    Choose which of your renders &amp; assets appear in the public
+                    read-only demo for each view. Visitors can only look.{" "}
+                    <a
+                      className="text-brand-accent hover:underline"
+                      href={`/demo?view=${demoView}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open preview ↗
+                    </a>
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex rounded-lg border border-white/10 bg-white/5 p-1">
+                    {(["VISIONLIGHT", "PICDRIFT"] as DemoView[]).map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setDemoView(v)}
+                        className={`rounded-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                          demoView === v
+                            ? "bg-white text-gray-900"
+                            : "text-gray-300 hover:text-white"
+                        }`}
+                      >
+                        {v === "PICDRIFT" ? "PicDrift" : "Visionlight"}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void saveDemoConfig()}
+                    disabled={demoSaving || demoLoading}
+                    className={adminUi.primaryButton}
+                  >
+                    {demoSaving ? "Saving…" : "Save Selection"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-6 p-5 sm:p-6">
+                {demoLoading ? (
+                  <div className="flex justify-center py-16">
+                    <LoadingSpinner size="lg" variant="neon" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-xs text-gray-400">
+                      Showing in{" "}
+                      <span className="font-bold text-white">
+                        {demoView === "PICDRIFT" ? "PicDrift" : "Visionlight"}
+                      </span>{" "}
+                      view:{" "}
+                      <span className="font-semibold text-emerald-300">
+                        {demoSelection[demoView].postIds.length}
+                      </span>{" "}
+                      renders,{" "}
+                      <span className="font-semibold text-emerald-300">
+                        {demoSelection[demoView].assetIds.length}
+                      </span>{" "}
+                      assets. Click any tile to add or remove it, then Save.
+                    </div>
+
+                    <div>
+                      <h3 className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-gray-300">
+                        Renders
+                      </h3>
+                      {demoPosts.length === 0 ? (
+                        <p className="text-xs text-gray-500">
+                          No completed renders on your account yet.
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-8">
+                          {demoPosts.map((p) => (
+                            <DemoPickTile
+                              key={p.id}
+                              url={p.mediaUrl}
+                              type={p.mediaType}
+                              selected={demoSelection[demoView].postIds.includes(p.id)}
+                              onClick={() => toggleDemoItem("post", p.id)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <h3 className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-gray-300">
+                        Assets
+                      </h3>
+                      {demoAssets.length === 0 ? (
+                        <p className="text-xs text-gray-500">
+                          No assets on your account yet.
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-8">
+                          {demoAssets.map((a) => (
+                            <DemoPickTile
+                              key={a.id}
+                              url={a.url}
+                              type={a.type}
+                              selected={demoSelection[demoView].assetIds.includes(a.id)}
+                              onClick={() => toggleDemoItem("asset", a.id)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* TAB CONTENT: GLOBAL PRESETS */}
         {activeTab === "global-presets" && (

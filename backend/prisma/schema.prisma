@@ -190,6 +190,10 @@ model GlobalSettings {
   featureVideoEditorForAll Boolean @default(false)
   welcomeVideoUrl String?
 
+  // Superadmin-curated content for the public /demo preview, keyed by view:
+  // { "PICDRIFT": { postIds: string[], assetIds: string[] }, "VISIONLIGHT": {...} }
+  demoConfig Json?
+
   updatedAt DateTime @updatedAt
 }
 
