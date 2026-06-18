@@ -12,11 +12,11 @@ export const adminUi = {
   eyebrow:
     "text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-300",
   tabBar:
-    "flex w-full flex-nowrap items-center gap-1 overflow-x-auto rounded-xl border border-white/10 bg-white/[0.04] p-1 shadow-[0_18px_45px_rgba(2,8,23,0.32)] backdrop-blur-xl xl:w-auto",
+    "flex w-full flex-wrap items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.05] p-1.5 shadow-[0_18px_45px_rgba(2,8,23,0.32)] backdrop-blur-xl xl:w-auto",
   tab:
-    "shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors",
-  tabActive: "bg-cyan-400/10 text-brand-accent",
-  tabInactive: "text-gray-300 hover:bg-white/5 hover:text-white",
+    "shrink-0 whitespace-nowrap rounded-lg px-3.5 py-2 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors",
+  tabActive: "bg-brand-accent text-gray-950 shadow-sm",
+  tabInactive: "text-gray-200 hover:bg-white/10 hover:text-white",
   panel:
     "rounded-2xl border border-white/10 bg-gray-900/45 shadow-[0_22px_50px_rgba(2,8,23,0.42)] backdrop-blur-xl",
   tablePanel:

@@ -1382,8 +1382,8 @@ export default function SuperAdminDashboard() {
             </p>
           </div>
 
-          <div className="flex flex-col xl:flex-row gap-3 w-full xl:w-auto xl:items-center">
-            <div className={adminUi.tabBar}>
+          <div className="flex w-full flex-col gap-3 xl:min-w-0 xl:flex-1 xl:items-end">
+            <div className={`${adminUi.tabBar} xl:!w-full`}>
               <button
                 onClick={() => navigate("/app")}
                 className={`${adminUi.tab} border border-brand-accent/20 text-brand-accent hover:bg-brand-accent/10`}
@@ -1410,6 +1410,7 @@ export default function SuperAdminDashboard() {
                 </button>
               ))}
             </div>
+            <div className="flex w-full flex-wrap items-center gap-2 xl:justify-end">
             <a
               href="https://fal.ai/dashboard/usage-billing/credits"
               target="_blank"
@@ -1450,6 +1451,7 @@ export default function SuperAdminDashboard() {
                 <>My Credit Limits: {adminCreditLimitsEnabled ? "On" : "Off"}</>
               )}
             </button>
+            </div>
           </div>
         </div>
 
