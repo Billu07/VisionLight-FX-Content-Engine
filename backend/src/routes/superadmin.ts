@@ -860,6 +860,7 @@ router.get("/demo/config", async (_req: AuthenticatedRequest, res) => {
           mediaUrl: true,
           mediaType: true,
           mediaProvider: true,
+          imageReference: true,
           createdAt: true,
         },
       }),

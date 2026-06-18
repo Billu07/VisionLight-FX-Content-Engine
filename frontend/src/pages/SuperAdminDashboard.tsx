@@ -4,7 +4,6 @@ import {
   apiEndpoints,
   startReadOnlyImpersonation,
   getCORSProxyUrl,
-  getCORSProxyVideoUrl,
 } from "../lib/api";
 import { adminUi } from "../lib/adminUi";
 import { confirmAction } from "../lib/notifications";
@@ -13,6 +12,8 @@ import { useAuth } from "../hooks/useAuth";
 import { isUserCreditLimited } from "../lib/adminCredits";
 
 type DemoView = "VISIONLIGHT" | "PICDRIFT";
+
+const DEMO_PICKER_PAGE = 36;
 
 // mediaUrl can be a JSON array (carousels) — take the first entry for the thumbnail.
 const demoCleanUrl = (url?: string): string => {
@@ -29,21 +30,38 @@ const demoCleanUrl = (url?: string): string => {
   return trimmed;
 };
 
+// Small, fast thumbnail: resize Cloudinary via its transform and proxy/resize R2.
+const demoThumbUrl = (raw?: string, w = 220, q = 55): string => {
+  const u = demoCleanUrl(raw);
+  if (!u) return "";
+  if (u.includes("res.cloudinary.com") && u.includes("/upload/")) {
+    return u.replace("/upload/", `/upload/w_${w},q_${q},c_limit,f_auto/`);
+  }
+  return getCORSProxyUrl(u, w, q);
+};
+
+const isDemoVideo = (url: string, type?: string) =>
+  type === "VIDEO" || /\.(mp4|webm|mov|m4v)(\?|$)/i.test(url);
+
 function DemoPickTile({
   url,
   type,
+  poster,
   selected,
   onClick,
 }: {
   url?: string;
   type?: string;
+  poster?: string;
   selected: boolean;
   onClick: () => void;
 }) {
   const clean = demoCleanUrl(url);
   if (!clean) return null;
-  const isVideo =
-    type === "VIDEO" || /\.(mp4|webm|mov|m4v)(\?|$)/i.test(clean);
+  const video = isDemoVideo(clean, type);
+  // Never mount a <video> in the picker — use a small poster image (or a
+  // placeholder for videos without one) so hundreds of tiles stay fast.
+  const thumb = video ? demoThumbUrl(poster) : demoThumbUrl(clean);
   return (
     <button
       type="button"
@@ -54,23 +72,23 @@ function DemoPickTile({
           : "border-white/10 hover:border-white/30"
       }`}
     >
-      {isVideo ? (
-        <video
-          src={getCORSProxyVideoUrl(clean)}
-          className="h-full w-full object-cover"
-          muted
-          loop
-          playsInline
-          preload="metadata"
-        />
-      ) : (
+      {thumb ? (
         <img
-          src={getCORSProxyUrl(clean, 240, 60)}
+          src={thumb}
           alt=""
           className="h-full w-full object-cover"
           loading="lazy"
           decoding="async"
         />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-gray-800 text-2xl text-gray-500">
+          ▶
+        </div>
+      )}
+      {video && (
+        <span className="absolute bottom-1 left-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-[9px] text-white">
+          ▶
+        </span>
       )}
       <span
         className={`absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-black ${
@@ -417,6 +435,8 @@ export default function SuperAdminDashboard() {
     PICDRIFT: { postIds: [], assetIds: [] },
     VISIONLIGHT: { postIds: [], assetIds: [] },
   });
+  const [demoPostsVisible, setDemoPostsVisible] = useState(DEMO_PICKER_PAGE);
+  const [demoAssetsVisible, setDemoAssetsVisible] = useState(DEMO_PICKER_PAGE);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [byokOrganizations, setByokOrganizations] = useState<any[]>([]);
   const [byokWebhookEvents, setByokWebhookEvents] = useState<any[]>([]);
@@ -734,6 +754,8 @@ export default function SuperAdminDashboard() {
         });
         setDemoPosts(res.data?.posts || []);
         setDemoAssets(res.data?.assets || []);
+        setDemoPostsVisible(DEMO_PICKER_PAGE);
+        setDemoAssetsVisible(DEMO_PICKER_PAGE);
       } catch (e: any) {
         if (!cancelled) setMsg("Error loading demo content: " + (e?.message || ""));
       } finally {
@@ -1571,17 +1593,31 @@ export default function SuperAdminDashboard() {
                           No completed renders on your account yet.
                         </p>
                       ) : (
-                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-8">
-                          {demoPosts.map((p) => (
-                            <DemoPickTile
-                              key={p.id}
-                              url={p.mediaUrl}
-                              type={p.mediaType}
-                              selected={demoSelection[demoView].postIds.includes(p.id)}
-                              onClick={() => toggleDemoItem("post", p.id)}
-                            />
-                          ))}
-                        </div>
+                        <>
+                          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-8">
+                            {demoPosts.slice(0, demoPostsVisible).map((p) => (
+                              <DemoPickTile
+                                key={p.id}
+                                url={p.mediaUrl}
+                                type={p.mediaType}
+                                poster={p.imageReference}
+                                selected={demoSelection[demoView].postIds.includes(p.id)}
+                                onClick={() => toggleDemoItem("post", p.id)}
+                              />
+                            ))}
+                          </div>
+                          {demoPosts.length > demoPostsVisible && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDemoPostsVisible((n) => n + DEMO_PICKER_PAGE)
+                              }
+                              className={`${adminUi.softButton} mt-3`}
+                            >
+                              Load more ({demoPosts.length - demoPostsVisible} left)
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
 
@@ -1594,17 +1630,30 @@ export default function SuperAdminDashboard() {
                           No assets on your account yet.
                         </p>
                       ) : (
-                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-8">
-                          {demoAssets.map((a) => (
-                            <DemoPickTile
-                              key={a.id}
-                              url={a.url}
-                              type={a.type}
-                              selected={demoSelection[demoView].assetIds.includes(a.id)}
-                              onClick={() => toggleDemoItem("asset", a.id)}
-                            />
-                          ))}
-                        </div>
+                        <>
+                          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-8">
+                            {demoAssets.slice(0, demoAssetsVisible).map((a) => (
+                              <DemoPickTile
+                                key={a.id}
+                                url={a.url}
+                                type={a.type}
+                                selected={demoSelection[demoView].assetIds.includes(a.id)}
+                                onClick={() => toggleDemoItem("asset", a.id)}
+                              />
+                            ))}
+                          </div>
+                          {demoAssets.length > demoAssetsVisible && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDemoAssetsVisible((n) => n + DEMO_PICKER_PAGE)
+                              }
+                              className={`${adminUi.softButton} mt-3`}
+                            >
+                              Load more ({demoAssets.length - demoAssetsVisible} left)
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </>
