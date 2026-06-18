@@ -59,8 +59,9 @@ export function DemoPricingModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto bg-black/85 p-4 backdrop-blur-sm sm:items-center">
-      <div className="relative w-full max-w-5xl rounded-2xl border border-white/10 bg-[#070a20] p-5 shadow-2xl sm:p-7">
+    <div className="fixed inset-0 z-[200] overflow-y-auto bg-black/85 backdrop-blur-sm">
+      <div className="flex min-h-full items-center justify-center p-4">
+      <div className="relative my-4 w-full max-w-5xl rounded-2xl border border-white/10 bg-[#070a20] p-5 shadow-2xl sm:p-7">
         <button
           type="button"
           onClick={onClose}
@@ -177,6 +178,7 @@ export function DemoPricingModal({ onClose }: { onClose: () => void }) {
             </article>
           ))}
         </div>
+      </div>
       </div>
 
       {checkoutPlan && checkoutStep && (

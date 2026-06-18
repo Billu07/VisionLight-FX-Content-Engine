@@ -57,19 +57,45 @@ const demoResponse = (config: any, data: any) =>
     request: {},
   });
 
+// "Make things we offer" — render/upload/edit/export/etc. Hitting any of these
+// (or any DELETE) surfaces the pricing page. Everything else (storyboard order,
+// project autosave, brand tweaks…) resolves as a harmless no-op so visitors can
+// freely browse the library tabs and panels.
+const DEMO_BLOCKED_ENDPOINTS = [
+  "/api/generate-media",
+  "/api/assets/upload-sync",
+  "/api/assets/auto-process",
+  "/api/assets/batch",
+  "/api/assets/enhance",
+  "/api/assets/edit",
+  "/api/assets/drift-video",
+  "/api/assets/save-url",
+  "/api/assets/download-zip",
+  "/api/stock/save",
+  "/api/export/video",
+  "/api/posts/", // POST /api/posts/:id/to-asset (GET /api/posts is unaffected)
+  "/api/request-credits",
+];
+
 const demoAdapter = (config: any): Promise<any> => {
   const method = String(config.method || "get").toLowerCase();
   const url = String(config.url || "");
   const s = demoState;
   if (!s) return demoResponse(config, { success: true });
 
-  // Any attempt to DO something → surface the pricing page; never write.
   if (method !== "get") {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("visionlight:demo-locked"));
+    const isPaidAction =
+      method === "delete" ||
+      DEMO_BLOCKED_ENDPOINTS.some((path) => url.includes(path));
+    if (isPaidAction) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("visionlight:demo-locked"));
+      }
+      // Never resolve — the action no-ops and the pricing modal takes over.
+      return new Promise<any>(() => {});
     }
-    // Resolve to nothing — the action no-ops and the pricing modal takes over.
-    return new Promise<any>(() => {});
+    // Benign browse-state write (storyboard/project/brand) → silent no-op.
+    return demoResponse(config, { success: true });
   }
 
   if (url.includes("/api/auth/me")) {

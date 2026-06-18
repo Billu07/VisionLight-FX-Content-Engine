@@ -32,8 +32,10 @@ const makeDemoUser = (view: DemoView) => ({
   isOrgActive: true,
   needsActivation: false,
   orgLockReason: null,
-  videoEditorEnabledForAll: true,
-  carouselEnabledForAll: true,
+  // Tenant view: the video editor (and carousel) are superadmin-gated features,
+  // so they must NOT appear in the demo.
+  videoEditorEnabledForAll: false,
+  carouselEnabledForAll: false,
   view,
   orgViewType: view,
   maxProjects: 3,
@@ -97,8 +99,16 @@ export default function DemoDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Cleanup when leaving the demo so the real app re-authenticates normally.
+  // Override logout so the menu's Logout button cleanly exits the demo to the
+  // landing page instead of wiping the synthetic session into a blank screen.
+  // Restore the real logout + clean up when leaving the demo.
   useEffect(() => {
+    const originalLogout = useAuth.getState().logout;
+    useAuth.setState({
+      logout: async () => {
+        window.location.href = "/";
+      },
+    });
     return () => {
       clearDemoMode();
       localStorage.removeItem("visionlight_active_project");
@@ -108,6 +118,7 @@ export default function DemoDashboard() {
         isLoading: false,
         profiles: [],
         profileSelectionRequired: false,
+        logout: originalLogout,
       });
     };
   }, []);
