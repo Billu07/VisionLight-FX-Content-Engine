@@ -2,7 +2,7 @@ import axios from "axios";
 import type { AxiosProgressEvent } from "axios";
 
 const RAW_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
-const API_BASE_URL = RAW_URL.replace(/\/api\/?$/, "").replace(/\/$/, "");
+export const API_BASE_URL = RAW_URL.replace(/\/api\/?$/, "").replace(/\/$/, "");
 const IMPERSONATE_USER_ID_KEY = "visionlight_impersonate_user_id";
 const IMPERSONATE_USER_LABEL_KEY = "visionlight_impersonate_user_label";
 const ACTIVE_PROFILE_ID_KEY = "visionlight_active_profile_id";

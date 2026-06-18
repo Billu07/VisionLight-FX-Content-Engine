@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   apiEndpoints,
   startReadOnlyImpersonation,
-  getCORSProxyUrl,
+  API_BASE_URL,
 } from "../lib/api";
 import { adminUi } from "../lib/adminUi";
 import { confirmAction } from "../lib/notifications";
@@ -30,14 +30,13 @@ const demoCleanUrl = (url?: string): string => {
   return trimmed;
 };
 
-// Small, fast thumbnail: resize Cloudinary via its transform and proxy/resize R2.
+// Small, fast thumbnail: route R2 media through the backend's resizing image
+// proxy (works for any R2 host, including custom domains — not just *.r2.dev).
 const demoThumbUrl = (raw?: string, w = 220, q = 55): string => {
   const u = demoCleanUrl(raw);
-  if (!u) return "";
-  if (u.includes("res.cloudinary.com") && u.includes("/upload/")) {
-    return u.replace("/upload/", `/upload/w_${w},q_${q},c_limit,f_auto/`);
-  }
-  return getCORSProxyUrl(u, w, q);
+  if (!u || !/^https?:\/\//i.test(u)) return u || "";
+  if (u.includes(".m3u8") || u.includes(".ts")) return u;
+  return `${API_BASE_URL}/api/proxy-image?url=${encodeURIComponent(u)}&w=${w}&q=${q}`;
 };
 
 const isDemoVideo = (url: string, type?: string) =>
