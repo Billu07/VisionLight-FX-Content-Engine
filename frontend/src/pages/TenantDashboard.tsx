@@ -574,7 +574,7 @@ export default function TenantDashboard() {
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center whitespace-nowrap rounded-lg border border-pink-400/40 bg-pink-600 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-white transition-colors hover:bg-pink-500"
             >
-              Check Your Credit
+              Check Your Credits
             </a>
             <button
               type="button"
@@ -641,7 +641,7 @@ export default function TenantDashboard() {
               />
             </div>
             <div className="mt-3 text-xs text-gray-400">
-              Remaining (shared across all tenant members):{" "}
+              Remaining (Shared Across Your Platforms):{" "}
               <span className="font-semibold text-gray-200">
                 {formatStorageGb(storageRemainingMb)}
               </span>

@@ -1268,7 +1268,7 @@ export default function SuperAdminDashboard() {
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center whitespace-nowrap rounded-lg border border-pink-400/40 bg-pink-600 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-white transition-colors hover:bg-pink-500"
             >
-              Check Your Credit
+              Check Your Credits
             </a>
             <button
               type="button"

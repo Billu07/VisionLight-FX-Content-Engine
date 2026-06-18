@@ -21,9 +21,14 @@ interface StockPhoto {
 interface StockPhotosModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onViewOriginals?: () => void;
 }
 
-export function StockPhotosModal({ isOpen, onClose }: StockPhotosModalProps) {
+export function StockPhotosModal({
+  isOpen,
+  onClose,
+  onViewOriginals,
+}: StockPhotosModalProps) {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
@@ -94,7 +99,14 @@ export function StockPhotosModal({ isOpen, onClose }: StockPhotosModalProps) {
       await apiEndpoints.stockSave({ url: photo.full, projectId });
       setSavedIds((prev) => new Set(prev).add(photo.id));
       queryClient.invalidateQueries({ queryKey: ["assets"] });
-      notify.success("Saved to Asset Library (Originals).");
+      if (onViewOriginals) {
+        notify.successAction("Saved to Asset Library (Originals).", {
+          label: "View Originals",
+          onClick: () => onViewOriginals(),
+        });
+      } else {
+        notify.success("Saved to Asset Library (Originals).");
+      }
     } catch (error: any) {
       notify.error(
         error?.response?.data?.error ||

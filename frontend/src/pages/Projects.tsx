@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { LoadingSpinner } from "../components/LoadingSpinner";
+import { MobileNavbar } from "../components/MobileNavbar";
 import { useAuth } from "../hooks/useAuth";
 import {
   apiEndpoints,
@@ -27,6 +28,19 @@ export default function Projects() {
   const canOpenAdmin =
     !isReadOnlyAccess &&
     (user?.role === "ADMIN" || user?.role === "SUPERADMIN");
+  const canUseVideoEditor =
+    user?.role === "SUPERADMIN" || user?.videoEditorEnabledForAll === true;
+
+  // Bottom-tab navigation from the Projects window. Content tabs hand off to the
+  // Dashboard via a one-shot session hint so the matching view opens on arrival.
+  const goToDashboardView = (view: "create" | "history" | "sequencer") => {
+    sessionStorage.setItem("visionlight_dashboard_view", view);
+    navigate("/app");
+  };
+  const openDashboardLibrary = () => {
+    sessionStorage.setItem("visionlight_open_library", "1");
+    navigate("/app");
+  };
 
   const { data: projectsData, isLoading } = useQuery({
     queryKey: ["projects"],
@@ -200,7 +214,7 @@ export default function Projects() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#070a20] px-4 py-6 text-gray-200 sm:px-6">
+    <div className="relative min-h-screen overflow-hidden bg-[#070a20] px-4 py-6 pb-28 text-gray-200 sm:px-6 lg:pb-6">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_14%_10%,rgba(34,211,238,0.14),transparent_36%),radial-gradient(circle_at_82%_12%,rgba(56,189,248,0.16),transparent_44%)]" />
 
       <div className="relative mx-auto w-full max-w-6xl">
@@ -425,6 +439,24 @@ export default function Projects() {
           </div>
         )}
       </div>
+
+      {/* MOBILE NAVBAR — keep the bottom tabs visible on the Projects window too */}
+      <MobileNavbar
+        activeTab="projects"
+        onTabChange={(tab) => {
+          if (tab === "projects") return;
+          if (tab === "library") {
+            openDashboardLibrary();
+          } else if (tab === "create" || tab === "history" || tab === "sequencer") {
+            goToDashboardView(tab);
+          }
+        }}
+        onOpenLibrary={openDashboardLibrary}
+        onOpenProjects={() => {
+          // Already on the Projects window.
+        }}
+        showSequencerTab={canUseVideoEditor}
+      />
     </div>
   );
 }

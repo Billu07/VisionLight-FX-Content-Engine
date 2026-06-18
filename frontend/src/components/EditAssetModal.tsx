@@ -161,6 +161,7 @@ export function EditAssetModal({
     getRecentPromptFxKeys(),
   );
   const [isUploadingInitial, setIsUploadingInitial] = useState(false);
+  const [showInitialLibrary, setShowInitialLibrary] = useState(false);
 
   const { systemPresets } = useAuth();
 
@@ -362,6 +363,13 @@ export function EditAssetModal({
           const res = await apiEndpoints.getPostStatus(job.driftPostId);
           const { status, progress, mediaUrl, error } = res.data;
 
+          if (status === "READY" || status === "COMPLETED") {
+            // The backend has finalized the drift render into a VIDEO/VIDEO asset
+            // (the "3DX Paths" folder). Refresh the asset cache so it appears there
+            // without needing a manual reload.
+            queryClient.invalidateQueries({ queryKey: ["assets"] });
+          }
+
           setJobs((prev) =>
             prev.map((j) => {
               if (j.id === job.id) {
@@ -369,12 +377,12 @@ export function EditAssetModal({
                   return { ...j, progress, message: `Rendering Path... ${progress}%` };
                 } else if (status === "READY" || status === "COMPLETED") {
                   localStorage.removeItem(`active_drift_post_${currentAsset.id}`);
-                  return { 
-                    ...j, 
-                    status: "ready", 
-                    message: "Ready!", 
-                    progress: 100, 
-                    resultAsset: { ...currentAsset, url: mediaUrl, type: "VIDEO" } 
+                  return {
+                    ...j,
+                    status: "ready",
+                    message: "Ready!",
+                    progress: 100,
+                    resultAsset: { ...currentAsset, url: mediaUrl, type: "VIDEO" }
                   };
                 } else if (status === "FAILED") {
                   localStorage.removeItem(`active_drift_post_${currentAsset.id}`);
@@ -899,10 +907,10 @@ export function EditAssetModal({
                   <span className="text-4xl text-gray-500">IMG</span>
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-white mb-2">Upload a Reference Image</h3>
-                  <p className="text-gray-400 max-w-sm">To use the 3DX Editor, you need a starting image. Upload one or select from your library.</p>
+                  <h3 className="text-xl font-bold text-white mb-2">Upload Image or Import From Library</h3>
+                  <p className="text-gray-400 max-w-sm">To use the 3DX Editor, you need a starting image. Upload one or import from your library.</p>
                 </div>
-                <div className="flex gap-4">
+                <div className="flex flex-wrap justify-center gap-4">
                   <label className={`cursor-pointer px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${isUploadingInitial ? 'opacity-50 cursor-not-allowed' : ''}`}>
                     {isUploadingInitial ? <LoadingSpinner size="sm" variant="light" /> : "Upload Image"}
                     <input
@@ -935,7 +943,43 @@ export function EditAssetModal({
                       }}
                     />
                   </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowInitialLibrary((prev) => !prev)}
+                    disabled={isUploadingInitial}
+                    className={`px-6 py-3 rounded-xl border border-purple-500/50 bg-gray-800/70 text-white font-bold shadow-lg transition-all hover:border-purple-400 hover:bg-gray-800 ${isUploadingInitial ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {showInitialLibrary ? "Hide Library" : "Import From Library"}
+                  </button>
                 </div>
+
+                {showInitialLibrary && (
+                  <div className="w-full max-w-md rounded-2xl border border-gray-700 bg-gray-950/80 p-3 animate-in slide-in-from-top-2">
+                    {imageAssets.length === 0 ? (
+                      <div className="py-6 text-center text-xs text-gray-500">
+                        No images in your library yet. Upload one to get started.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto custom-scrollbar sm:grid-cols-4">
+                        {imageAssets.map((a: Asset) => (
+                          <img
+                            key={a.id}
+                            src={getReferenceThumbnailUrl(a.url)}
+                            className="h-16 w-full cursor-pointer rounded border border-transparent object-cover transition-all hover:border-purple-500 hover:ring-1 hover:ring-purple-400"
+                            crossOrigin="anonymous"
+                            loading="lazy"
+                            decoding="async"
+                            onClick={() => {
+                              setHistory([a]);
+                              setCurrentIndex(0);
+                              setShowInitialLibrary(false);
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <>

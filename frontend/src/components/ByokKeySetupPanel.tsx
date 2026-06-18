@@ -48,7 +48,7 @@ export function ByokKeySetupPanel({
           onClick={onGuideShown}
           className="rounded-xl border border-cyan-300/40 bg-cyan-400/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-cyan-100 hover:bg-cyan-400/20"
         >
-          Fal Signup
+          1. Fal Signup
         </a>
         <a
           href={FAL_KEYS_URL}
@@ -57,7 +57,7 @@ export function ByokKeySetupPanel({
           onClick={onGuideShown}
           className="rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white hover:bg-white/10"
         >
-          Create Fal API Key
+          2. Create Fal API Key
         </a>
       </div>
 
@@ -82,7 +82,7 @@ export function ByokKeySetupPanel({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full rounded-xl bg-cyan-500 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-white transition hover:bg-cyan-400 disabled:opacity-60"
+          className="w-full rounded-xl bg-cyan-700 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-white transition hover:bg-cyan-600 disabled:opacity-60"
         >
           {isSubmitting ? (
             <span className="inline-flex items-center justify-center gap-2">
@@ -90,7 +90,7 @@ export function ByokKeySetupPanel({
               Adding...
             </span>
           ) : (
-            "ADD FAL API KEY"
+            "3. ADD FAL API KEY"
           )}
         </button>
       </form>

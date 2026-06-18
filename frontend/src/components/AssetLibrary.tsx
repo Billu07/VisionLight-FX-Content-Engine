@@ -535,7 +535,7 @@ export function AssetLibrary({
   const uploadLimitText =
     activeTab === "VIDEO" || (activeTab === "original" && originalMediaTab === "videos")
       ? "Video upload limit: 25MB"
-      : "Image Size Limit: 10MB";
+      : "Image Size Limit: 10MB Each";
   const uploadButtonLabel =
     activeTab === "16:9" || activeTab === "9:16" || activeTab === "1:1"
       ? "Bulk Convert Media"

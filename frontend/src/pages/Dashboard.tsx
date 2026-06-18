@@ -368,6 +368,7 @@ function Dashboard() {
     setShowNameStudio(false);
   };
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showSubscriptionRedirect, setShowSubscriptionRedirect] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
   const mainPanelRef = useRef<HTMLDivElement | null>(null);
   const [mainPanelHeight, setMainPanelHeight] = useState(0);
@@ -456,15 +457,33 @@ function Dashboard() {
 
   // === SEQUENCER STATE ===
   const [viewMode, setViewMode] = useState<"create" | "sequencer" | "history">(
-    () =>
-      typeof window !== "undefined" && window.innerWidth < 1024
-        ? "history"
-        : "create",
+    () => {
+      if (typeof window !== "undefined") {
+        // Honor a view hint set by the Projects window bottom-tab bar so that
+        // tapping a tab there lands on the matching Dashboard view.
+        const hint = sessionStorage.getItem("visionlight_dashboard_view");
+        if (hint === "create" || hint === "sequencer" || hint === "history") {
+          sessionStorage.removeItem("visionlight_dashboard_view");
+          return hint;
+        }
+        if (window.innerWidth < 1024) return "history";
+      }
+      return "create";
+    },
   );
   const activeProject =
     localStorage.getItem("visionlight_active_project") || undefined;
   const activeProjectId = activeProject || "default";
   const storylineKey = `visionlight_storyline_${activeProjectId}`;
+
+  // Open the library on arrival if the Projects window bottom-tab bar asked for it.
+  useEffect(() => {
+    if (sessionStorage.getItem("visionlight_open_library") === "1") {
+      sessionStorage.removeItem("visionlight_open_library");
+      setLibrarySource("top");
+      setActiveLibrarySlot("generic");
+    }
+  }, []);
   const [storylineSequence, setStorylineSequence] = useState<SequenceItem[]>(() => {
     try {
       const stored = localStorage.getItem(storylineKey);
@@ -3766,7 +3785,54 @@ function Dashboard() {
         <StockPhotosModal
           isOpen={showStockModal}
           onClose={() => setShowStockModal(false)}
+          onViewOriginals={() => {
+            setShowStockModal(false);
+            setLibraryInitialTab("original");
+            setLibrarySource("top");
+            setActiveLibrarySlot("generic");
+          }}
         />
+
+        {/* Manage Subscription redirect confirmation */}
+        {showSubscriptionRedirect && (
+          <div
+            className="fixed inset-0 z-[130] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+            onClick={() => setShowSubscriptionRedirect(false)}
+          >
+            <div
+              className="w-full max-w-md rounded-2xl border border-sky-400/25 bg-[#0b1020] p-6 shadow-[0_30px_90px_rgba(2,8,23,0.8)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-black text-white">Manage Subscription</h3>
+              <p className="mt-3 text-sm leading-relaxed text-slate-300">
+                You're being redirected to PicDrift, where you may need to log in.
+              </p>
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowSubscriptionRedirect(false)}
+                  className="flex-1 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold text-gray-300 transition-colors hover:bg-white/10"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.open(
+                      "https://picdrift.com/account/my-subscriptions",
+                      "_blank",
+                      "noopener,noreferrer",
+                    );
+                    setShowSubscriptionRedirect(false);
+                  }}
+                  className="flex-1 rounded-xl border border-sky-300/40 bg-sky-600 px-4 py-2.5 text-sm font-black text-white transition-colors hover:bg-sky-500"
+                >
+                  Proceed
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mx-auto w-full max-w-[2100px] px-[clamp(1rem,8vw,12rem)] py-4 sm:py-6">
           {" "}
@@ -4019,7 +4085,7 @@ function Dashboard() {
                       />
                     </div>
                     <div className="mt-2 text-[10px] text-gray-500">
-                      Remaining (shared across your tenant): {formatStorageGb(storageRemainingMb)}
+                      Remaining (Shared Across Your Platforms): {formatStorageGb(storageRemainingMb)}
                     </div>
                   </div>
                 )}
@@ -4052,7 +4118,7 @@ function Dashboard() {
                       rel="noreferrer"
                       className="rounded-2xl border border-pink-400/40 bg-pink-600 px-4 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white transition-colors hover:bg-pink-500"
                     >
-                      Check Your Credit
+                      Check Your Credits
                     </a>
                   )}
                   {isByokWorkspace && (
@@ -4154,6 +4220,18 @@ function Dashboard() {
                           className="w-full rounded-lg border border-orange-300/40 bg-gradient-to-r from-orange-500/25 via-rose-500/25 to-fuchsia-500/25 px-4 py-2 text-left text-sm font-black text-orange-100 shadow-[0_8px_20px_rgba(249,115,22,0.22)] transition-all hover:from-orange-500/35 hover:via-rose-500/35 hover:to-fuchsia-500/35"
                         >
                           Upgrade Package
+                        </button>
+                      )}
+
+                      {isAdmin && (
+                        <button
+                          onClick={() => {
+                            setShowUserMenu(false);
+                            setShowSubscriptionRedirect(true);
+                          }}
+                          className="w-full rounded-lg border border-sky-300/40 bg-gradient-to-r from-sky-500/25 via-blue-500/25 to-indigo-500/25 px-4 py-2 text-left text-sm font-black text-sky-100 shadow-[0_8px_20px_rgba(56,189,248,0.22)] transition-all hover:from-sky-500/35 hover:via-blue-500/35 hover:to-indigo-500/35"
+                        >
+                          Manage Subscription
                         </button>
                       )}
 
@@ -4271,7 +4349,7 @@ function Dashboard() {
                       rel="noreferrer"
                       className="w-full rounded-xl border border-pink-400/40 bg-pink-600 px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-pink-500"
                     >
-                      Check Your Credit
+                      Check Your Credits
                     </a>
                   )}
                   {isByokWorkspace && (
@@ -4351,6 +4429,19 @@ function Dashboard() {
                       className="rounded-xl border border-orange-300/40 bg-gradient-to-r from-orange-500/25 via-rose-500/25 to-fuchsia-500/25 px-3 py-2 text-left text-xs font-black text-orange-100 shadow-[0_8px_18px_rgba(249,115,22,0.22)] hover:from-orange-500/35 hover:via-rose-500/35 hover:to-fuchsia-500/35"
                     >
                       Upgrade Package
+                    </button>
+                  )}
+
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        setShowSubscriptionRedirect(true);
+                      }}
+                      className="rounded-xl border border-sky-300/40 bg-gradient-to-r from-sky-500/25 via-blue-500/25 to-indigo-500/25 px-3 py-2 text-left text-xs font-black text-sky-100 shadow-[0_8px_18px_rgba(56,189,248,0.22)] hover:from-sky-500/35 hover:via-blue-500/35 hover:to-indigo-500/35"
+                    >
+                      Manage Subscription
                     </button>
                   )}
 
@@ -6443,6 +6534,9 @@ function Dashboard() {
                   </>
                 ) : (
                   <div className="flex-1 min-h-0 space-y-3 overflow-y-auto custom-scrollbar pr-1">
+                    <p className="text-[11px] font-medium text-gray-400">
+                      Use Storyline for Organizing Creative
+                    </p>
                     {displayedStorylineItems.length > 0 ? (
                       displayedStorylineItems.map((item, index) => {
                         const storylinePost = buildStorylinePost(item, index);
