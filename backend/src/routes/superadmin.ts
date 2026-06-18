@@ -7,6 +7,7 @@ import { encryptionUtils } from "../utils/encryption";
 import { upload } from "../utils/fileUpload";
 import { uploadManagedBuffer } from "../utils/managedStorage";
 import { COST_KEYS, PRICE_KEYS } from "../config/pricing";
+import { getDemoOwnerUserIds } from "./demo";
 
 const router = express.Router();
 
@@ -834,13 +835,23 @@ router.put("/settings/global", async (req, res) => {
 
 // === DEMO PREVIEW CURATION ===
 // Read the saved demo selection plus the superadmin's selectable content.
-router.get("/demo/config", async (req: AuthenticatedRequest, res) => {
+router.get("/demo/config", async (_req: AuthenticatedRequest, res) => {
   try {
-    const userId = req.user!.id;
+    // Demo content always comes from the demo owner's studios (keith@picdrift.com),
+    // regardless of which superadmin is curating.
+    const ownerIds = await getDemoOwnerUserIds();
     const settings = await dbService.getGlobalSettings();
+    if (ownerIds.length === 0) {
+      return res.json({
+        success: true,
+        config: (settings as any).demoConfig || {},
+        posts: [],
+        assets: [],
+      });
+    }
     const [posts, assets] = await Promise.all([
       prisma.post.findMany({
-        where: { userId, status: "READY", mediaUrl: { not: null } },
+        where: { userId: { in: ownerIds }, status: "READY", mediaUrl: { not: null } },
         orderBy: { createdAt: "desc" },
         take: 200,
         select: {
@@ -853,7 +864,7 @@ router.get("/demo/config", async (req: AuthenticatedRequest, res) => {
         },
       }),
       prisma.asset.findMany({
-        where: { userId },
+        where: { userId: { in: ownerIds } },
         orderBy: { createdAt: "desc" },
         take: 200,
         select: {

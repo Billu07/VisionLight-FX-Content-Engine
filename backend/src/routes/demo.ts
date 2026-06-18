@@ -4,13 +4,30 @@ import { prisma } from "../services/database";
 // Public, read-only demo content endpoint.
 //
 // Anyone (no auth) can request the curated demo content for a given view. The
-// content is sourced from the SUPERADMIN's own per-view "demo project" and is
-// hard-projected to display-only fields. This router performs READ-ONLY queries
-// only and never touches credits/keys/PII, so it is safe to expose publicly.
+// content is sourced from the demo content owner's studios (keith@picdrift.com)
+// and is hard-projected to display-only fields. This router performs READ-ONLY
+// queries only and never touches credits/keys/PII, so it is safe to expose
+// publicly.
 
 const router = express.Router();
 
+// The demo gallery is always sourced from this account's studios, regardless of
+// which superadmin curates it from the panel.
+export const DEMO_CONTENT_OWNER_EMAIL = "keith@picdrift.com";
+
 type DemoView = "PICDRIFT" | "VISIONLIGHT";
+
+// One email can own several studios (profiles). Resolve every user id under the
+// demo owner's email so content from all of their studios is available.
+export async function getDemoOwnerUserIds(): Promise<string[]> {
+  const users = await prisma.user.findMany({
+    where: {
+      email: { equals: DEMO_CONTENT_OWNER_EMAIL, mode: "insensitive" },
+    },
+    select: { id: true },
+  });
+  return users.map((u) => u.id);
+}
 
 const DEMO_PROJECT_NAMES: Record<DemoView, string> = {
   PICDRIFT: process.env.DEMO_PROJECT_PICDRIFT || "PicDrift Demo",
@@ -43,28 +60,6 @@ function readSelection(demoConfig: unknown, view: DemoView): ViewSelection {
   return { postIds, assetIds };
 }
 
-async function resolveDemoUserId(): Promise<string | null> {
-  const configuredEmail = process.env.DEMO_SUPERADMIN_EMAIL?.trim().toLowerCase();
-  if (configuredEmail) {
-    const byEmail = await prisma.user.findFirst({
-      where: {
-        email: { equals: configuredEmail, mode: "insensitive" },
-        role: "SUPERADMIN",
-      },
-      select: { id: true },
-    });
-    if (byEmail) return byEmail.id;
-  }
-
-  // Fallback: the SUPERADMIN that lives in the default (system) organization.
-  const fallback = await prisma.user.findFirst({
-    where: { role: "SUPERADMIN", organization: { isDefault: true } },
-    orderBy: { createdAt: "asc" },
-    select: { id: true },
-  });
-  return fallback?.id ?? null;
-}
-
 router.get("/api/demo/content", async (req, res) => {
   const view: DemoView =
     String(req.query.view || "").toUpperCase() === "PICDRIFT"
@@ -75,6 +70,11 @@ router.get("/api/demo/content", async (req, res) => {
     const cached = cache.get(view);
     if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
       return res.json({ success: true, view, ...cached.data });
+    }
+
+    const ownerIds = await getDemoOwnerUserIds();
+    if (ownerIds.length === 0) {
+      return res.json({ success: true, view, posts: [], assets: [] });
     }
 
     // 1) Preferred source: superadmin-curated selection (Demo Preview manager).
@@ -92,7 +92,7 @@ router.get("/api/demo/content", async (req, res) => {
                 id: { in: selection.postIds },
                 status: "READY",
                 mediaUrl: { not: null },
-                user: { role: "SUPERADMIN" },
+                userId: { in: ownerIds },
               },
               select: {
                 id: true,
@@ -108,7 +108,7 @@ router.get("/api/demo/content", async (req, res) => {
           ? prisma.asset.findMany({
               where: {
                 id: { in: selection.assetIds },
-                user: { role: "SUPERADMIN" },
+                userId: { in: ownerIds },
               },
               select: {
                 id: true,
@@ -150,15 +150,10 @@ router.get("/api/demo/content", async (req, res) => {
       return res.json({ success: true, view, ...data });
     }
 
-    // 2) Fallback: the superadmin's per-view demo project (name convention).
-    const userId = await resolveDemoUserId();
-    if (!userId) {
-      return res.json({ success: true, view, posts: [], assets: [] });
-    }
-
+    // 2) Fallback: the demo owner's per-view demo project (name convention).
     const project = await prisma.project.findFirst({
       where: {
-        userId,
+        userId: { in: ownerIds },
         name: { equals: DEMO_PROJECT_NAMES[view], mode: "insensitive" },
       },
       orderBy: { createdAt: "desc" },
@@ -174,7 +169,7 @@ router.get("/api/demo/content", async (req, res) => {
     const [postRows, assetRows] = await Promise.all([
       prisma.post.findMany({
         where: {
-          userId,
+          userId: { in: ownerIds },
           projectId: project.id,
           status: "READY",
           mediaUrl: { not: null },
@@ -191,7 +186,7 @@ router.get("/api/demo/content", async (req, res) => {
         },
       }),
       prisma.asset.findMany({
-        where: { userId, projectId: project.id },
+        where: { userId: { in: ownerIds }, projectId: project.id },
         orderBy: { createdAt: "desc" },
         take: 60,
         select: {
