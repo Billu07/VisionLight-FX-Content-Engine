@@ -442,8 +442,8 @@ export const ByokLanding = () => {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#070a20] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.35),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.65),transparent_62%)]" />
-      <div className="absolute inset-0 bg-gradient-to-r from-[#170316] via-[#1a164f] to-[#0d2f59]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.35),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.65),transparent_62%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#170316] via-[#1a164f] to-[#0d2f59]" />
 
       <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col justify-center px-6 py-10 lg:flex-row lg:items-center lg:justify-between lg:px-12">
         <section className="max-w-2xl">
@@ -718,8 +718,8 @@ export const ByokLanding = () => {
 
       {showPackageSheet && (
         <div className="fixed inset-0 z-30 overflow-hidden bg-[#070a20] text-white">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.35),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.65),transparent_62%)]" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#170316] via-[#1a164f] to-[#0d2f59]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.35),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.65),transparent_62%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#170316] via-[#1a164f] to-[#0d2f59]" />
 
           <div className="relative z-10 flex h-full w-full flex-col">
             <header className="border-b border-white/10 bg-[#120f2b]/65 backdrop-blur-xl">

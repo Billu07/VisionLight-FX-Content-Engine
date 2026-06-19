@@ -302,25 +302,25 @@ const MarketingHeader = ({
 }) => {
   return (
     <header className="relative z-20 border-b border-white/10 bg-[#120f2b]/65 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6">
+      <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
         <a
           href="https://picdrift.com"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-3"
+          className="flex min-w-0 items-center gap-2 sm:gap-3"
         >
           <img
             src={picdriftLogo}
             alt="PicDrift"
-            className="h-9 w-auto object-contain sm:h-10"
+            className="h-8 w-auto max-w-[42vw] object-contain sm:h-10 sm:max-w-none"
           />
           {showFxLogo && (
             <>
-              <span className="h-7 w-px bg-white/20" />
+              <span className="h-6 w-px shrink-0 bg-white/20 sm:h-7" />
               <img
                 src={fxLogo}
                 alt="FX"
-                className="h-7 w-auto object-contain opacity-95"
+                className="h-5 w-auto shrink-0 object-contain opacity-95 sm:h-7"
               />
             </>
           )}
@@ -349,7 +349,7 @@ const MarketingHeader = ({
           </a>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3">
           <Link
             to="/pricing"
             className="text-sm font-semibold text-white transition-colors hover:text-cyan-200 md:hidden"
@@ -407,10 +407,10 @@ export const Hero = () => {
   return (
     <>
       <div className="relative min-h-screen overflow-hidden bg-[#070a20] text-white">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.35),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.65),transparent_62%)]" />
-        <div className="absolute inset-x-0 top-0 h-[52%] bg-gradient-to-r from-[#170316] via-[#1a164f] to-[#0d2f59]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(157,57,255,0.2),transparent_38%),radial-gradient(circle_at_82%_18%,rgba(26,103,255,0.35),transparent_42%),radial-gradient(circle_at_50%_64%,rgba(15,12,40,0.65),transparent_62%)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[52%] bg-gradient-to-r from-[#170316] via-[#1a164f] to-[#0d2f59]" />
         <div
-          className="absolute inset-x-0 bottom-[-140px] h-[68%] bg-gradient-to-r from-[#2f58df] via-[#5364f2] to-[#3f58dd]"
+          className="pointer-events-none absolute inset-x-0 bottom-[-140px] h-[68%] bg-gradient-to-r from-[#2f58df] via-[#5364f2] to-[#3f58dd]"
           style={{ clipPath: "polygon(0 16%, 100% 0, 100% 100%, 0 100%)" }}
         />
 

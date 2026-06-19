@@ -3122,7 +3122,9 @@ function Dashboard() {
           />
         )}
 
-        {/* MOBILE NAVBAR */}
+        {/* MOBILE NAVBAR — hidden while a full-screen surface (library, editor,
+            preview, extractor) is open so it never covers their controls. */}
+        {!isUiFocusMode && (
         <MobileNavbar
           activeTab={viewMode}
           onTabChange={(tab) => {
@@ -3154,6 +3156,7 @@ function Dashboard() {
           onOpenMenu={() => setShowUserMenu(true)}
           showSequencerTab={canUseVideoEditor}
         />
+        )}
 
         {/* EXTRACTOR MODAL */}
         {extractingVideoUrl && (
@@ -4398,11 +4401,11 @@ function Dashboard() {
 
           {isMobile && showUserMenu && (
             <div
-              className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm lg:hidden"
+              className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm lg:hidden"
               onClick={() => setShowUserMenu(false)}
             >
               <div
-                className="absolute inset-x-0 bottom-0 rounded-t-3xl border border-white/10 bg-gray-950 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-2xl"
+                className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-3xl border border-white/10 bg-gray-950 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-2xl"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="mb-4 flex items-center justify-between">

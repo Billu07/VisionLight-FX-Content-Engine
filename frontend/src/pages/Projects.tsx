@@ -31,17 +31,6 @@ export default function Projects() {
   const canUseVideoEditor =
     user?.role === "SUPERADMIN" || user?.videoEditorEnabledForAll === true;
 
-  // Bottom-tab navigation from the Projects window. Content tabs hand off to the
-  // Dashboard via a one-shot session hint so the matching view opens on arrival.
-  const goToDashboardView = (view: "create" | "history" | "sequencer") => {
-    sessionStorage.setItem("visionlight_dashboard_view", view);
-    navigate("/app");
-  };
-  const openDashboardLibrary = () => {
-    sessionStorage.setItem("visionlight_open_library", "1");
-    navigate("/app");
-  };
-
   const { data: projectsData, isLoading } = useQuery({
     queryKey: ["projects"],
     queryFn: async () => {
@@ -50,6 +39,33 @@ export default function Projects() {
     },
     enabled: !!user,
   });
+
+  // Bottom-tab navigation from the Projects window. The Dashboard requires an
+  // active project, so ensure one is selected (fall back to the most recent)
+  // before handing off; if there are none, open the create form instead.
+  const ensureActiveProject = (): boolean => {
+    if (localStorage.getItem("visionlight_active_project")) return true;
+    const first =
+      Array.isArray(projectsData) && projectsData.length
+        ? projectsData[0]?.id
+        : null;
+    if (first) {
+      localStorage.setItem("visionlight_active_project", first);
+      return true;
+    }
+    setShowCreateForm(true);
+    return false;
+  };
+  const goToDashboardView = (view: "create" | "history" | "sequencer") => {
+    if (!ensureActiveProject()) return;
+    sessionStorage.setItem("visionlight_dashboard_view", view);
+    navigate("/app");
+  };
+  const openDashboardLibrary = () => {
+    if (!ensureActiveProject()) return;
+    sessionStorage.setItem("visionlight_open_library", "1");
+    navigate("/app");
+  };
 
   const createProjectMutation = useMutation({
     mutationFn: async (name: string) => apiEndpoints.createProject({ name }),
@@ -215,7 +231,7 @@ export default function Projects() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#070a20] px-4 py-6 pb-28 text-gray-200 sm:px-6 lg:pb-6">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_14%_10%,rgba(34,211,238,0.14),transparent_36%),radial-gradient(circle_at_82%_12%,rgba(56,189,248,0.16),transparent_44%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_10%,rgba(34,211,238,0.14),transparent_36%),radial-gradient(circle_at_82%_12%,rgba(56,189,248,0.16),transparent_44%)]" />
 
       <div className="relative mx-auto w-full max-w-6xl">
         <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
