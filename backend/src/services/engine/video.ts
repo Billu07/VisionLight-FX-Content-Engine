@@ -1088,26 +1088,54 @@ export const videoLogic = {
 
       const params = post.generationParams as any;
       if (params?.source === "DRIFT_EDITOR") {
+        // 3DX path videos live in the "3DX Paths" folder, which filters on
+        // type === "VIDEO" && aspectRatio === "VIDEO".
+        //
+        // The render is already generated and the user has been charged, so we
+        // must NOT silently drop the library record. Size detection is best
+        // effort (never blocks), and if the first save fails (e.g. a storage
+        // limit hit, or a transient serialization conflict) we retry once
+        // without the size so the asset always lands in 3DX Paths.
+        let detectedSizeBytes: number | null = null;
         try {
-          const detectedSizeBytes =
+          detectedSizeBytes =
             await storageQuotaService.detectRemoteFileSizeBytes(url);
-          const newAsset = await airtableService.createAsset(
+        } catch {
+          detectedSizeBytes = null;
+        }
+
+        const saveDriftAsset = async (withSize: boolean) =>
+          airtableService.createAsset(
             userId,
             url,
-            // 3DX path videos live in the "3DX Paths" folder, which filters on
-            // aspectRatio === "VIDEO". Using the visual ratio (16:9/9:16/1:1)
-            // here left the asset matching no tab at all (the ratio tabs require
-            // IMAGE), so the folder showed empty.
             "VIDEO",
             "VIDEO",
             undefined,
             post.projectId || undefined,
-            detectedSizeBytes ?? undefined,
+            withSize ? detectedSizeBytes ?? undefined : undefined,
           );
-          // Trigger background processing for proxy and sprite sheet
-          processVideoAssetBackground(newAsset.id, url, userId).catch(e => console.error("Processor failure", e));
-        } catch (e) {
-          console.warn("Asset Save Failed");
+
+        try {
+          const newAsset = await saveDriftAsset(true);
+          processVideoAssetBackground(newAsset.id, url, userId).catch((e) =>
+            console.error("Processor failure", e),
+          );
+        } catch (firstErr: any) {
+          console.error(
+            "[Drift] 3DX asset save failed, retrying without size:",
+            firstErr?.message || firstErr,
+          );
+          try {
+            const newAsset = await saveDriftAsset(false);
+            processVideoAssetBackground(newAsset.id, url, userId).catch((e) =>
+              console.error("Processor failure", e),
+            );
+          } catch (retryErr: any) {
+            console.error(
+              "[Drift] 3DX asset save failed permanently:",
+              retryErr?.message || retryErr,
+            );
+          }
         }
       }
       await ROIService.incrementMediaGenerated(userId);

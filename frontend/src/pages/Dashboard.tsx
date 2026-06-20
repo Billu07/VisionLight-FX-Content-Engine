@@ -1110,6 +1110,9 @@ function Dashboard() {
       if (hasActive) {
         await apiEndpoints.checkActiveJobs();
         await queryClient.invalidateQueries({ queryKey: ["posts"] });
+        // A finished render may have produced a library asset (e.g. a 3DX path
+        // video lands in the "3DX Paths" folder), so refresh assets too.
+        await queryClient.invalidateQueries({ queryKey: ["assets"] });
       }
       return true;
     },
