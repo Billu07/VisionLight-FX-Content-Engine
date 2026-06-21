@@ -1598,7 +1598,12 @@ router.post(
               tenantApiKeys,
             );
           } else {
-            contentEngine.startVideoGeneration(
+            // IMPORTANT: must be awaited — otherwise a thrown error (e.g. a fal
+            // submit rejection on Kling start+end frame) becomes an unhandled
+            // rejection, the post is never marked FAILED, and it dangles in
+            // PROCESSING until the timeout cleanup ("job timed out" at ~95%,
+            // nothing in fal). Image/carousel above are already awaited.
+            await contentEngine.startVideoGeneration(
               post.id,
               prompt,
               generationParams,
@@ -1609,7 +1614,11 @@ router.post(
           console.error("Background Error:", err);
           await airtableService.updatePost(post.id, {
             status: "FAILED",
-            error: "Processing failed",
+            // Surface the real reason (provider/validation error) instead of a
+            // generic message, so failures are diagnosable rather than silent.
+            error:
+              (typeof err?.message === "string" && err.message.trim()) ||
+              "Processing failed",
           });
           await airtableService.refundGranularCredits(req.user!.id, pool, cost);
         }

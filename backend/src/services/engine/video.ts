@@ -576,6 +576,9 @@ export const videoLogic = {
             Authorization: `Key ${falKey}`,
             "Content-Type": "application/json",
           },
+          // Queue submit should return quickly; a hang here would otherwise leave
+          // the post stuck in PROCESSING with nothing queued on fal.
+          timeout: 120000,
         });
         externalId = submitRes.data.request_id;
         statusUrl = submitRes.data.status_url;
@@ -600,6 +603,10 @@ export const videoLogic = {
               const tailRaw = getOptimizedUrl(params.imageReferences[1]);
               const tailResp = await axios.get(tailRaw, {
                 responseType: "arraybuffer",
+                // Without a timeout an unreachable/slow end frame hangs the whole
+                // render before it ever reaches fal (the post then dangles until
+                // the cleanup times it out). Fail fast and fall back to start-only.
+                timeout: 60000,
               });
               let processedTail = await resizeStrict(
                 Buffer.from(tailResp.data),
@@ -616,7 +623,14 @@ export const videoLogic = {
               await airtableService.updatePost(postId, {
                 generatedEndFrame: klingEndUrl,
               });
-            } catch (e) {}
+            } catch (e: any) {
+              // End frame couldn't be prepared — proceed with start frame only
+              // rather than failing the whole render. Logged so it's visible.
+              console.warn(
+                `[Kling] end frame skipped for ${postId}:`,
+                e?.message || e,
+              );
+            }
           }
         } else if (params.imageReference) {
           // ✅ FIX: Force 1080p Source if Target is 1080p
@@ -687,6 +701,9 @@ export const videoLogic = {
             Authorization: `Key ${falKey}`,
             "Content-Type": "application/json",
           },
+          // Queue submit should return quickly; a hang here would otherwise leave
+          // the post stuck in PROCESSING with nothing queued on fal.
+          timeout: 120000,
         });
         externalId = submitRes.data.request_id;
         statusUrl = submitRes.data.status_url;
