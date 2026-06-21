@@ -624,11 +624,16 @@ export const videoLogic = {
                 generatedEndFrame: klingEndUrl,
               });
             } catch (e: any) {
-              // End frame couldn't be prepared — proceed with start frame only
-              // rather than failing the whole render. Logged so it's visible.
-              console.warn(
-                `[Kling] end frame skipped for ${postId}:`,
+              // The user explicitly supplied an end frame for first+last-frame
+              // interpolation. Never silently drop it and hand back a different
+              // (start-only) result — fail clearly with the real reason so the
+              // caller refunds and the user can retry.
+              console.error(
+                `[Kling] end frame preparation failed for ${postId}:`,
                 e?.message || e,
+              );
+              throw new Error(
+                `End frame could not be prepared: ${e?.message || e}`,
               );
             }
           }
