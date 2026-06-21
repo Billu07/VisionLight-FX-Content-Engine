@@ -607,19 +607,29 @@ export const dbService = {
     return prisma.post.findUnique({ where: { id } });
   },
   async getUserPosts(userId: string, projectId?: string) {
-    // Lazy Cleanup: Automatically fail jobs older than 15 minutes that are stuck in 'PROCESSING' or 'NEW'
-    const timeout = new Date(Date.now() - 15 * 60 * 1000);
+    // Lazy Cleanup: automatically fail jobs stuck in 'PROCESSING' / 'NEW'.
+    // Video renders run much longer than images — e.g. Kling first+last-frame
+    // interpolation routinely takes >15 min — so give videos a longer window
+    // before timing them out (previously they were killed at ~95%).
+    const now = Date.now();
+    const IMAGE_TIMEOUT_MS = 15 * 60 * 1000;
+    const VIDEO_TIMEOUT_MS = 30 * 60 * 1000;
+    const imageCutoff = new Date(now - IMAGE_TIMEOUT_MS);
+    const videoCutoff = new Date(now - VIDEO_TIMEOUT_MS);
     try {
       const stalePosts = await prisma.post.findMany({
         where: {
           userId,
           status: { in: ["PROCESSING", "NEW"] },
-          createdAt: { lt: timeout },
+          createdAt: { lt: imageCutoff },
         },
-        select: { id: true, generationParams: true },
+        select: { id: true, generationParams: true, mediaType: true, createdAt: true },
       });
 
       for (const stalePost of stalePosts) {
+        // Videos aren't considered stale until the longer window has elapsed.
+        const cutoff = stalePost.mediaType === "VIDEO" ? videoCutoff : imageCutoff;
+        if (stalePost.createdAt >= cutoff) continue;
         await prisma.$transaction(async (tx) => {
           const updated = await tx.post.updateMany({
             where: {

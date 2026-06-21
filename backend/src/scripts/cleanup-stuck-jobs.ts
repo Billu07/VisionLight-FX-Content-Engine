@@ -1,21 +1,32 @@
 import { prisma } from "../services/database";
 
-const TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+// Video renders (e.g. Kling first+last-frame) run much longer than images.
+const IMAGE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+const VIDEO_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 async function main() {
   console.log("🧹 Starting Stuck Job Cleanup...");
 
-  const cutoffDate = new Date(Date.now() - TIMEOUT_MS);
+  const now = Date.now();
+  const imageCutoff = new Date(now - IMAGE_TIMEOUT_MS);
+  const videoCutoff = new Date(now - VIDEO_TIMEOUT_MS);
 
-  // Find stuck jobs
-  const stuckPosts = await prisma.post.findMany({
+  // Find candidate stuck jobs (older than the shorter, image window).
+  const candidatePosts = await prisma.post.findMany({
     where: {
       status: { in: ["PROCESSING", "NEW"] },
       createdAt: {
-        lt: cutoffDate,
+        lt: imageCutoff,
       },
     },
   });
+
+  // Videos aren't considered stuck until the longer window has elapsed.
+  const stuckPosts = candidatePosts.filter((post) =>
+    post.mediaType === "VIDEO"
+      ? post.createdAt < videoCutoff
+      : post.createdAt < imageCutoff,
+  );
 
   console.log(`Found ${stuckPosts.length} stuck jobs.`);
 
