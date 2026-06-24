@@ -832,8 +832,25 @@ export function AssetLibrary({
     if (!onSelect) return;
     try {
       if (asset.type === "VIDEO") {
-        // For NLE timeline and general video imports, just pass a dummy file and the URL
-        const file = new File(["dummy"], `asset_${asset.id}.mp4`, { type: "video/mp4" });
+        // Fetch the REAL video bytes (via the range-aware video proxy) so any
+        // downstream reference upload sends a valid file. Previously a 5-byte
+        // "dummy" placeholder was uploaded, which fal then rejected with a
+        // video_read_error (Seedance) / ffprobe metadata failure (Topaz).
+        notify.info("Loading video…");
+        const proxyUrl = getCORSProxyVideoUrl(asset.url);
+        const response = await fetch(proxyUrl);
+        if (!response.ok) throw new Error("Failed to fetch video");
+        const blob = await response.blob();
+        const rawExt = (asset.url.split("?")[0].split(".").pop() || "").toLowerCase();
+        const ext = ["mp4", "mov", "webm", "m4v"].includes(rawExt) ? rawExt : "mp4";
+        const type = blob.type && blob.type.startsWith("video/")
+          ? blob.type
+          : ext === "mov"
+            ? "video/quicktime"
+            : ext === "webm"
+              ? "video/webm"
+              : "video/mp4";
+        const file = new File([blob], `asset_${asset.id}.${ext}`, { type });
         onSelect(file, asset.url, asset.aspectRatio);
         onClose();
         return;
