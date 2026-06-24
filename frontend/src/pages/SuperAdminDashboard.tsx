@@ -144,6 +144,7 @@ interface User {
   creditsVideoFX1: number;
   creditsVideoFX2: number;
   creditsVideoFX3: number;
+  maxProjects?: number;
   isOrganizationOwner?: boolean;
   isProtectedFromRemoval?: boolean;
   protectionReason?: "SUPERADMIN" | "TENANT_OWNER" | null;
@@ -1195,7 +1196,7 @@ export default function SuperAdminDashboard() {
       const isDefaultAgencyUser =
         editingUser.organizationId === adminUser?.organizationId;
       if (isDefaultAgencyUser && userUpdates.role !== "SUPERADMIN") {
-        payload.maxProjects = Math.max(1, toInt(userUpdates.maxProjects, 3));
+        payload.maxProjects = Math.max(1, Number(userUpdates.maxProjects) || 3);
       }
       await apiEndpoints.superadminUpdateUser(editingUser.id, payload);
       setMsg("User updated.");
