@@ -46,6 +46,10 @@ const getAllocatedProjectQuota = async (orgId: string, excludeUserId?: string) =
   const allocation = await prisma.user.aggregate({
     where: {
       organizationId: orgId,
+      // SuperAdmins have unlimited projects, so their per-user maxProjects must
+      // not consume the org's allocatable pool. Tenant orgs have no SUPERADMIN,
+      // so this only affects the default org.
+      role: { not: "SUPERADMIN" },
       ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
     },
     _sum: { maxProjects: true },

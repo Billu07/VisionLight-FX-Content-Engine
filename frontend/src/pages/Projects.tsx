@@ -216,10 +216,13 @@ export default function Projects() {
     }
   };
 
+  const isUnlimitedProjects = user?.role === "SUPERADMIN";
   const projectLimit = Number(user?.maxProjects || 0);
   const totalProjects = Array.isArray(projectsData) ? projectsData.length : 0;
   const remainingProjects =
-    projectLimit > 0 ? Math.max(0, projectLimit - totalProjects) : null;
+    !isUnlimitedProjects && projectLimit > 0
+      ? Math.max(0, projectLimit - totalProjects)
+      : null;
 
   if (isLoading) {
     return (
@@ -239,7 +242,11 @@ export default function Projects() {
             <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
               Your Projects
             </h1>
-            {remainingProjects !== null && (
+            {isUnlimitedProjects ? (
+              <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-300/90">
+                Unlimited Projects
+              </p>
+            ) : remainingProjects !== null && (
               <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-300/90">
                 Remaining Quota: {remainingProjects} / {projectLimit}
               </p>

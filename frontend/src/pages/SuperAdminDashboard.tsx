@@ -499,6 +499,7 @@ export default function SuperAdminDashboard() {
   const [userUpdates, setUserUpdates] = useState({
     view: "VISIONLIGHT",
     role: "USER",
+    maxProjects: 3,
   });
 
   const [newTenant, setNewTenant] = useState({
@@ -532,6 +533,7 @@ export default function SuperAdminDashboard() {
     name: "",
     role: "USER",
     view: "VISIONLIGHT",
+    maxProjects: 3,
   });
   const [teamMemberEmailStatus, setTeamMemberEmailStatus] =
     useState<ProvisionEmailStatus | null>(null);
@@ -617,6 +619,7 @@ export default function SuperAdminDashboard() {
       name: "",
       role: "USER",
       view: "VISIONLIGHT",
+      maxProjects: 3,
     });
     setTeamMemberEmailStatus(null);
   };
@@ -1186,10 +1189,18 @@ export default function SuperAdminDashboard() {
         view: userUpdates.view,
         role: userUpdates.role,
       };
+      // Project limit is only managed for the default agency here. SuperAdmins
+      // are unlimited, so we don't push a cap for them. Tenant users are not
+      // edited from this modal, so tenant setup is untouched.
+      const isDefaultAgencyUser =
+        editingUser.organizationId === adminUser?.organizationId;
+      if (isDefaultAgencyUser && userUpdates.role !== "SUPERADMIN") {
+        payload.maxProjects = Math.max(1, toInt(userUpdates.maxProjects, 3));
+      }
       await apiEndpoints.superadminUpdateUser(editingUser.id, payload);
       setMsg("User updated.");
       setEditingUser(null);
-      setUserUpdates({ view: "VISIONLIGHT", role: "USER" });
+      setUserUpdates({ view: "VISIONLIGHT", role: "USER", maxProjects: 3 });
       fetchInitialData();
     } catch (err: any) {
       alert(err.message);
@@ -2040,7 +2051,7 @@ export default function SuperAdminDashboard() {
                               <button
                                 onClick={() => {
                                   setEditingUser(u);
-                                  setUserUpdates({ view: u.view, role: u.role });
+                                  setUserUpdates({ view: u.view, role: u.role, maxProjects: u.maxProjects ?? 3 });
                                 }}
                                 className={adminUi.cyanButton}
                               >
@@ -2406,7 +2417,7 @@ export default function SuperAdminDashboard() {
                               Own Profile
                             </span>
                           )}
-                          <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className={adminUi.cyanButton}>Manage</button>
+                          <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role, maxProjects: u.maxProjects ?? 3 }); }} className={adminUi.cyanButton}>Manage</button>
                           {isProtectedUser(u) ? (
                             <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-amber-300">
                               {getProtectionLabel(u)}
@@ -2480,7 +2491,7 @@ export default function SuperAdminDashboard() {
                       ) : (
                         <span className="text-[8px] text-gray-500 uppercase font-bold tracking-tighter">Own Profile</span>
                       )}
-                      <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role }); }} className="text-[8px] text-gray-500 hover:text-white uppercase font-bold tracking-tighter">Edit View</button>
+                      <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role, maxProjects: u.maxProjects ?? 3 }); }} className="text-[8px] text-gray-500 hover:text-white uppercase font-bold tracking-tighter">Edit View</button>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-4 mt-4">
@@ -3415,6 +3426,26 @@ export default function SuperAdminDashboard() {
                 )}
               </div>
 
+              {editingUser.organizationId === adminUser?.organizationId && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Project Limit</label>
+                  {userUpdates.role === "SUPERADMIN" ? (
+                    <div className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-emerald-300 font-bold">
+                      Unlimited (SuperAdmin)
+                    </div>
+                  ) : (
+                    <input
+                      type="number"
+                      min={1}
+                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                      value={userUpdates.maxProjects}
+                      onChange={e => setUserUpdates({ ...userUpdates, maxProjects: Math.max(1, toInt(e.target.value, 3)) })}
+                    />
+                  )}
+                  <p className="text-[10px] text-gray-500">Drawn from the agency's project pool.</p>
+                </div>
+              )}
+
               <div className="space-y-2 rounded-xl border border-gray-800 bg-gray-950/60 p-4">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Password Reset</label>
                 <p className="text-[10px] leading-relaxed text-gray-500">
@@ -3660,6 +3691,26 @@ export default function SuperAdminDashboard() {
                     <option value="VISIONLIGHT">VisionLight View (Full)</option>
                     <option value="PICDRIFT">PicDrift View (Limited)</option>
                   </select>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      Project Limit
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                      value={newTeamMember.maxProjects}
+                      onChange={e =>
+                        setNewTeamMember({
+                          ...newTeamMember,
+                          maxProjects: Math.max(1, toInt(e.target.value, 3)),
+                        })
+                      }
+                    />
+                    <p className="text-[10px] text-gray-500">
+                      Max projects this member can create. Drawn from the agency's project pool.
+                    </p>
+                  </div>
                 </>
               )}
               <div className="flex gap-4 pt-4">

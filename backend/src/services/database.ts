@@ -325,15 +325,21 @@ export const dbService = {
               throw new Error("USER_NOT_FOUND");
             }
 
+            // SuperAdmins (platform owners, always in the default org) get
+            // unlimited projects — they are never capped by per-user or
+            // org-wide project quotas. Tenant orgs have no SUPERADMIN users,
+            // so this does not affect any tenant setup.
+            const isSuperAdmin = user.role === "SUPERADMIN";
+
             const userProjectCount = await tx.project.count({
               where: { userId },
             });
 
-            if (userProjectCount >= user.maxProjects) {
+            if (!isSuperAdmin && userProjectCount >= user.maxProjects) {
               throw new Error("USER_PROJECT_LIMIT");
             }
 
-            if (user.organizationId && user.organization) {
+            if (!isSuperAdmin && user.organizationId && user.organization) {
               const orgProjectCount = await tx.project.count({
                 where: {
                   OR: [
