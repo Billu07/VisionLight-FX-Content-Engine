@@ -52,11 +52,13 @@ export const FalService = {
     // High-resolution output for GPT Image 2. The old code used fal's ~1MP
     // presets (square_hd / landscape_16_9 ≈ 1024px edge), which is why renders
     // and edits looked low quality once downloaded. We instead request explicit
-    // dimensions at the top of what the API allows, preserving the exact aspect
-    // ratio. API limits: dimensions must be multiples of 16, max edge 3840px,
-    // aspect ratio <= 3:1, and total pixels <= 8,294,400.
-    const MAX_EDGE = 3840;
-    const TARGET_MAX_PIXELS = 8_000_000; // safely below the 8,294,400 hard cap
+    // dimensions with a ~2.5K long edge (agreed quality/cost target), preserving
+    // the exact aspect ratio. The output stays lossless PNG, so there is no
+    // quality compromise — only the pixel dimensions are bounded here.
+    // API limits (still respected): multiples of 16, max edge 3840px, aspect
+    // ratio <= 3:1, total pixels <= 8,294,400.
+    const MAX_EDGE = 2560; // ~2.5K long edge
+    const TARGET_MAX_PIXELS = 8_000_000; // safety cap, below the 8,294,400 hard limit
 
     const dimsForRatio = (
       ratioWidthOverHeight: number,
