@@ -48,34 +48,63 @@ export const FalService = {
   async _resolveGptImageSize(
     aspectRatio?: string,
     referenceImages?: Buffer[],
-  ): Promise<string> {
-    if (aspectRatio === "1:1" || aspectRatio === "square") return "square_hd";
-    if (aspectRatio === "9:16" || aspectRatio === "portrait") {
-      return "portrait_16_9";
-    }
-    if (aspectRatio === "16:9" || aspectRatio === "landscape") {
-      return "landscape_16_9";
-    }
+  ): Promise<string | { width: number; height: number }> {
+    // High-resolution output for GPT Image 2. The old code used fal's ~1MP
+    // presets (square_hd / landscape_16_9 ≈ 1024px edge), which is why renders
+    // and edits looked low quality once downloaded. We instead request explicit
+    // dimensions at the top of what the API allows, preserving the exact aspect
+    // ratio. API limits: dimensions must be multiples of 16, max edge 3840px,
+    // aspect ratio <= 3:1, and total pixels <= 8,294,400.
+    const MAX_EDGE = 3840;
+    const TARGET_MAX_PIXELS = 8_000_000; // safely below the 8,294,400 hard cap
 
-    const primaryRef = Array.isArray(referenceImages) ? referenceImages[0] : undefined;
-    if (!primaryRef) {
-      return "landscape_4_3";
-    }
+    const dimsForRatio = (
+      ratioWidthOverHeight: number,
+    ): { width: number; height: number } => {
+      let r = ratioWidthOverHeight;
+      if (!Number.isFinite(r) || r <= 0) r = 4 / 3;
+      // Clamp to the model's max aspect ratio (3:1 in either orientation).
+      r = Math.min(3, Math.max(1 / 3, r));
 
+      let w: number;
+      let h: number;
+      if (r >= 1) {
+        w = MAX_EDGE;
+        h = MAX_EDGE / r;
+      } else {
+        h = MAX_EDGE;
+        w = MAX_EDGE * r;
+      }
+      if (w * h > TARGET_MAX_PIXELS) {
+        const scale = Math.sqrt(TARGET_MAX_PIXELS / (w * h));
+        w *= scale;
+        h *= scale;
+      }
+      const round16 = (n: number) => Math.max(512, Math.floor(n / 16) * 16);
+      return { width: round16(w), height: round16(h) };
+    };
+
+    const ar = (aspectRatio || "").toLowerCase();
+    if (ar === "1:1" || ar === "square") return dimsForRatio(1);
+    if (ar === "9:16" || ar === "portrait") return dimsForRatio(9 / 16);
+    if (ar === "16:9" || ar === "landscape") return dimsForRatio(16 / 9);
+    if (ar === "4:3") return dimsForRatio(4 / 3);
+    if (ar === "3:4") return dimsForRatio(3 / 4);
+    if (ar === "21:9") return dimsForRatio(21 / 9);
+
+    // "original" / "auto" / unknown: keep the input image's native aspect ratio.
+    const primaryRef = Array.isArray(referenceImages)
+      ? referenceImages[0]
+      : undefined;
+    if (!primaryRef) return dimsForRatio(4 / 3);
     try {
       const meta = await sharp(primaryRef).metadata();
       const width = meta.width || 0;
       const height = meta.height || 0;
-      if (!width || !height) return "landscape_4_3";
-
-      const ratio = width / height;
-      if (ratio >= 1.55) return "landscape_16_9";
-      if (ratio >= 1.15) return "landscape_4_3";
-      if (ratio >= 0.87) return "square_hd";
-      if (ratio >= 0.65) return "portrait_4_3";
-      return "portrait_16_9";
+      if (!width || !height) return dimsForRatio(4 / 3);
+      return dimsForRatio(width / height);
     } catch {
-      return "landscape_4_3";
+      return dimsForRatio(4 / 3);
     }
   },
 
