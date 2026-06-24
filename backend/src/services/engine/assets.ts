@@ -95,6 +95,7 @@ export const assetsLogic = {
     originalAssetId?: string,
     projectId?: string,
     apiKeys?: any,
+    model: "gpt-image-2" | "nano-banana-2" = "gpt-image-2",
   ) {
     try {
       // Normalize EXIF orientation so AR detection and GPT outpaint reference
@@ -131,15 +132,16 @@ export const assetsLogic = {
         );
       } else {
         console.log(
-          `Asset ratio mismatch; triggering GPT outpaint for ${targetAspectRatio}.`,
+          `Asset ratio mismatch; triggering ${model} outpaint for ${targetAspectRatio}.`,
         );
-        // If GPT outpaint fails, bubble the error so route-level refund logic runs.
+        // If the outpaint fails, bubble the error so route-level refund logic runs.
         processedBuffer = await resizeWithGptImage2(
           normalizedBuffer,
           targetWidth,
           targetHeight,
           targetAspectRatio,
           apiKeys,
+          model,
         );
       }
 

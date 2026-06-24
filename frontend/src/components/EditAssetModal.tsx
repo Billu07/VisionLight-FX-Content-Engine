@@ -211,6 +211,9 @@ export function EditAssetModal({
     "16:9" | "9:16" | "1:1"
   >("16:9");
   const [convertMode, setConvertMode] = useState<"auto" | "custom">("custom");
+  const [convertModel, setConvertModel] = useState<
+    "gpt-image-2" | "nano-banana-2"
+  >("gpt-image-2");
 
   // Drift State
   const driftParams = {
@@ -412,10 +415,12 @@ export function EditAssetModal({
       prompt: editPrompt,
       customRatio,
       sourceAsset,
+      model,
     }: {
       prompt: string;
       customRatio?: string;
       sourceAsset: Asset;
+      model?: "gpt-image-2" | "nano-banana-2";
     }) => {
       const rootId = sourceAsset.originalAssetId || sourceAsset.id;
       return apiEndpoints.editAsset({
@@ -426,7 +431,7 @@ export function EditAssetModal({
         aspectRatio: customRatio || "original",
         referenceUrls: referenceAssets.map((asset) => asset.url),
         mode: activeTab as "standard" | "pro",
-        model: picFxEditModel,
+        model: model || picFxEditModel,
       });
     },
     onMutate: (variables) => {
@@ -499,6 +504,7 @@ export function EditAssetModal({
       formData.append("image", file);
       formData.append("raw", "false");
       formData.append("aspectRatio", targetRatio);
+      formData.append("model", convertModel);
 
       if (currentAsset.originalAssetId) {
         formData.append("originalAssetId", currentAsset.originalAssetId);
@@ -699,6 +705,7 @@ export function EditAssetModal({
         prompt: prompt.trim(),
         customRatio: convertTargetRatio,
         sourceAsset: currentAsset,
+        model: convertModel,
       });
     }
   };
@@ -1278,6 +1285,38 @@ export function EditAssetModal({
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* 1b. Convert Model */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    Convert Model
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: "gpt-image-2", label: "GPT 2 Image" },
+                      { id: "nano-banana-2", label: "Nano Banana 2" },
+                    ].map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() =>
+                          setConvertModel(
+                            m.id as "gpt-image-2" | "nano-banana-2",
+                          )
+                        }
+                        className={`py-2 text-xs font-bold rounded-lg border transition-all ${
+                          convertModel === m.id
+                            ? "bg-purple-600 border-purple-500 text-white"
+                            : "bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500"
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-gray-500">
+                    GPT 2 Image renders at ~2.5K lossless. Nano Banana 2 is faster.
+                  </p>
                 </div>
 
                 {/* 2. Mode Select */}

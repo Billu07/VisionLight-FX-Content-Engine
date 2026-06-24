@@ -152,9 +152,10 @@ export const resizeWithGptImage2 = async (
   targetHeight: number, // Kept for signature compatibility
   targetRatioString: string = "16:9",
   apiKeys?: any,
+  model: "gpt-image-2" | "nano-banana-2" = "gpt-image-2",
 ): Promise<Buffer> => {
   try {
-    console.log(`GPT-Image-2 Outpaint: Target ${targetRatioString}`);
+    console.log(`${model} Outpaint: Target ${targetRatioString}`);
 
     let resizeInstruction = "";
     if (targetRatioString === "9:16" || targetRatioString === "portrait") {
@@ -180,11 +181,14 @@ STRICT RULES:
       prompt,
       aspectRatio: targetRatioString,
       referenceImages: [originalBuffer],
-      model: "gpt-image-2",
+      model,
+      // GPT Image 2 resolves its own ~2.5K size; Nano Banana 2 is driven by the
+      // resolution hint, so request 2K there for a comparable-quality outpaint.
+      imageSize: model === "nano-banana-2" ? "2K" : undefined,
       apiKey: apiKeys?.falApiKey,
     });
   } catch (error: any) {
-    console.error("GPT-Image-2 Outpaint Error:", error.message);
+    console.error(`${model} Outpaint Error:`, error.message);
     throw error;
   }
 };

@@ -550,8 +550,11 @@ router.post(
     try {
       if (!req.file) return res.status(400).json({ error: "No media file provided" });
 
-      const { aspectRatio, raw, originalAssetId, projectId } = req.body;
+      const { aspectRatio, raw, originalAssetId, projectId, model } = req.body;
       const fileSizeBytes = req.file.size;
+      // Convert can run on GPT Image 2 (default, ~2.5K lossless) or Nano Banana 2.
+      const convertModel: "gpt-image-2" | "nano-banana-2" =
+        model === "nano-banana-2" ? "nano-banana-2" : "gpt-image-2";
 
       if (projectId) {
         const project = await airtableService.getProjectById(projectId);
@@ -624,7 +627,7 @@ router.post(
             "pro",
             sourceAsset.id,
             apiKeys,
-            "gpt-image-2",
+            convertModel,
           );
           return res.json({ success: true, asset });
         }
@@ -637,6 +640,7 @@ router.post(
         originalAssetId,
         projectId,
         apiKeys,
+        convertModel,
       );
       res.json({ success: true, asset });
     } catch (error: any) {
