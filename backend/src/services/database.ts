@@ -424,45 +424,93 @@ export const dbService = {
       data,
     });
   },
-  async deleteProject(id: string) {
-    // Total delete: free the project's R2 storage BEFORE the DB cascade removes
-    // the asset rows. Org storage quota is recomputed from Asset.sizeBytes, so
-    // the DB cascade already frees the user's quota; this additionally purges
-    // the physical objects from R2 (url + derived proxy/HLS/sprite files) so the
-    // platform's R2 space is reclaimed too. Best-effort: a hiccup here must not
-    // block the project (and its slot) from being deleted.
+  // Purge R2 objects for the given URLs, but ONLY those that nothing else still
+  // references. A render's R2 url can be shared with a history Post
+  // (post.mediaUrl = asset.url), reused as another post's imageReference, or
+  // shared by sibling asset variations — so we never delete an object that a
+  // surviving row still points at. Call this AFTER the owning rows are deleted
+  // (the just-removed rows then naturally fall out of the reference checks).
+  // Best-effort and never throws.
+  async _purgeUnreferencedR2Urls(
+    urls: (string | null | undefined)[],
+  ): Promise<number> {
     try {
-      const assets = await prisma.asset.findMany({
-        where: { projectId: id },
-        select: {
-          url: true,
-          proxyUrl: true,
-          hlsUrl: true,
-          spriteSheetUrl: true,
-        },
-      });
-      if (assets.length > 0) {
-        const urls = assets.flatMap((a) => [
-          a.url,
-          a.proxyUrl,
-          a.hlsUrl,
-          a.spriteSheetUrl,
-        ]);
-        const removed = await deleteR2ObjectsByUrl(urls);
-        console.log(
-          `🧹 Project ${id} delete: purged ${removed} R2 object(s) from ${assets.length} asset(s).`,
-        );
+      const candidates = Array.from(
+        new Set(
+          urls.filter(
+            (u): u is string => typeof u === "string" && u.length > 0,
+          ),
+        ),
+      );
+      if (candidates.length === 0) return 0;
+
+      const safe: string[] = [];
+      for (const url of candidates) {
+        const assetRefs = await prisma.asset.count({
+          where: {
+            OR: [
+              { url },
+              { proxyUrl: url },
+              { hlsUrl: url },
+              { spriteSheetUrl: url },
+            ],
+          },
+        });
+        if (assetRefs > 0) continue;
+
+        // Posts may store mediaUrl as a JSON string, so match by substring —
+        // the url is a unique R2 path, and erring toward KEEPING is safe.
+        const postRefs = await prisma.post.count({
+          where: {
+            OR: [
+              { mediaUrl: { contains: url } },
+              { imageReference: { contains: url } },
+              { generatedEndFrame: { contains: url } },
+            ],
+          },
+        });
+        if (postRefs > 0) continue;
+
+        safe.push(url);
       }
+
+      if (safe.length === 0) return 0;
+      return await deleteR2ObjectsByUrl(safe);
     } catch (err: any) {
       console.warn(
-        `R2 cleanup during project delete failed (continuing with DB delete):`,
+        `R2 purge failed (continuing):`,
         err?.message || err,
       );
+      return 0;
     }
+  },
 
-    return prisma.project.delete({
-      where: { id },
+  async deleteProject(id: string) {
+    // Total delete: the DB cascade removes all posts/assets, and org storage
+    // quota (computed from Asset.sizeBytes) recovers automatically. We also
+    // reclaim the platform's physical R2 space by purging the project's asset
+    // objects — but only those no surviving row references. Collect the URLs
+    // first (the cascade is about to remove the rows), delete, then purge.
+    const assets = await prisma.asset.findMany({
+      where: { projectId: id },
+      select: { url: true, proxyUrl: true, hlsUrl: true, spriteSheetUrl: true },
     });
+    const urls = assets.flatMap((a) => [
+      a.url,
+      a.proxyUrl,
+      a.hlsUrl,
+      a.spriteSheetUrl,
+    ]);
+
+    const result = await prisma.project.delete({ where: { id } });
+
+    const removed = await this._purgeUnreferencedR2Urls(urls);
+    if (urls.length > 0) {
+      console.log(
+        `🧹 Project ${id} delete: purged ${removed} R2 object(s) from ${assets.length} asset(s).`,
+      );
+    }
+    return result;
   },
 
   // === CREDITS (Kept Intact for Backward Compatibility) ===
@@ -611,7 +659,26 @@ export const dbService = {
     });
   },
   async deleteAsset(id: string) {
-    return prisma.asset.delete({ where: { id } });
+    // Deleting a render frees the user's storage (quota = sum of
+    // Asset.sizeBytes) and also reclaims R2 space. Collect this asset's R2
+    // URLs first, delete the row, then purge only the objects nothing else
+    // still references (a history post or sibling variation may share them).
+    const asset = await prisma.asset.findUnique({
+      where: { id },
+      select: { url: true, proxyUrl: true, hlsUrl: true, spriteSheetUrl: true },
+    });
+
+    const result = await prisma.asset.delete({ where: { id } });
+
+    if (asset) {
+      await this._purgeUnreferencedR2Urls([
+        asset.url,
+        asset.proxyUrl,
+        asset.hlsUrl,
+        asset.spriteSheetUrl,
+      ]);
+    }
+    return result;
   },
 
   // === POSTS (Intact) ===
