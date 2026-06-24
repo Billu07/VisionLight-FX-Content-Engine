@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { DEFAULT_FAL_PRICING, DEFAULT_PROVIDER_COSTS } from "../config/pricing";
+import { deleteR2ObjectsByUrl } from "../utils/r2Delete";
 
 export const prisma = new PrismaClient();
 export type {
@@ -424,6 +425,41 @@ export const dbService = {
     });
   },
   async deleteProject(id: string) {
+    // Total delete: free the project's R2 storage BEFORE the DB cascade removes
+    // the asset rows. Org storage quota is recomputed from Asset.sizeBytes, so
+    // the DB cascade already frees the user's quota; this additionally purges
+    // the physical objects from R2 (url + derived proxy/HLS/sprite files) so the
+    // platform's R2 space is reclaimed too. Best-effort: a hiccup here must not
+    // block the project (and its slot) from being deleted.
+    try {
+      const assets = await prisma.asset.findMany({
+        where: { projectId: id },
+        select: {
+          url: true,
+          proxyUrl: true,
+          hlsUrl: true,
+          spriteSheetUrl: true,
+        },
+      });
+      if (assets.length > 0) {
+        const urls = assets.flatMap((a) => [
+          a.url,
+          a.proxyUrl,
+          a.hlsUrl,
+          a.spriteSheetUrl,
+        ]);
+        const removed = await deleteR2ObjectsByUrl(urls);
+        console.log(
+          `🧹 Project ${id} delete: purged ${removed} R2 object(s) from ${assets.length} asset(s).`,
+        );
+      }
+    } catch (err: any) {
+      console.warn(
+        `R2 cleanup during project delete failed (continuing with DB delete):`,
+        err?.message || err,
+      );
+    }
+
     return prisma.project.delete({
       where: { id },
     });

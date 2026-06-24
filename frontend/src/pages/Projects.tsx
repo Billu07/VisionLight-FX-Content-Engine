@@ -95,6 +95,52 @@ export default function Projects() {
     },
   });
 
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (project: { id: string }) =>
+      apiEndpoints.deleteProject(project.id),
+    onSuccess: (_res, project) => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      setOpenMenuProjectId(null);
+      // If the deleted project was the active one, clear it so the dashboard
+      // doesn't try to open a project that no longer exists.
+      if (localStorage.getItem("visionlight_active_project") === project.id) {
+        localStorage.removeItem("visionlight_active_project");
+      }
+      notify.success("Project deleted. The slot is now free to reuse.");
+    },
+    onError: (err: any) => {
+      notify.error("Failed to delete project: " + (err?.message || "Unknown error"));
+    },
+  });
+
+  // Two-layer confirmation: an explicit warning, then a type-to-confirm gate.
+  // Deletion is permanent — it removes every render/asset in the project and
+  // frees both the user's storage and the platform's R2 space.
+  const handleDeleteProject = async (project: { id: string; name: string }) => {
+    setOpenMenuProjectId(null);
+    const acknowledged = await confirmAction(
+      `Delete "${project.name}"?`,
+      {
+        description:
+          "This permanently deletes the project and EVERYTHING in it — all renders, edits, assets and history. Your storage is freed and the slot becomes reusable. This cannot be undone.",
+        confirmLabel: "Continue",
+      },
+    );
+    if (!acknowledged) return;
+
+    const confirmed = await confirmAction(
+      `Permanently delete "${project.name}". This is irreversible.`,
+      {
+        critical: true,
+        confirmationText: project.name,
+        confirmLabel: "Delete Forever",
+      },
+    );
+    if (!confirmed) return;
+
+    deleteProjectMutation.mutate(project);
+  };
+
   useEffect(() => {
     const activationMessage = sessionStorage.getItem(
       "visionlight_activation_message",
@@ -440,6 +486,14 @@ export default function Projects() {
                               className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-cyan-300 transition-colors hover:bg-cyan-500/10"
                             >
                               Rename
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteProject(project)}
+                              disabled={deleteProjectMutation.isPending}
+                              className="w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-red-400 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+                            >
+                              Delete
                             </button>
                           </div>
                         )}
