@@ -192,7 +192,11 @@ export const FalService = {
         );
         input.quality = "high";
         input.num_images = 1;
-        input.output_format = "jpeg";
+        // Lossless PNG: GPT Image 2's native/default format. Requesting JPEG here
+        // re-compressed every render (and every edit) into a lossy file even
+        // though the user is charged for a full "high" quality result. PNG keeps
+        // the model output pixel-faithful for both download and re-editing.
+        input.output_format = "png";
       } else {
         // Keep Nano Banana behavior unchanged.
         input.enable_web_search = isEdit ? false : true;

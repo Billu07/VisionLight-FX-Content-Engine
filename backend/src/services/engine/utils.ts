@@ -230,13 +230,28 @@ export const uploadToCloudinary = async (
     const uniqueId = crypto.randomUUID();
     let extension = r === "video" ? "mp4" : "jpg";
     let contentType = r === "video" ? "video/mp4" : "image/jpeg";
-    
-    const fileKey = `visionlight/user_${u}/${r}s/${uniqueId}.${extension}`;
 
     let bufferToUpload: Buffer;
 
     if (Buffer.isBuffer(f)) {
       bufferToUpload = f;
+      // Preserve the real image format (don't mislabel a lossless PNG/WebP as
+      // JPEG). The bytes are stored as-is; we only fix the extension + the
+      // Content-Type so downloads/serving keep the original quality.
+      if (r !== "video" && f.length >= 12) {
+        if (
+          f[0] === 0x89 && f[1] === 0x50 && f[2] === 0x4e && f[3] === 0x47
+        ) {
+          extension = "png";
+          contentType = "image/png";
+        } else if (
+          f[0] === 0x52 && f[1] === 0x49 && f[2] === 0x46 && f[3] === 0x46 &&
+          f[8] === 0x57 && f[9] === 0x45 && f[10] === 0x42 && f[11] === 0x50
+        ) {
+          extension = "webp";
+          contentType = "image/webp";
+        }
+      }
     } else if (typeof f === 'string' && f.startsWith('http')) {
       // If a URL was passed, download it first then upload to R2
       const response = await axios.get(f, { responseType: 'arraybuffer' });
@@ -250,6 +265,8 @@ export const uploadToCloudinary = async (
     } else {
       throw new Error("Unsupported file format for R2 upload. Must be Buffer or URL.");
     }
+
+    const fileKey = `visionlight/user_${u}/${r}s/${uniqueId}.${extension}`;
 
     const command = new PutObjectCommand({
       Bucket: bucketName,
