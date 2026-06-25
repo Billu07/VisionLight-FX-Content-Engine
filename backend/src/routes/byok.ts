@@ -252,6 +252,27 @@ const resolveCustomerEmail = (payload: any): string | null => {
   return email;
 };
 
+// Wix automations may send the activation fields flat, or wrapped in a `data`
+// (and/or `payload`) envelope — e.g. { data: { packageCode, customerEmail, … } }.
+// (A Wix plan/automation change moved our fields under `data`, which made the
+// webhook arrive valid-but-IGNORED with a null packageCode/email.) The HMAC
+// signature is validated over the ORIGINAL raw body before this runs, so
+// flattening one level of envelope here is purely for field extraction and
+// keeps activation working whether Wix sends flat or nested payloads.
+const unwrapWebhookEnvelope = (payload: any): any => {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return payload;
+  }
+  let flattened: any = payload;
+  if (flattened.payload && typeof flattened.payload === "object" && !Array.isArray(flattened.payload)) {
+    flattened = { ...flattened, ...flattened.payload };
+  }
+  if (flattened.data && typeof flattened.data === "object" && !Array.isArray(flattened.data)) {
+    flattened = { ...flattened, ...flattened.data };
+  }
+  return flattened;
+};
+
 const resolveEventKey = (payload: any): string => {
   const raw =
     payload?.eventId ||
@@ -972,14 +993,17 @@ const handleWixWebhook = async (req: Request, res: Response) => {
     });
   }
 
-  const packageCode = resolvePackageCodeFromPayload(payload);
-  const customerEmail = resolveCustomerEmail(payload);
-  const eventKey = resolveEventKey(payload);
-  const eventType = String(payload?.eventType || payload?.event_type || "wix_event");
-  let checkoutSessionId = resolveCheckoutSessionIdFromPayload(req, payload);
-  const orderId = payload?.orderId || payload?.order_id || payload?.order?.id || null;
+  // Flatten any { data: … } / { payload: … } envelope so extraction works
+  // whether Wix sends fields flat (legacy) or nested (current).
+  const dataPayload = unwrapWebhookEnvelope(payload);
+  const packageCode = resolvePackageCodeFromPayload(dataPayload);
+  const customerEmail = resolveCustomerEmail(dataPayload);
+  const eventKey = resolveEventKey(dataPayload);
+  const eventType = String(dataPayload?.eventType || dataPayload?.event_type || "wix_event");
+  let checkoutSessionId = resolveCheckoutSessionIdFromPayload(req, dataPayload);
+  const orderId = dataPayload?.orderId || dataPayload?.order_id || dataPayload?.order?.id || null;
   const transactionId =
-    payload?.transactionId || payload?.transaction_id || payload?.payment?.id || null;
+    dataPayload?.transactionId || dataPayload?.transaction_id || dataPayload?.payment?.id || null;
   if (!checkoutSessionId && packageCode && customerEmail) {
     checkoutSessionId = await resolveFallbackCheckoutSessionId({
       customerEmail,
