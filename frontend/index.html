@@ -14,6 +14,20 @@
     <meta name="theme-color" content="#6366f1" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PicDrift Studio - AI Content Generation Studio</title>
+    <script>
+      // Domain-aware browser tab title. Runs before React so there is no flash
+      // of the wrong brand. Mirrors getSiteBrandFromHostname() in lib/branding.ts.
+      (function () {
+        var h = (location.hostname || "").trim().toLowerCase();
+        var title = "PicDrift Studio - AI Content Generation Studio";
+        if (h === "byok.link" || h === "www.byok.link") {
+          title = "BYOK - AI Content Studio";
+        } else if (h.indexOf("visualfx") !== -1) {
+          title = "VisualFX Studio - AI Content Generation Studio";
+        }
+        document.title = title;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
