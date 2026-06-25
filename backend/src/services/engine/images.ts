@@ -337,13 +337,15 @@ export const imageLogic = {
       const rawUrl = assetUrl;
       const bigBuffer = await FalService.upscaleImage({ imageUrl: rawUrl, apiKey: apiKeys?.falApiKey });
 
-      // FIX: Compress before Cloudinary upload (Mozjpeg 95)
+      // Enhance/upscale is a quality operation, so don't re-compress the result
+      // into lossy JPEG (which partly undid the upscale). Store it as LOSSLESS
+      // WebP: pixel-identical to the Topaz output, but smaller than PNG.
       const optimizedBuffer = await sharp(bigBuffer)
-        .jpeg({ quality: 95, mozjpeg: true })
+        .webp({ lossless: true })
         .toBuffer();
 
       console.log(
-        `📉 Compression: ${(bigBuffer.length / 1024 / 1024).toFixed(2)}MB -> ${(
+        `🔍 Enhance encode (lossless WebP): ${(bigBuffer.length / 1024 / 1024).toFixed(2)}MB -> ${(
           optimizedBuffer.length /
           1024 /
           1024

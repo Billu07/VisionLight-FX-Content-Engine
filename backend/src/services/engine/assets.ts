@@ -124,12 +124,28 @@ export const assetsLogic = {
 
       let processedBuffer: Buffer;
       if (isMatch) {
-        console.log("Asset ratios aligned; performing strict resize.");
-        processedBuffer = await resizeStrict(
-          normalizedBuffer,
-          targetWidth,
-          targetHeight,
+        // Ratio already matches: preserve the source's NATIVE resolution (the
+        // old code force-resized to 720p/1024px, silently downscaling). Crop to
+        // the exact target ratio at full resolution and keep it lossless (PNG),
+        // consistent with the outpaint path — never reduce quality on convert.
+        const srcW = metadata.width || targetWidth;
+        const srcH = metadata.height || targetHeight;
+        let outW: number;
+        let outH: number;
+        if (srcW / srcH > targetRatioNum) {
+          outH = srcH;
+          outW = Math.round(srcH * targetRatioNum);
+        } else {
+          outW = srcW;
+          outH = Math.round(srcW / targetRatioNum);
+        }
+        console.log(
+          `Asset ratios aligned; preserving native resolution (${outW}x${outH}).`,
         );
+        processedBuffer = await sharp(normalizedBuffer)
+          .resize(outW, outH, { fit: "cover", position: "center" })
+          .png()
+          .toBuffer();
       } else {
         console.log(
           `Asset ratio mismatch; triggering ${model} outpaint for ${targetAspectRatio}.`,
