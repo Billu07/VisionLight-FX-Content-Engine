@@ -724,6 +724,8 @@ export function EditAssetModal({
 
   // Handle Convert Action
   const handleConvertAction = () => {
+    // Guard against rapid repeat clicks while a convert is already running.
+    if (ratioMutation.isPending || textEditMutation.isPending) return;
     if (convertMode === "auto") {
       ratioMutation.mutate(convertTargetRatio);
     } else {
@@ -1384,9 +1386,17 @@ export function EditAssetModal({
                 {/* 4. Action Button */}
                 <button
                   onClick={handleConvertAction}
-                  className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white font-bold hover:shadow-lg flex items-center justify-center gap-2"
+                  disabled={ratioMutation.isPending || textEditMutation.isPending}
+                  className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white font-bold hover:shadow-lg flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  <span>Convert to {convertTargetRatio}</span>
+                  {ratioMutation.isPending || textEditMutation.isPending ? (
+                    <>
+                      <LoadingSpinner size="sm" color="text-white" />
+                      <span>Converting…</span>
+                    </>
+                  ) : (
+                    <span>Convert to {convertTargetRatio}</span>
+                  )}
                 </button>
               </div>
             )}
