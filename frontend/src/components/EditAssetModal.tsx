@@ -1342,9 +1342,6 @@ export function EditAssetModal({
                       </button>
                     ))}
                   </div>
-                  <p className="text-[10px] text-gray-500">
-                    GPT 2 Image renders at ~2.5K lossless. Nano Banana 2 is faster.
-                  </p>
                 </div>
 
                 {/* 2. Mode Select */}
