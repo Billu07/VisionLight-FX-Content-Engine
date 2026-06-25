@@ -338,14 +338,12 @@ export const imageLogic = {
       const bigBuffer = await FalService.upscaleImage({ imageUrl: rawUrl, apiKey: apiKeys?.falApiKey });
 
       // Enhance/upscale is a quality operation, so don't re-compress the result
-      // into lossy JPEG (which partly undid the upscale). Store it as LOSSLESS
-      // WebP: pixel-identical to the Topaz output, but smaller than PNG.
-      const optimizedBuffer = await sharp(bigBuffer)
-        .webp({ lossless: true })
-        .toBuffer();
+      // into lossy JPEG (which partly undid the upscale). Keep it LOSSLESS PNG —
+      // pixel-identical to the Topaz output and maximally compatible.
+      const optimizedBuffer = await sharp(bigBuffer).png().toBuffer();
 
       console.log(
-        `🔍 Enhance encode (lossless WebP): ${(bigBuffer.length / 1024 / 1024).toFixed(2)}MB -> ${(
+        `🔍 Enhance encode (lossless PNG): ${(bigBuffer.length / 1024 / 1024).toFixed(2)}MB -> ${(
           optimizedBuffer.length /
           1024 /
           1024
