@@ -30,6 +30,34 @@ export interface BackgroundJob {
   createdAt?: number;
 }
 
+// Restore a persisted editor session, dropping un-resumable in-flight tasks.
+// A non-drift edit/convert/enhance/crop job only completes via its live React
+// Query mutation, which no longer exists after the modal is closed and
+// reopened — so a persisted "processing" one would spin forever ("turns green,
+// then shows processing again on revisit"). Drift jobs carry a driftPostId and
+// are recovered by status polling, so those are kept.
+const loadEditorSession = (
+  key: string,
+): { jobs: BackgroundJob[]; isMinimized: boolean } => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return { jobs: [], isMinimized: false };
+    const parsed = JSON.parse(raw) as {
+      jobs?: BackgroundJob[];
+      isMinimized?: boolean;
+    };
+    const jobs = (Array.isArray(parsed.jobs) ? parsed.jobs : []).filter(
+      (j) =>
+        j.status !== "processing" ||
+        (j.type === "drift" && !!j.driftPostId),
+    );
+    return { jobs, isMinimized: parsed.isMinimized === true };
+  } catch (e) {
+    console.warn("Failed to restore editor session:", e);
+    return { jobs: [], isMinimized: false };
+  }
+};
+
 interface Asset {
   id: string;
   url: string;
@@ -81,10 +109,25 @@ export function EditAssetModal({
     initialTab || (initialVideoUrl ? "drift" : "pro"),
   );
 
-  const [jobs, setJobs] = useState<BackgroundJob[]>([]);
+  const [jobs, setJobs] = useState<BackgroundJob[]>(
+    () => loadEditorSession(editorSessionKey).jobs,
+  );
   const [showJobsMenu, setShowJobsMenu] = useState(false);
   const [lastJobId, setLastJobId] = useState<string | null>(null);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(
+    () => loadEditorSession(editorSessionKey).isMinimized,
+  );
+  // Reload the session synchronously when the editor switches to a different
+  // asset without unmounting (React's "adjust state on prop change" pattern).
+  // Doing it during render keeps jobs in sync with editorSessionKey so the
+  // persist effect below can never write one asset's jobs under another's key.
+  const [loadedSessionKey, setLoadedSessionKey] = useState(editorSessionKey);
+  if (loadedSessionKey !== editorSessionKey) {
+    const restored = loadEditorSession(editorSessionKey);
+    setLoadedSessionKey(editorSessionKey);
+    setJobs(restored.jobs);
+    setIsMinimized(restored.isMinimized);
+  }
 
   const triggerJobAdded = (job: BackgroundJob) => {
     const enrichedJob: BackgroundJob = {
@@ -101,25 +144,10 @@ export function EditAssetModal({
   };
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(editorSessionKey);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as {
-        jobs?: BackgroundJob[];
-        isMinimized?: boolean;
-      };
-      if (Array.isArray(parsed.jobs) && parsed.jobs.length > 0) {
-        setJobs(parsed.jobs);
-      }
-      if (typeof parsed.isMinimized === "boolean") {
-        setIsMinimized(parsed.isMinimized);
-      }
-    } catch (e) {
-      console.warn("Failed to restore editor session:", e);
-    }
-  }, [editorSessionKey]);
-
-  useEffect(() => {
+    // Only persist once the in-memory jobs belong to the current session key
+    // (guards the one render where editorSessionKey has changed but the
+    // synchronous reload above hasn't been applied yet).
+    if (loadedSessionKey !== editorSessionKey) return;
     try {
       localStorage.setItem(
         editorSessionKey,
@@ -131,7 +159,7 @@ export function EditAssetModal({
     } catch (e) {
       console.warn("Failed to persist editor session:", e);
     }
-  }, [editorSessionKey, jobs, isMinimized]);
+  }, [editorSessionKey, loadedSessionKey, jobs, isMinimized]);
 
   const [isImageLoading, setIsImageLoading] = useState(false);
   const [isCropping, setIsCropping] = useState(false);
