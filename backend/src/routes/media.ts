@@ -1414,8 +1414,9 @@ router.post(
   authenticateToken,
   upload.fields([
     { name: "referenceImages", maxCount: MAX_GENERATION_REFERENCE_IMAGES },
-    // Kling 3.0 reference subjects ("elements"): up to 2 subjects × 3 images.
-    { name: "elementImages", maxCount: 6 },
+    // Kling 3.0 reference subjects ("elements"): up to 2 subjects × 4 images
+    // (1 main/frontal + up to 3 reference images each).
+    { name: "elementImages", maxCount: 8 },
     // Kling 3.0 reference video element (only one allowed per request).
     { name: "elementVideo", maxCount: 1 },
   ]),

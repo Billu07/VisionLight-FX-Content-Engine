@@ -227,7 +227,7 @@ function Dashboard() {
 
   // Video FX 1 / PicDrift Engine
   // Updated default: 10s (matches PicDrift standard)
-  const [kieDuration, setKieDuration] = useState<3 | 5 | 10 | 15>(10);
+  const [kieDuration, setKieDuration] = useState<number>(10);
   // Updated default: 1080p
   const [kieResolution] = useState<"720p" | "1080p">("1080p");
 
@@ -261,10 +261,14 @@ function Dashboard() {
     { prompt: "", duration: 5 },
   ]);
   const MAX_KLING_SUBJECTS = 2;
-  const MAX_SUBJECT_IMAGES = 3;
+  // 1 main (frontal) image + up to 3 reference images (fal allows 1–3 reference
+  // images per element), so 4 total per subject.
+  const MAX_SUBJECT_IMAGES = 4;
   // Kling 2.6 only allows 5/10s — drop the 3s pick if the user leaves Plus.
   useEffect(() => {
-    if (picDriftMode !== "plus" && kieDuration === 3) setKieDuration(5);
+    // Kling 2.6 only accepts 5/10s; snap any 3.0-only duration back to a valid one.
+    if (picDriftMode !== "plus" && kieDuration !== 5 && kieDuration !== 10)
+      setKieDuration(kieDuration >= 8 ? 10 : 5);
   }, [picDriftMode, kieDuration]);
   const addSubjectImages = (subjectIndex: number, files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -5495,21 +5499,20 @@ function Dashboard() {
                                       <label className="text-sm font-semibold text-white mb-2 block">
                                         Duration
                                       </label>
-                                      <div className="flex gap-2">
-                                        {(picDriftMode === "plus" ? [3, 5, 10] : [5, 10]).map((d) => (
-                                          <button
-                                            key={d}
-                                            type="button"
-                                            onClick={() => setKieDuration(d as any)}
-                                            className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieDuration === d
-                                              ? "bg-rose-600 border-rose-600 text-white"
-                                              : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                              }`}
-                                          >
-                                            {d}s
-                                          </button>
+                                      <select
+                                        value={kieDuration}
+                                        onChange={(e) => setKieDuration(Number(e.target.value))}
+                                        className="w-full px-3 py-2.5 rounded-lg border border-white/10 bg-gray-800/50 text-sm font-medium text-white outline-none focus:border-rose-500 transition-colors cursor-pointer"
+                                      >
+                                        {(picDriftMode === "plus"
+                                          ? [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+                                          : [5, 10]
+                                        ).map((d) => (
+                                          <option key={d} value={d} className="bg-gray-900 text-white">
+                                            {d} seconds
+                                          </option>
                                         ))}
-                                      </div>
+                                      </select>
                                     </div>
                                     )}
                                     <div>
@@ -5636,7 +5639,7 @@ function Dashboard() {
                                           Reference in your prompt as{" "}
                                           <span className="text-rose-300 font-mono">@Element1</span> to keep a
                                           character/object consistent — it only appears if you mention the
-                                          tag. First image = main view; add up to 2 more angles.
+                                          tag. First image = main view; add up to 3 reference images.
                                         </p>
                                         <div className="space-y-3">
                                           {picDriftSubjects.map((imgs, si) => (
