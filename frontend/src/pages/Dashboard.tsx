@@ -241,6 +241,10 @@ function Dashboard() {
   const [picDriftMode, setPicDriftMode] = useState<"standard" | "plus">(
     "standard",
   );
+  // Kling advanced options (additive): negative prompt works on 2.6 + 3.0;
+  // CFG scale (prompt adherence) only applies to Kling 3.0 / "Plus".
+  const [picDriftNegativePrompt, setPicDriftNegativePrompt] = useState("");
+  const [picDriftCfgScale, setPicDriftCfgScale] = useState(0.5);
 
   // Drift State for 3DX
   const [driftParams, setDriftParams] = useState({ horizontal: 0, vertical: 0, zoom: 0 });
@@ -2264,6 +2268,11 @@ function Dashboard() {
       formData.append("duration", kieDuration.toString());
       formData.append("aspectRatio", kieAspect);
       formData.append("resolution", kieResolution);
+      if (picDriftNegativePrompt.trim())
+        formData.append("negativePrompt", picDriftNegativePrompt.trim());
+      // CFG scale only applies to Kling 3.0 ("Plus").
+      if (picDriftMode === "plus")
+        formData.append("cfgScale", picDriftCfgScale.toString());
     } else if (activeEngine === "openai") {
       formData.append("mediaType", "video");
       formData.append("model", videoModel);
@@ -5384,6 +5393,50 @@ function Dashboard() {
                                             </div>
                                           </div>
                                         </label>
+                                      </div>
+                                    )}
+
+                                    {/* Negative Prompt — Kling 2.6 + 3.0 */}
+                                    <div className="sm:col-span-2">
+                                      <label className="text-sm font-semibold text-white mb-2 block">
+                                        Negative Prompt{" "}
+                                        <span className="text-gray-500 font-normal">(optional)</span>
+                                      </label>
+                                      <textarea
+                                        value={picDriftNegativePrompt}
+                                        onChange={(e) =>
+                                          setPicDriftNegativePrompt(e.target.value)
+                                        }
+                                        placeholder="Things to avoid, e.g. blur, distortion, extra fingers, text"
+                                        rows={2}
+                                        className="w-full rounded-xl border border-white/10 bg-gray-800/50 p-3 text-sm text-white placeholder-gray-500 outline-none focus:border-rose-500 resize-none"
+                                      />
+                                    </div>
+
+                                    {/* CFG Scale — Kling 3.0 ("Plus") only */}
+                                    {picDriftMode === "plus" && (
+                                      <div className="sm:col-span-2">
+                                        <label className="text-sm font-semibold text-white mb-2 flex items-center justify-between">
+                                          <span>Prompt Adherence (CFG)</span>
+                                          <span className="text-rose-300 font-mono">
+                                            {picDriftCfgScale.toFixed(2)}
+                                          </span>
+                                        </label>
+                                        <input
+                                          type="range"
+                                          min={0}
+                                          max={1}
+                                          step={0.05}
+                                          value={picDriftCfgScale}
+                                          onChange={(e) =>
+                                            setPicDriftCfgScale(Number(e.target.value))
+                                          }
+                                          className="w-full accent-rose-600"
+                                        />
+                                        <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+                                          <span>More creative</span>
+                                          <span>Stricter to prompt</span>
+                                        </div>
                                       </div>
                                     )}
                                   </div>

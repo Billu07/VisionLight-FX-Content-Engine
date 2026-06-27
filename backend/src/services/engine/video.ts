@@ -698,6 +698,25 @@ export const videoLogic = {
           }
         }
 
+        // Negative prompt — supported by both Kling 2.6 and 3.0. Additive: only
+        // sent when the user actually provides one (otherwise fal uses its own
+        // default), so existing renders are unchanged.
+        if (
+          typeof params.negativePrompt === "string" &&
+          params.negativePrompt.trim()
+        ) {
+          payload.negative_prompt = params.negativePrompt.trim();
+        }
+
+        // CFG scale (prompt adherence, 0–1) — Kling 3.0 only; the 2.6
+        // image-to-video endpoint does not accept it.
+        if (isKling3) {
+          const cfg = Number(params.cfgScale);
+          if (Number.isFinite(cfg) && cfg >= 0 && cfg <= 1) {
+            payload.cfg_scale = cfg;
+          }
+        }
+
         const falKey = apiKeys?.falApiKey;
         if (!falKey) throw new Error("API Key is missing. Please configure your Fal AI key in the Admin Panel.");
 
