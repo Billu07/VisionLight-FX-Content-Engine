@@ -5405,7 +5405,92 @@ function Dashboard() {
                               {/* PICDRIFT SETTINGS */}
                               {activeEngine === "kie" && videoFxMode === "picdrift" && (
                                 <div className="space-y-6 mb-6">
+                                  {/* Shot Mode sub-tab (Kling 3.0 / Plus only) */}
+                                  {picDriftMode === "plus" && (
+                                    <div>
+                                      <label className="text-sm font-semibold text-white mb-2 block">
+                                        Shot Mode
+                                      </label>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        {[
+                                          { id: false, label: "Single Shot" },
+                                          { id: true, label: "Multi-shot" },
+                                        ].map((m) => (
+                                          <button
+                                            key={String(m.id)}
+                                            type="button"
+                                            onClick={() => setPicDriftMultiShot(m.id)}
+                                            className={`py-2 rounded-lg border text-sm font-medium transition-all ${
+                                              picDriftMultiShot === m.id
+                                                ? "bg-rose-600 border-rose-600 text-white"
+                                                : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                            }`}
+                                          >
+                                            {m.label}
+                                          </button>
+                                        ))}
+                                      </div>
+                                      {picDriftMultiShot && (
+                                        <div className="mt-3 space-y-2">
+                                          {picDriftShots.map((shot, i) => (
+                                            <div
+                                              key={i}
+                                              className="rounded-xl border border-white/10 bg-gray-800/40 p-2 flex gap-2 items-start"
+                                            >
+                                              <span className="text-[10px] text-gray-400 mt-2 w-10 shrink-0">
+                                                Shot {i + 1}
+                                              </span>
+                                              <textarea
+                                                value={shot.prompt}
+                                                onChange={(e) => updateShot(i, { prompt: e.target.value })}
+                                                rows={2}
+                                                placeholder="What happens in this shot"
+                                                className="flex-1 rounded-lg border border-white/10 bg-gray-900/60 p-2 text-xs text-white placeholder-gray-500 outline-none focus:border-rose-500 resize-none"
+                                              />
+                                              <select
+                                                value={shot.duration}
+                                                onChange={(e) =>
+                                                  updateShot(i, { duration: Number(e.target.value) })
+                                                }
+                                                className="rounded-lg border border-white/10 bg-gray-900/60 p-2 text-xs text-white outline-none shrink-0"
+                                              >
+                                                {[3, 4, 5, 6, 7, 8, 9, 10].map((d) => (
+                                                  <option key={d} value={d}>
+                                                    {d}s
+                                                  </option>
+                                                ))}
+                                              </select>
+                                              {picDriftShots.length > 2 && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => removeShot(i)}
+                                                  className="text-gray-400 hover:text-red-400 mt-1 shrink-0"
+                                                >
+                                                  ×
+                                                </button>
+                                              )}
+                                            </div>
+                                          ))}
+                                          {picDriftShots.length < 4 && (
+                                            <button
+                                              type="button"
+                                              onClick={addShot}
+                                              className="w-full py-2 rounded-lg border border-dashed border-white/20 text-gray-400 hover:text-white hover:border-rose-500 text-sm font-medium"
+                                            >
+                                              + Add Shot
+                                            </button>
+                                          )}
+                                          <p className="text-[11px] text-gray-500">
+                                            Each shot has its own prompt + duration — this replaces the main
+                                            prompt and the global duration.
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                                    {!isPicDriftMultiShotActive && (
                                     <div>
                                       <label className="text-sm font-semibold text-white mb-2 block">
                                         Duration
@@ -5426,6 +5511,7 @@ function Dashboard() {
                                         ))}
                                       </div>
                                     </div>
+                                    )}
                                     <div>
                                       <label className="text-sm font-semibold text-white mb-2 block">
                                         Aspect Ratio
@@ -5667,78 +5753,6 @@ function Dashboard() {
                                       </div>
                                     )}
 
-                                    {/* Multi-shot (multi_prompt) — Kling 3.0 only */}
-                                    {picDriftMode === "plus" && (
-                                      <div className="sm:col-span-2 space-y-2">
-                                        <label className="flex items-center gap-3 cursor-pointer">
-                                          <input
-                                            type="checkbox"
-                                            checked={picDriftMultiShot}
-                                            onChange={(e) => setPicDriftMultiShot(e.target.checked)}
-                                            className="w-5 h-5 rounded border-gray-600 text-rose-600 focus:ring-rose-500 bg-gray-700"
-                                          />
-                                          <div>
-                                            <div className="text-sm font-semibold text-white">Multi-shot</div>
-                                            <div className="text-[11px] text-gray-500">
-                                              Split the clip into shots, each with its own prompt + duration
-                                              (replaces the main prompt &amp; duration).
-                                            </div>
-                                          </div>
-                                        </label>
-                                        {picDriftMultiShot && (
-                                          <div className="space-y-2">
-                                            {picDriftShots.map((shot, i) => (
-                                              <div
-                                                key={i}
-                                                className="rounded-xl border border-white/10 bg-gray-800/40 p-2 flex gap-2 items-start"
-                                              >
-                                                <span className="text-[10px] text-gray-400 mt-2 w-10 shrink-0">
-                                                  Shot {i + 1}
-                                                </span>
-                                                <textarea
-                                                  value={shot.prompt}
-                                                  onChange={(e) => updateShot(i, { prompt: e.target.value })}
-                                                  rows={2}
-                                                  placeholder="What happens in this shot"
-                                                  className="flex-1 rounded-lg border border-white/10 bg-gray-900/60 p-2 text-xs text-white placeholder-gray-500 outline-none focus:border-rose-500 resize-none"
-                                                />
-                                                <select
-                                                  value={shot.duration}
-                                                  onChange={(e) =>
-                                                    updateShot(i, { duration: Number(e.target.value) })
-                                                  }
-                                                  className="rounded-lg border border-white/10 bg-gray-900/60 p-2 text-xs text-white outline-none shrink-0"
-                                                >
-                                                  {[3, 4, 5, 6, 7, 8, 9, 10].map((d) => (
-                                                    <option key={d} value={d}>
-                                                      {d}s
-                                                    </option>
-                                                  ))}
-                                                </select>
-                                                {picDriftShots.length > 2 && (
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => removeShot(i)}
-                                                    className="text-gray-400 hover:text-red-400 mt-1 shrink-0"
-                                                  >
-                                                    ×
-                                                  </button>
-                                                )}
-                                              </div>
-                                            ))}
-                                            {picDriftShots.length < 4 && (
-                                              <button
-                                                type="button"
-                                                onClick={addShot}
-                                                className="w-full py-2 rounded-lg border border-dashed border-white/20 text-gray-400 hover:text-white hover:border-rose-500 text-sm font-medium"
-                                              >
-                                                + Add Shot
-                                              </button>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
                                   </div>
                                 </div>
                               )}
