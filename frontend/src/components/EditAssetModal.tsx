@@ -851,10 +851,24 @@ export function EditAssetModal({
       j.sourceAssetId === currentAsset?.id,
   );
 
-  const handleSafeClose = () => {
+  const runningTasksWarning = () =>
+    `${activeJobsCount} task${activeJobsCount > 1 ? "s are" : " is"} still running. ` +
+    `Closing drops ${activeJobsCount > 1 ? "them" : "it"} from your task list — ` +
+    `minimize instead to keep working while they finish. ` +
+    `(Any finished result is still saved to your library.)`;
+
+  const handleSafeClose = async () => {
     if (hasRunningJobs) {
-      setIsMinimized(true);
-      return;
+      // Warn rather than silently minimizing, so the user knows tasks are still
+      // running and can choose to minimize (keep them) vs close (drop them).
+      const closeAnyway = await confirmAction(runningTasksWarning(), {
+        confirmLabel: "Close anyway",
+        cancelLabel: "Minimize",
+      });
+      if (!closeAnyway) {
+        setIsMinimized(true);
+        return;
+      }
     }
     localStorage.removeItem(editorSessionKey);
     onClose();
@@ -863,7 +877,10 @@ export function EditAssetModal({
   const handleForceClose = async () => {
     if (
       hasRunningJobs &&
-      !(await confirmAction("You still have running tasks. Closing will hide this editor task list. Continue?", { confirmLabel: "Close anyway" }))
+      !(await confirmAction(runningTasksWarning(), {
+        confirmLabel: "Close anyway",
+        cancelLabel: "Keep running",
+      }))
     ) {
       return;
     }
