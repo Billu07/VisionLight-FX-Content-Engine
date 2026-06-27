@@ -1416,6 +1416,8 @@ router.post(
     { name: "referenceImages", maxCount: MAX_GENERATION_REFERENCE_IMAGES },
     // Kling 3.0 reference subjects ("elements"): up to 2 subjects × 3 images.
     { name: "elementImages", maxCount: 6 },
+    // Kling 3.0 reference video element (only one allowed per request).
+    { name: "elementVideo", maxCount: 1 },
   ]),
   async (req: AuthenticatedRequest, res) => {
     let charged = false;
@@ -1522,6 +1524,7 @@ router.post(
         (req.files as Record<string, Express.Multer.File[]>) || {};
       const referenceFiles = filesByField.referenceImages || [];
       const elementFiles = filesByField.elementImages || [];
+      const elementVideoFile = (filesByField.elementVideo || [])[0];
       const uploadedUrls: string[] = [];
       const uploadedImageUrls: string[] = [];
       const uploadedVideoUrls: string[] = [];
@@ -1547,10 +1550,10 @@ router.post(
       // images flat in `elementImages` and sends `elementImagesMap` = the count
       // of images per subject (in order), so we can regroup them here. Each
       // subject → { frontal_image_url?, reference_image_urls[] } (>=1 ref).
-      let elements: Array<{
-        frontal_image_url?: string;
-        reference_image_urls: string[];
-      }> = [];
+      let elements: Array<
+        | { frontal_image_url?: string; reference_image_urls: string[] }
+        | { video_url: string }
+      > = [];
       if (elementFiles.length > 0) {
         try {
           const elementUrls: string[] = [];
@@ -1590,6 +1593,19 @@ router.post(
         } catch (err: any) {
           console.error("Element upload error in generate-media:", err);
           return res.status(500).json({ error: "Reference subject upload failed: " + err.message });
+        }
+      }
+
+      // Reference video element (Kling 3.0): only one video element allowed.
+      // Appended after the image-set subjects so @Element numbering stays in
+      // upload order.
+      if (elementVideoFile) {
+        try {
+          const videoUrl = await uploadToCloudinary(elementVideoFile);
+          elements.push({ video_url: videoUrl });
+        } catch (err: any) {
+          console.error("Element video upload error in generate-media:", err);
+          return res.status(500).json({ error: "Reference video upload failed: " + err.message });
         }
       }
 

@@ -248,6 +248,10 @@ function Dashboard() {
   // Kling 3.0 reference subjects (elements): up to 2 subjects, each 1–3 images
   // (first = frontal/main, rest = extra angles). Referenced as @Element1/@2.
   const [picDriftSubjects, setPicDriftSubjects] = useState<File[][]>([]);
+  // Optional single reference VIDEO element (Kling 3.0 allows one video element).
+  const [picDriftElementVideo, setPicDriftElementVideo] = useState<File | null>(
+    null,
+  );
   // Kling 3.0 multi-shot: an optional list of { prompt, duration } shots.
   const [picDriftMultiShot, setPicDriftMultiShot] = useState(false);
   const [picDriftShots, setPicDriftShots] = useState<
@@ -2341,6 +2345,8 @@ function Dashboard() {
         });
         if (subjectMap.length > 0)
           formData.append("elementImagesMap", JSON.stringify(subjectMap));
+        if (picDriftElementVideo)
+          formData.append("elementVideo", picDriftElementVideo);
 
         // Multi-shot: only when toggled on and at least one shot has a prompt.
         if (picDriftMultiShot) {
@@ -5602,6 +5608,47 @@ function Dashboard() {
                                             >
                                               + Add Subject
                                             </button>
+                                          )}
+
+                                          {/* Optional single reference VIDEO element */}
+                                          {picDriftElementVideo ? (
+                                            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-gray-800/40 p-2">
+                                              <span className="text-xs font-bold text-rose-300 font-mono shrink-0">
+                                                @Element
+                                                {picDriftSubjects.filter((s) => s.length > 0).length + 1}
+                                              </span>
+                                              <span className="text-xs text-gray-300 truncate flex-1">
+                                                {picDriftElementVideo.name}{" "}
+                                                <span className="text-gray-500">(video)</span>
+                                              </span>
+                                              <button
+                                                type="button"
+                                                onClick={() => setPicDriftElementVideo(null)}
+                                                className="text-gray-400 hover:text-red-400 text-sm shrink-0"
+                                              >
+                                                ×
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            <label className="block text-center py-2 rounded-lg border border-dashed border-white/20 text-gray-400 hover:text-white hover:border-rose-500 cursor-pointer text-sm font-medium">
+                                              + Reference Video (optional)
+                                              <input
+                                                type="file"
+                                                accept="video/*"
+                                                className="hidden"
+                                                onChange={(e) => {
+                                                  const f = e.target.files?.[0];
+                                                  if (f) {
+                                                    if (f.size > 50 * 1024 * 1024) {
+                                                      alert("Reference video must be 50MB or smaller.");
+                                                    } else {
+                                                      setPicDriftElementVideo(f);
+                                                    }
+                                                  }
+                                                  e.target.value = "";
+                                                }}
+                                              />
+                                            </label>
                                           )}
                                         </div>
                                       </div>

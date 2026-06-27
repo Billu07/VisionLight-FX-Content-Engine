@@ -13,7 +13,7 @@ import { EditAssetModal } from "./EditAssetModal";
 import { DriftFrameExtractor } from "./DriftFrameExtractor";
 
 const MAX_IMAGE_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const MAX_VIDEO_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+const MAX_VIDEO_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const ASSET_PAGE_SIZE = 24;
 const ASSET_TASK_PANEL_STATE_KEY = "visionlight_asset_task_panel_state_v1";
 
@@ -534,7 +534,7 @@ export function AssetLibrary({
   const hasTaskPanelItems = recentAutoProcessTasks.length > 0;
   const uploadLimitText =
     activeTab === "VIDEO" || (activeTab === "original" && originalMediaTab === "videos")
-      ? "Video upload limit: 25MB"
+      ? "Video upload limit: 50MB"
       : "Image Size Limit: 10MB Each";
   const uploadButtonLabel =
     activeTab === "16:9" || activeTab === "9:16" || activeTab === "1:1"
@@ -808,7 +808,7 @@ export function AssetLibrary({
         if (file.size > maxSize) {
           alert(
             `Skipped "${file.name}": exceeds ${
-              isVideo ? "25MB video" : "10MB image"
+              isVideo ? "50MB video" : "10MB image"
             } limit.`,
           );
         } else {
@@ -1249,13 +1249,29 @@ export function AssetLibrary({
                     {asset.type === "VIDEO" ? (
                       <div className="w-full h-full relative aspect-square bg-black/20">
                         {(() => {
+                          const isTimelinePreview = asset.source === "timeline";
+                          // Prefer the server-generated sprite sheet's first frame
+                          // as the poster: it's a plain image, so it renders for any
+                          // codec (HEVC/MOV phone uploads included), unlike a <video>
+                          // element which often can't decode those to a poster frame.
+                          // The sprite is a left-to-right strip, so left-aligning it
+                          // shows the opening frame.
+                          if (asset.spriteSheetUrl && !isTimelinePreview) {
+                            return (
+                              <div
+                                className="w-full h-full opacity-90"
+                                style={{
+                                  backgroundImage: `url(${getCORSProxyUrl(asset.spriteSheetUrl)})`,
+                                  backgroundSize: "auto 100%",
+                                  backgroundPosition: "left center",
+                                  backgroundRepeat: "no-repeat",
+                                }}
+                              />
+                            );
+                          }
                           const videoSrc = getCORSProxyVideoUrl(
                             asset.url || asset.proxyUrl || asset.hlsUrl || "",
                           );
-                          const isTimelinePreview = asset.source === "timeline";
-                          // Static grid thumbnail: a single seeked frame (#t) is a
-                          // clean image. The sprite sheet is a wide tiled strip used
-                          // for editor hover-scrubbing, not a single-frame poster.
                           const thumbSrc = isTimelinePreview
                             ? videoSrc
                             : `${videoSrc}#t=0.1`;
