@@ -227,7 +227,7 @@ function Dashboard() {
 
   // Video FX 1 / PicDrift Engine
   // Updated default: 10s (matches PicDrift standard)
-  const [kieDuration, setKieDuration] = useState<5 | 10 | 15>(10);
+  const [kieDuration, setKieDuration] = useState<3 | 5 | 10 | 15>(10);
   // Updated default: 1080p
   const [kieResolution] = useState<"720p" | "1080p">("1080p");
 
@@ -245,6 +245,63 @@ function Dashboard() {
   // CFG scale (prompt adherence) only applies to Kling 3.0 / "Plus".
   const [picDriftNegativePrompt, setPicDriftNegativePrompt] = useState("");
   const [picDriftCfgScale, setPicDriftCfgScale] = useState(0.5);
+  // Kling 3.0 reference subjects (elements): up to 2 subjects, each 1–3 images
+  // (first = frontal/main, rest = extra angles). Referenced as @Element1/@2.
+  const [picDriftSubjects, setPicDriftSubjects] = useState<File[][]>([]);
+  // Kling 3.0 multi-shot: an optional list of { prompt, duration } shots.
+  const [picDriftMultiShot, setPicDriftMultiShot] = useState(false);
+  const [picDriftShots, setPicDriftShots] = useState<
+    { prompt: string; duration: number }[]
+  >([
+    { prompt: "", duration: 5 },
+    { prompt: "", duration: 5 },
+  ]);
+  const MAX_KLING_SUBJECTS = 2;
+  const MAX_SUBJECT_IMAGES = 3;
+  // Kling 2.6 only allows 5/10s — drop the 3s pick if the user leaves Plus.
+  useEffect(() => {
+    if (picDriftMode !== "plus" && kieDuration === 3) setKieDuration(5);
+  }, [picDriftMode, kieDuration]);
+  const addSubjectImages = (subjectIndex: number, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const incoming = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (incoming.length === 0) return;
+    setPicDriftSubjects((prev) => {
+      const next = prev.map((s) => [...s]);
+      while (next.length <= subjectIndex) next.push([]);
+      next[subjectIndex] = [...next[subjectIndex], ...incoming].slice(
+        0,
+        MAX_SUBJECT_IMAGES,
+      );
+      return next.slice(0, MAX_KLING_SUBJECTS);
+    });
+  };
+  const removeSubjectImage = (si: number, ii: number) => {
+    setPicDriftSubjects((prev) => {
+      const next = prev.map((s) => [...s]);
+      if (next[si]) next[si].splice(ii, 1);
+      return next.filter((s) => s.length > 0);
+    });
+  };
+  const addSubject = () =>
+    setPicDriftSubjects((prev) =>
+      prev.length >= MAX_KLING_SUBJECTS ? prev : [...prev, []],
+    );
+  const updateShot = (
+    i: number,
+    patch: Partial<{ prompt: string; duration: number }>,
+  ) =>
+    setPicDriftShots((prev) =>
+      prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)),
+    );
+  const addShot = () =>
+    setPicDriftShots((prev) =>
+      prev.length >= 4 ? prev : [...prev, { prompt: "", duration: 5 }],
+    );
+  const removeShot = (i: number) =>
+    setPicDriftShots((prev) =>
+      prev.length <= 2 ? prev : prev.filter((_, idx) => idx !== i),
+    );
 
   // Drift State for 3DX
   const [driftParams, setDriftParams] = useState({ horizontal: 0, vertical: 0, zoom: 0 });
@@ -2270,9 +2327,32 @@ function Dashboard() {
       formData.append("resolution", kieResolution);
       if (picDriftNegativePrompt.trim())
         formData.append("negativePrompt", picDriftNegativePrompt.trim());
-      // CFG scale only applies to Kling 3.0 ("Plus").
-      if (picDriftMode === "plus")
+      // CFG scale, reference subjects and multi-shot are Kling 3.0 ("Plus") only.
+      if (picDriftMode === "plus") {
         formData.append("cfgScale", picDriftCfgScale.toString());
+
+        // Reference subjects: append images flat + a count-per-subject map.
+        const subjectMap: number[] = [];
+        picDriftSubjects.forEach((imgs) => {
+          if (imgs.length > 0) {
+            imgs.forEach((f) => formData.append("elementImages", f));
+            subjectMap.push(imgs.length);
+          }
+        });
+        if (subjectMap.length > 0)
+          formData.append("elementImagesMap", JSON.stringify(subjectMap));
+
+        // Multi-shot: only when toggled on and at least one shot has a prompt.
+        if (picDriftMultiShot) {
+          const shots = picDriftShots
+            .filter((s) => s.prompt.trim())
+            .map((s) => ({ prompt: s.prompt.trim(), duration: s.duration.toString() }));
+          if (shots.length > 0) {
+            formData.append("multiPrompt", JSON.stringify(shots));
+            formData.append("shotType", "customize");
+          }
+        }
+      }
     } else if (activeEngine === "openai") {
       formData.append("mediaType", "video");
       formData.append("model", videoModel);
@@ -5312,7 +5392,7 @@ function Dashboard() {
                                         Duration
                                       </label>
                                       <div className="flex gap-2">
-                                        {[5, 10].map((d) => (
+                                        {(picDriftMode === "plus" ? [3, 5, 10] : [5, 10]).map((d) => (
                                           <button
                                             key={d}
                                             type="button"
@@ -5437,6 +5517,166 @@ function Dashboard() {
                                           <span>More creative</span>
                                           <span>Stricter to prompt</span>
                                         </div>
+                                      </div>
+                                    )}
+
+                                    {/* Reference Subjects (elements) — Kling 3.0 only */}
+                                    {picDriftMode === "plus" && (
+                                      <div className="sm:col-span-2 space-y-2">
+                                        <label className="text-sm font-semibold text-white block">
+                                          Reference Subjects{" "}
+                                          <span className="text-gray-500 font-normal">(optional)</span>
+                                        </label>
+                                        <p className="text-[11px] text-gray-500 leading-relaxed">
+                                          Add a character/object, then mention it in your prompt as{" "}
+                                          <span className="text-rose-300 font-mono">@Element1</span> /{" "}
+                                          <span className="text-rose-300 font-mono">@Element2</span>. First
+                                          image = main view; add up to 2 more angles.
+                                        </p>
+                                        <div className="space-y-3">
+                                          {picDriftSubjects.map((imgs, si) => (
+                                            <div
+                                              key={si}
+                                              className="rounded-xl border border-white/10 bg-gray-800/40 p-3"
+                                            >
+                                              <div className="flex items-center justify-between mb-2">
+                                                <span className="text-xs font-bold text-rose-300 font-mono">
+                                                  @Element{si + 1}
+                                                </span>
+                                                <button
+                                                  type="button"
+                                                  onClick={() =>
+                                                    setPicDriftSubjects((prev) =>
+                                                      prev.filter((_, idx) => idx !== si),
+                                                    )
+                                                  }
+                                                  className="text-[10px] text-gray-400 hover:text-red-400 uppercase font-bold"
+                                                >
+                                                  Remove
+                                                </button>
+                                              </div>
+                                              <div className="flex flex-wrap gap-2">
+                                                {imgs.map((file, ii) => (
+                                                  <div key={ii} className="relative w-16 h-16">
+                                                    <img
+                                                      src={URL.createObjectURL(file)}
+                                                      className="w-16 h-16 object-cover rounded-lg border border-white/15"
+                                                    />
+                                                    {ii === 0 && (
+                                                      <span className="absolute bottom-0 left-0 right-0 text-[8px] text-center bg-black/60 text-white rounded-b-lg">
+                                                        main
+                                                      </span>
+                                                    )}
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => removeSubjectImage(si, ii)}
+                                                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]"
+                                                    >
+                                                      ×
+                                                    </button>
+                                                  </div>
+                                                ))}
+                                                {imgs.length < MAX_SUBJECT_IMAGES && (
+                                                  <label className="w-16 h-16 rounded-lg border border-dashed border-white/20 flex items-center justify-center text-gray-400 hover:text-white hover:border-rose-500 cursor-pointer text-xs">
+                                                    + img
+                                                    <input
+                                                      type="file"
+                                                      accept="image/*"
+                                                      multiple
+                                                      className="hidden"
+                                                      onChange={(e) => {
+                                                        addSubjectImages(si, e.target.files);
+                                                        e.target.value = "";
+                                                      }}
+                                                    />
+                                                  </label>
+                                                )}
+                                              </div>
+                                            </div>
+                                          ))}
+                                          {picDriftSubjects.length < MAX_KLING_SUBJECTS && (
+                                            <button
+                                              type="button"
+                                              onClick={addSubject}
+                                              className="w-full py-2 rounded-lg border border-dashed border-white/20 text-gray-400 hover:text-white hover:border-rose-500 text-sm font-medium"
+                                            >
+                                              + Add Subject
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Multi-shot (multi_prompt) — Kling 3.0 only */}
+                                    {picDriftMode === "plus" && (
+                                      <div className="sm:col-span-2 space-y-2">
+                                        <label className="flex items-center gap-3 cursor-pointer">
+                                          <input
+                                            type="checkbox"
+                                            checked={picDriftMultiShot}
+                                            onChange={(e) => setPicDriftMultiShot(e.target.checked)}
+                                            className="w-5 h-5 rounded border-gray-600 text-rose-600 focus:ring-rose-500 bg-gray-700"
+                                          />
+                                          <div>
+                                            <div className="text-sm font-semibold text-white">Multi-shot</div>
+                                            <div className="text-[11px] text-gray-500">
+                                              Split the clip into shots, each with its own prompt + duration
+                                              (replaces the main prompt &amp; duration).
+                                            </div>
+                                          </div>
+                                        </label>
+                                        {picDriftMultiShot && (
+                                          <div className="space-y-2">
+                                            {picDriftShots.map((shot, i) => (
+                                              <div
+                                                key={i}
+                                                className="rounded-xl border border-white/10 bg-gray-800/40 p-2 flex gap-2 items-start"
+                                              >
+                                                <span className="text-[10px] text-gray-400 mt-2 w-10 shrink-0">
+                                                  Shot {i + 1}
+                                                </span>
+                                                <textarea
+                                                  value={shot.prompt}
+                                                  onChange={(e) => updateShot(i, { prompt: e.target.value })}
+                                                  rows={2}
+                                                  placeholder="What happens in this shot"
+                                                  className="flex-1 rounded-lg border border-white/10 bg-gray-900/60 p-2 text-xs text-white placeholder-gray-500 outline-none focus:border-rose-500 resize-none"
+                                                />
+                                                <select
+                                                  value={shot.duration}
+                                                  onChange={(e) =>
+                                                    updateShot(i, { duration: Number(e.target.value) })
+                                                  }
+                                                  className="rounded-lg border border-white/10 bg-gray-900/60 p-2 text-xs text-white outline-none shrink-0"
+                                                >
+                                                  {[3, 4, 5, 6, 7, 8, 9, 10].map((d) => (
+                                                    <option key={d} value={d}>
+                                                      {d}s
+                                                    </option>
+                                                  ))}
+                                                </select>
+                                                {picDriftShots.length > 2 && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => removeShot(i)}
+                                                    className="text-gray-400 hover:text-red-400 mt-1 shrink-0"
+                                                  >
+                                                    ×
+                                                  </button>
+                                                )}
+                                              </div>
+                                            ))}
+                                            {picDriftShots.length < 4 && (
+                                              <button
+                                                type="button"
+                                                onClick={addShot}
+                                                className="w-full py-2 rounded-lg border border-dashed border-white/20 text-gray-400 hover:text-white hover:border-rose-500 text-sm font-medium"
+                                              >
+                                                + Add Shot
+                                              </button>
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
                                     )}
                                   </div>

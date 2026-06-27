@@ -708,12 +708,29 @@ export const videoLogic = {
           payload.negative_prompt = params.negativePrompt.trim();
         }
 
-        // CFG scale (prompt adherence, 0–1) — Kling 3.0 only; the 2.6
-        // image-to-video endpoint does not accept it.
+        // Kling 3.0-only advanced options (CFG, reference elements, multi-shot).
+        // All additive: omitted entirely when not provided, so 2.6 and existing
+        // 3.0 renders are unchanged.
         if (isKling3) {
           const cfg = Number(params.cfgScale);
           if (Number.isFinite(cfg) && cfg >= 0 && cfg <= 1) {
             payload.cfg_scale = cfg;
+          }
+
+          // Reference subjects (characters/objects) referenced as @Element1, …
+          // Each element is { frontal_image_url?, reference_image_urls[] }.
+          if (Array.isArray(params.elements) && params.elements.length > 0) {
+            payload.elements = params.elements;
+          }
+
+          // Multi-shot: replaces the single prompt + global duration with a list
+          // of per-shot { prompt, duration } (fal: prompt XOR multi_prompt).
+          if (Array.isArray(params.multiPrompt) && params.multiPrompt.length > 0) {
+            payload.multi_prompt = params.multiPrompt;
+            payload.shot_type =
+              params.shotType === "intelligent" ? "intelligent" : "customize";
+            delete payload.prompt;
+            delete payload.duration;
           }
         }
 

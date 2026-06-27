@@ -1412,7 +1412,11 @@ router.delete(
 router.post(
   "/api/generate-media",
   authenticateToken,
-  upload.array("referenceImages", MAX_GENERATION_REFERENCE_IMAGES),
+  upload.fields([
+    { name: "referenceImages", maxCount: MAX_GENERATION_REFERENCE_IMAGES },
+    // Kling 3.0 reference subjects ("elements"): up to 2 subjects × 3 images.
+    { name: "elementImages", maxCount: 6 },
+  ]),
   async (req: AuthenticatedRequest, res) => {
     let charged = false;
     let chargedPool: CreditPool | null = null;
@@ -1514,7 +1518,10 @@ router.post(
         });
       }
 
-      const referenceFiles = (req.files as Express.Multer.File[]) || [];
+      const filesByField =
+        (req.files as Record<string, Express.Multer.File[]>) || {};
+      const referenceFiles = filesByField.referenceImages || [];
+      const elementFiles = filesByField.elementImages || [];
       const uploadedUrls: string[] = [];
       const uploadedImageUrls: string[] = [];
       const uploadedVideoUrls: string[] = [];
@@ -1536,6 +1543,73 @@ router.post(
       const primaryRefUrl =
         uploadedImageUrls[0] || uploadedVideoUrls[0] || uploadedUrls[0] || "";
 
+      // Kling 3.0 reference subjects ("elements"). The frontend uploads the
+      // images flat in `elementImages` and sends `elementImagesMap` = the count
+      // of images per subject (in order), so we can regroup them here. Each
+      // subject → { frontal_image_url?, reference_image_urls[] } (>=1 ref).
+      let elements: Array<{
+        frontal_image_url?: string;
+        reference_image_urls: string[];
+      }> = [];
+      if (elementFiles.length > 0) {
+        try {
+          const elementUrls: string[] = [];
+          for (const file of elementFiles) {
+            elementUrls.push(await uploadToCloudinary(file));
+          }
+          let groups: number[] = [];
+          try {
+            const parsed = JSON.parse(String(req.body.elementImagesMap || "[]"));
+            if (Array.isArray(parsed)) {
+              groups = parsed
+                .map((n: any) => Math.max(0, Math.floor(Number(n) || 0)))
+                .filter((n: number) => n > 0);
+            }
+          } catch {
+            groups = [];
+          }
+          let cursor = 0;
+          for (const count of groups) {
+            const imgs = elementUrls.slice(cursor, cursor + count);
+            cursor += count;
+            if (imgs.length === 0) continue;
+            elements.push(
+              imgs.length >= 2
+                ? { frontal_image_url: imgs[0], reference_image_urls: imgs.slice(1) }
+                : { reference_image_urls: [imgs[0]] },
+            );
+          }
+          // Fallback: no/!valid map but images present → one subject.
+          if (elements.length === 0 && elementUrls.length > 0) {
+            elements.push(
+              elementUrls.length >= 2
+                ? { frontal_image_url: elementUrls[0], reference_image_urls: elementUrls.slice(1) }
+                : { reference_image_urls: [elementUrls[0]] },
+            );
+          }
+        } catch (err: any) {
+          console.error("Element upload error in generate-media:", err);
+          return res.status(500).json({ error: "Reference subject upload failed: " + err.message });
+        }
+      }
+
+      // Multi-shot (Kling 3.0): list of { prompt, duration } shots.
+      let multiPrompt: Array<{ prompt: string; duration: string }> = [];
+      try {
+        const parsed = JSON.parse(String(req.body.multiPrompt || "[]"));
+        if (Array.isArray(parsed)) {
+          multiPrompt = parsed
+            .filter((s: any) => s && typeof s.prompt === "string" && s.prompt.trim())
+            .map((s: any) => ({
+              prompt: String(s.prompt).trim(),
+              duration: String(s.duration || "5"),
+            }));
+        }
+      } catch {
+        multiPrompt = [];
+      }
+      const shotType = req.body.shotType === "intelligent" ? "intelligent" : "customize";
+
       const generationParams = {
         mediaType,
         duration: duration ? parseInt(duration) : undefined,
@@ -1545,6 +1619,9 @@ router.post(
         generateAudio,
         negativePrompt,
         cfgScale,
+        elements: elements.length > 0 ? elements : undefined,
+        multiPrompt: multiPrompt.length > 0 ? multiPrompt : undefined,
+        shotType,
         seed,
         autoFix,
         veoMode,
