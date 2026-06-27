@@ -5663,42 +5663,51 @@ function Dashboard() {
                                                   Remove
                                                 </button>
                                               </div>
-                                              <div className="flex flex-wrap gap-2">
-                                                {imgs.map((file, ii) => (
-                                                  <div key={ii} className="relative w-16 h-16">
-                                                    <img
-                                                      src={URL.createObjectURL(file)}
-                                                      className="w-16 h-16 object-cover rounded-lg border border-white/15"
-                                                    />
-                                                    {ii === 0 && (
-                                                      <span className="absolute bottom-0 left-0 right-0 text-[8px] text-center bg-black/60 text-white rounded-b-lg">
-                                                        main
-                                                      </span>
-                                                    )}
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => removeSubjectImage(si, ii)}
-                                                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]"
+                                              {/* Fixed slots: 1 main + 3 reference, all shown at once */}
+                                              <div className="grid grid-cols-4 gap-2">
+                                                {Array.from({ length: MAX_SUBJECT_IMAGES }).map((_, ii) => {
+                                                  const file = imgs[ii];
+                                                  if (file) {
+                                                    return (
+                                                      <div key={ii} className="relative aspect-square">
+                                                        <img
+                                                          src={URL.createObjectURL(file)}
+                                                          className="w-full h-full object-cover rounded-lg border border-white/15"
+                                                        />
+                                                        <span className="absolute bottom-0 left-0 right-0 text-[8px] text-center bg-black/70 text-white rounded-b-lg">
+                                                          {ii === 0 ? "main" : "ref"}
+                                                        </span>
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => removeSubjectImage(si, ii)}
+                                                          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]"
+                                                        >
+                                                          ×
+                                                        </button>
+                                                      </div>
+                                                    );
+                                                  }
+                                                  return (
+                                                    <label
+                                                      key={ii}
+                                                      className="aspect-square rounded-lg border border-dashed border-white/20 flex flex-col items-center justify-center gap-0.5 text-gray-400 hover:text-white hover:border-rose-500 cursor-pointer"
                                                     >
-                                                      ×
-                                                    </button>
-                                                  </div>
-                                                ))}
-                                                {imgs.length < MAX_SUBJECT_IMAGES && (
-                                                  <label className="w-16 h-16 rounded-lg border border-dashed border-white/20 flex items-center justify-center text-gray-400 hover:text-white hover:border-rose-500 cursor-pointer text-xs">
-                                                    + img
-                                                    <input
-                                                      type="file"
-                                                      accept="image/*"
-                                                      multiple
-                                                      className="hidden"
-                                                      onChange={(e) => {
-                                                        addSubjectImages(si, e.target.files);
-                                                        e.target.value = "";
-                                                      }}
-                                                    />
-                                                  </label>
-                                                )}
+                                                      <span className="text-base leading-none">+</span>
+                                                      <span className="text-[9px] font-medium">
+                                                        {ii === 0 ? "Main" : "Reference"}
+                                                      </span>
+                                                      <input
+                                                        type="file"
+                                                        accept="image/*"
+                                                        className="hidden"
+                                                        onChange={(e) => {
+                                                          addSubjectImages(si, e.target.files);
+                                                          e.target.value = "";
+                                                        }}
+                                                      />
+                                                    </label>
+                                                  );
+                                                })}
                                               </div>
                                             </div>
                                           ))}
