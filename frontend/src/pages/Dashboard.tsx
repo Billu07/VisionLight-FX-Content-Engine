@@ -314,6 +314,13 @@ function Dashboard() {
   const [videoFxMode, setVideoFxMode] = useState<"video" | "picdrift">(
     "picdrift",
   );
+  // When multi-shot is on, fal uses the per-shot prompts and ignores the single
+  // prompt (prompt XOR multi_prompt), so the main prompt box is not used.
+  const isPicDriftMultiShotActive =
+    activeEngine === "kie" &&
+    videoFxMode === "picdrift" &&
+    picDriftMode === "plus" &&
+    picDriftMultiShot;
 
   // Veo Settings
   const [veoMode, setVeoMode] = useState<VeoMode>("image_to_video");
@@ -5353,19 +5360,25 @@ function Dashboard() {
                                 </div>
 
                                 <textarea
-                                  value={activeEngine === "topaz" ? "" : prompt}
+                                  value={
+                                    activeEngine === "topaz" || isPicDriftMultiShotActive
+                                      ? ""
+                                      : prompt
+                                  }
                                   onChange={(e) => {
-                                    if (activeEngine !== "topaz") {
+                                    if (activeEngine !== "topaz" && !isPicDriftMultiShotActive) {
                                       setPrompt(e.target.value);
                                     }
                                   }}
                                   placeholder={activeEngine === "topaz"
                                     ? "Prompt not needed for Topaz Upscale."
-                                    : currentVisualTab === "3dx"
-                                      ? "Describe where you want the camera to move to create a path."
-                                      : "Describe your vision with a prompt"}
-                                  disabled={activeEngine === "topaz"}
-                                  className={`w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base leading-relaxed ${activeEngine === "topaz" ? "cursor-not-allowed opacity-60" : ""}`}
+                                    : isPicDriftMultiShotActive
+                                      ? "Multi-shot is on — describe each shot in the boxes below. The main prompt isn't used."
+                                      : currentVisualTab === "3dx"
+                                        ? "Describe where you want the camera to move to create a path."
+                                        : "Describe your vision with a prompt"}
+                                  disabled={activeEngine === "topaz" || isPicDriftMultiShotActive}
+                                  className={`w-full p-4 bg-gray-900/50 border border-white/10 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-transparent transition-all resize-none text-white placeholder-purple-300/60 backdrop-blur-sm text-base leading-relaxed ${activeEngine === "topaz" || isPicDriftMultiShotActive ? "cursor-not-allowed opacity-60" : ""}`}
                                   rows={3}
                                 />
                               </div>
