@@ -170,6 +170,34 @@ const parseTaskParams = (raw: unknown) => {
   return {};
 };
 
+// Small info icon with a tooltip — hover (desktop) or tap (mobile) reveals a
+// short helper text, keeping the panel clean and well-spaced.
+function InfoTip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-flex align-middle">
+      <button
+        type="button"
+        aria-label="More info"
+        onClick={(e) => {
+          e.preventDefault();
+          setOpen((o) => !o);
+        }}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        className="w-4 h-4 rounded-full border border-white/30 text-[9px] font-bold leading-none text-gray-300 flex items-center justify-center hover:border-rose-400 hover:text-rose-300 transition-colors"
+      >
+        i
+      </button>
+      {open && (
+        <span className="absolute left-0 top-full mt-1.5 z-50 w-56 rounded-lg border border-white/15 bg-gray-950/95 backdrop-blur-sm p-2.5 text-[11px] font-normal leading-relaxed text-gray-300 shadow-xl">
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function Dashboard() {
   // ==========================================
   // STATE
@@ -5412,8 +5440,9 @@ function Dashboard() {
                                   {/* Shot Mode sub-tab (Kling 3.0 / Plus only) */}
                                   {picDriftMode === "plus" && (
                                     <div>
-                                      <label className="text-sm font-semibold text-white mb-2 block">
+                                      <label className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
                                         Shot Mode
+                                        <InfoTip text="Multi-shot splits the clip into shots, each with its own prompt + duration — it replaces the main prompt and the global duration." />
                                       </label>
                                       <div className="grid grid-cols-2 gap-2">
                                         {[
@@ -5484,10 +5513,6 @@ function Dashboard() {
                                               + Add Shot
                                             </button>
                                           )}
-                                          <p className="text-[11px] text-gray-500">
-                                            Each shot has its own prompt + duration — this replaces the main
-                                            prompt and the global duration.
-                                          </p>
                                         </div>
                                       )}
                                     </div>
@@ -5499,20 +5524,35 @@ function Dashboard() {
                                       <label className="text-sm font-semibold text-white mb-2 block">
                                         Duration
                                       </label>
-                                      <select
-                                        value={kieDuration}
-                                        onChange={(e) => setKieDuration(Number(e.target.value))}
-                                        className="w-full px-3 py-2.5 rounded-lg border border-white/10 bg-gray-800/50 text-sm font-medium text-white outline-none focus:border-rose-500 transition-colors cursor-pointer"
-                                      >
-                                        {(picDriftMode === "plus"
-                                          ? [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
-                                          : [5, 10]
-                                        ).map((d) => (
-                                          <option key={d} value={d} className="bg-gray-900 text-white">
-                                            {d} seconds
-                                          </option>
-                                        ))}
-                                      </select>
+                                      {picDriftMode === "plus" ? (
+                                        <select
+                                          value={kieDuration}
+                                          onChange={(e) => setKieDuration(Number(e.target.value))}
+                                          className="w-full px-3 py-2.5 rounded-lg border border-white/10 bg-gray-800/50 text-sm font-medium text-white outline-none focus:border-rose-500 transition-colors cursor-pointer"
+                                        >
+                                          {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].map((d) => (
+                                            <option key={d} value={d} className="bg-gray-900 text-white">
+                                              {d} seconds
+                                            </option>
+                                          ))}
+                                        </select>
+                                      ) : (
+                                        <div className="flex gap-2">
+                                          {[5, 10].map((d) => (
+                                            <button
+                                              key={d}
+                                              type="button"
+                                              onClick={() => setKieDuration(d)}
+                                              className={`flex-1 py-2 rounded-lg border text-sm font-medium ${kieDuration === d
+                                                ? "bg-rose-600 border-rose-600 text-white"
+                                                : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
+                                                }`}
+                                            >
+                                              {d}s
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
                                     )}
                                     <div>
@@ -5631,16 +5671,11 @@ function Dashboard() {
                                     {/* Reference Subjects (elements) — Kling 3.0 only */}
                                     {picDriftMode === "plus" && (
                                       <div className="sm:col-span-2 space-y-2">
-                                        <label className="text-sm font-semibold text-white block">
-                                          Reference Subjects{" "}
+                                        <label className="text-sm font-semibold text-white flex items-center gap-1.5">
+                                          Reference Subjects
                                           <span className="text-gray-500 font-normal">(optional)</span>
+                                          <InfoTip text="Reference in your prompt as @Element1 to keep a character/object consistent — it only appears if you mention the tag. First image = main view; add up to 3 reference images." />
                                         </label>
-                                        <p className="text-[11px] text-gray-500 leading-relaxed">
-                                          Reference in your prompt as{" "}
-                                          <span className="text-rose-300 font-mono">@Element1</span> to keep a
-                                          character/object consistent — it only appears if you mention the
-                                          tag. First image = main view; add up to 3 reference images.
-                                        </p>
                                         <div className="space-y-3">
                                           {picDriftSubjects.map((imgs, si) => (
                                             <div
@@ -5664,17 +5699,17 @@ function Dashboard() {
                                                 </button>
                                               </div>
                                               {/* Fixed slots: 1 main + 3 reference, all shown at once */}
-                                              <div className="grid grid-cols-4 gap-2">
+                                              <div className="flex flex-wrap gap-2">
                                                 {Array.from({ length: MAX_SUBJECT_IMAGES }).map((_, ii) => {
                                                   const file = imgs[ii];
                                                   if (file) {
                                                     return (
-                                                      <div key={ii} className="relative aspect-square">
+                                                      <div key={ii} className="relative w-14 h-14">
                                                         <img
                                                           src={URL.createObjectURL(file)}
                                                           className="w-full h-full object-cover rounded-lg border border-white/15"
                                                         />
-                                                        <span className="absolute bottom-0 left-0 right-0 text-[8px] text-center bg-black/70 text-white rounded-b-lg">
+                                                        <span className="absolute bottom-0 left-0 right-0 text-[7px] text-center bg-black/70 text-white rounded-b-lg">
                                                           {ii === 0 ? "main" : "ref"}
                                                         </span>
                                                         <button
@@ -5690,11 +5725,11 @@ function Dashboard() {
                                                   return (
                                                     <label
                                                       key={ii}
-                                                      className="aspect-square rounded-lg border border-dashed border-white/20 flex flex-col items-center justify-center gap-0.5 text-gray-400 hover:text-white hover:border-rose-500 cursor-pointer"
+                                                      className="w-14 h-14 rounded-lg border border-dashed border-white/20 flex flex-col items-center justify-center gap-0.5 text-gray-400 hover:text-white hover:border-rose-500 cursor-pointer"
                                                     >
-                                                      <span className="text-base leading-none">+</span>
-                                                      <span className="text-[9px] font-medium">
-                                                        {ii === 0 ? "Main" : "Reference"}
+                                                      <span className="text-sm leading-none">+</span>
+                                                      <span className="text-[8px] font-medium">
+                                                        {ii === 0 ? "Main" : "Ref"}
                                                       </span>
                                                       <input
                                                         type="file"
