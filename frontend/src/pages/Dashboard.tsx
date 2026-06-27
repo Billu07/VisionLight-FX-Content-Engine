@@ -5528,10 +5528,10 @@ function Dashboard() {
                                           <span className="text-gray-500 font-normal">(optional)</span>
                                         </label>
                                         <p className="text-[11px] text-gray-500 leading-relaxed">
-                                          Add a character/object, then mention it in your prompt as{" "}
-                                          <span className="text-rose-300 font-mono">@Element1</span> /{" "}
-                                          <span className="text-rose-300 font-mono">@Element2</span>. First
-                                          image = main view; add up to 2 more angles.
+                                          Reference in your prompt as{" "}
+                                          <span className="text-rose-300 font-mono">@Element1</span> to keep a
+                                          character/object consistent — it only appears if you mention the
+                                          tag. First image = main view; add up to 2 more angles.
                                         </p>
                                         <div className="space-y-3">
                                           {picDriftSubjects.map((imgs, si) => (
