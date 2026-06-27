@@ -95,12 +95,11 @@ export function EditAssetModal({
 }: EditAssetModalProps) {
   const queryClient = useQueryClient();
   const refFileInput = useRef<HTMLInputElement>(null);
-  const editorSessionKey = useMemo(() => {
-    if (initialAsset?.id) return `visionlight_editor_session_${initialAsset.id}`;
-    if (initialVideoUrl)
-      return `visionlight_editor_session_video_${initialVideoUrl}`;
-    return "visionlight_editor_session_generic";
-  }, [initialAsset?.id, initialVideoUrl]);
+  // ONE global task list shared across every image opened in the editor, so a
+  // task started on one image stays visible (and keeps the panel populated)
+  // when you minimize/swap to a different image. Per-image "busy" state is
+  // derived from each job's sourceAssetId instead (see isConvertingCurrent).
+  const editorSessionKey = "visionlight_editor_session_global";
   const [history, setHistory] = useState<Asset[]>(initialAsset ? [initialAsset] : []);
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentAsset = history[currentIndex];
@@ -375,6 +374,8 @@ export function EditAssetModal({
             status: "processing",
             message: "Recovering...",
             driftPostId: pendingPostId,
+            sourceAssetId: currentAsset.id,
+            sourcePreviewUrl: currentAsset.url,
           }
         ];
       });
@@ -404,19 +405,30 @@ export function EditAssetModal({
           setJobs((prev) =>
             prev.map((j) => {
               if (j.id === job.id) {
+                // Build the result from the JOB's own asset (not currentAsset):
+                // the task list is global, so the drift job may belong to a
+                // different image than the one currently open.
+                const driftAssetId = j.sourceAssetId || currentAsset?.id;
                 if (status === "PROCESSING") {
                   return { ...j, progress, message: `Rendering Path... ${progress}%` };
                 } else if (status === "READY" || status === "COMPLETED") {
-                  localStorage.removeItem(`active_drift_post_${currentAsset.id}`);
+                  if (driftAssetId)
+                    localStorage.removeItem(`active_drift_post_${driftAssetId}`);
                   return {
                     ...j,
                     status: "ready",
                     message: "Ready!",
                     progress: 100,
-                    resultAsset: { ...currentAsset, url: mediaUrl, type: "VIDEO" }
+                    resultAsset: {
+                      id: driftAssetId,
+                      url: mediaUrl,
+                      type: "VIDEO",
+                      aspectRatio: "VIDEO",
+                    },
                   };
                 } else if (status === "FAILED") {
-                  localStorage.removeItem(`active_drift_post_${currentAsset.id}`);
+                  if (driftAssetId)
+                    localStorage.removeItem(`active_drift_post_${driftAssetId}`);
                   return { ...j, status: "failed", error: error || "Generation failed" };
                 }
               }
@@ -724,8 +736,9 @@ export function EditAssetModal({
 
   // Handle Convert Action
   const handleConvertAction = () => {
-    // Guard against rapid repeat clicks while a convert is already running.
-    if (ratioMutation.isPending || textEditMutation.isPending) return;
+    // Guard against rapid repeat clicks while THIS image is already converting
+    // (per-asset, so converting a different image in parallel is still allowed).
+    if (isConvertingCurrent) return;
     if (convertMode === "auto") {
       ratioMutation.mutate(convertTargetRatio);
     } else {
@@ -827,6 +840,16 @@ export function EditAssetModal({
 
   const activeJobsCount = jobs.filter(j => j.status === "processing").length;
   const hasRunningJobs = activeJobsCount > 0;
+  // Is THIS image currently converting/editing? Derived per-asset from the
+  // global job list (via sourceAssetId), not the shared mutation's isPending —
+  // so the Convert button never shows "Converting…" for an image that isn't,
+  // while another image's task runs.
+  const isConvertingCurrent = jobs.some(
+    (j) =>
+      j.status === "processing" &&
+      (j.type === "convert" || j.type === "edit") &&
+      j.sourceAssetId === currentAsset?.id,
+  );
 
   const handleSafeClose = () => {
     if (hasRunningJobs) {
@@ -1386,10 +1409,10 @@ export function EditAssetModal({
                 {/* 4. Action Button */}
                 <button
                   onClick={handleConvertAction}
-                  disabled={ratioMutation.isPending || textEditMutation.isPending}
+                  disabled={isConvertingCurrent}
                   className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white font-bold hover:shadow-lg flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {ratioMutation.isPending || textEditMutation.isPending ? (
+                  {isConvertingCurrent ? (
                     <>
                       <LoadingSpinner size="sm" color="text-white" />
                       <span>Converting…</span>
