@@ -231,8 +231,19 @@ function Dashboard() {
   );
 
   const [activeLibrarySlot, setActiveLibrarySlot] = useState<
-    "start" | "end" | "generic" | "sequencer" | "storyline" | null
+    | "start"
+    | "end"
+    | "generic"
+    | "sequencer"
+    | "storyline"
+    | "klingSubject"
+    | "klingVideo"
+    | null
   >(null);
+  // Which reference subject a library import targets (Kling 3.0 elements).
+  const [librarySubjectIndex, setLibrarySubjectIndex] = useState<number | null>(
+    null,
+  );
   const [librarySource, setLibrarySource] = useState<"top" | "field">("top");
   const [libraryInitialTab, setLibraryInitialTab] = useState<
     | "16:9"
@@ -306,6 +317,18 @@ function Dashboard() {
       const next = prev.map((s) => [...s]);
       while (next.length <= subjectIndex) next.push([]);
       next[subjectIndex] = [...next[subjectIndex], ...incoming].slice(
+        0,
+        MAX_SUBJECT_IMAGES,
+      );
+      return next.slice(0, MAX_KLING_SUBJECTS);
+    });
+  };
+  const addSubjectImageFromLibrary = (subjectIndex: number, file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    setPicDriftSubjects((prev) => {
+      const next = prev.map((s) => [...s]);
+      while (next.length <= subjectIndex) next.push([]);
+      next[subjectIndex] = [...next[subjectIndex], file].slice(
         0,
         MAX_SUBJECT_IMAGES,
       );
@@ -1617,6 +1640,26 @@ function Dashboard() {
 
   // --- 1. ASSET LIBRARY SELECTION HANDLER ---
   const handleAssetSelect = (file: File, url: string, ratio?: string) => {
+    // Kling 3.0 reference subject / video imports from the library.
+    if (activeLibrarySlot === "klingSubject") {
+      if (isVideoFile(file)) {
+        alert("Reference subject slots take images only.");
+      } else if (librarySubjectIndex !== null) {
+        addSubjectImageFromLibrary(librarySubjectIndex, file);
+      }
+      setActiveLibrarySlot(null);
+      setLibrarySubjectIndex(null);
+      return;
+    }
+    if (activeLibrarySlot === "klingVideo") {
+      if (!isVideoFile(file)) {
+        alert("The reference video slot takes a video file.");
+      } else {
+        setPicDriftElementVideo(file);
+      }
+      setActiveLibrarySlot(null);
+      return;
+    }
     // 1. Handle File Setting (Existing Logic)
     if (activeLibrarySlot === "start") {
       if (activeEngine === "veo" && veoMode === "first_last_frame") {
@@ -5744,6 +5787,18 @@ function Dashboard() {
                                                   );
                                                 })}
                                               </div>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setLibrarySource("field");
+                                                  setLibraryInitialTab("original");
+                                                  setLibrarySubjectIndex(si);
+                                                  setActiveLibrarySlot("klingSubject");
+                                                }}
+                                                className="mt-2 text-[11px] text-rose-300 hover:text-rose-200 font-semibold"
+                                              >
+                                                + From Library
+                                              </button>
                                             </div>
                                           ))}
                                           {picDriftSubjects.length < MAX_KLING_SUBJECTS && (
@@ -5776,25 +5831,38 @@ function Dashboard() {
                                               </button>
                                             </div>
                                           ) : (
-                                            <label className="block text-center py-2 rounded-lg border border-dashed border-white/20 text-gray-400 hover:text-white hover:border-rose-500 cursor-pointer text-sm font-medium">
-                                              + Reference Video (optional)
-                                              <input
-                                                type="file"
-                                                accept="video/*"
-                                                className="hidden"
-                                                onChange={(e) => {
-                                                  const f = e.target.files?.[0];
-                                                  if (f) {
-                                                    if (f.size > 50 * 1024 * 1024) {
-                                                      alert("Reference video must be 50MB or smaller.");
-                                                    } else {
-                                                      setPicDriftElementVideo(f);
+                                            <div className="flex gap-2">
+                                              <label className="flex-1 text-center py-2 rounded-lg border border-dashed border-white/20 text-gray-400 hover:text-white hover:border-rose-500 cursor-pointer text-xs font-medium">
+                                                + Upload Video
+                                                <input
+                                                  type="file"
+                                                  accept="video/*"
+                                                  className="hidden"
+                                                  onChange={(e) => {
+                                                    const f = e.target.files?.[0];
+                                                    if (f) {
+                                                      if (f.size > 50 * 1024 * 1024) {
+                                                        alert("Reference video must be 50MB or smaller.");
+                                                      } else {
+                                                        setPicDriftElementVideo(f);
+                                                      }
                                                     }
-                                                  }
-                                                  e.target.value = "";
+                                                    e.target.value = "";
+                                                  }}
+                                                />
+                                              </label>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setLibrarySource("field");
+                                                  setLibraryInitialTab("original");
+                                                  setActiveLibrarySlot("klingVideo");
                                                 }}
-                                              />
-                                            </label>
+                                                className="flex-1 py-2 rounded-lg border border-dashed border-white/20 text-gray-400 hover:text-white hover:border-rose-500 text-xs font-medium"
+                                              >
+                                                From Library
+                                              </button>
+                                            </div>
                                           )}
                                         </div>
                                       </div>
