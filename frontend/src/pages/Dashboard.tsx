@@ -633,6 +633,7 @@ function Dashboard() {
   const byokActivationPollRef = useRef(false);
 
   // State for Magic Edit Asset
+  const [isUploadingMagicEdit, setIsUploadingMagicEdit] = useState(false);
   const [editingAsset, setEditingAsset] = useState<any | null>(null);
   const [editingVideoUrl, setEditingVideoUrl] = useState<string | undefined>(
     undefined,
@@ -2336,6 +2337,7 @@ function Dashboard() {
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setIsUploadingMagicEdit(true);
     try {
       const formData = new FormData();
       formData.append("image", file);
@@ -2348,10 +2350,12 @@ function Dashboard() {
         setEditingAsset(res.data.asset);
         setShowEditorModal(false);
         setEditingVideoUrl(undefined);
-        e.target.value = "";
       }
     } catch (err: any) {
       alert("Upload failed: " + err.message);
+    } finally {
+      setIsUploadingMagicEdit(false);
+      e.target.value = "";
     }
   };
 
@@ -5079,14 +5083,28 @@ function Dashboard() {
                                   style-transfer your image.
                                 </p>
                               </div>
-                              <label className="block w-full max-w-sm mx-auto cursor-pointer group">
+                              <label
+                                className={`block w-full max-w-sm mx-auto group ${
+                                  isUploadingMagicEdit
+                                    ? "cursor-not-allowed opacity-70"
+                                    : "cursor-pointer"
+                                }`}
+                              >
                                 <div className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl text-white font-bold group-hover:shadow-lg group-hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
-                                  <span>Upload to Start</span>
+                                  {isUploadingMagicEdit ? (
+                                    <>
+                                      <LoadingSpinner size="sm" variant="light" />
+                                      <span>Uploading & opening editor…</span>
+                                    </>
+                                  ) : (
+                                    <span>Upload to Start</span>
+                                  )}
                                 </div>
                                 <input
                                   type="file"
                                   accept="image/*"
                                   className="hidden"
+                                  disabled={isUploadingMagicEdit}
                                   onChange={handleMagicEditUpload}
                                 />
                               </label>

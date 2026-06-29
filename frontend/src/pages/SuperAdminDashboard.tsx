@@ -429,6 +429,7 @@ export default function SuperAdminDashboard() {
     | "demo"
     | "global-settings"
     | "global-presets"
+    | "editor-presets"
     | "lab"
   >("platform");
 
@@ -478,6 +479,16 @@ export default function SuperAdminDashboard() {
   // Edit Preset State
   const [editingPreset, setEditingPreset] = useState<any | null>(null);
   const [presetForm, setPresetForm] = useState({
+    name: "",
+    prompt: "",
+    isActive: true
+  });
+
+  // Editor (PicFX + Convert) Preset State — isolated from the shared presets above
+  const [editorPresets, setEditorPresets] = useState<any[]>([]);
+  const [showEditorPresetModal, setShowEditorPresetModal] = useState(false);
+  const [editingEditorPreset, setEditingEditorPreset] = useState<any | null>(null);
+  const [editorPresetForm, setEditorPresetForm] = useState({
     name: "",
     prompt: "",
     isActive: true
@@ -806,11 +817,12 @@ export default function SuperAdminDashboard() {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const [tenantsRes, settingsRes, usersRes, presetsRes, requestsRes, byokRes] = await Promise.all([
+      const [tenantsRes, settingsRes, usersRes, presetsRes, editorPresetsRes, requestsRes, byokRes] = await Promise.all([
         apiEndpoints.superadminGetOrganizations(),
         apiEndpoints.superadminGetGlobalSettings(),
         apiEndpoints.superadminGetUsers(),
         apiEndpoints.superadminGetPresets(),
+        apiEndpoints.superadminGetEditorPresets(),
         apiEndpoints.superadminGetRequests(),
         apiEndpoints.superadminGetByokOrganizations(),
       ]);
@@ -819,6 +831,7 @@ export default function SuperAdminDashboard() {
       if (settingsRes.data.success) setGlobalSettings(settingsRes.data.settings);
       if (usersRes.data.success) setUsers(usersRes.data.users);
       if (presetsRes.data.success) setPresets(presetsRes.data.presets);
+      if (editorPresetsRes.data.success) setEditorPresets(editorPresetsRes.data.presets);
       if (requestsRes.data.success) setCreditRequests(requestsRes.data.requests || []);
       if (byokRes.data.success) setByokOrganizations(byokRes.data.organizations || []);
       await fetchByokOpsData();
@@ -931,6 +944,48 @@ export default function SuperAdminDashboard() {
       isActive: p.isActive
     });
     setShowPresetModal(true);
+  };
+
+  // ---- Editor (PicFX + Convert) global presets — isolated CRUD ----
+  const handleSaveEditorPreset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActionLoading(true);
+    try {
+      if (editingEditorPreset) {
+        await apiEndpoints.superadminUpdateEditorPreset(editingEditorPreset.id, editorPresetForm);
+      } else {
+        await apiEndpoints.superadminCreateEditorPreset(editorPresetForm);
+      }
+      setMsg(`Editor preset ${editingEditorPreset ? 'updated' : 'created'} successfully.`);
+      setShowEditorPresetModal(false);
+      setEditingEditorPreset(null);
+      setEditorPresetForm({ name: "", prompt: "", isActive: true });
+      fetchInitialData();
+    } catch (err: any) {
+      setMsg("Error: " + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteEditorPreset = async (id: string) => {
+    if (!(await confirmAction("Are you sure you want to delete this editor preset?", { confirmLabel: "Delete" }))) return;
+    try {
+      await apiEndpoints.superadminDeleteEditorPreset(id);
+      fetchInitialData();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const openEditEditorPreset = (p: any) => {
+    setEditingEditorPreset(p);
+    setEditorPresetForm({
+      name: p.name,
+      prompt: p.prompt,
+      isActive: p.isActive
+    });
+    setShowEditorPresetModal(true);
   };
 
   const handleCreateTenant = async (e: React.FormEvent) => {
@@ -1440,6 +1495,7 @@ export default function SuperAdminDashboard() {
                 { id: "demo", label: "demo preview" },
                 { id: "global-settings", label: "global settings" },
                 { id: "global-presets", label: "global presets" },
+                { id: "editor-presets", label: "editor presets" },
                 { id: "lab", label: "lab" },
               ].map((tab) => (
                 <button
@@ -1745,6 +1801,82 @@ export default function SuperAdminDashboard() {
                           <button
                             className={adminUi.dangerButton}
                             onClick={() => handleDeletePreset(p.id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        )}
+
+        {/* TAB CONTENT: EDITOR PRESETS (PicFX + Convert) */}
+        {activeTab === "editor-presets" && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className={adminUi.sectionTitle}>Editor Prompt Presets</h2>
+                <p className={adminUi.sectionCopy}>These presets appear only in the asset-library editor — the PicFX and Convert tabs. They are isolated from the global presets above.</p>
+              </div>
+              <button
+                onClick={() => {
+                  setEditingEditorPreset(null);
+                  setEditorPresetForm({ name: "", prompt: "", isActive: true });
+                  setShowEditorPresetModal(true);
+                }}
+                className={adminUi.primaryButton}
+              >
+                Add New Preset
+              </button>
+            </div>
+
+            <div className={adminUi.tablePanel}>
+              <table className="w-full text-left">
+                <thead className={adminUi.tableHead}>
+                  <tr>
+                    <th className="p-6">Preset Name</th>
+                    <th className="p-6">Prompt Content</th>
+                    <th className="p-6 text-center">Status</th>
+                    <th className="p-6 text-right">Operations</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {editorPresets.length === 0 ? (
+                    <tr><td colSpan={4} className="p-10 text-center text-gray-500 italic">No editor presets created yet.</td></tr>
+                  ) : editorPresets.map(p => (
+                    <tr key={p.id} className={adminUi.tableRow}>
+                      <td className="p-6">
+                        <div className="font-bold text-white">{p.name}</div>
+                      </td>
+                      <td className="p-6">
+                        <div className="text-xs text-gray-400 line-clamp-2 max-w-md">{p.prompt}</div>
+                      </td>
+                      <td className="p-6 text-center">
+                        <span
+                          className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${p.isActive
+                              ? "bg-green-500/10 text-green-400 border-green-500/20"
+                              : "bg-red-500/10 text-red-400 border-red-500/20"
+                            }`}
+                        >
+                          {p.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="p-6 text-right">
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            className={adminUi.softButton}
+                            onClick={() => openEditEditorPreset(p)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className={adminUi.dangerButton}
+                            onClick={() => handleDeleteEditorPreset(p.id)}
                           >
                             Delete
                           </button>
@@ -3613,6 +3745,66 @@ export default function SuperAdminDashboard() {
                 <button type="button" onClick={() => setShowPresetModal(false)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
                 <button type="submit" disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
                   {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : (editingPreset ? "Update Preset" : "Save Preset")}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDITOR PRESET (PicFX + Convert) */}
+      {showEditorPresetModal && (
+        <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg shadow-2xl max-h-[92vh] overflow-y-auto">
+            <div className="p-8 border-b border-gray-800 flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-bold text-white uppercase tracking-tight">
+                  {editingEditorPreset ? "Edit Editor Preset" : "New Editor Preset"}
+                </h3>
+                <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">PicFX + Convert tabs only</p>
+              </div>
+              <button onClick={() => setShowEditorPresetModal(false)} className="text-gray-500 hover:text-white font-bold text-xl">x</button>
+            </div>
+            <form onSubmit={handleSaveEditorPreset} className="p-8 space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Preset Name</label>
+                <input
+                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                  placeholder="e.g. Cinematic Relight"
+                  required
+                  value={editorPresetForm.name}
+                  onChange={e => setEditorPresetForm({ ...editorPresetForm, name: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Prompt Content</label>
+                <textarea
+                  className="w-full h-32 p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent resize-none"
+                  placeholder="The base prompt to apply..."
+                  required
+                  value={editorPresetForm.prompt}
+                  onChange={e => setEditorPresetForm({ ...editorPresetForm, prompt: e.target.value })}
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="editor-preset-active"
+                  className="w-4 h-4 rounded bg-gray-950 border-gray-800 text-brand-accent focus:ring-brand-accent"
+                  checked={editorPresetForm.isActive}
+                  onChange={e => setEditorPresetForm({ ...editorPresetForm, isActive: e.target.checked })}
+                />
+                <label htmlFor="editor-preset-active" className="text-xs font-bold text-gray-400 uppercase tracking-widest cursor-pointer">
+                  Preset is Active
+                </label>
+              </div>
+
+              <div className="flex gap-4 pt-4">
+                <button type="button" onClick={() => setShowEditorPresetModal(false)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
+                <button type="submit" disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
+                  {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : (editingEditorPreset ? "Update Preset" : "Save Preset")}
                 </button>
               </div>
             </form>

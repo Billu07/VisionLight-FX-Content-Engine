@@ -527,6 +527,21 @@ router.get(
         where: { isActive: true },
         select: { id: true, name: true, prompt: true },
       });
+      // Defensive: the EditorPresetPrompt table is new. If a deploy lands before
+      // `prisma db push` is run, fall back to an empty list rather than 500-ing
+      // auth/me (which would break login for everyone).
+      let editorSystemPresets: { id: string; name: string; prompt: string }[] = [];
+      try {
+        editorSystemPresets = await prisma.editorPresetPrompt.findMany({
+          where: { isActive: true },
+          select: { id: true, name: true, prompt: true },
+        });
+      } catch (presetError: any) {
+        console.warn(
+          "[auth/me] Editor presets unavailable (table may not be migrated yet).",
+          presetError?.message || presetError,
+        );
+      }
       const profiles = isReadOnlyImpersonation
         ? [buildPublicProfileOption(user)]
         : (
@@ -563,6 +578,7 @@ router.get(
       res.json({
         success: true,
         systemPresets,
+        editorSystemPresets,
         profiles,
         user: {
           ...req.user,
@@ -957,6 +973,43 @@ router.put(
       res.json({ success: true, promptFx: updatedUser.promptFx });
     } catch (error: any) {
       console.error("PromptFX Update Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// ---- Editor-only PromptFX (isolated to the asset-library PicFX + Convert tabs) ----
+router.get(
+  "/api/user-editor-prompt-fx",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: req.user!.id },
+        select: { editorPromptFx: true },
+      });
+      res.json({ success: true, promptFx: user?.editorPromptFx || [] });
+    } catch (error: any) {
+      console.error("Editor PromptFX Get Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+router.put(
+  "/api/user-editor-prompt-fx",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { promptFx } = req.body;
+      const updatedUser = await prisma.user.update({
+        where: { id: req.user!.id },
+        data: { editorPromptFx: promptFx },
+        select: { editorPromptFx: true },
+      });
+      res.json({ success: true, promptFx: updatedUser.editorPromptFx });
+    } catch (error: any) {
+      console.error("Editor PromptFX Update Error:", error);
       res.status(500).json({ error: error.message });
     }
   },

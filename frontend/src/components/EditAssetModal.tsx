@@ -190,7 +190,18 @@ export function EditAssetModal({
   const [isUploadingInitial, setIsUploadingInitial] = useState(false);
   const [showInitialLibrary, setShowInitialLibrary] = useState(false);
 
-  const { systemPresets } = useAuth();
+  const { systemPresets, editorSystemPresets } = useAuth();
+
+  // Editor-only (isolated) PromptFX state — native to the PicFX + Convert tabs.
+  // Kept fully separate from the shared PromptFX above (used by the 3DX/drift tab
+  // and dashboard panels) so saved prompts and presets never bleed across.
+  const [showEditorPromptFxMenu, setShowEditorPromptFxMenu] = useState(false);
+  const [newEditorPromptFxName, setNewEditorPromptFxName] = useState("");
+  const [newEditorPromptFxText, setNewEditorPromptFxText] = useState("");
+  const [isAddingEditorPromptFx, setIsAddingEditorPromptFx] = useState(false);
+  const [editingEditorPromptFxIndex, setEditingEditorPromptFxIndex] = useState<
+    number | null
+  >(null);
 
   const { data: promptFxList = [] } = useQuery({
     queryKey: ["prompt-fx"],
@@ -199,6 +210,66 @@ export function EditAssetModal({
       return res.data.promptFx || [];
     },
   });
+
+  const { data: editorPromptFxList = [] } = useQuery({
+    queryKey: ["editor-prompt-fx"],
+    queryFn: async () => {
+      const res = await apiEndpoints.getEditorPromptFx();
+      return res.data.promptFx || [];
+    },
+  });
+
+  const saveEditorPromptFxMutation = useMutation({
+    mutationFn: (newPromptFx: { name: string; prompt: string }[]) =>
+      apiEndpoints.saveEditorPromptFx(newPromptFx),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["editor-prompt-fx"] });
+      setNewEditorPromptFxName("");
+      setNewEditorPromptFxText("");
+      setIsAddingEditorPromptFx(false);
+      setEditingEditorPromptFxIndex(null);
+    },
+  });
+
+  const handleAddEditorPromptFx = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEditorPromptFxName.trim() || !newEditorPromptFxText.trim()) return;
+
+    const newList = [...editorPromptFxList];
+    const savedItem = {
+      name: newEditorPromptFxName.trim(),
+      prompt: newEditorPromptFxText.trim(),
+    };
+    if (editingEditorPromptFxIndex !== null) {
+      newList[editingEditorPromptFxIndex] = savedItem;
+    } else {
+      newList.push(savedItem);
+    }
+    saveEditorPromptFxMutation.mutate(newList);
+  };
+
+  const handleRemoveEditorPromptFx = async (indexToRemove: number) => {
+    if (
+      await confirmAction(
+        "Are you sure you want to delete this prompt preset?",
+        { confirmLabel: "Delete" },
+      )
+    ) {
+      const newList = editorPromptFxList.filter(
+        (_: any, idx: number) => idx !== indexToRemove,
+      );
+      saveEditorPromptFxMutation.mutate(newList);
+    }
+  };
+
+  const getEditorPromptFxOriginalIndex = (item: {
+    name: string;
+    prompt: string;
+  }) =>
+    editorPromptFxList.findIndex(
+      (entry: { name: string; prompt: string }) =>
+        getPromptFxKey(entry) === getPromptFxKey(item),
+    );
 
   const savePromptFxMutation = useMutation({
     mutationFn: (newPromptFx: { name: string; prompt: string }[]) =>
@@ -934,6 +1005,168 @@ export function EditAssetModal({
     );
   }
 
+  // Isolated PromptFX picker for the PicFX + Convert tabs. Mirrors the 3DX/drift
+  // menu styling but is backed entirely by the editor-only stores so the two
+  // never share saved prompts or global presets.
+  const renderEditorPromptFx = () => (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowEditorPromptFxMenu((open) => !open);
+        }}
+        className="text-[10px] bg-cyan-900/40 hover:bg-cyan-800/60 text-cyan-300 px-3 py-1.5 rounded-lg border border-cyan-500/50 flex items-center gap-1.5 transition-colors shadow-sm"
+      >
+        PromptFX
+      </button>
+
+      {showEditorPromptFxMenu && (
+        <div className="absolute right-0 top-full mt-2 w-64 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[60] overflow-hidden">
+          <div className="p-3 border-b border-gray-800 bg-gray-950 flex justify-between items-center">
+            <span className="text-xs font-bold text-indigo-300">Saved Prompts</span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setIsAddingEditorPromptFx(true)}
+                className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded transition-colors"
+              >
+                + New
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowEditorPromptFxMenu(false)}
+                className="text-xs text-gray-400 hover:text-white hover:bg-gray-800 px-2 py-1 rounded transition-colors"
+              >
+                x
+              </button>
+            </div>
+          </div>
+
+          {isAddingEditorPromptFx && (
+            <form
+              onSubmit={handleAddEditorPromptFx}
+              className="p-3 bg-gray-800 border-b border-gray-700 space-y-2"
+            >
+              <input
+                type="text"
+                placeholder="Preset Name..."
+                value={newEditorPromptFxName}
+                onChange={(e) => setNewEditorPromptFxName(e.target.value)}
+                className="w-full bg-gray-950 border border-gray-700 rounded p-2 text-xs text-white"
+                required
+              />
+              <textarea
+                placeholder="Prompt text..."
+                value={newEditorPromptFxText}
+                onChange={(e) => setNewEditorPromptFxText(e.target.value)}
+                className="w-full h-16 bg-gray-950 border border-gray-700 rounded p-2 text-xs text-white resize-none"
+                required
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddingEditorPromptFx(false);
+                    setEditingEditorPromptFxIndex(null);
+                    setNewEditorPromptFxName("");
+                    setNewEditorPromptFxText("");
+                  }}
+                  className="flex-1 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
+          )}
+
+          <div className="max-h-48 overflow-y-auto">
+            {/* Editor Global Presets */}
+            {editorSystemPresets && editorSystemPresets.length > 0 && (
+              <div className="bg-indigo-900/10">
+                <div className="px-3 py-1 bg-gray-950/50 text-[8px] font-black text-indigo-400 uppercase tracking-[0.2em] border-b border-gray-800">
+                  System Presets
+                </div>
+                {editorSystemPresets.map((pfx: any) => (
+                  <div
+                    key={pfx.id}
+                    className="group flex flex-col p-3 border-b border-gray-800 hover:bg-indigo-900/20 cursor-pointer transition-colors"
+                    onClick={() => {
+                      setPrompt(pfx.prompt);
+                      setShowEditorPromptFxMenu(false);
+                    }}
+                  >
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="text-xs font-bold text-indigo-200">{pfx.name}</span>
+                      <span className="text-[8px] bg-indigo-500/20 text-indigo-400 px-1.5 py-0.5 rounded uppercase font-bold">
+                        FX
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-gray-500 line-clamp-2">{pfx.prompt}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Editor User Presets */}
+            {editorPromptFxList.length === 0 &&
+            !isAddingEditorPromptFx &&
+            (!editorSystemPresets || editorSystemPresets.length === 0) ? (
+              <div className="p-4 text-center text-xs text-gray-500">No saved prompts.</div>
+            ) : (
+              editorPromptFxList.map((pfx: any, idx: number) => (
+                <div
+                  key={idx}
+                  className="group flex flex-col p-3 border-b border-gray-800 hover:bg-gray-800 cursor-pointer transition-colors"
+                  onClick={() => {
+                    setPrompt(pfx.prompt);
+                    setShowEditorPromptFxMenu(false);
+                  }}
+                >
+                  <div className="flex justify-between items-start mb-1">
+                    <span className="text-xs font-bold text-gray-200">{pfx.name}</span>
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setNewEditorPromptFxName(pfx.name);
+                          setNewEditorPromptFxText(pfx.prompt);
+                          setEditingEditorPromptFxIndex(getEditorPromptFxOriginalIndex(pfx));
+                          setIsAddingEditorPromptFx(true);
+                        }}
+                        className="text-blue-400 hover:text-blue-300 text-xs"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveEditorPromptFx(getEditorPromptFxOriginalIndex(pfx));
+                        }}
+                        className="text-red-500 hover:text-red-400 text-xs"
+                      >
+                        x
+                      </button>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-gray-500 line-clamp-2">{pfx.prompt}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 z-[140] flex items-start justify-center bg-black/95 p-2 sm:p-4 md:items-center backdrop-blur-md">
       <div className="relative flex h-[96dvh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-gray-700 bg-gray-900 shadow-2xl md:h-[90vh] md:flex-row">
@@ -1410,7 +1643,13 @@ export function EditAssetModal({
 
                 {/* 3. Custom Prompt Input */}
                 {convertMode === "custom" && (
-                  <div className="animate-in slide-in-from-top-2">
+                  <div className="animate-in slide-in-from-top-2 space-y-2">
+                    <div className="flex justify-between items-end relative">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                        Custom Prompt
+                      </label>
+                      {renderEditorPromptFx()}
+                    </div>
                     <textarea
                       className="w-full h-24 bg-gray-800 border border-gray-700 rounded-xl p-3 text-sm text-white focus:ring-2 focus:ring-purple-500 outline-none resize-none leading-relaxed placeholder-gray-500"
                       placeholder="e.g. 'Expand the sky and add clouds'"
@@ -1567,10 +1806,11 @@ export function EditAssetModal({
 
                 {/* Prompt Box */}
                 <div className="space-y-3">
-                  <div className="flex justify-between items-end">
+                  <div className="flex justify-between items-end relative">
                     <label className="text-xs font-bold text-cyan-300 uppercase tracking-wider">
                       Instruction
                     </label>
+                    {renderEditorPromptFx()}
                   </div>
                   <textarea
                     className="w-full h-32 bg-gray-800 border border-gray-700 rounded-xl p-4 text-sm text-white focus:ring-2 focus:ring-cyan-500 outline-none resize-none leading-relaxed placeholder-gray-500"

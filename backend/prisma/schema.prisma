@@ -95,6 +95,7 @@ model User {
   seatLocked   Boolean  @default(false)
   adminNotes   String?
   promptFx     Json?    // Stores the user's custom PromptFX setups [{ name: string, prompt: string }]
+  editorPromptFx Json?  // Isolated PromptFX setups for the asset-library editor (PicFX + Convert tabs) [{ name, prompt }]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -295,6 +296,18 @@ model CreditRequest {
 }
 
 model PresetPrompt {
+  id        String   @id @default(uuid())
+  name      String
+  prompt    String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Global presets isolated to the asset-library editor (PicFX + Convert tabs).
+// Kept in a separate table so editor PromptFX never mixes with the shared
+// PresetPrompt presets used by the dashboard panels and 3DX tab.
+model EditorPresetPrompt {
   id        String   @id @default(uuid())
   name      String
   prompt    String

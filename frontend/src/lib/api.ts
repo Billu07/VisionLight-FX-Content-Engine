@@ -104,6 +104,7 @@ const demoAdapter = (config: any): Promise<any> => {
       user: s.user,
       profiles: [],
       systemPresets: [],
+      editorSystemPresets: [],
     });
   }
   if (url.includes("/api/posts")) {
@@ -134,7 +135,10 @@ const demoAdapter = (config: any): Promise<any> => {
       creditsVideoFX3: 25,
     });
   }
-  if (url.includes("/api/user-prompt-fx")) {
+  if (
+    url.includes("/api/user-prompt-fx") ||
+    url.includes("/api/user-editor-prompt-fx")
+  ) {
     return demoResponse(config, { success: true, promptFx: [] });
   }
   if (url.includes("/api/storyboard")) {
@@ -285,6 +289,11 @@ export const apiEndpoints = {
   superadminCreatePreset: (data: any) => api.post("/api/superadmin/presets", data),
   superadminUpdatePreset: (id: string, data: any) => api.put(`/api/superadmin/presets/${id}`, data),
   superadminDeletePreset: (id: string) => api.delete(`/api/superadmin/presets/${id}`),
+  // Editor (PicFX + Convert) global presets — isolated from the shared presets above
+  superadminGetEditorPresets: () => api.get("/api/superadmin/editor-presets"),
+  superadminCreateEditorPreset: (data: any) => api.post("/api/superadmin/editor-presets", data),
+  superadminUpdateEditorPreset: (id: string, data: any) => api.put(`/api/superadmin/editor-presets/${id}`, data),
+  superadminDeleteEditorPreset: (id: string) => api.delete(`/api/superadmin/editor-presets/${id}`),
 
   // === Tenant (Team Management) ===
   tenantGetTeam: () => api.get("/api/tenant/team"),
@@ -444,6 +453,9 @@ export const apiEndpoints = {
   // === Prompt FX ===
   getPromptFx: () => api.get("/api/user-prompt-fx"),
   savePromptFx: (promptFx: { name: string, prompt: string }[]) => api.put("/api/user-prompt-fx", { promptFx }),
+  // Editor-only PromptFX (isolated to the asset-library PicFX + Convert tabs)
+  getEditorPromptFx: () => api.get("/api/user-editor-prompt-fx"),
+  saveEditorPromptFx: (promptFx: { name: string, prompt: string }[]) => api.put("/api/user-editor-prompt-fx", { promptFx }),
 
   // === Admin Notifications ===
   adminGetRequests: () => api.get("/api/admin/requests"),

@@ -86,6 +86,7 @@ interface AuthState {
   profiles: WorkspaceProfile[];
   profileSelectionRequired: boolean;
   systemPresets: any[] | null;
+  editorSystemPresets: any[] | null;
   isLoading: boolean;
   token: string | null;
   checkAuth: () => Promise<AuthCheckResult>;
@@ -97,6 +98,7 @@ const signedOutState = {
   profiles: [],
   profileSelectionRequired: false,
   systemPresets: null,
+  editorSystemPresets: null,
   token: null,
 };
 
@@ -117,6 +119,7 @@ export const useAuth = create<AuthState>((set) => ({
               profiles: supportResponse.data.profiles || [],
               profileSelectionRequired: false,
               systemPresets: supportResponse.data.systemPresets || [],
+              editorSystemPresets: supportResponse.data.editorSystemPresets || [],
               token: supportToken,
               isLoading: false,
             });
@@ -148,6 +151,7 @@ export const useAuth = create<AuthState>((set) => ({
             profiles: response.data.profiles || [],
             profileSelectionRequired: true,
             systemPresets: response.data.systemPresets || [],
+            editorSystemPresets: response.data.editorSystemPresets || [],
             token: session.access_token,
             isLoading: false,
           });
@@ -159,6 +163,7 @@ export const useAuth = create<AuthState>((set) => ({
           profiles: response.data.profiles || [],
           profileSelectionRequired: false,
           systemPresets: response.data.systemPresets || [],
+          editorSystemPresets: response.data.editorSystemPresets || [],
           token: session.access_token,
           isLoading: false,
         });
