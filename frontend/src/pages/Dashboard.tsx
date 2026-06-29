@@ -2828,9 +2828,12 @@ function Dashboard() {
     navigate("/admin");
   };
   const handleOpenApiIntegration = () => {
-    setShowByokKeyModal(false);
+    // Open the Fal key setup modal in place. Navigating to the admin panel
+    // bounces BYOK users to /projects when the panel is locked (and to /app
+    // when they lack an admin role), which is why "Link Fal Key" appeared to
+    // dump people on the project page instead of the integration surface.
     setShowMissingFalKeyModal(false);
-    navigate("/admin?tab=integrations");
+    setShowByokKeyModal(true);
   };
   const openByokUpgradeModal = () => {
     setByokUpgradeModalIntent(true);
@@ -3944,7 +3947,7 @@ function Dashboard() {
                 <button
                   type="button"
                   onClick={proceedByokCheckoutConfirm}
-                  className="flex-1 rounded-xl bg-cyan-500 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-white hover:bg-cyan-400"
+                  className="flex-1 rounded-xl bg-cyan-500 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-950 hover:bg-cyan-400"
                 >
                   {byokCheckoutConfirmStep === "email" ? "Next" : "Proceed"}
                 </button>

@@ -914,7 +914,7 @@ export const ByokLanding = () => {
               <button
                 type="button"
                 onClick={proceedCheckoutConfirm}
-                className="flex-1 rounded-xl bg-cyan-500 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-white hover:bg-cyan-400"
+                className="flex-1 rounded-xl bg-cyan-500 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-950 hover:bg-cyan-400"
               >
                 {checkoutConfirmStep === "email" ? "Next" : "Proceed"}
               </button>

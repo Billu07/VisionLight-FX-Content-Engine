@@ -128,7 +128,7 @@ export function DemoPricingModal({ onClose }: { onClose: () => void }) {
                 href={trialUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block w-full rounded-xl border border-cyan-300/60 bg-cyan-500 px-4 py-3 text-center text-xs font-bold uppercase tracking-[0.12em] text-white transition hover:bg-cyan-400"
+                className="block w-full rounded-xl border border-cyan-300/60 bg-cyan-500 px-4 py-3 text-center text-xs font-bold uppercase tracking-[0.12em] text-slate-950 transition hover:bg-cyan-400"
               >
                 Start Free Trial
               </a>
@@ -222,7 +222,7 @@ export function DemoPricingModal({ onClose }: { onClose: () => void }) {
               <button
                 type="button"
                 onClick={proceedCheckout}
-                className="flex-1 rounded-xl bg-cyan-500 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-white hover:bg-cyan-400"
+                className="flex-1 rounded-xl bg-cyan-500 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-950 hover:bg-cyan-400"
               >
                 {checkoutStep === "email" ? "Next" : "Proceed"}
               </button>
