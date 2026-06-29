@@ -188,6 +188,10 @@ export function AssetLibrary({
 
   // UI States
   const [isUploading, setIsUploading] = useState(false);
+  // True while a picked asset (esp. a video) is being fetched into a real file
+  // before handing it back — shows a loading overlay so the user isn't left in
+  // the dark during the (sometimes multi-second) import.
+  const [isImportingMedia, setIsImportingMedia] = useState(false);
   const [uploadProgressPercent, setUploadProgressPercent] = useState(0);
   const [uploadingFileName, setUploadingFileName] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
@@ -830,6 +834,7 @@ export function AssetLibrary({
 
   const handleUseImage = async (asset: Asset) => {
     if (!onSelect) return;
+    setIsImportingMedia(true);
     try {
       if (asset.type === "VIDEO") {
         // Fetch the REAL video bytes (via the range-aware video proxy) so any
@@ -869,6 +874,8 @@ export function AssetLibrary({
     } catch (e) {
       console.error("handleUseImage Error:", e);
       alert("Could not load media.");
+    } finally {
+      setIsImportingMedia(false);
     }
   };
 
@@ -966,6 +973,13 @@ export function AssetLibrary({
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black sm:bg-black/95 sm:p-4 backdrop-blur-md">
+      {isImportingMedia && (
+        <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-black/70 backdrop-blur-sm">
+          <LoadingSpinner size="lg" variant="neon" />
+          <span className="text-sm font-semibold text-white">Loading media…</span>
+          <span className="text-[11px] text-gray-400">Preparing your selection</span>
+        </div>
+      )}
       <div className="bg-gray-900 w-full h-full sm:max-w-6xl sm:h-[85vh] sm:rounded-2xl border-0 sm:border border-gray-700 flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         {/* HEADER */}
         <div className="p-4 sm:p-6 border-b border-gray-800 flex justify-between items-center bg-gray-900 z-10 shrink-0">

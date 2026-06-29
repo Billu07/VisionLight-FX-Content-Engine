@@ -5812,58 +5812,77 @@ function Dashboard() {
                                           )}
 
                                           {/* Optional single reference VIDEO element */}
-                                          {picDriftElementVideo ? (
-                                            <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-gray-800/40 p-2">
-                                              <span className="text-xs font-bold text-rose-300 font-mono shrink-0">
-                                                @Element
-                                                {picDriftSubjects.filter((s) => s.length > 0).length + 1}
-                                              </span>
-                                              <span className="text-xs text-gray-300 truncate flex-1">
-                                                {picDriftElementVideo.name}{" "}
-                                                <span className="text-gray-500">(video)</span>
-                                              </span>
-                                              <button
-                                                type="button"
-                                                onClick={() => setPicDriftElementVideo(null)}
-                                                className="text-gray-400 hover:text-red-400 text-sm shrink-0"
-                                              >
-                                                ×
-                                              </button>
-                                            </div>
-                                          ) : (
-                                            <div className="flex gap-2">
-                                              <label className="flex-1 text-center py-2 rounded-lg border border-dashed border-white/20 text-gray-400 hover:text-white hover:border-rose-500 cursor-pointer text-xs font-medium">
-                                                + Upload Video
-                                                <input
-                                                  type="file"
-                                                  accept="video/*"
-                                                  className="hidden"
-                                                  onChange={(e) => {
-                                                    const f = e.target.files?.[0];
-                                                    if (f) {
-                                                      if (f.size > 50 * 1024 * 1024) {
-                                                        alert("Reference video must be 50MB or smaller.");
-                                                      } else {
-                                                        setPicDriftElementVideo(f);
-                                                      }
-                                                    }
-                                                    e.target.value = "";
-                                                  }}
-                                                />
+                                          <div className="space-y-2">
+                                            <div className="flex justify-between items-center">
+                                              <label className="text-sm font-semibold text-white flex items-center gap-1.5">
+                                                Reference Video
+                                                <span className="text-gray-500 font-normal">(optional)</span>
+                                                <InfoTip text="An element can use one reference video instead of images. Reference it in your prompt as @ElementN (numbered after your image subjects). Best with a 3–10s clip, max 50MB." />
                                               </label>
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  setLibrarySource("field");
-                                                  setLibraryInitialTab("original");
-                                                  setActiveLibrarySlot("klingVideo");
-                                                }}
-                                                className="flex-1 py-2 rounded-lg border border-dashed border-white/20 text-gray-400 hover:text-white hover:border-rose-500 text-xs font-medium"
-                                              >
-                                                From Library
-                                              </button>
+                                              {!picDriftElementVideo && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    setLibrarySource("field");
+                                                    setLibraryInitialTab("original");
+                                                    setActiveLibrarySlot("klingVideo");
+                                                  }}
+                                                  className="text-[10px] px-2 py-1 rounded-md border border-rose-500/30 text-rose-300 hover:bg-rose-500/10"
+                                                >
+                                                  Library
+                                                </button>
+                                              )}
                                             </div>
-                                          )}
+                                            <div className="relative aspect-video bg-gray-900/60 border-2 border-dashed border-white/15 rounded-xl overflow-hidden">
+                                              {picDriftElementVideo ? (
+                                                <>
+                                                  <video
+                                                    src={URL.createObjectURL(picDriftElementVideo)}
+                                                    className="w-full h-full object-cover"
+                                                    muted
+                                                    playsInline
+                                                    onMouseEnter={(e) => e.currentTarget.play()}
+                                                    onMouseLeave={(e) => e.currentTarget.pause()}
+                                                  />
+                                                  <span className="absolute top-2 left-2 text-[10px] font-bold text-rose-200 bg-black/60 px-2 py-0.5 rounded font-mono">
+                                                    @Element
+                                                    {picDriftSubjects.filter((s) => s.length > 0).length + 1}
+                                                  </span>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => setPicDriftElementVideo(null)}
+                                                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center"
+                                                  >
+                                                    ×
+                                                  </button>
+                                                </>
+                                              ) : (
+                                                <label className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer text-gray-400 hover:text-white text-xs font-semibold gap-1">
+                                                  <span className="text-2xl leading-none">+</span>
+                                                  Upload Video
+                                                  <span className="text-[10px] text-gray-500 font-normal">
+                                                    or pick from Library · max 50MB
+                                                  </span>
+                                                  <input
+                                                    type="file"
+                                                    accept="video/*"
+                                                    className="hidden"
+                                                    onChange={(e) => {
+                                                      const f = e.target.files?.[0];
+                                                      if (f) {
+                                                        if (f.size > 50 * 1024 * 1024) {
+                                                          alert("Reference video must be 50MB or smaller.");
+                                                        } else {
+                                                          setPicDriftElementVideo(f);
+                                                        }
+                                                      }
+                                                      e.target.value = "";
+                                                    }}
+                                                  />
+                                                </label>
+                                              )}
+                                            </div>
+                                          </div>
                                         </div>
                                       </div>
                                     )}
