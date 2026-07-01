@@ -5854,7 +5854,7 @@ function Dashboard() {
                                                 </button>
                                               )}
                                             </div>
-                                            <div className="relative aspect-video bg-gray-900/60 border-2 border-dashed border-white/15 rounded-xl overflow-hidden">
+                                            <div className="relative w-full max-w-[220px] aspect-video bg-gray-900/60 border-2 border-dashed border-white/15 rounded-xl overflow-hidden">
                                               {picDriftElementVideo ? (
                                                 <>
                                                   <video
