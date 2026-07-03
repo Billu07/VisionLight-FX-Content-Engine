@@ -195,6 +195,7 @@
   function up(){ dragging=false; }
 
   viewer.addEventListener('pointerdown', e=>{
+    if(e.target.closest('.zbtn') || e.target.closest('.cta')) return; // let controls get their own taps
     viewer.setPointerCapture(e.pointerId); pointers.set(e.pointerId,e);
     if(pointers.size===1) down(e);
   });
