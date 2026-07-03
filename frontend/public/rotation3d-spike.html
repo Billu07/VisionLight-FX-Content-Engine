@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Rotation3D — Viewer Spike</title>
+<style>
+  :root{
+    --bg:#0b0c0f; --panel:#111318; --line:#20242c; --text:#eef1f6; --muted:#8a92a3;
+    --accent:#6b8bff; --accent2:#3ad0c9;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+  .wrap{min-height:100%;display:flex;flex-direction:column;align-items:center;gap:14px;
+    padding:18px 14px 28px}
+  .head{width:100%;max-width:520px;display:flex;align-items:center;justify-content:space-between}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:650;letter-spacing:.2px}
+  .dot{width:10px;height:10px;border-radius:50%;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 0 14px var(--accent)}
+  .tag{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:4px 10px}
+
+  /* The viewer — this is the reusable piece */
+  .viewer{position:relative;width:100%;max-width:520px;aspect-ratio:1/1;border-radius:22px;
+    overflow:hidden;background:
+      radial-gradient(120% 90% at 50% 12%, #171a21 0%, #0d0f14 60%, #090a0d 100%);
+    border:1px solid var(--line);
+    box-shadow:0 30px 80px -30px #000, inset 0 1px 0 #ffffff0a;
+    touch-action:none;cursor:grab;user-select:none}
+  .viewer:active{cursor:grabbing}
+  .viewer canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .floor{position:absolute;left:50%;bottom:16%;width:62%;height:9%;transform:translateX(-50%);
+    background:radial-gradient(50% 50% at 50% 50%, #000000cc, #00000000 70%);
+    filter:blur(3px);pointer-events:none}
+  .hint{position:absolute;left:50%;top:14px;transform:translateX(-50%);
+    font-size:12px;color:var(--muted);background:#0009;border:1px solid var(--line);
+    padding:6px 12px;border-radius:999px;display:flex;gap:8px;align-items:center;
+    transition:opacity .4s;pointer-events:none}
+  .hint.gone{opacity:0}
+  .swipe{width:18px;height:18px;border:2px solid var(--muted);border-radius:50%;position:relative}
+  .swipe::after{content:"";position:absolute;inset:5px;border-top:2px solid var(--muted);
+    border-right:2px solid var(--muted);transform:rotate(45deg);left:2px;top:5px}
+  .ctas{position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;padding:14px;
+    background:linear-gradient(to top,#000000cc,#00000000)}
+  .cta{flex:1;text-align:center;padding:12px 14px;border-radius:14px;font-weight:650;
+    font-size:14px;text-decoration:none;color:#fff;border:1px solid #ffffff1f;
+    background:#ffffff12;backdrop-filter:blur(6px);transition:transform .12s,background .2s}
+  .cta.primary{background:linear-gradient(135deg,var(--accent),#5a76ff);border-color:#ffffff33}
+  .cta:active{transform:translateY(1px)}
+  .name{position:absolute;left:16px;top:14px;font-weight:650;font-size:14px;
+    text-shadow:0 1px 8px #000}
+  .zoom{position:absolute;right:12px;top:52px;display:flex;flex-direction:column;gap:8px}
+  .zbtn{width:34px;height:34px;border-radius:10px;background:#0008;border:1px solid var(--line);
+    color:var(--text);font-size:18px;line-height:1;display:grid;place-items:center;cursor:pointer}
+  .foot{max-width:520px;font-size:12px;color:var(--muted);text-align:center;line-height:1.6}
+  code{color:#cdd6ea;background:#0006;padding:1px 6px;border-radius:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="brand"><span class="dot"></span> Rotation3D</div>
+    <div class="tag">viewer spike · synthetic frames</div>
+  </div>
+
+  <div class="viewer" id="viewer">
+    <canvas id="cv"></canvas>
+    <div class="floor"></div>
+    <div class="name">Demo Product</div>
+    <div class="hint" id="hint"><span class="swipe"></span> drag to rotate · pinch/scroll to zoom</div>
+    <div class="zoom">
+      <div class="zbtn" data-z="1">+</div>
+      <div class="zbtn" data-z="-1">−</div>
+    </div>
+    <div class="ctas">
+      <a class="cta primary" id="ctaA" href="#" target="_blank" rel="noopener">Buy now</a>
+      <a class="cta" id="ctaB" href="#" target="_blank" rel="noopener">Next product</a>
+    </div>
+  </div>
+
+  <div class="foot">
+    This simulates the real player: rotation is <b>quantized to a discrete frame grid</b>
+    (36 yaw × 9 pitch) exactly like scrubbing ffmpeg-extracted frames. In production these
+    frames are transparent WebP cutouts served from a CDN. The two buttons and their URLs are
+    what a brand admin edits; everything else is delivered ready-made.
+  </div>
+</div>
+
+<script>
+(() => {
+  // ---- Frame grid config (mirrors the real extraction spec) -------------------
+  const YAW_STEPS = 36;                 // 10° increments around the object
+  const PITCH_MIN = -38, PITCH_MAX = 38, PITCH_STEPS = 9; // vertical tilt band
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const viewer = document.getElementById('viewer');
+  const hint = document.getElementById('hint');
+
+  // ---- Continuous interaction state (quantized only at render) ----------------
+  let yaw = 30 * Math.PI/180;    // default: slightly off-axis "hero" angle, centered
+  let pitch = 10 * Math.PI/180;
+  let yawVel = 0;                // inertia
+  let zoom = 1;
+  let idleSpin = true;          // gentle auto-rotate until first touch
+
+  // ---- Simple 3D cube (stand-in for a real product) ---------------------------
+  const V = [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
+  const F = [ // face: vertex indices + base color + label
+    {i:[0,1,2,3],c:[92,120,255],t:'1'},
+    {i:[5,4,7,6],c:[58,208,201],t:'2'},
+    {i:[4,0,3,7],c:[240,110,140],t:'3'},
+    {i:[1,5,6,2],c:[255,190,90],t:'4'},
+    {i:[4,5,1,0],c:[180,140,255],t:'5'},
+    {i:[3,2,6,7],c:[120,220,150],t:'6'},
+  ];
+  const LIGHT = norm([0.4,0.7,0.8]);
+  function norm(v){const l=Math.hypot(...v)||1;return [v[0]/l,v[1]/l,v[2]/l]}
+  function rotY(p,a){const c=Math.cos(a),s=Math.sin(a);return [c*p[0]+s*p[2],p[1],-s*p[0]+c*p[2]]}
+  function rotX(p,a){const c=Math.cos(a),s=Math.sin(a);return [p[0],c*p[1]-s*p[2],s*p[1]+c*p[2]]}
+
+  function fit(){
+    const r = viewer.getBoundingClientRect();
+    cv.width = Math.round(r.width*DPR); cv.height = Math.round(r.height*DPR);
+  }
+  window.addEventListener('resize', fit);
+
+  function draw(){
+    // Quantize to the frame grid — this is the key "scrub discrete frames" behavior
+    const stepY = (Math.PI*2)/YAW_STEPS;
+    const qYaw = Math.round(yaw/stepY)*stepY;
+    const pRange = (PITCH_MAX-PITCH_MIN)*Math.PI/180;
+    const pStep = pRange/(PITCH_STEPS-1);
+    const pClamped = Math.max(PITCH_MIN*Math.PI/180, Math.min(PITCH_MAX*Math.PI/180, pitch));
+    const qPitch = Math.round((pClamped-PITCH_MIN*Math.PI/180)/pStep)*pStep + PITCH_MIN*Math.PI/180;
+
+    const W=cv.width, H=cv.height;
+    ctx.clearRect(0,0,W,H);
+    const scale = Math.min(W,H)*0.24*zoom;
+    const cx=W/2, cy=H*0.46;
+
+    const faces = F.map(f=>{
+      const pts = f.i.map(idx=>rotX(rotY(V[idx],qYaw),qPitch));
+      const z = pts.reduce((s,p)=>s+p[2],0)/pts.length;
+      // normal via cross product of two edges
+      const a=pts[0],b=pts[1],c=pts[2];
+      const u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], v=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
+      const nrm=norm([u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]]);
+      const lit=Math.max(0.18, nrm[0]*LIGHT[0]+nrm[1]*LIGHT[1]+nrm[2]*LIGHT[2]);
+      return {pts,z,lit,f,facing:nrm[2]};
+    }).sort((A,B)=>A.z-B.z); // painter's algorithm
+
+    for(const fc of faces){
+      if(fc.facing<0) continue; // backface cull
+      ctx.beginPath();
+      fc.pts.forEach((p,k)=>{const x=cx+p[0]*scale,y=cy-p[1]*scale;k?ctx.lineTo(x,y):ctx.moveTo(x,y)});
+      ctx.closePath();
+      const [r,g,b]=fc.f.c, l=fc.lit;
+      ctx.fillStyle=`rgb(${r*l|0},${g*l|0},${b*l|0})`;
+      ctx.fill();
+      ctx.strokeStyle='#00000044'; ctx.lineWidth=DPR; ctx.stroke();
+      // face label so rotation direction is obvious
+      const mx=fc.pts.reduce((s,p)=>s+p[0],0)/4, my=fc.pts.reduce((s,p)=>s+p[1],0)/4;
+      ctx.fillStyle='#ffffffcc'; ctx.font=`${28*DPR}px ui-sans-serif`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(fc.f.t, cx+mx*scale, cy-my*scale);
+    }
+  }
+
+  function tick(){
+    if(idleSpin){ yaw += 0.004; }
+    else if(Math.abs(yawVel)>0.00002){ yaw += yawVel; yawVel *= 0.94; }
+    draw();
+    requestAnimationFrame(tick);
+  }
+
+  // ---- Pointer / touch handling ----------------------------------------------
+  let dragging=false, lastX=0, lastY=0, lastT=0, pointers=new Map(), pinchDist=0;
+  function down(e){
+    idleSpin=false; hint.classList.add('gone');
+    dragging=true; yawVel=0;
+    lastX=e.clientX; lastY=e.clientY; lastT=performance.now();
+  }
+  function move(e){
+    if(!dragging) return;
+    const now=performance.now(), dt=Math.max(1,now-lastT);
+    const dx=e.clientX-lastX, dy=e.clientY-lastY;
+    const k=0.006;
+    yaw += dx*k;
+    pitch += dy*k;
+    yawVel = (dx*k)/dt*16;             // momentum ∝ last velocity
+    lastX=e.clientX; lastY=e.clientY; lastT=now;
+  }
+  function up(){ dragging=false; }
+
+  viewer.addEventListener('pointerdown', e=>{
+    viewer.setPointerCapture(e.pointerId); pointers.set(e.pointerId,e);
+    if(pointers.size===1) down(e);
+  });
+  viewer.addEventListener('pointermove', e=>{
+    if(pointers.has(e.pointerId)) pointers.set(e.pointerId,e);
+    if(pointers.size===2){                   // pinch zoom
+      const [a,b]=[...pointers.values()];
+      const d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+      if(pinchDist) zoom=Math.max(0.6,Math.min(2.6, zoom*(d/pinchDist)));
+      pinchDist=d; dragging=false;
+    } else move(e);
+  });
+  const end=e=>{ pointers.delete(e.pointerId); if(pointers.size<2) pinchDist=0; if(pointers.size===0) up(); };
+  viewer.addEventListener('pointerup', end);
+  viewer.addEventListener('pointercancel', end);
+  viewer.addEventListener('wheel', e=>{
+    e.preventDefault(); idleSpin=false; hint.classList.add('gone');
+    zoom=Math.max(0.6,Math.min(2.6, zoom*(e.deltaY<0?1.08:0.93)));
+  }, {passive:false});
+  document.querySelectorAll('.zbtn').forEach(b=>b.addEventListener('click',()=>{
+    idleSpin=false; zoom=Math.max(0.6,Math.min(2.6, zoom*(+b.dataset.z>0?1.15:0.87)));
+  }));
+
+  // ---- CTA buttons (what the brand admin configures) --------------------------
+  document.getElementById('ctaA').addEventListener('click',e=>{e.preventDefault();alert('Primary CTA → brand-configured URL')});
+  document.getElementById('ctaB').addEventListener('click',e=>{e.preventDefault();alert('Secondary CTA → next product / URL')});
+
+  fit(); tick();
+})();
+</script>
+</body>
+</html>
