@@ -33,6 +33,9 @@ export type SpinViewerProps = {
   /** called before navigation so callers can record analytics (CTA_CLICK) */
   onCtaClick?: (which: "primary" | "secondary", cta: SpinCta) => void;
   className?: string;
+  /** "full" = full-screen player with chrome; "hero" = contained, chrome-less
+   * spinning object that fills its parent (used as a landing/hero visual) */
+  variant?: "full" | "hero";
 };
 
 const clampZoom = (z: number) => Math.max(0.7, Math.min(2.8, z));
@@ -45,7 +48,9 @@ export default function SpinViewer({
   ctaSecondary,
   onCtaClick,
   className,
+  variant = "full",
 }: SpinViewerProps) {
+  const hero = variant === "hero";
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hintRef = useRef<HTMLDivElement>(null);
@@ -342,7 +347,7 @@ export default function SpinViewer({
     };
     const finishLoad = () => {
       loaderRef.current?.classList.add("r3d-gone");
-      stage.focus({ preventScroll: true });
+      if (!hero) stage.focus({ preventScroll: true });
     };
 
     if (realMode) {
@@ -387,7 +392,7 @@ export default function SpinViewer({
       window.removeEventListener("resize", fit);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manifest, FRAMES, DEFAULT_FRAME]);
+  }, [manifest, FRAMES, DEFAULT_FRAME, hero]);
 
   const fireCta = (which: "primary" | "secondary", cta?: SpinCta) => {
     if (!cta) return;
@@ -399,7 +404,8 @@ export default function SpinViewer({
   };
 
   return (
-    <div ref={stageRef} className={`r3d-stage ${className || ""}`} tabIndex={0}
+    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${className || ""}`}
+      tabIndex={hero ? -1 : 0}
       aria-label="Interactive 360 degree product viewer. Drag to rotate.">
       <style>{R3D_CSS}</style>
       <canvas ref={canvasRef} />
@@ -533,4 +539,7 @@ const R3D_CSS = `
 .r3d-pct{font-weight:600;font-size:13px;color:var(--r3d-muted)}
 .r3d-lbl{font-size:12px;color:var(--r3d-muted);letter-spacing:.14em;text-transform:uppercase}
 @media (prefers-reduced-motion:reduce){.r3d-hand{animation:none}}
+/* hero variant: contained, transparent, chrome-less spinning object */
+.r3d-hero{height:100%!important;background:transparent!important}
+.r3d-hero .r3d-scrim-top,.r3d-hero .r3d-scrim-bot,.r3d-hero .r3d-topbar,.r3d-hero .r3d-zoomcol,.r3d-hero .r3d-rot,.r3d-hero .r3d-ctas,.r3d-hero .r3d-loader{display:none!important}
 `;

@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, useParams } from "react-router-dom";
 import SpinViewer from "./SpinViewer";
+import Rotation3DLanding from "./Rotation3DLanding";
 
 /**
  * Rotation3D route tree (path-based tenancy). Rendered by App only when the app
@@ -74,7 +75,7 @@ function Placeholder({ title, sub }: { title: string; sub: string }) {
 export default function Rotation3DApp() {
   return (
     <Routes>
-      <Route path="/" element={<PlayerPage />} />
+      <Route path="/" element={<Rotation3DLanding />} />
       <Route path="/p/:productId" element={<PlayerPage />} />
       <Route path="/embed/:productId" element={<PlayerPage />} />
       <Route
