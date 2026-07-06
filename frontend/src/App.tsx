@@ -34,6 +34,9 @@ import { useAutoAppRefresh } from "./hooks/useAutoAppRefresh";
 // --- NEW IMPORTS (Add these) ---
 import { Terms } from "./pages/Terms";
 import { Privacy } from "./pages/Privacy";
+import Rotation3DDemo from "./rotation3d/Rotation3DDemo";
+import Rotation3DApp from "./rotation3d/Rotation3DApp";
+import { isRotation3dSite } from "./lib/branding";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -258,6 +261,9 @@ function App() {
           }}
         />
         <Router>
+          {isRotation3dSite() ? (
+            <Rotation3DApp />
+          ) : (
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<MarketingSite />} />
@@ -312,8 +318,12 @@ function App() {
 
             {/* Public, read-only demo preview (no auth, no mutations) */}
             <Route path="/demo" element={<DemoDashboard />} />
+            {/* Rotation3D — public player preview (no auth). Path-gated for now;
+                moves behind the Rotation3D domain once DNS + branding land. */}
+            <Route path="/rotation3d" element={<Rotation3DDemo />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          )}
         </Router>
       </BrandProvider>
     </QueryClientProvider>
