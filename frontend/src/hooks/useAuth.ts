@@ -27,8 +27,8 @@ interface User {
   orgLockReason?: "DEACTIVATED" | "MISSING_FAL_KEY" | "SEAT_LOCKED" | null;
   videoEditorEnabledForAll?: boolean;
   carouselEnabledForAll?: boolean;
-  view?: "VISIONLIGHT" | "PICDRIFT";
-  orgViewType?: "VISIONLIGHT" | "PICDRIFT";
+  view?: "VISIONLIGHT" | "PICDRIFT" | "ROTATION3D";
+  orgViewType?: "VISIONLIGHT" | "PICDRIFT" | "ROTATION3D";
   maxProjects?: number;
   isSuperAdmin?: boolean;
   adminCreditLimitsEnabled?: boolean;
@@ -68,7 +68,7 @@ export interface WorkspaceProfile {
   email: string;
   name?: string | null;
   role?: "ADMIN" | "USER" | "MANAGER" | "SUPERADMIN";
-  view?: "VISIONLIGHT" | "PICDRIFT";
+  view?: "VISIONLIGHT" | "PICDRIFT" | "ROTATION3D";
   organizationId?: string | null;
   organizationName?: string | null;
   organizationIsDefault?: boolean;

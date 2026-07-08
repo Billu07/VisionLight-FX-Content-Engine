@@ -36,6 +36,7 @@ import { Terms } from "./pages/Terms";
 import { Privacy } from "./pages/Privacy";
 import Rotation3DDemo from "./rotation3d/Rotation3DDemo";
 import Rotation3DApp from "./rotation3d/Rotation3DApp";
+import Rotation3DBrandDashboard from "./rotation3d/Rotation3DBrandDashboard";
 import { isRotation3dSite } from "./lib/branding";
 
 const queryClient = new QueryClient({
@@ -156,6 +157,27 @@ const ProjectRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   return <>{children}</>;
+};
+
+// --- App Entry ---
+// Rotation3D brand admins land in their brand dashboard; every other studio
+// keeps the exact existing project-scoped dashboard (no behavior change).
+const AppEntry = () => {
+  const { user } = useAuth();
+  if (user?.view === "ROTATION3D") {
+    return (
+      <ErrorBoundary>
+        <Rotation3DBrandDashboard />
+      </ErrorBoundary>
+    );
+  }
+  return (
+    <ProjectRoute>
+      <ErrorBoundary>
+        <Dashboard />
+      </ErrorBoundary>
+    </ProjectRoute>
+  );
 };
 
 // --- 🔒 Admin Only Route ---
@@ -295,11 +317,7 @@ function App() {
               path="/app"
               element={
                 <ProtectedRoute>
-                  <ProjectRoute>
-                    <ErrorBoundary>
-                      <Dashboard />
-                    </ErrorBoundary>
-                  </ProjectRoute>
+                  <AppEntry />
                 </ProtectedRoute>
               }
             />

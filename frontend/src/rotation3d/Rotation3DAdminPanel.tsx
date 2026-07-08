@@ -40,7 +40,14 @@ export default function Rotation3DAdminPanel() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loadingBrands, setLoadingBrands] = useState(true);
   const [newBrand, setNewBrand] = useState("");
+  const [newBrandEmail, setNewBrandEmail] = useState("");
+  const [newBrandAdminName, setNewBrandAdminName] = useState("");
   const [creatingBrand, setCreatingBrand] = useState(false);
+  const [credential, setCredential] = useState<{
+    email: string;
+    tempPassword?: string;
+    reused?: boolean;
+  } | null>(null);
 
   const [selected, setSelected] = useState<Brand | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -88,11 +95,24 @@ export default function Rotation3DAdminPanel() {
     if (!name) return;
     setCreatingBrand(true);
     setMsg(null);
+    setCredential(null);
     try {
-      await apiEndpoints.r3dCreateBrand(name);
+      const res = await apiEndpoints.r3dCreateBrand(
+        name,
+        newBrandEmail.trim() || undefined,
+        newBrandAdminName.trim() || undefined,
+      );
       setNewBrand("");
+      setNewBrandEmail("");
+      setNewBrandAdminName("");
       await loadBrands();
-      setMsg({ kind: "ok", text: `Brand "${name}" created.` });
+      if (res.data.admin) {
+        setCredential(res.data.admin);
+      } else if (res.data.adminError) {
+        setMsg({ kind: "err", text: `Brand created, but admin login failed: ${res.data.adminError}` });
+      } else {
+        setMsg({ kind: "ok", text: `Brand "${name}" created.` });
+      }
     } catch (e: any) {
       setMsg({ kind: "err", text: e?.response?.data?.error || "Failed to create brand" });
     } finally {
@@ -156,18 +176,74 @@ export default function Rotation3DAdminPanel() {
           <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Brands</h2>
           <p className="mt-1 text-xs text-gray-400">Each brand is a managed Rotation3D org.</p>
 
-          <div className="mt-4 flex gap-2">
+          <div className="mt-4 space-y-2">
             <input
               className={input}
               placeholder="New brand name"
               value={newBrand}
               onChange={(e) => setNewBrand(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && createBrand()}
             />
-            <button className={btn} onClick={createBrand} disabled={creatingBrand || !newBrand.trim()}>
-              {creatingBrand ? "…" : "Add"}
+            <input
+              className={input}
+              placeholder="Brand admin email (optional — creates a login)"
+              value={newBrandEmail}
+              onChange={(e) => setNewBrandEmail(e.target.value)}
+            />
+            <input
+              className={input}
+              placeholder="Admin name (optional)"
+              value={newBrandAdminName}
+              onChange={(e) => setNewBrandAdminName(e.target.value)}
+            />
+            <button
+              className={`${btn} w-full`}
+              onClick={createBrand}
+              disabled={creatingBrand || !newBrand.trim()}
+            >
+              {creatingBrand ? "Creating…" : "Create brand"}
             </button>
           </div>
+
+          {credential && (
+            <div className="mt-3 rounded-lg border border-emerald-400/30 bg-emerald-500/10 p-3 text-xs">
+              <div className="flex items-center justify-between">
+                <p className="font-bold text-emerald-200">Brand admin login</p>
+                <button className="text-gray-400 hover:text-white" onClick={() => setCredential(null)}>
+                  ×
+                </button>
+              </div>
+              {credential.reused ? (
+                <p className="mt-1 text-gray-300">
+                  <span className="font-mono">{credential.email}</span> already has an account — they
+                  log in with their existing password.
+                </p>
+              ) : (
+                <>
+                  <div className="mt-2 space-y-1 text-gray-200">
+                    <p>
+                      Email: <span className="font-mono text-white">{credential.email}</span>
+                    </p>
+                    <p>
+                      Password: <span className="font-mono text-white">{credential.tempPassword}</span>
+                    </p>
+                  </div>
+                  <p className="mt-2 text-[11px] text-amber-300">
+                    Shown once — copy and forward to the brand now.
+                  </p>
+                  <button
+                    className="mt-2 text-[11px] text-emerald-300 underline"
+                    onClick={() =>
+                      navigator.clipboard.writeText(
+                        `Login: https://rotation3d.com\nEmail: ${credential.email}\nPassword: ${credential.tempPassword}`,
+                      )
+                    }
+                  >
+                    Copy credentials
+                  </button>
+                </>
+              )}
+            </div>
+          )}
 
           <div className="mt-4 space-y-2">
             {loadingBrands ? (

@@ -70,7 +70,7 @@ export default function StudioChooser() {
       setSelectingId(null);
       return;
     }
-    navigate("/projects", { replace: true });
+    navigate(profile.view === "ROTATION3D" ? "/app" : "/projects", { replace: true });
   };
 
   if (isLoading) {
@@ -86,7 +86,7 @@ export default function StudioChooser() {
   }
 
   if (user && !profileSelectionRequired && profiles.length <= 1) {
-    return <Navigate to="/projects" replace />;
+    return <Navigate to={user?.view === "ROTATION3D" ? "/app" : "/projects"} replace />;
   }
 
   if ((!profileSelectionRequired && !user) || profiles.length === 0) {
@@ -112,6 +112,7 @@ export default function StudioChooser() {
         <div className="grid gap-4 md:grid-cols-2">
           {profiles.map((profile) => {
             const isPicdrift = profile.view === "PICDRIFT";
+            const isRotation3d = profile.view === "ROTATION3D";
             return (
               <button
                 key={profile.id}
@@ -127,8 +128,8 @@ export default function StudioChooser() {
                     </h2>
                     <p className="mt-1 text-xs text-gray-500">{profile.email}</p>
                   </div>
-                  <span className={`rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-widest ${isPicdrift ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-200" : "border-amber-300/30 bg-amber-300/10 text-amber-200"}`}>
-                    {isPicdrift ? "PicDrift" : "VisualFX"}
+                  <span className={`rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-widest ${isRotation3d ? "border-violet-300/30 bg-violet-300/10 text-violet-200" : isPicdrift ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-200" : "border-amber-300/30 bg-amber-300/10 text-amber-200"}`}>
+                    {isRotation3d ? "Rotation3D" : isPicdrift ? "PicDrift" : "VisualFX"}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">

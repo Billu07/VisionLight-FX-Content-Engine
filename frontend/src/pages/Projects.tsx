@@ -17,6 +17,12 @@ export default function Projects() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  // Rotation3D brand admins have no generation projects — route them to their
+  // brand dashboard if they ever land on this page.
+  useEffect(() => {
+    if (user?.view === "ROTATION3D") navigate("/app", { replace: true });
+  }, [user?.view, navigate]);
+
   const [newProjectName, setNewProjectName] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);

@@ -7,6 +7,7 @@ import {
   requireSuperAdmin,
   type AuthenticatedRequest,
 } from "../middleware/auth";
+import { AuthService } from "../services/auth";
 import { uploadManagedBuffer } from "../utils/managedStorage";
 import { buildSpinFromVideo } from "../services/rotation3d/pipeline";
 
@@ -66,19 +67,54 @@ router.get(
   },
 );
 
-// Create a Rotation3D brand organization.
+// Create a Rotation3D brand organization, optionally provisioning its admin
+// login. Returns a one-time temp password to forward (unless the email already
+// has an account, in which case they keep their existing password).
 router.post(
   "/api/rotation3d/brands",
   authenticateToken,
   requireSuperAdmin,
   async (req: AuthenticatedRequest, res: Response) => {
     const name = String(req.body?.name || "").trim();
+    const adminEmail = String(req.body?.adminEmail || "").trim().toLowerCase();
+    const adminName = String(req.body?.adminName || "").trim() || name;
     if (!name) return res.status(400).json({ error: "Brand name is required" });
+    if (adminEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(adminEmail)) {
+      return res.status(400).json({ error: "Invalid admin email" });
+    }
+
     const org = await prisma.organization.create({
       data: { name, productLine: "ROTATION3D", provisioningSource: "MANUAL" },
       select: { id: true, name: true, createdAt: true },
     });
-    res.status(201).json({ brand: org });
+
+    let admin:
+      | { email: string; tempPassword?: string; reused?: boolean }
+      | undefined;
+    if (adminEmail) {
+      const tempPassword = crypto.randomBytes(9).toString("base64url");
+      try {
+        const created: any = await AuthService.createSystemUser(
+          adminEmail,
+          tempPassword,
+          adminName,
+          "ROTATION3D",
+          3,
+          org.id,
+          "ADMIN",
+        );
+        admin = created?.authIdentityReused
+          ? { email: adminEmail, reused: true }
+          : { email: adminEmail, tempPassword };
+      } catch (e: any) {
+        // Org is created; report the admin failure so the team can retry/add later.
+        return res.status(201).json({
+          brand: org,
+          adminError: e?.message || "Failed to create brand admin",
+        });
+      }
+    }
+    res.status(201).json({ brand: org, admin });
   },
 );
 
