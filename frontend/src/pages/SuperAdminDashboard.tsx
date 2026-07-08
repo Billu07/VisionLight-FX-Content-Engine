@@ -10,6 +10,7 @@ import { confirmAction } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
 import { isUserCreditLimited } from "../lib/adminCredits";
+import Rotation3DAdminPanel from "../rotation3d/Rotation3DAdminPanel";
 
 type DemoView = "VISIONLIGHT" | "PICDRIFT";
 
@@ -431,6 +432,7 @@ export default function SuperAdminDashboard() {
     | "global-presets"
     | "editor-presets"
     | "lab"
+    | "rotation3d"
   >("platform");
 
   // Demo Preview curation state
@@ -1497,6 +1499,7 @@ export default function SuperAdminDashboard() {
                 { id: "global-presets", label: "global presets" },
                 { id: "editor-presets", label: "editor presets" },
                 { id: "lab", label: "lab" },
+                { id: "rotation3d", label: "rotation3d" },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -1586,6 +1589,9 @@ export default function SuperAdminDashboard() {
             </button>
           </div>
         </div>
+
+        {/* TAB CONTENT: ROTATION3D */}
+        {activeTab === "rotation3d" && <Rotation3DAdminPanel />}
 
         {/* TAB CONTENT: DEMO PREVIEW */}
         {activeTab === "demo" && (

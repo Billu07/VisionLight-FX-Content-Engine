@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { Routes, Route, Navigate, useParams } from "react-router-dom";
 import SpinViewer from "./SpinViewer";
 import Rotation3DLanding from "./Rotation3DLanding";
+import { apiEndpoints } from "../lib/api";
 
 /**
  * Rotation3D route tree (path-based tenancy). Rendered by App only when the app
@@ -15,21 +17,79 @@ import Rotation3DLanding from "./Rotation3DLanding";
  * wired to real manifests once the backend data model + pipeline land.
  */
 
-// Turns "air-max-90" → "Air Max 90" for placeholder display.
-const titleFromSlug = (s?: string) =>
-  (s || "Demo Product")
-    .replace(/[-_]+/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+const toCta = (c: any) =>
+  c && typeof c === "object" && c.label && c.url && c.url !== "#"
+    ? { label: String(c.label), url: String(c.url) }
+    : undefined;
 
 function PlayerPage() {
   const { productId } = useParams();
+  const isDemo = !productId || productId === "demo";
+  const [state, setState] = useState<{
+    loading: boolean;
+    data?: any;
+    error?: "not_found" | "error";
+  }>({ loading: !isDemo });
+
+  useEffect(() => {
+    if (isDemo) return;
+    let alive = true;
+    setState({ loading: true });
+    apiEndpoints
+      .r3dPublicProduct(productId!)
+      .then((res) => {
+        if (!alive) return;
+        setState({ loading: false, data: res.data.product });
+        apiEndpoints.r3dTrackEvent(productId!, "VIEW").catch(() => undefined);
+      })
+      .catch((err) => {
+        if (!alive) return;
+        setState({
+          loading: false,
+          error: err?.response?.status === 404 ? "not_found" : "error",
+        });
+      });
+    return () => {
+      alive = false;
+    };
+  }, [productId, isDemo]);
+
+  // Demo spin (landing "See it full-screen" → /p/demo) uses the synthetic object.
+  if (isDemo) {
+    return (
+      <SpinViewer
+        manifest={{ frameCount: 36, defaultFrame: 3 }}
+        brandName="Rotation3D"
+        productName="Demo Product"
+        ctaPrimary={{ label: "Buy now", url: "#" }}
+        ctaSecondary={{ label: "Next product", url: "#" }}
+      />
+    );
+  }
+
+  if (state.loading)
+    return <Placeholder title="Loading…" sub="Preparing the spin." />;
+  if (state.error === "not_found")
+    return <Placeholder title="Not found" sub="This product isn't available yet." />;
+  if (state.error || !state.data)
+    return <Placeholder title="Something went wrong" sub="Please try again in a moment." />;
+
+  const p = state.data;
+  const m = p.manifest || {};
   return (
     <SpinViewer
-      manifest={{ frameCount: 36, defaultFrame: 3 }}
-      brandName="Rotation3D"
-      productName={titleFromSlug(productId)}
-      ctaPrimary={{ label: "Buy now", url: "#" }}
-      ctaSecondary={{ label: "Next product", url: "#" }}
+      manifest={{
+        frameCount: m.frameCount || (m.frames?.length ?? 0),
+        frames: m.frames,
+        defaultFrame: p.defaultFrame ?? m.defaultFrame ?? 0,
+      }}
+      brandName={p.brandName || "Rotation3D"}
+      productName={p.name || "Product"}
+      ctaPrimary={toCta(p.ctaPrimary)}
+      ctaSecondary={toCta(p.ctaSecondary)}
+      onCtaClick={(which) =>
+        apiEndpoints.r3dTrackEvent(productId!, "CTA_CLICK", { which }).catch(() => undefined)
+      }
     />
   );
 }

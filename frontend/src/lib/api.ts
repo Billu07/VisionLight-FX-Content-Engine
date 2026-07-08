@@ -214,6 +214,38 @@ export const apiEndpoints = {
   byokGetPackages: () => api.get("/api/byok/packages"),
   byokCreateCheckoutIntent: (packageCode: string) =>
     api.post("/api/byok/checkout-intent", { packageCode }),
+
+  // === Rotation3D ===
+  r3dListBrands: () => api.get("/api/rotation3d/brands"),
+  r3dCreateBrand: (name: string) => api.post("/api/rotation3d/brands", { name }),
+  r3dBrandProducts: (orgId: string) =>
+    api.get(`/api/rotation3d/brands/${orgId}/products`),
+  r3dUploadProductVideo: (
+    orgId: string,
+    formData: FormData,
+    options?: { onUploadProgress?: (e: AxiosProgressEvent) => void },
+  ) =>
+    api.post(`/api/rotation3d/brands/${orgId}/products`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: options?.onUploadProgress,
+    }),
+  r3dMyProducts: () => api.get("/api/rotation3d/my/products"),
+  r3dUpdateProduct: (id: string, data: Record<string, unknown>) =>
+    api.patch(`/api/rotation3d/my/products/${id}`, data),
+  r3dUploadSourceImages: (
+    formData: FormData,
+    options?: { onUploadProgress?: (e: AxiosProgressEvent) => void },
+  ) =>
+    api.post("/api/rotation3d/my/source-images", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: options?.onUploadProgress,
+    }),
+  r3dCreateEmbed: (id: string, allowedDomains: string[]) =>
+    api.post(`/api/rotation3d/my/products/${id}/embed`, { allowedDomains }),
+  r3dPublicProduct: (id: string) =>
+    api.get(`/api/rotation3d/public/products/${id}`),
+  r3dTrackEvent: (productId: string, type: string, meta?: Record<string, unknown>) =>
+    api.post("/api/rotation3d/public/events", { productId, type, meta }),
   byokGetActivationStatus: (checkoutSessionId: string) =>
     api.get("/api/byok/activation-status", { params: { checkoutSessionId } }),
   byokGetActivationStatusPublic: (checkoutSessionId: string) =>
