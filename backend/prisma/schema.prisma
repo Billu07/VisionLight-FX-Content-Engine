@@ -14,6 +14,7 @@ model Organization {
   isDefault        Boolean @default(false)
   provisioningSource String @default("MANUAL") // MANUAL | BYOK
   entitlementCode    String? // BYOK_TRIAL | PD_APP | VFX_APP | PD_STUDIO | VFX_STUDIO | VFX_STUDIO_AGENCY
+  productLine        String? // "ROTATION3D" marks a managed Rotation3D brand org
   routingDomain      String?
   adminPanelLocked   Boolean @default(false)
   renderDailyLimit   Int?
@@ -70,6 +71,10 @@ model Organization {
   renderUsages      ByokRenderUsage[]
   webhookEvents     WebhookEvent[]
   entitlement       OrganizationEntitlement?
+
+  rot3dProducts     Rot3dProduct[]
+  rot3dSourceImages Rot3dSourceImage[]
+  rot3dEvents       Rot3dEvent[]
 }
 
 model User {
@@ -364,4 +369,102 @@ model OrganizationEntitlement {
   updatedAt           DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rotation3D — interactive 360° product spins. Managed studio (view "ROTATION3D").
+// Brands upload source images; the team uploads a rendered video that the pipeline
+// turns into a frame manifest (Rot3dSpin) the public player scrubs. All additive.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Rot3dProduct {
+  id              String   @id @default(uuid())
+  organizationId  String
+  slug            String
+  name            String
+  status          String   @default("DRAFT") // DRAFT | PROCESSING | READY | PUBLISHED | ARCHIVED
+  defaultFrame    Int      @default(0)
+  background      String? // "transparent" | hex
+  ctaPrimary      Json? // { label, url } — e.g. "Next"
+  ctaSecondary    Json? // { label, url } — e.g. "Previous"
+  order           Int      @default(0)
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sourceImages Rot3dSourceImage[]
+  videos       Rot3dVideo[]
+  spin         Rot3dSpin?
+  embed        Rot3dEmbed?
+  events       Rot3dEvent[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+model Rot3dSourceImage {
+  id               String   @id @default(uuid())
+  organizationId   String
+  productId        String?
+  url              String
+  angleLabel       String?
+  uploadedByUserId String?
+  createdAt        DateTime @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  product      Rot3dProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([productId])
+}
+
+model Rot3dVideo {
+  id               String   @id @default(uuid())
+  productId        String
+  url              String
+  status           String   @default("UPLOADED") // UPLOADED | PROCESSING | DONE | FAILED
+  uploadedByUserId String?
+  createdAt        DateTime @default(now())
+
+  product Rot3dProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model Rot3dSpin {
+  id         String   @id @default(uuid())
+  productId  String   @unique
+  frameCount Int
+  manifest   Json // { frames: string[], defaultFrame, resolutions }
+  status     String   @default("READY")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  product Rot3dProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Rot3dEmbed {
+  id             String   @id @default(uuid())
+  productId      String   @unique
+  token          String   @unique
+  allowedDomains String[]
+  createdAt      DateTime @default(now())
+
+  product Rot3dProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Rot3dEvent {
+  id             String   @id @default(uuid())
+  organizationId String
+  productId      String
+  type           String // VIEW | ROTATE | ZOOM | CTA_CLICK
+  meta           Json?
+  ts             DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  product      Rot3dProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([organizationId, ts])
 }
