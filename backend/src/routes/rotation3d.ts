@@ -84,7 +84,15 @@ router.post(
     }
 
     const org = await prisma.organization.create({
-      data: { name, productLine: "ROTATION3D", provisioningSource: "MANUAL" },
+      data: {
+        name,
+        productLine: "ROTATION3D",
+        provisioningSource: "MANUAL",
+        // Brand admins are canonically routed to rotation3d.com, so wherever
+        // they log in they are handed off to the Rotation3D domain (which now
+        // serves the full app + their brand dashboard).
+        routingDomain: "rotation3d.com",
+      },
       select: { id: true, name: true, createdAt: true },
     });
 
