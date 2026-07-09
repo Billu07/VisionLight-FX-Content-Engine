@@ -35,7 +35,8 @@ import { useAutoAppRefresh } from "./hooks/useAutoAppRefresh";
 import { Terms } from "./pages/Terms";
 import { Privacy } from "./pages/Privacy";
 import Rotation3DDemo from "./rotation3d/Rotation3DDemo";
-import Rotation3DApp from "./rotation3d/Rotation3DApp";
+import Rotation3DLanding from "./rotation3d/Rotation3DLanding";
+import Rotation3DPlayer from "./rotation3d/Rotation3DPlayer";
 import Rotation3DBrandDashboard from "./rotation3d/Rotation3DBrandDashboard";
 import { isRotation3dSite } from "./lib/branding";
 
@@ -283,12 +284,18 @@ function App() {
           }}
         />
         <Router>
-          {isRotation3dSite() ? (
-            <Rotation3DApp />
-          ) : (
           <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<MarketingSite />} />
+            {/* Public Routes. On the Rotation3D host, "/" is the Rotation3D
+                landing; every other domain keeps the studio marketing site.
+                The rest of the routes (auth, chooser, dashboards) are shared,
+                so brands can log in on rotation3d.com too. */}
+            <Route
+              path="/"
+              element={isRotation3dSite() ? <Rotation3DLanding /> : <MarketingSite />}
+            />
+            {/* Rotation3D public player + iframe embed (linked from rotation3d.com) */}
+            <Route path="/p/:productId" element={<Rotation3DPlayer />} />
+            <Route path="/embed/:productId" element={<Rotation3DPlayer />} />
             <Route path="/pricing" element={<Pricing />} />
 
             {/* --- ADD THESE NEW ROUTES --- */}
@@ -341,7 +348,6 @@ function App() {
             <Route path="/rotation3d" element={<Rotation3DDemo />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-          )}
         </Router>
       </BrandProvider>
     </QueryClientProvider>
