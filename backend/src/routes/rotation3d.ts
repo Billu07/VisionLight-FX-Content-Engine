@@ -165,7 +165,7 @@ router.post(
   async (req: AuthenticatedRequest, res: Response) => {
     const { orgId } = req.params;
     const name = String(req.body?.name || "").trim();
-    const frameCount = Number(req.body?.frameCount) || 36;
+    const frameCount = Number(req.body?.frameCount) || 48;
     const file = req.file;
     if (!name) {
       if (file?.path) await fs.rm(file.path, { force: true }).catch(() => undefined);
