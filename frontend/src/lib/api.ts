@@ -219,6 +219,7 @@ export const apiEndpoints = {
   r3dListBrands: () => api.get("/api/rotation3d/brands"),
   r3dCreateBrand: (name: string, adminEmail?: string, adminName?: string) =>
     api.post("/api/rotation3d/brands", { name, adminEmail, adminName }),
+  r3dDeleteBrand: (orgId: string) => api.delete(`/api/rotation3d/brands/${orgId}`),
   r3dBrandProducts: (orgId: string) =>
     api.get(`/api/rotation3d/brands/${orgId}/products`),
   r3dUploadProductVideo: (

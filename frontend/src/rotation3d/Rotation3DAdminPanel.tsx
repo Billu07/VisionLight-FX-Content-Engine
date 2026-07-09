@@ -34,7 +34,9 @@ const statusColor = (s: string) =>
       ? "text-cyan-300"
       : s === "PROCESSING"
         ? "text-amber-300"
-        : "text-gray-400";
+        : s === "FAILED"
+          ? "text-rose-300"
+          : "text-gray-400";
 
 export default function Rotation3DAdminPanel() {
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -76,17 +78,42 @@ export default function Rotation3DAdminPanel() {
     void loadBrands();
   }, []);
 
-  const loadProducts = async (brand: Brand) => {
+  const loadProducts = async (brand: Brand, silent = false) => {
     setSelected(brand);
-    setLoadingProducts(true);
-    setProducts([]);
+    if (!silent) {
+      setLoadingProducts(true);
+      setProducts([]);
+    }
     try {
       const res = await apiEndpoints.r3dBrandProducts(brand.id);
       setProducts(res.data.products || []);
     } catch (e: any) {
-      setMsg({ kind: "err", text: e?.response?.data?.error || "Failed to load products" });
+      if (!silent) setMsg({ kind: "err", text: e?.response?.data?.error || "Failed to load products" });
     } finally {
-      setLoadingProducts(false);
+      if (!silent) setLoadingProducts(false);
+    }
+  };
+
+  // While anything is PROCESSING, quietly poll so it flips to READY/FAILED live.
+  useEffect(() => {
+    if (!selected || !products.some((p) => p.status === "PROCESSING")) return;
+    const t = setInterval(() => void loadProducts(selected, true), 4000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, selected]);
+
+  const deleteBrand = async (b: Brand) => {
+    if (!window.confirm(`Delete "${b.name}" and all of its products? This cannot be undone.`)) return;
+    try {
+      await apiEndpoints.r3dDeleteBrand(b.id);
+      if (selected?.id === b.id) {
+        setSelected(null);
+        setProducts([]);
+      }
+      await loadBrands();
+      setMsg({ kind: "ok", text: `Deleted "${b.name}".` });
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e?.response?.data?.error || "Failed to delete brand" });
     }
   };
 
@@ -138,7 +165,7 @@ export default function Rotation3DAdminPanel() {
           }
         },
       });
-      setMsg({ kind: "ok", text: `"${productName.trim()}" processed into a spin.` });
+      setMsg({ kind: "ok", text: `"${productName.trim()}" uploaded — building the spin…` });
       setProductName("");
       setVideoFile(null);
       if (fileRef.current) fileRef.current.value = "";
@@ -254,18 +281,29 @@ export default function Rotation3DAdminPanel() {
               <p className="py-6 text-center text-xs text-gray-500">No brands yet.</p>
             ) : (
               brands.map((b) => (
-                <button
+                <div
                   key={b.id}
-                  onClick={() => loadProducts(b)}
-                  className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                  className={`flex items-center gap-1 rounded-lg border transition-colors ${
                     selected?.id === b.id
                       ? "border-brand-accent/50 bg-brand-accent/10"
                       : "border-gray-700/60 bg-gray-950/50 hover:bg-gray-800/60"
                   }`}
                 >
-                  <span className="text-sm font-medium text-white">{b.name}</span>
-                  <span className="text-[11px] text-gray-500">{b._count?.rot3dProducts ?? 0} products</span>
-                </button>
+                  <button
+                    onClick={() => loadProducts(b)}
+                    className="flex flex-1 items-center justify-between px-3 py-2.5 text-left"
+                  >
+                    <span className="text-sm font-medium text-white">{b.name}</span>
+                    <span className="text-[11px] text-gray-500">{b._count?.rot3dProducts ?? 0} products</span>
+                  </button>
+                  <button
+                    onClick={() => deleteBrand(b)}
+                    title="Delete brand"
+                    className="px-2.5 py-2.5 text-lg leading-none text-gray-600 hover:text-rose-400"
+                  >
+                    ×
+                  </button>
+                </div>
               ))
             )}
           </div>

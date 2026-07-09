@@ -1,6 +1,8 @@
 import { Router, Response } from "express";
 import multer from "multer";
 import crypto from "node:crypto";
+import fs from "node:fs/promises";
+import os from "node:os";
 import { prisma } from "../services/database";
 import {
   authenticateToken,
@@ -13,10 +15,19 @@ import { buildSpinFromVideo } from "../services/rotation3d/pipeline";
 
 const router = Router();
 
-const mem = (mb: number) =>
-  multer({ storage: multer.memoryStorage(), limits: { fileSize: mb * 1024 * 1024 } });
-const videoUpload = mem(300);
-const imageUpload = mem(25);
+// Images are small → memory. Videos stream to a temp file (low memory, allows
+// large files, and lets the pipeline read the file directly with no R2 round-trip).
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
+});
+const videoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, os.tmpdir()),
+    filename: (_req, _file, cb) => cb(null, `r3d-upload-${crypto.randomUUID()}.mp4`),
+  }),
+  limits: { fileSize: 500 * 1024 * 1024 },
+});
 
 const slugify = (s: string) =>
   s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) ||
@@ -156,14 +167,20 @@ router.post(
     const name = String(req.body?.name || "").trim();
     const frameCount = Number(req.body?.frameCount) || 36;
     const file = req.file;
-    if (!name) return res.status(400).json({ error: "Product name is required" });
+    if (!name) {
+      if (file?.path) await fs.rm(file.path, { force: true }).catch(() => undefined);
+      return res.status(400).json({ error: "Product name is required" });
+    }
     if (!file) return res.status(400).json({ error: "A video file is required" });
 
     const org = await prisma.organization.findFirst({
       where: { id: orgId, productLine: "ROTATION3D" },
       select: { id: true },
     });
-    if (!org) return res.status(404).json({ error: "Rotation3D brand not found" });
+    if (!org) {
+      await fs.rm(file.path, { force: true }).catch(() => undefined);
+      return res.status(404).json({ error: "Rotation3D brand not found" });
+    }
 
     const slug = await uniqueSlug(orgId, name);
     const product = await prisma.rot3dProduct.create({
@@ -176,56 +193,71 @@ router.post(
       },
     });
 
-    try {
-      const videoUrl = await uploadManagedBuffer({
-        buffer: file.buffer,
-        contentType: file.mimetype || "video/mp4",
-        keyPrefix: `rotation3d/org_${orgId}/product_${product.id}/video`,
-        fallbackExtension: "mp4",
-      });
-      await prisma.rot3dVideo.create({
-        data: {
-          productId: product.id,
-          url: videoUrl,
-          status: "PROCESSING",
-          uploadedByUserId: req.user?.id || null,
-        },
-      });
+    // Respond immediately; frames are built in the background so the client
+    // never waits on (or times out during) extraction. The admin UI polls for
+    // PROCESSING → READY/FAILED.
+    res.status(201).json({ product });
 
-      const manifest = await buildSpinFromVideo({
-        videoUrl,
-        organizationId: orgId,
-        productId: product.id,
-        frameCount,
-      });
+    const videoPath = file.path;
+    const mimetype = file.mimetype;
+    const uploaderId = req.user?.id || null;
+    void (async () => {
+      try {
+        const buf = await fs.readFile(videoPath);
+        const videoUrl = await uploadManagedBuffer({
+          buffer: buf,
+          contentType: mimetype || "video/mp4",
+          keyPrefix: `rotation3d/org_${orgId}/product_${product.id}/video`,
+          fallbackExtension: "mp4",
+        });
+        await prisma.rot3dVideo.create({
+          data: { productId: product.id, url: videoUrl, status: "PROCESSING", uploadedByUserId: uploaderId },
+        });
 
-      await prisma.rot3dSpin.upsert({
-        where: { productId: product.id },
-        create: {
+        const manifest = await buildSpinFromVideo({
+          videoPath,
+          organizationId: orgId,
           productId: product.id,
-          frameCount: manifest.frameCount,
-          manifest: manifest as any,
-          status: "READY",
-        },
-        update: {
-          frameCount: manifest.frameCount,
-          manifest: manifest as any,
-          status: "READY",
-        },
-      });
-      const ready = await prisma.rot3dProduct.update({
-        where: { id: product.id },
-        data: { status: "READY", defaultFrame: manifest.defaultFrame },
-        include: { spin: true },
-      });
-      res.status(201).json({ product: ready });
-    } catch (err: any) {
-      await prisma.rot3dProduct
-        .update({ where: { id: product.id }, data: { status: "DRAFT" } })
-        .catch(() => undefined);
-      console.error("Rotation3D pipeline error:", err);
-      res.status(500).json({ error: `Processing failed: ${err?.message || "unknown"}` });
-    }
+          frameCount,
+        });
+
+        await prisma.rot3dSpin.upsert({
+          where: { productId: product.id },
+          create: { productId: product.id, frameCount: manifest.frameCount, manifest: manifest as any, status: "READY" },
+          update: { frameCount: manifest.frameCount, manifest: manifest as any, status: "READY" },
+        });
+        await prisma.rot3dProduct.update({
+          where: { id: product.id },
+          data: { status: "READY", defaultFrame: manifest.defaultFrame },
+        });
+        console.log(`[r3d] product ${product.id} READY (${manifest.frameCount} frames)`);
+      } catch (err: any) {
+        console.error("Rotation3D pipeline error:", err);
+        await prisma.rot3dProduct
+          .update({ where: { id: product.id }, data: { status: "FAILED" } })
+          .catch(() => undefined);
+      } finally {
+        await fs.rm(videoPath, { force: true }).catch(() => undefined);
+      }
+    })();
+  },
+);
+
+// Delete a Rotation3D brand and everything under it (cascades to products,
+// spins, videos, embeds, events, users). Guarded to ROTATION3D orgs only.
+router.delete(
+  "/api/rotation3d/brands/:orgId",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { orgId } = req.params;
+    const org = await prisma.organization.findFirst({
+      where: { id: orgId, productLine: "ROTATION3D" },
+      select: { id: true },
+    });
+    if (!org) return res.status(404).json({ error: "Rotation3D brand not found" });
+    await prisma.organization.delete({ where: { id: orgId } });
+    res.json({ ok: true });
   },
 );
 
