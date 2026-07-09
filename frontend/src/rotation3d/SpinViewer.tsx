@@ -90,7 +90,8 @@ export default function SpinViewer({
     // --- interaction state (refs, not React state, to keep the loop hot) ---
     let yaw = (DEFAULT_FRAME / FRAMES) * TWO_PI;
     let yawVel = 0;
-    let zoom = 1;
+    let zoom = 1, zoomTarget = 1;
+    let panX = 0, panY = 0;
     let idleSpin = !reduce;
     let interacted = false;
     let raf = 0;
@@ -194,9 +195,24 @@ export default function SpinViewer({
       }
     };
 
+    const isReady = (im: HTMLImageElement | null): im is HTMLImageElement =>
+      !!im && im.complete && im.naturalWidth > 0;
+    // While frames stream in, draw the nearest already-loaded frame so scrubbing
+    // never shows a blank — the spin is usable long before every frame arrives.
+    const nearestLoaded = (frame: number): HTMLImageElement | null => {
+      if (isReady(imgs[frame])) return imgs[frame];
+      for (let d = 1; d <= FRAMES; d++) {
+        const a = (((frame - d) % FRAMES) + FRAMES) % FRAMES;
+        const b = (frame + d) % FRAMES;
+        if (isReady(imgs[a])) return imgs[a];
+        if (isReady(imgs[b])) return imgs[b];
+      }
+      return null;
+    };
+
     const drawFrameImage = (frame: number, cx: number, cy: number, scale: number) => {
-      const img = imgs[frame];
-      if (!img || !img.complete || !img.naturalWidth) return;
+      const img = nearestLoaded(frame);
+      if (!img) return;
       // contain-fit the frame into a square-ish box around center
       const box = scale * 4.2;
       const ar = img.naturalWidth / img.naturalHeight;
@@ -212,7 +228,7 @@ export default function SpinViewer({
       const W = cv.width, H = cv.height;
       ctx.clearRect(0, 0, W, H);
       const scale = Math.min(W, H) * 0.23 * zoom;
-      const cx = W / 2, cy = H * 0.47;
+      const cx = W / 2 + panX * DPR, cy = H * 0.47 + panY * DPR;
 
       ctx.save();
       drawShadow(cx, cy, scale);
@@ -228,8 +244,10 @@ export default function SpinViewer({
 
     const tick = () => {
       if (!alive) return;
-      if (idleSpin) yaw += 0.005;
-      else if (Math.abs(yawVel) > 0.00003) { yaw += yawVel; yawVel *= 0.93; }
+      if (idleSpin) yaw += 0.004;
+      else if (Math.abs(yawVel) > 0.00003) { yaw += yawVel; yawVel *= 0.94; }
+      zoom += (zoomTarget - zoom) * 0.18; // eased zoom for a premium feel
+      if (zoomTarget <= 1.1) { panX += (0 - panX) * 0.2; panY += (0 - panY) * 0.2; }
       draw();
       raf = requestAnimationFrame(tick);
     };
@@ -242,7 +260,7 @@ export default function SpinViewer({
         hintRef.current?.classList.add("r3d-gone");
       }
     };
-    let dragging = false, lastX = 0, lastT = 0, pinchD = 0;
+    let dragging = false, lastX = 0, lastY = 0, lastT = 0, pinchD = 0;
     const pointers = new Map<number, PointerEvent>();
     const isControl = (t: EventTarget | null) =>
       t instanceof Element && (t.closest(".r3d-iconbtn") || t.closest(".r3d-cta"));
@@ -252,6 +270,7 @@ export default function SpinViewer({
       dragging = true;
       yawVel = 0;
       lastX = e.clientX;
+      lastY = e.clientY;
       lastT = performance.now();
       stage.classList.add("r3d-grabbing");
     };
@@ -260,10 +279,20 @@ export default function SpinViewer({
       const now = performance.now();
       const dt = Math.max(1, now - lastT);
       const dx = e.clientX - lastX;
-      const k = 0.006;
-      yaw += dx * k;
-      yawVel = ((dx * k) / dt) * 16;
+      const dy = e.clientY - lastY;
+      if (zoomTarget > 1.15) {
+        // zoomed in → drag pans to inspect detail
+        const lim = 130 * (zoomTarget - 1);
+        panX = Math.max(-lim, Math.min(lim, panX + dx));
+        panY = Math.max(-lim, Math.min(lim, panY + dy));
+        yawVel = 0;
+      } else {
+        const k = 0.006;
+        yaw += dx * k;
+        yawVel = ((dx * k) / dt) * 16;
+      }
       lastX = e.clientX;
+      lastY = e.clientY;
       lastT = now;
     };
     const up = () => { dragging = false; stage.classList.remove("r3d-grabbing"); };
@@ -279,7 +308,7 @@ export default function SpinViewer({
       if (pointers.size === 2) {
         const [a, b] = [...pointers.values()];
         const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-        if (pinchD) { zoom = clampZoom(zoom * (d / pinchD)); engage(); }
+        if (pinchD) { zoomTarget = clampZoom(zoomTarget * (d / pinchD)); zoom = zoomTarget; engage(); }
         pinchD = d;
         dragging = false;
       } else move(e);
@@ -291,21 +320,21 @@ export default function SpinViewer({
       if (!pointers.size) up();
       if (isControl(e.target)) return;
       const now = performance.now();
-      if (now - lastTap < 300) { zoom = zoom > 1.2 ? 1 : 1.8; engage(); }
+      if (now - lastTap < 300) { zoomTarget = zoomTarget > 1.2 ? 1 : 2.2; engage(); }
       lastTap = now;
     };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       engage();
-      zoom = clampZoom(zoom * (e.deltaY < 0 ? 1.08 : 0.93));
+      zoomTarget = clampZoom(zoomTarget * (e.deltaY < 0 ? 1.1 : 0.9));
     };
     const onKey = (e: KeyboardEvent) => {
       const step = TWO_PI / FRAMES;
       if (e.key === "ArrowLeft") { engage(); yaw -= step; }
       else if (e.key === "ArrowRight") { engage(); yaw += step; }
-      else if (e.key === "+" || e.key === "=") zoom = clampZoom(zoom * 1.2);
-      else if (e.key === "-") zoom = clampZoom(zoom * 0.83);
-      else if (e.key === "r" || e.key === "R") { yaw = (DEFAULT_FRAME / FRAMES) * TWO_PI; zoom = 1; }
+      else if (e.key === "+" || e.key === "=") zoomTarget = clampZoom(zoomTarget * 1.2);
+      else if (e.key === "-") zoomTarget = clampZoom(zoomTarget * 0.83);
+      else if (e.key === "r" || e.key === "R") { yaw = (DEFAULT_FRAME / FRAMES) * TWO_PI; zoomTarget = 1; panX = panY = 0; }
       else if (e.key === "f" || e.key === "F") toggleFs();
     };
 
@@ -328,9 +357,9 @@ export default function SpinViewer({
       const zbtn = t.closest("[data-z]");
       if (zbtn) {
         engage();
-        zoom = clampZoom(zoom * (Number(zbtn.getAttribute("data-z")) > 0 ? 1.2 : 0.83));
+        zoomTarget = clampZoom(zoomTarget * (Number(zbtn.getAttribute("data-z")) > 0 ? 1.25 : 0.8));
       } else if (t.closest("[data-reset]")) {
-        yaw = (DEFAULT_FRAME / FRAMES) * TWO_PI; yawVel = 0; zoom = 1;
+        yaw = (DEFAULT_FRAME / FRAMES) * TWO_PI; yawVel = 0; zoomTarget = 1; panX = panY = 0;
       } else if (t.closest("[data-fs]")) {
         toggleFs();
       }
@@ -362,16 +391,29 @@ export default function SpinViewer({
     };
 
     if (realMode) {
-      urls!.forEach((u, i) => {
+      const n = urls!.length;
+      // Prioritize the hero frame + its neighbors, then fan outward, so the
+      // viewer reveals almost instantly and the rest stream in behind it.
+      const order: number[] = [DEFAULT_FRAME];
+      for (let d = 1; d <= n; d++) {
+        order.push((((DEFAULT_FRAME - d) % n) + n) % n, (DEFAULT_FRAME + d) % n);
+      }
+      const seq = [...new Set(order)].slice(0, n);
+      let revealed = false;
+      seq.forEach((i, k) => {
         const im = new Image();
         im.decoding = "async";
+        if (k < 4) (im as any).fetchPriority = "high";
         im.onload = im.onerror = () => {
           imgs[i] = im;
           loaded++;
-          setProgress((loaded / urls!.length) * 100);
-          if (loaded === urls!.length) finishLoad();
+          setProgress((loaded / n) * 100);
+          if (!revealed && (isReady(imgs[DEFAULT_FRAME]) || loaded >= Math.min(6, n))) {
+            revealed = true;
+            finishLoad();
+          }
         };
-        im.src = u;
+        im.src = urls![i];
       });
     } else {
       // synthetic: simulate a short preload so the UX matches real mode
