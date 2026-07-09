@@ -123,7 +123,7 @@ export const buildSpinFromVideo = async (params: {
   productId: string;
   frameCount?: number;
 }): Promise<SpinManifest> => {
-  const targetCount = Math.min(72, Math.max(12, params.frameCount ?? 36));
+  const targetCount = Math.min(120, Math.max(12, params.frameCount ?? 48));
   const framesDir = await fs.mkdtemp(path.join(os.tmpdir(), "r3d-frames-"));
 
   try {

@@ -40,6 +40,8 @@ export type SpinViewerProps = {
   logoUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
+  /** per-product page background (CSS color). Empty → default studio gradient. */
+  background?: string | null;
 };
 
 const clampZoom = (z: number) => Math.max(0.7, Math.min(2.8, z));
@@ -56,11 +58,13 @@ export default function SpinViewer({
   logoUrl,
   primaryColor,
   secondaryColor,
+  background,
 }: SpinViewerProps) {
   const hero = variant === "hero";
-  const brandStyle: CSSProperties = {
+  const stageStyle: CSSProperties = {
     ...(primaryColor ? { ["--r3d-primary" as any]: primaryColor } : {}),
     ...(secondaryColor ? { ["--r3d-secondary" as any]: secondaryColor } : {}),
+    ...(background && !hero ? { background } : {}),
   };
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -91,7 +95,7 @@ export default function SpinViewer({
     let yaw = (DEFAULT_FRAME / FRAMES) * TWO_PI;
     let yawVel = 0;
     let zoom = 1, zoomTarget = 1;
-    let panX = 0, panY = 0;
+    let panX = 0, panY = 0, panTX = 0, panTY = 0;
     let idleSpin = !reduce;
     let interacted = false;
     let raf = 0;
@@ -247,7 +251,9 @@ export default function SpinViewer({
       if (idleSpin) yaw += 0.004;
       else if (Math.abs(yawVel) > 0.00003) { yaw += yawVel; yawVel *= 0.94; }
       zoom += (zoomTarget - zoom) * 0.18; // eased zoom for a premium feel
-      if (zoomTarget <= 1.1) { panX += (0 - panX) * 0.2; panY += (0 - panY) * 0.2; }
+      if (zoomTarget <= 1.1) { panTX = 0; panTY = 0; }
+      panX += (panTX - panX) * 0.2;
+      panY += (panTY - panY) * 0.2;
       draw();
       raf = requestAnimationFrame(tick);
     };
@@ -281,10 +287,11 @@ export default function SpinViewer({
       const dx = e.clientX - lastX;
       const dy = e.clientY - lastY;
       if (zoomTarget > 1.15) {
-        // zoomed in → drag pans to inspect detail
+        // zoomed in → drag moves the product around to inspect any part
         const lim = 130 * (zoomTarget - 1);
-        panX = Math.max(-lim, Math.min(lim, panX + dx));
-        panY = Math.max(-lim, Math.min(lim, panY + dy));
+        panTX = Math.max(-lim, Math.min(lim, panTX + dx));
+        panTY = Math.max(-lim, Math.min(lim, panTY + dy));
+        panX = panTX; panY = panTY; // immediate follow while dragging
         yawVel = 0;
       } else {
         const k = 0.006;
@@ -320,7 +327,22 @@ export default function SpinViewer({
       if (!pointers.size) up();
       if (isControl(e.target)) return;
       const now = performance.now();
-      if (now - lastTap < 300) { zoomTarget = zoomTarget > 1.2 ? 1 : 2.2; engage(); }
+      if (now - lastTap < 300) {
+        if (zoomTarget > 1.2) {
+          zoomTarget = 1; panTX = 0; panTY = 0;
+        } else {
+          // double-tap zooms INTO the tapped spot
+          const rect = stage.getBoundingClientRect();
+          const flx = ((e.clientX - rect.left) - (rect.width / 2 + panX)) / zoom;
+          const fly = ((e.clientY - rect.top) - (rect.height * 0.47 + panY)) / zoom;
+          const z2 = 2.4;
+          const lim = 130 * (z2 - 1);
+          zoomTarget = z2;
+          panTX = Math.max(-lim, Math.min(lim, -flx * z2));
+          panTY = Math.max(-lim, Math.min(lim, -fly * z2));
+        }
+        engage();
+      }
       lastTap = now;
     };
     const onWheel = (e: WheelEvent) => {
@@ -334,7 +356,7 @@ export default function SpinViewer({
       else if (e.key === "ArrowRight") { engage(); yaw += step; }
       else if (e.key === "+" || e.key === "=") zoomTarget = clampZoom(zoomTarget * 1.2);
       else if (e.key === "-") zoomTarget = clampZoom(zoomTarget * 0.83);
-      else if (e.key === "r" || e.key === "R") { yaw = (DEFAULT_FRAME / FRAMES) * TWO_PI; zoomTarget = 1; panX = panY = 0; }
+      else if (e.key === "r" || e.key === "R") { yaw = (DEFAULT_FRAME / FRAMES) * TWO_PI; zoomTarget = 1; panX = panY = panTX = panTY = 0; }
       else if (e.key === "f" || e.key === "F") toggleFs();
     };
 
@@ -359,7 +381,7 @@ export default function SpinViewer({
         engage();
         zoomTarget = clampZoom(zoomTarget * (Number(zbtn.getAttribute("data-z")) > 0 ? 1.25 : 0.8));
       } else if (t.closest("[data-reset]")) {
-        yaw = (DEFAULT_FRAME / FRAMES) * TWO_PI; yawVel = 0; zoomTarget = 1; panX = panY = 0;
+        yaw = (DEFAULT_FRAME / FRAMES) * TWO_PI; yawVel = 0; zoomTarget = 1; panX = panY = panTX = panTY = 0;
       } else if (t.closest("[data-fs]")) {
         toggleFs();
       }
@@ -458,7 +480,7 @@ export default function SpinViewer({
 
   return (
     <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${className || ""}`}
-      style={brandStyle}
+      style={stageStyle}
       tabIndex={hero ? -1 : 0}
       aria-label="Interactive 360 degree product viewer. Drag to rotate.">
       <style>{R3D_CSS}</style>

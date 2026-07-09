@@ -116,6 +116,7 @@ export default function Rotation3DPlayer() {
       logoUrl={p.logoUrl}
       primaryColor={p.primaryColor}
       secondaryColor={p.secondaryColor}
+      background={p.background}
       ctaPrimary={toCta(p.ctaPrimary)}
       ctaSecondary={toCta(p.ctaSecondary)}
       onCtaClick={(which) =>

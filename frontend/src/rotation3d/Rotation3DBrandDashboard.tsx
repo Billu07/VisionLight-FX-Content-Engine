@@ -19,6 +19,7 @@ type Product = {
   name: string;
   status: string;
   defaultFrame: number;
+  background?: string | null;
   ctaPrimary: Cta;
   ctaSecondary: Cta;
   spin?: { manifest?: { frames?: string[] } } | null;
@@ -41,6 +42,7 @@ function ProductCard({ product, onSaved }: { product: Product; onSaved: () => vo
   const [p1Url, setP1Url] = useState(product.ctaPrimary?.url || "");
   const [p2Label, setP2Label] = useState(product.ctaSecondary?.label || "");
   const [p2Url, setP2Url] = useState(product.ctaSecondary?.url || "");
+  const [bg, setBg] = useState(product.background || "");
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [note, setNote] = useState("");
@@ -55,6 +57,7 @@ function ProductCard({ product, onSaved }: { product: Product; onSaved: () => vo
       await apiEndpoints.r3dUpdateProduct(product.id, {
         ctaPrimary: { label: p1Label, url: p1Url },
         ctaSecondary: { label: p2Label, url: p2Url },
+        background: bg,
         ...(publishOverride !== undefined ? { publish: publishOverride } : {}),
       });
       onSaved();
@@ -110,6 +113,28 @@ function ProductCard({ product, onSaved }: { product: Product; onSaved: () => vo
               <p className={label}>Secondary button</p>
               <input className={`${input} mt-1`} placeholder="Label (e.g. Next product)" value={p2Label} onChange={(e) => setP2Label(e.target.value)} />
               <input className={`${input} mt-2`} placeholder="https://…" value={p2Url} onChange={(e) => setP2Url(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <p className={label}>Player background</p>
+            <div className="mt-1 flex items-center gap-3">
+              <input
+                type="color"
+                value={bg || "#0b0f19"}
+                onChange={(e) => setBg(e.target.value)}
+                className="h-9 w-12 cursor-pointer rounded border border-gray-700 bg-gray-950"
+              />
+              <span className="font-mono text-xs text-gray-400">{bg || "default gradient"}</span>
+              {bg && (
+                <button
+                  type="button"
+                  className="text-[11px] text-gray-400 underline hover:text-white"
+                  onClick={() => setBg("")}
+                >
+                  Reset to default
+                </button>
+              )}
             </div>
           </div>
 

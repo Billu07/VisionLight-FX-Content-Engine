@@ -58,6 +58,7 @@ export default function Rotation3DAdminPanel() {
 
   const [productName, setProductName] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [frames, setFrames] = useState(60);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [processing, setProcessing] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -162,6 +163,7 @@ export default function Rotation3DAdminPanel() {
     const fd = new FormData();
     fd.append("video", videoFile);
     fd.append("name", productName.trim());
+    fd.append("frameCount", String(frames));
     try {
       await apiEndpoints.r3dUploadProductVideo(selected.id, fd, {
         onUploadProgress: (e) => {
@@ -381,7 +383,7 @@ export default function Rotation3DAdminPanel() {
                     className="text-xs text-gray-400 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-800 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
                   />
                 </div>
-                <div className="mt-3 flex items-center gap-3">
+                <div className="mt-3 flex flex-wrap items-center gap-3">
                   <button
                     className={btn}
                     onClick={uploadVideo}
@@ -389,6 +391,21 @@ export default function Rotation3DAdminPanel() {
                   >
                     {busy ? "Working…" : "Upload & build spin"}
                   </button>
+                  <label className="flex items-center gap-2 text-xs text-gray-400">
+                    Smoothness
+                    <select
+                      value={frames}
+                      onChange={(e) => setFrames(Number(e.target.value))}
+                      disabled={busy}
+                      className="rounded-lg border border-gray-700 bg-gray-950 px-2 py-1.5 text-xs text-white outline-none focus:border-brand-accent"
+                    >
+                      <option value={36}>36 frames · light</option>
+                      <option value={48}>48 frames</option>
+                      <option value={60}>60 frames · smooth</option>
+                      <option value={72}>72 frames · very smooth</option>
+                      <option value={90}>90 frames · max</option>
+                    </select>
+                  </label>
                   {uploadPct !== null && (
                     <span className="text-xs text-gray-400">
                       {processing ? "Extracting frames…" : `Uploading ${uploadPct}%`}
@@ -396,7 +413,8 @@ export default function Rotation3DAdminPanel() {
                   )}
                 </div>
                 <p className="mt-2 text-[11px] text-gray-500">
-                  A short single-rotation clip works best; the pipeline extracts ~36 frames.
+                  A short single-rotation clip works best. More frames = smoother spin,
+                  but longer processing and a larger download (each frame is background-removed).
                 </p>
               </div>
 
