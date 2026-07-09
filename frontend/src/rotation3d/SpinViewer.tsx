@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 
 /**
  * Rotation3D — reusable interactive 360° spin viewer.
@@ -36,6 +36,10 @@ export type SpinViewerProps = {
   /** "full" = full-screen player with chrome; "hero" = contained, chrome-less
    * spinning object that fills its parent (used as a landing/hero visual) */
   variant?: "full" | "hero";
+  /** brand player customization (from the brand's BrandConfig) */
+  logoUrl?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
 };
 
 const clampZoom = (z: number) => Math.max(0.7, Math.min(2.8, z));
@@ -49,8 +53,15 @@ export default function SpinViewer({
   onCtaClick,
   className,
   variant = "full",
+  logoUrl,
+  primaryColor,
+  secondaryColor,
 }: SpinViewerProps) {
   const hero = variant === "hero";
+  const brandStyle: CSSProperties = {
+    ...(primaryColor ? { ["--r3d-primary" as any]: primaryColor } : {}),
+    ...(secondaryColor ? { ["--r3d-secondary" as any]: secondaryColor } : {}),
+  };
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const hintRef = useRef<HTMLDivElement>(null);
@@ -405,6 +416,7 @@ export default function SpinViewer({
 
   return (
     <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${className || ""}`}
+      style={brandStyle}
       tabIndex={hero ? -1 : 0}
       aria-label="Interactive 360 degree product viewer. Drag to rotate.">
       <style>{R3D_CSS}</style>
@@ -414,9 +426,13 @@ export default function SpinViewer({
 
       <div className="r3d-topbar">
         <div className="r3d-brand">
-          <span className="r3d-logo" aria-hidden>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
-          </span>
+          {logoUrl ? (
+            <img className="r3d-logo-img" src={logoUrl} alt={brandName} />
+          ) : (
+            <span className="r3d-logo" aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
+            </span>
+          )}
           <div className="r3d-titles">
             <div className="r3d-kicker">{brandName}</div>
             <div className="r3d-name">{productName}</div>
@@ -504,6 +520,7 @@ const R3D_CSS = `
 .r3d-brand{display:flex;align-items:center;gap:10px;min-width:0}
 .r3d-logo{width:30px;height:30px;border-radius:9px;flex:none;background:linear-gradient(135deg,var(--r3d-primary),var(--r3d-secondary));box-shadow:var(--r3d-glow);display:grid;place-items:center}
 .r3d-logo svg{width:16px;height:16px;color:#fff}
+.r3d-logo-img{height:34px;max-width:130px;object-fit:contain;flex:none;filter:drop-shadow(0 1px 6px rgba(0,0,0,.4))}
 .r3d-titles{min-width:0}
 .r3d-kicker{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--r3d-muted)}
 .r3d-name{font-weight:600;font-size:16px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { LoadingSpinner } from "../components/LoadingSpinner";
@@ -185,9 +186,144 @@ function SendImages({ onDone }: { onDone: () => void }) {
   );
 }
 
+function BrandingPanel() {
+  const [loading, setLoading] = useState(true);
+  const [companyName, setCompanyName] = useState("");
+  const [primaryColor, setPrimaryColor] = useState("#6366f1");
+  const [secondaryColor, setSecondaryColor] = useState("#8b5cf6");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [note, setNote] = useState("");
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    apiEndpoints
+      .getBrandConfig()
+      .then((res) => {
+        const c = res.data?.config || res.data || {};
+        setCompanyName(c.companyName || "");
+        if (c.primaryColor) setPrimaryColor(c.primaryColor);
+        if (c.secondaryColor) setSecondaryColor(c.secondaryColor);
+        setLogoUrl(c.logoUrl || null);
+      })
+      .catch(() => undefined)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const uploadLogo = async (file: File) => {
+    setUploading(true);
+    setNote("");
+    const fd = new FormData();
+    fd.append("image", file);
+    try {
+      const res = await apiEndpoints.uploadBrandLogo(fd);
+      setLogoUrl(res.data?.logoUrl || null);
+      setNote("Logo updated.");
+    } catch {
+      setNote("Logo upload failed.");
+    } finally {
+      setUploading(false);
+      if (ref.current) ref.current.value = "";
+    }
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setNote("");
+    try {
+      await apiEndpoints.updateBrandConfig({ companyName, primaryColor, secondaryColor, logoUrl });
+      setNote("Saved.");
+    } catch {
+      setNote("Save failed.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading)
+    return (
+      <div className={panel}>
+        <div className="py-6 text-center">
+          <LoadingSpinner size="sm" />
+        </div>
+      </div>
+    );
+
+  return (
+    <div className={panel}>
+      <h3 className="text-base font-semibold text-white">Player branding</h3>
+      <p className="mt-1 text-sm text-gray-400">
+        Your logo and colors appear on every product player and embed.
+      </p>
+
+      <div className="mt-5">
+        <p className={label}>Logo</p>
+        <div className="mt-2 flex items-center gap-4">
+          <div className="grid h-16 w-32 place-items-center overflow-hidden rounded-xl border border-white/10 bg-gray-950">
+            {logoUrl ? (
+              <img src={logoUrl} alt="" className="max-h-full max-w-full object-contain" />
+            ) : (
+              <span className="text-[10px] text-gray-600">no logo</span>
+            )}
+          </div>
+          <div>
+            <input
+              ref={ref}
+              type="file"
+              accept="image/*"
+              onChange={(e) => e.target.files?.[0] && uploadLogo(e.target.files[0])}
+              className="text-xs text-gray-400 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-800 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
+            />
+            {uploading && <span className="ml-2 text-xs text-gray-500">Uploading…</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <p className={label}>Brand name</p>
+        <input
+          className={`${input} mt-1 max-w-sm`}
+          value={companyName}
+          onChange={(e) => setCompanyName(e.target.value)}
+          placeholder="Your brand"
+        />
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-6">
+        {([
+          ["Primary color", primaryColor, setPrimaryColor] as const,
+          ["Secondary color", secondaryColor, setSecondaryColor] as const,
+        ]).map(([lbl, val, setVal]) => (
+          <div key={lbl}>
+            <p className={label}>{lbl}</p>
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                type="color"
+                value={val}
+                onChange={(e) => setVal(e.target.value)}
+                className="h-9 w-12 cursor-pointer rounded border border-gray-700 bg-gray-950"
+              />
+              <span className="font-mono text-xs text-gray-400">{val}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6 flex items-center gap-3">
+        <button className={primaryBtn} onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Save branding"}
+        </button>
+        {note && <span className="text-xs text-gray-400">{note}</span>}
+      </div>
+    </div>
+  );
+}
+
 export default function Rotation3DBrandDashboard() {
   const { user, logout } = useAuth();
-  const [tab, setTab] = useState<"products" | "send">("products");
+  const navigate = useNavigate();
+  const [tab, setTab] = useState<"products" | "branding" | "send">("products");
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -223,9 +359,9 @@ export default function Rotation3DBrandDashboard() {
             </div>
             <p className="mt-1 text-xs text-gray-500">{user?.email}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex rounded-xl border border-white/10 bg-white/[0.03] p-1">
-              {(["products", "send"] as const).map((t) => (
+              {(["products", "branding", "send"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -233,10 +369,13 @@ export default function Rotation3DBrandDashboard() {
                     tab === t ? "bg-white/10 text-white" : "text-gray-400 hover:text-white"
                   }`}
                 >
-                  {t === "products" ? "Products" : "Send images"}
+                  {t === "products" ? "Products" : t === "branding" ? "Branding" : "Send images"}
                 </button>
               ))}
             </div>
+            <button onClick={() => navigate("/studios")} className={ghostBtn}>
+              Switch studio
+            </button>
             <button onClick={logout} className={ghostBtn}>
               Log out
             </button>
@@ -244,7 +383,9 @@ export default function Rotation3DBrandDashboard() {
         </div>
 
         <div className="mt-8 space-y-4">
-          {tab === "send" ? (
+          {tab === "branding" ? (
+            <BrandingPanel />
+          ) : tab === "send" ? (
             <SendImages onDone={load} />
           ) : loading ? (
             <div className="py-20 text-center">

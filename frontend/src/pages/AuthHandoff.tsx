@@ -35,7 +35,15 @@ export function AuthHandoff() {
         if (!token) {
           throw new Error("Missing handoff token.");
         }
-        const response = await apiEndpoints.consumeWorkspaceHandoff(token);
+        // The handoff token can occasionally miss on the very first consume
+        // (redirect racing the token store); one short retry makes it reliable.
+        let response;
+        try {
+          response = await apiEndpoints.consumeWorkspaceHandoff(token);
+        } catch (firstErr) {
+          await new Promise((r) => setTimeout(r, 800));
+          response = await apiEndpoints.consumeWorkspaceHandoff(token);
+        }
         const sessionToken = response.data?.sessionToken;
         if (!sessionToken || typeof sessionToken !== "string") {
           throw new Error("Workspace session token was not returned.");

@@ -222,6 +222,8 @@ export const apiEndpoints = {
   r3dDeleteBrand: (orgId: string) => api.delete(`/api/rotation3d/brands/${orgId}`),
   r3dBrandProducts: (orgId: string) =>
     api.get(`/api/rotation3d/brands/${orgId}/products`),
+  r3dBrandSourceImages: (orgId: string) =>
+    api.get(`/api/rotation3d/brands/${orgId}/source-images`),
   r3dUploadProductVideo: (
     orgId: string,
     formData: FormData,

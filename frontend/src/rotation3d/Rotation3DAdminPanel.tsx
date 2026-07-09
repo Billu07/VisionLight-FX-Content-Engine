@@ -54,6 +54,7 @@ export default function Rotation3DAdminPanel() {
   const [selected, setSelected] = useState<Brand | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [sourceImages, setSourceImages] = useState<any[]>([]);
 
   const [productName, setProductName] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -83,6 +84,11 @@ export default function Rotation3DAdminPanel() {
     if (!silent) {
       setLoadingProducts(true);
       setProducts([]);
+      setSourceImages([]);
+      apiEndpoints
+        .r3dBrandSourceImages(brand.id)
+        .then((r) => setSourceImages(r.data.images || []))
+        .catch(() => setSourceImages([]));
     }
     try {
       const res = await apiEndpoints.r3dBrandProducts(brand.id);
@@ -109,6 +115,7 @@ export default function Rotation3DAdminPanel() {
       if (selected?.id === b.id) {
         setSelected(null);
         setProducts([]);
+        setSourceImages([]);
       }
       await loadBrands();
       setMsg({ kind: "ok", text: `Deleted "${b.name}".` });
@@ -325,6 +332,32 @@ export default function Rotation3DAdminPanel() {
                   ↻ refresh
                 </button>
               </div>
+
+              {/* Images the brand sent in */}
+              {sourceImages.length > 0 && (
+                <div className="mt-4 rounded-lg border border-gray-700/60 bg-gray-950/50 p-4">
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-300">
+                    Images sent by the brand ({sourceImages.length})
+                  </p>
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    Raw product photos to build spins from. Click to open / download.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {sourceImages.map((img) => (
+                      <a
+                        key={img.id}
+                        href={img.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Open / download"
+                        className="block h-16 w-16 overflow-hidden rounded-lg border border-white/10 bg-gray-900 transition-transform hover:scale-105"
+                      >
+                        <img src={img.url} alt="" className="h-full w-full object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Upload rendered video */}
               <div className="mt-4 rounded-lg border border-gray-700/60 bg-gray-950/50 p-4">

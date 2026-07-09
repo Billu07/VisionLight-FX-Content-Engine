@@ -156,6 +156,21 @@ router.get(
   },
 );
 
+// Source images a brand has sent in (raw product photos) for the team to work from.
+router.get(
+  "/api/rotation3d/brands/:orgId/source-images",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const images = await prisma.rot3dSourceImage.findMany({
+      where: { organizationId: req.params.orgId },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, url: true, angleLabel: true, productId: true, createdAt: true },
+    });
+    res.json({ images });
+  },
+);
+
 // Team uploads a rendered rotation video for a brand → pipeline builds the spin.
 router.post(
   "/api/rotation3d/brands/:orgId/products",
@@ -388,11 +403,21 @@ router.get(
       where: { id: req.params.id, status: { in: ["READY", "PUBLISHED"] } },
       include: {
         spin: true,
-        organization: { select: { id: true, name: true, brandConfigs: { select: { logoUrl: true }, take: 1 } } },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            brandConfigs: {
+              select: { logoUrl: true, companyName: true, primaryColor: true, secondaryColor: true },
+              take: 1,
+            },
+          },
+        },
       },
     });
     if (!product || !product.spin) return res.status(404).json({ error: "Not found" });
 
+    const bc = product.organization?.brandConfigs?.[0];
     res.json({
       product: {
         id: product.id,
@@ -401,8 +426,10 @@ router.get(
         background: product.background,
         ctaPrimary: product.ctaPrimary,
         ctaSecondary: product.ctaSecondary,
-        brandName: product.organization?.name || "",
-        logoUrl: product.organization?.brandConfigs?.[0]?.logoUrl || null,
+        brandName: bc?.companyName || product.organization?.name || "",
+        logoUrl: bc?.logoUrl || null,
+        primaryColor: bc?.primaryColor || null,
+        secondaryColor: bc?.secondaryColor || null,
         manifest: product.spin.manifest,
       },
     });
