@@ -47,13 +47,22 @@ const parseDuration = (stderr: string): number => {
 
 const probeDurationSeconds = (input: string): Promise<number> =>
   new Promise((resolve) => {
+    let dur = 0;
     let stderr = "";
-    const cmd = ffmpeg(input).outputOptions(["-f", "null"]).output(NULL_DEVICE);
+    // `-frames:v 1` reads essentially just the header (fast) — codecData carries
+    // the duration, so we avoid decoding the whole clip just to measure length.
+    const cmd = ffmpeg(input)
+      .outputOptions(["-frames:v", "1", "-f", "null"])
+      .output(NULL_DEVICE);
+    cmd.on("codecData", (data: any) => {
+      const m = String(data?.duration || "").match(/(\d+):(\d+):(\d+(?:\.\d+)?)/);
+      if (m) dur = Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
+    });
     cmd.on("stderr", (line: string) => {
       if (stderr.length < 8000) stderr += `${line}\n`;
     });
-    cmd.on("end", () => resolve(parseDuration(stderr)));
-    cmd.on("error", () => resolve(parseDuration(stderr)));
+    cmd.on("end", () => resolve(dur || parseDuration(stderr)));
+    cmd.on("error", () => resolve(dur || parseDuration(stderr)));
     cmd.run();
   });
 
@@ -118,9 +127,13 @@ export const buildSpinFromVideo = async (params: {
   await fs.mkdir(framesDir, { recursive: true });
 
   try {
+    console.log(`[r3d] pipeline start product=${params.productId} url=${params.videoUrl}`);
     await downloadToFile(params.videoUrl, videoPath);
+    const dl = await fs.stat(videoPath);
+    console.log(`[r3d] downloaded ${dl.size} bytes`);
 
     const duration = await probeDurationSeconds(videoPath);
+    console.log(`[r3d] duration=${duration}s`);
     if (!duration || duration <= 0) {
       throw new Error("Could not read video duration");
     }
@@ -131,6 +144,7 @@ export const buildSpinFromVideo = async (params: {
     const files = (await fs.readdir(framesDir))
       .filter((f) => f.endsWith(".jpg"))
       .sort(); // f_0001, f_0002, … → rotation order
+    console.log(`[r3d] extracted ${files.length} frames (fps=${fps.toFixed(3)})`);
     if (files.length === 0) throw new Error("No frames were extracted");
 
     const keyPrefix = `rotation3d/org_${params.organizationId}/product_${params.productId}/frames`;
@@ -149,6 +163,7 @@ export const buildSpinFromVideo = async (params: {
       });
       frames.push(url);
     }
+    console.log(`[r3d] uploaded ${frames.length} frames to R2`);
 
     return {
       frameCount: frames.length,

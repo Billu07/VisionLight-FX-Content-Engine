@@ -229,6 +229,7 @@ export const apiEndpoints = {
     api.post(`/api/rotation3d/brands/${orgId}/products`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
       onUploadProgress: options?.onUploadProgress,
+      timeout: 600000, // frame extraction + R2 uploads can take a while
     }),
   r3dMyProducts: () => api.get("/api/rotation3d/my/products"),
   r3dUpdateProduct: (id: string, data: Record<string, unknown>) =>

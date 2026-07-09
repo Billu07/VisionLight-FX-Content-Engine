@@ -223,7 +223,7 @@ router.post(
       await prisma.rot3dProduct
         .update({ where: { id: product.id }, data: { status: "DRAFT" } })
         .catch(() => undefined);
-      console.error("Rotation3D pipeline error:", err?.message);
+      console.error("Rotation3D pipeline error:", err);
       res.status(500).json({ error: `Processing failed: ${err?.message || "unknown"}` });
     }
   },
