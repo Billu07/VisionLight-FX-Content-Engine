@@ -2640,7 +2640,13 @@ function Dashboard() {
       }
     }
 
-    if (isPromptRequired && !prompt.trim()) return;
+    if (
+      isPromptRequired &&
+      (isPicDriftMultiShotActive
+        ? !picDriftShots.some((s) => s.prompt.trim())
+        : !prompt.trim())
+    )
+      return;
 
     const toRequiredInt = (value: any, fallback = 1) => {
       const n = Number(value);
@@ -6865,7 +6871,12 @@ function Dashboard() {
                                     ? driftStartMutation.isPending
                                     : generateMediaMutation.isPending) ||
                                   user?.readOnlyImpersonation ||
-                                  (activeEngine !== "topaz" && !prompt.trim())
+                                  (activeEngine !== "topaz" &&
+                                    (isPicDriftMultiShotActive
+                                      ? !picDriftShots.some((s) =>
+                                          s.prompt.trim(),
+                                        )
+                                      : !prompt.trim()))
                                 }
                                 className={`w-full py-4 sm:py-5 px-6 sm:px-8 rounded-2xl transition-all disabled:opacity-50 font-bold text-base sm:text-lg flex flex-col items-center justify-center gap-1 ${activeEngine === "veo"
                                   ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg"
@@ -6914,7 +6925,13 @@ function Dashboard() {
                       <ErrorAlert
                         message={generationState.error || "Generation failed"}
                         onRetry={() => {
-                          if (activeEngine !== "topaz" && !prompt.trim()) return;
+                          if (
+                            activeEngine !== "topaz" &&
+                            (isPicDriftMultiShotActive
+                              ? !picDriftShots.some((s) => s.prompt.trim())
+                              : !prompt.trim())
+                          )
+                            return;
                           generateMediaMutation.mutate(buildFormData());
                         }}
                         type="error"
