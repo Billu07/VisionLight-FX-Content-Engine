@@ -37,6 +37,8 @@ const VISIONLIGHT_CANONICAL_DOMAIN =
       process.env.VISUALFX_CANONICAL_DOMAIN ||
       process.env.VISUALFX_DOMAIN,
   ) || "visualfx.studio";
+const ROTATION3D_CANONICAL_DOMAIN =
+  sanitizeDomain(process.env.ROTATION3D_CANONICAL_DOMAIN) || "rotation3d.com";
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -145,7 +147,12 @@ export class AuthService {
   }
 
   private static toProfileOption(user: any) {
-    const view = user.view === "PICDRIFT" ? "PICDRIFT" : "VISIONLIGHT";
+    const view =
+      user.view === "PICDRIFT"
+        ? "PICDRIFT"
+        : user.view === "ROTATION3D"
+          ? "ROTATION3D"
+          : "VISIONLIGHT";
     const organizationName = user.organization?.name || "Personal Workspace";
     const orgRoutingDomain = sanitizeDomain(user.organization?.routingDomain || null);
     return {
@@ -162,7 +169,11 @@ export class AuthService {
       seatLocked: user.seatLocked === true,
       canonicalDomain:
         orgRoutingDomain ||
-        (view === "PICDRIFT" ? PICDRIFT_CANONICAL_DOMAIN : VISIONLIGHT_CANONICAL_DOMAIN),
+        (view === "PICDRIFT"
+          ? PICDRIFT_CANONICAL_DOMAIN
+          : view === "ROTATION3D"
+            ? ROTATION3D_CANONICAL_DOMAIN
+            : VISIONLIGHT_CANONICAL_DOMAIN),
     };
   }
 
