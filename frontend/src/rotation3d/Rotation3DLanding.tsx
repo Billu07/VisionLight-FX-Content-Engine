@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Upload,
@@ -14,6 +14,22 @@ import {
 import { Link } from "react-router-dom";
 import SpinViewer, { type SpinManifest } from "./SpinViewer";
 import { LoginModal } from "../components/LoginModal";
+import { apiEndpoints } from "../lib/api";
+
+type Featured = {
+  id: string;
+  name: string;
+  brandName?: string;
+  background?: string | null;
+  defaultFrame?: number;
+  manifest?: { frameCount?: number; frames?: string[] };
+};
+
+const featuredManifest = (p: Featured): SpinManifest => ({
+  frameCount: p.manifest?.frameCount || p.manifest?.frames?.length || 36,
+  frames: p.manifest?.frames,
+  defaultFrame: p.defaultFrame ?? 0,
+});
 
 /**
  * Rotation3D marketing landing page (rotation3d.com/). On-theme with the studio
@@ -31,12 +47,16 @@ const fadeUp = {
   transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const },
 };
 
-function HeroSpin({ className = "" }: { className?: string }) {
+function HeroSpin({ className = "", product }: { className?: string; product?: Featured }) {
   return (
     <div className={`relative ${className}`}>
       <div className="absolute inset-0 -z-10 rounded-[32px] bg-gradient-to-br from-brand-primary/20 to-brand-secondary/10 blur-3xl" />
       <div className="relative aspect-square w-full overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.02] shadow-[0_40px_120px_-40px_rgba(2,8,23,0.9)]">
-        <SpinViewer manifest={DEMO} variant="hero" />
+        <SpinViewer
+          manifest={product ? featuredManifest(product) : DEMO}
+          variant="hero"
+          background={product?.background}
+        />
       </div>
     </div>
   );
@@ -108,6 +128,13 @@ const PLANS = [
 
 export default function Rotation3DLanding() {
   const [showLogin, setShowLogin] = useState(false);
+  const [featured, setFeatured] = useState<Featured[]>([]);
+  useEffect(() => {
+    apiEndpoints
+      .r3dPublicFeatured()
+      .then((r) => setFeatured(r.data.products || []))
+      .catch(() => undefined);
+  }, []);
   return (
     <div className="min-h-screen bg-studio-gradient font-sans text-white antialiased">
       <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
@@ -186,7 +213,7 @@ export default function Rotation3DLanding() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         >
-          <HeroSpin />
+          <HeroSpin product={featured[0]} />
           <p className="mt-4 text-center text-xs text-gray-500">
             ↑ This is live — drag it to spin
           </p>
@@ -233,22 +260,41 @@ export default function Rotation3DLanding() {
           </p>
         </motion.div>
         <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {["Sneaker", "Handbag", "Headphones"].map((name, i) => (
-            <motion.div
-              key={name}
-              {...fadeUp}
-              transition={{ ...fadeUp.transition, delay: i * 0.1 }}
-              className="overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02]"
-            >
-              <div className="relative aspect-square">
-                <SpinViewer manifest={{ frameCount: 36, defaultFrame: (i + 1) * 4 }} variant="hero" />
-              </div>
-              <div className="flex items-center justify-between border-t border-white/8 px-5 py-4">
-                <span className="text-sm font-medium">{name}</span>
-                <span className="text-xs text-gray-500">Drag to rotate</span>
-              </div>
-            </motion.div>
-          ))}
+          {featured.length > 0
+            ? featured.slice(0, 6).map((p, i) => (
+                <motion.div
+                  key={p.id}
+                  {...fadeUp}
+                  transition={{ ...fadeUp.transition, delay: (i % 3) * 0.1 }}
+                  className="overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02]"
+                >
+                  <div className="relative aspect-square">
+                    <SpinViewer manifest={featuredManifest(p)} variant="hero" background={p.background} />
+                  </div>
+                  <div className="flex items-center justify-between border-t border-white/8 px-5 py-4">
+                    <Link to={`/p/${p.id}`} className="text-sm font-medium transition-colors hover:text-brand-accent">
+                      {p.name}
+                    </Link>
+                    <span className="text-xs text-gray-500">Drag to rotate</span>
+                  </div>
+                </motion.div>
+              ))
+            : ["Sneaker", "Handbag", "Headphones"].map((name, i) => (
+                <motion.div
+                  key={name}
+                  {...fadeUp}
+                  transition={{ ...fadeUp.transition, delay: i * 0.1 }}
+                  className="overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02]"
+                >
+                  <div className="relative aspect-square">
+                    <SpinViewer manifest={{ frameCount: 36, defaultFrame: (i + 1) * 4 }} variant="hero" />
+                  </div>
+                  <div className="flex items-center justify-between border-t border-white/8 px-5 py-4">
+                    <span className="text-sm font-medium">{name}</span>
+                    <span className="text-xs text-gray-500">Drag to rotate</span>
+                  </div>
+                </motion.div>
+              ))}
         </div>
       </Section>
 

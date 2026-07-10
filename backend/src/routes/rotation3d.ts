@@ -278,6 +278,54 @@ router.delete(
   },
 );
 
+// All ready/published products across brands, for homepage-showcase curation.
+router.get(
+  "/api/rotation3d/products",
+  authenticateToken,
+  requireSuperAdmin,
+  async (_req: AuthenticatedRequest, res: Response) => {
+    const products = await prisma.rot3dProduct.findMany({
+      where: { status: { in: ["READY", "PUBLISHED"] } },
+      orderBy: [{ featured: "desc" }, { featuredRank: "asc" }, { createdAt: "desc" }],
+      include: {
+        spin: { select: { manifest: true } },
+        organization: { select: { name: true } },
+      },
+    });
+    const list = products.map((p) => {
+      const m = (p.spin?.manifest as any) || {};
+      const frames = Array.isArray(m.frames) ? m.frames : [];
+      return {
+        id: p.id,
+        name: p.name,
+        status: p.status,
+        featured: p.featured,
+        featuredRank: p.featuredRank,
+        brandName: p.organization?.name || "",
+        thumb: frames[p.defaultFrame] || frames[0] || null,
+      };
+    });
+    res.json({ products: list });
+  },
+);
+
+// Toggle a product onto/off the public homepage showcase.
+router.patch(
+  "/api/rotation3d/products/:id/feature",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const featured = req.body?.featured === true;
+    const rankRaw = Number(req.body?.featuredRank);
+    const product = await prisma.rot3dProduct.update({
+      where: { id: req.params.id },
+      data: { featured, ...(Number.isFinite(rankRaw) ? { featuredRank: rankRaw } : {}) },
+      select: { id: true, featured: true, featuredRank: true },
+    });
+    res.json({ product });
+  },
+);
+
 // ─────────────────────────── BRAND ADMIN (org-scoped) ───────────────────────────
 
 const requireOrg = (req: AuthenticatedRequest, res: Response): string | null => {
@@ -396,6 +444,30 @@ router.post(
 );
 
 // ─────────────────────────── PUBLIC (no auth) ───────────────────────────
+
+// Curated products for the public homepage showcase (superadmin picks).
+router.get(
+  "/api/rotation3d/public/featured",
+  async (_req: AuthenticatedRequest, res: Response) => {
+    const products = await prisma.rot3dProduct.findMany({
+      where: { featured: true, status: { in: ["READY", "PUBLISHED"] } },
+      orderBy: [{ featuredRank: "asc" }, { createdAt: "desc" }],
+      take: 12,
+      include: { spin: { select: { manifest: true } }, organization: { select: { name: true } } },
+    });
+    const list = products
+      .filter((p) => p.spin)
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        defaultFrame: p.defaultFrame,
+        background: p.background,
+        brandName: p.organization?.name || "",
+        manifest: p.spin!.manifest,
+      }));
+    res.json({ products: list });
+  },
+);
 
 // Manifest + presentation for the player. Only READY/PUBLISHED products.
 router.get(

@@ -38,7 +38,110 @@ const statusColor = (s: string) =>
           ? "text-rose-300"
           : "text-gray-400";
 
+function ShowcasePanel() {
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const r = await apiEndpoints.r3dAllProducts();
+      setProducts(r.data.products || []);
+    } catch {
+      /* ignore */
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const toggle = async (p: any) => {
+    setBusyId(p.id);
+    try {
+      await apiEndpoints.r3dSetFeatured(p.id, !p.featured);
+      setProducts((prev) => prev.map((x) => (x.id === p.id ? { ...x, featured: !x.featured } : x)));
+    } catch {
+      /* ignore */
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const featuredCount = products.filter((p) => p.featured).length;
+
+  return (
+    <div className={card}>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Homepage showcase</h2>
+          <p className="mt-1 text-xs text-gray-400">
+            Pick which spins appear on rotation3d.com — {featuredCount} featured.
+          </p>
+        </div>
+        <button className="text-xs text-gray-400 hover:text-white" onClick={load}>
+          ↻ refresh
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="py-10 text-center">
+          <LoadingSpinner size="sm" />
+        </div>
+      ) : products.length === 0 ? (
+        <p className="py-10 text-center text-xs text-gray-500">
+          No ready products yet. Featured picks come from READY/PUBLISHED spins.
+        </p>
+      ) : (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {products.map((p) => (
+            <div
+              key={p.id}
+              className={`rounded-xl border p-3 transition-colors ${
+                p.featured
+                  ? "border-brand-accent/50 bg-brand-accent/[0.06]"
+                  : "border-gray-700/60 bg-gray-950/50"
+              }`}
+            >
+              <div className="flex gap-3">
+                <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/10 bg-gray-900">
+                  {p.thumb ? (
+                    <img src={p.thumb} alt="" className="h-full w-full object-contain" />
+                  ) : (
+                    <span className="text-[9px] text-gray-600">no preview</span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-white">{p.name}</p>
+                  <p className="truncate text-[11px] text-gray-500">{p.brandName}</p>
+                  <p className="text-[11px]">
+                    <span className={statusColor(p.status)}>{p.status}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => toggle(p)}
+                disabled={busyId === p.id}
+                className={`mt-2 w-full rounded-lg py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${
+                  p.featured
+                    ? "border border-brand-accent/40 bg-brand-accent/15 text-brand-accent"
+                    : "border border-gray-700 text-gray-300 hover:bg-gray-800"
+                }`}
+              >
+                {busyId === p.id ? "…" : p.featured ? "★ Featured" : "☆ Feature"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Rotation3DAdminPanel() {
+  const [mode, setMode] = useState<"brands" | "showcase">("brands");
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loadingBrands, setLoadingBrands] = useState(true);
   const [newBrand, setNewBrand] = useState("");
@@ -208,6 +311,23 @@ export default function Rotation3DAdminPanel() {
         </div>
       )}
 
+      <div className="flex gap-2">
+        {(["brands", "showcase"] as const).map((m) => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            className={`rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] transition-colors ${
+              mode === m ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"
+            }`}
+          >
+            {m === "brands" ? "Brands" : "Homepage showcase"}
+          </button>
+        ))}
+      </div>
+
+      {mode === "showcase" ? (
+        <ShowcasePanel />
+      ) : (
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
         {/* Brands column */}
         <div className={card}>
@@ -472,6 +592,7 @@ export default function Rotation3DAdminPanel() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }
