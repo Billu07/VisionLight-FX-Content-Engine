@@ -58,11 +58,16 @@ function ShowcasePanel() {
     void load();
   }, []);
 
-  const toggle = async (p: any) => {
+  const toggle = async (p: any, field: "featured" | "heroFeatured") => {
     setBusyId(p.id);
     try {
-      await apiEndpoints.r3dSetFeatured(p.id, !p.featured);
-      setProducts((prev) => prev.map((x) => (x.id === p.id ? { ...x, featured: !x.featured } : x)));
+      const next = !p[field];
+      await apiEndpoints.r3dSetFeatured(p.id, { [field]: next });
+      if (field === "heroFeatured" && next) {
+        await load(); // single hero — reflect others being cleared
+      } else {
+        setProducts((prev) => prev.map((x) => (x.id === p.id ? { ...x, [field]: next } : x)));
+      }
     } catch {
       /* ignore */
     } finally {
@@ -70,7 +75,8 @@ function ShowcasePanel() {
     }
   };
 
-  const featuredCount = products.filter((p) => p.featured).length;
+  const heroCount = products.filter((p) => p.heroFeatured).length;
+  const showcaseCount = products.filter((p) => p.featured).length;
 
   return (
     <div className={card}>
@@ -78,7 +84,7 @@ function ShowcasePanel() {
         <div>
           <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Homepage showcase</h2>
           <p className="mt-1 text-xs text-gray-400">
-            Pick which spins appear on rotation3d.com — {featuredCount} featured.
+            Pick the homepage spins — {heroCount} hero, {showcaseCount} in showcase.
           </p>
         </div>
         <button className="text-xs text-gray-400 hover:text-white" onClick={load}>
@@ -121,17 +127,30 @@ function ShowcasePanel() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => toggle(p)}
-                disabled={busyId === p.id}
-                className={`mt-2 w-full rounded-lg py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${
-                  p.featured
-                    ? "border border-brand-accent/40 bg-brand-accent/15 text-brand-accent"
-                    : "border border-gray-700 text-gray-300 hover:bg-gray-800"
-                }`}
-              >
-                {busyId === p.id ? "…" : p.featured ? "★ Featured" : "☆ Feature"}
-              </button>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => toggle(p, "heroFeatured")}
+                  disabled={busyId === p.id}
+                  className={`rounded-lg py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${
+                    p.heroFeatured
+                      ? "border border-amber-400/40 bg-amber-400/15 text-amber-200"
+                      : "border border-gray-700 text-gray-300 hover:bg-gray-800"
+                  }`}
+                >
+                  {p.heroFeatured ? "★ Hero" : "Hero"}
+                </button>
+                <button
+                  onClick={() => toggle(p, "featured")}
+                  disabled={busyId === p.id}
+                  className={`rounded-lg py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${
+                    p.featured
+                      ? "border border-brand-accent/40 bg-brand-accent/15 text-brand-accent"
+                      : "border border-gray-700 text-gray-300 hover:bg-gray-800"
+                  }`}
+                >
+                  {p.featured ? "✓ Showcase" : "Showcase"}
+                </button>
+              </div>
             </div>
           ))}
         </div>

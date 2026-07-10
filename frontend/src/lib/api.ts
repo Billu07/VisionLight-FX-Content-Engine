@@ -225,8 +225,10 @@ export const apiEndpoints = {
   r3dBrandSourceImages: (orgId: string) =>
     api.get(`/api/rotation3d/brands/${orgId}/source-images`),
   r3dAllProducts: () => api.get("/api/rotation3d/products"),
-  r3dSetFeatured: (id: string, featured: boolean, featuredRank?: number) =>
-    api.patch(`/api/rotation3d/products/${id}/feature`, { featured, featuredRank }),
+  r3dSetFeatured: (
+    id: string,
+    changes: { featured?: boolean; heroFeatured?: boolean; featuredRank?: number },
+  ) => api.patch(`/api/rotation3d/products/${id}/feature`, changes),
   r3dPublicFeatured: () => api.get("/api/rotation3d/public/featured"),
   r3dUploadProductVideo: (
     orgId: string,

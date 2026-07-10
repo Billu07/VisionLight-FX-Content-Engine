@@ -22,6 +22,8 @@ type Featured = {
   brandName?: string;
   background?: string | null;
   defaultFrame?: number;
+  featured?: boolean;
+  heroFeatured?: boolean;
   manifest?: { frameCount?: number; frames?: string[] };
 };
 
@@ -135,6 +137,8 @@ export default function Rotation3DLanding() {
       .then((r) => setFeatured(r.data.products || []))
       .catch(() => undefined);
   }, []);
+  const heroProduct = featured.find((p) => p.heroFeatured) || featured[0];
+  const showcase = featured.filter((p) => p.featured);
   return (
     <div className="min-h-screen bg-studio-gradient font-sans text-white antialiased">
       <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
@@ -213,7 +217,7 @@ export default function Rotation3DLanding() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         >
-          <HeroSpin product={featured[0]} />
+          <HeroSpin product={heroProduct} />
           <p className="mt-4 text-center text-xs text-gray-500">
             ↑ This is live — drag it to spin
           </p>
@@ -260,8 +264,8 @@ export default function Rotation3DLanding() {
           </p>
         </motion.div>
         <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {featured.length > 0
-            ? featured.slice(0, 6).map((p, i) => (
+          {showcase.length > 0
+            ? showcase.slice(0, 6).map((p, i) => (
                 <motion.div
                   key={p.id}
                   {...fadeUp}

@@ -101,7 +101,6 @@ export default function SpinViewer({
     const stage = stageRef.current!;
     const cv = canvasRef.current!;
     const ctx = cv.getContext("2d")!;
-    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     const DPR = Math.min(window.devicePixelRatio || 1, 2);
     const ELEV = (12 * Math.PI) / 180;
     const TWO_PI = Math.PI * 2;
@@ -111,7 +110,7 @@ export default function SpinViewer({
     let yawVel = 0;
     let zoom = 1, zoomTarget = 1;
     let panX = 0, panY = 0, panTX = 0, panTY = 0;
-    let idleSpin = !reduce;
+    let idleSpin = false; // no auto-rotation; the "Drag to rotate" hint invites it
     let dirty = true, lastYaw = NaN, lastZoom = NaN, lastPX = 0, lastPY = 0;
     let interacted = false;
     let raf = 0;
@@ -314,17 +313,15 @@ export default function SpinViewer({
       const dt = Math.max(1, now - lastT);
       const dx = e.clientX - lastX;
       const dy = e.clientY - lastY;
+      // Horizontal drag always rotates — you can spin even while zoomed in.
+      const k = 0.006;
+      yaw += dx * k;
+      yawVel = ((dx * k) / dt) * 16;
+      // Vertical drag pans up/down to inspect when zoomed in.
       if (zoomTarget > 1.15) {
-        // zoomed in → drag moves the product around to inspect any part
         const lim = 130 * (zoomTarget - 1);
-        panTX = Math.max(-lim, Math.min(lim, panTX + dx));
         panTY = Math.max(-lim, Math.min(lim, panTY + dy));
-        panX = panTX; panY = panTY; // immediate follow while dragging
-        yawVel = 0;
-      } else {
-        const k = 0.006;
-        yaw += dx * k;
-        yawVel = ((dx * k) / dt) * 16;
+        panY = panTY;
       }
       lastX = e.clientX;
       lastY = e.clientY;

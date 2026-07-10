@@ -299,7 +299,7 @@ router.get(
   async (_req: AuthenticatedRequest, res: Response) => {
     const products = await prisma.rot3dProduct.findMany({
       where: { status: { in: ["READY", "PUBLISHED"] } },
-      orderBy: [{ featured: "desc" }, { featuredRank: "asc" }, { createdAt: "desc" }],
+      orderBy: [{ heroFeatured: "desc" }, { featured: "desc" }, { featuredRank: "asc" }, { createdAt: "desc" }],
       include: {
         spin: { select: { manifest: true } },
         organization: { select: { name: true } },
@@ -313,6 +313,7 @@ router.get(
         name: p.name,
         status: p.status,
         featured: p.featured,
+        heroFeatured: p.heroFeatured,
         featuredRank: p.featuredRank,
         brandName: p.organization?.name || "",
         thumb: frames[p.defaultFrame] || frames[0] || null,
@@ -322,18 +323,30 @@ router.get(
   },
 );
 
-// Toggle a product onto/off the public homepage showcase.
+// Toggle a product's homepage placement (showcase grid and/or the single hero).
 router.patch(
   "/api/rotation3d/products/:id/feature",
   authenticateToken,
   requireSuperAdmin,
   async (req: AuthenticatedRequest, res: Response) => {
-    const featured = req.body?.featured === true;
+    const data: Record<string, unknown> = {};
+    if (typeof req.body?.featured === "boolean") data.featured = req.body.featured;
     const rankRaw = Number(req.body?.featuredRank);
+    if (Number.isFinite(rankRaw)) data.featuredRank = rankRaw;
+    if (typeof req.body?.heroFeatured === "boolean") {
+      data.heroFeatured = req.body.heroFeatured;
+      if (req.body.heroFeatured === true) {
+        // Only one hero — clear any existing one first.
+        await prisma.rot3dProduct.updateMany({
+          where: { heroFeatured: true, id: { not: req.params.id } },
+          data: { heroFeatured: false },
+        });
+      }
+    }
     const product = await prisma.rot3dProduct.update({
       where: { id: req.params.id },
-      data: { featured, ...(Number.isFinite(rankRaw) ? { featuredRank: rankRaw } : {}) },
-      select: { id: true, featured: true, featuredRank: true },
+      data,
+      select: { id: true, featured: true, heroFeatured: true, featuredRank: true },
     });
     res.json({ product });
   },
@@ -463,7 +476,10 @@ router.get(
   "/api/rotation3d/public/featured",
   async (_req: AuthenticatedRequest, res: Response) => {
     const products = await prisma.rot3dProduct.findMany({
-      where: { featured: true, status: { in: ["READY", "PUBLISHED"] } },
+      where: {
+        OR: [{ featured: true }, { heroFeatured: true }],
+        status: { in: ["READY", "PUBLISHED"] },
+      },
       orderBy: [{ featuredRank: "asc" }, { createdAt: "desc" }],
       take: 12,
       include: { spin: { select: { manifest: true } }, organization: { select: { name: true } } },
@@ -476,6 +492,8 @@ router.get(
         defaultFrame: p.defaultFrame,
         background: p.background,
         brandName: p.organization?.name || "",
+        featured: p.featured,
+        heroFeatured: p.heroFeatured,
         manifest: p.spin!.manifest,
       }));
     res.json({ products: list });

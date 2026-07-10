@@ -388,7 +388,8 @@ model Rot3dProduct {
   ctaPrimary      Json? // { label, url } — e.g. "Next"
   ctaSecondary    Json? // { label, url } — e.g. "Previous"
   order           Int      @default(0)
-  featured        Boolean  @default(false) // curated onto the public homepage showcase
+  featured        Boolean  @default(false) // curated into the public homepage showcase
+  heroFeatured    Boolean  @default(false) // the single hero spin on the homepage
   featuredRank    Int      @default(0) // homepage ordering (lower first)
   createdByUserId String?
   createdAt       DateTime @default(now())
