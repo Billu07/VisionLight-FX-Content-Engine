@@ -181,7 +181,19 @@ router.post(
     const { orgId } = req.params;
     const name = String(req.body?.name || "").trim();
     const frameCount = Number(req.body?.frameCount) || 48;
-    const background = req.body?.background ? String(req.body.background).slice(0, 40) : null;
+    // bgMode picks how the video backdrop is handled:
+    //  remove-white/black = free ffmpeg chroma-key → transparent on gradient
+    //  ai                 = paid Fal matte (best edges)
+    //  keep-white/black   = opaque, player bg set to match
+    //  keep-gradient      = opaque on the default gradient
+    const bgMode = String(req.body?.bgMode || "remove-white");
+    let removal: "white" | "black" | "ai" | "none" = "white";
+    let background: string | null = null; // player bg; null = default studio gradient
+    if (bgMode === "remove-black") removal = "black";
+    else if (bgMode === "ai") removal = "ai";
+    else if (bgMode === "keep-white") { removal = "none"; background = "#ffffff"; }
+    else if (bgMode === "keep-black") { removal = "none"; background = "#000000"; }
+    else if (bgMode === "keep-gradient") removal = "none";
     const file = req.file;
     if (!name) {
       if (file?.path) await fs.rm(file.path, { force: true }).catch(() => undefined);
@@ -236,6 +248,7 @@ router.post(
           organizationId: orgId,
           productId: product.id,
           frameCount,
+          removal,
         });
 
         await prisma.rot3dSpin.upsert({

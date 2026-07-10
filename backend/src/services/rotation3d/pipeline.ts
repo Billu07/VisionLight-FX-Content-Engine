@@ -5,9 +5,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { uploadManagedBuffer } from "../../utils/managedStorage";
-// Background removal (matte.ts) is intentionally disabled to avoid per-frame
-// cost — videos ship on a solid white/black backdrop and the player background
-// is set to match. Re-enable by wiring matteFrame back into the frame loop.
+import { matteFrame } from "./matte";
 
 if (ffmpegStatic) ffmpeg.setFfmpegPath(ffmpegStatic);
 
@@ -56,11 +54,21 @@ const probeDurationSeconds = (input: string): Promise<number> =>
 
 // One ffmpeg pass extracts ~targetCount evenly-spaced frames as lossless PNG
 // (no intermediate JPEG generation loss).
-const extractFrames = (input: string, outDir: string, fps: number): Promise<void> =>
+const extractFrames = (
+  input: string,
+  outDir: string,
+  fps: number,
+  keyColor?: string,
+): Promise<void> =>
   new Promise((resolve, reject) => {
     let stderr = "";
+    // Free background removal for a SOLID backdrop: key out the given color
+    // (white/black) → transparent PNG. No per-frame API cost.
+    const vf = keyColor
+      ? `fps=${fps},format=rgba,colorkey=${keyColor}:0.30:0.12`
+      : `fps=${fps}`;
     const cmd = ffmpeg(input)
-      .outputOptions([`-vf`, `fps=${fps}`, "-an", "-y"])
+      .outputOptions([`-vf`, vf, "-an", "-y"])
       .output(path.join(outDir, "f_%04d.png"));
 
     let settled = false;
@@ -124,18 +132,23 @@ export const buildSpinFromVideo = async (params: {
   organizationId: string;
   productId: string;
   frameCount?: number;
+  /** white/black = free ffmpeg chroma-key; ai = paid Fal matte; none = opaque */
+  removal?: "white" | "black" | "ai" | "none";
 }): Promise<SpinManifest> => {
   const targetCount = Math.min(120, Math.max(12, params.frameCount ?? 48));
+  const removal = params.removal ?? "none";
+  const keyColor =
+    removal === "white" ? "0xFFFFFF" : removal === "black" ? "0x000000" : undefined;
   const framesDir = await fs.mkdtemp(path.join(os.tmpdir(), "r3d-frames-"));
 
   try {
-    console.log(`[r3d] pipeline start product=${params.productId}`);
+    console.log(`[r3d] pipeline start product=${params.productId} removal=${removal}`);
     const duration = await probeDurationSeconds(params.videoPath);
     console.log(`[r3d] duration=${duration}s`);
     if (!duration || duration <= 0) throw new Error("Could not read video duration");
 
     const fps = Math.max(0.1, targetCount / duration);
-    await extractFrames(params.videoPath, framesDir, fps);
+    await extractFrames(params.videoPath, framesDir, fps, keyColor);
 
     const files = (await fs.readdir(framesDir))
       .filter((f) => f.endsWith(".png"))
@@ -144,9 +157,15 @@ export const buildSpinFromVideo = async (params: {
     if (files.length === 0) throw new Error("No frames were extracted");
 
     const keyPrefix = `rotation3d/org_${params.organizationId}/product_${params.productId}/frames`;
+    let aiCut = 0;
     const frames = await mapPool(files, UPLOAD_CONCURRENCY, async (file) => {
       const raw = await fs.readFile(path.join(framesDir, file));
-      const webp = await sharp(raw)
+      let input: Buffer = raw;
+      if (removal === "ai") {
+        const cut = await matteFrame(raw); // paid Fal matte, on demand only
+        if (cut) { input = cut; aiCut++; }
+      }
+      const webp = await sharp(input)
         .resize({ width: MAX_FRAME_WIDTH, withoutEnlargement: true })
         .webp({ quality: WEBP_QUALITY })
         .toBuffer();
@@ -157,7 +176,9 @@ export const buildSpinFromVideo = async (params: {
         fallbackExtension: "webp",
       });
     });
-    console.log(`[r3d] uploaded ${frames.length} frames to R2 (opaque)`);
+    console.log(
+      `[r3d] uploaded ${frames.length} frames to R2 (removal=${removal}${removal === "ai" ? ` ${aiCut}/${files.length}` : ""})`,
+    );
 
     return {
       frameCount: frames.length,

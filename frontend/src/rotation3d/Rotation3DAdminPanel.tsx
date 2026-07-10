@@ -162,7 +162,7 @@ export default function Rotation3DAdminPanel() {
   const [productName, setProductName] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [frames, setFrames] = useState(60);
-  const [bg, setBg] = useState("#ffffff");
+  const [bgMode, setBgMode] = useState("remove-white");
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [processing, setProcessing] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -268,7 +268,7 @@ export default function Rotation3DAdminPanel() {
     fd.append("video", videoFile);
     fd.append("name", productName.trim());
     fd.append("frameCount", String(frames));
-    fd.append("background", bg);
+    fd.append("bgMode", bgMode);
     try {
       await apiEndpoints.r3dUploadProductVideo(selected.id, fd, {
         onUploadProgress: (e) => {
@@ -529,16 +529,19 @@ export default function Rotation3DAdminPanel() {
                     </select>
                   </label>
                   <label className="flex items-center gap-2 text-xs text-gray-400">
-                    Video bg
+                    Background
                     <select
-                      value={bg}
-                      onChange={(e) => setBg(e.target.value)}
+                      value={bgMode}
+                      onChange={(e) => setBgMode(e.target.value)}
                       disabled={busy}
                       className="rounded-lg border border-gray-700 bg-gray-950 px-2 py-1.5 text-xs text-white outline-none focus:border-brand-accent"
                     >
-                      <option value="#ffffff">White</option>
-                      <option value="#000000">Black</option>
-                      <option value="">Gradient</option>
+                      <option value="remove-white">Remove white bg · free</option>
+                      <option value="remove-black">Remove black bg · free</option>
+                      <option value="ai">AI cutout · paid</option>
+                      <option value="keep-white">Keep · white</option>
+                      <option value="keep-black">Keep · black</option>
+                      <option value="keep-gradient">Keep · gradient</option>
                     </select>
                   </label>
                   {uploadPct !== null && (
@@ -548,8 +551,9 @@ export default function Rotation3DAdminPanel() {
                   )}
                 </div>
                 <p className="mt-2 text-[11px] text-gray-500">
-                  A short single-rotation clip works best. More frames = smoother spin,
-                  but longer processing and a larger download (each frame is background-removed).
+                  A short single-rotation clip works best. "Remove white/black" keys out a
+                  solid backdrop for <b>free</b> so the product floats on the page; "AI cutout"
+                  is paid but handles any background. More frames = smoother spin.
                 </p>
               </div>
 
