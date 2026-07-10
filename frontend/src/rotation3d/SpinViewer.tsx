@@ -453,6 +453,7 @@ export default function SpinViewer({
         if (k < 4) (im as any).fetchPriority = "high";
         im.onload = im.onerror = () => {
           imgs[i] = im;
+          dirty = true; // repaint once a frame arrives (no auto-spin to do it)
           loaded++;
           setProgress((loaded / n) * 100);
           if (!revealed && (isReady(imgs[DEFAULT_FRAME]) || loaded >= Math.min(6, n))) {
