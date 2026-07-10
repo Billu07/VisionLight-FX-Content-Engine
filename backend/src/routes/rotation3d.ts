@@ -181,6 +181,7 @@ router.post(
     const { orgId } = req.params;
     const name = String(req.body?.name || "").trim();
     const frameCount = Number(req.body?.frameCount) || 48;
+    const background = req.body?.background ? String(req.body.background).slice(0, 40) : null;
     const file = req.file;
     if (!name) {
       if (file?.path) await fs.rm(file.path, { force: true }).catch(() => undefined);
@@ -203,6 +204,7 @@ router.post(
         organizationId: orgId,
         slug,
         name,
+        background,
         status: "PROCESSING",
         createdByUserId: req.user?.id || null,
       },

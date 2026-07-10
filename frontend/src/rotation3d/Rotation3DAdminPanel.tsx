@@ -59,6 +59,7 @@ export default function Rotation3DAdminPanel() {
   const [productName, setProductName] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [frames, setFrames] = useState(60);
+  const [bg, setBg] = useState("#ffffff");
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [processing, setProcessing] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -164,6 +165,7 @@ export default function Rotation3DAdminPanel() {
     fd.append("video", videoFile);
     fd.append("name", productName.trim());
     fd.append("frameCount", String(frames));
+    fd.append("background", bg);
     try {
       await apiEndpoints.r3dUploadProductVideo(selected.id, fd, {
         onUploadProgress: (e) => {
@@ -404,6 +406,19 @@ export default function Rotation3DAdminPanel() {
                       <option value={60}>60 frames · smooth</option>
                       <option value={72}>72 frames · very smooth</option>
                       <option value={90}>90 frames · max</option>
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-gray-400">
+                    Video bg
+                    <select
+                      value={bg}
+                      onChange={(e) => setBg(e.target.value)}
+                      disabled={busy}
+                      className="rounded-lg border border-gray-700 bg-gray-950 px-2 py-1.5 text-xs text-white outline-none focus:border-brand-accent"
+                    >
+                      <option value="#ffffff">White</option>
+                      <option value="#000000">Black</option>
+                      <option value="">Gradient</option>
                     </select>
                   </label>
                   {uploadPct !== null && (

@@ -5,7 +5,9 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { uploadManagedBuffer } from "../../utils/managedStorage";
-import { matteEnabled, matteFrame } from "./matte";
+// Background removal (matte.ts) is intentionally disabled to avoid per-frame
+// cost — videos ship on a solid white/black backdrop and the player background
+// is set to match. Re-enable by wiring matteFrame back into the frame loop.
 
 if (ffmpegStatic) ffmpeg.setFfmpegPath(ffmpegStatic);
 
@@ -141,24 +143,12 @@ export const buildSpinFromVideo = async (params: {
     console.log(`[r3d] extracted ${files.length} frames (fps=${fps.toFixed(3)})`);
     if (files.length === 0) throw new Error("No frames were extracted");
 
-    const matte = matteEnabled();
-    let matted = 0;
     const keyPrefix = `rotation3d/org_${params.organizationId}/product_${params.productId}/frames`;
     const frames = await mapPool(files, UPLOAD_CONCURRENCY, async (file) => {
       const raw = await fs.readFile(path.join(framesDir, file));
-      // Background cutout (transparent PNG). Falls back to the opaque frame on
-      // any failure so a spin still ships.
-      let input: Buffer = raw;
-      if (matte) {
-        const cut = await matteFrame(raw);
-        if (cut) {
-          input = cut;
-          matted++;
-        }
-      }
-      const webp = await sharp(input)
+      const webp = await sharp(raw)
         .resize({ width: MAX_FRAME_WIDTH, withoutEnlargement: true })
-        .webp({ quality: WEBP_QUALITY }) // sharp preserves alpha in webp
+        .webp({ quality: WEBP_QUALITY })
         .toBuffer();
       return uploadManagedBuffer({
         buffer: webp,
@@ -167,9 +157,7 @@ export const buildSpinFromVideo = async (params: {
         fallbackExtension: "webp",
       });
     });
-    console.log(
-      `[r3d] uploaded ${frames.length} frames to R2 (matte ${matte ? `${matted}/${files.length}` : "off"})`,
-    );
+    console.log(`[r3d] uploaded ${frames.length} frames to R2 (opaque)`);
 
     return {
       frameCount: frames.length,

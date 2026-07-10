@@ -118,23 +118,33 @@ function ProductCard({ product, onSaved }: { product: Product; onSaved: () => vo
 
           <div className="mt-3">
             <p className={label}>Player background</p>
-            <div className="mt-1 flex items-center gap-3">
+            <p className="mt-0.5 text-[11px] text-gray-500">Match your video's background (white or black).</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <input
                 type="color"
                 value={bg || "#0b0f19"}
                 onChange={(e) => setBg(e.target.value)}
                 className="h-9 w-12 cursor-pointer rounded border border-gray-700 bg-gray-950"
               />
-              <span className="font-mono text-xs text-gray-400">{bg || "default gradient"}</span>
-              {bg && (
+              {[
+                ["White", "#ffffff"],
+                ["Black", "#000000"],
+                ["Gradient", ""],
+              ].map(([lbl, val]) => (
                 <button
+                  key={lbl}
                   type="button"
-                  className="text-[11px] text-gray-400 underline hover:text-white"
-                  onClick={() => setBg("")}
+                  onClick={() => setBg(val)}
+                  className={`rounded-md border px-2.5 py-1.5 text-[11px] font-semibold transition-colors ${
+                    bg === val
+                      ? "border-brand-accent/50 bg-brand-accent/10 text-white"
+                      : "border-gray-700 text-gray-300 hover:bg-gray-800"
+                  }`}
                 >
-                  Reset to default
+                  {lbl}
                 </button>
-              )}
+              ))}
+              <span className="font-mono text-xs text-gray-500">{bg || "default"}</span>
             </div>
           </div>
 

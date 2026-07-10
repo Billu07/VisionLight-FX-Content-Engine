@@ -97,6 +97,7 @@ export default function SpinViewer({
     let zoom = 1, zoomTarget = 1;
     let panX = 0, panY = 0, panTX = 0, panTY = 0;
     let idleSpin = !reduce;
+    let dirty = true, lastYaw = NaN, lastZoom = NaN, lastPX = 0, lastPY = 0;
     let interacted = false;
     let raf = 0;
     let alive = true;
@@ -140,6 +141,7 @@ export default function SpinViewer({
       const r = stage.getBoundingClientRect();
       cv.width = Math.round(r.width * DPR);
       cv.height = Math.round(r.height * DPR);
+      dirty = true;
     };
 
     const drawShadow = (cx: number, cy: number, scale: number) => {
@@ -254,7 +256,18 @@ export default function SpinViewer({
       if (zoomTarget <= 1.1) { panTX = 0; panTY = 0; }
       panX += (panTX - panX) * 0.2;
       panY += (panTY - panY) * 0.2;
-      draw();
+      // Only repaint when something actually changed — idle products stop
+      // burning CPU/battery on mobile.
+      if (
+        dirty ||
+        yaw !== lastYaw ||
+        Math.abs(zoom - lastZoom) > 0.0004 ||
+        Math.abs(panX - lastPX) > 0.03 ||
+        Math.abs(panY - lastPY) > 0.03
+      ) {
+        draw();
+        lastYaw = yaw; lastZoom = zoom; lastPX = panX; lastPY = panY; dirty = false;
+      }
       raf = requestAnimationFrame(tick);
     };
 
@@ -575,6 +588,7 @@ const R3D_CSS = `
   font-family:"Bai Jamjuree",ui-sans-serif,system-ui,sans-serif;color:#eef1f6;
   background:radial-gradient(120% 80% at 50% -10%,#1a2336 0%,rgba(17,24,39,0) 55%),linear-gradient(to bottom right,#111827,#0B0F19);
   touch-action:none;user-select:none;-webkit-user-select:none;
+  overscroll-behavior:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;
 }
 .r3d-stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab}
 .r3d-stage.r3d-grabbing canvas{cursor:grabbing}
@@ -593,7 +607,7 @@ const R3D_CSS = `
 .r3d-iconbtn:hover{background:var(--r3d-glass2)}
 .r3d-iconbtn:active{transform:translateY(1px)}
 .r3d-iconbtn svg{width:18px;height:18px}
-.r3d-zoomcol{position:absolute;right:16px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px;z-index:5}
+.r3d-zoomcol{position:absolute;right:14px;bottom:calc(100px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;z-index:6}
 .r3d-rot{position:absolute;left:50%;bottom:118px;transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:10px;color:var(--r3d-muted);font-size:12px;font-weight:500;background:rgba(11,15,25,.35);border:1px solid var(--r3d-line);border-radius:999px;padding:6px 12px;backdrop-filter:blur(8px)}
 .r3d-track{position:relative;width:132px;height:3px;border-radius:2px;background:rgba(255,255,255,.12)}
 .r3d-fill{position:absolute;top:-3px;width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,var(--r3d-primary),var(--r3d-secondary));box-shadow:var(--r3d-glow);transform:translateX(-50%)}
@@ -623,4 +637,13 @@ const R3D_CSS = `
 /* hero variant: contained, transparent, chrome-less spinning object */
 .r3d-hero{height:100%!important;background:transparent!important}
 .r3d-hero .r3d-scrim-top,.r3d-hero .r3d-scrim-bot,.r3d-hero .r3d-topbar,.r3d-hero .r3d-zoomcol,.r3d-hero .r3d-rot,.r3d-hero .r3d-ctas,.r3d-hero .r3d-loader{display:none!important}
+/* mobile: keep controls off the product + clear of each other */
+@media (max-width:560px){
+  .r3d-iconbtn{width:40px;height:40px}
+  .r3d-name{font-size:14px;max-width:52vw}
+  .r3d-rot{bottom:150px;padding:5px 11px}
+  .r3d-rot .r3d-track{width:92px}
+  .r3d-zoomcol{bottom:calc(150px + env(safe-area-inset-bottom))}
+  .r3d-cta{padding:13px 12px;font-size:14px}
+}
 `;
