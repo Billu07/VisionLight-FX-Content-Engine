@@ -181,7 +181,7 @@ export default function Rotation3DAdminPanel() {
   const [productName, setProductName] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [frames, setFrames] = useState(60);
-  const [bgMode, setBgMode] = useState("remove-white");
+  const [bgMode, setBgMode] = useState("keep");
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [processing, setProcessing] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -555,10 +555,10 @@ export default function Rotation3DAdminPanel() {
                       disabled={busy}
                       className="rounded-lg border border-gray-700 bg-gray-950 px-2 py-1.5 text-xs text-white outline-none focus:border-brand-accent"
                     >
+                      <option value="keep">Keep bg (auto-match)</option>
                       <option value="remove-white">Remove white bg · free</option>
                       <option value="remove-black">Remove black bg · free</option>
                       <option value="ai">AI cutout · paid</option>
-                      <option value="keep">Keep bg (auto-match)</option>
                     </select>
                   </label>
                   {uploadPct !== null && (

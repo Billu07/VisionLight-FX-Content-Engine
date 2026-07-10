@@ -186,11 +186,11 @@ router.post(
     //  ai                 = paid Fal matte (best edges)
     //  keep-white/black   = opaque, player bg set to match
     //  keep-gradient      = opaque on the default gradient
-    const bgMode = String(req.body?.bgMode || "remove-white");
-    let removal: "white" | "black" | "ai" | "none" = "white";
-    if (bgMode === "remove-black") removal = "black";
+    const bgMode = String(req.body?.bgMode || "keep");
+    let removal: "white" | "black" | "ai" | "none" = "none"; // "keep" default
+    if (bgMode === "remove-white") removal = "white";
+    else if (bgMode === "remove-black") removal = "black";
     else if (bgMode === "ai") removal = "ai";
-    else if (bgMode === "keep") removal = "none";
     const file = req.file;
     if (!name) {
       if (file?.path) await fs.rm(file.path, { force: true }).catch(() => undefined);
