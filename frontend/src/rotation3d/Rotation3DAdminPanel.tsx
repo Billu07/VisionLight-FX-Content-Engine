@@ -232,6 +232,16 @@ export default function Rotation3DAdminPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products, selected]);
 
+  const deleteProduct = async (p: Product) => {
+    if (!window.confirm(`Delete "${p.name}"? This removes its spin and can't be undone.`)) return;
+    try {
+      await apiEndpoints.r3dDeleteProduct(p.id);
+      setProducts((prev) => prev.filter((x) => x.id !== p.id));
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e?.response?.data?.error || "Failed to delete product" });
+    }
+  };
+
   const deleteBrand = async (b: Brand) => {
     if (!window.confirm(`Delete "${b.name}" and all of its products? This cannot be undone.`)) return;
     try {
@@ -596,16 +606,25 @@ export default function Rotation3DAdminPanel() {
                           {p.spin ? ` · ${p.spin.frameCount} frames` : ""}
                         </p>
                       </div>
-                      {(p.status === "READY" || p.status === "PUBLISHED") && (
-                        <a
-                          href={`${PLAYER_ORIGIN}/p/${p.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="shrink-0 rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
+                      <div className="flex shrink-0 items-center gap-2">
+                        {(p.status === "READY" || p.status === "PUBLISHED") && (
+                          <a
+                            href={`${PLAYER_ORIGIN}/p/${p.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
+                          >
+                            View player ↗
+                          </a>
+                        )}
+                        <button
+                          onClick={() => deleteProduct(p)}
+                          title="Delete product"
+                          className="px-1.5 text-lg leading-none text-gray-600 hover:text-rose-400"
                         >
-                          View player ↗
-                        </a>
-                      )}
+                          ×
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}

@@ -354,6 +354,22 @@ router.patch(
   },
 );
 
+// Delete a product (cascades its spin/videos/embed/events; source images kept).
+router.delete(
+  "/api/rotation3d/products/:id",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const existing = await prisma.rot3dProduct.findUnique({
+      where: { id: req.params.id },
+      select: { id: true },
+    });
+    if (!existing) return res.status(404).json({ error: "Product not found" });
+    await prisma.rot3dProduct.delete({ where: { id: req.params.id } });
+    res.json({ ok: true });
+  },
+);
+
 // ─────────────────────────── BRAND ADMIN (org-scoped) ───────────────────────────
 
 const requireOrg = (req: AuthenticatedRequest, res: Response): string | null => {
