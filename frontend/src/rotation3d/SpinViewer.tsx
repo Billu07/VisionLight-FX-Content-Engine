@@ -79,7 +79,7 @@ export default function SpinViewer({
   const stageStyle: CSSProperties = {
     ...(primaryColor ? { ["--r3d-primary" as any]: primaryColor } : {}),
     ...(secondaryColor ? { ["--r3d-secondary" as any]: secondaryColor } : {}),
-    ...(background && !hero ? { background } : {}),
+    ...(background ? { background } : {}),
   };
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -647,7 +647,9 @@ const R3D_CSS = `
 .r3d-lbl{font-size:12px;color:var(--r3d-muted);letter-spacing:.14em;text-transform:uppercase}
 @media (prefers-reduced-motion:reduce){.r3d-hand{animation:none}}
 /* hero variant: contained, transparent, chrome-less spinning object */
-.r3d-hero{height:100%!important;background:transparent!important}
+/* hero fills its parent and is transparent by default (blends into the page),
+   but an explicit product background still shows through via inline style */
+.r3d-hero{height:100%!important;background:transparent}
 .r3d-hero .r3d-scrim-top,.r3d-hero .r3d-scrim-bot,.r3d-hero .r3d-topbar,.r3d-hero .r3d-zoomcol,.r3d-hero .r3d-rot,.r3d-hero .r3d-ctas,.r3d-hero .r3d-loader{display:none!important}
 /* mobile: keep controls off the product + clear of each other */
 @media (max-width:560px){

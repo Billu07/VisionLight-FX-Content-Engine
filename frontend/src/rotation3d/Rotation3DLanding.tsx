@@ -33,6 +33,12 @@ const featuredManifest = (p: Featured): SpinManifest => ({
   defaultFrame: p.defaultFrame ?? 0,
 });
 
+// The default studio gradient — so a gradient-background product's featured
+// container matches its player page (white/black match via the color itself).
+const STUDIO_GRADIENT =
+  "radial-gradient(120% 80% at 50% -10%,#1a2336 0%,rgba(17,24,39,0) 55%),linear-gradient(to bottom right,#111827,#0B0F19)";
+const containerBg = (p: Featured) => p.background || STUDIO_GRADIENT;
+
 /**
  * Rotation3D marketing landing page (rotation3d.com/). On-theme with the studio
  * system: Bai Jamjuree, --primary-brand → --secondary-brand gradient, cyan glow,
@@ -57,7 +63,7 @@ function HeroSpin({ className = "", product }: { className?: string; product?: F
         <SpinViewer
           manifest={product ? featuredManifest(product) : DEMO}
           variant="hero"
-          background={product?.background}
+          background={product ? containerBg(product) : undefined}
         />
       </div>
     </div>
@@ -273,7 +279,7 @@ export default function Rotation3DLanding() {
                   className="overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02]"
                 >
                   <div className="relative aspect-square">
-                    <SpinViewer manifest={featuredManifest(p)} variant="hero" background={p.background} />
+                    <SpinViewer manifest={featuredManifest(p)} variant="hero" background={containerBg(p)} />
                   </div>
                   <div className="flex items-center justify-between border-t border-white/8 px-5 py-4">
                     <Link to={`/p/${p.id}`} className="text-sm font-medium transition-colors hover:text-brand-accent">
