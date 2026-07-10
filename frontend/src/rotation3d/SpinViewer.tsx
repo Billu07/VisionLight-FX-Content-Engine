@@ -46,6 +46,20 @@ export type SpinViewerProps = {
 
 const clampZoom = (z: number) => Math.max(0.7, Math.min(2.8, z));
 
+// Is the player background a light color? (so we flip text/controls to dark).
+const isLightColor = (bg?: string | null): boolean => {
+  if (!bg) return false; // empty → default dark studio gradient
+  const s = bg.trim().toLowerCase();
+  if (s === "white") return true;
+  if (s === "black") return false;
+  let hex = s.replace(/^#/, "");
+  if (hex.length === 3) hex = hex.split("").map((c) => c + c).join("");
+  if (!/^[0-9a-f]{6}$/.test(hex)) return false;
+  const n = parseInt(hex, 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 150;
+};
+
 export default function SpinViewer({
   manifest,
   productName = "Product",
@@ -61,6 +75,7 @@ export default function SpinViewer({
   background,
 }: SpinViewerProps) {
   const hero = variant === "hero";
+  const lightBg = isLightColor(background);
   const stageStyle: CSSProperties = {
     ...(primaryColor ? { ["--r3d-primary" as any]: primaryColor } : {}),
     ...(secondaryColor ? { ["--r3d-secondary" as any]: secondaryColor } : {}),
@@ -492,7 +507,7 @@ export default function SpinViewer({
   };
 
   return (
-    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${className || ""}`}
+    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${lightBg ? "r3d-light" : ""} ${className || ""}`}
       style={stageStyle}
       tabIndex={hero ? -1 : 0}
       aria-label="Interactive 360 degree product viewer. Drag to rotate.">
@@ -646,4 +661,21 @@ const R3D_CSS = `
   .r3d-zoomcol{bottom:calc(150px + env(safe-area-inset-bottom))}
   .r3d-cta{padding:13px 12px;font-size:14px}
 }
+/* light background → flip text + controls to dark for contrast */
+.r3d-light .r3d-name{color:#0b0f19}
+.r3d-light .r3d-kicker{color:#5b6472}
+.r3d-light .r3d-hint span{color:#0b0f19;text-shadow:none}
+.r3d-light .r3d-hand{border-color:rgba(0,0,0,.12);background:rgba(255,255,255,.55)}
+.r3d-light .r3d-hand svg{color:#0b0f19}
+.r3d-light .r3d-iconbtn{border-color:rgba(0,0,0,.12);background:rgba(0,0,0,.05);color:#0b0f19}
+.r3d-light .r3d-iconbtn:hover{background:rgba(0,0,0,.10)}
+.r3d-light .r3d-rot{color:#5b6472;background:rgba(255,255,255,.6);border-color:rgba(0,0,0,.10)}
+.r3d-light .r3d-track{background:rgba(0,0,0,.12)}
+.r3d-light .r3d-cta.r3d-ghost{background:rgba(0,0,0,.05);color:#0b0f19;border-color:rgba(0,0,0,.12)}
+.r3d-light .r3d-cta.r3d-ghost:hover{background:rgba(0,0,0,.10)}
+.r3d-light .r3d-scrim-top{background:linear-gradient(to bottom,rgba(255,255,255,.6),transparent)}
+.r3d-light .r3d-scrim-bot{background:linear-gradient(to top,rgba(255,255,255,.75),transparent)}
+.r3d-light .r3d-loader{background:#f4f5f7}
+.r3d-light .r3d-pct,.r3d-light .r3d-lbl{color:#5b6472}
+.r3d-light .r3d-ring-bg{stroke:rgba(0,0,0,.10)}
 `;
