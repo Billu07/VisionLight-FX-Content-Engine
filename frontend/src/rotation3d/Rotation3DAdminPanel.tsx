@@ -558,9 +558,7 @@ export default function Rotation3DAdminPanel() {
                       <option value="remove-white">Remove white bg · free</option>
                       <option value="remove-black">Remove black bg · free</option>
                       <option value="ai">AI cutout · paid</option>
-                      <option value="keep-white">Keep · white</option>
-                      <option value="keep-black">Keep · black</option>
-                      <option value="keep-gradient">Keep · gradient</option>
+                      <option value="keep">Keep bg (auto-match)</option>
                     </select>
                   </label>
                   {uploadPct !== null && (
@@ -571,8 +569,9 @@ export default function Rotation3DAdminPanel() {
                 </div>
                 <p className="mt-2 text-[11px] text-gray-500">
                   A short single-rotation clip works best. "Remove white/black" keys out a
-                  solid backdrop for <b>free</b> so the product floats on the page; "AI cutout"
-                  is paid but handles any background. More frames = smoother spin.
+                  solid backdrop for <b>free</b> so the product floats; "AI cutout" is paid but
+                  handles any background; "Keep" leaves it opaque and the player background
+                  auto-matches the video's backdrop. More frames = smoother spin.
                 </p>
               </div>
 

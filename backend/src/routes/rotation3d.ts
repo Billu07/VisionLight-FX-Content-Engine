@@ -188,12 +188,9 @@ router.post(
     //  keep-gradient      = opaque on the default gradient
     const bgMode = String(req.body?.bgMode || "remove-white");
     let removal: "white" | "black" | "ai" | "none" = "white";
-    let background: string | null = null; // player bg; null = default studio gradient
     if (bgMode === "remove-black") removal = "black";
     else if (bgMode === "ai") removal = "ai";
-    else if (bgMode === "keep-white") { removal = "none"; background = "#ffffff"; }
-    else if (bgMode === "keep-black") { removal = "none"; background = "#000000"; }
-    else if (bgMode === "keep-gradient") removal = "none";
+    else if (bgMode === "keep") removal = "none";
     const file = req.file;
     if (!name) {
       if (file?.path) await fs.rm(file.path, { force: true }).catch(() => undefined);
@@ -216,7 +213,6 @@ router.post(
         organizationId: orgId,
         slug,
         name,
-        background,
         status: "PROCESSING",
         createdByUserId: req.user?.id || null,
       },
@@ -258,7 +254,13 @@ router.post(
         });
         await prisma.rot3dProduct.update({
           where: { id: product.id },
-          data: { status: "READY", defaultFrame: manifest.defaultFrame },
+          // Content-aware default player background: the detected corner color
+          // (opaque frames) or null → default gradient (transparent frames).
+          data: {
+            status: "READY",
+            defaultFrame: manifest.defaultFrame,
+            background: manifest.detectedBg ?? null,
+          },
         });
         console.log(`[r3d] product ${product.id} READY (${manifest.frameCount} frames)`);
       } catch (err: any) {

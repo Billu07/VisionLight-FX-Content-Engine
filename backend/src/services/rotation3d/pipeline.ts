@@ -23,6 +23,32 @@ export type SpinManifest = {
   frames: string[];
   defaultFrame: number;
   width: number | null;
+  /** content-aware player background: the frame's corner color if opaque, else
+   * null (transparent frames → default gradient). */
+  detectedBg?: string | null;
+};
+
+// Sample a frame's top-left corner (the product's backdrop) → a CSS color if
+// the frame is opaque there, or null if it's transparent (bg was removed).
+const detectCornerColor = async (png: Buffer): Promise<string | null> => {
+  try {
+    const { data, info } = await sharp(png)
+      .extract({ left: 0, top: 0, width: 6, height: 6 })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const ch = info.channels;
+    const px = info.width * info.height;
+    let r = 0, g = 0, b = 0, a = 0;
+    for (let i = 0; i < px; i++) {
+      const o = i * ch;
+      r += data[o]; g += data[o + 1]; b += data[o + 2];
+      a += ch >= 4 ? data[o + 3] : 255;
+    }
+    if (a / px < 235) return null; // transparent corner → no solid backdrop
+    return `rgb(${Math.round(r / px)},${Math.round(g / px)},${Math.round(b / px)})`;
+  } catch {
+    return null;
+  }
 };
 
 const parseDuration = (stderr: string): number => {
@@ -156,6 +182,15 @@ export const buildSpinFromVideo = async (params: {
     console.log(`[r3d] extracted ${files.length} frames (fps=${fps.toFixed(3)})`);
     if (files.length === 0) throw new Error("No frames were extracted");
 
+    // Content-aware player background from a representative frame's corner.
+    let detectedBg: string | null = null;
+    try {
+      detectedBg = await detectCornerColor(await fs.readFile(path.join(framesDir, files[0])));
+    } catch {
+      /* ignore */
+    }
+    console.log(`[r3d] detected bg=${detectedBg}`);
+
     const keyPrefix = `rotation3d/org_${params.organizationId}/product_${params.productId}/frames`;
     let aiCut = 0;
     const frames = await mapPool(files, UPLOAD_CONCURRENCY, async (file) => {
@@ -185,6 +220,7 @@ export const buildSpinFromVideo = async (params: {
       frames,
       defaultFrame: Math.round(frames.length / 12),
       width: MAX_FRAME_WIDTH,
+      detectedBg,
     };
   } finally {
     await fs.rm(framesDir, { recursive: true, force: true }).catch(() => undefined);
