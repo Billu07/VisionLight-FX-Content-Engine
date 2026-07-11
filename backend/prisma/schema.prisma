@@ -15,6 +15,7 @@ model Organization {
   provisioningSource String @default("MANUAL") // MANUAL | BYOK
   entitlementCode    String? // BYOK_TRIAL | PD_APP | VFX_APP | PD_STUDIO | VFX_STUDIO | VFX_STUDIO_AGENCY
   productLine        String? // "ROTATION3D" marks a managed Rotation3D brand org
+  slug               String? @unique // vanity slug → rotation3d.com/{slug}
   routingDomain      String?
   adminPanelLocked   Boolean @default(false)
   renderDailyLimit   Int?

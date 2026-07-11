@@ -17,6 +17,7 @@ type Cta = { label?: string; url?: string } | null;
 type Product = {
   id: string;
   name: string;
+  slug?: string;
   status: string;
   defaultFrame: number;
   background?: string | null;
@@ -34,7 +35,29 @@ const primaryBtn =
 const ghostBtn =
   "rounded-lg border border-white/12 bg-white/[0.04] px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-200 transition-colors hover:bg-white/[0.08] disabled:opacity-50";
 
-function ProductCard({ product, onSaved }: { product: Product; onSaved: () => void }) {
+function ProductCard({
+  product,
+  onSaved,
+  brandSlug,
+}: {
+  product: Product;
+  onSaved: () => void;
+  brandSlug?: string | null;
+}) {
+  const [linkCopied, setLinkCopied] = useState(false);
+  const playerLink =
+    brandSlug && product.slug
+      ? `${PLAYER_ORIGIN}/${brandSlug}/${product.slug}`
+      : `${PLAYER_ORIGIN}/p/${product.id}`;
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(playerLink);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 1500);
+    } catch {
+      /* clipboard blocked */
+    }
+  };
   const [p1Label, setP1Label] = useState(product.ctaPrimary?.label || "");
   const [p1Url, setP1Url] = useState(product.ctaPrimary?.url || "");
   const [p2Label, setP2Label] = useState(product.ctaSecondary?.label || "");
@@ -166,7 +189,10 @@ function ProductCard({ product, onSaved }: { product: Product; onSaved: () => vo
             <button className={ghostBtn} onClick={() => save(!published)} disabled={saving}>
               {published ? "Unpublish" : "Publish"}
             </button>
-            <a className={ghostBtn} href={`${PLAYER_ORIGIN}/p/${product.id}`} target="_blank" rel="noopener noreferrer">
+            <button className={ghostBtn} onClick={copyLink}>
+              {linkCopied ? "Copied!" : "Copy link"}
+            </button>
+            <a className={ghostBtn} href={playerLink} target="_blank" rel="noopener noreferrer">
               View player ↗
             </a>
             {note && <span className="text-xs text-gray-400">{note}</span>}
@@ -398,6 +424,7 @@ export default function Rotation3DBrandDashboard() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<"products" | "branding" | "send">("products");
   const [products, setProducts] = useState<Product[]>([]);
+  const [brandSlug, setBrandSlug] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -407,6 +434,7 @@ export default function Rotation3DBrandDashboard() {
     try {
       const res = await apiEndpoints.r3dMyProducts();
       setProducts(res.data.products || []);
+      setBrandSlug(res.data.brandSlug || null);
     } catch (e: any) {
       setError(e?.response?.data?.error || "Failed to load products");
     } finally {
@@ -471,7 +499,9 @@ export default function Rotation3DBrandDashboard() {
               No products yet. Send us your product images and we'll build your first spin.
             </div>
           ) : (
-            products.map((p) => <ProductCard key={p.id} product={p} onSaved={load} />)
+            products.map((p) => (
+              <ProductCard key={p.id} product={p} onSaved={load} brandSlug={brandSlug} />
+            ))
           )}
         </div>
       </div>

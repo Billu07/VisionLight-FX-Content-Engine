@@ -256,6 +256,11 @@ export const apiEndpoints = {
     api.post(`/api/rotation3d/my/products/${id}/embed`, { allowedDomains }),
   r3dPublicProduct: (id: string) =>
     api.get(`/api/rotation3d/public/products/${id}`),
+  r3dPublicBrand: (brandSlug: string) => api.get(`/api/rotation3d/public/b/${brandSlug}`),
+  r3dPublicBrandProduct: (brandSlug: string, productSlug: string) =>
+    api.get(`/api/rotation3d/public/b/${brandSlug}/${productSlug}`),
+  r3dSetBrandSlug: (orgId: string, slug: string) =>
+    api.patch(`/api/rotation3d/brands/${orgId}/slug`, { slug }),
   r3dTrackEvent: (productId: string, type: string, meta?: Record<string, unknown>) =>
     api.post("/api/rotation3d/public/events", { productId, type, meta }),
   byokGetActivationStatus: (checkoutSessionId: string) =>

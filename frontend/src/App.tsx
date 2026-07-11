@@ -37,6 +37,7 @@ import { Privacy } from "./pages/Privacy";
 import Rotation3DDemo from "./rotation3d/Rotation3DDemo";
 import Rotation3DLanding from "./rotation3d/Rotation3DLanding";
 import Rotation3DPlayer from "./rotation3d/Rotation3DPlayer";
+import BrandShowcasePage from "./rotation3d/BrandShowcasePage";
 import Rotation3DBrandDashboard from "./rotation3d/Rotation3DBrandDashboard";
 import { isRotation3dSite } from "./lib/branding";
 
@@ -296,6 +297,7 @@ function App() {
             {/* Rotation3D public player + iframe embed (linked from rotation3d.com) */}
             <Route path="/p/:productId" element={<Rotation3DPlayer />} />
             <Route path="/embed/:productId" element={<Rotation3DPlayer />} />
+            <Route path="/embed/showcase/:brandSlug" element={<BrandShowcasePage embed />} />
             <Route path="/pricing" element={<Pricing />} />
 
             {/* --- ADD THESE NEW ROUTES --- */}
@@ -346,6 +348,11 @@ function App() {
             {/* Rotation3D — public player preview (no auth). Path-gated for now;
                 moves behind the Rotation3D domain once DNS + branding land. */}
             <Route path="/rotation3d" element={<Rotation3DDemo />} />
+            {/* Rotation3D vanity URLs (kept last so specific routes win):
+                /{brand}/{product} = player, /{brand} = brand showcase.
+                Non-Rotation3D hosts fall through to "/" inside the components. */}
+            <Route path="/:brandSlug/:productSlug" element={<Rotation3DPlayer />} />
+            <Route path="/:brandSlug" element={<BrandShowcasePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Router>

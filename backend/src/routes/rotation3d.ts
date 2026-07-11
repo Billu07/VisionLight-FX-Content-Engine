@@ -47,6 +47,38 @@ const uniqueSlug = async (organizationId: string, name: string) => {
   return `${base}-${crypto.randomBytes(4).toString("hex")}`;
 };
 
+// Top-level path segments reserved by the app (a brand slug can't be one).
+const RESERVED_SLUGS = new Set([
+  "p", "embed", "admin", "studios", "projects", "pricing", "terms", "privacy",
+  "reset-password", "support-handoff", "auth", "billing", "demo", "rotation3d",
+  "api", "www", "b", "assets", "favicon",
+]);
+
+// Globally-unique vanity slug for an organization.
+const uniqueOrgSlug = async (name: string): Promise<string> => {
+  const base = slugify(name);
+  for (let i = 0; i < 8; i++) {
+    const slug = i === 0 ? base : `${base}-${crypto.randomBytes(2).toString("hex")}`;
+    if (RESERVED_SLUGS.has(slug)) continue;
+    const clash = await prisma.organization.findFirst({ where: { slug }, select: { id: true } });
+    if (!clash) return slug;
+  }
+  return `${base}-${crypto.randomBytes(4).toString("hex")}`;
+};
+
+// Resilient read of an org's slug (null if the column isn't migrated yet).
+const orgSlug = async (organizationId: string): Promise<string | null> => {
+  try {
+    const o = await prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { slug: true },
+    });
+    return o?.slug || null;
+  } catch {
+    return null;
+  }
+};
+
 const cta = (v: unknown) => {
   if (!v || typeof v !== "object") return undefined;
   const o = v as any;
@@ -107,6 +139,15 @@ router.post(
       select: { id: true, name: true, createdAt: true },
     });
 
+    // Vanity slug (resilient — the column may not be migrated yet).
+    let slug: string | null = null;
+    try {
+      slug = await uniqueOrgSlug(name);
+      await prisma.organization.update({ where: { id: org.id }, data: { slug } });
+    } catch {
+      slug = null;
+    }
+
     let admin:
       | { email: string; tempPassword?: string; reused?: boolean }
       | undefined;
@@ -133,7 +174,31 @@ router.post(
         });
       }
     }
-    res.status(201).json({ brand: org, admin });
+    res.status(201).json({ brand: { ...org, slug }, admin });
+  },
+);
+
+// Set / rename a brand's vanity slug (superadmin).
+router.patch(
+  "/api/rotation3d/brands/:orgId/slug",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const raw = slugify(String(req.body?.slug || ""));
+    if (!raw || RESERVED_SLUGS.has(raw)) {
+      return res.status(400).json({ error: "That slug is reserved or invalid" });
+    }
+    try {
+      const clash = await prisma.organization.findFirst({
+        where: { slug: raw, id: { not: req.params.orgId } },
+        select: { id: true },
+      });
+      if (clash) return res.status(409).json({ error: "That slug is already taken" });
+      await prisma.organization.update({ where: { id: req.params.orgId }, data: { slug: raw } });
+      res.json({ slug: raw });
+    } catch {
+      res.status(500).json({ error: "Slug not available yet (pending DB update)" });
+    }
   },
 );
 
@@ -152,7 +217,7 @@ router.get(
         _count: { select: { sourceImages: true, videos: true } },
       },
     });
-    res.json({ products });
+    res.json({ products, brandSlug: await orgSlug(orgId) });
   },
 );
 
@@ -393,7 +458,7 @@ router.get(
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
       include: { spin: true, embed: true },
     });
-    res.json({ products });
+    res.json({ products, brandSlug: await orgSlug(orgId) });
   },
 );
 
@@ -515,6 +580,84 @@ router.get(
         manifest: p.spin!.manifest,
       }));
     res.json({ products: list });
+  },
+);
+
+// Brand showcase by vanity slug → rotation3d.com/{brandSlug}
+router.get(
+  "/api/rotation3d/public/b/:brandSlug",
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const org = await prisma.organization.findFirst({
+        where: { slug: req.params.brandSlug, productLine: "ROTATION3D" },
+        select: {
+          id: true, name: true, slug: true,
+          brandConfigs: { select: { logoUrl: true, companyName: true, primaryColor: true, secondaryColor: true }, take: 1 },
+        },
+      });
+      if (!org) return res.status(404).json({ error: "Not found" });
+      const products = await prisma.rot3dProduct.findMany({
+        where: { organizationId: org.id, status: { in: ["READY", "PUBLISHED"] } },
+        orderBy: [{ order: "asc" }, { createdAt: "desc" }],
+        include: { spin: { select: { manifest: true } } },
+      });
+      const bc = org.brandConfigs?.[0];
+      res.json({
+        brand: {
+          name: bc?.companyName || org.name,
+          slug: org.slug,
+          logoUrl: bc?.logoUrl || null,
+          primaryColor: bc?.primaryColor || null,
+          secondaryColor: bc?.secondaryColor || null,
+        },
+        products: products
+          .filter((p) => p.spin)
+          .map((p) => ({
+            id: p.id, slug: p.slug, name: p.name, defaultFrame: p.defaultFrame,
+            background: p.background, manifest: p.spin!.manifest,
+          })),
+      });
+    } catch {
+      res.status(404).json({ error: "Not found" });
+    }
+  },
+);
+
+// Player by vanity slugs → rotation3d.com/{brandSlug}/{productSlug}
+router.get(
+  "/api/rotation3d/public/b/:brandSlug/:productSlug",
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const org = await prisma.organization.findFirst({
+        where: { slug: req.params.brandSlug, productLine: "ROTATION3D" },
+        select: {
+          id: true, name: true, slug: true,
+          brandConfigs: { select: { logoUrl: true, companyName: true, primaryColor: true, secondaryColor: true }, take: 1 },
+        },
+      });
+      if (!org) return res.status(404).json({ error: "Not found" });
+      const product = await prisma.rot3dProduct.findFirst({
+        where: { organizationId: org.id, slug: req.params.productSlug, status: { in: ["READY", "PUBLISHED"] } },
+        include: { spin: true },
+      });
+      if (!product || !product.spin) return res.status(404).json({ error: "Not found" });
+      const bc = org.brandConfigs?.[0];
+      res.json({
+        product: {
+          id: product.id, name: product.name, slug: product.slug,
+          defaultFrame: product.defaultFrame, background: product.background,
+          ctaPrimary: product.ctaPrimary, ctaSecondary: product.ctaSecondary,
+          brandName: bc?.companyName || org.name,
+          brandSlug: org.slug,
+          logoUrl: bc?.logoUrl || null,
+          primaryColor: bc?.primaryColor || null,
+          secondaryColor: bc?.secondaryColor || null,
+          manifest: product.spin.manifest,
+        },
+      });
+    } catch {
+      res.status(404).json({ error: "Not found" });
+    }
   },
 );
 

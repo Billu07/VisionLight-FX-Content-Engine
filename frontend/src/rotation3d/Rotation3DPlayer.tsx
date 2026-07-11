@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams, Navigate } from "react-router-dom";
 import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
+import { isRotation3dSite } from "../lib/branding";
 
 /**
  * Public Rotation3D player (rotation3d.com/p/:id and /embed/:id). Fetches the
@@ -53,13 +54,15 @@ function Placeholder({ title, sub }: { title: string; sub: string }) {
 }
 
 export default function Rotation3DPlayer() {
-  const { productId } = useParams();
+  // /p/:productId (id) OR /:brandSlug/:productSlug (vanity)
+  const { productId, brandSlug, productSlug } = useParams();
   const [search] = useSearchParams();
   // embed customization via URL params (?cta=0&controls=0&brand=0)
   const showCtas = search.get("cta") !== "0";
   const showControls = search.get("controls") !== "0";
   const showBrand = search.get("brand") !== "0";
-  const isDemo = !productId || productId === "demo";
+  const bySlug = !!(brandSlug && productSlug);
+  const isDemo = !bySlug && (!productId || productId === "demo");
   const [state, setState] = useState<{
     loading: boolean;
     data?: any;
@@ -70,12 +73,15 @@ export default function Rotation3DPlayer() {
     if (isDemo) return;
     let alive = true;
     setState({ loading: true });
-    apiEndpoints
-      .r3dPublicProduct(productId!)
+    const req = bySlug
+      ? apiEndpoints.r3dPublicBrandProduct(brandSlug!, productSlug!)
+      : apiEndpoints.r3dPublicProduct(productId!);
+    req
       .then((res) => {
         if (!alive) return;
-        setState({ loading: false, data: res.data.product });
-        apiEndpoints.r3dTrackEvent(productId!, "VIEW").catch(() => undefined);
+        const data = res.data.product;
+        setState({ loading: false, data });
+        if (data?.id) apiEndpoints.r3dTrackEvent(data.id, "VIEW").catch(() => undefined);
       })
       .catch((err) => {
         if (!alive) return;
@@ -87,7 +93,10 @@ export default function Rotation3DPlayer() {
     return () => {
       alive = false;
     };
-  }, [productId, isDemo]);
+  }, [productId, brandSlug, productSlug, isDemo, bySlug]);
+
+  // vanity URLs are Rotation3D-host only — on other domains fall through to "/"
+  if (bySlug && !isRotation3dSite()) return <Navigate to="/" replace />;
 
   if (isDemo) {
     return (
@@ -128,7 +137,7 @@ export default function Rotation3DPlayer() {
       ctaPrimary={toCta(p.ctaPrimary)}
       ctaSecondary={toCta(p.ctaSecondary)}
       onCtaClick={(which) =>
-        apiEndpoints.r3dTrackEvent(productId!, "CTA_CLICK", { which }).catch(() => undefined)
+        p?.id && apiEndpoints.r3dTrackEvent(p.id, "CTA_CLICK", { which }).catch(() => undefined)
       }
     />
   );
