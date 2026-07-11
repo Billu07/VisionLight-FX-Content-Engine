@@ -18,6 +18,9 @@ export type SpinManifest = {
   frameCount: number;
   /** ordered frame image URLs; when omitted the synthetic demo object renders */
   frames?: string[];
+  /** lighter, smaller-resolution frames served to phones for fast loading;
+   * same order/count as `frames`. Absent on products processed before this. */
+  framesMobile?: string[];
   /** frame index shown on load / reset (centered "hero" angle) */
   defaultFrame?: number;
 };
@@ -132,8 +135,20 @@ export default function SpinViewer({
     let alive = true;
 
     // --- frame images (real mode) ---
-    const urls = manifest.frames;
+    // On phones, prefer the lighter mobile frame set (much smaller download →
+    // buffers fast) when the product has one. Desktop and legacy products use
+    // the full-resolution set.
+    const isMobileViewport =
+      typeof window !== "undefined" &&
+      (Math.min(window.innerWidth, window.innerHeight) <= 820 ||
+        !!window.matchMedia?.("(pointer: coarse)").matches);
+    const usingMobileFrames =
+      isMobileViewport &&
+      Array.isArray(manifest.framesMobile) &&
+      manifest.framesMobile.length > 0;
+    const urls = usingMobileFrames ? manifest.framesMobile : manifest.frames;
     const realMode = Array.isArray(urls) && urls.length > 0;
+    let revealTimer: ReturnType<typeof setTimeout> | null = null;
     const imgs: (HTMLImageElement | null)[] = realMode
       ? new Array(urls!.length).fill(null)
       : [];
@@ -319,8 +334,9 @@ export default function SpinViewer({
     let startX = 0, startY = 0;
     // Per-touch gesture lock. At rest a vertical swipe becomes "scroll" (we bail
     // and let the page scroll — never gets stuck on the spinner); horizontal
-    // becomes "rotate". When zoomed, drag is "pan" to inspect.
-    let axis: "" | "rotate" | "scroll" | "pan" = "";
+    // becomes "rotate". When zoomed, "rotatepan": horizontal still spins the
+    // product, vertical pans up/down to inspect.
+    let axis: "" | "rotate" | "scroll" | "rotatepan" = "";
     const pointers = new Map<number, PointerEvent>();
     const isControl = (t: EventTarget | null) =>
       t instanceof Element && (t.closest(".r3d-iconbtn") || t.closest(".r3d-cta"));
@@ -331,8 +347,9 @@ export default function SpinViewer({
       lastX = startX = e.clientX;
       lastY = startY = e.clientY;
       lastT = performance.now();
-      if (zoomTarget > 1.15) {
-        axis = "pan"; // zoomed → capture immediately and inspect
+      if (zoomTarget > 1.05) {
+        // zoomed → capture immediately; drag still spins (x) and pans (y)
+        axis = "rotatepan";
         try { stage.setPointerCapture(e.pointerId); } catch { /* ignore */ }
         stage.classList.add("r3d-grabbing");
         engage();
@@ -363,12 +380,15 @@ export default function SpinViewer({
       }
       if (axis === "scroll") return;
 
-      if (axis === "pan") {
-        // zoomed in → move the product around to inspect (left/right + up/down)
+      if (axis === "rotatepan") {
+        // zoomed → horizontal still spins the product (so you never lose the
+        // rotate), vertical pans up/down to inspect the zoomed-in region.
+        const k = 0.006;
+        const d = -dx * k;
+        yaw += d;
+        yawVel = (d / dt) * 16;
         const lim = 130 * (zoomTarget - 1);
-        panTX = Math.max(-lim, Math.min(lim, panTX + dx));
         panTY = Math.max(-lim, Math.min(lim, panTY + dy));
-        panX = panTX;
         panY = panTY;
       } else {
         // at rest → horizontal rotates (negated so dragging right spins right)
@@ -487,6 +507,7 @@ export default function SpinViewer({
       if (pctRef.current) pctRef.current.textContent = Math.round(p) + "%";
     };
     const finishLoad = () => {
+      if (revealTimer) { clearTimeout(revealTimer); revealTimer = null; }
       loaderRef.current?.classList.add("r3d-gone");
       if (!hero) stage.focus({ preventScroll: true });
     };
@@ -510,13 +531,27 @@ export default function SpinViewer({
           dirty = true; // repaint once a frame arrives (no auto-spin to do it)
           loaded++;
           setProgress((loaded / n) * 100);
-          if (!revealed && (isReady(imgs[DEFAULT_FRAME]) || loaded >= Math.min(6, n))) {
+          // On mobile with the light frame set, buffer the whole ring before
+          // inviting a spin so the first drag is glitch-free (no "still loading"
+          // feel). Light frames make this quick. Desktop / legacy products keep
+          // the instant reveal + stream-behind.
+          const ready = usingMobileFrames
+            ? loaded >= n
+            : isReady(imgs[DEFAULT_FRAME]) || loaded >= Math.min(6, n);
+          if (!revealed && ready) {
             revealed = true;
             finishLoad();
           }
         };
         im.src = urls![i];
       });
+      // Safety net: if a slow/stalled network keeps us from fully buffering,
+      // reveal anyway (with whatever loaded) so the player is never stuck.
+      if (usingMobileFrames) {
+        revealTimer = setTimeout(() => {
+          if (!revealed) { revealed = true; finishLoad(); }
+        }, 12000);
+      }
     } else {
       // synthetic: simulate a short preload so the UX matches real mode
       let p = 0;
@@ -535,6 +570,7 @@ export default function SpinViewer({
 
     return () => {
       alive = false;
+      if (revealTimer) clearTimeout(revealTimer);
       cancelAnimationFrame(raf);
       stage.removeEventListener("pointerdown", onDown);
       stage.removeEventListener("pointermove", onMove);

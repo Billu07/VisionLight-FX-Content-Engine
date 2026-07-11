@@ -17,10 +17,17 @@ const UPLOAD_CONCURRENCY = 8; // parallel frame → R2 uploads
 // lossless, so extracted frames match the source.
 const MAX_FRAME_WIDTH = 2048;
 const WEBP_QUALITY = 92;
+// A second, lighter frame set for phones. ~1080px at q80 is visually
+// indistinguishable on a handset but roughly a quarter of the bytes, so a
+// 180-frame ring buffers fast on cellular. The player picks this set on mobile.
+const MOBILE_FRAME_WIDTH = 1080;
+const MOBILE_WEBP_QUALITY = 80;
 
 export type SpinManifest = {
   frameCount: number;
   frames: string[];
+  /** lighter phone-resolution frames, same order/count as `frames` */
+  framesMobile?: string[];
   defaultFrame: number;
   width: number | null;
   /** content-aware player background: the frame's corner color if opaque, else
@@ -193,31 +200,36 @@ export const buildSpinFromVideo = async (params: {
 
     const keyPrefix = `rotation3d/org_${params.organizationId}/product_${params.productId}/frames`;
     let aiCut = 0;
-    const frames = await mapPool(files, UPLOAD_CONCURRENCY, async (file) => {
+    // Each frame → a full-res WebP and a lighter mobile WebP, both on R2.
+    // Resizing from the already-extracted frame is cheap next to ffmpeg, so the
+    // second variant adds little processing time while making phones much faster.
+    const pairs = await mapPool(files, UPLOAD_CONCURRENCY, async (file) => {
       const raw = await fs.readFile(path.join(framesDir, file));
       let input: Buffer = raw;
       if (removal === "ai") {
         const cut = await matteFrame(raw); // paid Fal matte, on demand only
         if (cut) { input = cut; aiCut++; }
       }
-      const webp = await sharp(input)
-        .resize({ width: MAX_FRAME_WIDTH, withoutEnlargement: true })
-        .webp({ quality: WEBP_QUALITY })
-        .toBuffer();
-      return uploadManagedBuffer({
-        buffer: webp,
-        contentType: "image/webp",
-        keyPrefix,
-        fallbackExtension: "webp",
-      });
+      const [fullWebp, mobileWebp] = await Promise.all([
+        sharp(input).resize({ width: MAX_FRAME_WIDTH, withoutEnlargement: true }).webp({ quality: WEBP_QUALITY }).toBuffer(),
+        sharp(input).resize({ width: MOBILE_FRAME_WIDTH, withoutEnlargement: true }).webp({ quality: MOBILE_WEBP_QUALITY }).toBuffer(),
+      ]);
+      const [full, mobile] = await Promise.all([
+        uploadManagedBuffer({ buffer: fullWebp, contentType: "image/webp", keyPrefix, fallbackExtension: "webp" }),
+        uploadManagedBuffer({ buffer: mobileWebp, contentType: "image/webp", keyPrefix: `${keyPrefix}/m`, fallbackExtension: "webp" }),
+      ]);
+      return { full, mobile };
     });
+    const frames = pairs.map((p) => p.full);
+    const framesMobile = pairs.map((p) => p.mobile);
     console.log(
-      `[r3d] uploaded ${frames.length} frames to R2 (removal=${removal}${removal === "ai" ? ` ${aiCut}/${files.length}` : ""})`,
+      `[r3d] uploaded ${frames.length} frames ×2 (full+mobile) to R2 (removal=${removal}${removal === "ai" ? ` ${aiCut}/${files.length}` : ""})`,
     );
 
     return {
       frameCount: frames.length,
       frames,
+      framesMobile,
       defaultFrame: Math.round(frames.length / 12),
       width: MAX_FRAME_WIDTH,
       detectedBg,
