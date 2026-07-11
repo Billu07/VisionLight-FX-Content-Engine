@@ -112,6 +112,7 @@ export default function SpinViewer({
     let panX = 0, panY = 0, panTX = 0, panTY = 0;
     let idleSpin = false; // no auto-rotation; the "Drag to rotate" hint invites it
     let dirty = true, lastYaw = NaN, lastZoom = NaN, lastPX = 0, lastPY = 0;
+    let touchZoomed = false;
     let interacted = false;
     let raf = 0;
     let alive = true;
@@ -270,6 +271,13 @@ export default function SpinViewer({
       if (zoomTarget <= 1.1) { panTX = 0; panTY = 0; }
       panX += (panTX - panX) * 0.2;
       panY += (panTY - panY) * 0.2;
+      // At rest, let the browser scroll the page vertically (touch-action pan-y);
+      // once zoomed in, capture all gestures so drag can pan to inspect.
+      const zoomedNow = zoomTarget > 1.05;
+      if (zoomedNow !== touchZoomed) {
+        touchZoomed = zoomedNow;
+        stage.style.touchAction = zoomedNow ? "none" : "pan-y";
+      }
       // Only repaint when something actually changed — idle products stop
       // burning CPU/battery on mobile.
       if (
@@ -294,18 +302,29 @@ export default function SpinViewer({
       }
     };
     let dragging = false, lastX = 0, lastY = 0, lastT = 0, pinchD = 0;
+    let startX = 0, startY = 0;
+    // Per-touch gesture lock. At rest a vertical swipe becomes "scroll" (we bail
+    // and let the page scroll — never gets stuck on the spinner); horizontal
+    // becomes "rotate". When zoomed, drag is "pan" to inspect.
+    let axis: "" | "rotate" | "scroll" | "pan" = "";
     const pointers = new Map<number, PointerEvent>();
     const isControl = (t: EventTarget | null) =>
       t instanceof Element && (t.closest(".r3d-iconbtn") || t.closest(".r3d-cta"));
 
     const down = (e: PointerEvent) => {
-      engage();
       dragging = true;
       yawVel = 0;
-      lastX = e.clientX;
-      lastY = e.clientY;
+      lastX = startX = e.clientX;
+      lastY = startY = e.clientY;
       lastT = performance.now();
-      stage.classList.add("r3d-grabbing");
+      if (zoomTarget > 1.15) {
+        axis = "pan"; // zoomed → capture immediately and inspect
+        try { stage.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+        stage.classList.add("r3d-grabbing");
+        engage();
+      } else {
+        axis = ""; // undecided — first move picks rotate vs page-scroll
+      }
     };
     const move = (e: PointerEvent) => {
       if (!dragging) return;
@@ -313,14 +332,30 @@ export default function SpinViewer({
       const dt = Math.max(1, now - lastT);
       const dx = e.clientX - lastX;
       const dy = e.clientY - lastY;
-      // Horizontal drag always rotates — you can spin even while zoomed in.
-      // Negated so dragging right spins the product right (natural direction).
+
+      if (axis === "") {
+        const tdx = e.clientX - startX, tdy = e.clientY - startY;
+        if (Math.abs(tdx) < 6 && Math.abs(tdy) < 6) { lastX = e.clientX; lastY = e.clientY; lastT = now; return; }
+        if (Math.abs(tdx) >= Math.abs(tdy)) {
+          axis = "rotate";
+          try { stage.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+          stage.classList.add("r3d-grabbing");
+          engage();
+        } else {
+          axis = "scroll"; // vertical → hand it back to the page
+          dragging = false;
+          return;
+        }
+      }
+      if (axis === "scroll") return;
+
+      // horizontal → rotate (negated so dragging right spins right)
       const k = 0.006;
       const d = -dx * k;
       yaw += d;
       yawVel = (d / dt) * 16;
-      // Vertical drag pans up/down to inspect when zoomed in.
-      if (zoomTarget > 1.15) {
+      // vertical → pan when zoomed in
+      if (axis === "pan" && zoomTarget > 1.15) {
         const lim = 130 * (zoomTarget - 1);
         panTY = Math.max(-lim, Math.min(lim, panTY + dy));
         panY = panTY;
@@ -329,12 +364,12 @@ export default function SpinViewer({
       lastY = e.clientY;
       lastT = now;
     };
-    const up = () => { dragging = false; stage.classList.remove("r3d-grabbing"); };
+    const up = () => { dragging = false; axis = ""; stage.classList.remove("r3d-grabbing"); };
 
     const onDown = (e: PointerEvent) => {
       if (isControl(e.target)) return;
-      stage.setPointerCapture(e.pointerId);
       pointers.set(e.pointerId, e);
+      if (pointers.size === 2) { dragging = false; axis = ""; return; } // pinch
       if (pointers.size === 1) down(e);
     };
     const onMove = (e: PointerEvent) => {
@@ -602,8 +637,8 @@ const R3D_CSS = `
   position:relative;height:100dvh;width:100%;overflow:hidden;outline:none;
   font-family:"Bai Jamjuree",ui-sans-serif,system-ui,sans-serif;color:#eef1f6;
   background:radial-gradient(120% 80% at 50% -10%,#1a2336 0%,rgba(17,24,39,0) 55%),linear-gradient(to bottom right,#111827,#0B0F19);
-  touch-action:none;user-select:none;-webkit-user-select:none;
-  overscroll-behavior:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;
+  touch-action:pan-y;user-select:none;-webkit-user-select:none;
+  -webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;
 }
 .r3d-stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab}
 .r3d-stage.r3d-grabbing canvas{cursor:grabbing}
