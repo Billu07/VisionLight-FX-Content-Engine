@@ -56,11 +56,18 @@ const isLightColor = (bg?: string | null): boolean => {
   const s = bg.trim().toLowerCase();
   if (s === "white") return true;
   if (s === "black") return false;
-  let hex = s.replace(/^#/, "");
-  if (hex.length === 3) hex = hex.split("").map((c) => c + c).join("");
-  if (!/^[0-9a-f]{6}$/.test(hex)) return false;
-  const n = parseInt(hex, 16);
-  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  let r: number, g: number, b: number;
+  // Auto-matched ("keep") backgrounds arrive as rgb()/rgba(); manual picks as hex.
+  const rgb = s.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/);
+  if (rgb) {
+    r = +rgb[1]; g = +rgb[2]; b = +rgb[3];
+  } else {
+    let hex = s.replace(/^#/, "");
+    if (hex.length === 3) hex = hex.split("").map((c) => c + c).join("");
+    if (!/^[0-9a-f]{6}$/.test(hex)) return false;
+    const n = parseInt(hex, 16);
+    r = (n >> 16) & 255; g = (n >> 8) & 255; b = n & 255;
+  }
   return 0.2126 * r + 0.7152 * g + 0.0722 * b > 150;
 };
 
