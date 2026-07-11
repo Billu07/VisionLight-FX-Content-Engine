@@ -146,7 +146,7 @@ export default function Rotation3DLanding() {
   const heroProduct = featured.find((p) => p.heroFeatured) || featured[0];
   const showcase = featured.filter((p) => p.featured);
   return (
-    <div className="min-h-screen bg-studio-gradient font-sans text-white antialiased">
+    <div className="min-h-screen overflow-x-hidden bg-studio-gradient font-sans text-white antialiased">
       <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
       {/* Nav */}
       <header className="sticky top-0 z-40 border-b border-white/5 bg-gray-950/70 backdrop-blur-xl">
@@ -336,7 +336,7 @@ export default function Rotation3DLanding() {
       {/* Embed demo */}
       <Section className="py-16 sm:py-24">
         <div className="grid items-center gap-10 rounded-3xl border border-white/8 bg-glass-panel p-8 backdrop-blur sm:p-12 lg:grid-cols-2">
-          <motion.div {...fadeUp}>
+          <motion.div {...fadeUp} className="min-w-0">
             <h2 className="text-3xl font-bold tracking-tight">One line. Live on your site.</h2>
             <p className="mt-4 text-gray-400">
               No SDK, no build step. Paste the snippet where you want the spin to appear —

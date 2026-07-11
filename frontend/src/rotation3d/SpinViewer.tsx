@@ -42,6 +42,10 @@ export type SpinViewerProps = {
   secondaryColor?: string | null;
   /** per-product page background (CSS color). Empty → default studio gradient. */
   background?: string | null;
+  /** embed chrome toggles (default all shown) */
+  showControls?: boolean;
+  showCtas?: boolean;
+  showBrand?: boolean;
 };
 
 const clampZoom = (z: number) => Math.max(0.7, Math.min(2.8, z));
@@ -73,6 +77,9 @@ export default function SpinViewer({
   primaryColor,
   secondaryColor,
   background,
+  showControls = true,
+  showCtas = true,
+  showBrand = true,
 }: SpinViewerProps) {
   const hero = variant === "hero";
   const lightBg = isLightColor(background);
@@ -349,16 +356,19 @@ export default function SpinViewer({
       }
       if (axis === "scroll") return;
 
-      // horizontal → rotate (negated so dragging right spins right)
-      const k = 0.006;
-      const d = -dx * k;
-      yaw += d;
-      yawVel = (d / dt) * 16;
-      // vertical → pan when zoomed in
-      if (axis === "pan" && zoomTarget > 1.15) {
+      if (axis === "pan") {
+        // zoomed in → move the product around to inspect (left/right + up/down)
         const lim = 130 * (zoomTarget - 1);
+        panTX = Math.max(-lim, Math.min(lim, panTX + dx));
         panTY = Math.max(-lim, Math.min(lim, panTY + dy));
+        panX = panTX;
         panY = panTY;
+      } else {
+        // at rest → horizontal rotates (negated so dragging right spins right)
+        const k = 0.006;
+        const d = -dx * k;
+        yaw += d;
+        yawVel = (d / dt) * 16;
       }
       lastX = e.clientX;
       lastY = e.clientY;
@@ -542,7 +552,7 @@ export default function SpinViewer({
   };
 
   return (
-    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${lightBg ? "r3d-light" : ""} ${className || ""}`}
+    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${className || ""}`}
       style={stageStyle}
       tabIndex={hero ? -1 : 0}
       aria-label="Interactive 360 degree product viewer. Drag to rotate.">
@@ -698,6 +708,10 @@ const R3D_CSS = `
   .r3d-zoomcol{bottom:calc(150px + env(safe-area-inset-bottom))}
   .r3d-cta{padding:13px 12px;font-size:14px}
 }
+/* embed chrome toggles */
+.r3d-no-controls .r3d-zoomcol,.r3d-no-controls .r3d-tools,.r3d-no-controls .r3d-rot{display:none!important}
+.r3d-no-ctas .r3d-ctas{display:none!important}
+.r3d-no-brand .r3d-brand{display:none!important}
 /* light background → flip text + controls to dark for contrast */
 .r3d-light .r3d-name{color:#0b0f19}
 .r3d-light .r3d-kicker{color:#5b6472}

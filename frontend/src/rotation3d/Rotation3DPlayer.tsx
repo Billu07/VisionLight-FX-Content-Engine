@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
 
@@ -54,6 +54,11 @@ function Placeholder({ title, sub }: { title: string; sub: string }) {
 
 export default function Rotation3DPlayer() {
   const { productId } = useParams();
+  const [search] = useSearchParams();
+  // embed customization via URL params (?cta=0&controls=0&brand=0)
+  const showCtas = search.get("cta") !== "0";
+  const showControls = search.get("controls") !== "0";
+  const showBrand = search.get("brand") !== "0";
   const isDemo = !productId || productId === "demo";
   const [state, setState] = useState<{
     loading: boolean;
@@ -117,6 +122,9 @@ export default function Rotation3DPlayer() {
       primaryColor={p.primaryColor}
       secondaryColor={p.secondaryColor}
       background={p.background}
+      showControls={showControls}
+      showCtas={showCtas}
+      showBrand={showBrand}
       ctaPrimary={toCta(p.ctaPrimary)}
       ctaSecondary={toCta(p.ctaSecondary)}
       onCtaClick={(which) =>

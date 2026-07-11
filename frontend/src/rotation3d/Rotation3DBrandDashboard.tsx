@@ -34,9 +34,6 @@ const primaryBtn =
 const ghostBtn =
   "rounded-lg border border-white/12 bg-white/[0.04] px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-200 transition-colors hover:bg-white/[0.08] disabled:opacity-50";
 
-const embedSnippet = (id: string) =>
-  `<iframe src="${PLAYER_ORIGIN}/embed/${id}" width="100%" height="520" style="border:0" allowfullscreen></iframe>`;
-
 function ProductCard({ product, onSaved }: { product: Product; onSaved: () => void }) {
   const [p1Label, setP1Label] = useState(product.ctaPrimary?.label || "");
   const [p1Url, setP1Url] = useState(product.ctaPrimary?.url || "");
@@ -46,9 +43,23 @@ function ProductCard({ product, onSaved }: { product: Product; onSaved: () => vo
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [note, setNote] = useState("");
+  const [emCtas, setEmCtas] = useState(true);
+  const [emControls, setEmControls] = useState(true);
+  const [emLogo, setEmLogo] = useState(true);
 
   const thumb = product.spin?.manifest?.frames?.[0];
   const published = product.status === "PUBLISHED";
+
+  const embedUrl = () => {
+    const q = new URLSearchParams();
+    if (!emCtas) q.set("cta", "0");
+    if (!emControls) q.set("controls", "0");
+    if (!emLogo) q.set("brand", "0");
+    const s = q.toString();
+    return `${PLAYER_ORIGIN}/embed/${product.id}${s ? `?${s}` : ""}`;
+  };
+  const embedCode = () =>
+    `<iframe src="${embedUrl()}" width="100%" height="520" style="border:0" allowfullscreen></iframe>`;
 
   const save = async (publishOverride?: boolean) => {
     setSaving(true);
@@ -71,7 +82,7 @@ function ProductCard({ product, onSaved }: { product: Product; onSaved: () => vo
 
   const copyEmbed = async () => {
     try {
-      await navigator.clipboard.writeText(embedSnippet(product.id));
+      await navigator.clipboard.writeText(embedCode());
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -155,13 +166,40 @@ function ProductCard({ product, onSaved }: { product: Product; onSaved: () => vo
             <button className={ghostBtn} onClick={() => save(!published)} disabled={saving}>
               {published ? "Unpublish" : "Publish"}
             </button>
-            <button className={ghostBtn} onClick={copyEmbed}>
-              {copied ? "Copied!" : "Copy embed"}
-            </button>
             <a className={ghostBtn} href={`${PLAYER_ORIGIN}/p/${product.id}`} target="_blank" rel="noopener noreferrer">
               View player ↗
             </a>
             {note && <span className="text-xs text-gray-400">{note}</span>}
+          </div>
+
+          {/* Embed builder — choose what shows in the embed, then copy the code */}
+          <div className="mt-3 rounded-lg border border-white/8 bg-gray-950/40 p-3">
+            <p className={label}>Embed</p>
+            <div className="mt-2 flex flex-wrap gap-4 text-xs text-gray-300">
+              {(
+                [
+                  ["Buttons", emCtas, setEmCtas],
+                  ["Controls", emControls, setEmControls],
+                  ["Logo", emLogo, setEmLogo],
+                ] as const
+              ).map(([lbl, val, set]) => (
+                <label key={lbl} className="flex cursor-pointer items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={val}
+                    onChange={(e) => set(e.target.checked)}
+                    className="accent-brand-primary"
+                  />
+                  {lbl}
+                </label>
+              ))}
+            </div>
+            <div className="mt-2 overflow-x-auto rounded-md border border-white/10 bg-gray-950 p-2">
+              <code className="whitespace-pre text-[10px] text-gray-400">{embedCode()}</code>
+            </div>
+            <button className={`${ghostBtn} mt-2`} onClick={copyEmbed}>
+              {copied ? "Copied!" : "Copy embed code"}
+            </button>
           </div>
         </div>
       </div>
@@ -381,7 +419,7 @@ export default function Rotation3DBrandDashboard() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-studio-gradient font-sans text-white">
+    <div className="min-h-screen overflow-x-hidden bg-studio-gradient font-sans text-white">
       <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

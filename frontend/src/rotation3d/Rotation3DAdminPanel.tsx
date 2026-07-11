@@ -553,8 +553,10 @@ export default function Rotation3DAdminPanel() {
                       <option value={36}>36 frames · light</option>
                       <option value={48}>48 frames</option>
                       <option value={60}>60 frames · smooth</option>
-                      <option value={72}>72 frames · very smooth</option>
-                      <option value={90}>90 frames · max</option>
+                      <option value={72}>72 frames</option>
+                      <option value={90}>90 frames · very smooth</option>
+                      <option value={120}>120 frames · ultra</option>
+                      <option value={180}>180 frames · max</option>
                     </select>
                   </label>
                   <label className="flex items-center gap-2 text-xs text-gray-400">

@@ -161,7 +161,7 @@ export const buildSpinFromVideo = async (params: {
   /** white/black = free ffmpeg chroma-key; ai = paid Fal matte; none = opaque */
   removal?: "white" | "black" | "ai" | "none";
 }): Promise<SpinManifest> => {
-  const targetCount = Math.min(120, Math.max(12, params.frameCount ?? 48));
+  const targetCount = Math.min(180, Math.max(12, params.frameCount ?? 48));
   const removal = params.removal ?? "none";
   const keyColor =
     removal === "white" ? "0xFFFFFF" : removal === "black" ? "0x000000" : undefined;
