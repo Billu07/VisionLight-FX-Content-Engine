@@ -665,7 +665,9 @@ const R3D_CSS = `
 .r3d-brand{display:flex;align-items:center;gap:10px;min-width:0}
 .r3d-logo{width:30px;height:30px;border-radius:9px;flex:none;background:linear-gradient(135deg,var(--r3d-primary),var(--r3d-secondary));box-shadow:var(--r3d-glow);display:grid;place-items:center}
 .r3d-logo svg{width:16px;height:16px;color:#fff}
-.r3d-logo-img{height:34px;max-width:130px;object-fit:contain;flex:none;filter:drop-shadow(0 1px 6px rgba(0,0,0,.4))}
+/* theme-adaptive halo keeps a static brand logo legible on any background:
+   dark bg → faint light ring (protects dark logos); light bg override below */
+.r3d-logo-img{height:34px;max-width:130px;object-fit:contain;flex:none;filter:drop-shadow(0 0 2px rgba(0,0,0,.45)) drop-shadow(0 0 6px rgba(255,255,255,.14))}
 .r3d-titles{min-width:0}
 .r3d-kicker{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--r3d-muted)}
 .r3d-name{font-weight:600;font-size:16px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -720,6 +722,7 @@ const R3D_CSS = `
 .r3d-no-ctas .r3d-ctas{display:none!important}
 .r3d-no-brand .r3d-brand{display:none!important}
 /* light background → flip text + controls to dark for contrast */
+.r3d-light .r3d-logo-img{filter:drop-shadow(0 0 1px rgba(0,0,0,.55)) drop-shadow(0 1px 5px rgba(0,0,0,.3))}
 .r3d-light .r3d-name{color:#0b0f19}
 .r3d-light .r3d-kicker{color:#5b6472}
 .r3d-light .r3d-hint span{color:#0b0f19;text-shadow:none}
