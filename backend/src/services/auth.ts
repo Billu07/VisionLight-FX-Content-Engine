@@ -33,6 +33,11 @@ if (SUPABASE_JWT_SECRET) {
   );
 }
 
+// One-shot confirmation: logged the first time a token actually verifies
+// offline, so we can tell "secret is set" apart from "local verification is
+// really happening" (vs silently falling back to the remote path).
+let loggedLocalVerifyWorking = false;
+
 type LocalSupabaseUser = {
   id: string;
   email: string;
@@ -54,6 +59,10 @@ function verifyLocalSupabaseToken(token: string): LocalSupabaseUser | null {
     const id = typeof payload.sub === "string" ? payload.sub : "";
     const email = typeof payload.email === "string" ? payload.email : "";
     if (!id || !email) return null; // not the shape we need → fall back
+    if (!loggedLocalVerifyWorking) {
+      loggedLocalVerifyWorking = true;
+      console.log("✅ Supabase JWT: local verification WORKING (a token verified offline)");
+    }
     return {
       id,
       email,
