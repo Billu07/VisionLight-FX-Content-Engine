@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import jwt from "jsonwebtoken";
 import { dbService as airtableService } from "./database";
 import { supportHandoffService } from "./supportHandoff";
 import dotenv from "dotenv";
@@ -13,6 +14,57 @@ const supabase = createClient(
   process.env.SUPABASE_URL || "",
   process.env.SUPABASE_SERVICE_ROLE_KEY || "",
 );
+
+// Local (offline) verification of Supabase access tokens.
+// Supabase signs access tokens as HS256 JWTs with the project's JWT secret.
+// Verifying the signature locally lets authenticated requests skip a network
+// round-trip to Supabase's auth server on every call — which is what caused
+// the p95 latency and the intermittent ConnectTimeout/ECONNRESET errors.
+// It stays a pure fast-path: if the secret is unset, or the token isn't an
+// HS256 Supabase JWT (e.g. asymmetric-signed projects, or our own support /
+// workspace tokens), we return null and the caller falls back to the remote
+// `supabase.auth.getUser()` — so behavior is unchanged except on the hot path.
+const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET || "";
+if (SUPABASE_JWT_SECRET) {
+  console.log("🔐 Supabase JWT: local verification enabled (offline hot path)");
+} else {
+  console.warn(
+    "🔐 Supabase JWT: SUPABASE_JWT_SECRET not set — every auth check calls Supabase remotely (slower, network-dependent)",
+  );
+}
+
+type LocalSupabaseUser = {
+  id: string;
+  email: string;
+  user_metadata?: { full_name?: string; [k: string]: any };
+};
+
+/**
+ * Verify a Supabase access token offline. Returns a user shaped like the
+ * subset of `supabase.auth.getUser()` that validateSession consumes, or null
+ * if it can't be verified locally (caller should then try the remote path).
+ * Trusts the token only on a valid HS256 signature + unexpired + has email.
+ */
+function verifyLocalSupabaseToken(token: string): LocalSupabaseUser | null {
+  if (!SUPABASE_JWT_SECRET) return null;
+  try {
+    const payload = jwt.verify(token, SUPABASE_JWT_SECRET, {
+      algorithms: ["HS256"], // pin the algorithm — never accept "none" or RS/ES
+    }) as jwt.JwtPayload;
+    const id = typeof payload.sub === "string" ? payload.sub : "";
+    const email = typeof payload.email === "string" ? payload.email : "";
+    if (!id || !email) return null; // not the shape we need → fall back
+    return {
+      id,
+      email,
+      user_metadata: (payload.user_metadata as LocalSupabaseUser["user_metadata"]) || {},
+    };
+  } catch {
+    // Expired, bad signature, malformed, or a non-Supabase token (support /
+    // workspace). Fall back to the remote path, preserving prior behavior.
+    return null;
+  }
+}
 
 const ADMIN_EMAILS_RAW = process.env.ADMIN_EMAILS || "";
 const ADMIN_EMAILS = ADMIN_EMAILS_RAW.split(",").map((email) =>
@@ -316,13 +368,24 @@ export class AuthService {
 
   static async validateSession(token: string, activeProfileId?: string) {
     try {
-      const {
-        data: { user: supabaseUser },
-        error,
-      } = await supabase.auth.getUser(token);
+      // Fast path: verify the Supabase JWT locally (no network). Falls back to
+      // the remote getUser() below for anything we can't verify offline.
+      let supabaseUser: LocalSupabaseUser | null = verifyLocalSupabaseToken(token);
 
-      if (error || !supabaseUser || !supabaseUser.email) {
-        return null;
+      if (!supabaseUser) {
+        const {
+          data: { user: remoteUser },
+          error,
+        } = await supabase.auth.getUser(token);
+
+        if (error || !remoteUser || !remoteUser.email) {
+          return null;
+        }
+        supabaseUser = {
+          id: remoteUser.id,
+          email: remoteUser.email,
+          user_metadata: remoteUser.user_metadata,
+        };
       }
 
       const email = normalizeEmail(supabaseUser.email);
