@@ -177,6 +177,26 @@ export default function Rotation3DAdminPanel() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [sourceImages, setSourceImages] = useState<any[]>([]);
+  const [brandSlug, setBrandSlug] = useState<string | null>(null);
+  const [slugDraft, setSlugDraft] = useState("");
+  const [savingSlug, setSavingSlug] = useState(false);
+  const [slugMsg, setSlugMsg] = useState("");
+  const [backfilling, setBackfilling] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyProductLink = async (p: Product) => {
+    const link =
+      brandSlug && p.slug
+        ? `${PLAYER_ORIGIN}/${brandSlug}/${p.slug}`
+        : `${PLAYER_ORIGIN}/p/${p.id}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedId(p.id);
+      setTimeout(() => setCopiedId(null), 1500);
+    } catch {
+      /* clipboard blocked */
+    }
+  };
 
   const [productName, setProductName] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -217,10 +237,45 @@ export default function Rotation3DAdminPanel() {
     try {
       const res = await apiEndpoints.r3dBrandProducts(brand.id);
       setProducts(res.data.products || []);
+      const bs = res.data.brandSlug || null;
+      setBrandSlug(bs);
+      if (!silent) {
+        setSlugDraft(bs || "");
+        setSlugMsg("");
+      }
     } catch (e: any) {
       if (!silent) setMsg({ kind: "err", text: e?.response?.data?.error || "Failed to load products" });
     } finally {
       if (!silent) setLoadingProducts(false);
+    }
+  };
+
+  const saveBrandSlug = async () => {
+    if (!selected || !slugDraft.trim()) return;
+    setSavingSlug(true);
+    setSlugMsg("");
+    try {
+      const res = await apiEndpoints.r3dSetBrandSlug(selected.id, slugDraft);
+      setBrandSlug(res.data.slug);
+      setSlugDraft(res.data.slug);
+      setSlugMsg("Saved");
+    } catch (e: any) {
+      setSlugMsg(e?.response?.data?.error || "Failed");
+    } finally {
+      setSavingSlug(false);
+    }
+  };
+
+  const backfillSlugs = async () => {
+    setBackfilling(true);
+    try {
+      const res = await apiEndpoints.r3dBackfillSlugs();
+      setMsg({ kind: "ok", text: `Generated ${res.data.updated} brand link(s).` });
+      if (selected) await loadProducts(selected);
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e?.response?.data?.error || "Backfill failed" });
+    } finally {
+      setBackfilling(false);
     }
   };
 
@@ -432,6 +487,17 @@ export default function Rotation3DAdminPanel() {
             </div>
           )}
 
+          {brands.length > 0 && (
+            <button
+              onClick={backfillSlugs}
+              disabled={backfilling}
+              className="mt-4 w-full rounded-lg border border-gray-700/60 px-3 py-2 text-[11px] font-semibold text-gray-300 hover:bg-gray-800/60 disabled:opacity-50"
+              title="Assign vanity links to brands that don't have one yet"
+            >
+              {backfilling ? "Generating…" : "Generate missing brand links"}
+            </button>
+          )}
+
           <div className="mt-4 space-y-2">
             {loadingBrands ? (
               <div className="py-6 text-center">
@@ -484,6 +550,41 @@ export default function Rotation3DAdminPanel() {
                 <button className="text-xs text-gray-400 hover:text-white" onClick={() => loadProducts(selected)}>
                   ↻ refresh
                 </button>
+              </div>
+
+              {/* Brand vanity link (rotation3d.com/{slug}) */}
+              <div className="mt-4 rounded-lg border border-gray-700/60 bg-gray-950/50 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-300">Brand link</p>
+                <p className="mt-1 text-[11px] text-gray-500">
+                  Public showcase &amp; the base of every product URL.
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <span className="font-mono text-xs text-gray-500">rotation3d.com/</span>
+                  <input
+                    className={`${input} w-44`}
+                    placeholder="brand-name"
+                    value={slugDraft}
+                    onChange={(e) => setSlugDraft(e.target.value)}
+                  />
+                  <button
+                    className="rounded-md border border-gray-700 px-2.5 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800 disabled:opacity-50"
+                    onClick={saveBrandSlug}
+                    disabled={savingSlug}
+                  >
+                    {savingSlug ? "Saving…" : "Save"}
+                  </button>
+                  {brandSlug && (
+                    <a
+                      className="rounded-md border border-gray-700 px-2.5 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
+                      href={`https://rotation3d.com/${brandSlug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Open ↗
+                    </a>
+                  )}
+                  {slugMsg && <span className="text-[11px] text-gray-400">{slugMsg}</span>}
+                </div>
               </div>
 
               {/* Images the brand sent in */}
@@ -610,14 +711,26 @@ export default function Rotation3DAdminPanel() {
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
                         {(p.status === "READY" || p.status === "PUBLISHED") && (
-                          <a
-                            href={`${PLAYER_ORIGIN}/p/${p.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
-                          >
-                            View player ↗
-                          </a>
+                          <>
+                            <button
+                              onClick={() => copyProductLink(p)}
+                              className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
+                            >
+                              {copiedId === p.id ? "Copied!" : "Copy link"}
+                            </button>
+                            <a
+                              href={
+                                brandSlug && p.slug
+                                  ? `${PLAYER_ORIGIN}/${brandSlug}/${p.slug}`
+                                  : `${PLAYER_ORIGIN}/p/${p.id}`
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
+                            >
+                              View player ↗
+                            </a>
+                          </>
                         )}
                         <button
                           onClick={() => deleteProduct(p)}

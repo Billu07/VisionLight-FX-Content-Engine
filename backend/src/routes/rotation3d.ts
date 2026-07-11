@@ -202,6 +202,30 @@ router.patch(
   },
 );
 
+// Assign vanity slugs to any Rotation3D brands that don't have one yet.
+router.post(
+  "/api/rotation3d/backfill-slugs",
+  authenticateToken,
+  requireSuperAdmin,
+  async (_req: AuthenticatedRequest, res: Response) => {
+    try {
+      const brands = await prisma.organization.findMany({
+        where: { productLine: "ROTATION3D", slug: null },
+        select: { id: true, name: true },
+      });
+      let updated = 0;
+      for (const b of brands) {
+        const slug = await uniqueOrgSlug(b.name);
+        await prisma.organization.update({ where: { id: b.id }, data: { slug } });
+        updated++;
+      }
+      res.json({ updated });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message || "Backfill failed (pending DB update?)" });
+    }
+  },
+);
+
 // List a brand's products (with spin + counts) for the team console.
 router.get(
   "/api/rotation3d/brands/:orgId/products",
@@ -481,6 +505,15 @@ router.patch(
     if ("defaultFrame" in req.body) data.defaultFrame = Math.max(0, Number(req.body.defaultFrame) || 0);
     if ("background" in req.body) data.background = String(req.body.background || "").slice(0, 40);
     if (typeof req.body.publish === "boolean") data.status = req.body.publish ? "PUBLISHED" : "READY";
+    if (typeof req.body.slug === "string" && req.body.slug.trim()) {
+      const s = slugify(req.body.slug);
+      const clash = await prisma.rot3dProduct.findFirst({
+        where: { organizationId: orgId, slug: s, NOT: { id: owned.id } },
+        select: { id: true },
+      });
+      if (clash) return res.status(409).json({ error: "That product link is already taken" });
+      data.slug = s;
+    }
 
     const product = await prisma.rot3dProduct.update({
       where: { id: owned.id },

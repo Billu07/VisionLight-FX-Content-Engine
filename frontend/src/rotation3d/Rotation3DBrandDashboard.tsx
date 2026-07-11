@@ -69,6 +69,24 @@ function ProductCard({
   const [emCtas, setEmCtas] = useState(true);
   const [emControls, setEmControls] = useState(true);
   const [emLogo, setEmLogo] = useState(true);
+  const [slug, setSlug] = useState(product.slug || "");
+  const [slugSaving, setSlugSaving] = useState(false);
+  const [slugNote, setSlugNote] = useState("");
+
+  const saveSlug = async () => {
+    if (!slug.trim()) return;
+    setSlugSaving(true);
+    setSlugNote("");
+    try {
+      await apiEndpoints.r3dUpdateProduct(product.id, { slug });
+      onSaved();
+      setSlugNote("Saved");
+    } catch (e: any) {
+      setSlugNote(e?.response?.data?.error || "Failed");
+    } finally {
+      setSlugSaving(false);
+    }
+  };
 
   const thumb = product.spin?.manifest?.frames?.[0];
   const published = product.status === "PUBLISHED";
@@ -197,6 +215,29 @@ function ProductCard({
             </a>
             {note && <span className="text-xs text-gray-400">{note}</span>}
           </div>
+
+          {/* Custom link — name the shareable vanity URL (needs a brand slug) */}
+          {brandSlug && (
+            <div className="mt-3 rounded-lg border border-white/8 bg-gray-950/40 p-3">
+              <p className={label}>Custom link</p>
+              <p className="mt-0.5 text-[11px] text-gray-500">Name the shareable URL for this product.</p>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="font-mono text-xs text-gray-500">
+                  {PLAYER_ORIGIN.replace(/^https?:\/\//, "")}/{brandSlug}/
+                </span>
+                <input
+                  className={`${input} w-44`}
+                  placeholder="product-name"
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value)}
+                />
+                <button className={ghostBtn} onClick={saveSlug} disabled={slugSaving}>
+                  {slugSaving ? "Saving…" : "Save link"}
+                </button>
+                {slugNote && <span className="text-xs text-gray-400">{slugNote}</span>}
+              </div>
+            </div>
+          )}
 
           {/* Embed builder — choose what shows in the embed, then copy the code */}
           <div className="mt-3 rounded-lg border border-white/8 bg-gray-950/40 p-3">
