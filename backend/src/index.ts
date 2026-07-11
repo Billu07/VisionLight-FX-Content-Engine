@@ -11,7 +11,7 @@ import demoRouter from "./routes/demo";
 import appDataRouter from "./routes/app-data";
 import mediaRouter from "./routes/media";
 import byokRouter from "./routes/byok";
-import rotation3dRouter from "./routes/rotation3d";
+import rotation3dRouter, { recoverOrphanedRot3dJobs } from "./routes/rotation3d";
 
 console.log("Environment Check:", {
   airtableKey: process.env.AIRTABLE_API_KEY ? "Loaded" : "Missing",
@@ -58,6 +58,7 @@ if (process.env.NODE_ENV !== "production" || process.env.VERCEL !== "1") {
     console.log(`Server running on port ${PORT}`);
     console.log(`Start Time: ${new Date().toISOString()}`);
     console.log(`SuperAdmin DELETE Org Route: ACTIVE`);
+    void recoverOrphanedRot3dJobs();
   });
 }
 

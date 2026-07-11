@@ -12,6 +12,7 @@ import {
 import { AuthService } from "../services/auth";
 import { uploadManagedBuffer } from "../utils/managedStorage";
 import { buildSpinFromVideo } from "../services/rotation3d/pipeline";
+import { enqueueProcessing, processingQueueDepth } from "../services/rotation3d/processingQueue";
 
 const router = Router();
 
@@ -315,7 +316,17 @@ router.post(
     const videoPath = file.path;
     const mimetype = file.mimetype;
     const uploaderId = req.user?.id || null;
-    void (async () => {
+
+    // Heavy frame extraction runs through a bounded-concurrency queue so a
+    // burst of parallel/batch uploads can't oversubscribe the CPU. The upload
+    // already returned above; queued jobs stay PROCESSING until their turn.
+    {
+      const d = processingQueueDepth();
+      console.log(
+        `[r3d] product ${product.id} queued for processing (active ${d.active}/${d.concurrency}, waiting ${d.waiting})`,
+      );
+    }
+    void enqueueProcessing(async () => {
       try {
         const buf = await fs.readFile(videoPath);
         const videoUrl = await uploadManagedBuffer({
@@ -360,7 +371,7 @@ router.post(
       } finally {
         await fs.rm(videoPath, { force: true }).catch(() => undefined);
       }
-    })();
+    }).catch(() => undefined);
   },
 );
 
@@ -762,5 +773,24 @@ router.post(
     res.json({ ok: true });
   },
 );
+
+// Called once at server startup. The processing queue is in-memory, so any
+// product left PROCESSING by a previous (crashed/restarted) process is an
+// orphan — nothing will ever finish it. Mark those FAILED so they aren't stuck
+// forever and the team knows to re-upload. Safe because this runs before any
+// new upload can enqueue, and there is only one backend process (pm2 fork).
+export async function recoverOrphanedRot3dJobs() {
+  try {
+    const { count } = await prisma.rot3dProduct.updateMany({
+      where: { status: "PROCESSING" },
+      data: { status: "FAILED" },
+    });
+    if (count > 0) {
+      console.log(`[r3d] startup recovery: marked ${count} orphaned PROCESSING product(s) FAILED`);
+    }
+  } catch (err) {
+    console.error("[r3d] startup recovery failed:", err);
+  }
+}
 
 export default router;
