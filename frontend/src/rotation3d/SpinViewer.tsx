@@ -314,9 +314,11 @@ export default function SpinViewer({
       const dx = e.clientX - lastX;
       const dy = e.clientY - lastY;
       // Horizontal drag always rotates — you can spin even while zoomed in.
+      // Negated so dragging right spins the product right (natural direction).
       const k = 0.006;
-      yaw += dx * k;
-      yawVel = ((dx * k) / dt) * 16;
+      const d = -dx * k;
+      yaw += d;
+      yawVel = (d / dt) * 16;
       // Vertical drag pans up/down to inspect when zoomed in.
       if (zoomTarget > 1.15) {
         const lim = 130 * (zoomTarget - 1);
@@ -377,8 +379,8 @@ export default function SpinViewer({
     };
     const onKey = (e: KeyboardEvent) => {
       const step = TWO_PI / FRAMES;
-      if (e.key === "ArrowLeft") { engage(); yaw -= step; }
-      else if (e.key === "ArrowRight") { engage(); yaw += step; }
+      if (e.key === "ArrowLeft") { engage(); yaw += step; }
+      else if (e.key === "ArrowRight") { engage(); yaw -= step; }
       else if (e.key === "+" || e.key === "=") zoomTarget = clampZoom(zoomTarget * 1.2);
       else if (e.key === "-") zoomTarget = clampZoom(zoomTarget * 0.83);
       else if (e.key === "r" || e.key === "R") { yaw = (DEFAULT_FRAME / FRAMES) * TWO_PI; zoomTarget = 1; panX = panY = panTX = panTY = 0; }
