@@ -148,7 +148,6 @@ export default function SpinViewer({
       manifest.framesMobile.length > 0;
     const urls = usingMobileFrames ? manifest.framesMobile : manifest.frames;
     const realMode = Array.isArray(urls) && urls.length > 0;
-    let revealTimer: ReturnType<typeof setTimeout> | null = null;
     const imgs: (HTMLImageElement | null)[] = realMode
       ? new Array(urls!.length).fill(null)
       : [];
@@ -347,14 +346,21 @@ export default function SpinViewer({
       lastX = startX = e.clientX;
       lastY = startY = e.clientY;
       lastT = performance.now();
-      if (zoomTarget > 1.05) {
-        // zoomed → capture immediately; drag still spins (x) and pans (y)
-        axis = "rotatepan";
+      // Pan (moving the frame around) only unlocks once you're zoomed in a few
+      // clicks; below that a turn stays anchored so it can't wobble. Each zoom
+      // click is ×1.2, so 1.2^4 ≈ 2.07 → ~1.9 is the 4th zoom-in click.
+      if (zoomTarget > 1.9) {
+        axis = "rotatepan"; // deep zoom → spin (x) + vertical pan (y) to inspect
+        try { stage.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+        stage.classList.add("r3d-grabbing");
+        engage();
+      } else if (zoomTarget > 1.05) {
+        axis = "rotate"; // light zoom → keep anchored: rotate only, no wobble
         try { stage.setPointerCapture(e.pointerId); } catch { /* ignore */ }
         stage.classList.add("r3d-grabbing");
         engage();
       } else {
-        axis = ""; // undecided — first move picks rotate vs page-scroll
+        axis = ""; // at rest → first move picks rotate vs page-scroll
       }
     };
     const move = (e: PointerEvent) => {
@@ -507,7 +513,6 @@ export default function SpinViewer({
       if (pctRef.current) pctRef.current.textContent = Math.round(p) + "%";
     };
     const finishLoad = () => {
-      if (revealTimer) { clearTimeout(revealTimer); revealTimer = null; }
       loaderRef.current?.classList.add("r3d-gone");
       if (!hero) stage.focus({ preventScroll: true });
     };
@@ -522,36 +527,41 @@ export default function SpinViewer({
       }
       const seq = [...new Set(order)].slice(0, n);
       let revealed = false;
-      seq.forEach((i, k) => {
+      let cursor = 0;
+
+      // Load frames with BOUNDED concurrency and decode each one OFF the main
+      // thread (img.decode()) before it's used. Firing all 180 at once
+      // saturated the connection, and — worse — drawing a freshly-arrived but
+      // not-yet-decoded frame forced a synchronous decode on the animation
+      // thread. That was the 5-10s of "bogging" before the spin smoothed out.
+      // Bounded + pre-decoded keeps the turn smooth from the first second.
+      const LOAD_CONCURRENCY = 8;
+      const loadOne = async (i: number) => {
         const im = new Image();
         im.decoding = "async";
-        if (k < 4) (im as any).fetchPriority = "high";
-        im.onload = im.onerror = () => {
-          imgs[i] = im;
-          dirty = true; // repaint once a frame arrives (no auto-spin to do it)
-          loaded++;
-          setProgress((loaded / n) * 100);
-          // On mobile with the light frame set, buffer the whole ring before
-          // inviting a spin so the first drag is glitch-free (no "still loading"
-          // feel). Light frames make this quick. Desktop / legacy products keep
-          // the instant reveal + stream-behind.
-          const ready = usingMobileFrames
-            ? loaded >= n
-            : isReady(imgs[DEFAULT_FRAME]) || loaded >= Math.min(6, n);
-          if (!revealed && ready) {
-            revealed = true;
-            finishLoad();
-          }
-        };
         im.src = urls![i];
-      });
-      // Safety net: if a slow/stalled network keeps us from fully buffering,
-      // reveal anyway (with whatever loaded) so the player is never stuck.
-      if (usingMobileFrames) {
-        revealTimer = setTimeout(() => {
-          if (!revealed) { revealed = true; finishLoad(); }
-        }, 12000);
-      }
+        try {
+          if (im.decode) await im.decode();
+          else await new Promise<void>((r) => { im.onload = im.onerror = () => r(); });
+        } catch {
+          /* broken/cancelled frame — fall through so loading can't stall */
+        }
+        if (!alive) return;
+        imgs[i] = im;
+        dirty = true; // repaint once a frame is decoded (no auto-spin to do it)
+        loaded++;
+        setProgress((loaded / n) * 100);
+        if (!revealed && (isReady(imgs[DEFAULT_FRAME]) || loaded >= Math.min(6, n))) {
+          revealed = true;
+          finishLoad();
+        }
+      };
+      const worker = async () => {
+        while (alive && cursor < seq.length) {
+          await loadOne(seq[cursor++]);
+        }
+      };
+      for (let w = 0; w < Math.min(LOAD_CONCURRENCY, seq.length); w++) void worker();
     } else {
       // synthetic: simulate a short preload so the UX matches real mode
       let p = 0;
@@ -570,7 +580,6 @@ export default function SpinViewer({
 
     return () => {
       alive = false;
-      if (revealTimer) clearTimeout(revealTimer);
       cancelAnimationFrame(raf);
       stage.removeEventListener("pointerdown", onDown);
       stage.removeEventListener("pointermove", onMove);
