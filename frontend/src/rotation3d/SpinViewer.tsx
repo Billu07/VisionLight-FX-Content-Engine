@@ -148,6 +148,7 @@ export default function SpinViewer({
       manifest.framesMobile.length > 0;
     const urls = usingMobileFrames ? manifest.framesMobile : manifest.frames;
     const realMode = Array.isArray(urls) && urls.length > 0;
+    let revealTimer: ReturnType<typeof setTimeout> | null = null;
     const imgs: (HTMLImageElement | null)[] = realMode
       ? new Array(urls!.length).fill(null)
       : [];
@@ -513,6 +514,7 @@ export default function SpinViewer({
       if (pctRef.current) pctRef.current.textContent = Math.round(p) + "%";
     };
     const finishLoad = () => {
+      if (revealTimer) { clearTimeout(revealTimer); revealTimer = null; }
       loaderRef.current?.classList.add("r3d-gone");
       if (!hero) stage.focus({ preventScroll: true });
     };
@@ -551,7 +553,10 @@ export default function SpinViewer({
         dirty = true; // repaint once a frame is decoded (no auto-spin to do it)
         loaded++;
         setProgress((loaded / n) * 100);
-        if (!revealed && (isReady(imgs[DEFAULT_FRAME]) || loaded >= Math.min(6, n))) {
+        // Hold the loader until the WHOLE ring is buffered + decoded, so the
+        // instant it clears the spin is flawless — every frame present, zero
+        // decode lag or mid-turn skips. A slightly longer loader, but no jank.
+        if (!revealed && loaded >= n) {
           revealed = true;
           finishLoad();
         }
@@ -562,6 +567,11 @@ export default function SpinViewer({
         }
       };
       for (let w = 0; w < Math.min(LOAD_CONCURRENCY, seq.length); w++) void worker();
+      // Safety net: if a frame stalls on a bad network, reveal anyway (with
+      // whatever's loaded) rather than trapping the user on the loader forever.
+      revealTimer = setTimeout(() => {
+        if (!revealed) { revealed = true; finishLoad(); }
+      }, 15000);
     } else {
       // synthetic: simulate a short preload so the UX matches real mode
       let p = 0;
@@ -580,6 +590,7 @@ export default function SpinViewer({
 
     return () => {
       alive = false;
+      if (revealTimer) clearTimeout(revealTimer);
       cancelAnimationFrame(raf);
       stage.removeEventListener("pointerdown", onDown);
       stage.removeEventListener("pointermove", onMove);
