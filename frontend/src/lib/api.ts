@@ -262,6 +262,8 @@ export const apiEndpoints = {
   r3dSetBrandSlug: (orgId: string, slug: string) =>
     api.patch(`/api/rotation3d/brands/${orgId}/slug`, { slug }),
   r3dBackfillSlugs: () => api.post("/api/rotation3d/backfill-slugs"),
+  r3dShareCard: (id: string) =>
+    api.get(`/api/rotation3d/my/products/${id}/share-card`, { responseType: "blob" }),
   r3dTrackEvent: (productId: string, type: string, meta?: Record<string, unknown>) =>
     api.post("/api/rotation3d/public/events", { productId, type, meta }),
   byokGetActivationStatus: (checkoutSessionId: string) =>

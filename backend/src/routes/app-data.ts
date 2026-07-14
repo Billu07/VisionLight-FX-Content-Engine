@@ -806,6 +806,9 @@ router.put(
 
       const config = await airtableService.upsertBrandConfig({
         userId: req.user!.id,
+        // Link to the active org so per-org readers (e.g. the Rotation3D player,
+        // which looks up branding via organization.brandConfigs) find it.
+        organizationId: req.user!.organizationId || null,
         companyName,
         primaryColor,
         secondaryColor,
@@ -842,6 +845,8 @@ router.post(
       const existing = await airtableService.getBrandConfig(req.user!.id);
       const config = await airtableService.upsertBrandConfig({
         userId: req.user!.id,
+        organizationId:
+          req.user!.organizationId || existing?.organizationId || null,
         companyName: existing?.companyName,
         primaryColor: existing?.primaryColor,
         secondaryColor: existing?.secondaryColor,

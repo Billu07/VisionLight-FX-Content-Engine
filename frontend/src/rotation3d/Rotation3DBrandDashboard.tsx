@@ -131,6 +131,26 @@ function ProductCard({
     }
   };
 
+  const [cardBusy, setCardBusy] = useState(false);
+  const downloadShareCard = async () => {
+    setCardBusy(true);
+    try {
+      const res = await apiEndpoints.r3dShareCard(product.id);
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${product.slug || product.name || "rotation3d"}-share.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setNote("Could not generate share card");
+    } finally {
+      setCardBusy(false);
+    }
+  };
+
   return (
     <div className={panel}>
       <div className="flex flex-col gap-4 sm:flex-row">
@@ -264,9 +284,17 @@ function ProductCard({
             <div className="mt-2 overflow-x-auto rounded-md border border-white/10 bg-gray-950 p-2">
               <code className="whitespace-pre text-[10px] text-gray-400">{embedCode()}</code>
             </div>
-            <button className={`${ghostBtn} mt-2`} onClick={copyEmbed}>
-              {copied ? "Copied!" : "Copy embed code"}
-            </button>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button className={ghostBtn} onClick={copyEmbed}>
+                {copied ? "Copied!" : "Copy embed code"}
+              </button>
+              <button className={ghostBtn} onClick={downloadShareCard} disabled={cardBusy}>
+                {cardBusy ? "Preparing…" : "Download share card"}
+              </button>
+            </div>
+            <p className="mt-1.5 text-[11px] text-gray-500">
+              Share card = the product image + a scannable QR to its link, for social posts.
+            </p>
           </div>
         </div>
       </div>

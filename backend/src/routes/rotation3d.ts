@@ -13,6 +13,7 @@ import { AuthService } from "../services/auth";
 import { uploadManagedBuffer } from "../utils/managedStorage";
 import { buildSpinFromVideo } from "../services/rotation3d/pipeline";
 import { enqueueProcessing, processingQueueDepth } from "../services/rotation3d/processingQueue";
+import { buildShareCard } from "../services/rotation3d/shareCard";
 
 const router = Router();
 
@@ -771,6 +772,81 @@ router.post(
       },
     });
     res.json({ ok: true });
+  },
+);
+
+// Downloadable social "share card": product start frame + a QR to the product
+// link (brand logo in its center) + "Powered by Rotation3D.com". Generated
+// server-side (reads frames/logo from R2 without browser CORS constraints).
+router.get(
+  "/api/rotation3d/my/products/:id/share-card",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const orgId = requireOrg(req, res);
+    if (!orgId) return;
+    const product = await prisma.rot3dProduct.findFirst({
+      where: { id: req.params.id, organizationId: orgId },
+      include: { spin: true },
+    });
+    if (!product) return res.status(404).json({ error: "Product not found" });
+
+    let org: any = null;
+    try {
+      org = await prisma.organization.findUnique({
+        where: { id: orgId },
+        select: {
+          name: true,
+          slug: true,
+          brandConfigs: {
+            select: { logoUrl: true, companyName: true, primaryColor: true },
+            take: 1,
+          },
+        },
+      });
+    } catch {
+      org = await prisma.organization.findUnique({
+        where: { id: orgId },
+        select: {
+          name: true,
+          brandConfigs: {
+            select: { logoUrl: true, companyName: true, primaryColor: true },
+            take: 1,
+          },
+        },
+      });
+    }
+    const bc = org?.brandConfigs?.[0];
+    const brandSlug: string | null = org?.slug || null;
+
+    const manifest: any = product.spin?.manifest || {};
+    const frames: string[] = Array.isArray(manifest.frames) ? manifest.frames : [];
+    const df = Math.min(Math.max(0, product.defaultFrame || 0), Math.max(0, frames.length - 1));
+    const frameUrl = frames[df] || frames[0] || null;
+
+    const productUrl =
+      brandSlug && product.slug
+        ? `https://rotation3d.com/${brandSlug}/${product.slug}`
+        : `https://rotation3d.com/p/${product.id}`;
+
+    try {
+      const png = await buildShareCard({
+        productUrl,
+        frameUrl,
+        logoUrl: bc?.logoUrl || null,
+        productName: product.name,
+        brandName: bc?.companyName || org?.name || "Rotation3D",
+        primaryColor: bc?.primaryColor || null,
+      });
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${product.slug || "rotation3d"}-share.png"`,
+      );
+      res.send(png);
+    } catch (e: any) {
+      console.error("[r3d] share-card error:", e);
+      res.status(500).json({ error: "Could not generate the share card" });
+    }
   },
 );
 
