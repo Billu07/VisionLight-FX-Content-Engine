@@ -1085,9 +1085,18 @@ export const videoLogic = {
                 normalizedPayload.includes("partner_validation_failed") ||
                 normalizedPayload.includes("generated_video"));
 
+            // Kling reference videos/subjects ("elements") are treated as
+            // performance subjects and require a recognizable human face — so
+            // they can't be used to reference a product/object. Surface a clear
+            // fix instead of the raw 422 JSON.
+            const isKlingElementFaceError =
+              normalizedPayload.includes("recognizable face");
+
             isFailed = true;
             errorMessage = isSeedanceAudioPolicyViolation
               ? "Seedance rejected generated audio for this prompt. Disable Generate Audio and retry."
+              : isKlingElementFaceError
+              ? "Kling needs a recognizable human face in a reference video/subject. For a product or object render, remove the reference video/element — a start frame, end frame, and prompt are enough for a smooth turntable rotation."
               : `Fal poll rejected (422): ${pollPayload || "Unprocessable Entity"}`;
           }
         }
