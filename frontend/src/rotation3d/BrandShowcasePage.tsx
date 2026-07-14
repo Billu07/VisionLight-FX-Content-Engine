@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams, Navigate } from "react-router-dom";
 import SpinViewer, { type SpinManifest } from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
@@ -19,7 +19,19 @@ type P = {
   name: string;
   defaultFrame?: number;
   background?: string | null;
-  manifest?: { frameCount?: number; frames?: string[] };
+  manifest?: { frameCount?: number; frames?: string[]; framesMobile?: string[] };
+};
+
+// Gallery tiles don't need a product's full 120/180 frames — cap them to ~90
+// (evenly subsampled) so a grid of spins stays light. The player page (opened
+// on click) still uses the full-density manifest.
+const GALLERY_MAX_FRAMES = 90;
+const cap = (arr: string[] | undefined, max: number): string[] | undefined => {
+  if (!arr || arr.length <= max) return arr;
+  const out: string[] = [];
+  const step = arr.length / max;
+  for (let i = 0; i < max; i++) out.push(arr[Math.floor(i * step)]);
+  return out;
 };
 type Brand = {
   name: string;
@@ -29,11 +41,61 @@ type Brand = {
   secondaryColor?: string | null;
 };
 
-const man = (p: P): SpinManifest => ({
-  frameCount: p.manifest?.frameCount || p.manifest?.frames?.length || 36,
-  frames: p.manifest?.frames,
-  defaultFrame: p.defaultFrame ?? 0,
-});
+const galleryMan = (p: P): SpinManifest => {
+  const frames = cap(p.manifest?.frames, GALLERY_MAX_FRAMES);
+  const framesMobile = cap(p.manifest?.framesMobile, GALLERY_MAX_FRAMES);
+  return {
+    frameCount: frames?.length || p.manifest?.frameCount || 36,
+    frames,
+    framesMobile,
+    defaultFrame: 0,
+  };
+};
+
+const posterFor = (p: P): string | undefined => {
+  const src = p.manifest?.framesMobile?.length ? p.manifest.framesMobile : p.manifest?.frames;
+  if (!src || src.length === 0) return undefined;
+  const d = Math.min(src.length - 1, Math.max(0, p.defaultFrame ?? 0));
+  return src[d];
+};
+
+// Lazy gallery tile: shows a static poster frame instantly (grid feels
+// immediate), and only mounts the live SpinViewer — which then loads its
+// coarse ring first, per the player's progressive loader — once the tile
+// scrolls near the viewport. That keeps a big grid from loading every spin at
+// once. Once mounted it stays mounted (no reload thrash on scroll).
+function GalleryTile({ p, background }: { p: P; background: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [live, setLive] = useState(false);
+  const poster = posterFor(p);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || live) return;
+    if (typeof IntersectionObserver === "undefined") { setLive(true); return; }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) { setLive(true); io.disconnect(); }
+      },
+      { rootMargin: "300px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [live]);
+
+  return (
+    <div ref={ref} className="relative aspect-square" style={{ background }}>
+      {poster && (
+        <img src={poster} alt="" aria-hidden className="absolute inset-0 h-full w-full object-contain" />
+      )}
+      {live && (
+        <div className="absolute inset-0">
+          <SpinViewer manifest={galleryMan(p)} variant="hero" background={background} />
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -98,9 +160,7 @@ export default function BrandShowcasePage({ embed = false }: { embed?: boolean }
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {products.map((p) => (
               <div key={p.id} className="overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02]">
-                <div className="relative aspect-square">
-                  <SpinViewer manifest={man(p)} variant="hero" background={p.background || STUDIO_GRADIENT} />
-                </div>
+                <GalleryTile p={p} background={p.background || STUDIO_GRADIENT} />
                 <div className="flex items-center justify-between border-t border-white/8 px-5 py-4">
                   <Link
                     to={`/${brand.slug}/${p.slug}`}

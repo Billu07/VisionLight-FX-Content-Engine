@@ -74,6 +74,29 @@ const isLightColor = (bg?: string | null): boolean => {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b > 150;
 };
 
+// Progressive load order: an evenly-spread COARSE ring first, then repeatedly
+// halve the gaps. Any prefix of the result covers the full 360°, so the spin is
+// usable early (at low density) and sharpens seamlessly as more frames arrive —
+// nearestLoaded() always draws the best frame available. `start` loads first
+// (the hero angle) so the very first painted frame is the intended one.
+const progressiveOrder = (n: number, start = 0): number[] => {
+  const order: number[] = [];
+  const seen = new Array(n).fill(false);
+  const add = (raw: number) => {
+    const i = ((raw % n) + n) % n;
+    if (!seen[i]) { seen[i] = true; order.push(i); }
+  };
+  add(start);
+  let stride = n;
+  while (stride > 1) {
+    stride = Math.max(1, Math.ceil(stride / 2));
+    for (let i = 0; i < n; i += stride) add(start + i);
+    if (stride === 1) break;
+  }
+  for (let i = 0; i < n; i++) add(start + i); // safety: include any remainder
+  return order;
+};
+
 export default function SpinViewer({
   manifest,
   productName = "Product",
@@ -466,18 +489,40 @@ export default function SpinViewer({
       else if (e.key === "f" || e.key === "F") toggleFs();
     };
 
-    const toggleFs = () => {
-      if (!document.fullscreenElement) stage.requestFullscreen?.().catch(() => {});
-      else document.exitFullscreen?.();
-    };
-    const onFsChange = () => {
+    // Fullscreen with an iOS fallback. Safari can't fullscreen a <div> (only
+    // <video>), so requestFullscreen is undefined there and the button did
+    // nothing on iPhone. Fall back to a CSS "pseudo fullscreen" that fixes the
+    // stage to fill the viewport — works on every mobile browser.
+    let pseudoFs = false;
+    const nativeFsActive = () =>
+      !!(document.fullscreenElement || (document as any).webkitFullscreenElement);
+    const ENTER_ICON = '<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>';
+    const EXIT_ICON = '<path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>';
+    const syncFsIcon = () => {
       const el = fsIconRef.current;
-      if (el)
-        el.innerHTML = document.fullscreenElement
-          ? '<path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>'
-          : '<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>';
+      if (el) el.innerHTML = nativeFsActive() || pseudoFs ? EXIT_ICON : ENTER_ICON;
       setTimeout(fit, 60);
     };
+    const setPseudo = (on: boolean) => {
+      pseudoFs = on;
+      stage.classList.toggle("r3d-pseudo-fs", on);
+      document.documentElement.classList.toggle("r3d-fs-lock", on);
+      syncFsIcon();
+    };
+    const toggleFs = () => {
+      const reqFs = stage.requestFullscreen || (stage as any).webkitRequestFullscreen;
+      if (reqFs) {
+        if (nativeFsActive()) {
+          (document.exitFullscreen || (document as any).webkitExitFullscreen)?.call(document);
+        } else {
+          const p = reqFs.call(stage);
+          if (p && typeof p.catch === "function") p.catch(() => setPseudo(true)); // iOS refuses → pseudo
+        }
+      } else {
+        setPseudo(!pseudoFs); // no native fullscreen (iOS Safari) → pseudo
+      }
+    };
+    const onFsChange = () => syncFsIcon();
 
     // control buttons (delegated within the stage)
     const onClick = (e: MouseEvent) => {
@@ -521,13 +566,11 @@ export default function SpinViewer({
 
     if (realMode) {
       const n = urls!.length;
-      // Prioritize the hero frame + its neighbors, then fan outward, so the
-      // viewer reveals almost instantly and the rest stream in behind it.
-      const order: number[] = [DEFAULT_FRAME];
-      for (let d = 1; d <= n; d++) {
-        order.push((((DEFAULT_FRAME - d) % n) + n) % n, (DEFAULT_FRAME + d) % n);
-      }
-      const seq = [...new Set(order)].slice(0, n);
+      // Progressive density: load an evenly-spread coarse ring first so the
+      // whole 360 is usable within ~a second, then keep filling the gaps so the
+      // spin sharpens toward full frame count — no waiting for all 120/180.
+      const seq = progressiveOrder(n, DEFAULT_FRAME);
+      const COARSE = Math.min(n, 36); // a turntable already reads well at ~36
       let revealed = false;
       let cursor = 0;
 
@@ -553,10 +596,10 @@ export default function SpinViewer({
         dirty = true; // repaint once a frame is decoded (no auto-spin to do it)
         loaded++;
         setProgress((loaded / n) * 100);
-        // Hold the loader until the WHOLE ring is buffered + decoded, so the
-        // instant it clears the spin is flawless — every frame present, zero
-        // decode lag or mid-turn skips. A slightly longer loader, but no jank.
-        if (!revealed && loaded >= n) {
+        // Reveal as soon as a usable coarse ring is decoded — don't make the
+        // user wait for all 120/180. The rest keep loading underneath and the
+        // spin sharpens seamlessly (nearestLoaded picks the best frame).
+        if (!revealed && loaded >= COARSE) {
           revealed = true;
           finishLoad();
         }
@@ -567,11 +610,12 @@ export default function SpinViewer({
         }
       };
       for (let w = 0; w < Math.min(LOAD_CONCURRENCY, seq.length); w++) void worker();
-      // Safety net: if a frame stalls on a bad network, reveal anyway (with
-      // whatever's loaded) rather than trapping the user on the loader forever.
+      // Cap the loader so the user never stares at it: reveal with whatever's
+      // decoded after 1.5s even if the coarse ring isn't complete (a low-density
+      // spin is still usable, and keeps sharpening as frames arrive).
       revealTimer = setTimeout(() => {
         if (!revealed) { revealed = true; finishLoad(); }
-      }, 15000);
+      }, 1500);
     } else {
       // synthetic: simulate a short preload so the UX matches real mode
       let p = 0;
@@ -601,6 +645,9 @@ export default function SpinViewer({
       stage.removeEventListener("click", onClick);
       document.removeEventListener("fullscreenchange", onFsChange);
       window.removeEventListener("resize", fit);
+      // undo pseudo-fullscreen if we unmount while it's active
+      stage.classList.remove("r3d-pseudo-fs");
+      document.documentElement.classList.remove("r3d-fs-lock");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manifest, FRAMES, DEFAULT_FRAME, hero]);
@@ -694,6 +741,7 @@ export default function SpinViewer({
           </svg>
           <div className="r3d-pct" ref={pctRef}>0%</div>
           <div className="r3d-lbl">Preparing spin</div>
+          <div className="r3d-powered">Powered by Rotation3D</div>
         </div>
       </div>
     </div>
@@ -743,7 +791,8 @@ const R3D_CSS = `
 .r3d-ghost{background:var(--r3d-glass);backdrop-filter:blur(10px)}
 .r3d-ghost:hover{background:var(--r3d-glass2)}
 .r3d-cta:active{transform:translateY(1px)}
-.r3d-hint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:4;display:flex;flex-direction:column;align-items:center;gap:12px;pointer-events:none;transition:opacity .5s}
+/* hint sits UNDER the product (lower third), not over it */
+.r3d-hint{position:absolute;left:50%;bottom:19%;top:auto;transform:translateX(-50%);z-index:4;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;transition:opacity .5s}
 .r3d-hint.r3d-gone{opacity:0}
 .r3d-hand{width:52px;height:52px;border-radius:50%;border:1px solid var(--r3d-line);background:rgba(11,15,25,.4);backdrop-filter:blur(8px);display:grid;place-items:center;animation:r3dsway 1.8s ease-in-out infinite}
 .r3d-hand svg{width:24px;height:24px;color:#eef1f6}
@@ -758,12 +807,21 @@ const R3D_CSS = `
 .r3d-loadwrap{display:flex;flex-direction:column;align-items:center;gap:14px}
 .r3d-pct{font-weight:600;font-size:13px;color:var(--r3d-muted)}
 .r3d-lbl{font-size:12px;color:var(--r3d-muted);letter-spacing:.14em;text-transform:uppercase}
+.r3d-powered{margin-top:4px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--r3d-muted);opacity:.65}
 @media (prefers-reduced-motion:reduce){.r3d-hand{animation:none}}
+/* pseudo-fullscreen (iOS fallback): fix the stage to fill the viewport */
+.r3d-pseudo-fs{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;z-index:2147483000!important;margin:0!important}
+:root.r3d-fs-lock,html.r3d-fs-lock{overflow:hidden!important}
 /* hero variant: contained, transparent, chrome-less spinning object */
 /* hero fills its parent and is transparent by default (blends into the page),
    but an explicit product background still shows through via inline style */
 .r3d-hero{height:100%!important;background:transparent}
 .r3d-hero .r3d-scrim-top,.r3d-hero .r3d-scrim-bot,.r3d-hero .r3d-topbar,.r3d-hero .r3d-zoomcol,.r3d-hero .r3d-rot,.r3d-hero .r3d-ctas,.r3d-hero .r3d-loader{display:none!important}
+/* gallery tiles: keep the drag hint small and low so it sits under the product */
+.r3d-hero .r3d-hint{bottom:8%;gap:5px;opacity:.8}
+.r3d-hero .r3d-hand{width:32px;height:32px}
+.r3d-hero .r3d-hand svg{width:15px;height:15px}
+.r3d-hero .r3d-hint span{font-size:11px}
 /* mobile: keep controls off the product + clear of each other */
 @media (max-width:560px){
   .r3d-iconbtn{width:40px;height:40px}
@@ -776,7 +834,7 @@ const R3D_CSS = `
 /* embed chrome toggles */
 .r3d-no-controls .r3d-zoomcol,.r3d-no-controls .r3d-tools,.r3d-no-controls .r3d-rot{display:none!important}
 .r3d-no-ctas .r3d-ctas{display:none!important}
-.r3d-no-brand .r3d-brand{display:none!important}
+.r3d-no-brand .r3d-brand,.r3d-no-brand .r3d-powered{display:none!important}
 /* light background → flip text + controls to dark for contrast */
 .r3d-light .r3d-logo-img{filter:drop-shadow(0 0 1px rgba(0,0,0,.55)) drop-shadow(0 1px 5px rgba(0,0,0,.3))}
 .r3d-light .r3d-name{color:#0b0f19}
