@@ -791,8 +791,9 @@ const R3D_CSS = `
 .r3d-ghost{background:var(--r3d-glass);backdrop-filter:blur(10px)}
 .r3d-ghost:hover{background:var(--r3d-glass2)}
 .r3d-cta:active{transform:translateY(1px)}
-/* hint sits UNDER the product (lower third), not over it */
-.r3d-hint{position:absolute;left:50%;bottom:19%;top:auto;transform:translateX(-50%);z-index:4;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;transition:opacity .5s}
+/* hint sits UNDER the product (lower third), not over it; the max() floor keeps
+   it clear of the angle navigator (.r3d-rot at bottom:118px) on short viewports */
+.r3d-hint{position:absolute;left:50%;bottom:max(19%,170px);top:auto;transform:translateX(-50%);z-index:4;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;transition:opacity .5s}
 .r3d-hint.r3d-gone{opacity:0}
 .r3d-hand{width:52px;height:52px;border-radius:50%;border:1px solid var(--r3d-line);background:rgba(11,15,25,.4);backdrop-filter:blur(8px);display:grid;place-items:center;animation:r3dsway 1.8s ease-in-out infinite}
 .r3d-hand svg{width:24px;height:24px;color:#eef1f6}
@@ -828,6 +829,7 @@ const R3D_CSS = `
   .r3d-name{font-size:14px;max-width:52vw}
   .r3d-rot{bottom:150px;padding:5px 11px}
   .r3d-rot .r3d-track{width:92px}
+  .r3d-hint{bottom:max(20%,202px)}
   .r3d-zoomcol{bottom:calc(150px + env(safe-area-inset-bottom))}
   .r3d-cta{padding:13px 12px;font-size:14px}
 }
