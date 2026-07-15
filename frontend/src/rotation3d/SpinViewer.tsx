@@ -503,11 +503,34 @@ export default function SpinViewer({
       if (el) el.innerHTML = nativeFsActive() || pseudoFs ? EXIT_ICON : ENTER_ICON;
       setTimeout(fit, 60);
     };
+    // On a phone held sideways in fullscreen there's lots of empty width but the
+    // product only fills the height — so auto-zoom to 2× to fill the frame. We
+    // only auto-apply once (autoLandscapeZoom) and only pull back if the user
+    // hasn't since changed the zoom themselves, so we never fight their pinch.
+    let autoLandscapeZoom = false;
+    const isLandscape = () =>
+      window.matchMedia?.("(orientation: landscape)")?.matches ??
+      window.innerWidth > window.innerHeight;
+    const updateLandscapeZoom = () => {
+      const want = isMobileViewport && (nativeFsActive() || pseudoFs) && isLandscape();
+      if (want && !autoLandscapeZoom && zoomTarget <= 1.05) {
+        zoomTarget = clampZoom(2);
+        autoLandscapeZoom = true;
+        engage();
+      } else if (!want && autoLandscapeZoom) {
+        if (Math.abs(zoomTarget - clampZoom(2)) < 0.01) {
+          zoomTarget = 1; panTX = 0; panTY = 0;
+        }
+        autoLandscapeZoom = false;
+      }
+    };
     const setPseudo = (on: boolean) => {
       pseudoFs = on;
       stage.classList.toggle("r3d-pseudo-fs", on);
       document.documentElement.classList.toggle("r3d-fs-lock", on);
       syncFsIcon();
+      // let the pseudo-fs layout settle before measuring orientation
+      setTimeout(updateLandscapeZoom, 80);
     };
     const toggleFs = () => {
       const reqFs = stage.requestFullscreen || (stage as any).webkitRequestFullscreen;
@@ -522,7 +545,8 @@ export default function SpinViewer({
         setPseudo(!pseudoFs); // no native fullscreen (iOS Safari) → pseudo
       }
     };
-    const onFsChange = () => syncFsIcon();
+    const onFsChange = () => { syncFsIcon(); setTimeout(updateLandscapeZoom, 80); };
+    const onOrient = () => { fit(); updateLandscapeZoom(); };
 
     // control buttons (delegated within the stage)
     const onClick = (e: MouseEvent) => {
@@ -546,7 +570,8 @@ export default function SpinViewer({
     stage.addEventListener("keydown", onKey);
     stage.addEventListener("click", onClick);
     document.addEventListener("fullscreenchange", onFsChange);
-    window.addEventListener("resize", fit);
+    window.addEventListener("resize", onOrient);
+    window.addEventListener("orientationchange", onOrient);
 
     // --- loading / preload ---
     const C = 2 * Math.PI * 27;
@@ -644,7 +669,8 @@ export default function SpinViewer({
       stage.removeEventListener("keydown", onKey);
       stage.removeEventListener("click", onClick);
       document.removeEventListener("fullscreenchange", onFsChange);
-      window.removeEventListener("resize", fit);
+      window.removeEventListener("resize", onOrient);
+      window.removeEventListener("orientationchange", onOrient);
       // undo pseudo-fullscreen if we unmount while it's active
       stage.classList.remove("r3d-pseudo-fs");
       document.documentElement.classList.remove("r3d-fs-lock");
