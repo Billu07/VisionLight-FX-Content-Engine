@@ -300,7 +300,9 @@ export default function SpinViewer({
       const frame = ((Math.round(yaw / step) % FRAMES) + FRAMES) % FRAMES;
       const W = cv.width, H = cv.height;
       ctx.clearRect(0, 0, W, H);
-      const scale = Math.min(W, H) * 0.23 * zoom;
+      // Default size matches what used to be the "first zoom" size (~×1.25) so
+      // the product reads bigger on load; hero/gallery tiles stay compact.
+      const scale = Math.min(W, H) * (hero ? 0.23 : 0.28) * zoom;
       const cx = W / 2 + panX * DPR, cy = H * 0.47 + panY * DPR;
 
       ctx.save();
@@ -508,11 +510,15 @@ export default function SpinViewer({
     // only auto-apply once (autoLandscapeZoom) and only pull back if the user
     // hasn't since changed the zoom themselves, so we never fight their pinch.
     let autoLandscapeZoom = false;
+    // A real touch device (phone/tablet) is the only place this applies — a coarse
+    // pointer is the reliable signal, so a small laptop window that merely looks
+    // phone-sized never triggers it.
+    const isTouchDevice = window.matchMedia?.("(pointer: coarse)")?.matches ?? false;
     const isLandscape = () =>
       window.matchMedia?.("(orientation: landscape)")?.matches ??
       window.innerWidth > window.innerHeight;
     const updateLandscapeZoom = () => {
-      const want = isMobileViewport && (nativeFsActive() || pseudoFs) && isLandscape();
+      const want = isTouchDevice && (nativeFsActive() || pseudoFs) && isLandscape();
       if (want && !autoLandscapeZoom && zoomTarget <= 1.05) {
         zoomTarget = clampZoom(2);
         autoLandscapeZoom = true;
@@ -524,13 +530,23 @@ export default function SpinViewer({
         autoLandscapeZoom = false;
       }
     };
+    // Rotating a phone fires a burst of resize/orientation events with transient
+    // (sometimes momentarily-portrait) dimensions mid-animation; debounce so we
+    // act once the viewport settles, or a stray reading cancels the zoom.
+    let landscapeZoomTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleLandscapeZoom = () => {
+      if (landscapeZoomTimer) clearTimeout(landscapeZoomTimer);
+      landscapeZoomTimer = setTimeout(() => {
+        landscapeZoomTimer = null;
+        updateLandscapeZoom();
+      }, 160);
+    };
     const setPseudo = (on: boolean) => {
       pseudoFs = on;
       stage.classList.toggle("r3d-pseudo-fs", on);
       document.documentElement.classList.toggle("r3d-fs-lock", on);
       syncFsIcon();
-      // let the pseudo-fs layout settle before measuring orientation
-      setTimeout(updateLandscapeZoom, 80);
+      scheduleLandscapeZoom();
     };
     const toggleFs = () => {
       const reqFs = stage.requestFullscreen || (stage as any).webkitRequestFullscreen;
@@ -545,8 +561,8 @@ export default function SpinViewer({
         setPseudo(!pseudoFs); // no native fullscreen (iOS Safari) → pseudo
       }
     };
-    const onFsChange = () => { syncFsIcon(); setTimeout(updateLandscapeZoom, 80); };
-    const onOrient = () => { fit(); updateLandscapeZoom(); };
+    const onFsChange = () => { syncFsIcon(); scheduleLandscapeZoom(); };
+    const onOrient = () => { fit(); scheduleLandscapeZoom(); };
 
     // control buttons (delegated within the stage)
     const onClick = (e: MouseEvent) => {
@@ -572,6 +588,8 @@ export default function SpinViewer({
     document.addEventListener("fullscreenchange", onFsChange);
     window.addEventListener("resize", onOrient);
     window.addEventListener("orientationchange", onOrient);
+    const orientMql = window.matchMedia?.("(orientation: landscape)");
+    orientMql?.addEventListener?.("change", onOrient);
 
     // --- loading / preload ---
     const C = 2 * Math.PI * 27;
@@ -660,6 +678,7 @@ export default function SpinViewer({
     return () => {
       alive = false;
       if (revealTimer) clearTimeout(revealTimer);
+      if (landscapeZoomTimer) clearTimeout(landscapeZoomTimer);
       cancelAnimationFrame(raf);
       stage.removeEventListener("pointerdown", onDown);
       stage.removeEventListener("pointermove", onMove);
@@ -671,6 +690,7 @@ export default function SpinViewer({
       document.removeEventListener("fullscreenchange", onFsChange);
       window.removeEventListener("resize", onOrient);
       window.removeEventListener("orientationchange", onOrient);
+      orientMql?.removeEventListener?.("change", onOrient);
       // undo pseudo-fullscreen if we unmount while it's active
       stage.classList.remove("r3d-pseudo-fs");
       document.documentElement.classList.remove("r3d-fs-lock");
