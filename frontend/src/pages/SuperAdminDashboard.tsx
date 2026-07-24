@@ -1276,6 +1276,12 @@ export default function SuperAdminDashboard() {
       }
 
       startReadOnlyImpersonation(target.id, target.email);
+      // Rotation3D brands aren't project-scoped — their share cards + links live
+      // on the brand dashboard at /app, so send the operator straight there.
+      if (target.view === "ROTATION3D") {
+        navigate("/app");
+        return;
+      }
       const res = await apiEndpoints.getProjects();
       const firstProject = res.data?.projects?.[0];
       if (firstProject?.id) {

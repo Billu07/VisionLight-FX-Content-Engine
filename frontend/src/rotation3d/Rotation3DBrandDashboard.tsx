@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
+import { useExitReadOnly } from "../hooks/useExitReadOnly";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 
 /**
@@ -490,6 +491,7 @@ function BrandingPanel() {
 
 export default function Rotation3DBrandDashboard() {
   const { user, logout } = useAuth();
+  const { exitReadOnly, exiting: exitingReadOnly } = useExitReadOnly();
   const navigate = useNavigate();
   const [tab, setTab] = useState<"products" | "branding" | "send">("products");
   const [products, setProducts] = useState<Product[]>([]);
@@ -518,6 +520,40 @@ export default function Rotation3DBrandDashboard() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-studio-gradient font-sans text-white">
       <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
+        {/* Read-only agency access: the operator entered this brand account to
+            grab share cards + links. Writes (publish, save link, upload) return
+            403; this banner explains that and offers a clean exit. */}
+        {user?.readOnlyImpersonation && (
+          <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100 shadow-xl">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <span className="font-bold uppercase tracking-widest text-amber-300">
+                  Read-only agency access
+                </span>
+                <p className="mt-1 text-xs text-amber-100/80">
+                  You are viewing {user.email}. You can copy links, copy embed
+                  codes, and download share cards. Publish, save-link, and upload
+                  actions are blocked.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  void exitReadOnly();
+                }}
+                disabled={exitingReadOnly}
+                className="shrink-0 rounded-xl border border-amber-400/30 bg-amber-400/15 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-amber-100 hover:bg-amber-400/25 disabled:cursor-wait disabled:opacity-70"
+              >
+                <span className="inline-flex items-center gap-2">
+                  {exitingReadOnly && (
+                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  )}
+                  {exitingReadOnly ? "Exiting..." : "Exit Read-only"}
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
