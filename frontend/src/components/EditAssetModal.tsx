@@ -7,6 +7,7 @@ import { confirmAction } from "../lib/notifications";
 import { useAuth } from "../hooks/useAuth";
 import { DriftFrameExtractor } from "./DriftFrameExtractor";
 import { LoadingSpinner } from "./LoadingSpinner";
+import { SizeFxPreview } from "./SizeFxPreview";
 import drift_icon from "../assets/drift_icon.png";
 import {
   getPromptFxKey,
@@ -82,7 +83,7 @@ interface EditAssetModalProps {
   dockIndex?: number;
 }
 
-type EditorMode = "pro" | "drift" | "convert";
+type EditorMode = "pro" | "drift" | "convert" | "sizefx";
 const MAX_EDITOR_REFERENCE_IMAGES = 5;
 
 export function EditAssetModal({
@@ -313,6 +314,17 @@ export function EditAssetModal({
     "gpt-image-2" | "nano-banana-2"
   >("gpt-image-2");
 
+  // SizeFX Tab State (server reverse-crop + anchor comparison)
+  const [sizeFxZoomOut, setSizeFxZoomOut] = useState(1.5);
+  const [sizeFxBg, setSizeFxBg] = useState<"white" | "black" | "match">("white");
+  const [sizeFxAnchor, setSizeFxAnchor] = useState<Asset | null>(null);
+  const [showSizeFxAnchorPicker, setShowSizeFxAnchorPicker] = useState(false);
+  const [sizeFxCompare, setSizeFxCompare] = useState<
+    "off" | "side" | "overlay" | "ab"
+  >("off");
+  const [sizeFxOverlayOpacity, setSizeFxOverlayOpacity] = useState(0.5);
+  const [sizeFxAbShowAnchor, setSizeFxAbShowAnchor] = useState(false);
+
   // Drift State
   const driftParams = {
     horizontal: 0,
@@ -336,7 +348,7 @@ export function EditAssetModal({
   const { data: allAssets = [] } = useQuery({
     queryKey: ["assets"],
     queryFn: async () => (await apiEndpoints.getAssets()).data.assets,
-    enabled: showRefSelector || !currentAsset,
+    enabled: showRefSelector || showSizeFxAnchorPicker || !currentAsset,
   });
 
   const orderedPromptFxList = useMemo(
@@ -657,6 +669,59 @@ export function EditAssetModal({
       }
     },
   });
+
+  // === MUTATION 3b: SIZEFX (SERVER REVERSE-CROP) ===
+  const sizeFxMutation = useMutation({
+    mutationFn: async () => {
+      const activeProject =
+        localStorage.getItem("visionlight_active_project") || undefined;
+      return apiEndpoints.sizeFxReverseCrop({
+        assetUrl: currentAsset.url,
+        zoomOut: sizeFxZoomOut,
+        bg: sizeFxBg,
+        projectId: activeProject,
+      });
+    },
+    onMutate: () => {
+      const id = Date.now().toString();
+      triggerJobAdded({
+        id,
+        type: "sizefx",
+        status: "processing",
+        message: "Applying SizeFX...",
+        sourceAssetId: currentAsset?.id,
+        sourcePreviewUrl: currentAsset?.url,
+      });
+      return { id };
+    },
+    onSuccess: (res: any, _variables, context) => {
+      if (context?.id) {
+        setJobs((prev) =>
+          prev.map((j) =>
+            j.id === context.id
+              ? { ...j, status: "ready", resultAsset: res.data.asset, message: "SizeFX Ready" }
+              : j,
+          ),
+        );
+      }
+    },
+    onError: (err: any, _variables, context) => {
+      if (context?.id) {
+        setJobs((prev) =>
+          prev.map((j) =>
+            j.id === context.id ? { ...j, status: "failed", error: err.message } : j,
+          ),
+        );
+      }
+    },
+  });
+
+  const isSizeFxApplyingCurrent = jobs.some(
+    (j) =>
+      j.status === "processing" &&
+      j.type === "sizefx" &&
+      j.sourceAssetId === currentAsset?.id,
+  );
 
   // === MUTATION 4: DRIFT START ===
   const driftStartMutation = useMutation({
@@ -1415,7 +1480,8 @@ export function EditAssetModal({
                 </div>
 
                 {referenceAssets.length > 0 &&
-                  activeTab !== "drift" && (
+                  activeTab !== "drift" &&
+                  activeTab !== "sizefx" && (
                     <div className="absolute bottom-4 right-4 w-40 border-2 border-purple-500 rounded-lg overflow-hidden bg-gray-800 shadow-2xl z-20">
                       <div className="grid grid-cols-2 gap-1 p-1 bg-gray-900/90">
                         {referenceAssets.slice(0, 4).map((referenceAsset) => (
@@ -1458,7 +1524,7 @@ export function EditAssetModal({
                     </div>
                   )}
 
-                {isImageLoading && (
+                {isImageLoading && activeTab !== "sizefx" && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30 backdrop-blur-sm">
                     <div className="flex flex-col items-center gap-4 w-full max-w-sm px-6">
                       <LoadingSpinner size="lg" variant="neon" />
@@ -1485,6 +1551,17 @@ export function EditAssetModal({
                       onLoad={onImageLoad}
                     />
                   </ReactCrop>
+                ) : activeTab === "sizefx" ? (
+                  <SizeFxPreview
+                    srcUrl={currentAsset.url}
+                    anchorUrl={sizeFxAnchor?.url || null}
+                    zoomOut={sizeFxZoomOut}
+                    bg={sizeFxBg}
+                    compare={sizeFxCompare}
+                    overlayOpacity={sizeFxOverlayOpacity}
+                    abShowAnchor={sizeFxAbShowAnchor}
+                    onToggleAb={() => setSizeFxAbShowAnchor((v) => !v)}
+                  />
                 ) : (
                   <img
                     src={previewAssetUrl || currentAsset.url}
@@ -1622,6 +1699,7 @@ export function EditAssetModal({
               {[
                 { id: "pro", label: "PicFX" },
                 { id: "convert", label: "Convert" },
+                { id: "sizefx", label: "SizeFX" },
                 { id: "drift", label: <img src={drift_icon} alt="3DX" className="h-4 w-auto" /> },
               ].map((mode) => (
                 <button
@@ -1643,7 +1721,7 @@ export function EditAssetModal({
 
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6">
             {/* ACTIONS: Crop / Enhance */}
-            {activeTab !== "drift" && activeTab !== "convert" && (
+            {activeTab !== "drift" && activeTab !== "convert" && activeTab !== "sizefx" && (
               <div className="flex gap-2">
                 <button
                   onClick={() => setIsCropping(true)}
@@ -1777,6 +1855,226 @@ export function EditAssetModal({
                     </>
                   ) : (
                     <span>Convert to {convertTargetRatio}</span>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* SIZEFX UI */}
+            {activeTab === "sizefx" && (
+              <div className="space-y-6 animate-in fade-in">
+                <p className="text-[11px] leading-relaxed text-gray-400">
+                  Zoom back from the subject by padding the canvas — no AI render,
+                  so it&rsquo;s instant and free. Pick a background, optionally
+                  match an anchor image&rsquo;s size, then Apply to save a new asset.
+                </p>
+
+                {/* Zoom out */}
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                      Zoom out
+                    </label>
+                    <span className="text-xs font-mono text-purple-300">
+                      {sizeFxZoomOut.toFixed(2)}×
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={3}
+                    step={0.05}
+                    value={sizeFxZoomOut}
+                    onChange={(e) => setSizeFxZoomOut(Number(e.target.value))}
+                    className="w-full accent-purple-500"
+                  />
+                  <div className="flex justify-between text-[10px] text-gray-600">
+                    <span>1× (none)</span>
+                    <span>3× (max)</span>
+                  </div>
+                </div>
+
+                {/* Background */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    Background
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: "white", label: "White" },
+                      { id: "black", label: "Black" },
+                      { id: "match", label: "Match edges" },
+                    ].map((b) => (
+                      <button
+                        key={b.id}
+                        onClick={() => setSizeFxBg(b.id as "white" | "black" | "match")}
+                        className={`py-2 text-xs font-bold rounded-lg border transition-all ${
+                          sizeFxBg === b.id
+                            ? "bg-purple-600 border-purple-500 text-white"
+                            : "bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500"
+                        }`}
+                      >
+                        {b.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Anchor image */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-purple-300 uppercase tracking-wider">
+                      Compare to anchor
+                    </label>
+                    {sizeFxAnchor && (
+                      <button
+                        onClick={() => {
+                          setSizeFxAnchor(null);
+                          setSizeFxCompare("off");
+                        }}
+                        className="text-[10px] text-gray-400 hover:text-white"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  {!showSizeFxAnchorPicker ? (
+                    <button
+                      onClick={() => setShowSizeFxAnchorPicker(true)}
+                      className={`w-full border border-dashed rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${
+                        sizeFxAnchor
+                          ? "border-purple-500/50 bg-purple-500/10"
+                          : "border-gray-700 hover:border-gray-500"
+                      }`}
+                    >
+                      {sizeFxAnchor ? (
+                        <span className="flex items-center gap-2">
+                          <img
+                            src={getReferenceThumbnailUrl(sizeFxAnchor.url)}
+                            className="h-8 w-8 rounded object-cover"
+                            crossOrigin="anonymous"
+                          />
+                          <span className="text-xs text-gray-300">Change anchor</span>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300">
+                          Pick an anchor image
+                        </span>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 animate-in slide-in-from-top-2">
+                      <div className="flex justify-end mb-2">
+                        <button
+                          onClick={() => setShowSizeFxAnchorPicker(false)}
+                          className="px-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 text-xs"
+                        >
+                          Close
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto custom-scrollbar">
+                        {imageAssets.map((a: Asset) => (
+                          <img
+                            key={a.id}
+                            src={getReferenceThumbnailUrl(a.url)}
+                            className={`w-full h-12 object-cover rounded cursor-pointer border ${
+                              sizeFxAnchor?.id === a.id
+                                ? "border-purple-500 ring-1 ring-purple-400"
+                                : "border-transparent hover:border-purple-500"
+                            }`}
+                            crossOrigin="anonymous"
+                            loading="lazy"
+                            decoding="async"
+                            onClick={() => {
+                              setSizeFxAnchor(a);
+                              setShowSizeFxAnchorPicker(false);
+                              if (sizeFxCompare === "off") setSizeFxCompare("overlay");
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Compare mode (only meaningful with an anchor) */}
+                {sizeFxAnchor && (
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                      Compare mode
+                    </label>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {[
+                        { id: "off", label: "Off" },
+                        { id: "side", label: "Side" },
+                        { id: "overlay", label: "Overlay" },
+                        { id: "ab", label: "A/B" },
+                      ].map((m) => (
+                        <button
+                          key={m.id}
+                          onClick={() =>
+                            setSizeFxCompare(m.id as "off" | "side" | "overlay" | "ab")
+                          }
+                          className={`py-2 text-[11px] font-bold rounded-lg border transition-all ${
+                            sizeFxCompare === m.id
+                              ? "bg-purple-600 border-purple-500 text-white"
+                              : "bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500"
+                          }`}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                    {sizeFxCompare === "overlay" && (
+                      <div className="pt-1">
+                        <div className="flex justify-between">
+                          <span className="text-[10px] text-gray-500">
+                            Anchor opacity
+                          </span>
+                          <span className="text-[10px] font-mono text-purple-300">
+                            {Math.round(sizeFxOverlayOpacity * 100)}%
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.02}
+                          value={sizeFxOverlayOpacity}
+                          onChange={(e) =>
+                            setSizeFxOverlayOpacity(Number(e.target.value))
+                          }
+                          className="w-full accent-purple-500"
+                        />
+                      </div>
+                    )}
+                    {sizeFxCompare === "ab" && (
+                      <button
+                        onClick={() => setSizeFxAbShowAnchor((v) => !v)}
+                        className="w-full py-2 text-xs font-bold rounded-lg border border-gray-700 bg-gray-800 text-gray-300 hover:border-gray-500"
+                      >
+                        Showing: {sizeFxAbShowAnchor ? "Anchor" : "Preview"} — tap to
+                        flip
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Apply */}
+                <button
+                  onClick={() => {
+                    if (!isSizeFxApplyingCurrent && currentAsset) sizeFxMutation.mutate();
+                  }}
+                  disabled={isSizeFxApplyingCurrent}
+                  className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white font-bold hover:shadow-lg flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isSizeFxApplyingCurrent ? (
+                    <>
+                      <LoadingSpinner size="sm" color="text-white" />
+                      <span>Applying…</span>
+                    </>
+                  ) : (
+                    <span>Apply SizeFX</span>
                   )}
                 </button>
               </div>

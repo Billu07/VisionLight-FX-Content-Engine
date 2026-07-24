@@ -410,6 +410,15 @@ export const apiEndpoints = {
       timeout: 600000,
     }),
 
+  // SizeFX — server reverse-crop (uncrop). Pads an existing asset with a chosen
+  // background so the subject "zooms back", and saves the result as a new asset.
+  sizeFxReverseCrop: (data: {
+    assetUrl: string;
+    zoomOut: number;
+    bg: "white" | "black" | "match";
+    projectId?: string;
+  }) => api.post("/api/sizefx/reverse-crop", data, { timeout: 120000 }),
+
   stockSearch: (params: { q?: string; page?: number; perPage?: number }) =>
     api.get("/api/stock/search", { params }),
   stockSave: (data: { url: string; projectId?: string }) =>

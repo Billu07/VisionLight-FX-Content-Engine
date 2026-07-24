@@ -17,6 +17,7 @@ import {
   normalizeAssetUrl,
 } from "../lib/app-runtime";
 import { copyExternalImageToManagedStorage } from "../utils/managedStorage";
+import { buildReverseCrop } from "../services/sizefx";
 
 const router = express.Router();
 const MAX_GENERATION_REFERENCE_IMAGES = 14;
@@ -667,6 +668,64 @@ router.post(
         );
       }
       res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// ==================== SIZEFX (SERVER REVERSE-CROP / UNCROP) ====================
+// Deterministic "zoom back": pad the image on all sides with white/black/matching
+// background so the subject shrinks inside a larger same-aspect canvas. No AI
+// render, so it's free + fast — the foundation for rotation-prep size matching.
+// Applies to an existing asset (by URL) and saves the result as a new asset.
+router.post(
+  "/api/sizefx/reverse-crop",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { assetUrl, zoomOut, bg, projectId } = req.body;
+
+      if (typeof assetUrl !== "string" || !assetUrl.trim()) {
+        return res.status(400).json({ error: "assetUrl is required" });
+      }
+      if (!isSafeExternalUrl(assetUrl)) {
+        return res.status(400).json({ error: "Invalid asset URL" });
+      }
+
+      if (projectId) {
+        const project = await airtableService.getProjectById(projectId);
+        if (!project || project.userId !== req.user!.id) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
+
+      const imageResponse = await axios.get(assetUrl, {
+        responseType: "arraybuffer",
+      });
+      const inputBuffer = Buffer.from(imageResponse.data);
+
+      const bgMode: "white" | "black" | "match" =
+        bg === "black" ? "black" : bg === "match" ? "match" : "white";
+
+      const outBuffer = await buildReverseCrop({
+        input: inputBuffer,
+        zoomOut: Number(zoomOut) || 1.5,
+        bg: bgMode,
+      });
+
+      // Save as a fresh library asset (original untouched), so it flows into the
+      // existing rotation-prep pipeline like any other image.
+      const asset = await contentEngine.uploadRawAsset(
+        outBuffer,
+        req.user!.id,
+        typeof projectId === "string" && projectId ? projectId : undefined,
+        "original",
+        outBuffer.length,
+        "image/png",
+      );
+
+      res.json({ success: true, asset });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "SizeFX failed" });
     }
   },
 );
