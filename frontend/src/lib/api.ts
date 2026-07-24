@@ -415,9 +415,11 @@ export const apiEndpoints = {
   sizeFxReverseCrop: (data: {
     assetUrl: string;
     zoomOut: number;
-    bg: "white" | "black" | "match";
+    bg: "white" | "black" | "match" | "ai";
     projectId?: string;
-  }) => api.post("/api/sizefx/reverse-crop", data, { timeout: 120000 }),
+    originalAssetId?: string;
+    model?: "gpt-image-2" | "nano-banana-2";
+  }) => api.post("/api/sizefx/reverse-crop", data, { timeout: 600000 }),
 
   stockSearch: (params: { q?: string; page?: number; perPage?: number }) =>
     api.get("/api/stock/search", { params }),

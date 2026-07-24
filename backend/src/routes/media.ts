@@ -18,6 +18,7 @@ import {
 } from "../lib/app-runtime";
 import { copyExternalImageToManagedStorage } from "../utils/managedStorage";
 import { buildReverseCrop } from "../services/sizefx";
+import { uploadToCloudinary as uploadBufferToStorage } from "../services/engine/utils";
 
 const router = express.Router();
 const MAX_GENERATION_REFERENCE_IMAGES = 14;
@@ -673,16 +674,21 @@ router.post(
 );
 
 // ==================== SIZEFX (SERVER REVERSE-CROP / UNCROP) ====================
-// Deterministic "zoom back": pad the image on all sides with white/black/matching
-// background so the subject shrinks inside a larger same-aspect canvas. No AI
-// render, so it's free + fast — the foundation for rotation-prep size matching.
+// "Zoom back": pad the image on all sides so the subject shrinks inside a larger
+// same-aspect canvas. Two background modes:
+//   • white / black / match  → deterministic sharp pad. Free + instant.
+//   • ai                     → pad with a clean white margin, then AI-outpaint
+//                              the border so the scene continues naturally.
+//                              Costs one Image FX render (gpt-image-2 / nano-banana-2).
 // Applies to an existing asset (by URL) and saves the result as a new asset.
 router.post(
   "/api/sizefx/reverse-crop",
   authenticateToken,
   async (req: AuthenticatedRequest, res) => {
+    let creditsDeducted = false;
+    let creditsCost = 0;
     try {
-      const { assetUrl, zoomOut, bg, projectId } = req.body;
+      const { assetUrl, zoomOut, bg, projectId, originalAssetId, model } = req.body;
 
       if (typeof assetUrl !== "string" || !assetUrl.trim()) {
         return res.status(400).json({ error: "assetUrl is required" });
@@ -702,29 +708,106 @@ router.post(
         responseType: "arraybuffer",
       });
       const inputBuffer = Buffer.from(imageResponse.data);
+      const zoom = Number(zoomOut) || 1.5;
+      const isAi = bg === "ai";
 
-      const bgMode: "white" | "black" | "match" =
-        bg === "black" ? "black" : bg === "match" ? "match" : "white";
+      // --- Free deterministic path (white / black / match) ---
+      if (!isAi) {
+        const bgMode: "white" | "black" | "match" =
+          bg === "black" ? "black" : bg === "match" ? "match" : "white";
+        const outBuffer = await buildReverseCrop({
+          input: inputBuffer,
+          zoomOut: zoom,
+          bg: bgMode,
+        });
+        // Save as a fresh library asset (original untouched), so it flows into
+        // the existing rotation-prep pipeline like any other image.
+        const asset = await contentEngine.uploadRawAsset(
+          outBuffer,
+          req.user!.id,
+          typeof projectId === "string" && projectId ? projectId : undefined,
+          "original",
+          outBuffer.length,
+          "image/png",
+        );
+        return res.json({ success: true, asset });
+      }
 
-      const outBuffer = await buildReverseCrop({
+      // --- AI outpaint path (costs one render) ---
+      const outpaintModel: "gpt-image-2" | "nano-banana-2" =
+        model === "nano-banana-2" ? "nano-banana-2" : "gpt-image-2";
+
+      const [settings, user] = await Promise.all([
+        getTenantSettings(req.user!.id),
+        airtableService.findUserById(req.user!.id),
+      ]);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      const byokPolicy = await enforceByokRenderPolicy(req.user!.id, res);
+      if (!byokPolicy) return;
+      const apiKeys = await getTenantApiKeys(req.user!.id);
+      if (!apiKeys.falApiKey) {
+        return res.status(403).json({
+          error:
+            "Missing Fal API key. Configure it in the Admin Panel before using AI SizeFX.",
+        });
+      }
+
+      const cost = getCost(user, { mediaType: "image", mode: "convert" }, settings);
+      creditsCost = cost;
+      if (user.creditsImageFX < cost) {
+        return res.status(403).json({ error: "Insufficient Image FX credits" });
+      }
+      await airtableService.deductGranularCredits(req.user!.id, "creditsImageFX", cost);
+      creditsDeducted = true;
+      if (byokPolicy.shouldCountDailyUsage) {
+        await byokService.consumeDailyRender(req.user!.id);
+      }
+
+      // Pad with a clean white margin so the model has a well-defined border to
+      // fill, upload it as the edit input, then AI-outpaint the surrounding scene.
+      const paddedBuffer = await buildReverseCrop({
         input: inputBuffer,
-        zoomOut: Number(zoomOut) || 1.5,
-        bg: bgMode,
+        zoomOut: zoom,
+        bg: "white",
       });
-
-      // Save as a fresh library asset (original untouched), so it flows into the
-      // existing rotation-prep pipeline like any other image.
-      const asset = await contentEngine.uploadRawAsset(
-        outBuffer,
+      const paddedUrl = await uploadBufferToStorage(
+        paddedBuffer,
+        `sizefx_pad_${req.user!.id}_${Date.now()}`,
         req.user!.id,
-        typeof projectId === "string" && projectId ? projectId : undefined,
-        "original",
-        outBuffer.length,
-        "image/png",
+        "SizeFX outpaint base",
+        "image",
       );
 
-      res.json({ success: true, asset });
+      const outpaintPrompt =
+        "This image shows a subject centered inside a plain white margin/border. " +
+        "Outpaint and fill the entire white border region so the scene, background, " +
+        "lighting, shadows, and ground continue naturally and seamlessly outward from " +
+        "the subject to every edge. Keep the central subject exactly as-is — do not " +
+        "change, move, resize, or duplicate it, and do not add unrelated new objects.";
+
+      const asset = await contentEngine.editAsset(
+        paddedUrl,
+        outpaintPrompt,
+        req.user!.id,
+        "original",
+        [],
+        "pro",
+        typeof originalAssetId === "string" && originalAssetId
+          ? originalAssetId
+          : undefined,
+        apiKeys,
+        outpaintModel,
+      );
+
+      return res.json({ success: true, asset });
     } catch (error: any) {
+      if (creditsDeducted && creditsCost > 0) {
+        await airtableService.refundGranularCredits(
+          req.user!.id,
+          "creditsImageFX",
+          creditsCost,
+        );
+      }
       res.status(500).json({ error: error.message || "SizeFX failed" });
     }
   },

@@ -316,7 +316,12 @@ export function EditAssetModal({
 
   // SizeFX Tab State (server reverse-crop + anchor comparison)
   const [sizeFxZoomOut, setSizeFxZoomOut] = useState(1.5);
-  const [sizeFxBg, setSizeFxBg] = useState<"white" | "black" | "match">("white");
+  const [sizeFxBg, setSizeFxBg] = useState<"white" | "black" | "match" | "ai">(
+    "white",
+  );
+  const [sizeFxAiModel, setSizeFxAiModel] = useState<
+    "gpt-image-2" | "nano-banana-2"
+  >("gpt-image-2");
   const [sizeFxAnchor, setSizeFxAnchor] = useState<Asset | null>(null);
   const [showSizeFxAnchorPicker, setShowSizeFxAnchorPicker] = useState(false);
   const [sizeFxCompare, setSizeFxCompare] = useState<
@@ -680,6 +685,8 @@ export function EditAssetModal({
         zoomOut: sizeFxZoomOut,
         bg: sizeFxBg,
         projectId: activeProject,
+        originalAssetId: currentAsset.originalAssetId || currentAsset.id,
+        model: sizeFxAiModel,
       });
     },
     onMutate: () => {
@@ -688,7 +695,7 @@ export function EditAssetModal({
         id,
         type: "sizefx",
         status: "processing",
-        message: "Applying SizeFX...",
+        message: sizeFxBg === "ai" ? "AI outpainting..." : "Applying SizeFX...",
         sourceAssetId: currentAsset?.id,
         sourcePreviewUrl: currentAsset?.url,
       });
@@ -1358,6 +1365,7 @@ export function EditAssetModal({
             <div className="text-white px-6 py-1.5 rounded-full font-bold tracking-widest text-xs sm:text-sm border border-white/10 bg-gray-800/80 shadow-inner flex items-center gap-2">
               {activeTab === "pro" && "PicFX Editor"}
               {activeTab === "convert" && "Convert FX"}
+              {activeTab === "sizefx" && "SizeFX"}
               {activeTab === "drift" && (
                 <div className="flex items-center gap-2">
                   <img src={drift_icon} alt="Drift" className="h-4 w-auto" />
@@ -1556,7 +1564,9 @@ export function EditAssetModal({
                     srcUrl={currentAsset.url}
                     anchorUrl={sizeFxAnchor?.url || null}
                     zoomOut={sizeFxZoomOut}
-                    bg={sizeFxBg}
+                    /* AI fill can't be previewed client-side, so show the match
+                       framing as a placeholder; the real fill happens on Apply. */
+                    bg={sizeFxBg === "ai" ? "match" : sizeFxBg}
                     compare={sizeFxCompare}
                     overlayOpacity={sizeFxOverlayOpacity}
                     abShowAnchor={sizeFxAbShowAnchor}
@@ -1899,15 +1909,18 @@ export function EditAssetModal({
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
                     Background
                   </label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     {[
                       { id: "white", label: "White" },
                       { id: "black", label: "Black" },
                       { id: "match", label: "Match edges" },
+                      { id: "ai", label: "Smart AI ✨" },
                     ].map((b) => (
                       <button
                         key={b.id}
-                        onClick={() => setSizeFxBg(b.id as "white" | "black" | "match")}
+                        onClick={() =>
+                          setSizeFxBg(b.id as "white" | "black" | "match" | "ai")
+                        }
                         className={`py-2 text-xs font-bold rounded-lg border transition-all ${
                           sizeFxBg === b.id
                             ? "bg-purple-600 border-purple-500 text-white"
@@ -1918,6 +1931,41 @@ export function EditAssetModal({
                       </button>
                     ))}
                   </div>
+
+                  {/* AI outpaint model + note (only in Smart AI mode) */}
+                  {sizeFxBg === "ai" && (
+                    <div className="mt-2 space-y-2 rounded-lg border border-fuchsia-500/25 bg-fuchsia-500/5 p-3 animate-in fade-in">
+                      <p className="text-[11px] leading-relaxed text-fuchsia-200/80">
+                        AI fills the new space so the scene continues naturally
+                        instead of a flat color. This runs a render and{" "}
+                        <span className="font-semibold">costs 1 Image FX credit</span>.
+                        The live preview shows the framing; the filled result appears
+                        after Apply.
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { id: "gpt-image-2", label: "GPT 2 Image" },
+                          { id: "nano-banana-2", label: "Nano Banana 2" },
+                        ].map((m) => (
+                          <button
+                            key={m.id}
+                            onClick={() =>
+                              setSizeFxAiModel(
+                                m.id as "gpt-image-2" | "nano-banana-2",
+                              )
+                            }
+                            className={`py-2 text-xs font-bold rounded-lg border transition-all ${
+                              sizeFxAiModel === m.id
+                                ? "bg-fuchsia-600 border-fuchsia-500 text-white"
+                                : "bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500"
+                            }`}
+                          >
+                            {m.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Anchor image */}
@@ -2071,10 +2119,12 @@ export function EditAssetModal({
                   {isSizeFxApplyingCurrent ? (
                     <>
                       <LoadingSpinner size="sm" color="text-white" />
-                      <span>Applying…</span>
+                      <span>{sizeFxBg === "ai" ? "Outpainting…" : "Applying…"}</span>
                     </>
                   ) : (
-                    <span>Apply SizeFX</span>
+                    <span>
+                      {sizeFxBg === "ai" ? "Apply SizeFX (AI ✨)" : "Apply SizeFX"}
+                    </span>
                   )}
                 </button>
               </div>
