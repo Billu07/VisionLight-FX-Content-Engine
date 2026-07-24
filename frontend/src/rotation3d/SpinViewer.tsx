@@ -597,14 +597,42 @@ export default function SpinViewer({
       ringRef.current.style.strokeDasharray = String(C);
       ringRef.current.style.strokeDashoffset = String(C);
     }
-    const setProgress = (p: number) => {
+    let progressShown = 0;
+    let finishing = false;
+    const paintProgress = (p: number) => {
       if (ringRef.current) ringRef.current.style.strokeDashoffset = String(C * (1 - p / 100));
       if (pctRef.current) pctRef.current.textContent = Math.round(p) + "%";
     };
+    const setProgress = (p: number) => {
+      // Once the finish sweep is running, ignore late real-load ticks so the ring
+      // can't jump backwards while it's completing to 100%.
+      if (finishing) return;
+      progressShown = p;
+      paintProgress(p);
+    };
     const finishLoad = () => {
+      if (finishing) return;
+      finishing = true;
       if (revealTimer) { clearTimeout(revealTimer); revealTimer = null; }
-      loaderRef.current?.classList.add("r3d-gone");
-      if (!hero) stage.focus({ preventScroll: true });
+      // We usually reveal at a low % (a usable coarse ring decodes fast), so sweep
+      // the ring to a satisfying 100% before fading — the short load still reads
+      // as a "full load" instead of vanishing at ~11%.
+      const from = progressShown;
+      const startT = performance.now();
+      const DUR = 420;
+      const sweep = (t: number) => {
+        if (!alive) return;
+        const k = Math.min(1, (t - startT) / DUR);
+        const eased = 1 - Math.pow(1 - k, 3);
+        paintProgress(from + (100 - from) * eased);
+        if (k < 1) {
+          requestAnimationFrame(sweep);
+        } else {
+          loaderRef.current?.classList.add("r3d-gone");
+          if (!hero) stage.focus({ preventScroll: true });
+        }
+      };
+      requestAnimationFrame(sweep);
     };
 
     if (realMode) {

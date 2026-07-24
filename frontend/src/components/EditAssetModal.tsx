@@ -617,6 +617,13 @@ export function EditAssetModal({
       formData.append("aspectRatio", targetRatio);
       formData.append("model", convertModel);
 
+      // Auto convert can now use reference images too (parity with PicFX + custom
+      // convert). Custom convert already forwards refs via textEditMutation.
+      const convertRefUrls = referenceAssets.map((asset) => asset.url);
+      if (convertRefUrls.length > 0) {
+        formData.append("referenceUrls", JSON.stringify(convertRefUrls));
+      }
+
       if (currentAsset.originalAssetId) {
         formData.append("originalAssetId", currentAsset.originalAssetId);
       } else {
@@ -1005,6 +1012,99 @@ export function EditAssetModal({
     );
   }
 
+  // Shared reference-image picker for the PicFX + Convert tabs. Extracted so both
+  // tabs offer identical "add references" behaviour (Convert now matches PicFX).
+  // Backed by the same referenceAssets store used by both the edit + convert flows.
+  const renderReferencePicker = () => (
+    <div className="space-y-2">
+      <div className="flex justify-between items-center">
+        <label className="text-xs font-bold text-purple-300 uppercase tracking-wider">
+          References
+        </label>
+        {referenceAssets.length > 0 && (
+          <button
+            onClick={() => setReferenceAssets([])}
+            className="text-[10px] text-gray-400 hover:text-white"
+          >
+            Clear all
+          </button>
+        )}
+      </div>
+      {!showRefSelector ? (
+        <button
+          onClick={() => {
+            setShowRefSelector(true);
+            setIsCropping(false);
+          }}
+          className={`w-full border border-dashed rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${referenceAssets.length > 0
+            ? "border-purple-500/50 bg-purple-500/10"
+            : "border-gray-700 hover:border-gray-500"
+            }`}
+        >
+          <span className="text-xs text-gray-300">
+            {referenceAssets.length > 0
+              ? `Manage References (${referenceAssets.length}/${MAX_EDITOR_REFERENCE_IMAGES})`
+              : `Add References (up to ${MAX_EDITOR_REFERENCE_IMAGES})`}
+          </span>
+        </button>
+      ) : (
+        <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 animate-in slide-in-from-top-2">
+          <div className="flex gap-2 mb-3 border-b border-gray-800 pb-3">
+            <button
+              onClick={() => refFileInput.current?.click()}
+              disabled={isUploadingRef}
+              className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-white border border-gray-600 flex items-center justify-center gap-1"
+            >
+              {isUploadingRef ? <LoadingSpinner size="sm" /> : "Local"}
+            </button>
+            <input
+              type="file"
+              ref={refFileInput}
+              className="hidden"
+              accept="image/*"
+              multiple
+              onChange={handleRefFileUpload}
+            />
+            <button
+              onClick={() => setShowRefSelector(false)}
+              className="px-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 text-xs"
+            >
+              Close
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto custom-scrollbar">
+            {imageAssets.map((a: Asset) => {
+              const isSelected = referenceAssets.some(
+                (referenceAsset) =>
+                  referenceAsset.id === a.id || referenceAsset.url === a.url,
+              );
+
+              return (
+                <img
+                  key={a.id}
+                  src={getReferenceThumbnailUrl(a.url)}
+                  className={`w-full h-12 object-cover rounded cursor-pointer border ${
+                    isSelected
+                      ? "border-purple-500 ring-1 ring-purple-400"
+                      : "border-transparent hover:border-purple-500"
+                  }`}
+                  crossOrigin="anonymous"
+                  loading="lazy"
+                  decoding="async"
+                  onClick={() => toggleReferenceAsset(a)}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setFullscreenReferenceAsset(a);
+                  }}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   // Isolated PromptFX picker for the PicFX + Convert tabs. Mirrors the 3DX/drift
   // menu styling but is backed entirely by the editor-only stores so the two
   // never share saved prompts or global presets.
@@ -1315,8 +1415,7 @@ export function EditAssetModal({
                 </div>
 
                 {referenceAssets.length > 0 &&
-                  activeTab !== "drift" &&
-                  activeTab !== "convert" && (
+                  activeTab !== "drift" && (
                     <div className="absolute bottom-4 right-4 w-40 border-2 border-purple-500 rounded-lg overflow-hidden bg-gray-800 shadow-2xl z-20">
                       <div className="grid grid-cols-2 gap-1 p-1 bg-gray-900/90">
                         {referenceAssets.slice(0, 4).map((referenceAsset) => (
@@ -1619,6 +1718,9 @@ export function EditAssetModal({
                   </div>
                 </div>
 
+                {/* 1c. References (same picker as PicFX) */}
+                {renderReferencePicker()}
+
                 {/* 2. Mode Select */}
                 <div className="bg-gray-800/50 p-1 rounded-lg flex border border-gray-700">
                   <button
@@ -1712,97 +1814,7 @@ export function EditAssetModal({
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-bold text-purple-300 uppercase tracking-wider">
-                      References
-                    </label>
-                    {referenceAssets.length > 0 && (
-                      <button
-                        onClick={() => setReferenceAssets([])}
-                        className="text-[10px] text-gray-400 hover:text-white"
-                      >
-                        Clear all
-                      </button>
-                    )}
-                  </div>
-                  {!showRefSelector ? (
-                    <button
-                      onClick={() => {
-                        setShowRefSelector(true);
-                        setIsCropping(false);
-                      }}
-                      className={`w-full border border-dashed rounded-xl p-3 flex items-center justify-center gap-2 transition-all ${referenceAssets.length > 0
-                        ? "border-purple-500/50 bg-purple-500/10"
-                        : "border-gray-700 hover:border-gray-500"
-                        }`}
-                    >
-                      <span className="text-xs text-gray-300">
-                        {referenceAssets.length > 0
-                          ? `Manage References (${referenceAssets.length}/${MAX_EDITOR_REFERENCE_IMAGES})`
-                          : `Add References (up to ${MAX_EDITOR_REFERENCE_IMAGES})`}
-                      </span>
-                    </button>
-                  ) : (
-                    <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 animate-in slide-in-from-top-2">
-                      <div className="flex gap-2 mb-3 border-b border-gray-800 pb-3">
-                        <button
-                          onClick={() => refFileInput.current?.click()}
-                          disabled={isUploadingRef}
-                          className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs text-white border border-gray-600 flex items-center justify-center gap-1"
-                        >
-                          {isUploadingRef ? (
-                            <LoadingSpinner size="sm" />
-                          ) : (
-                            "Local"
-                          )}
-                        </button>
-                        <input
-                          type="file"
-                          ref={refFileInput}
-                          className="hidden"
-                          accept="image/*"
-                          multiple
-                          onChange={handleRefFileUpload}
-                        />
-                        <button
-                          onClick={() => setShowRefSelector(false)}
-                          className="px-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 text-xs"
-                        >
-                          Close
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto custom-scrollbar">
-                        {imageAssets.map((a: Asset) => {
-                          const isSelected = referenceAssets.some(
-                            (referenceAsset) =>
-                              referenceAsset.id === a.id || referenceAsset.url === a.url,
-                          );
-
-                          return (
-                            <img
-                              key={a.id}
-                              src={getReferenceThumbnailUrl(a.url)}
-                              className={`w-full h-12 object-cover rounded cursor-pointer border ${
-                                isSelected
-                                  ? "border-purple-500 ring-1 ring-purple-400"
-                                  : "border-transparent hover:border-purple-500"
-                              }`}
-                              crossOrigin="anonymous"
-                              loading="lazy"
-                              decoding="async"
-                              onClick={() => toggleReferenceAsset(a)}
-                              onDoubleClick={(e) => {
-                                e.stopPropagation();
-                                setFullscreenReferenceAsset(a);
-                              }}
-                            />
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                {renderReferencePicker()}
 
                 {/* Prompt Box */}
                 <div className="space-y-3">

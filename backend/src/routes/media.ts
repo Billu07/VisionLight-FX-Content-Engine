@@ -552,9 +552,24 @@ router.post(
 
       const { aspectRatio, raw, originalAssetId, projectId, model } = req.body;
       const fileSizeBytes = req.file.size;
-      // Convert can run on GPT Image 2 (default, ~2.5K lossless) or Nano Banana 2.
+      // Convert can run on GPT Image 2 (default, 1080p lossless) or Nano Banana 2.
       const convertModel: "gpt-image-2" | "nano-banana-2" =
         model === "nano-banana-2" ? "nano-banana-2" : "gpt-image-2";
+
+      // Optional reference images (parity with the PicFX editor). Sent as a JSON
+      // array of URLs; parsed defensively and capped so a bad payload can't blow
+      // up the convert. Only used when we reuse the edit pipeline below.
+      let convertReferenceUrls: string[] = [];
+      try {
+        const parsed = JSON.parse(req.body.referenceUrls || "[]");
+        if (Array.isArray(parsed)) {
+          convertReferenceUrls = parsed
+            .filter((u): u is string => typeof u === "string" && u.trim().length > 0)
+            .slice(0, 5);
+        }
+      } catch {
+        convertReferenceUrls = [];
+      }
 
       if (projectId) {
         const project = await airtableService.getProjectById(projectId);
@@ -623,7 +638,7 @@ router.post(
             buildAutoOutpaintPrompt(normalizedAspectRatio),
             req.user!.id,
             normalizedAspectRatio,
-            [],
+            convertReferenceUrls,
             "pro",
             sourceAsset.id,
             apiKeys,
