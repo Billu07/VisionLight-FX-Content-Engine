@@ -13,8 +13,11 @@ const clampZoom = (z: number): number => {
   return Math.max(1, Math.min(3, n));
 };
 
-// Average the four corner pixels. Product shots are usually on a solid
-// background, so this "matches" that background when we pad around the subject.
+// Auto-detect the background by averaging thin strips along all four edges.
+// Product shots are usually on a solid background, so the border mean "matches"
+// that background when we pad around the subject. Averaging strips (rather than
+// just the corners) is robust when the product touches an edge. Mirrors the
+// client preview's border sampling so the applied result matches the preview.
 async function sampleMatchColor(
   normalized: Buffer,
 ): Promise<{ r: number; g: number; b: number }> {
@@ -23,28 +26,32 @@ async function sampleMatchColor(
     const w = meta.width || 0;
     const h = meta.height || 0;
     if (!w || !h) return { r: 255, g: 255, b: 255 };
-    const corners = [
-      { left: 0, top: 0 },
-      { left: w - 1, top: 0 },
-      { left: 0, top: h - 1 },
-      { left: w - 1, top: h - 1 },
+    const strip = Math.max(1, Math.round(Math.min(w, h) * 0.03)); // ~3% border
+    const regions = [
+      { left: 0, top: 0, width: w, height: strip }, // top
+      { left: 0, top: h - strip, width: w, height: strip }, // bottom
+      { left: 0, top: 0, width: strip, height: h }, // left
+      { left: w - strip, top: 0, width: strip, height: h }, // right
     ];
     let r = 0;
     let g = 0;
     let b = 0;
-    for (const c of corners) {
-      const px = await sharp(normalized)
-        .extract({ left: c.left, top: c.top, width: 1, height: 1 })
-        .raw()
-        .toBuffer();
-      r += px[0];
-      g += px[1];
-      b += px[2];
+    let n = 0;
+    for (const region of regions) {
+      const stats = await sharp(normalized).extract(region).stats();
+      const ch = stats.channels;
+      if (ch.length >= 3) {
+        r += ch[0].mean;
+        g += ch[1].mean;
+        b += ch[2].mean;
+        n++;
+      }
     }
+    if (!n) return { r: 255, g: 255, b: 255 };
     return {
-      r: Math.round(r / 4),
-      g: Math.round(g / 4),
-      b: Math.round(b / 4),
+      r: Math.round(r / n),
+      g: Math.round(g / n),
+      b: Math.round(b / n),
     };
   } catch {
     return { r: 255, g: 255, b: 255 };

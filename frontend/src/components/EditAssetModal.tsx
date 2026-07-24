@@ -2422,8 +2422,8 @@ export function EditAssetModal({
                     <span>Generate Path</span>
                   </>
               </button>
-            ) : activeTab === "convert" ? (
-              null // Convert button is in the UI block above
+            ) : activeTab === "convert" || activeTab === "sizefx" ? (
+              null // Convert + SizeFX have their own action button in the UI block above
             ) : (
               <button
                 onClick={() => {
