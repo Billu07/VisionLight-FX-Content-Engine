@@ -416,16 +416,16 @@ export default function SpinViewer({
         // zoomed → horizontal still spins the product (so you never lose the
         // rotate), vertical pans up/down to inspect the zoomed-in region.
         const k = 0.006;
-        const d = -dx * k;
+        const d = dx * k; // drag follows the finger (client: reverse to match drag)
         yaw += d;
         yawVel = (d / dt) * 16;
         const lim = 130 * (zoomTarget - 1);
         panTY = Math.max(-lim, Math.min(lim, panTY + dy));
         panY = panTY;
       } else {
-        // at rest → horizontal rotates (negated so dragging right spins right)
+        // at rest → horizontal rotates, following the finger direction
         const k = 0.006;
-        const d = -dx * k;
+        const d = dx * k; // client: reversed so the product turns with the drag
         yaw += d;
         yawVel = (d / dt) * 16;
       }
@@ -505,10 +505,10 @@ export default function SpinViewer({
       if (el) el.innerHTML = nativeFsActive() || pseudoFs ? EXIT_ICON : ENTER_ICON;
       setTimeout(fit, 60);
     };
-    // On a phone held sideways in fullscreen there's lots of empty width but the
-    // product only fills the height — so auto-zoom to 2× to fill the frame. We
-    // only auto-apply once (autoLandscapeZoom) and only pull back if the user
-    // hasn't since changed the zoom themselves, so we never fight their pinch.
+    // On a phone held sideways there's lots of empty width but the product only
+    // fills the height — so auto-zoom to 2× to fill the frame. We only auto-apply
+    // once (autoLandscapeZoom) and only pull back if the user hasn't since changed
+    // the zoom themselves, so we never fight their pinch.
     let autoLandscapeZoom = false;
     // A real touch device (phone/tablet) is the only place this applies — a coarse
     // pointer is the reliable signal, so a small laptop window that merely looks
@@ -518,7 +518,9 @@ export default function SpinViewer({
       window.matchMedia?.("(orientation: landscape)")?.matches ??
       window.innerWidth > window.innerHeight;
     const updateLandscapeZoom = () => {
-      const want = isTouchDevice && (nativeFsActive() || pseudoFs) && isLandscape();
+      // Client spec: portrait → 1×, landscape → 2× (main player only, any touch
+      // device — not gated to fullscreen; never the tiny hero/gallery tiles).
+      const want = isTouchDevice && !hero && isLandscape();
       if (want && !autoLandscapeZoom && zoomTarget <= 1.05) {
         zoomTarget = clampZoom(2);
         autoLandscapeZoom = true;
@@ -702,6 +704,7 @@ export default function SpinViewer({
 
     fit();
     tick();
+    scheduleLandscapeZoom(); // apply landscape 2× if we mount already held sideways
 
     return () => {
       alive = false;
@@ -906,6 +909,19 @@ const R3D_CSS = `
   .r3d-hint{bottom:max(20%,202px)}
   .r3d-zoomcol{bottom:calc(150px + env(safe-area-inset-bottom))}
   .r3d-cta{padding:13px 12px;font-size:14px}
+}
+/* landscape phone (short viewport): the angle navigator + hint sit ~150px up,
+   which lands right over the product on a short sideways screen ("toggle covering
+   product"). Pull all chrome to the very bottom edge, and trim the scrims that
+   read as bars across a wide short frame. */
+@media (orientation:landscape) and (max-height:540px){
+  .r3d-rot{bottom:max(10px,env(safe-area-inset-bottom));padding:4px 10px}
+  .r3d-rot .r3d-track{width:104px}
+  .r3d-hint{bottom:max(54px,calc(env(safe-area-inset-bottom) + 44px))}
+  .r3d-hand{width:40px;height:40px}
+  .r3d-zoomcol{bottom:calc(54px + env(safe-area-inset-bottom))}
+  .r3d-scrim-bot{height:120px}
+  .r3d-scrim-top{height:70px}
 }
 /* embed chrome toggles */
 .r3d-no-controls .r3d-zoomcol,.r3d-no-controls .r3d-tools,.r3d-no-controls .r3d-rot{display:none!important}
