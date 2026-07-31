@@ -188,6 +188,26 @@ export default function Rotation3DAdminPanel() {
   const [productQuery, setProductQuery] = useState("");
   const [productStatus, setProductStatus] = useState("ALL");
 
+  const [downloadingZip, setDownloadingZip] = useState(false);
+  const downloadSourceZip = async (brand: Brand) => {
+    setDownloadingZip(true);
+    try {
+      const res = await apiEndpoints.r3dBrandSourceImagesZip(brand.id);
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${brand.name.replace(/[^a-z0-9-_]+/gi, "-") || "brand"}-source-images.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e?.response?.data?.error || "Failed to download ZIP" });
+    } finally {
+      setDownloadingZip(false);
+    }
+  };
+
   const copyProductLink = async (p: Product) => {
     const link =
       brandSlug && p.slug
@@ -612,11 +632,21 @@ export default function Rotation3DAdminPanel() {
               {/* Images the brand sent in */}
               {sourceImages.length > 0 && (
                 <div className="mt-4 rounded-lg border border-gray-700/60 bg-gray-950/50 p-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-300">
-                    Images sent by the brand ({sourceImages.length})
-                  </p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-300">
+                      Images sent by the brand ({sourceImages.length})
+                    </p>
+                    <button
+                      onClick={() => downloadSourceZip(selected)}
+                      disabled={downloadingZip}
+                      className="rounded-lg border border-brand-accent/40 bg-brand-accent/15 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-brand-accent transition-colors hover:bg-brand-accent/25 disabled:opacity-50"
+                    >
+                      {downloadingZip ? "Zipping…" : "⬇ Download all (ZIP)"}
+                    </button>
+                  </div>
                   <p className="mt-1 text-[11px] text-gray-500">
-                    Raw product photos to build spins from. Click to open / download.
+                    Raw product photos to build spins from. Click a thumb to open one, or grab
+                    them all as a ZIP.
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {sourceImages.map((img) => (

@@ -225,6 +225,11 @@ export const apiEndpoints = {
     api.get(`/api/rotation3d/brands/${orgId}/products`),
   r3dBrandSourceImages: (orgId: string) =>
     api.get(`/api/rotation3d/brands/${orgId}/source-images`),
+  r3dBrandSourceImagesZip: (orgId: string) =>
+    api.get(`/api/rotation3d/brands/${orgId}/source-images.zip`, {
+      responseType: "blob",
+      timeout: 120000,
+    }),
   r3dAllProducts: () => api.get("/api/rotation3d/products"),
   r3dSetFeatured: (
     id: string,

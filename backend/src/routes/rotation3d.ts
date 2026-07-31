@@ -1,5 +1,7 @@
 import { Router, Response } from "express";
 import multer from "multer";
+import axios from "axios";
+import archiver from "archiver";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -259,6 +261,65 @@ router.get(
       select: { id: true, url: true, angleLabel: true, productId: true, createdAt: true },
     });
     res.json({ images });
+  },
+);
+
+// Download ALL of a brand's source images as one ZIP — the brand sends product
+// photos one-by-one, the team grabs them in a single file to work from. Grouped
+// into a per-product folder when an image is tied to a product.
+router.get(
+  "/api/rotation3d/brands/:orgId/source-images.zip",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const orgId = req.params.orgId;
+    const [org, images] = await Promise.all([
+      prisma.organization.findUnique({ where: { id: orgId }, select: { name: true } }),
+      prisma.rot3dSourceImage.findMany({
+        where: { organizationId: orgId },
+        orderBy: [{ productId: "asc" }, { createdAt: "asc" }],
+        select: { url: true, angleLabel: true, product: { select: { name: true } } },
+      }),
+    ]);
+    if (images.length === 0)
+      return res.status(404).json({ error: "No source images for this brand yet" });
+
+    const slug = (s: string) =>
+      s.replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+    const brandSlug = slug(org?.name || "brand") || "brand";
+
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${brandSlug}-source-images.zip"`,
+    );
+
+    const archive = archiver("zip", { zlib: { level: 9 } });
+    archive.on("error", (e) => {
+      console.error("Source-image ZIP error:", e);
+      if (!res.headersSent) res.status(500).end();
+    });
+    archive.pipe(res);
+
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i];
+      try {
+        const response = await axios({
+          url: img.url,
+          method: "GET",
+          responseType: "stream",
+          timeout: 15000,
+        });
+        const ext = img.url.split(".").pop()?.split("?")[0]?.slice(0, 5) || "jpg";
+        const label = img.angleLabel ? "-" + slug(img.angleLabel) : "";
+        const base = `${String(i + 1).padStart(2, "0")}${label}.${ext}`;
+        const name = img.product?.name ? `${slug(img.product.name)}/${base}` : base;
+        archive.append(response.data, { name });
+      } catch (e) {
+        console.error(`Failed to add source image ${img.url} to zip:`, e);
+      }
+    }
+    await archive.finalize();
   },
 );
 
