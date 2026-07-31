@@ -905,26 +905,29 @@ export function EditAssetModal({
   const handleCrop = async () => {
     if (!completedCrop || !imgRef.current) return;
     const image = imgRef.current;
-    const canvas = document.createElement("canvas");
     const scaleX = image.naturalWidth / image.width;
     const scaleY = image.naturalHeight / image.height;
 
-    canvas.width = Math.floor(completedCrop.width * scaleX);
-    canvas.height = Math.floor(completedCrop.height * scaleY);
+    // Convert the display-space crop to source pixels, clamped inside the image.
+    // Sampling past the edge leaves uncovered canvas pixels which — with no alpha
+    // in the JPEG output — render as a black bar along the bottom/right. Clamping
+    // + integer source=dest=canvas dims removes that strip.
+    const sx = Math.max(0, Math.round(completedCrop.x * scaleX));
+    const sy = Math.max(0, Math.round(completedCrop.y * scaleY));
+    const sw = Math.min(image.naturalWidth - sx, Math.round(completedCrop.width * scaleX));
+    const sh = Math.min(image.naturalHeight - sy, Math.round(completedCrop.height * scaleY));
+    if (sw <= 0 || sh <= 0) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = sw;
+    canvas.height = sh;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    ctx.drawImage(
-      image,
-      completedCrop.x * scaleX,
-      completedCrop.y * scaleY,
-      completedCrop.width * scaleX,
-      completedCrop.height * scaleY,
-      0,
-      0,
-      completedCrop.width * scaleX,
-      completedCrop.height * scaleY,
-    );
+    // White base so any transparent source pixels flatten to white, not black.
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, sw, sh);
+    ctx.drawImage(image, sx, sy, sw, sh, 0, 0, sw, sh);
 
     const id = Date.now().toString();
     triggerJobAdded({ id, type: "crop", status: "processing", message: "Cropping..." });
@@ -2423,7 +2426,7 @@ export function EditAssetModal({
                     { label: "16:9", value: 16 / 9 },
                     { label: "9:16", value: 9 / 16 },
                     { label: "4:3", value: 4 / 3 },
-                    { label: "3:4", value: 3 / 4 },
+                    { label: "4:5", value: 4 / 5 },
                   ].map((ratio) => (
                     <button
                       key={ratio.label}
