@@ -303,6 +303,118 @@ function ProductCard({
   );
 }
 
+// Recreated (Rotation3D-branded) version of the capture-instructions infographic
+// so brands shoot a clean, evenly-spaced set the team can turn into a spin.
+function CaptureInstructions() {
+  const [open, setOpen] = useState(true);
+
+  const tips = [
+    {
+      t: "Good lighting",
+      d: "Even, bright light so every detail is easy to see.",
+      icon: <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.6.6 1 1.4 1 2.2V16h6v-.3c0-.8.4-1.6 1-2.2A6 6 0 0 0 12 3Z" />,
+    },
+    {
+      t: "Keep it still",
+      d: "Once you start shooting, don't move the product.",
+      icon: (
+        <>
+          <rect x="5" y="11" width="14" height="9" rx="2" />
+          <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+        </>
+      ),
+    },
+    {
+      t: "Same height & distance",
+      d: "Hold the camera at one height and distance for every shot.",
+      icon: (
+        <>
+          <path d="M4 8h3l2-2h6l2 2h3v11H4z" />
+          <circle cx="12" cy="13" r="3.5" />
+        </>
+      ),
+    },
+    {
+      t: "Fill the frame",
+      d: "Fill most of the frame — but never crop the product.",
+      icon: <path d="M12 3 3 8v8l9 5 9-5V8l-9-5Zm0 0v18M3 8l9 5 9-5" />,
+    },
+  ];
+
+  const steps = [
+    { n: 1, t: "Start flat", d: "Picture a + on the floor with the product centered." },
+    { n: 2, t: "Raise slightly", d: "Lift until the top shows, then keep that height." },
+    { n: 3, t: "The 4 ends", d: "One photo from the end of each line of the + (4 photos)." },
+    { n: 4, t: "The 4 corners", d: "Halfway between each, face every corner (4 more)." },
+  ];
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-gradient-to-b from-brand-primary/10 to-transparent">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+      >
+        <span className="flex items-center gap-2">
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-brand-primary to-brand-secondary text-white">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+              <path d="M4 8h3l2-2h6l2 2h3v11H4z" />
+              <circle cx="12" cy="13" r="3.2" />
+            </svg>
+          </span>
+          <span className="text-sm font-bold text-white">How to capture — read first</span>
+        </span>
+        <span className="text-xs text-gray-400">{open ? "Hide" : "Show"}</span>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4">
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-brand-accent">
+            Before you start
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {tips.map((tip) => (
+              <div key={tip.t} className="rounded-lg border border-white/10 bg-gray-950/40 p-3">
+                <span className="text-brand-accent">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+                    {tip.icon}
+                  </svg>
+                </span>
+                <p className="mt-2 text-xs font-semibold text-white">{tip.t}</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-gray-400">{tip.d}</p>
+              </div>
+            ))}
+          </div>
+
+          <p className="mb-2 mt-4 text-[11px] font-bold uppercase tracking-[0.16em] text-brand-accent">
+            Capture order
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {steps.map((s) => (
+              <div key={s.n} className="rounded-lg border border-white/10 bg-gray-950/40 p-3">
+                <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-brand-primary to-brand-secondary text-[11px] font-bold text-white">
+                  {s.n}
+                </span>
+                <p className="mt-2 text-xs font-semibold text-white">{s.t}</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-gray-400">{s.d}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-3 flex items-center gap-2 rounded-lg border border-brand-accent/20 bg-brand-accent/[0.06] px-3 py-2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-brand-accent">
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+            <p className="text-[11px] text-gray-300">
+              Finish with <b className="text-white">8 evenly spaced photos</b> around the product.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SendImages({ onDone }: { onDone: () => void }) {
   const [files, setFiles] = useState<File[]>([]);
   const [pct, setPct] = useState<number | null>(null);
@@ -334,9 +446,12 @@ function SendImages({ onDone }: { onDone: () => void }) {
     <div className={panel}>
       <h3 className="text-base font-semibold text-white">Send product images</h3>
       <p className="mt-1 text-sm text-gray-400">
-        Upload photos of a product from multiple angles. Our team turns them into an
-        interactive 3D spin and adds it to your dashboard.
+        Shoot one product at a time following the capture guide below, then upload the
+        set. Our team turns them into an interactive 3D spin and adds it to your dashboard.
       </p>
+
+      <CaptureInstructions />
+
       <input
         ref={ref}
         type="file"
