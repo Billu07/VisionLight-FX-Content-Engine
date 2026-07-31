@@ -22,10 +22,10 @@ type BrandMeta = {
 
 const BRAND_META: Record<"picdrift" | "visualfx" | "byok", BrandMeta> = {
   picdrift: {
-    title: "PicDrift Studio",
+    title: "Workspace",
     subtitle: "Preparing your motion canvas",
     accentText: "text-cyan-200",
-    chipText: "PICDRIFT SESSION",
+    chipText: "WORKSPACE SESSION",
     panelGradient:
       "from-cyan-400/20 via-sky-500/10 to-blue-500/20",
     haloGradient:

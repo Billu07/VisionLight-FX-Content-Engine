@@ -15,7 +15,7 @@ const toCta = (c: any) =>
     ? { label: String(c.label), url: String(c.url) }
     : undefined;
 
-function Placeholder({ title, sub }: { title: string; sub: string }) {
+function Placeholder({ title, sub, showHome }: { title: string; sub: string; showHome?: boolean }) {
   return (
     <div
       style={{
@@ -48,6 +48,26 @@ function Placeholder({ title, sub }: { title: string; sub: string }) {
         </div>
         <h1 style={{ fontSize: 24, fontWeight: 700, margin: "0 0 8px" }}>{title}</h1>
         <p style={{ color: "#9aa3b6", lineHeight: 1.6, margin: 0 }}>{sub}</p>
+        {showHome ? (
+          <a
+            href="https://rotation3d.com"
+            style={{
+              display: "inline-block",
+              marginTop: 22,
+              padding: "11px 20px",
+              borderRadius: 12,
+              fontSize: 14,
+              fontWeight: 600,
+              color: "#fff",
+              textDecoration: "none",
+              background:
+                "linear-gradient(135deg, var(--primary-brand,#6366f1), var(--secondary-brand,#8b5cf6))",
+              boxShadow: "0 10px 30px -10px rgba(139,92,246,.6)",
+            }}
+          >
+            Go to Rotation3D.com →
+          </a>
+        ) : null}
       </div>
     </div>
   );
@@ -112,9 +132,9 @@ export default function Rotation3DPlayer() {
 
   if (state.loading) return <Placeholder title="Loading…" sub="Preparing the spin." />;
   if (state.error === "not_found")
-    return <Placeholder title="Not found" sub="This product isn't available yet." />;
+    return <Placeholder title="Not found" sub="This product isn't available yet." showHome />;
   if (state.error || !state.data)
-    return <Placeholder title="Something went wrong" sub="Please try again in a moment." />;
+    return <Placeholder title="Something went wrong" sub="Please try again in a moment." showHome />;
 
   const p = state.data;
   const m = p.manifest || {};
