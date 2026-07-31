@@ -364,7 +364,10 @@ export default function SpinViewer({
     let axis: "" | "rotate" | "scroll" | "rotatepan" = "";
     const pointers = new Map<number, PointerEvent>();
     const isControl = (t: EventTarget | null) =>
-      t instanceof Element && (t.closest(".r3d-iconbtn") || t.closest(".r3d-cta"));
+      t instanceof Element &&
+      (t.closest(".r3d-iconbtn") ||
+        t.closest(".r3d-cta") ||
+        t.closest(".r3d-powered-badge"));
 
     const down = (e: PointerEvent) => {
       dragging = true;
@@ -804,6 +807,17 @@ export default function SpinViewer({
         </div>
       )}
 
+      <a
+        className="r3d-powered-badge"
+        href="https://rotation3d.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Powered by Rotation3D"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
+        <span>Powered by <b>Rotation3D</b></span>
+      </a>
+
       <div className="r3d-loader" ref={loaderRef}>
         <div className="r3d-loadwrap">
           <svg className="r3d-ring" viewBox="0 0 64 64">
@@ -817,7 +831,7 @@ export default function SpinViewer({
             <circle className="r3d-ring-fg" ref={ringRef} cx="32" cy="32" r="27" />
           </svg>
           <div className="r3d-pct" ref={pctRef}>0%</div>
-          <div className="r3d-lbl">Preparing spin</div>
+          <div className="r3d-lbl">Optimizing frames…</div>
           <div className="r3d-powered">Powered by Rotation3D</div>
         </div>
       </div>
@@ -910,6 +924,17 @@ const R3D_CSS = `
   .r3d-zoomcol{bottom:calc(150px + env(safe-area-inset-bottom))}
   .r3d-cta{padding:13px 12px;font-size:14px}
 }
+/* persistent viral attribution — shows on every embed regardless of the tenant
+   brand toggle (brand=0 only hides the tenant's own logo/name). Bottom-left, above
+   the CTA bar; drops to the edge when there are no CTAs; hidden on hero tiles. */
+.r3d-powered-badge{position:absolute;left:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:6;display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid var(--r3d-line);background:rgba(11,15,25,.42);backdrop-filter:blur(8px);color:#eef1f6;font-size:11px;line-height:1;text-decoration:none;opacity:.72;transition:opacity .2s,background .2s}
+.r3d-powered-badge:hover{opacity:1;background:var(--r3d-glass2)}
+.r3d-powered-badge svg{width:13px;height:13px;color:var(--r3d-secondary)}
+.r3d-powered-badge b{font-weight:700}
+.r3d-no-ctas .r3d-powered-badge{bottom:calc(16px + env(safe-area-inset-bottom))}
+.r3d-hero .r3d-powered-badge{display:none!important}
+.r3d-light .r3d-powered-badge{border-color:rgba(0,0,0,.12);background:rgba(255,255,255,.6);color:#0b0f19}
+
 /* landscape phone (short viewport): the angle navigator + hint sit ~150px up,
    which lands right over the product on a short sideways screen ("toggle covering
    product"). Pull all chrome to the very bottom edge, and trim the scrims that
