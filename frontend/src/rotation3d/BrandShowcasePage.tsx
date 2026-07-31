@@ -66,6 +66,7 @@ const posterFor = (p: P): string | undefined => {
 // once. Once mounted it stays mounted (no reload thrash on scroll).
 function GalleryTile({ p, background }: { p: P; background: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  const fsRef = useRef<HTMLDivElement>(null);
   const [live, setLive] = useState(false);
   const poster = posterFor(p);
 
@@ -83,14 +84,40 @@ function GalleryTile({ p, background }: { p: P; background: string }) {
     return () => io.disconnect();
   }, [live]);
 
+  // Expand this tile's spin to native fullscreen so it can be explored in place.
+  // (iOS Safari can't fullscreen a <div>, so the button no-ops there — the tile's
+  // name still links to the full player, which has an iOS-safe fullscreen.)
+  const toggleFs = () => {
+    const el = fsRef.current;
+    if (!el) return;
+    const doc = document as Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void };
+    const anyEl = el as HTMLDivElement & { webkitRequestFullscreen?: () => void };
+    if (doc.fullscreenElement || doc.webkitFullscreenElement) {
+      (doc.exitFullscreen || doc.webkitExitFullscreen)?.call(doc);
+    } else {
+      (anyEl.requestFullscreen || anyEl.webkitRequestFullscreen)?.call(anyEl);
+    }
+  };
+
   return (
     <div ref={ref} className="relative aspect-square" style={{ background }}>
       {poster && (
         <img src={poster} alt="" aria-hidden className="absolute inset-0 h-full w-full object-contain" />
       )}
       {live && (
-        <div className="absolute inset-0">
+        <div ref={fsRef} className="r3d-gallery-fs absolute inset-0" style={{ background }}>
           <SpinViewer manifest={galleryMan(p)} variant="hero" background={background} />
+          <button
+            type="button"
+            onClick={toggleFs}
+            aria-label="Fullscreen"
+            title="Fullscreen"
+            className="absolute right-2 top-2 z-10 grid h-8 w-8 place-items-center rounded-lg border border-white/15 bg-black/40 text-white backdrop-blur transition-colors hover:bg-black/60"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" />
+            </svg>
+          </button>
         </div>
       )}
     </div>
@@ -113,6 +140,7 @@ export default function BrandShowcasePage({ embed = false }: { embed?: boolean }
     products?: P[];
     error?: boolean;
   }>({ loading: true });
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     if (!brandSlug) return;
@@ -136,6 +164,17 @@ export default function BrandShowcasePage({ embed = false }: { embed?: boolean }
 
   const brand = state.brand;
   const products = state.products || [];
+  // Paginate the grid so a large brand doesn't mount every spin at once (the
+  // cause of the load stutter). 6 per page; each tile still lazy-mounts + loads
+  // its coarse ring first, so a page settles fast.
+  const PAGE_SIZE = 6;
+  const pageCount = Math.max(1, Math.ceil(products.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageProducts = products.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+  const goPage = (n: number) => {
+    setPage(Math.max(0, Math.min(pageCount - 1, n)));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
   const brandStyle = {
     ...(brand.primaryColor ? { ["--primary-brand" as any]: brand.primaryColor } : {}),
     ...(brand.secondaryColor ? { ["--secondary-brand" as any]: brand.secondaryColor } : {}),
@@ -143,6 +182,10 @@ export default function BrandShowcasePage({ embed = false }: { embed?: boolean }
 
   return (
     <div style={brandStyle} className="min-h-screen overflow-x-hidden bg-studio-gradient font-sans text-white">
+      <style>{`
+        .r3d-gallery-fs:fullscreen{width:100vw;height:100vh}
+        .r3d-gallery-fs:-webkit-full-screen{width:100vw;height:100vh}
+      `}</style>
       <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-8">
         {!embed && (
           <div className="mb-10 flex items-center gap-3">
@@ -157,24 +200,50 @@ export default function BrandShowcasePage({ embed = false }: { embed?: boolean }
         {products.length === 0 ? (
           <p className="py-20 text-center text-sm text-gray-500">No products yet.</p>
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {products.map((p) => (
-              <div key={p.id} className="overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02]">
-                <GalleryTile p={p} background={p.background || STUDIO_GRADIENT} />
-                <div className="flex items-center justify-between border-t border-white/8 px-5 py-4">
-                  <Link
-                    to={`/${brand.slug}/${p.slug}`}
-                    target={embed ? "_blank" : undefined}
-                    rel={embed ? "noopener noreferrer" : undefined}
-                    className="text-sm font-medium transition-colors hover:text-brand-accent"
-                  >
-                    {p.name}
-                  </Link>
-                  <span className="text-xs text-gray-500">Drag to rotate</span>
+          <>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {pageProducts.map((p) => (
+                <div key={p.id} className="overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02]">
+                  <GalleryTile p={p} background={p.background || STUDIO_GRADIENT} />
+                  <div className="flex items-center justify-between border-t border-white/8 px-5 py-4">
+                    <Link
+                      to={`/${brand.slug}/${p.slug}`}
+                      target={embed ? "_blank" : undefined}
+                      rel={embed ? "noopener noreferrer" : undefined}
+                      className="text-sm font-medium transition-colors hover:text-brand-accent"
+                    >
+                      {p.name}
+                    </Link>
+                    <span className="text-xs text-gray-500">Drag to rotate</span>
+                  </div>
                 </div>
+              ))}
+            </div>
+
+            {pageCount > 1 && (
+              <div className="mt-10 flex items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => goPage(safePage - 1)}
+                  disabled={safePage === 0}
+                  className="rounded-lg border border-white/12 bg-white/[0.04] px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-200 transition-colors hover:bg-white/[0.08] disabled:opacity-40"
+                >
+                  ← Prev
+                </button>
+                <span className="text-xs text-gray-400">
+                  Page {safePage + 1} of {pageCount}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => goPage(safePage + 1)}
+                  disabled={safePage >= pageCount - 1}
+                  className="rounded-lg border border-white/12 bg-white/[0.04] px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-gray-200 transition-colors hover:bg-white/[0.08] disabled:opacity-40"
+                >
+                  Next →
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>

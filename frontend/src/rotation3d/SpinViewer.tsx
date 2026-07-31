@@ -376,6 +376,7 @@ export default function SpinViewer({
 
     const down = (e: PointerEvent) => {
       dragging = true;
+      engage(); // dismiss the "drag to rotate" hint the instant the player is touched
       yawVel = 0;
       lastX = startX = e.clientX;
       lastY = startY = e.clientY;
@@ -923,6 +924,9 @@ const R3D_CSS = `
 .r3d-hero .r3d-scrim-top,.r3d-hero .r3d-scrim-bot,.r3d-hero .r3d-topbar,.r3d-hero .r3d-zoomcol,.r3d-hero .r3d-rot,.r3d-hero .r3d-ctas,.r3d-hero .r3d-loader{display:none!important}
 /* gallery tiles: keep the drag hint small and low so it sits under the product */
 .r3d-hero .r3d-hint{bottom:8%;gap:5px;opacity:.8}
+/* the hero rule above has equal specificity to .r3d-hint.r3d-gone but comes later,
+   so it used to override the dismiss — this makes the gone-state win on hero too */
+.r3d-hero .r3d-hint.r3d-gone{opacity:0}
 .r3d-hero .r3d-hand{width:32px;height:32px}
 .r3d-hero .r3d-hand svg{width:15px;height:15px}
 .r3d-hero .r3d-hint span{font-size:11px}
