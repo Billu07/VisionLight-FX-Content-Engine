@@ -49,6 +49,9 @@ export type SpinViewerProps = {
   showControls?: boolean;
   showCtas?: boolean;
   showBrand?: boolean;
+  /** optional product info shown beside the player (desktop right / mobile top) */
+  title?: string | null;
+  description?: string | null;
 };
 
 const clampZoom = (z: number) => Math.max(0.7, Math.min(2.8, z));
@@ -113,6 +116,8 @@ export default function SpinViewer({
   showControls = true,
   showCtas = true,
   showBrand = true,
+  title,
+  description,
 }: SpinViewerProps) {
   const hero = variant === "hero";
   const lightBg = isLightColor(background);
@@ -775,6 +780,13 @@ export default function SpinViewer({
         </div>
       </div>
 
+      {!hero && (title || description) && (
+        <div className="r3d-info" aria-hidden>
+          {title && <div className="r3d-info-title">{title}</div>}
+          {description && <div className="r3d-info-desc">{description}</div>}
+        </div>
+      )}
+
       <div className="r3d-zoomcol">
         <button className="r3d-iconbtn" data-z="1" aria-label="Zoom in">+</button>
         <button className="r3d-iconbtn" data-z="-1" aria-label="Zoom out">−</button>
@@ -948,6 +960,22 @@ const R3D_CSS = `
   .r3d-scrim-bot{height:120px}
   .r3d-scrim-top{height:70px}
 }
+/* optional product info (title + description). Only rendered when the brand sets
+   it, so default players look unchanged. Desktop: right, vertically centered;
+   mobile: top under the topbar. pointer-events:none so it never blocks the drag. */
+.r3d-info{position:absolute;z-index:4;pointer-events:none;color:#eef1f6;text-shadow:0 1px 12px rgba(0,0,0,.6)}
+.r3d-info-title{font-size:18px;font-weight:700;line-height:1.2}
+.r3d-info-desc{margin-top:6px;font-size:13px;line-height:1.5;color:#c7cdd9}
+@media (min-width:768px){
+  .r3d-info{right:22px;top:50%;transform:translateY(-50%);max-width:min(300px,32%);text-align:right}
+}
+@media (max-width:767px){
+  .r3d-info{left:16px;right:16px;top:calc(58px + env(safe-area-inset-top));text-align:center;max-height:22vh;overflow:hidden}
+  .r3d-info-title{font-size:16px}
+  .r3d-info-desc{font-size:12px;margin-top:4px}
+}
+.r3d-light .r3d-info{color:#0b0f19;text-shadow:none}
+.r3d-light .r3d-info-desc{color:#3a4150}
 /* embed chrome toggles */
 .r3d-no-controls .r3d-zoomcol,.r3d-no-controls .r3d-tools,.r3d-no-controls .r3d-rot{display:none!important}
 .r3d-no-ctas .r3d-ctas{display:none!important}

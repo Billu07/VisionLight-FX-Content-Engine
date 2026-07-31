@@ -18,6 +18,8 @@ type Cta = { label?: string; url?: string } | null;
 type Product = {
   id: string;
   name: string;
+  title?: string | null;
+  description?: string | null;
   slug?: string;
   status: string;
   defaultFrame: number;
@@ -64,9 +66,28 @@ function ProductCard({
   const [p2Label, setP2Label] = useState(product.ctaSecondary?.label || "");
   const [p2Url, setP2Url] = useState(product.ctaSecondary?.url || "");
   const [bg, setBg] = useState(product.background || "");
+  const [title, setTitle] = useState(product.title || "");
+  const [description, setDescription] = useState(product.description || "");
+  const frames = product.spin?.manifest?.frames || [];
+  const [showFrame, setShowFrame] = useState(false);
+  const [frameIdx, setFrameIdx] = useState(product.defaultFrame || 0);
+  const [savingFrame, setSavingFrame] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [note, setNote] = useState("");
+
+  const saveFrame = async () => {
+    setSavingFrame(true);
+    try {
+      await apiEndpoints.r3dUpdateProduct(product.id, { defaultFrame: frameIdx });
+      onSaved();
+      setShowFrame(false);
+    } catch {
+      /* ignore */
+    } finally {
+      setSavingFrame(false);
+    }
+  };
   const [emCtas, setEmCtas] = useState(true);
   const [emControls, setEmControls] = useState(true);
   const [emLogo, setEmLogo] = useState(true);
@@ -111,6 +132,8 @@ function ProductCard({
         ctaPrimary: { label: p1Label, url: p1Url },
         ctaSecondary: { label: p2Label, url: p2Url },
         background: bg,
+        title,
+        description,
         ...(publishOverride !== undefined ? { publish: publishOverride } : {}),
       });
       onSaved();
@@ -220,6 +243,76 @@ function ProductCard({
               <span className="font-mono text-xs text-gray-500">{bg || "default"}</span>
             </div>
           </div>
+
+          {/* Product info — optional title + description shown beside the player */}
+          <div className="mt-3">
+            <p className={label}>
+              Product info <span className="font-normal normal-case text-gray-500">· optional</span>
+            </p>
+            <input
+              className={`${input} mt-1`}
+              placeholder="Title (defaults to the product name)"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+            <textarea
+              className={`${input} mt-2 resize-none`}
+              rows={3}
+              placeholder="Short description shown next to the player…"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+
+          {/* Start frame — the angle the player + share card open on */}
+          {frames.length > 0 && (
+            <div className="mt-3 rounded-lg border border-white/8 bg-gray-950/40 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className={label}>Start frame</p>
+                  <p className="mt-0.5 text-[11px] text-gray-500">
+                    The angle the player &amp; share card open on.
+                  </p>
+                </div>
+                <button
+                  className={ghostBtn}
+                  onClick={() => {
+                    setFrameIdx(product.defaultFrame || 0);
+                    setShowFrame((s) => !s);
+                  }}
+                >
+                  {showFrame ? "Close" : "Set start frame"}
+                </button>
+              </div>
+              {showFrame && (
+                <div className="mt-3">
+                  <div className="mx-auto h-40 w-40 overflow-hidden rounded-xl border border-white/10 bg-gray-950">
+                    <img
+                      src={frames[Math.min(frameIdx, frames.length - 1)]}
+                      alt=""
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={frames.length - 1}
+                    value={frameIdx}
+                    onChange={(e) => setFrameIdx(Number(e.target.value))}
+                    className="mt-3 w-full accent-brand-primary"
+                  />
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="text-[11px] text-gray-500">
+                      Frame {frameIdx + 1} / {frames.length}
+                    </span>
+                    <button className={primaryBtn} onClick={saveFrame} disabled={savingFrame}>
+                      {savingFrame ? "Saving…" : "Save start frame"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <button className={primaryBtn} onClick={() => save()} disabled={saving}>
@@ -417,6 +510,7 @@ function CaptureInstructions() {
 
 function SendImages({ onDone }: { onDone: () => void }) {
   const [files, setFiles] = useState<File[]>([]);
+  const [productLabel, setProductLabel] = useState("");
   const [pct, setPct] = useState<number | null>(null);
   const [msg, setMsg] = useState("");
   const ref = useRef<HTMLInputElement>(null);
@@ -427,12 +521,14 @@ function SendImages({ onDone }: { onDone: () => void }) {
     setMsg("");
     const fd = new FormData();
     files.forEach((f) => fd.append("images", f));
+    if (productLabel.trim()) fd.append("productLabel", productLabel.trim());
     try {
       await apiEndpoints.r3dUploadSourceImages(fd, {
         onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)),
       });
       setMsg(`Sent ${files.length} image${files.length === 1 ? "" : "s"} to the team.`);
       setFiles([]);
+      setProductLabel("");
       if (ref.current) ref.current.value = "";
       onDone();
     } catch (e: any) {
@@ -451,6 +547,19 @@ function SendImages({ onDone }: { onDone: () => void }) {
       </p>
 
       <CaptureInstructions />
+
+      <div className="mt-4">
+        <p className={label}>Product name</p>
+        <p className="mt-0.5 text-[11px] text-gray-500">
+          Send one product at a time — this keeps each set together for the team.
+        </p>
+        <input
+          className={`${input} mt-1.5 max-w-sm`}
+          placeholder="e.g. Air Max 90"
+          value={productLabel}
+          onChange={(e) => setProductLabel(e.target.value)}
+        />
+      </div>
 
       <input
         ref={ref}

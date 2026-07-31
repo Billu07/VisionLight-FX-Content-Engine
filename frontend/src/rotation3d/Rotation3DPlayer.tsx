@@ -147,6 +147,8 @@ export default function Rotation3DPlayer() {
       }}
       brandName={p.brandName || "Rotation3D"}
       productName={p.name || "Product"}
+      title={p.title}
+      description={p.description}
       logoUrl={p.logoUrl}
       primaryColor={p.primaryColor}
       secondaryColor={p.secondaryColor}

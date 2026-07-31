@@ -383,6 +383,8 @@ model Rot3dProduct {
   organizationId  String
   slug            String
   name            String
+  title           String? // optional display title shown beside the player (falls back to name)
+  description     String? // optional product blurb shown beside the player
   status          String   @default("DRAFT") // DRAFT | PROCESSING | READY | PUBLISHED | ARCHIVED
   defaultFrame    Int      @default(0)
   background      String? // "transparent" | hex
@@ -413,6 +415,7 @@ model Rot3dSourceImage {
   productId        String?
   url              String
   angleLabel       String?
+  productLabel     String? // free-text product name the brand typed when sending a batch
   uploadedByUserId String?
   createdAt        DateTime @default(now())
 

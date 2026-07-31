@@ -258,7 +258,14 @@ router.get(
     const images = await prisma.rot3dSourceImage.findMany({
       where: { organizationId: req.params.orgId },
       orderBy: { createdAt: "desc" },
-      select: { id: true, url: true, angleLabel: true, productId: true, createdAt: true },
+      select: {
+        id: true,
+        url: true,
+        angleLabel: true,
+        productLabel: true,
+        productId: true,
+        createdAt: true,
+      },
     });
     res.json({ images });
   },
@@ -278,7 +285,12 @@ router.get(
       prisma.rot3dSourceImage.findMany({
         where: { organizationId: orgId },
         orderBy: [{ productId: "asc" }, { createdAt: "asc" }],
-        select: { url: true, angleLabel: true, product: { select: { name: true } } },
+        select: {
+          url: true,
+          angleLabel: true,
+          productLabel: true,
+          product: { select: { name: true } },
+        },
       }),
     ]);
     if (images.length === 0)
@@ -313,7 +325,8 @@ router.get(
         const ext = img.url.split(".").pop()?.split("?")[0]?.slice(0, 5) || "jpg";
         const label = img.angleLabel ? "-" + slug(img.angleLabel) : "";
         const base = `${String(i + 1).padStart(2, "0")}${label}.${ext}`;
-        const name = img.product?.name ? `${slug(img.product.name)}/${base}` : base;
+        const folder = img.product?.name || img.productLabel;
+        const name = folder ? `${slug(folder)}/${base}` : base;
         archive.append(response.data, { name });
       } catch (e) {
         console.error(`Failed to add source image ${img.url} to zip:`, e);
@@ -577,6 +590,10 @@ router.patch(
     if ("ctaSecondary" in req.body) data.ctaSecondary = cta(req.body.ctaSecondary) ?? null;
     if ("defaultFrame" in req.body) data.defaultFrame = Math.max(0, Number(req.body.defaultFrame) || 0);
     if ("background" in req.body) data.background = String(req.body.background || "").slice(0, 40);
+    if ("title" in req.body)
+      data.title = req.body.title ? String(req.body.title).slice(0, 120) : null;
+    if ("description" in req.body)
+      data.description = req.body.description ? String(req.body.description).slice(0, 600) : null;
     if (typeof req.body.publish === "boolean") data.status = req.body.publish ? "PUBLISHED" : "READY";
     if (typeof req.body.slug === "string" && req.body.slug.trim()) {
       const s = slugify(req.body.slug);
@@ -608,6 +625,9 @@ router.post(
     const files = (req.files as Express.Multer.File[]) || [];
     if (files.length === 0) return res.status(400).json({ error: "No images uploaded" });
     const productId = req.body?.productId ? String(req.body.productId) : null;
+    const productLabel = req.body?.productLabel
+      ? String(req.body.productLabel).slice(0, 120)
+      : null;
 
     const created = [];
     for (const f of files) {
@@ -622,6 +642,7 @@ router.post(
         data: {
           organizationId: orgId,
           productId,
+          productLabel,
           url,
           uploadedByUserId: req.user?.id || null,
         },
@@ -751,6 +772,7 @@ router.get(
       res.json({
         product: {
           id: product.id, name: product.name, slug: product.slug,
+          title: product.title, description: product.description,
           defaultFrame: product.defaultFrame, background: product.background,
           ctaPrimary: product.ctaPrimary, ctaSecondary: product.ctaSecondary,
           brandName: bc?.companyName || org.name,
@@ -794,6 +816,8 @@ router.get(
       product: {
         id: product.id,
         name: product.name,
+        title: product.title,
+        description: product.description,
         defaultFrame: product.defaultFrame,
         background: product.background,
         ctaPrimary: product.ctaPrimary,
