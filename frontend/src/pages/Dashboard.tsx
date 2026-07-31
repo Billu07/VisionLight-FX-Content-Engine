@@ -5682,6 +5682,22 @@ function Dashboard() {
                                                       </div>
                                                     );
                                                   }
+                                                  // Ref slots stay locked until the main image exists — otherwise
+                                                  // the packed list would drop a ref into index 0 and it would
+                                                  // "become" the main. Fill Main first, then refs fill in order.
+                                                  const locked = ii > 0 && imgs.length === 0;
+                                                  if (locked) {
+                                                    return (
+                                                      <div
+                                                        key={ii}
+                                                        title="Add the main image first"
+                                                        className="w-14 h-14 rounded-lg border border-dashed border-white/10 bg-black/20 flex flex-col items-center justify-center gap-0.5 text-gray-600 cursor-not-allowed"
+                                                      >
+                                                        <span className="text-sm leading-none">+</span>
+                                                        <span className="text-[8px] font-medium">Ref</span>
+                                                      </div>
+                                                    );
+                                                  }
                                                   return (
                                                     <label
                                                       key={ii}
@@ -5712,9 +5728,9 @@ function Dashboard() {
                                                   setLibrarySubjectIndex(si);
                                                   setActiveLibrarySlot("klingSubject");
                                                 }}
-                                                className="mt-2 text-[11px] text-rose-300 hover:text-rose-200 font-semibold"
+                                                className="mt-3 w-full py-1.5 rounded-lg border border-rose-500/30 text-rose-300 hover:bg-rose-500/10 text-[11px] font-semibold"
                                               >
-                                                + From Library
+                                                + Add from Library
                                               </button>
                                             </div>
                                           ))}
