@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import { FalService } from "./fal";
 
 // SizeFX — server-side "reverse crop" (uncrop). Instead of an AI outpaint, we
 // deterministically pad the image on all sides with a chosen background so the
@@ -81,6 +82,9 @@ export async function buildReverseCrop(opts: {
   const top = Math.round((newH - h) / 2);
   const bottom = Math.max(0, newH - h - top);
 
+  // Zoom ≈ 1 → nothing to pad; return the normalized image untouched.
+  if (left + right + top + bottom === 0) return normalized;
+
   let background: sharp.Color;
   if (opts.bg === "black") {
     background = { r: 0, g: 0, b: 0, alpha: 1 };
@@ -95,4 +99,40 @@ export async function buildReverseCrop(opts: {
     .extend({ top, bottom, left, right, background })
     .png()
     .toBuffer();
+}
+
+// Intelligent "zoom back": pad with a clean white margin, then AI-outpaint the
+// border so the scene continues naturally instead of a flat color. The padded
+// buffer is handed straight to Fal (which uploads it to its own temp storage),
+// so we never persist an intermediate in our own storage. Returns the rendered
+// image buffer (PNG for gpt-image-2, JPEG for nano-banana-2).
+export async function buildAiOutpaint(opts: {
+  input: Buffer;
+  zoomOut: number;
+  model: "gpt-image-2" | "nano-banana-2";
+  apiKey?: string;
+}): Promise<Buffer> {
+  const paddedBuffer = await buildReverseCrop({
+    input: opts.input,
+    zoomOut: opts.zoomOut,
+    bg: "white",
+  });
+
+  const prompt =
+    "INPUT 1 shows a subject centered inside a plain white margin/border. " +
+    "Outpaint and fill the entire white border region so the scene, background, " +
+    "lighting, shadows, and ground continue naturally and seamlessly outward from " +
+    "the subject to every edge. Keep the central subject exactly as-is — do not " +
+    "change, move, resize, or duplicate it, and do not add unrelated new objects.";
+
+  return FalService.generateOrEditImage({
+    prompt,
+    aspectRatio: "original",
+    referenceImages: [paddedBuffer],
+    modelType: "quality",
+    useGrounding: true,
+    imageSize: "2K",
+    model: opts.model,
+    apiKey: opts.apiKey,
+  });
 }

@@ -685,7 +685,6 @@ export function EditAssetModal({
         zoomOut: sizeFxZoomOut,
         bg: sizeFxBg,
         projectId: activeProject,
-        originalAssetId: currentAsset.originalAssetId || currentAsset.id,
         model: sizeFxAiModel,
       });
     },

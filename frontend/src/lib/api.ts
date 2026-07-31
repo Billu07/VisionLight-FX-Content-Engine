@@ -417,7 +417,6 @@ export const apiEndpoints = {
     zoomOut: number;
     bg: "white" | "black" | "match" | "ai";
     projectId?: string;
-    originalAssetId?: string;
     model?: "gpt-image-2" | "nano-banana-2";
   }) => api.post("/api/sizefx/reverse-crop", data, { timeout: 600000 }),
 

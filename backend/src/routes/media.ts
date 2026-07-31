@@ -17,8 +17,7 @@ import {
   normalizeAssetUrl,
 } from "../lib/app-runtime";
 import { copyExternalImageToManagedStorage } from "../utils/managedStorage";
-import { buildReverseCrop } from "../services/sizefx";
-import { uploadToCloudinary as uploadBufferToStorage } from "../services/engine/utils";
+import { buildReverseCrop, buildAiOutpaint } from "../services/sizefx";
 
 const router = express.Router();
 const MAX_GENERATION_REFERENCE_IMAGES = 14;
@@ -688,7 +687,7 @@ router.post(
     let creditsDeducted = false;
     let creditsCost = 0;
     try {
-      const { assetUrl, zoomOut, bg, projectId, originalAssetId, model } = req.body;
+      const { assetUrl, zoomOut, bg, projectId, model } = req.body;
 
       if (typeof assetUrl !== "string" || !assetUrl.trim()) {
         return res.status(400).json({ error: "assetUrl is required" });
@@ -763,40 +762,22 @@ router.post(
         await byokService.consumeDailyRender(req.user!.id);
       }
 
-      // Pad with a clean white margin so the model has a well-defined border to
-      // fill, upload it as the edit input, then AI-outpaint the surrounding scene.
-      const paddedBuffer = await buildReverseCrop({
+      // Pad with a clean white margin, then AI-outpaint the border. The padded
+      // buffer goes straight to Fal (no persisted intermediate in our storage).
+      const outBuffer = await buildAiOutpaint({
         input: inputBuffer,
         zoomOut: zoom,
-        bg: "white",
+        model: outpaintModel,
+        apiKey: apiKeys.falApiKey,
       });
-      const paddedUrl = await uploadBufferToStorage(
-        paddedBuffer,
-        `sizefx_pad_${req.user!.id}_${Date.now()}`,
-        req.user!.id,
-        "SizeFX outpaint base",
-        "image",
-      );
 
-      const outpaintPrompt =
-        "This image shows a subject centered inside a plain white margin/border. " +
-        "Outpaint and fill the entire white border region so the scene, background, " +
-        "lighting, shadows, and ground continue naturally and seamlessly outward from " +
-        "the subject to every edge. Keep the central subject exactly as-is — do not " +
-        "change, move, resize, or duplicate it, and do not add unrelated new objects.";
-
-      const asset = await contentEngine.editAsset(
-        paddedUrl,
-        outpaintPrompt,
+      const asset = await contentEngine.uploadRawAsset(
+        outBuffer,
         req.user!.id,
+        typeof projectId === "string" && projectId ? projectId : undefined,
         "original",
-        [],
-        "pro",
-        typeof originalAssetId === "string" && originalAssetId
-          ? originalAssetId
-          : undefined,
-        apiKeys,
-        outpaintModel,
+        outBuffer.length,
+        outpaintModel === "gpt-image-2" ? "image/png" : "image/jpeg",
       );
 
       return res.json({ success: true, asset });

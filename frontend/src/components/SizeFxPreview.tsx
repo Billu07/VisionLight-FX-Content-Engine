@@ -84,6 +84,10 @@ export function SizeFxPreview({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
+  // Cache the auto-matched background per image. Sampling reads the full image
+  // via getImageData, which is expensive — it must NOT rerun on every zoom tick,
+  // only when the source image itself changes.
+  const matchColorRef = useRef<string>("#ffffff");
 
   // Load the source (CORS-safe so we can sample colors + draw without taint).
   useEffect(() => {
@@ -102,6 +106,13 @@ export function SizeFxPreview({
       alive = false;
     };
   }, [srcUrl]);
+
+  // Sample the auto-match colour once per image (not per zoom change).
+  useEffect(() => {
+    matchColorRef.current = img
+      ? sampleBackgroundColor(img) || "#ffffff"
+      : "#ffffff";
+  }, [img]);
 
   // Redraw whenever the source, zoom, background, OR compare mode changes.
   // `compare` matters because switching modes remounts the <canvas>, and the
@@ -124,7 +135,7 @@ export function SizeFxPreview({
 
     let fill = "#ffffff";
     if (bg === "black") fill = "#000000";
-    else if (bg === "match" && img) fill = sampleBackgroundColor(img) || "#ffffff";
+    else if (bg === "match") fill = matchColorRef.current;
     ctx.fillStyle = fill;
     ctx.fillRect(0, 0, cw, ch);
 
