@@ -183,6 +183,10 @@ export default function Rotation3DAdminPanel() {
   const [slugMsg, setSlugMsg] = useState("");
   const [backfilling, setBackfilling] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  // Search/filter for the brand list + the selected brand's product list.
+  const [brandQuery, setBrandQuery] = useState("");
+  const [productQuery, setProductQuery] = useState("");
+  const [productStatus, setProductStatus] = useState("ALL");
 
   const copyProductLink = async (p: Product) => {
     const link =
@@ -377,6 +381,14 @@ export default function Rotation3DAdminPanel() {
   };
 
   const busy = uploadPct !== null;
+  const bq = brandQuery.trim().toLowerCase();
+  const visibleBrands = bq ? brands.filter((b) => b.name.toLowerCase().includes(bq)) : brands;
+  const pq = productQuery.trim().toLowerCase();
+  const visibleProducts = products.filter(
+    (p) =>
+      (productStatus === "ALL" || p.status === productStatus) &&
+      (!pq || p.name.toLowerCase().includes(pq)),
+  );
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
@@ -498,15 +510,25 @@ export default function Rotation3DAdminPanel() {
             </button>
           )}
 
-          <div className="mt-4 space-y-2">
+          {brands.length > 0 && (
+            <input
+              className={`${input} mt-4`}
+              placeholder="Search brands…"
+              value={brandQuery}
+              onChange={(e) => setBrandQuery(e.target.value)}
+            />
+          )}
+          <div className="mt-2 space-y-2">
             {loadingBrands ? (
               <div className="py-6 text-center">
                 <LoadingSpinner size="sm" />
               </div>
             ) : brands.length === 0 ? (
               <p className="py-6 text-center text-xs text-gray-500">No brands yet.</p>
+            ) : visibleBrands.length === 0 ? (
+              <p className="py-6 text-center text-xs text-gray-500">No brands match “{brandQuery}”.</p>
             ) : (
-              brands.map((b) => (
+              visibleBrands.map((b) => (
                 <div
                   key={b.id}
                   className={`flex items-center gap-1 rounded-lg border transition-colors ${
@@ -689,15 +711,38 @@ export default function Rotation3DAdminPanel() {
               </div>
 
               {/* Products list */}
-              <div className="mt-5 space-y-2">
+              {products.length > 0 && (
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <input
+                    className={`${input} flex-1 min-w-[140px]`}
+                    placeholder="Search products…"
+                    value={productQuery}
+                    onChange={(e) => setProductQuery(e.target.value)}
+                  />
+                  <select
+                    value={productStatus}
+                    onChange={(e) => setProductStatus(e.target.value)}
+                    className="rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-brand-accent"
+                  >
+                    {["ALL", "PUBLISHED", "READY", "PROCESSING", "FAILED"].map((s) => (
+                      <option key={s} value={s}>
+                        {s === "ALL" ? "All statuses" : s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="mt-3 space-y-2">
                 {loadingProducts ? (
                   <div className="py-6 text-center">
                     <LoadingSpinner size="sm" />
                   </div>
                 ) : products.length === 0 ? (
                   <p className="py-6 text-center text-xs text-gray-500">No products yet.</p>
+                ) : visibleProducts.length === 0 ? (
+                  <p className="py-6 text-center text-xs text-gray-500">No products match your filters.</p>
                 ) : (
-                  products.map((p) => (
+                  visibleProducts.map((p) => (
                     <div
                       key={p.id}
                       className="flex items-center justify-between rounded-lg border border-gray-700/60 bg-gray-950/50 px-4 py-3"
