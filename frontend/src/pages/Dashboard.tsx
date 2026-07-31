@@ -400,7 +400,9 @@ function Dashboard() {
   });
   const [veoReferenceFiles, setVeoReferenceFiles] = useState<File[]>([]);
   const [veoReferenceUrls, setVeoReferenceUrls] = useState<string[]>([]);
-  const [topazUpscaleFactor, setTopazUpscaleFactor] = useState<2 | 4>(2);
+  // Continuous upscale factor (1–8×, matching Topaz's upscale_factor float). The
+  // backend clamps to 1–8 and prices ≥4× at the higher tier.
+  const [topazUpscaleFactor, setTopazUpscaleFactor] = useState<number>(2);
   const [topazTargetFps, setTopazTargetFps] = useState<30 | 60 | "source">(
     "source",
   );
@@ -5962,22 +5964,31 @@ function Dashboard() {
                                         <label className="text-sm font-semibold text-white mb-2 block">
                                           Upscale Factor
                                         </label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                          {[2, 4].map((factor) => (
-                                            <button
-                                              key={factor}
-                                              type="button"
-                                              onClick={() =>
-                                                setTopazUpscaleFactor(factor as 2 | 4)
-                                              }
-                                              className={`py-2 rounded-lg border text-sm font-medium ${topazUpscaleFactor === factor
-                                                ? "bg-cyan-600 border-cyan-600 text-white"
-                                                : "border-white/10 bg-gray-800/50 text-gray-400 hover:text-white"
-                                                }`}
-                                            >
-                                              {factor}x
-                                            </button>
-                                          ))}
+                                        <div className="rounded-lg border border-white/10 bg-gray-800/50 px-3 py-2.5">
+                                          <div className="flex items-center justify-between mb-1.5">
+                                            <span className="text-lg font-bold text-cyan-300 tabular-nums">
+                                              {topazUpscaleFactor.toFixed(1)}×
+                                            </span>
+                                            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                                              {topazUpscaleFactor >= 4 ? "higher price tier" : "standard tier"}
+                                            </span>
+                                          </div>
+                                          <input
+                                            type="range"
+                                            min={1}
+                                            max={8}
+                                            step={0.1}
+                                            value={topazUpscaleFactor}
+                                            onChange={(e) =>
+                                              setTopazUpscaleFactor(Number(e.target.value))
+                                            }
+                                            className="w-full accent-cyan-500"
+                                          />
+                                          <div className="flex justify-between text-[9px] text-gray-500 mt-0.5">
+                                            <span>1×</span>
+                                            <span>≈2.3× = 480p→1080p</span>
+                                            <span>8×</span>
+                                          </div>
                                         </div>
                                       </div>
                                       <div>
