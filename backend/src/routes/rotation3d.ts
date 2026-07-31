@@ -765,7 +765,7 @@ router.get(
       if (!org) return res.status(404).json({ error: "Not found" });
       const product = await prisma.rot3dProduct.findFirst({
         where: { organizationId: org.id, slug: req.params.productSlug, status: { in: ["READY", "PUBLISHED"] } },
-        include: { spin: true },
+        include: { spin: true, videos: { orderBy: { createdAt: "desc" }, take: 1 } },
       });
       if (!product || !product.spin) return res.status(404).json({ error: "Not found" });
       const bc = org.brandConfigs?.[0];
@@ -775,6 +775,7 @@ router.get(
           title: product.title, description: product.description,
           defaultFrame: product.defaultFrame, background: product.background,
           ctaPrimary: product.ctaPrimary, ctaSecondary: product.ctaSecondary,
+          videoUrl: product.videos?.[0]?.url || null,
           brandName: bc?.companyName || org.name,
           brandSlug: org.slug,
           logoUrl: bc?.logoUrl || null,
@@ -797,6 +798,7 @@ router.get(
       where: { id: req.params.id, status: { in: ["READY", "PUBLISHED"] } },
       include: {
         spin: true,
+        videos: { orderBy: { createdAt: "desc" }, take: 1 },
         organization: {
           select: {
             id: true,
@@ -822,6 +824,7 @@ router.get(
         background: product.background,
         ctaPrimary: product.ctaPrimary,
         ctaSecondary: product.ctaSecondary,
+        videoUrl: product.videos?.[0]?.url || null,
         brandName: bc?.companyName || product.organization?.name || "",
         logoUrl: bc?.logoUrl || null,
         primaryColor: bc?.primaryColor || null,

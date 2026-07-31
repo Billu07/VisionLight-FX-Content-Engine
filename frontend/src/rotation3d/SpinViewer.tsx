@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 /**
  * Rotation3D — reusable interactive 360° spin viewer.
@@ -52,6 +52,8 @@ export type SpinViewerProps = {
   /** optional product info shown beside the player (desktop right / mobile top) */
   title?: string | null;
   description?: string | null;
+  /** rendered rotation clip — enables the "Video" tab in the view selector */
+  videoUrl?: string | null;
 };
 
 const clampZoom = (z: number) => Math.max(0.7, Math.min(2.8, z));
@@ -118,6 +120,7 @@ export default function SpinViewer({
   showBrand = true,
   title,
   description,
+  videoUrl,
 }: SpinViewerProps) {
   const hero = variant === "hero";
   const lightBg = isLightColor(background);
@@ -135,6 +138,17 @@ export default function SpinViewer({
   const ringRef = useRef<SVGCircleElement>(null);
   const pctRef = useRef<HTMLDivElement>(null);
   const fsIconRef = useRef<SVGSVGElement>(null);
+  // Adidas-style view selector: interactive 360° (default) / rendered video /
+  // three stills from different angles.
+  const [mode, setMode] = useState<"interactive" | "video" | "stills">("interactive");
+  const [activeStill, setActiveStill] = useState(0);
+  const galleryFrames = manifest.frames || [];
+  const stills =
+    galleryFrames.length >= 3
+      ? [0, Math.floor(galleryFrames.length / 3), Math.floor((2 * galleryFrames.length) / 3)].map(
+          (i) => galleryFrames[i],
+        )
+      : galleryFrames;
 
   const FRAMES = Math.max(2, manifest.frameCount || 36);
   const DEFAULT_FRAME = Math.min(
@@ -372,7 +386,10 @@ export default function SpinViewer({
       t instanceof Element &&
       (t.closest(".r3d-iconbtn") ||
         t.closest(".r3d-cta") ||
-        t.closest(".r3d-powered-badge"));
+        t.closest(".r3d-powered-badge") ||
+        t.closest(".r3d-modes") ||
+        t.closest(".r3d-media") ||
+        t.closest(".r3d-stills"));
 
     const down = (e: PointerEvent) => {
       dragging = true;
@@ -748,7 +765,7 @@ export default function SpinViewer({
   };
 
   return (
-    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${className || ""}`}
+    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${mode !== "interactive" ? "r3d-media-mode" : ""} ${className || ""}`}
       style={stageStyle}
       tabIndex={hero ? -1 : 0}
       aria-label="Interactive 360 degree product viewer. Drag to rotate.">
@@ -815,6 +832,73 @@ export default function SpinViewer({
           {ctaSecondary && (
             <button className="r3d-cta r3d-ghost" onClick={() => fireCta("secondary", ctaSecondary)}>
               {ctaSecondary.label}
+            </button>
+          )}
+        </div>
+      )}
+
+      {mode === "video" && videoUrl && (
+        <div className="r3d-media">
+          <video
+            className="r3d-media-video"
+            src={videoUrl}
+            autoPlay
+            loop
+            muted
+            playsInline
+            controls
+          />
+        </div>
+      )}
+
+      {mode === "stills" && stills.length > 0 && (
+        <div className="r3d-stills">
+          <img
+            className="r3d-stills-main"
+            src={stills[Math.min(activeStill, stills.length - 1)]}
+            alt=""
+          />
+          <div className="r3d-stills-thumbs">
+            {stills.map((f, i) => (
+              <button
+                key={i}
+                type="button"
+                className={i === activeStill ? "active" : ""}
+                onClick={() => setActiveStill(i)}
+                aria-label={`Still ${i + 1}`}
+              >
+                <img src={f} alt="" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!hero && (videoUrl || stills.length > 0) && (
+        <div className="r3d-modes">
+          <button
+            type="button"
+            className={mode === "interactive" ? "active" : ""}
+            onClick={() => setMode("interactive")}
+          >
+            360°
+          </button>
+          {videoUrl && (
+            <button
+              type="button"
+              className={mode === "video" ? "active" : ""}
+              onClick={() => setMode("video")}
+            >
+              Video
+            </button>
+          )}
+          {stills.length > 0 && (
+            <button
+              type="button"
+              className={mode === "stills" ? "active" : ""}
+              onClick={() => setMode("stills")}
+            >
+              Stills
             </button>
           )}
         </div>
@@ -964,6 +1048,24 @@ const R3D_CSS = `
   .r3d-scrim-bot{height:120px}
   .r3d-scrim-top{height:70px}
 }
+/* view-mode selector (360° / Video / Stills) + the video & stills overlays. The
+   canvas is hidden in media mode so only the stage background shows behind them. */
+.r3d-modes{position:absolute;left:50%;bottom:calc(70px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:7;display:flex;gap:4px;padding:4px;border-radius:999px;border:1px solid var(--r3d-line);background:rgba(11,15,25,.5);backdrop-filter:blur(10px)}
+.r3d-modes button{border:none;background:transparent;color:var(--r3d-muted);font-family:inherit;font-size:12px;font-weight:600;padding:6px 14px;border-radius:999px;cursor:pointer;transition:background .2s,color .2s}
+.r3d-modes button.active{background:linear-gradient(135deg,var(--r3d-primary),var(--r3d-secondary));color:#fff}
+.r3d-media,.r3d-stills{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:70px 14px 120px}
+.r3d-media-video{max-width:100%;max-height:100%;border-radius:14px;background:#000;box-shadow:0 20px 60px -20px rgba(0,0,0,.7)}
+.r3d-stills-main{max-width:100%;max-height:66%;object-fit:contain;border-radius:14px}
+.r3d-stills-thumbs{display:flex;gap:8px}
+.r3d-stills-thumbs button{width:60px;height:60px;padding:0;border-radius:12px;overflow:hidden;border:2px solid var(--r3d-line);background:none;cursor:pointer;transition:border-color .2s}
+.r3d-stills-thumbs button.active{border-color:var(--r3d-primary)}
+.r3d-stills-thumbs img{width:100%;height:100%;object-fit:cover;display:block}
+.r3d-media-mode canvas{opacity:0}
+.r3d-media-mode .r3d-zoomcol,.r3d-media-mode .r3d-rot,.r3d-media-mode .r3d-hint{display:none!important}
+.r3d-light .r3d-modes{background:rgba(255,255,255,.65)}
+.r3d-light .r3d-modes button{color:#5b6472}
+.r3d-light .r3d-modes button.active{color:#fff}
+
 /* optional product info (title + description). Only rendered when the brand sets
    it, so default players look unchanged. Desktop: right, vertically centered;
    mobile: top under the topbar. pointer-events:none so it never blocks the drag. */
