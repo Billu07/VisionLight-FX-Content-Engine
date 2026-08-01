@@ -332,8 +332,12 @@ export default function SpinViewer({
       else drawSynthetic(q, cx, cy, scale);
 
       const n01 = (((yaw % TWO_PI) + TWO_PI) % TWO_PI) / TWO_PI;
-      if (degRef.current) degRef.current.textContent = Math.round(n01 * 360) + "°";
-      if (fillRef.current) fillRef.current.style.left = n01 * 100 + "%";
+      // The navigator read reversed relative to the visual spin, so mirror it
+      // (1 - n01) — the dot + degrees now track the direction you're turning,
+      // while the actual rotation drag is unchanged.
+      const nav = 1 - n01;
+      if (degRef.current) degRef.current.textContent = Math.round(nav * 360) + "°";
+      if (fillRef.current) fillRef.current.style.left = nav * 100 + "%";
     };
 
     const tick = () => {
@@ -442,16 +446,16 @@ export default function SpinViewer({
         // zoomed → horizontal still spins the product (so you never lose the
         // rotate), vertical pans up/down to inspect the zoomed-in region.
         const k = 0.006;
-        const d = dx * k; // drag follows the finger (client: reverse to match drag)
+        const d = -dx * k;
         yaw += d;
         yawVel = (d / dt) * 16;
         const lim = 130 * (zoomTarget - 1);
         panTY = Math.max(-lim, Math.min(lim, panTY + dy));
         panY = panTY;
       } else {
-        // at rest → horizontal rotates, following the finger direction
+        // at rest → horizontal rotates (negated so dragging right spins right)
         const k = 0.006;
-        const d = dx * k; // client: reversed so the product turns with the drag
+        const d = -dx * k;
         yaw += d;
         yawVel = (d / dt) * 16;
       }
