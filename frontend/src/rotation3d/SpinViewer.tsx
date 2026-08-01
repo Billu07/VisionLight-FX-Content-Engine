@@ -171,6 +171,7 @@ export default function SpinViewer({
     let idleSpin = false; // no auto-rotation; the "Drag to rotate" hint invites it
     let dirty = true, lastYaw = NaN, lastZoom = NaN, lastPX = 0, lastPY = 0;
     let touchZoomed = false;
+    let scrimHidden = false;
     let interacted = false;
     let raf = 0;
     let alive = true;
@@ -353,6 +354,13 @@ export default function SpinViewer({
       if (zoomedNow !== touchZoomed) {
         touchZoomed = zoomedNow;
         stage.style.touchAction = zoomedNow ? "none" : "pan-y";
+      }
+      // Once zoomed in a bit, fade the top/bottom scrims — otherwise a product
+      // zoomed to fill the screen gets washed out by them (esp. on light bg).
+      const bigZoom = zoom > 1.35;
+      if (bigZoom !== scrimHidden) {
+        scrimHidden = bigZoom;
+        stage.classList.toggle("r3d-zoomed", bigZoom);
       }
       // Only repaint when something actually changed — idle products stop
       // burning CPU/battery on mobile.
@@ -918,8 +926,10 @@ const R3D_CSS = `
 }
 .r3d-stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab}
 .r3d-stage.r3d-grabbing canvas{cursor:grabbing}
-.r3d-scrim-top{position:absolute;top:0;left:0;right:0;height:120px;pointer-events:none;background:linear-gradient(to bottom,rgba(11,15,25,.55),transparent)}
-.r3d-scrim-bot{position:absolute;bottom:0;left:0;right:0;height:190px;pointer-events:none;background:linear-gradient(to top,rgba(11,15,25,.72),transparent)}
+.r3d-scrim-top{position:absolute;top:0;left:0;right:0;height:120px;pointer-events:none;background:linear-gradient(to bottom,rgba(11,15,25,.55),transparent);transition:opacity .3s}
+.r3d-scrim-bot{position:absolute;bottom:0;left:0;right:0;height:190px;pointer-events:none;background:linear-gradient(to top,rgba(11,15,25,.72),transparent);transition:opacity .3s}
+/* zoomed in → fade the scrims so a screen-filling product isn't washed out */
+.r3d-zoomed .r3d-scrim-top,.r3d-zoomed .r3d-scrim-bot{opacity:0}
 .r3d-topbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:flex-start;justify-content:space-between;padding:max(16px,env(safe-area-inset-top)) 16px 0;gap:12px;z-index:5}
 .r3d-brand{display:flex;align-items:center;gap:10px;min-width:0}
 .r3d-logo{width:30px;height:30px;border-radius:9px;flex:none;background:linear-gradient(135deg,var(--r3d-primary),var(--r3d-secondary));box-shadow:var(--r3d-glow);display:grid;place-items:center}
@@ -1067,8 +1077,8 @@ const R3D_CSS = `
 .r3d-light .r3d-track{background:rgba(0,0,0,.12)}
 .r3d-light .r3d-cta.r3d-ghost{background:rgba(0,0,0,.05);color:#0b0f19;border-color:rgba(0,0,0,.12)}
 .r3d-light .r3d-cta.r3d-ghost:hover{background:rgba(0,0,0,.10)}
-.r3d-light .r3d-scrim-top{background:linear-gradient(to bottom,rgba(255,255,255,.6),transparent)}
-.r3d-light .r3d-scrim-bot{background:linear-gradient(to top,rgba(255,255,255,.75),transparent)}
+.r3d-light .r3d-scrim-top{background:linear-gradient(to bottom,rgba(255,255,255,.42),transparent)}
+.r3d-light .r3d-scrim-bot{background:linear-gradient(to top,rgba(255,255,255,.48),transparent)}
 .r3d-light .r3d-loader{background:#f4f5f7}
 .r3d-light .r3d-pct,.r3d-light .r3d-lbl{color:#5b6472}
 .r3d-light .r3d-ring-bg{stroke:rgba(0,0,0,.10)}
