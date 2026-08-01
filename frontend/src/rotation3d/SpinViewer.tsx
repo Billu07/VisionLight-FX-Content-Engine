@@ -936,8 +936,8 @@ const R3D_CSS = `
 .r3d-iconbtn:active{transform:translateY(1px)}
 .r3d-iconbtn svg{width:18px;height:18px}
 .r3d-zoomcol{position:absolute;right:14px;bottom:calc(146px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;z-index:6}
-/* slim, low-profile angle indicator (no heavy pill) so it never blocks the product */
-.r3d-rot{position:absolute;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:8px;color:var(--r3d-muted);font-size:11px;font-weight:500;text-shadow:0 1px 6px rgba(0,0,0,.55)}
+/* angle indicator — subtle blurred pill so it reads on the product's shadow/platform */
+.r3d-rot{position:absolute;left:50%;bottom:calc(128px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:8px;color:var(--r3d-muted);font-size:11px;font-weight:500;background:rgba(11,15,25,.45);border:1px solid var(--r3d-line);border-radius:999px;padding:5px 11px;backdrop-filter:blur(8px)}
 .r3d-track{position:relative;width:132px;height:3px;border-radius:2px;background:rgba(255,255,255,.12)}
 .r3d-fill{position:absolute;top:-3px;width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,var(--r3d-primary),var(--r3d-secondary));box-shadow:var(--r3d-glow);transform:translateX(-50%)}
 .r3d-ctas{position:absolute;left:0;right:0;bottom:0;z-index:5;display:flex;gap:12px;padding:14px 16px calc(16px + env(safe-area-inset-bottom));max-width:640px;margin:0 auto}
@@ -988,18 +988,17 @@ const R3D_CSS = `
   .r3d-name{font-size:14px;max-width:52vw}
   .r3d-thumbs{bottom:calc(82px + env(safe-area-inset-bottom))}
   .r3d-thumb{width:42px;height:42px}
-  .r3d-powered-badge{bottom:calc(128px + env(safe-area-inset-bottom))}
-  .r3d-rot{bottom:calc(146px + env(safe-area-inset-bottom))}
+  .r3d-rot{bottom:calc(132px + env(safe-area-inset-bottom))}
   .r3d-rot .r3d-track{width:88px}
-  .r3d-hint{bottom:max(26%,206px)}
+  .r3d-hint{bottom:max(26%,200px)}
   .r3d-zoomcol{bottom:calc(146px + env(safe-area-inset-bottom))}
   .r3d-cta{padding:13px 12px;font-size:14px}
 }
 /* persistent viral attribution — shows on every embed regardless of the tenant
    brand toggle (brand=0 only hides the tenant's own logo/name). Bottom-left, above
    the CTA bar; drops to the edge when there are no CTAs; hidden on hero tiles. */
-/* subtle caption directly under the angle indicator (not a heavy badge) */
-.r3d-powered-badge{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(122px + env(safe-area-inset-bottom));z-index:6;display:flex;align-items:center;gap:5px;color:var(--r3d-muted);font-size:10px;letter-spacing:.03em;line-height:1;text-decoration:none;opacity:.7;text-shadow:0 1px 6px rgba(0,0,0,.55);transition:opacity .2s}
+/* subtle "Powered by Rotation3D" caption at the TOP, clear of the bottom controls */
+.r3d-powered-badge{position:absolute;left:50%;transform:translateX(-50%);top:calc(60px + env(safe-area-inset-top));z-index:6;display:flex;align-items:center;gap:5px;color:var(--r3d-muted);font-size:10px;letter-spacing:.03em;line-height:1;text-decoration:none;opacity:.7;text-shadow:0 1px 6px rgba(0,0,0,.55);transition:opacity .2s}
 .r3d-powered-badge:hover{opacity:1}
 .r3d-powered-badge svg{width:12px;height:12px;color:var(--r3d-secondary)}
 .r3d-powered-badge b{font-weight:700}
@@ -1013,13 +1012,12 @@ const R3D_CSS = `
 @media (orientation:landscape) and (max-height:540px){
   .r3d-thumbs{bottom:max(6px,env(safe-area-inset-bottom))}
   .r3d-thumb{width:36px;height:36px}
-  .r3d-powered-badge{bottom:48px}
-  .r3d-rot{bottom:62px}
+  .r3d-rot{bottom:52px}
   .r3d-rot .r3d-track{width:100px}
-  .r3d-hint{bottom:84px}
+  .r3d-hint{bottom:82px}
   .r3d-hand{width:32px;height:32px}
-  .r3d-zoomcol{bottom:62px}
-  .r3d-scrim-bot{height:170px}
+  .r3d-zoomcol{bottom:52px}
+  .r3d-scrim-bot{height:150px}
   .r3d-scrim-top{height:64px}
 }
 /* thumbnail-box view selector (e-commerce style): interactive 360° + 4 stills.
@@ -1046,7 +1044,7 @@ const R3D_CSS = `
   .r3d-info{right:22px;top:50%;transform:translateY(-50%);max-width:min(300px,32%);text-align:right}
 }
 @media (max-width:767px){
-  .r3d-info{left:16px;right:16px;top:calc(58px + env(safe-area-inset-top));text-align:center;max-height:22vh;overflow:hidden}
+  .r3d-info{left:16px;right:16px;top:calc(92px + env(safe-area-inset-top));text-align:center;max-height:22vh;overflow:hidden}
   .r3d-info-title{font-size:16px}
   .r3d-info-desc{font-size:12px;margin-top:4px}
 }
