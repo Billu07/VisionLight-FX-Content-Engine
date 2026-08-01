@@ -120,7 +120,6 @@ export default function SpinViewer({
   showBrand = true,
   title,
   description,
-  videoUrl,
 }: SpinViewerProps) {
   const hero = variant === "hero";
   const lightBg = isLightColor(background);
@@ -138,17 +137,17 @@ export default function SpinViewer({
   const ringRef = useRef<SVGCircleElement>(null);
   const pctRef = useRef<HTMLDivElement>(null);
   const fsIconRef = useRef<SVGSVGElement>(null);
-  // Adidas-style view selector: interactive 360° (default) / rendered video /
-  // three stills from different angles.
-  const [mode, setMode] = useState<"interactive" | "video" | "stills">("interactive");
-  const [activeStill, setActiveStill] = useState(0);
+  // E-commerce-style thumbnail selector: box 0 = interactive 360° (default),
+  // boxes 1..4 = stills from different angles. Clicking a still box shows it large.
+  const [view, setView] = useState(0);
   const galleryFrames = manifest.frames || [];
   const stills =
-    galleryFrames.length >= 3
-      ? [0, Math.floor(galleryFrames.length / 3), Math.floor((2 * galleryFrames.length) / 3)].map(
-          (i) => galleryFrames[i],
-        )
+    galleryFrames.length >= 4
+      ? [0, 1, 2, 3].map((k) => galleryFrames[Math.floor((k / 4) * galleryFrames.length)])
       : galleryFrames;
+  const poster = galleryFrames.length
+    ? galleryFrames[Math.min(manifest.defaultFrame || 0, galleryFrames.length - 1)]
+    : undefined;
 
   const FRAMES = Math.max(2, manifest.frameCount || 36);
   const DEFAULT_FRAME = Math.min(
@@ -391,9 +390,8 @@ export default function SpinViewer({
       (t.closest(".r3d-iconbtn") ||
         t.closest(".r3d-cta") ||
         t.closest(".r3d-powered-badge") ||
-        t.closest(".r3d-modes") ||
-        t.closest(".r3d-media") ||
-        t.closest(".r3d-stills"));
+        t.closest(".r3d-thumbs") ||
+        t.closest(".r3d-media"));
 
     const down = (e: PointerEvent) => {
       dragging = true;
@@ -769,7 +767,7 @@ export default function SpinViewer({
   };
 
   return (
-    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${mode !== "interactive" ? "r3d-media-mode" : ""} ${className || ""}`}
+    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
       style={stageStyle}
       tabIndex={hero ? -1 : 0}
       aria-label="Interactive 360 degree product viewer. Drag to rotate.">
@@ -841,70 +839,35 @@ export default function SpinViewer({
         </div>
       )}
 
-      {mode === "video" && videoUrl && (
+      {view > 0 && stills[view - 1] && (
         <div className="r3d-media">
-          <video
-            className="r3d-media-video"
-            src={videoUrl}
-            autoPlay
-            loop
-            muted
-            playsInline
-            controls
-          />
+          <img className="r3d-media-still" src={stills[view - 1]} alt="" />
         </div>
       )}
 
-      {mode === "stills" && stills.length > 0 && (
-        <div className="r3d-stills">
-          <img
-            className="r3d-stills-main"
-            src={stills[Math.min(activeStill, stills.length - 1)]}
-            alt=""
-          />
-          <div className="r3d-stills-thumbs">
-            {stills.map((f, i) => (
-              <button
-                key={i}
-                type="button"
-                className={i === activeStill ? "active" : ""}
-                onClick={() => setActiveStill(i)}
-                aria-label={`Still ${i + 1}`}
-              >
-                <img src={f} alt="" />
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {!hero && (videoUrl || stills.length > 0) && (
-        <div className="r3d-modes">
+      {!hero && stills.length > 0 && (
+        <div className="r3d-thumbs">
           <button
             type="button"
-            className={mode === "interactive" ? "active" : ""}
-            onClick={() => setMode("interactive")}
+            className={`r3d-thumb ${view === 0 ? "active" : ""}`}
+            onClick={() => setView(0)}
+            aria-label="Interactive 360° view"
+            title="360° interactive"
           >
-            360°
+            {poster && <img src={poster} alt="" />}
+            <span className="r3d-thumb-360">360°</span>
           </button>
-          {videoUrl && (
+          {stills.map((f, i) => (
             <button
+              key={i}
               type="button"
-              className={mode === "video" ? "active" : ""}
-              onClick={() => setMode("video")}
+              className={`r3d-thumb ${view === i + 1 ? "active" : ""}`}
+              onClick={() => setView(i + 1)}
+              aria-label={`Still ${i + 1}`}
             >
-              Video
+              <img src={f} alt="" />
             </button>
-          )}
-          {stills.length > 0 && (
-            <button
-              type="button"
-              className={mode === "stills" ? "active" : ""}
-              onClick={() => setMode("stills")}
-            >
-              Stills
-            </button>
-          )}
+          ))}
         </div>
       )}
 
@@ -972,8 +935,8 @@ const R3D_CSS = `
 .r3d-iconbtn:hover{background:var(--r3d-glass2)}
 .r3d-iconbtn:active{transform:translateY(1px)}
 .r3d-iconbtn svg{width:18px;height:18px}
-.r3d-zoomcol{position:absolute;right:14px;bottom:calc(100px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;z-index:6}
-.r3d-rot{position:absolute;left:50%;bottom:118px;transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:10px;color:var(--r3d-muted);font-size:12px;font-weight:500;background:rgba(11,15,25,.35);border:1px solid var(--r3d-line);border-radius:999px;padding:6px 12px;backdrop-filter:blur(8px)}
+.r3d-zoomcol{position:absolute;right:14px;bottom:calc(168px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;z-index:6}
+.r3d-rot{position:absolute;left:50%;bottom:calc(168px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:10px;color:var(--r3d-muted);font-size:12px;font-weight:500;background:rgba(11,15,25,.35);border:1px solid var(--r3d-line);border-radius:999px;padding:6px 12px;backdrop-filter:blur(8px)}
 .r3d-track{position:relative;width:132px;height:3px;border-radius:2px;background:rgba(255,255,255,.12)}
 .r3d-fill{position:absolute;top:-3px;width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,var(--r3d-primary),var(--r3d-secondary));box-shadow:var(--r3d-glow);transform:translateX(-50%)}
 .r3d-ctas{position:absolute;left:0;right:0;bottom:0;z-index:5;display:flex;gap:12px;padding:14px 16px calc(16px + env(safe-area-inset-bottom));max-width:640px;margin:0 auto}
@@ -985,7 +948,7 @@ const R3D_CSS = `
 .r3d-cta:active{transform:translateY(1px)}
 /* hint sits UNDER the product (lower third), not over it; the max() floor keeps
    it clear of the angle navigator (.r3d-rot at bottom:118px) on short viewports */
-.r3d-hint{position:absolute;left:50%;bottom:max(19%,170px);top:auto;transform:translateX(-50%);z-index:4;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;transition:opacity .5s}
+.r3d-hint{position:absolute;left:50%;bottom:max(30%,214px);top:auto;transform:translateX(-50%);z-index:4;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;transition:opacity .5s}
 .r3d-hint.r3d-gone{opacity:0}
 .r3d-hand{width:52px;height:52px;border-radius:50%;border:1px solid var(--r3d-line);background:rgba(11,15,25,.4);backdrop-filter:blur(8px);display:grid;place-items:center;animation:r3dsway 1.8s ease-in-out infinite}
 .r3d-hand svg{width:24px;height:24px;color:#eef1f6}
@@ -1022,20 +985,22 @@ const R3D_CSS = `
 @media (max-width:560px){
   .r3d-iconbtn{width:40px;height:40px}
   .r3d-name{font-size:14px;max-width:52vw}
-  .r3d-rot{bottom:150px;padding:5px 11px}
+  .r3d-thumbs{bottom:calc(96px + env(safe-area-inset-bottom))}
+  .r3d-thumb{width:44px;height:44px}
+  .r3d-powered-badge{bottom:calc(150px + env(safe-area-inset-bottom))}
+  .r3d-rot{bottom:calc(180px + env(safe-area-inset-bottom));padding:5px 11px}
   .r3d-rot .r3d-track{width:92px}
-  .r3d-hint{bottom:max(20%,202px)}
-  .r3d-zoomcol{bottom:calc(150px + env(safe-area-inset-bottom))}
+  .r3d-hint{bottom:max(30%,236px)}
+  .r3d-zoomcol{bottom:calc(180px + env(safe-area-inset-bottom))}
   .r3d-cta{padding:13px 12px;font-size:14px}
 }
 /* persistent viral attribution — shows on every embed regardless of the tenant
    brand toggle (brand=0 only hides the tenant's own logo/name). Bottom-left, above
    the CTA bar; drops to the edge when there are no CTAs; hidden on hero tiles. */
-.r3d-powered-badge{position:absolute;left:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:6;display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid var(--r3d-line);background:rgba(11,15,25,.42);backdrop-filter:blur(8px);color:#eef1f6;font-size:11px;line-height:1;text-decoration:none;opacity:.72;transition:opacity .2s,background .2s}
+.r3d-powered-badge{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(140px + env(safe-area-inset-bottom));z-index:6;display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;border:1px solid var(--r3d-line);background:rgba(11,15,25,.42);backdrop-filter:blur(8px);color:#eef1f6;font-size:11px;line-height:1;text-decoration:none;opacity:.72;transition:opacity .2s,background .2s}
 .r3d-powered-badge:hover{opacity:1;background:var(--r3d-glass2)}
 .r3d-powered-badge svg{width:13px;height:13px;color:var(--r3d-secondary)}
 .r3d-powered-badge b{font-weight:700}
-.r3d-no-ctas .r3d-powered-badge{bottom:calc(16px + env(safe-area-inset-bottom))}
 .r3d-hero .r3d-powered-badge{display:none!important}
 .r3d-light .r3d-powered-badge{border-color:rgba(0,0,0,.12);background:rgba(255,255,255,.6);color:#0b0f19}
 
@@ -1044,31 +1009,30 @@ const R3D_CSS = `
    product"). Pull all chrome to the very bottom edge, and trim the scrims that
    read as bars across a wide short frame. */
 @media (orientation:landscape) and (max-height:540px){
-  .r3d-rot{bottom:max(10px,env(safe-area-inset-bottom));padding:4px 10px}
+  .r3d-thumbs{bottom:max(8px,env(safe-area-inset-bottom))}
+  .r3d-thumb{width:38px;height:38px}
+  .r3d-powered-badge{bottom:56px}
+  .r3d-rot{bottom:84px;padding:4px 10px}
   .r3d-rot .r3d-track{width:104px}
-  .r3d-hint{bottom:max(54px,calc(env(safe-area-inset-bottom) + 44px))}
-  .r3d-hand{width:40px;height:40px}
-  .r3d-zoomcol{bottom:calc(54px + env(safe-area-inset-bottom))}
-  .r3d-scrim-bot{height:120px}
+  .r3d-hint{bottom:92px}
+  .r3d-hand{width:34px;height:34px}
+  .r3d-zoomcol{bottom:84px}
+  .r3d-scrim-bot{height:160px}
   .r3d-scrim-top{height:70px}
 }
-/* view-mode selector (360° / Video / Stills) + the video & stills overlays. The
-   canvas is hidden in media mode so only the stage background shows behind them. */
-.r3d-modes{position:absolute;left:50%;bottom:calc(70px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:7;display:flex;gap:4px;padding:4px;border-radius:999px;border:1px solid var(--r3d-line);background:rgba(11,15,25,.5);backdrop-filter:blur(10px)}
-.r3d-modes button{border:none;background:transparent;color:var(--r3d-muted);font-family:inherit;font-size:12px;font-weight:600;padding:6px 14px;border-radius:999px;cursor:pointer;transition:background .2s,color .2s}
-.r3d-modes button.active{background:linear-gradient(135deg,var(--r3d-primary),var(--r3d-secondary));color:#fff}
-.r3d-media,.r3d-stills{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:70px 14px 120px}
-.r3d-media-video{max-width:100%;max-height:100%;border-radius:14px;background:#000;box-shadow:0 20px 60px -20px rgba(0,0,0,.7)}
-.r3d-stills-main{max-width:100%;max-height:66%;object-fit:contain;border-radius:14px}
-.r3d-stills-thumbs{display:flex;gap:8px}
-.r3d-stills-thumbs button{width:60px;height:60px;padding:0;border-radius:12px;overflow:hidden;border:2px solid var(--r3d-line);background:none;cursor:pointer;transition:border-color .2s}
-.r3d-stills-thumbs button.active{border-color:var(--r3d-primary)}
-.r3d-stills-thumbs img{width:100%;height:100%;object-fit:cover;display:block}
+/* thumbnail-box view selector (e-commerce style): interactive 360° + 4 stills.
+   Selecting a still shows it large (.r3d-media) with the canvas hidden. */
+.r3d-thumbs{position:absolute;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:7;display:flex;gap:8px}
+.r3d-thumb{position:relative;width:46px;height:46px;padding:0;border-radius:10px;overflow:hidden;border:2px solid var(--r3d-line);background:rgba(11,15,25,.5);cursor:pointer;transition:border-color .2s,transform .1s}
+.r3d-thumb:hover{transform:translateY(-1px)}
+.r3d-thumb.active{border-color:var(--r3d-primary)}
+.r3d-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.r3d-thumb-360{position:absolute;inset:0;display:grid;place-items:center;font-size:9px;font-weight:800;letter-spacing:.03em;color:#fff;background:rgba(0,0,0,.32);text-shadow:0 1px 4px #000}
+.r3d-media{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:center;padding:70px 14px 150px}
+.r3d-media-still{max-width:100%;max-height:100%;object-fit:contain;border-radius:14px}
 .r3d-media-mode canvas{opacity:0}
 .r3d-media-mode .r3d-zoomcol,.r3d-media-mode .r3d-rot,.r3d-media-mode .r3d-hint{display:none!important}
-.r3d-light .r3d-modes{background:rgba(255,255,255,.65)}
-.r3d-light .r3d-modes button{color:#5b6472}
-.r3d-light .r3d-modes button.active{color:#fff}
+.r3d-light .r3d-thumb{background:rgba(255,255,255,.6)}
 
 /* optional product info (title + description). Only rendered when the brand sets
    it, so default players look unchanged. Desktop: right, vertically centered;
