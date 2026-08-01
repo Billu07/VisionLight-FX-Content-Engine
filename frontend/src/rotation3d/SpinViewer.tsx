@@ -320,7 +320,7 @@ export default function SpinViewer({
       ctx.clearRect(0, 0, W, H);
       // Default size matches what used to be the "first zoom" size (~×1.25) so
       // the product reads bigger on load; hero/gallery tiles stay compact.
-      const scale = Math.min(W, H) * (hero ? 0.23 : 0.28) * zoom;
+      const scale = Math.min(W, H) * (hero ? 0.23 : 0.25) * zoom;
       const cx = W / 2 + panX * DPR, cy = H * 0.47 + panY * DPR;
 
       ctx.save();
@@ -935,8 +935,9 @@ const R3D_CSS = `
 .r3d-iconbtn:hover{background:var(--r3d-glass2)}
 .r3d-iconbtn:active{transform:translateY(1px)}
 .r3d-iconbtn svg{width:18px;height:18px}
-.r3d-zoomcol{position:absolute;right:14px;bottom:calc(168px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;z-index:6}
-.r3d-rot{position:absolute;left:50%;bottom:calc(168px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:10px;color:var(--r3d-muted);font-size:12px;font-weight:500;background:rgba(11,15,25,.35);border:1px solid var(--r3d-line);border-radius:999px;padding:6px 12px;backdrop-filter:blur(8px)}
+.r3d-zoomcol{position:absolute;right:14px;bottom:calc(146px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;z-index:6}
+/* slim, low-profile angle indicator (no heavy pill) so it never blocks the product */
+.r3d-rot{position:absolute;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:8px;color:var(--r3d-muted);font-size:11px;font-weight:500;text-shadow:0 1px 6px rgba(0,0,0,.55)}
 .r3d-track{position:relative;width:132px;height:3px;border-radius:2px;background:rgba(255,255,255,.12)}
 .r3d-fill{position:absolute;top:-3px;width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,var(--r3d-primary),var(--r3d-secondary));box-shadow:var(--r3d-glow);transform:translateX(-50%)}
 .r3d-ctas{position:absolute;left:0;right:0;bottom:0;z-index:5;display:flex;gap:12px;padding:14px 16px calc(16px + env(safe-area-inset-bottom));max-width:640px;margin:0 auto}
@@ -948,7 +949,7 @@ const R3D_CSS = `
 .r3d-cta:active{transform:translateY(1px)}
 /* hint sits UNDER the product (lower third), not over it; the max() floor keeps
    it clear of the angle navigator (.r3d-rot at bottom:118px) on short viewports */
-.r3d-hint{position:absolute;left:50%;bottom:max(30%,214px);top:auto;transform:translateX(-50%);z-index:4;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;transition:opacity .5s}
+.r3d-hint{position:absolute;left:50%;bottom:max(28%,200px);top:auto;transform:translateX(-50%);z-index:4;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;transition:opacity .5s}
 .r3d-hint.r3d-gone{opacity:0}
 .r3d-hand{width:52px;height:52px;border-radius:50%;border:1px solid var(--r3d-line);background:rgba(11,15,25,.4);backdrop-filter:blur(8px);display:grid;place-items:center;animation:r3dsway 1.8s ease-in-out infinite}
 .r3d-hand svg{width:24px;height:24px;color:#eef1f6}
@@ -985,45 +986,46 @@ const R3D_CSS = `
 @media (max-width:560px){
   .r3d-iconbtn{width:40px;height:40px}
   .r3d-name{font-size:14px;max-width:52vw}
-  .r3d-thumbs{bottom:calc(96px + env(safe-area-inset-bottom))}
-  .r3d-thumb{width:44px;height:44px}
-  .r3d-powered-badge{bottom:calc(150px + env(safe-area-inset-bottom))}
-  .r3d-rot{bottom:calc(180px + env(safe-area-inset-bottom));padding:5px 11px}
-  .r3d-rot .r3d-track{width:92px}
-  .r3d-hint{bottom:max(30%,236px)}
-  .r3d-zoomcol{bottom:calc(180px + env(safe-area-inset-bottom))}
+  .r3d-thumbs{bottom:calc(82px + env(safe-area-inset-bottom))}
+  .r3d-thumb{width:42px;height:42px}
+  .r3d-powered-badge{bottom:calc(128px + env(safe-area-inset-bottom))}
+  .r3d-rot{bottom:calc(146px + env(safe-area-inset-bottom))}
+  .r3d-rot .r3d-track{width:88px}
+  .r3d-hint{bottom:max(26%,206px)}
+  .r3d-zoomcol{bottom:calc(146px + env(safe-area-inset-bottom))}
   .r3d-cta{padding:13px 12px;font-size:14px}
 }
 /* persistent viral attribution — shows on every embed regardless of the tenant
    brand toggle (brand=0 only hides the tenant's own logo/name). Bottom-left, above
    the CTA bar; drops to the edge when there are no CTAs; hidden on hero tiles. */
-.r3d-powered-badge{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(140px + env(safe-area-inset-bottom));z-index:6;display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;border:1px solid var(--r3d-line);background:rgba(11,15,25,.42);backdrop-filter:blur(8px);color:#eef1f6;font-size:11px;line-height:1;text-decoration:none;opacity:.72;transition:opacity .2s,background .2s}
-.r3d-powered-badge:hover{opacity:1;background:var(--r3d-glass2)}
-.r3d-powered-badge svg{width:13px;height:13px;color:var(--r3d-secondary)}
+/* subtle caption directly under the angle indicator (not a heavy badge) */
+.r3d-powered-badge{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(122px + env(safe-area-inset-bottom));z-index:6;display:flex;align-items:center;gap:5px;color:var(--r3d-muted);font-size:10px;letter-spacing:.03em;line-height:1;text-decoration:none;opacity:.7;text-shadow:0 1px 6px rgba(0,0,0,.55);transition:opacity .2s}
+.r3d-powered-badge:hover{opacity:1}
+.r3d-powered-badge svg{width:12px;height:12px;color:var(--r3d-secondary)}
 .r3d-powered-badge b{font-weight:700}
 .r3d-hero .r3d-powered-badge{display:none!important}
-.r3d-light .r3d-powered-badge{border-color:rgba(0,0,0,.12);background:rgba(255,255,255,.6);color:#0b0f19}
+.r3d-light .r3d-powered-badge{color:#5b6472;text-shadow:none}
 
 /* landscape phone (short viewport): the angle navigator + hint sit ~150px up,
    which lands right over the product on a short sideways screen ("toggle covering
    product"). Pull all chrome to the very bottom edge, and trim the scrims that
    read as bars across a wide short frame. */
 @media (orientation:landscape) and (max-height:540px){
-  .r3d-thumbs{bottom:max(8px,env(safe-area-inset-bottom))}
-  .r3d-thumb{width:38px;height:38px}
-  .r3d-powered-badge{bottom:56px}
-  .r3d-rot{bottom:84px;padding:4px 10px}
-  .r3d-rot .r3d-track{width:104px}
-  .r3d-hint{bottom:92px}
-  .r3d-hand{width:34px;height:34px}
-  .r3d-zoomcol{bottom:84px}
-  .r3d-scrim-bot{height:160px}
-  .r3d-scrim-top{height:70px}
+  .r3d-thumbs{bottom:max(6px,env(safe-area-inset-bottom))}
+  .r3d-thumb{width:36px;height:36px}
+  .r3d-powered-badge{bottom:48px}
+  .r3d-rot{bottom:62px}
+  .r3d-rot .r3d-track{width:100px}
+  .r3d-hint{bottom:84px}
+  .r3d-hand{width:32px;height:32px}
+  .r3d-zoomcol{bottom:62px}
+  .r3d-scrim-bot{height:170px}
+  .r3d-scrim-top{height:64px}
 }
 /* thumbnail-box view selector (e-commerce style): interactive 360° + 4 stills.
    Selecting a still shows it large (.r3d-media) with the canvas hidden. */
-.r3d-thumbs{position:absolute;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:7;display:flex;gap:8px}
-.r3d-thumb{position:relative;width:46px;height:46px;padding:0;border-radius:10px;overflow:hidden;border:2px solid var(--r3d-line);background:rgba(11,15,25,.5);cursor:pointer;transition:border-color .2s,transform .1s}
+.r3d-thumbs{position:absolute;left:50%;bottom:calc(76px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:7;display:flex;gap:8px}
+.r3d-thumb{position:relative;width:44px;height:44px;padding:0;border-radius:10px;overflow:hidden;border:2px solid var(--r3d-line);background:rgba(11,15,25,.5);cursor:pointer;transition:border-color .2s,transform .1s}
 .r3d-thumb:hover{transform:translateY(-1px)}
 .r3d-thumb.active{border-color:var(--r3d-primary)}
 .r3d-thumb img{width:100%;height:100%;object-fit:cover;display:block}
