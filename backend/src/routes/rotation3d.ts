@@ -769,6 +769,7 @@ router.get(
       });
       if (!product || !product.spin) return res.status(404).json({ error: "Not found" });
       const bc = org.brandConfigs?.[0];
+      const showViewSelector = await labStillsEnabled();
       res.json({
         product: {
           id: product.id, name: product.name, slug: product.slug,
@@ -776,6 +777,7 @@ router.get(
           defaultFrame: product.defaultFrame, background: product.background,
           ctaPrimary: product.ctaPrimary, ctaSecondary: product.ctaSecondary,
           videoUrl: product.videos?.[0]?.url || null,
+          showViewSelector,
           brandName: bc?.companyName || org.name,
           brandSlug: org.slug,
           logoUrl: bc?.logoUrl || null,
@@ -787,6 +789,40 @@ router.get(
     } catch {
       res.status(404).json({ error: "Not found" });
     }
+  },
+);
+
+// Rotation3D Lab — experimental feature toggles, read by the public player.
+async function labStillsEnabled(): Promise<boolean> {
+  try {
+    const s = await prisma.globalSettings.findFirst({ select: { rot3dLabStills: true } });
+    return !!s?.rot3dLabStills;
+  } catch {
+    return false;
+  }
+}
+
+router.get(
+  "/api/rotation3d/lab",
+  authenticateToken,
+  requireSuperAdmin,
+  async (_req: AuthenticatedRequest, res: Response) => {
+    res.json({ stills: await labStillsEnabled() });
+  },
+);
+
+router.patch(
+  "/api/rotation3d/lab",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const stills = !!req.body?.stills;
+    await prisma.globalSettings.upsert({
+      where: { id: "singleton" },
+      update: { rot3dLabStills: stills },
+      create: { id: "singleton", rot3dLabStills: stills },
+    });
+    res.json({ stills });
   },
 );
 
@@ -814,6 +850,7 @@ router.get(
     if (!product || !product.spin) return res.status(404).json({ error: "Not found" });
 
     const bc = product.organization?.brandConfigs?.[0];
+    const showViewSelector = await labStillsEnabled();
     res.json({
       product: {
         id: product.id,
@@ -825,6 +862,7 @@ router.get(
         ctaPrimary: product.ctaPrimary,
         ctaSecondary: product.ctaSecondary,
         videoUrl: product.videos?.[0]?.url || null,
+        showViewSelector,
         brandName: bc?.companyName || product.organization?.name || "",
         logoUrl: bc?.logoUrl || null,
         primaryColor: bc?.primaryColor || null,

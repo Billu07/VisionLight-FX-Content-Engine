@@ -230,6 +230,8 @@ export const apiEndpoints = {
       responseType: "blob",
       timeout: 120000,
     }),
+  r3dGetLab: () => api.get("/api/rotation3d/lab"),
+  r3dSetLab: (stills: boolean) => api.patch("/api/rotation3d/lab", { stills }),
   r3dAllProducts: () => api.get("/api/rotation3d/products"),
   r3dSetFeatured: (
     id: string,

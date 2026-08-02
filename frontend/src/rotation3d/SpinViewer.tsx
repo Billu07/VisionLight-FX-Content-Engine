@@ -54,6 +54,8 @@ export type SpinViewerProps = {
   description?: string | null;
   /** rendered rotation clip — enables the "Video" tab in the view selector */
   videoUrl?: string | null;
+  /** Lab feature (off by default): show the thumbnail view selector (stills) */
+  showViewSelector?: boolean;
 };
 
 const clampZoom = (z: number) => Math.max(0.7, Math.min(2.8, z));
@@ -120,6 +122,7 @@ export default function SpinViewer({
   showBrand = true,
   title,
   description,
+  showViewSelector = false,
 }: SpinViewerProps) {
   const hero = variant === "hero";
   const lightBg = isLightColor(background);
@@ -853,7 +856,7 @@ export default function SpinViewer({
         </div>
       )}
 
-      {!hero && stills.length > 0 && (
+      {!hero && showViewSelector && stills.length > 0 && (
         <div className="r3d-thumbs">
           <button
             type="button"

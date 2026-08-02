@@ -150,6 +150,7 @@ export default function Rotation3DPlayer() {
       title={p.title}
       description={p.description}
       videoUrl={p.videoUrl}
+      showViewSelector={p.showViewSelector}
       logoUrl={p.logoUrl}
       primaryColor={p.primaryColor}
       secondaryColor={p.secondaryColor}

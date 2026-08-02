@@ -159,8 +159,66 @@ function ShowcasePanel() {
   );
 }
 
+// Experimental feature toggles for the Rotation3D player (global, off by default).
+function LabPanel() {
+  const [stills, setStills] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    apiEndpoints
+      .r3dGetLab()
+      .then((r) => setStills(!!r.data.stills))
+      .catch(() => setStills(false));
+  }, []);
+
+  const toggle = async () => {
+    if (stills === null) return;
+    setSaving(true);
+    try {
+      const r = await apiEndpoints.r3dSetLab(!stills);
+      setStills(!!r.data.stills);
+    } catch {
+      /* ignore */
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className={card}>
+      <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Lab — experimental</h2>
+      <p className="mt-1 text-xs text-gray-400">
+        Experimental player features, off by default. Changes apply to all published players.
+      </p>
+      <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-gray-700/60 bg-gray-950/50 p-4">
+        <div>
+          <p className="text-sm font-medium text-white">Player view selector (stills)</p>
+          <p className="mt-1 text-[11px] text-gray-500">
+            Thumbnail boxes under the product — interactive 360° + 4 stills from different angles.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={toggle}
+          disabled={stills === null || saving}
+          aria-pressed={!!stills}
+          className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+            stills ? "bg-brand-accent" : "bg-gray-700"
+          }`}
+        >
+          <span
+            className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${
+              stills ? "left-6" : "left-1"
+            }`}
+          />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Rotation3DAdminPanel() {
-  const [mode, setMode] = useState<"brands" | "showcase">("brands");
+  const [mode, setMode] = useState<"brands" | "showcase" | "lab">("brands");
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loadingBrands, setLoadingBrands] = useState(true);
   const [newBrand, setNewBrand] = useState("");
@@ -428,7 +486,7 @@ export default function Rotation3DAdminPanel() {
       )}
 
       <div className="flex gap-2">
-        {(["brands", "showcase"] as const).map((m) => (
+        {(["brands", "showcase", "lab"] as const).map((m) => (
           <button
             key={m}
             onClick={() => setMode(m)}
@@ -436,12 +494,14 @@ export default function Rotation3DAdminPanel() {
               mode === m ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"
             }`}
           >
-            {m === "brands" ? "Brands" : "Homepage showcase"}
+            {m === "brands" ? "Brands" : m === "showcase" ? "Homepage showcase" : "Lab"}
           </button>
         ))}
       </div>
 
-      {mode === "showcase" ? (
+      {mode === "lab" ? (
+        <LabPanel />
+      ) : mode === "showcase" ? (
         <ShowcasePanel />
       ) : (
       <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
