@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams, Navigate } from "react-router-dom";
 import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
-import { isRotation3dSite } from "../lib/branding";
+import { isSpinPlayerSite, getPlayerBranding } from "../lib/branding";
 
 /**
  * Public Rotation3D player (rotation3d.com/p/:id and /embed/:id). Fetches the
@@ -116,16 +116,17 @@ export default function Rotation3DPlayer() {
   }, [productId, brandSlug, productSlug, isDemo, bySlug]);
 
   // vanity URLs are Rotation3D-host only — on other domains fall through to "/"
-  if (bySlug && !isRotation3dSite()) return <Navigate to="/" replace />;
+  if (bySlug && !isSpinPlayerSite()) return <Navigate to="/" replace />;
 
   if (isDemo) {
     return (
       <SpinViewer
         manifest={{ frameCount: 36, defaultFrame: 3 }}
-        brandName="Rotation3D"
+        brandName={getPlayerBranding().name}
         productName="Demo Product"
         ctaPrimary={{ label: "Buy now", url: "#" }}
         ctaSecondary={{ label: "Next product", url: "#" }}
+        enableLoop={getPlayerBranding().loopByDefault}
       />
     );
   }
@@ -151,6 +152,7 @@ export default function Rotation3DPlayer() {
       description={p.description}
       videoUrl={p.videoUrl}
       showViewSelector={p.showViewSelector}
+      enableLoop={getPlayerBranding().loopByDefault}
       logoUrl={p.logoUrl}
       primaryColor={p.primaryColor}
       secondaryColor={p.secondaryColor}

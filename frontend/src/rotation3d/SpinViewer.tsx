@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { getPlayerBranding } from "../lib/branding";
 
 /**
  * Rotation3D — reusable interactive 360° spin viewer.
@@ -56,6 +57,8 @@ export type SpinViewerProps = {
   videoUrl?: string | null;
   /** Lab feature (off by default): show the thumbnail view selector (stills) */
   showViewSelector?: boolean;
+  /** Drift surface: auto-rotate ("loop") with a play/pause toggle in the chrome */
+  enableLoop?: boolean;
 };
 
 const clampZoom = (z: number) => Math.max(0.7, Math.min(2.8, z));
@@ -123,8 +126,10 @@ export default function SpinViewer({
   title,
   description,
   showViewSelector = false,
+  enableLoop = false,
 }: SpinViewerProps) {
   const hero = variant === "hero";
+  const playerBrand = getPlayerBranding();
   const lightBg = isLightColor(background);
   const stageStyle: CSSProperties = {
     ...(primaryColor ? { ["--r3d-primary" as any]: primaryColor } : {}),
@@ -140,6 +145,7 @@ export default function SpinViewer({
   const ringRef = useRef<SVGCircleElement>(null);
   const pctRef = useRef<HTMLDivElement>(null);
   const fsIconRef = useRef<SVGSVGElement>(null);
+  const loopIconRef = useRef<SVGSVGElement>(null);
   // E-commerce-style thumbnail selector: box 0 = interactive 360° (default),
   // boxes 1..4 = stills from different angles. Clicking a still box shows it large.
   const [view, setView] = useState(0);
@@ -171,7 +177,8 @@ export default function SpinViewer({
     let yawVel = 0;
     let zoom = 1, zoomTarget = 1;
     let panX = 0, panY = 0, panTX = 0, panTY = 0;
-    let idleSpin = false; // no auto-rotation; the "Drag to rotate" hint invites it
+    let loopOn = enableLoop; // Drift: auto-rotate/loop; toggled by the play/pause button
+    let idleSpin = enableLoop; // Drift starts looping; Rotation3D is drag-only
     let dirty = true, lastYaw = NaN, lastZoom = NaN, lastPX = 0, lastPY = 0;
     let touchZoomed = false;
     let scrimHidden = false;
@@ -384,7 +391,7 @@ export default function SpinViewer({
     const engage = () => {
       if (!interacted) {
         interacted = true;
-        idleSpin = false;
+        if (!loopOn) idleSpin = false; // loop keeps spinning after the first touch
         hintRef.current?.classList.add("r3d-gone");
       }
     };
@@ -407,6 +414,7 @@ export default function SpinViewer({
     const down = (e: PointerEvent) => {
       dragging = true;
       engage(); // dismiss the "drag to rotate" hint the instant the player is touched
+      idleSpin = false; // pause auto-rotate while actively dragging
       yawVel = 0;
       lastX = startX = e.clientX;
       lastY = startY = e.clientY;
@@ -472,7 +480,12 @@ export default function SpinViewer({
       lastY = e.clientY;
       lastT = now;
     };
-    const up = () => { dragging = false; axis = ""; stage.classList.remove("r3d-grabbing"); };
+    const up = () => {
+      dragging = false;
+      axis = "";
+      if (loopOn) idleSpin = true; // resume auto-rotate after the drag ends
+      stage.classList.remove("r3d-grabbing");
+    };
 
     const onDown = (e: PointerEvent) => {
       if (isControl(e.target)) return;
@@ -539,6 +552,12 @@ export default function SpinViewer({
       !!(document.fullscreenElement || (document as any).webkitFullscreenElement);
     const ENTER_ICON = '<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>';
     const EXIT_ICON = '<path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>';
+    const PLAY_ICON = '<path d="M8 5v14l11-7z"/>';
+    const PAUSE_ICON = '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>';
+    const syncLoopIcon = () => {
+      const el = loopIconRef.current;
+      if (el) el.innerHTML = loopOn ? PAUSE_ICON : PLAY_ICON;
+    };
     const syncFsIcon = () => {
       const el = fsIconRef.current;
       if (el) el.innerHTML = nativeFsActive() || pseudoFs ? EXIT_ICON : ENTER_ICON;
@@ -616,6 +635,11 @@ export default function SpinViewer({
         yaw = (DEFAULT_FRAME / FRAMES) * TWO_PI; yawVel = 0; zoomTarget = 1; panX = panY = panTX = panTY = 0;
       } else if (t.closest("[data-fs]")) {
         toggleFs();
+      } else if (t.closest("[data-loop]")) {
+        loopOn = !loopOn;
+        idleSpin = loopOn;
+        engage();
+        syncLoopIcon();
       }
     };
 
@@ -743,6 +767,7 @@ export default function SpinViewer({
 
     fit();
     tick();
+    if (enableLoop) syncLoopIcon();
     scheduleLandscapeZoom(); // apply landscape 2× if we mount already held sideways
 
     return () => {
@@ -802,6 +827,11 @@ export default function SpinViewer({
           </div>
         </div>
         <div className="r3d-tools">
+          {enableLoop && (
+            <button className="r3d-iconbtn" data-loop title="Play / pause auto-rotate" aria-label="Toggle auto-rotate">
+              <svg ref={loopIconRef} viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 5h4v14H6zM14 5h4v14h-4z" /></svg>
+            </button>
+          )}
           <button className="r3d-iconbtn" data-reset title="Reset view" aria-label="Reset view">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.7 9.7 0 0 0-6.7 2.7L3 8" /><path d="M3 3v5h5" /></svg>
           </button>
@@ -884,13 +914,13 @@ export default function SpinViewer({
 
       <a
         className="r3d-powered-badge"
-        href="https://rotation3d.com"
+        href={playerBrand.url}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="Powered by Rotation3D"
+        aria-label={`Powered by ${playerBrand.name}`}
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
-        <span>Powered by <b>Rotation3D</b></span>
+        <span>Powered by <b>{playerBrand.name}</b></span>
       </a>
 
       <div className="r3d-loader" ref={loaderRef}>
@@ -907,7 +937,7 @@ export default function SpinViewer({
           </svg>
           <div className="r3d-pct" ref={pctRef}>0%</div>
           <div className="r3d-lbl">Optimizing frames…</div>
-          <div className="r3d-powered">Powered by Rotation3D</div>
+          <div className="r3d-powered">Powered by {playerBrand.name}</div>
         </div>
       </div>
     </div>

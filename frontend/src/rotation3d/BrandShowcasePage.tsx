@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams, Navigate } from "react-router-dom";
 import SpinViewer, { type SpinManifest } from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
-import { isRotation3dSite } from "../lib/branding";
+import { isSpinPlayerSite } from "../lib/branding";
 
 /**
  * Public brand showcase — rotation3d.com/{brandSlug}: a grid of all the brand's
@@ -158,7 +158,7 @@ export default function BrandShowcasePage({ embed = false }: { embed?: boolean }
     };
   }, [brandSlug]);
 
-  if (!isRotation3dSite()) return <Navigate to="/" replace />;
+  if (!isSpinPlayerSite()) return <Navigate to="/" replace />;
   if (state.loading) return <Shell>Loading…</Shell>;
   if (state.error || !state.brand) return <Shell>This page isn't available.</Shell>;
 

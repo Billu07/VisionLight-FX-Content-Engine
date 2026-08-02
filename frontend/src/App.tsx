@@ -36,10 +36,11 @@ import { Terms } from "./pages/Terms";
 import { Privacy } from "./pages/Privacy";
 import Rotation3DDemo from "./rotation3d/Rotation3DDemo";
 import Rotation3DLanding from "./rotation3d/Rotation3DLanding";
+import DriftLanding from "./rotation3d/DriftLanding";
 import Rotation3DPlayer from "./rotation3d/Rotation3DPlayer";
 import BrandShowcasePage from "./rotation3d/BrandShowcasePage";
 import Rotation3DBrandDashboard from "./rotation3d/Rotation3DBrandDashboard";
-import { isRotation3dSite } from "./lib/branding";
+import { isRotation3dSite, isDriftSite } from "./lib/branding";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -292,7 +293,15 @@ function App() {
                 so brands can log in on rotation3d.com too. */}
             <Route
               path="/"
-              element={isRotation3dSite() ? <Rotation3DLanding /> : <MarketingSite />}
+              element={
+                isRotation3dSite() ? (
+                  <Rotation3DLanding />
+                ) : isDriftSite() ? (
+                  <DriftLanding />
+                ) : (
+                  <MarketingSite />
+                )
+              }
             />
             {/* Rotation3D public player + iframe embed (linked from rotation3d.com) */}
             <Route path="/p/:productId" element={<Rotation3DPlayer />} />
