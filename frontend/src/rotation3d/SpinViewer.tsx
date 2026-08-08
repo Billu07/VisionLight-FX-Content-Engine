@@ -341,12 +341,12 @@ export default function SpinViewer({
       if (realMode) drawFrameImage(frame, cx, cy, scale);
       else drawSynthetic(q, cx, cy, scale);
 
-      const n01 = (((yaw % TWO_PI) + TWO_PI) % TWO_PI) / TWO_PI;
-      // The navigator read reversed relative to the visual spin, so mirror it
-      // (1 - n01) — the dot + degrees now track the direction you're turning,
-      // while the actual rotation drag is unchanged.
-      const nav = 1 - n01;
-      if (degRef.current) degRef.current.textContent = Math.round(nav * 360) + "°";
+      // Navigator: 0° at the start frame (DEFAULT_FRAME), counting up as you
+      // drag forward (right). Measured relative to the start so the readout
+      // begins at 0°; circular, so dragging back past the start wraps toward 360°.
+      const startYaw = (DEFAULT_FRAME / FRAMES) * TWO_PI;
+      const nav = ((((yaw - startYaw) % TWO_PI) + TWO_PI) % TWO_PI) / TWO_PI;
+      if (degRef.current) degRef.current.textContent = (Math.round(nav * 360) % 360) + "°";
       if (fillRef.current) fillRef.current.style.left = nav * 100 + "%";
     };
 
@@ -463,16 +463,16 @@ export default function SpinViewer({
         // zoomed → horizontal still spins the product (so you never lose the
         // rotate), vertical pans up/down to inspect the zoomed-in region.
         const k = 0.006;
-        const d = -dx * k;
+        const d = dx * k;
         yaw += d;
         yawVel = (d / dt) * 16;
         const lim = 130 * (zoomTarget - 1);
         panTY = Math.max(-lim, Math.min(lim, panTY + dy));
         panY = panTY;
       } else {
-        // at rest → horizontal rotates (negated so dragging right spins right)
+        // at rest → horizontal scrubs the sequence: drag right = forward
         const k = 0.006;
-        const d = -dx * k;
+        const d = dx * k;
         yaw += d;
         yawVel = (d / dt) * 16;
       }
@@ -535,8 +535,8 @@ export default function SpinViewer({
     };
     const onKey = (e: KeyboardEvent) => {
       const step = TWO_PI / FRAMES;
-      if (e.key === "ArrowLeft") { engage(); yaw += step; }
-      else if (e.key === "ArrowRight") { engage(); yaw -= step; }
+      if (e.key === "ArrowRight") { engage(); yaw += step; }
+      else if (e.key === "ArrowLeft") { engage(); yaw -= step; }
       else if (e.key === "+" || e.key === "=") zoomTarget = clampZoom(zoomTarget * 1.2);
       else if (e.key === "-") zoomTarget = clampZoom(zoomTarget * 0.83);
       else if (e.key === "r" || e.key === "R") { yaw = (DEFAULT_FRAME / FRAMES) * TWO_PI; zoomTarget = 1; panX = panY = panTX = panTY = 0; }
