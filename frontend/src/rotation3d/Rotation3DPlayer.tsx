@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams, Navigate } from "react-router-dom";
 import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
-import { isSpinPlayerSite, getPlayerBranding } from "../lib/branding";
+import { isSpinPlayerSite, isDriftSite, getPlayerBranding } from "../lib/branding";
 
 /**
  * Public Rotation3D player (rotation3d.com/p/:id and /embed/:id). Fetches the
@@ -50,7 +50,7 @@ function Placeholder({ title, sub, showHome }: { title: string; sub: string; sho
         <p style={{ color: "#9aa3b6", lineHeight: 1.6, margin: 0 }}>{sub}</p>
         {showHome ? (
           <a
-            href="https://rotation3d.com"
+            href={getPlayerBranding().url}
             style={{
               display: "inline-block",
               marginTop: 22,
@@ -65,7 +65,7 @@ function Placeholder({ title, sub, showHome }: { title: string; sub: string; sho
               boxShadow: "0 10px 30px -10px rgba(139,92,246,.6)",
             }}
           >
-            Go to Rotation3D.com →
+            Go to {getPlayerBranding().name} →
           </a>
         ) : null}
       </div>
@@ -83,6 +83,13 @@ export default function Rotation3DPlayer() {
   const showBrand = search.get("brand") !== "0";
   const bySlug = !!(brandSlug && productSlug);
   const isDemo = !bySlug && (!productId || productId === "demo");
+  // drift.li serves the same player against its own data (/api/drift/*).
+  const drift = isDriftSite();
+  const pubProduct = drift ? apiEndpoints.driftPublicProduct : apiEndpoints.r3dPublicProduct;
+  const pubBrandProduct = drift
+    ? apiEndpoints.driftPublicBrandProduct
+    : apiEndpoints.r3dPublicBrandProduct;
+  const trackEvent = drift ? apiEndpoints.driftTrackEvent : apiEndpoints.r3dTrackEvent;
   const [state, setState] = useState<{
     loading: boolean;
     data?: any;
@@ -94,14 +101,14 @@ export default function Rotation3DPlayer() {
     let alive = true;
     setState({ loading: true });
     const req = bySlug
-      ? apiEndpoints.r3dPublicBrandProduct(brandSlug!, productSlug!)
-      : apiEndpoints.r3dPublicProduct(productId!);
+      ? pubBrandProduct(brandSlug!, productSlug!)
+      : pubProduct(productId!);
     req
       .then((res) => {
         if (!alive) return;
         const data = res.data.product;
         setState({ loading: false, data });
-        if (data?.id) apiEndpoints.r3dTrackEvent(data.id, "VIEW").catch(() => undefined);
+        if (data?.id) trackEvent(data.id, "VIEW").catch(() => undefined);
       })
       .catch((err) => {
         if (!alive) return;
@@ -146,13 +153,13 @@ export default function Rotation3DPlayer() {
         frames: m.frames,
         defaultFrame: p.defaultFrame ?? m.defaultFrame ?? 0,
       }}
-      brandName={p.brandName || "Rotation3D"}
+      brandName={p.brandName || getPlayerBranding().name}
       productName={p.name || "Product"}
       title={p.title}
       description={p.description}
       videoUrl={p.videoUrl}
       showViewSelector={p.showViewSelector}
-      enableLoop={getPlayerBranding().loopByDefault}
+      enableLoop={drift ? p.loopEnabled ?? true : getPlayerBranding().loopByDefault}
       logoUrl={p.logoUrl}
       primaryColor={p.primaryColor}
       secondaryColor={p.secondaryColor}
@@ -163,7 +170,7 @@ export default function Rotation3DPlayer() {
       ctaPrimary={toCta(p.ctaPrimary)}
       ctaSecondary={toCta(p.ctaSecondary)}
       onCtaClick={(which) =>
-        p?.id && apiEndpoints.r3dTrackEvent(p.id, "CTA_CLICK", { which }).catch(() => undefined)
+        p?.id && trackEvent(p.id, "CTA_CLICK", { which }).catch(() => undefined)
       }
     />
   );

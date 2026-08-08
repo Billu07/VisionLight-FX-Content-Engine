@@ -11,6 +11,7 @@ import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
 import { isUserCreditLimited } from "../lib/adminCredits";
 import Rotation3DAdminPanel from "../rotation3d/Rotation3DAdminPanel";
+import DriftAdminPanel from "../rotation3d/DriftAdminPanel";
 
 type DemoView = "VISIONLIGHT" | "PICDRIFT";
 
@@ -433,6 +434,7 @@ export default function SuperAdminDashboard() {
     | "editor-presets"
     | "lab"
     | "rotation3d"
+    | "drift"
   >("platform");
 
   // Demo Preview curation state
@@ -1506,6 +1508,7 @@ export default function SuperAdminDashboard() {
                 { id: "editor-presets", label: "editor presets" },
                 { id: "lab", label: "lab" },
                 { id: "rotation3d", label: "rotation3d" },
+                { id: "drift", label: "drift.li" },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -1598,6 +1601,7 @@ export default function SuperAdminDashboard() {
 
         {/* TAB CONTENT: ROTATION3D */}
         {activeTab === "rotation3d" && <Rotation3DAdminPanel />}
+        {activeTab === "drift" && <DriftAdminPanel />}
 
         {/* TAB CONTENT: DEMO PREVIEW */}
         {activeTab === "demo" && (

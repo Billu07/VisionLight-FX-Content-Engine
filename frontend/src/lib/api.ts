@@ -273,6 +273,74 @@ export const apiEndpoints = {
     api.get(`/api/rotation3d/my/products/${id}/share-card`, { responseType: "blob" }),
   r3dTrackEvent: (productId: string, type: string, meta?: Record<string, unknown>) =>
     api.post("/api/rotation3d/public/events", { productId, type, meta }),
+
+  // ── Drift (drift.li) — separate product line, mirrors the r3d endpoints ──
+  driftListBrands: () => api.get("/api/drift/brands"),
+  driftCreateBrand: (name: string, adminEmail?: string, adminName?: string) =>
+    api.post("/api/drift/brands", { name, adminEmail, adminName }),
+  driftDeleteBrand: (orgId: string) => api.delete(`/api/drift/brands/${orgId}`),
+  driftSetBrandSlug: (orgId: string, slug: string) =>
+    api.patch(`/api/drift/brands/${orgId}/slug`, { slug }),
+  driftBrandProducts: (orgId: string) => api.get(`/api/drift/brands/${orgId}/products`),
+  driftBrandSourceImages: (orgId: string) =>
+    api.get(`/api/drift/brands/${orgId}/source-images`),
+  driftBrandSourceImagesZip: (orgId: string) =>
+    api.get(`/api/drift/brands/${orgId}/source-images.zip`, { responseType: "blob" }),
+  driftUploadProductVideo: (
+    orgId: string,
+    formData: FormData,
+    options?: { onUploadProgress?: (e: AxiosProgressEvent) => void },
+  ) =>
+    api.post(`/api/drift/brands/${orgId}/products`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: options?.onUploadProgress,
+      timeout: 600000,
+    }),
+  driftUploadSecondClip: (
+    orgId: string,
+    productId: string,
+    formData: FormData,
+    options?: { onUploadProgress?: (e: AxiosProgressEvent) => void },
+  ) =>
+    api.post(`/api/drift/brands/${orgId}/products/${productId}/second-clip`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: options?.onUploadProgress,
+      timeout: 600000,
+    }),
+  driftDeleteSecondClip: (orgId: string, productId: string) =>
+    api.delete(`/api/drift/brands/${orgId}/products/${productId}/second-clip`),
+  driftAdminUpdateProduct: (orgId: string, productId: string, data: Record<string, unknown>) =>
+    api.patch(`/api/drift/brands/${orgId}/products/${productId}`, data),
+  driftDeleteProduct: (id: string) => api.delete(`/api/drift/products/${id}`),
+  driftAllProducts: () => api.get("/api/drift/products"),
+  driftSetFeatured: (id: string, changes: Record<string, unknown>) =>
+    api.patch(`/api/drift/products/${id}/feature`, changes),
+  driftMyProducts: () => api.get("/api/drift/my/products"),
+  driftUpdateProduct: (id: string, data: Record<string, unknown>) =>
+    api.patch(`/api/drift/my/products/${id}`, data),
+  driftGetCaptions: (id: string) => api.get(`/api/drift/my/products/${id}/captions`),
+  driftSaveCaptions: (id: string, captions: unknown[]) =>
+    api.put(`/api/drift/my/products/${id}/captions`, { captions }),
+  driftUploadSourceImages: (
+    formData: FormData,
+    options?: { onUploadProgress?: (e: AxiosProgressEvent) => void },
+  ) =>
+    api.post("/api/drift/my/source-images", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: options?.onUploadProgress,
+    }),
+  driftCreateEmbed: (id: string, allowedDomains: string[]) =>
+    api.post(`/api/drift/my/products/${id}/embed`, { allowedDomains }),
+  driftPublicFeatured: () => api.get("/api/drift/public/featured"),
+  driftPublicProduct: (id: string) => api.get(`/api/drift/public/products/${id}`),
+  driftPublicBrand: (brandSlug: string) => api.get(`/api/drift/public/b/${brandSlug}`),
+  driftPublicBrandProduct: (brandSlug: string, productSlug: string) =>
+    api.get(`/api/drift/public/b/${brandSlug}/${productSlug}`),
+  driftShareCard: (id: string) =>
+    api.get(`/api/drift/my/products/${id}/share-card`, { responseType: "blob" }),
+  driftTrackEvent: (productId: string, type: string, meta?: Record<string, unknown>) =>
+    api.post("/api/drift/public/events", { productId, type, meta }),
+
   byokGetActivationStatus: (checkoutSessionId: string) =>
     api.get("/api/byok/activation-status", { params: { checkoutSessionId } }),
   byokGetActivationStatusPublic: (checkoutSessionId: string) =>
