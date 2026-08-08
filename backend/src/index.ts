@@ -12,6 +12,7 @@ import appDataRouter from "./routes/app-data";
 import mediaRouter from "./routes/media";
 import byokRouter from "./routes/byok";
 import rotation3dRouter, { recoverOrphanedRot3dJobs } from "./routes/rotation3d";
+import driftRouter, { recoverOrphanedDriftJobs } from "./routes/drift";
 
 console.log("Environment Check:", {
   airtableKey: process.env.AIRTABLE_API_KEY ? "Loaded" : "Missing",
@@ -46,6 +47,7 @@ app.use(appDataRouter);
 app.use(mediaRouter);
 app.use(byokRouter);
 app.use(rotation3dRouter);
+app.use(driftRouter);
 
 app.use((req, res) => res.status(404).json({ error: "Route not found" }));
 app.use((error: any, req: Request, res: Response, next: NextFunction) => {
@@ -59,6 +61,7 @@ if (process.env.NODE_ENV !== "production" || process.env.VERCEL !== "1") {
     console.log(`Start Time: ${new Date().toISOString()}`);
     console.log(`SuperAdmin DELETE Org Route: ACTIVE`);
     void recoverOrphanedRot3dJobs();
+    void recoverOrphanedDriftJobs();
   });
 }
 

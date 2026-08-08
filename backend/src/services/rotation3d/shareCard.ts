@@ -36,6 +36,7 @@ export async function buildShareCard(opts: {
   productName: string;
   brandName: string;
   primaryColor?: string | null;
+  poweredBy?: string | null; // footer wordmark (default "Rotation3D.com")
 }): Promise<Buffer> {
   const primary = sanitizeHex(opts.primaryColor) || "#22d3ee";
 
@@ -129,7 +130,7 @@ export async function buildShareCard(opts: {
       <text x="${W / 2}" y="${H - 132}" text-anchor="middle" class="name">${esc(
         opts.productName,
       )}</text>
-      <text x="${W / 2}" y="${H - 54}" text-anchor="middle" class="powered">Powered by Rotation3D.com</text>
+      <text x="${W / 2}" y="${H - 54}" text-anchor="middle" class="powered">Powered by ${esc(opts.poweredBy || "Rotation3D.com")}</text>
     </svg>`);
 
   const composites: sharp.OverlayOptions[] = [

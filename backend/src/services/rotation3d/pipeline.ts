@@ -167,6 +167,8 @@ export const buildSpinFromVideo = async (params: {
   frameCount?: number;
   /** white/black = free ffmpeg chroma-key; ai = paid Fal matte; none = opaque */
   removal?: "white" | "black" | "ai" | "none";
+  /** storage namespace for frame keys (default "rotation3d"; "drift" for Drift). */
+  keyNamespace?: string;
 }): Promise<SpinManifest> => {
   const targetCount = Math.min(180, Math.max(12, params.frameCount ?? 48));
   const removal = params.removal ?? "none";
@@ -198,7 +200,7 @@ export const buildSpinFromVideo = async (params: {
     }
     console.log(`[r3d] detected bg=${detectedBg}`);
 
-    const keyPrefix = `rotation3d/org_${params.organizationId}/product_${params.productId}/frames`;
+    const keyPrefix = `${params.keyNamespace || "rotation3d"}/org_${params.organizationId}/product_${params.productId}/frames`;
     let aiCut = 0;
     // Each frame → a full-res WebP and a lighter mobile WebP, both on R2.
     // Resizing from the already-extracted frame is cheap next to ffmpeg, so the

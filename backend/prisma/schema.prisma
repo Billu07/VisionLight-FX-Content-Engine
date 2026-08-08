@@ -76,6 +76,10 @@ model Organization {
   rot3dProducts     Rot3dProduct[]
   rot3dSourceImages Rot3dSourceImage[]
   rot3dEvents       Rot3dEvent[]
+
+  driftProducts     DriftProduct[]
+  driftSourceImages DriftSourceImage[]
+  driftEvents       DriftEvent[]
 }
 
 model User {
@@ -473,6 +477,141 @@ model Rot3dEvent {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   product      Rot3dProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([organizationId, ts])
+}
+
+// ─────────────────────────── DRIFT (drift.li) ───────────────────────────
+// Parallel to the Rot3d* models but a completely separate product line: its own
+// brand orgs (Organization.productLine = "DRIFT"), admin tab, landing, and
+// player. Extra vs Rotation3D: per-product loop toggle, on-frame text captions,
+// and an optional linked second clip (2-clip seamless loop).
+
+model DriftProduct {
+  id              String   @id @default(uuid())
+  organizationId  String
+  slug            String
+  name            String
+  title           String? // optional display title shown beside the player (falls back to name)
+  description     String? // optional product blurb shown beside the player
+  status          String   @default("DRAFT") // DRAFT | PROCESSING | READY | PUBLISHED | ARCHIVED
+  defaultFrame    Int      @default(0)
+  loopEnabled     Boolean  @default(true) // player auto-loop/continuous playback toggle
+  background      String? // "transparent" | hex
+  ctaPrimary      Json? // { label, url }
+  ctaSecondary    Json? // { label, url }
+  order           Int      @default(0)
+  featured        Boolean  @default(false) // curated into the drift.li landing showcase
+  heroFeatured    Boolean  @default(false) // the single hero clip on the landing
+  featuredRank    Int      @default(0)
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sourceImages DriftSourceImage[]
+  videos       DriftVideo[]
+  spin         DriftSpin?
+  embed        DriftEmbed?
+  captions     DriftCaption[]
+  events       DriftEvent[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+model DriftSourceImage {
+  id               String   @id @default(uuid())
+  organizationId   String
+  productId        String?
+  url              String
+  angleLabel       String?
+  productLabel     String? // free-text product name the brand typed when sending a batch
+  uploadedByUserId String?
+  createdAt        DateTime @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  product      DriftProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([productId])
+}
+
+model DriftVideo {
+  id               String   @id @default(uuid())
+  productId        String
+  url              String
+  clip             String   @default("A") // A = primary clip, B = linked second clip
+  status           String   @default("UPLOADED") // UPLOADED | PROCESSING | DONE | FAILED
+  uploadedByUserId String?
+  createdAt        DateTime @default(now())
+
+  product DriftProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model DriftSpin {
+  id               String   @id @default(uuid())
+  productId        String   @unique
+  frameCount       Int
+  manifest         Json // primary clip A: { frames: string[], defaultFrame, resolutions }
+  secondFrameCount Int? // linked clip B frame count (null = no second clip)
+  secondManifest   Json? // linked clip B manifest (played on the reverse leg of the loop)
+  status           String   @default("READY")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  product DriftProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model DriftEmbed {
+  id             String   @id @default(uuid())
+  productId      String   @unique
+  token          String   @unique
+  allowedDomains String[]
+  createdAt      DateTime @default(now())
+
+  product DriftProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+// On-frame text overlays. A caption is visible while the playhead is within
+// [startFrame, endFrame] on the given clip; position/style are normalized so the
+// player can render them over the frame canvas at any size.
+model DriftCaption {
+  id         String   @id @default(uuid())
+  productId  String
+  clip       String   @default("A") // A = primary clip, B = linked second clip
+  startFrame Int      @default(0)
+  endFrame   Int      @default(0)
+  text       String
+  x          Float    @default(0.5) // normalized 0..1 (left→right)
+  y          Float    @default(0.5) // normalized 0..1 (top→bottom)
+  color      String   @default("#ffffff")
+  fontSize   Float    @default(0.05) // normalized to canvas height (0..1)
+  fontWeight Int      @default(600)
+  background String? // optional pill/backdrop color behind the text
+  align      String   @default("center") // left | center | right
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  product DriftProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model DriftEvent {
+  id             String   @id @default(uuid())
+  organizationId String
+  productId      String
+  type           String // VIEW | ROTATE | ZOOM | CTA_CLICK
+  meta           Json?
+  ts             DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  product      DriftProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@index([organizationId, ts])
