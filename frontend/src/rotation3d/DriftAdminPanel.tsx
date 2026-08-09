@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiEndpoints } from "../lib/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
+import DriftCaptionEditor from "./DriftCaptionEditor";
 
 /**
  * Team (SuperAdmin) console for Drift (drift.li) — lives inside
@@ -186,6 +187,7 @@ export default function DriftAdminPanel() {
   const [savingSlug, setSavingSlug] = useState(false);
   const [slugMsg, setSlugMsg] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [editingCaptions, setEditingCaptions] = useState<{ id: string; name: string } | null>(null);
   const [brandQuery, setBrandQuery] = useState("");
   const [productQuery, setProductQuery] = useState("");
   const [productStatus, setProductStatus] = useState("ALL");
@@ -717,6 +719,12 @@ export default function DriftAdminPanel() {
                           {(p.status === "READY" || p.status === "PUBLISHED") && (
                             <>
                               <button
+                                onClick={() => setEditingCaptions({ id: p.id, name: p.name })}
+                                className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
+                              >
+                                Captions
+                              </button>
+                              <button
                                 onClick={() => copyProductLink(p)}
                                 className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
                               >
@@ -752,6 +760,14 @@ export default function DriftAdminPanel() {
             )}
           </div>
         </div>
+      )}
+
+      {editingCaptions && (
+        <DriftCaptionEditor
+          productId={editingCaptions.id}
+          productName={editingCaptions.name}
+          onClose={() => setEditingCaptions(null)}
+        />
       )}
     </div>
   );

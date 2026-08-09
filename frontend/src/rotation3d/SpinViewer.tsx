@@ -28,6 +28,22 @@ export type SpinManifest = {
 
 export type SpinCta = { label: string; url: string; newTab?: boolean };
 
+/** On-frame text overlay (Drift). Visible while the current frame is within
+ * [startFrame, endFrame]; position/size are normalized to the canvas (0..1). */
+export type SpinCaption = {
+  clip?: string; // "A" (primary) | "B" (linked clip) — only "A" rendered for now
+  startFrame: number;
+  endFrame: number;
+  text: string;
+  x: number; // 0..1 left→right
+  y: number; // 0..1 top→bottom
+  color?: string;
+  fontSize?: number; // 0..1 of canvas height
+  fontWeight?: number;
+  background?: string | null;
+  align?: "left" | "center" | "right";
+};
+
 export type SpinViewerProps = {
   manifest: SpinManifest;
   productName?: string;
@@ -62,6 +78,8 @@ export type SpinViewerProps = {
   /** Drift player chrome: "drag to drift" + directional arrow under the frame,
    * no bottom scrim, playback starts at the actual first frame (frame 0). */
   driftMode?: boolean;
+  /** Drift on-frame text overlays, shown while their frame range is active. */
+  captions?: SpinCaption[];
 };
 
 const clampZoom = (z: number) => Math.max(0.7, Math.min(2.8, z));
@@ -131,6 +149,7 @@ export default function SpinViewer({
   showViewSelector = false,
   enableLoop = false,
   driftMode = false,
+  captions,
 }: SpinViewerProps) {
   const hero = variant === "hero";
   const playerBrand = getPlayerBranding();
@@ -150,6 +169,11 @@ export default function SpinViewer({
   const pctRef = useRef<HTMLDivElement>(null);
   const fsIconRef = useRef<SVGSVGElement>(null);
   const loopIconRef = useRef<SVGSVGElement>(null);
+  // Captions live in a ref so updating them doesn't re-init the render engine.
+  const captionsRef = useRef<SpinCaption[] | undefined>(captions);
+  useEffect(() => {
+    captionsRef.current = captions;
+  }, [captions]);
   // E-commerce-style thumbnail selector: box 0 = interactive 360° (default),
   // boxes 1..4 = stills from different angles. Clicking a still box shows it large.
   const [view, setView] = useState(0);
@@ -346,6 +370,49 @@ export default function SpinViewer({
 
       if (realMode) drawFrameImage(frame, cx, cy, scale);
       else drawSynthetic(q, cx, cy, scale);
+
+      // Drift on-frame captions — visible while this frame is within range.
+      const caps = captionsRef.current;
+      if (caps && caps.length) {
+        for (const c of caps) {
+          if (c.clip && c.clip !== "A") continue; // clip B not consumed yet
+          if (frame < c.startFrame || frame > c.endFrame) continue;
+          const fs = Math.max(9, (c.fontSize ?? 0.05) * H);
+          const lines = String(c.text || "").split("\n");
+          if (!lines.some((l) => l.trim())) continue;
+          ctx.save();
+          ctx.font = `${c.fontWeight ?? 600} ${fs}px "Bai Jamjuree", ui-sans-serif, system-ui, sans-serif`;
+          ctx.textAlign = c.align === "left" ? "left" : c.align === "right" ? "right" : "center";
+          ctx.textBaseline = "middle";
+          const px = c.x * W, py = c.y * H, lh = fs * 1.25;
+          if (c.background) {
+            let maxW = 0;
+            for (const ln of lines) maxW = Math.max(maxW, ctx.measureText(ln).width);
+            const padX = fs * 0.55, padY = fs * 0.4;
+            const boxW = maxW + padX * 2, boxH = (lines.length - 1) * lh + fs + padY * 2;
+            let bx = px - boxW / 2;
+            if (ctx.textAlign === "left") bx = px - padX;
+            else if (ctx.textAlign === "right") bx = px - boxW + padX;
+            const by = py - boxH / 2, r = Math.min(fs * 0.4, boxH / 2);
+            ctx.beginPath();
+            ctx.moveTo(bx + r, by);
+            ctx.arcTo(bx + boxW, by, bx + boxW, by + boxH, r);
+            ctx.arcTo(bx + boxW, by + boxH, bx, by + boxH, r);
+            ctx.arcTo(bx, by + boxH, bx, by, r);
+            ctx.arcTo(bx, by, bx + boxW, by, r);
+            ctx.closePath();
+            ctx.fillStyle = c.background;
+            ctx.fill();
+          } else {
+            ctx.shadowColor = "rgba(0,0,0,.65)";
+            ctx.shadowBlur = fs * 0.45;
+          }
+          ctx.fillStyle = c.color || "#ffffff";
+          const y0 = py - ((lines.length - 1) * lh) / 2;
+          lines.forEach((ln, i) => ctx.fillText(ln, px, y0 + i * lh));
+          ctx.restore();
+        }
+      }
 
       // Navigator: 0° at the start frame (DEFAULT_FRAME), counting up as you
       // drag forward (right). Measured relative to the start so the readout
