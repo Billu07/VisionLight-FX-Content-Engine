@@ -91,7 +91,7 @@ export default function DriftCaptionEditor({
         setFrames(fr);
         const fmax = Math.max(0, fr.length - 1);
         setCaptions((Array.isArray(p?.captions) ? p.captions : []).map((c: any) => normalize(c, fmax)));
-        setFrame(Math.min(p?.defaultFrame ?? 0, fmax));
+        setFrame(0); // drift starts at the beginning — match the player/export
       })
       .catch((e) => {
         if (alive) setError(e?.response?.data?.error || "Could not load this drift");
