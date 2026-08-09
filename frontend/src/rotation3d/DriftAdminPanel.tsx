@@ -3,6 +3,7 @@ import { apiEndpoints } from "../lib/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import DriftCaptionEditor from "./DriftCaptionEditor";
 import BrandProductEditModal from "./BrandProductEditModal";
+import DriftBrandDashboard from "./DriftBrandDashboard";
 
 /**
  * Team (SuperAdmin) console for Drift (drift.li) — lives inside
@@ -377,6 +378,7 @@ export default function DriftAdminPanel() {
   const [editingCaptions, setEditingCaptions] = useState<{ id: string; name: string } | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [exportingId, setExportingId] = useState<string | null>(null);
+  const [brandView, setBrandView] = useState(false);
   const [brandQuery, setBrandQuery] = useState("");
   const [productQuery, setProductQuery] = useState("");
   const [productStatus, setProductStatus] = useState("ALL");
@@ -759,6 +761,28 @@ export default function DriftAdminPanel() {
                   </button>
                 </div>
 
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => setBrandView(false)}
+                    className={`rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors ${!brandView ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"}`}
+                  >
+                    Team tools
+                  </button>
+                  <button
+                    onClick={() => setBrandView(true)}
+                    className={`rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors ${brandView ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"}`}
+                  >
+                    Brand dashboard
+                  </button>
+                </div>
+
+                {brandView ? (
+                  <div className="mt-4">
+                    <DriftBrandDashboard adminOrgId={selected.id} />
+                  </div>
+                ) : (
+                <>
+
                 {/* Brand vanity link (drift.li/{slug}) */}
                 <div className="mt-4 rounded-lg border border-gray-700/60 bg-gray-950/50 p-4">
                   <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-300">Brand link</p>
@@ -985,6 +1009,8 @@ export default function DriftAdminPanel() {
                     ))
                   )}
                 </div>
+                </>
+                )}
               </>
             )}
           </div>

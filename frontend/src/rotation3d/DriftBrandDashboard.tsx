@@ -31,7 +31,10 @@ type Product = {
 const statusColor = (s: string) =>
   s === "PUBLISHED" ? "text-emerald-300" : s === "READY" ? "text-cyan-300" : s === "PROCESSING" ? "text-amber-300" : s === "FAILED" ? "text-rose-300" : "text-gray-400";
 
-export default function DriftBrandDashboard() {
+export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: string } = {}) {
+  // Superadmin brand-view: same dashboard embedded in the superadmin Drift tab,
+  // pointed at any brand via org-scoped endpoints (no page chrome).
+  const admin = !!adminOrgId;
   const { user, logout } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [brandSlug, setBrandSlug] = useState<string | null>(null);
@@ -44,7 +47,9 @@ export default function DriftBrandDashboard() {
   const load = async () => {
     setLoading(true);
     try {
-      const r = await apiEndpoints.driftMyProducts();
+      const r = admin
+        ? await apiEndpoints.driftBrandProducts(adminOrgId!)
+        : await apiEndpoints.driftMyProducts();
       setProducts(r.data.products || []);
       setBrandSlug(r.data.brandSlug || null);
     } catch (e: any) {
@@ -55,7 +60,8 @@ export default function DriftBrandDashboard() {
   };
   useEffect(() => {
     void load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminOrgId]);
 
   const productLink = (p: Product) =>
     brandSlug && p.slug ? `${PLAYER_ORIGIN}/${brandSlug}/${p.slug}` : `${PLAYER_ORIGIN}/p/${p.id}`;
@@ -82,7 +88,8 @@ export default function DriftBrandDashboard() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-[#05070d] text-gray-100" style={{ fontFamily: '"Bai Jamjuree",ui-sans-serif,system-ui,sans-serif' }}>
+    <div className={admin ? "text-gray-100" : "min-h-[100dvh] bg-[#05070d] text-gray-100"} style={{ fontFamily: '"Bai Jamjuree",ui-sans-serif,system-ui,sans-serif' }}>
+      {!admin && (
       <header className="flex items-center justify-between border-b border-white/8 px-6 py-4">
         <div className="text-xl font-extrabold tracking-tight text-white">
           drift<span style={{ color: "#22d3ee" }}>.li</span>
@@ -97,8 +104,9 @@ export default function DriftBrandDashboard() {
           </button>
         </div>
       </header>
+      )}
 
-      <main className="mx-auto max-w-5xl px-6 py-8">
+      <main className={admin ? "" : "mx-auto max-w-5xl px-6 py-8"}>
         <div className="mb-6 flex items-end justify-between">
           <div>
             <h1 className="text-lg font-bold text-white">Your drifts</h1>
@@ -187,7 +195,8 @@ export default function DriftBrandDashboard() {
           product={editing}
           showLoop
           onSave={async (data) => {
-            await apiEndpoints.driftUpdateProduct(editing.id, data);
+            if (admin) await apiEndpoints.driftAdminUpdateProduct(adminOrgId!, editing.id, data);
+            else await apiEndpoints.driftUpdateProduct(editing.id, data);
             await load();
           }}
           onClose={() => setEditing(null)}
