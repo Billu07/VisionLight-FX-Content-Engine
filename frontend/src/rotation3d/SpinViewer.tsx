@@ -203,6 +203,10 @@ export default function SpinViewer({
     // --- interaction state (refs, not React state, to keep the loop hot) ---
     // Drift always begins at the actual first frame; Rotation3D at its start frame.
     const START_FRAME = driftMode ? 0 : DEFAULT_FRAME;
+    // Drag direction. Drift is a VIDEO: drag right must advance frames (1→2→3→4),
+    // so spin=+1. Rotation3D keeps the opposite object-spin the user approved (-1).
+    // Everything below (drag, idle, arrows, navigator) is expressed via `spin`.
+    const spin = driftMode ? 1 : -1;
     let yaw = (START_FRAME / FRAMES) * TWO_PI;
     let yawVel = 0;
     let zoom = 1, zoomTarget = 1;
@@ -423,16 +427,16 @@ export default function SpinViewer({
       // drag forward (right). Measured relative to the start so the readout
       // begins at 0°; circular, so dragging back past the start wraps toward 360°.
       const startYaw = (START_FRAME / FRAMES) * TWO_PI;
-      // startYaw - yaw (not yaw - startYaw): the object drag is negated, so this
-      // keeps the navigator's DISPLAY identical (0° at start, up on drag-right).
-      const nav = ((((startYaw - yaw) % TWO_PI) + TWO_PI) % TWO_PI) / TWO_PI;
+      // Navigator display is the same for both modes (0° at start, up on
+      // drag-right): measure progress in the `spin` direction from the start.
+      const nav = (((spin * (yaw - startYaw)) % TWO_PI + TWO_PI) % TWO_PI) / TWO_PI;
       if (degRef.current) degRef.current.textContent = (Math.round(nav * 360) % 360) + "°";
       if (fillRef.current) fillRef.current.style.left = nav * 100 + "%";
     };
 
     const tick = () => {
       if (!alive) return;
-      if (idleSpin) yaw -= 0.004;
+      if (idleSpin) yaw += spin * 0.004;
       else if (Math.abs(yawVel) > 0.00003) { yaw += yawVel; yawVel *= 0.94; }
       zoom += (zoomTarget - zoom) * 0.18; // eased zoom for a premium feel
       if (zoomTarget <= 1.1) { panTX = 0; panTY = 0; }
@@ -544,7 +548,7 @@ export default function SpinViewer({
         // zoomed → horizontal still spins the product (so you never lose the
         // rotate), vertical pans up/down to inspect the zoomed-in region.
         const k = 0.006;
-        const d = -dx * k;
+        const d = spin * dx * k;
         yaw += d;
         yawVel = (d / dt) * 16;
         // Drift: point the arrow the way you're dragging (right = forward, left = back).
@@ -555,7 +559,7 @@ export default function SpinViewer({
       } else {
         // at rest → horizontal scrubs the sequence: drag right = forward
         const k = 0.006;
-        const d = -dx * k;
+        const d = spin * dx * k;
         yaw += d;
         yawVel = (d / dt) * 16;
         // Drift: point the arrow the way you're dragging (right = forward, left = back).
@@ -622,8 +626,8 @@ export default function SpinViewer({
     };
     const onKey = (e: KeyboardEvent) => {
       const step = TWO_PI / FRAMES;
-      if (e.key === "ArrowRight") { engage(); yaw -= step; }
-      else if (e.key === "ArrowLeft") { engage(); yaw += step; }
+      if (e.key === "ArrowRight") { engage(); yaw += spin * step; }
+      else if (e.key === "ArrowLeft") { engage(); yaw -= spin * step; }
       else if (e.key === "+" || e.key === "=") zoomTarget = clampZoom(zoomTarget * 1.2);
       else if (e.key === "-") zoomTarget = clampZoom(zoomTarget * 0.83);
       else if (e.key === "r" || e.key === "R") { yaw = (DEFAULT_FRAME / FRAMES) * TWO_PI; zoomTarget = 1; panX = panY = panTX = panTY = 0; }
