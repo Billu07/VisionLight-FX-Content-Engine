@@ -1107,26 +1107,32 @@ router.get(
     });
     if (!product || !product.spin) return res.status(404).json({ error: "Drift not found" });
 
+    // Export from the ORIGINAL uploaded video(s) — not the sampled spin frames —
+    // so the exported clip keeps the source's true duration + smoothness.
     const m: any = product.spin.manifest || {};
-    const framesA: string[] = Array.isArray(m.frames) ? m.frames : [];
-    const sm: any = product.spin.secondManifest;
-    const framesB: string[] = sm && Array.isArray(sm.frames) ? sm.frames : [];
-    const frames = framesB.length ? [...framesA, ...framesB] : framesA;
-    if (frames.length === 0) return res.status(400).json({ error: "No frames to export" });
+    const frameSampleUrl: string | undefined = Array.isArray(m.frames) ? m.frames[0] : undefined;
+    if (!frameSampleUrl) return res.status(400).json({ error: "No frames to export" });
 
-    const caps = await prisma.driftCaption.findMany({ where: { productId: product.id } });
-    // Remap clip-B captions into the combined index space (offset by A's length).
-    const captions = caps.map((c) =>
-      c.clip === "B"
-        ? { ...c, startFrame: c.startFrame + framesA.length, endFrame: c.endFrame + framesA.length }
-        : c,
-    );
+    const videos = await prisma.driftVideo.findMany({
+      where: { productId: product.id },
+      orderBy: { createdAt: "desc" },
+    });
+    const vA = videos.find((v) => v.clip === "A") || videos.find((v) => v.clip !== "B");
+    const vB = videos.find((v) => v.clip === "B");
+    if (!vA?.url) return res.status(400).json({ error: "Original video is unavailable for this drift" });
+
+    const clips = [{ url: vA.url, frameCount: product.spin.frameCount }];
+    if (vB?.url && product.spin.secondFrameCount) {
+      clips.push({ url: vB.url, frameCount: product.spin.secondFrameCount });
+    }
+
+    const captions = await prisma.driftCaption.findMany({ where: { productId: product.id } });
     const baseName =
       (product.slug || "drift").replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 50) ||
       "drift";
 
     try {
-      await streamDriftExportZip({ frames, captions: captions as any, fps: 30, baseName, res });
+      await streamDriftExportZip({ clips, captions: captions as any, frameSampleUrl, baseName, res });
     } catch (e: any) {
       console.error("[drift] export failed:", e);
       if (!res.headersSent) res.status(500).json({ error: "Export failed" });
