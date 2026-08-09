@@ -207,8 +207,10 @@ export default function SpinViewer({
     let yawVel = 0;
     let zoom = 1, zoomTarget = 1;
     let panX = 0, panY = 0, panTX = 0, panTY = 0;
-    let loopOn = enableLoop; // Drift: auto-rotate/loop; toggled by the play/pause button
-    let idleSpin = enableLoop; // Drift starts looping; Rotation3D is drag-only
+    // Start paused — no autoplay. The loop/play button (shown when enableLoop)
+    // toggles auto-rotate on demand.
+    let loopOn = false;
+    let idleSpin = false;
     let dirty = true, lastYaw = NaN, lastZoom = NaN, lastPX = 0, lastPY = 0;
     let touchZoomed = false;
     let scrimHidden = false;
@@ -612,6 +614,8 @@ export default function SpinViewer({
       lastTap = now;
     };
     const onWheel = (e: WheelEvent) => {
+      // Drift: never hijack the page scroll to zoom — the +/- buttons handle zoom.
+      if (driftMode) return;
       e.preventDefault();
       engage();
       zoomTarget = clampZoom(zoomTarget * (e.deltaY < 0 ? 1.1 : 0.9));
