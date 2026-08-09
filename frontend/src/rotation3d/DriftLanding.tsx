@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
+import { LoginModal } from "../components/LoginModal";
 
 /**
  * drift.li landing — cinematic, motion-first but PERFORMANT: the grid shows clean
@@ -101,6 +102,7 @@ export default function DriftLanding() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<Item | null>(null);
+  const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -126,8 +128,12 @@ export default function DriftLanding() {
         <div className="dl-word">
           drift<span>.li</span>
         </div>
-        <div className="dl-tag">Interactive drift paths</div>
+        <button className="dl-login" onClick={() => setShowLogin(true)}>
+          Log in
+        </button>
       </header>
+
+      <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
 
       {/* Hero */}
       <section className="dl-hero">
@@ -199,6 +205,8 @@ const CSS = `
 .dl-word{font-weight:800;font-size:21px;letter-spacing:-.02em;color:#fff}
 .dl-word span{background:linear-gradient(135deg,${DRIFT_PRIMARY},${DRIFT_SECONDARY});-webkit-background-clip:text;background-clip:text;color:transparent}
 .dl-tag{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#7387a1}
+.dl-login{padding:9px 18px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.04);color:#e9eef7;font-family:inherit;font-weight:600;font-size:13px;cursor:pointer;transition:background .2s,border-color .2s,color .2s}
+.dl-login:hover{background:rgba(34,211,238,.12);border-color:rgba(34,211,238,.5);color:#fff}
 
 /* Hero: asymmetric, text never overlaps the art */
 .dl-hero{position:relative;z-index:1;display:grid;grid-template-columns:1.05fr 1fr;gap:clamp(24px,4vw,64px);
