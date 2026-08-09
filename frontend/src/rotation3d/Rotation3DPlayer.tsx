@@ -160,6 +160,7 @@ export default function Rotation3DPlayer() {
       videoUrl={p.videoUrl}
       showViewSelector={p.showViewSelector}
       enableLoop={drift ? p.loopEnabled ?? true : getPlayerBranding().loopByDefault}
+      driftMode={drift}
       logoUrl={p.logoUrl}
       primaryColor={p.primaryColor}
       secondaryColor={p.secondaryColor}

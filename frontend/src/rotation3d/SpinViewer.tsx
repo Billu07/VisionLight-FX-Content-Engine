@@ -59,6 +59,9 @@ export type SpinViewerProps = {
   showViewSelector?: boolean;
   /** Drift surface: auto-rotate ("loop") with a play/pause toggle in the chrome */
   enableLoop?: boolean;
+  /** Drift player chrome: "drag to drift" + directional arrow under the frame,
+   * no bottom scrim, playback starts at the actual first frame (frame 0). */
+  driftMode?: boolean;
 };
 
 const clampZoom = (z: number) => Math.max(0.7, Math.min(2.8, z));
@@ -127,6 +130,7 @@ export default function SpinViewer({
   description,
   showViewSelector = false,
   enableLoop = false,
+  driftMode = false,
 }: SpinViewerProps) {
   const hero = variant === "hero";
   const playerBrand = getPlayerBranding();
@@ -173,7 +177,9 @@ export default function SpinViewer({
     const TWO_PI = Math.PI * 2;
 
     // --- interaction state (refs, not React state, to keep the loop hot) ---
-    let yaw = (DEFAULT_FRAME / FRAMES) * TWO_PI;
+    // Drift always begins at the actual first frame; Rotation3D at its start frame.
+    const START_FRAME = driftMode ? 0 : DEFAULT_FRAME;
+    let yaw = (START_FRAME / FRAMES) * TWO_PI;
     let yawVel = 0;
     let zoom = 1, zoomTarget = 1;
     let panX = 0, panY = 0, panTX = 0, panTY = 0;
@@ -344,7 +350,7 @@ export default function SpinViewer({
       // Navigator: 0° at the start frame (DEFAULT_FRAME), counting up as you
       // drag forward (right). Measured relative to the start so the readout
       // begins at 0°; circular, so dragging back past the start wraps toward 360°.
-      const startYaw = (DEFAULT_FRAME / FRAMES) * TWO_PI;
+      const startYaw = (START_FRAME / FRAMES) * TWO_PI;
       const nav = ((((yaw - startYaw) % TWO_PI) + TWO_PI) % TWO_PI) / TWO_PI;
       if (degRef.current) degRef.current.textContent = (Math.round(nav * 360) % 360) + "°";
       if (fillRef.current) fillRef.current.style.left = nav * 100 + "%";
@@ -392,7 +398,8 @@ export default function SpinViewer({
       if (!interacted) {
         interacted = true;
         if (!loopOn) idleSpin = false; // loop keeps spinning after the first touch
-        hintRef.current?.classList.add("r3d-gone");
+        // Drift keeps the "drag to drift" arrow as a persistent directional guide.
+        if (!driftMode) hintRef.current?.classList.add("r3d-gone");
       }
     };
     let dragging = false, lastX = 0, lastY = 0, lastT = 0, pinchD = 0;
@@ -466,6 +473,8 @@ export default function SpinViewer({
         const d = dx * k;
         yaw += d;
         yawVel = (d / dt) * 16;
+        // Drift: point the arrow the way you're dragging (right = forward, left = back).
+        if (driftMode && d !== 0) hintRef.current?.classList.toggle("r3d-back", d < 0);
         const lim = 130 * (zoomTarget - 1);
         panTY = Math.max(-lim, Math.min(lim, panTY + dy));
         panY = panTY;
@@ -475,6 +484,8 @@ export default function SpinViewer({
         const d = dx * k;
         yaw += d;
         yawVel = (d / dt) * 16;
+        // Drift: point the arrow the way you're dragging (right = forward, left = back).
+        if (driftMode && d !== 0) hintRef.current?.classList.toggle("r3d-back", d < 0);
       }
       lastX = e.clientX;
       lastY = e.clientY;
@@ -632,7 +643,7 @@ export default function SpinViewer({
         engage();
         zoomTarget = clampZoom(zoomTarget * (Number(zbtn.getAttribute("data-z")) > 0 ? 1.25 : 0.8));
       } else if (t.closest("[data-reset]")) {
-        yaw = (DEFAULT_FRAME / FRAMES) * TWO_PI; yawVel = 0; zoomTarget = 1; panX = panY = panTX = panTY = 0;
+        yaw = (START_FRAME / FRAMES) * TWO_PI; yawVel = 0; zoomTarget = 1; panX = panY = panTX = panTY = 0;
       } else if (t.closest("[data-fs]")) {
         toggleFs();
       } else if (t.closest("[data-loop]")) {
@@ -705,7 +716,7 @@ export default function SpinViewer({
       // Progressive density: load an evenly-spread coarse ring first so the
       // whole 360 is usable within ~a second, then keep filling the gaps so the
       // spin sharpens toward full frame count — no waiting for all 120/180.
-      const seq = progressiveOrder(n, DEFAULT_FRAME);
+      const seq = progressiveOrder(n, START_FRAME);
       const COARSE = Math.min(n, 36); // a turntable already reads well at ~36
       let revealed = false;
       let cursor = 0;
@@ -791,7 +802,7 @@ export default function SpinViewer({
       document.documentElement.classList.remove("r3d-fs-lock");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manifest, FRAMES, DEFAULT_FRAME, hero]);
+  }, [manifest, FRAMES, DEFAULT_FRAME, hero, driftMode]);
 
   const fireCta = (which: "primary" | "secondary", cta?: SpinCta) => {
     if (!cta) return;
@@ -803,7 +814,7 @@ export default function SpinViewer({
   };
 
   return (
-    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
+    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
       style={stageStyle}
       tabIndex={hero ? -1 : 0}
       aria-label="Interactive 360 degree product viewer. Drag to rotate.">
@@ -859,10 +870,21 @@ export default function SpinViewer({
       </div>
 
       <div className="r3d-hint" ref={hintRef}>
-        <div className="r3d-hand">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-7-4l-2.5-4a2 2 0 0 1 3.4-2L8 14" /></svg>
-        </div>
-        <span>Drag to rotate</span>
+        {driftMode ? (
+          <>
+            <div className="r3d-drift-arrow" aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
+            </div>
+            <span>Drag to drift</span>
+          </>
+        ) : (
+          <>
+            <div className="r3d-hand">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-7-4l-2.5-4a2 2 0 0 1 3.4-2L8 14" /></svg>
+            </div>
+            <span>Drag to rotate</span>
+          </>
+        )}
       </div>
 
       {(ctaPrimary || ctaSecondary) && (
@@ -998,6 +1020,16 @@ const R3D_CSS = `
 .r3d-hand svg{width:24px;height:24px;color:#eef1f6}
 .r3d-hint span{font-size:13px;color:#eef1f6;text-shadow:0 1px 10px #000}
 @keyframes r3dsway{0%,100%{transform:translateX(-12px)}50%{transform:translateX(12px)}}
+/* Drift player chrome: "drag to drift" arrow (flips with drag direction), no
+   bottom scrim, and the angle number hidden (the scrubber track stays). */
+.r3d-drift .r3d-scrim-bot{display:none}
+.r3d-drift .r3d-rot span{display:none}
+.r3d-drift .r3d-rot{gap:0;padding:6px 12px}
+.r3d-drift .r3d-hint{opacity:.72}
+.r3d-drift-arrow{width:52px;height:52px;border-radius:50%;border:1px solid var(--r3d-line);background:rgba(11,15,25,.4);backdrop-filter:blur(8px);display:grid;place-items:center;animation:r3dsway 1.8s ease-in-out infinite}
+.r3d-drift-arrow svg{width:24px;height:24px;color:#eef1f6;transition:transform .25s}
+.r3d-hint.r3d-back .r3d-drift-arrow svg{transform:scaleX(-1)}
+@media (prefers-reduced-motion:reduce){.r3d-drift-arrow{animation:none}}
 .r3d-loader{position:absolute;inset:0;z-index:20;display:grid;place-items:center;background:linear-gradient(to bottom right,#111827,#0B0F19);transition:opacity .5s}
 .r3d-loader.r3d-gone{opacity:0;pointer-events:none}
 .r3d-ring{width:64px;height:64px;transform:rotate(-90deg)}
