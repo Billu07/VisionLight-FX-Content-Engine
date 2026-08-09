@@ -364,9 +364,12 @@ export default function SpinViewer({
       const scale = Math.min(W, H) * (hero ? 0.23 : 0.25) * zoom;
       const cx = W / 2 + panX * DPR, cy = H * 0.47 + panY * DPR;
 
-      ctx.save();
-      drawShadow(cx, cy, scale);
-      ctx.restore();
+      // Drift has no grounding shadow (per spec); Rotation3D keeps its contact shadow.
+      if (!driftMode) {
+        ctx.save();
+        drawShadow(cx, cy, scale);
+        ctx.restore();
+      }
 
       if (realMode) drawFrameImage(frame, cx, cy, scale);
       else drawSynthetic(q, cx, cy, scale);
