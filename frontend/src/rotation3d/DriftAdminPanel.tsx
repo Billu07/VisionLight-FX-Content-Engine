@@ -165,6 +165,96 @@ function ShowcasePanel() {
   );
 }
 
+// Per-drift second-clip control: upload/replace/remove the linked clip B.
+function SecondClipButton({
+  orgId,
+  product,
+  onChange,
+  onMsg,
+}: {
+  orgId: string;
+  product: Product;
+  onChange: () => void;
+  onMsg: (m: { kind: "ok" | "err"; text: string }) => void;
+}) {
+  const [pct, setPct] = useState<number | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+  const has = !!product.spin?.secondFrameCount;
+
+  const upload = async (file: File) => {
+    setPct(0);
+    const fd = new FormData();
+    fd.append("video", file);
+    fd.append("frameCount", String(product.spin?.frameCount || 60));
+    fd.append("bgMode", "keep");
+    try {
+      await apiEndpoints.driftUploadSecondClip(orgId, product.id, fd, {
+        onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)),
+      });
+      onMsg({ kind: "ok", text: `Second clip uploaded for "${product.name}" — building… refresh shortly.` });
+    } catch (e: any) {
+      onMsg({ kind: "err", text: e?.response?.data?.error || "Second clip upload failed" });
+    } finally {
+      setPct(null);
+      if (ref.current) ref.current.value = "";
+      onChange();
+    }
+  };
+
+  const remove = async () => {
+    if (!window.confirm("Remove the linked second clip?")) return;
+    setRemoving(true);
+    try {
+      await apiEndpoints.driftDeleteSecondClip(orgId, product.id);
+      onMsg({ kind: "ok", text: "Second clip removed." });
+    } catch (e: any) {
+      onMsg({ kind: "err", text: e?.response?.data?.error || "Failed to remove second clip" });
+    } finally {
+      setRemoving(false);
+      onChange();
+    }
+  };
+
+  if (pct !== null) return <span className="text-[11px] text-amber-300">2nd {pct}%</span>;
+  if (has) {
+    return (
+      <span className="flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-300">
+        2nd ✓
+        <button
+          onClick={remove}
+          disabled={removing}
+          title="Remove second clip"
+          className="leading-none text-emerald-300/70 hover:text-rose-300"
+        >
+          ×
+        </button>
+      </span>
+    );
+  }
+  return (
+    <>
+      <input
+        ref={ref}
+        type="file"
+        accept="video/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void upload(f);
+        }}
+      />
+      <button
+        onClick={() => ref.current?.click()}
+        title="Link a second clip for a 2-clip loop"
+        className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
+      >
+        + 2nd clip
+      </button>
+    </>
+  );
+}
+
 export default function DriftAdminPanel() {
   const [mode, setMode] = useState<"brands" | "showcase">("brands");
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -724,6 +814,12 @@ export default function DriftAdminPanel() {
                               >
                                 Captions
                               </button>
+                              <SecondClipButton
+                                orgId={selected.id}
+                                product={p}
+                                onChange={() => loadProducts(selected, true)}
+                                onMsg={setMsg}
+                              />
                               <button
                                 onClick={() => copyProductLink(p)}
                                 className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"

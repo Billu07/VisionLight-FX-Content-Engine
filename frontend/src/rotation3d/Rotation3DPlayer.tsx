@@ -146,11 +146,27 @@ export default function Rotation3DPlayer() {
 
   const p = state.data;
   const m = p.manifest || {};
+  const framesA: string[] = Array.isArray(m.frames) ? m.frames : [];
+  // 2-clip drift: clip A + clip B form one seamless circular timeline. Dragging
+  // scrubs through A then B then wraps back to A (the "there and back" loop).
+  const secondM = drift ? p.secondManifest : null;
+  const framesB: string[] =
+    secondM && Array.isArray(secondM.frames) ? secondM.frames : [];
+  const combinedFrames = framesB.length ? [...framesA, ...framesB] : framesA;
+  // Remap clip-B captions into the combined index space (offset by A's length).
+  let captions = drift ? p.captions : undefined;
+  if (captions && framesB.length) {
+    captions = captions.map((c: any) =>
+      c.clip === "B"
+        ? { ...c, clip: "A", startFrame: c.startFrame + framesA.length, endFrame: c.endFrame + framesA.length }
+        : c,
+    );
+  }
   return (
     <SpinViewer
       manifest={{
-        frameCount: m.frameCount || (m.frames?.length ?? 0),
-        frames: m.frames,
+        frameCount: combinedFrames.length || m.frameCount || 0,
+        frames: combinedFrames,
         defaultFrame: p.defaultFrame ?? m.defaultFrame ?? 0,
       }}
       brandName={p.brandName || getPlayerBranding().name}
@@ -161,7 +177,7 @@ export default function Rotation3DPlayer() {
       showViewSelector={p.showViewSelector}
       enableLoop={drift ? p.loopEnabled ?? true : getPlayerBranding().loopByDefault}
       driftMode={drift}
-      captions={drift ? p.captions : undefined}
+      captions={captions}
       logoUrl={p.logoUrl}
       primaryColor={p.primaryColor}
       secondaryColor={p.secondaryColor}
