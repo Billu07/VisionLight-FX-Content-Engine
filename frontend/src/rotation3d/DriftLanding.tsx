@@ -1,275 +1,171 @@
-import { useEffect, useState, type CSSProperties } from "react";
-import { motion } from "framer-motion";
-import { Waves, MousePointerClick, Code2, Repeat, Boxes, ArrowRight } from "lucide-react";
-import { Link } from "react-router-dom";
-import SpinViewer, { type SpinManifest } from "./SpinViewer";
-import { LoginModal } from "../components/LoginModal";
+import { useEffect, useMemo, useState } from "react";
+import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
-import { PLAYER_BRANDING } from "../lib/branding";
 
 /**
- * Drift (drift.li) marketing landing. Drift is the generic interactive
- * image-sequence player; Rotation3D runs on top of it as one use case. Same
- * content/data as Rotation3D — this page just wears the Drift skin (cyan/blue)
- * and the players auto-loop ("drift"). Bespoke aesthetic still to be refined.
+ * drift.li landing — cinematic, motion-first. A large looping hero drift with a
+ * minimal wordmark, then a grid of looping tiles. Curated (cross-line) via the
+ * superadmin Drift → Landing showcase; falls back to a clean empty hero before
+ * anything is curated.
  */
 
-const DRIFT = PLAYER_BRANDING.drift;
+const DRIFT_PRIMARY = "#22d3ee";
+const DRIFT_SECONDARY = "#3b82f6";
 
-// Cyan/blue Drift theme — swaps the brand CSS vars the whole page reads through.
-const driftTheme: CSSProperties = {
-  ["--primary-brand" as string]: DRIFT.primary,
-  ["--secondary-brand" as string]: DRIFT.secondary,
-};
-
-type Featured = {
+type Item = {
+  itemId: string;
+  source: string;
   id: string;
   name: string;
-  background?: string | null;
-  defaultFrame?: number;
-  featured?: boolean;
-  heroFeatured?: boolean;
-  manifest?: { frameCount?: number; frames?: string[] };
+  brandName: string;
+  defaultFrame: number;
+  background: string | null;
+  loopEnabled: boolean;
+  manifest: any;
+  secondManifest: any;
+  isHero: boolean;
 };
 
-const STUDIO_GRADIENT =
-  "radial-gradient(120% 80% at 50% -10%,#0e2a33 0%,rgba(15,23,42,0) 55%),linear-gradient(to bottom right,#0b1220,#070c16)";
-const containerBg = (p: Featured) => p.background || STUDIO_GRADIENT;
-const man = (p: Featured): SpinManifest => ({
-  frameCount: p.manifest?.frameCount || p.manifest?.frames?.length || 36,
-  frames: p.manifest?.frames,
-  defaultFrame: p.defaultFrame ?? 0,
-});
-
-const DEMO: SpinManifest = { frameCount: 36, defaultFrame: 3 };
-
-const fadeUp = {
-  initial: { opacity: 0, y: 24 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: "-80px" },
-  transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const },
+// Combine clip A + clip B into one circular sequence (matches the player).
+const combinedManifest = (it: Item) => {
+  const a: string[] = Array.isArray(it.manifest?.frames) ? it.manifest.frames : [];
+  const b: string[] = Array.isArray(it.secondManifest?.frames) ? it.secondManifest.frames : [];
+  const frames = b.length ? [...a, ...b] : a;
+  return { frameCount: frames.length, frames, defaultFrame: 0 };
 };
 
-function Section({ id, children, className = "" }: { id?: string; children: React.ReactNode; className?: string }) {
+function Tile({ it }: { it: Item }) {
+  const manifest = useMemo(() => combinedManifest(it), [it]);
   return (
-    <section id={id} className={`mx-auto w-full max-w-6xl px-5 sm:px-8 ${className}`}>
-      {children}
-    </section>
+    <a href={`/p/${it.id}`} className="drift-tile group">
+      <div className="drift-tile-stage">
+        <SpinViewer
+          manifest={manifest}
+          variant="hero"
+          driftMode
+          enableLoop
+          background={it.background || undefined}
+          primaryColor={DRIFT_PRIMARY}
+          secondaryColor={DRIFT_SECONDARY}
+          className="drift-tile-viewer"
+        />
+      </div>
+      <div className="drift-tile-meta">
+        <span className="drift-tile-name">{it.name}</span>
+        {it.brandName && <span className="drift-tile-brand">{it.brandName}</span>}
+      </div>
+    </a>
   );
 }
 
-const FEATURES = [
-  { icon: Waves, title: "Motion that loops", body: "Every sequence drifts on its own — seamless, no jarring restart. Pause it any time to explore by hand." },
-  { icon: MousePointerClick, title: "Grab and steer", body: "Drag to take control of the path, spin to any point, pinch to zoom. It's fully interactive on any device." },
-  { icon: Repeat, title: "Any image sequence", body: "360° spins, product angles, before/after — Drift turns any ordered frame set into a living, interactive view." },
-  { icon: Code2, title: "One-line embed", body: "Drop a single iframe anywhere. Loops on load, works on every platform, no plugins." },
-];
-
 export default function DriftLanding() {
-  const [showLogin, setShowLogin] = useState(false);
-  const [featured, setFeatured] = useState<Featured[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
+    let alive = true;
     apiEndpoints
-      .r3dPublicFeatured()
-      .then((r) => setFeatured(r.data.products || []))
-      .catch(() => undefined);
+      .driftPublicLanding()
+      .then((r) => alive && setItems(r.data.items || []))
+      .catch(() => alive && setItems([]))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
   }, []);
-  const hero = featured.find((p) => p.heroFeatured) || featured[0];
-  const showcase = featured.filter((p) => p.featured);
+
+  const hero = items.find((i) => i.isHero) || items[0] || null;
+  const tiles = items.filter((i) => i !== hero);
+  const heroManifest = hero ? combinedManifest(hero) : null;
 
   return (
-    <div
-      style={driftTheme}
-      className="min-h-screen overflow-x-hidden bg-[#070c16] font-sans text-white antialiased"
-    >
-      <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
+    <div className="drift-root">
+      <style>{CSS}</style>
 
-      {/* Nav */}
-      <header className="sticky top-0 z-40 border-b border-white/5 bg-[#070c16]/70 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-5 sm:px-8">
-          <div className="flex items-center gap-2.5">
-            <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-gradient-to-br from-brand-primary to-brand-secondary shadow-glow">
-              <Waves className="h-4 w-4 text-white" />
-            </span>
-            <span className="text-[15px] font-semibold tracking-tight">Drift</span>
-          </div>
-          <nav className="hidden items-center gap-8 text-sm text-gray-300 md:flex">
-            <a href="#showcase" className="transition-colors hover:text-white">Showcase</a>
-            <a href="#features" className="transition-colors hover:text-white">Features</a>
-          </nav>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowLogin(true)}
-              className="rounded-xl border border-white/12 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-gray-200 transition-colors hover:bg-white/[0.08]"
-            >
-              Log in
-            </button>
-            <a
-              href="#contact"
-              className="hidden rounded-xl bg-gradient-to-r from-brand-primary to-brand-secondary px-4 py-2 text-sm font-semibold shadow-glow-sm transition-all hover:brightness-110 sm:inline-block"
-            >
-              Request a demo
-            </a>
-          </div>
+      <header className="drift-header">
+        <div className="drift-word">
+          drift<span>.li</span>
         </div>
       </header>
 
       {/* Hero */}
-      <Section className="grid items-center gap-10 pb-16 pt-14 sm:pt-20 lg:grid-cols-2 lg:gap-16 lg:pb-24">
-        <motion.div {...fadeUp}>
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-medium text-brand-accent">
-            <span className="h-1.5 w-1.5 rounded-full bg-brand-accent shadow-glow-sm" />
-            The interactive drift player
-          </span>
-          <h1 className="mt-5 text-4xl font-bold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
-            Bring any sequence{" "}
-            <span className="bg-gradient-to-r from-brand-primary to-brand-secondary bg-clip-text text-transparent">
-              to life
-            </span>
-            .
+      <section className="drift-hero">
+        {hero && heroManifest ? (
+          <div className="drift-hero-stage">
+            <SpinViewer
+              manifest={heroManifest}
+              variant="hero"
+              driftMode
+              enableLoop
+              background={hero.background || undefined}
+              primaryColor={DRIFT_PRIMARY}
+              secondaryColor={DRIFT_SECONDARY}
+              className="drift-hero-viewer"
+            />
+          </div>
+        ) : null}
+        <div className="drift-hero-scrim" />
+        <div className="drift-hero-copy">
+          <h1 className="drift-title">
+            Drag anything <em>to life</em>
           </h1>
-          <p className="mt-5 max-w-lg text-base leading-relaxed text-gray-300 sm:text-lg">
-            Drift turns an ordered set of frames into a living, looping, fully
-            interactive view — grab it, steer it, zoom it. One player for every
-            kind of motion.
-          </p>
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <a
-              href="#contact"
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-primary to-brand-secondary px-5 py-3 text-sm font-semibold shadow-glow transition-all hover:brightness-110"
-            >
-              Get started <ArrowRight className="h-4 w-4" />
-            </a>
-            <Link
-              to="/p/demo"
-              className="inline-flex items-center gap-2 rounded-xl border border-white/12 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-gray-200 backdrop-blur transition-colors hover:bg-white/[0.08]"
-            >
-              See it full-screen
-            </Link>
-          </div>
-          <p className="mt-6 text-xs text-gray-500">Loops on its own · Grab to steer · Works on every device</p>
-        </motion.div>
+          <p className="drift-sub">Interactive drift paths — real motion you scrub with a finger.</p>
+        </div>
+        {!loading && !hero && <div className="drift-empty">Nothing showcased yet.</div>}
+      </section>
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.94 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <div className="relative">
-            <div className="absolute inset-0 -z-10 rounded-[32px] bg-gradient-to-br from-brand-primary/20 to-brand-secondary/10 blur-3xl" />
-            <div className="relative aspect-square w-full overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.02] shadow-[0_40px_120px_-40px_rgba(2,8,23,0.9)]">
-              <SpinViewer
-                manifest={hero ? man(hero) : DEMO}
-                variant="hero"
-                background={hero ? containerBg(hero) : undefined}
-                enableLoop
-              />
-            </div>
-          </div>
-          <p className="mt-4 text-center text-xs text-gray-500">↑ This is live — grab it to steer</p>
-        </motion.div>
-      </Section>
-
-      {/* Showcase */}
-      <Section id="showcase" className="py-16 sm:py-24">
-        <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Live and drifting</h2>
-          <p className="mt-4 text-gray-400">Every one below is interactive — grab it, or let it drift.</p>
-        </motion.div>
-        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {(showcase.length > 0 ? showcase.slice(0, 6) : []).map((p, i) => (
-            <motion.div
-              key={p.id}
-              {...fadeUp}
-              transition={{ ...fadeUp.transition, delay: (i % 3) * 0.1 }}
-              className="overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02]"
-            >
-              <div className="relative aspect-square">
-                <SpinViewer manifest={man(p)} variant="hero" background={containerBg(p)} enableLoop />
-              </div>
-              <div className="flex items-center justify-between border-t border-white/8 px-5 py-4">
-                <Link to={`/p/${p.id}`} className="text-sm font-medium transition-colors hover:text-brand-accent">
-                  {p.name}
-                </Link>
-                <span className="text-xs text-gray-500">Grab to steer</span>
-              </div>
-            </motion.div>
-          ))}
-          {showcase.length === 0 &&
-            ["Sequence 01", "Sequence 02", "Sequence 03"].map((name, i) => (
-              <motion.div
-                key={name}
-                {...fadeUp}
-                transition={{ ...fadeUp.transition, delay: i * 0.1 }}
-                className="overflow-hidden rounded-2xl border border-white/8 bg-white/[0.02]"
-              >
-                <div className="relative aspect-square">
-                  <SpinViewer manifest={{ frameCount: 36, defaultFrame: (i + 1) * 4 }} variant="hero" enableLoop />
-                </div>
-                <div className="flex items-center justify-between border-t border-white/8 px-5 py-4">
-                  <span className="text-sm font-medium">{name}</span>
-                  <span className="text-xs text-gray-500">Grab to steer</span>
-                </div>
-              </motion.div>
+      {/* Grid */}
+      {tiles.length > 0 && (
+        <section className="drift-grid-wrap">
+          <div className="drift-grid">
+            {tiles.map((it) => (
+              <Tile key={it.itemId} it={it} />
             ))}
-        </div>
-      </Section>
-
-      {/* Features */}
-      <Section id="features" className="py-16 sm:py-24">
-        <motion.div {...fadeUp} className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">One player, endless motion</h2>
-        </motion.div>
-        <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {FEATURES.map((f, i) => (
-            <motion.div
-              key={f.title}
-              {...fadeUp}
-              transition={{ ...fadeUp.transition, delay: (i % 4) * 0.08 }}
-              className="rounded-2xl border border-white/8 bg-glass-panel p-6 backdrop-blur transition-colors hover:border-white/15"
-            >
-              <span className="grid h-10 w-10 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-brand-accent">
-                <f.icon className="h-5 w-5" />
-              </span>
-              <h3 className="mt-4 font-semibold">{f.title}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-gray-400">{f.body}</p>
-            </motion.div>
-          ))}
-        </div>
-      </Section>
-
-      {/* CTA */}
-      <Section id="contact" className="py-16 sm:py-24">
-        <motion.div
-          {...fadeUp}
-          className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-brand-primary/15 via-transparent to-brand-secondary/15 p-10 text-center sm:p-16"
-        >
-          <div className="absolute inset-0 -z-10 bg-[#070c16]/40" />
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Ready to make it drift?</h2>
-          <p className="mx-auto mt-4 max-w-xl text-gray-300">
-            Tell us about your sequences and we'll set up your interactive Drift player.
-          </p>
-          <a
-            href="mailto:hello@drift.li?subject=Drift%20demo%20request"
-            className="mt-8 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-primary to-brand-secondary px-6 py-3.5 text-sm font-semibold shadow-glow transition-all hover:brightness-110"
-          >
-            Request a demo <ArrowRight className="h-4 w-4" />
-          </a>
-        </motion.div>
-      </Section>
-
-      {/* Footer */}
-      <footer className="border-t border-white/5 py-10">
-        <Section className="flex flex-col items-center justify-between gap-4 text-sm text-gray-500 sm:flex-row">
-          <div className="flex items-center gap-2.5">
-            <span className="grid h-6 w-6 place-items-center rounded-md bg-gradient-to-br from-brand-primary to-brand-secondary">
-              <Boxes className="h-3.5 w-3.5 text-white" />
-            </span>
-            <span className="font-medium text-gray-300">Drift</span>
           </div>
-          <span>© {new Date().getFullYear()} Drift. All rights reserved.</span>
-        </Section>
+        </section>
+      )}
+
+      <footer className="drift-footer">
+        <span>drift.li</span>
+        <span>Interactive drift paths</span>
       </footer>
     </div>
   );
 }
+
+const CSS = `
+.drift-root{min-height:100dvh;background:
+  radial-gradient(120% 90% at 50% -10%, #10233a 0%, rgba(4,10,20,0) 55%),
+  radial-gradient(80% 60% at 100% 100%, rgba(59,130,246,.10) 0%, rgba(4,10,20,0) 60%),
+  linear-gradient(to bottom, #060b14, #04070d);
+  color:#e8eef7;font-family:"Bai Jamjuree",ui-sans-serif,system-ui,sans-serif;overflow-x:hidden}
+.drift-header{position:absolute;top:0;left:0;right:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:22px 26px}
+.drift-word{font-weight:800;font-size:22px;letter-spacing:-.02em;color:#fff}
+.drift-word span{background:linear-gradient(135deg,${DRIFT_PRIMARY},${DRIFT_SECONDARY});-webkit-background-clip:text;background-clip:text;color:transparent}
+
+.drift-hero{position:relative;height:82vh;min-height:520px;display:flex;align-items:flex-end;overflow:hidden}
+.drift-hero-stage{position:absolute;inset:0}
+.drift-hero-viewer{position:absolute;inset:0}
+.drift-hero-scrim{position:absolute;inset:0;pointer-events:none;background:
+  radial-gradient(90% 70% at 50% 40%, rgba(4,7,13,0) 40%, rgba(4,7,13,.55) 100%),
+  linear-gradient(to top, rgba(4,7,13,.92) 0%, rgba(4,7,13,0) 45%)}
+.drift-hero-copy{position:relative;z-index:3;padding:0 26px 8vh;max-width:820px;pointer-events:none}
+.drift-title{margin:0;font-size:clamp(34px,6.4vw,76px);line-height:1.02;font-weight:800;letter-spacing:-.03em;color:#fff}
+.drift-title em{font-style:normal;background:linear-gradient(135deg,${DRIFT_PRIMARY},${DRIFT_SECONDARY});-webkit-background-clip:text;background-clip:text;color:transparent}
+.drift-sub{margin:18px 0 0;font-size:clamp(14px,1.7vw,18px);color:#9fb2c9;max-width:40ch}
+.drift-empty{position:absolute;left:26px;bottom:8vh;z-index:3;color:#6b7c93;font-size:13px}
+
+.drift-grid-wrap{padding:min(9vw,110px) 26px 40px}
+.drift-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px;max-width:1240px;margin:0 auto}
+.drift-tile{display:block;text-decoration:none;color:inherit;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.02);transition:transform .35s cubic-bezier(.2,.7,.2,1),border-color .35s,box-shadow .35s}
+.drift-tile:hover{transform:translateY(-4px);border-color:rgba(34,211,238,.4);box-shadow:0 24px 60px -30px rgba(34,211,238,.5)}
+.drift-tile-stage{position:relative;aspect-ratio:4/3;overflow:hidden;background:linear-gradient(180deg,#0a1524,#060b14)}
+.drift-tile-viewer{position:absolute;inset:0}
+.drift-tile-viewer .r3d-hint{display:none!important}
+.drift-tile-meta{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:13px 15px 15px}
+.drift-tile-name{font-weight:600;font-size:14px;color:#eaf1fa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drift-tile-brand{font-size:11px;color:#7286a0;white-space:nowrap}
+
+.drift-footer{display:flex;align-items:center;justify-content:space-between;padding:26px;border-top:1px solid rgba(255,255,255,.06);color:#5f7089;font-size:12px;letter-spacing:.04em}
+@media (max-width:560px){.drift-hero{height:74vh}.drift-hero-copy{padding-bottom:12vh}}
+`;

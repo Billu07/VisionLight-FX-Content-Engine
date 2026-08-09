@@ -340,6 +340,15 @@ export const apiEndpoints = {
     api.get(`/api/drift/my/products/${id}/share-card`, { responseType: "blob" }),
   driftTrackEvent: (productId: string, type: string, meta?: Record<string, unknown>) =>
     api.post("/api/drift/public/events", { productId, type, meta }),
+  // drift.li landing curation (cross-line: Drift + Rotation3D)
+  driftLandingList: () => api.get("/api/drift/landing"),
+  driftLandingCandidates: () => api.get("/api/drift/landing/candidates"),
+  driftLandingAdd: (source: string, productId: string) =>
+    api.post("/api/drift/landing", { source, productId }),
+  driftLandingUpdate: (id: string, changes: Record<string, unknown>) =>
+    api.patch(`/api/drift/landing/${id}`, changes),
+  driftLandingRemove: (id: string) => api.delete(`/api/drift/landing/${id}`),
+  driftPublicLanding: () => api.get("/api/drift/public/landing"),
 
   byokGetActivationStatus: (checkoutSessionId: string) =>
     api.get("/api/byok/activation-status", { params: { checkoutSessionId } }),

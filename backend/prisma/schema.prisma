@@ -616,3 +616,18 @@ model DriftEvent {
   @@index([productId])
   @@index([organizationId, ts])
 }
+
+// drift.li landing showcase curation. Cross-line: an item points at EITHER a
+// DriftProduct or a Rot3dProduct (no FK — resolved by source+productId in the
+// route) so the landing can feature drifts and Rotation3D spins together.
+model DriftLandingItem {
+  id        String   @id @default(uuid())
+  source    String // "DRIFT" | "ROTATION3D"
+  productId String // id in DriftProduct or Rot3dProduct (per source)
+  rank      Int      @default(0) // landing order (lower first)
+  isHero    Boolean  @default(false) // the single big hero drift
+  createdAt DateTime @default(now())
+
+  @@unique([source, productId])
+  @@index([rank])
+}

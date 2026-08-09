@@ -1090,6 +1090,166 @@ router.get(
   },
 );
 
+// ─────────────────────────── LANDING CURATION ───────────────────────────
+// Cross-line: a landing item points at a DriftProduct or a Rot3dProduct.
+
+const landingThumb = (m: any, df: number): string | null => {
+  const frames = Array.isArray(m?.frames) ? m.frames : [];
+  return frames[df] || frames[0] || null;
+};
+
+// Resolve a curated item to the product data the landing renders. Null if the
+// referenced product is gone / not published (so stale items are skipped).
+async function resolveLandingItem(item: {
+  id: string;
+  source: string;
+  productId: string;
+  rank: number;
+  isHero: boolean;
+}) {
+  if (item.source === "ROTATION3D") {
+    const p = await prisma.rot3dProduct.findFirst({
+      where: { id: item.productId, status: { in: ["READY", "PUBLISHED"] } },
+      include: { spin: { select: { manifest: true } }, organization: { select: { name: true } } },
+    });
+    if (!p || !p.spin) return null;
+    const m = p.spin.manifest as any;
+    return {
+      itemId: item.id, source: "ROTATION3D", id: p.id, name: p.name,
+      brandName: p.organization?.name || "", defaultFrame: p.defaultFrame,
+      background: p.background, loopEnabled: true, manifest: m, secondManifest: null,
+      rank: item.rank, isHero: item.isHero, thumb: landingThumb(m, p.defaultFrame),
+    };
+  }
+  const p = await prisma.driftProduct.findFirst({
+    where: { id: item.productId, status: { in: ["READY", "PUBLISHED"] } },
+    include: {
+      spin: { select: { manifest: true, secondManifest: true } },
+      organization: { select: { name: true } },
+    },
+  });
+  if (!p || !p.spin) return null;
+  const m = p.spin.manifest as any;
+  return {
+    itemId: item.id, source: "DRIFT", id: p.id, name: p.name,
+    brandName: p.organization?.name || "", defaultFrame: p.defaultFrame,
+    background: p.background, loopEnabled: p.loopEnabled, manifest: m,
+    secondManifest: p.spin.secondManifest ?? null,
+    rank: item.rank, isHero: item.isHero, thumb: landingThumb(m, p.defaultFrame),
+  };
+}
+
+// Curated items (superadmin).
+router.get(
+  "/api/drift/landing",
+  authenticateToken,
+  requireSuperAdmin,
+  async (_req: AuthenticatedRequest, res: Response) => {
+    const items = await prisma.driftLandingItem.findMany({
+      orderBy: [{ isHero: "desc" }, { rank: "asc" }, { createdAt: "asc" }],
+    });
+    const resolved = (await Promise.all(items.map(resolveLandingItem))).filter(Boolean);
+    res.json({ items: resolved });
+  },
+);
+
+// Pickable pool: all READY/PUBLISHED drifts + Rotation3D spins (superadmin).
+router.get(
+  "/api/drift/landing/candidates",
+  authenticateToken,
+  requireSuperAdmin,
+  async (_req: AuthenticatedRequest, res: Response) => {
+    const [drifts, spins] = await Promise.all([
+      prisma.driftProduct.findMany({
+        where: { status: { in: ["READY", "PUBLISHED"] } },
+        orderBy: { createdAt: "desc" },
+        include: { spin: { select: { manifest: true } }, organization: { select: { name: true } } },
+      }),
+      prisma.rot3dProduct.findMany({
+        where: { status: { in: ["READY", "PUBLISHED"] } },
+        orderBy: { createdAt: "desc" },
+        include: { spin: { select: { manifest: true } }, organization: { select: { name: true } } },
+      }),
+    ]);
+    const map = (list: any[], source: string) =>
+      list
+        .filter((p) => p.spin)
+        .map((p) => {
+          const m = p.spin.manifest as any;
+          const frames = Array.isArray(m?.frames) ? m.frames : [];
+          return {
+            source, id: p.id, name: p.name,
+            brandName: p.organization?.name || "",
+            thumb: frames[p.defaultFrame] || frames[0] || null,
+          };
+        });
+    res.json({ drift: map(drifts, "DRIFT"), rotation3d: map(spins, "ROTATION3D") });
+  },
+);
+
+// Add an item to the landing (idempotent on source+productId).
+router.post(
+  "/api/drift/landing",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const source = req.body?.source === "ROTATION3D" ? "ROTATION3D" : "DRIFT";
+    const productId = String(req.body?.productId || "");
+    if (!productId) return res.status(400).json({ error: "productId is required" });
+    const item = await prisma.driftLandingItem.upsert({
+      where: { source_productId: { source, productId } },
+      create: { source, productId },
+      update: {},
+    });
+    res.status(201).json({ item });
+  },
+);
+
+// Reorder / set the single hero.
+router.patch(
+  "/api/drift/landing/:id",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const data: Record<string, unknown> = {};
+    if (Number.isFinite(Number(req.body?.rank))) data.rank = Math.floor(Number(req.body.rank));
+    if (typeof req.body?.isHero === "boolean") {
+      data.isHero = req.body.isHero;
+      if (req.body.isHero) {
+        await prisma.driftLandingItem.updateMany({
+          where: { isHero: true, id: { not: req.params.id } },
+          data: { isHero: false },
+        });
+      }
+    }
+    const item = await prisma.driftLandingItem.update({ where: { id: req.params.id }, data });
+    res.json({ item });
+  },
+);
+
+router.delete(
+  "/api/drift/landing/:id",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    await prisma.driftLandingItem.delete({ where: { id: req.params.id } }).catch(() => undefined);
+    res.json({ ok: true });
+  },
+);
+
+// Public landing feed — resilient so it returns [] before the table is migrated.
+router.get("/api/drift/public/landing", async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const items = await prisma.driftLandingItem.findMany({
+      orderBy: [{ isHero: "desc" }, { rank: "asc" }, { createdAt: "asc" }],
+    });
+    const resolved = (await Promise.all(items.map(resolveLandingItem))).filter(Boolean);
+    res.json({ items: resolved });
+  } catch {
+    res.json({ items: [] });
+  }
+});
+
 // Called once at server startup — mark orphaned PROCESSING products FAILED.
 export async function recoverOrphanedDriftJobs() {
   try {

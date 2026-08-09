@@ -44,16 +44,30 @@ const statusColor = (s: string) =>
           ? "text-rose-300"
           : "text-gray-400";
 
-function ShowcasePanel() {
-  const [products, setProducts] = useState<any[]>([]);
+const sourceBadge = (s: string) =>
+  s === "ROTATION3D"
+    ? "border-violet-400/40 bg-violet-500/15 text-violet-200"
+    : "border-brand-accent/40 bg-brand-accent/15 text-brand-accent";
+
+// drift.li landing curation — pick the showcase from BOTH Drift drifts and
+// Rotation3D spins (unified curation table), set the single hero.
+function LandingPanel() {
+  const [items, setItems] = useState<any[]>([]);
+  const [cands, setCands] = useState<{ drift: any[]; rotation3d: any[] }>({ drift: [], rotation3d: [] });
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [tab, setTab] = useState<"DRIFT" | "ROTATION3D">("DRIFT");
+  const [q, setQ] = useState("");
 
   const load = async () => {
     setLoading(true);
     try {
-      const r = await apiEndpoints.driftAllProducts();
-      setProducts(r.data.products || []);
+      const [a, b] = await Promise.all([
+        apiEndpoints.driftLandingList(),
+        apiEndpoints.driftLandingCandidates(),
+      ]);
+      setItems(a.data.items || []);
+      setCands({ drift: b.data.drift || [], rotation3d: b.data.rotation3d || [] });
     } catch {
       /* ignore */
     } finally {
@@ -64,103 +78,180 @@ function ShowcasePanel() {
     void load();
   }, []);
 
-  const toggle = async (p: any, field: "featured" | "heroFeatured") => {
-    setBusyId(p.id);
+  const add = async (source: string, productId: string) => {
+    setBusy(source + productId);
     try {
-      const next = !p[field];
-      await apiEndpoints.driftSetFeatured(p.id, { [field]: next });
-      if (field === "heroFeatured" && next) {
-        await load(); // single hero — reflect others being cleared
-      } else {
-        setProducts((prev) => prev.map((x) => (x.id === p.id ? { ...x, [field]: next } : x)));
-      }
+      await apiEndpoints.driftLandingAdd(source, productId);
+      await load();
     } catch {
       /* ignore */
     } finally {
-      setBusyId(null);
+      setBusy(null);
+    }
+  };
+  const remove = async (itemId: string) => {
+    setBusy(itemId);
+    try {
+      await apiEndpoints.driftLandingRemove(itemId);
+      await load();
+    } catch {
+      /* ignore */
+    } finally {
+      setBusy(null);
+    }
+  };
+  const setHero = async (item: any) => {
+    setBusy(item.itemId);
+    try {
+      await apiEndpoints.driftLandingUpdate(item.itemId, { isHero: !item.isHero });
+      await load();
+    } catch {
+      /* ignore */
+    } finally {
+      setBusy(null);
     }
   };
 
-  const heroCount = products.filter((p) => p.heroFeatured).length;
-  const showcaseCount = products.filter((p) => p.featured).length;
+  const curated = new Set(items.map((i) => `${i.source}:${i.id}`));
+  const ql = q.trim().toLowerCase();
+  const pool = (tab === "DRIFT" ? cands.drift : cands.rotation3d).filter(
+    (c) => !curated.has(`${c.source}:${c.id}`) && (!ql || c.name.toLowerCase().includes(ql)),
+  );
 
   return (
-    <div className={card}>
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Landing showcase</h2>
-          <p className="mt-1 text-xs text-gray-400">
-            Pick the drift.li landing interactives — {heroCount} hero, {showcaseCount} in showcase.
-          </p>
+    <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      {/* Curated landing */}
+      <div className={card}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Landing showcase</h2>
+            <p className="mt-1 text-xs text-gray-400">
+              What appears on drift.li — {items.length} item(s){items.some((i) => i.isHero) ? ", 1 hero" : ""}.
+            </p>
+          </div>
+          <button className="text-xs text-gray-400 hover:text-white" onClick={load}>
+            ↻ refresh
+          </button>
         </div>
-        <button className="text-xs text-gray-400 hover:text-white" onClick={load}>
-          ↻ refresh
-        </button>
+
+        {loading ? (
+          <div className="py-10 text-center">
+            <LoadingSpinner size="sm" />
+          </div>
+        ) : items.length === 0 ? (
+          <p className="py-10 text-center text-xs text-gray-500">
+            Nothing on the landing yet. Add drifts or Rotation3D spins from the right.
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {items.map((it) => (
+              <div
+                key={it.itemId}
+                className={`rounded-xl border p-3 ${
+                  it.isHero ? "border-amber-400/40 bg-amber-400/[0.06]" : "border-gray-700/60 bg-gray-950/50"
+                }`}
+              >
+                <div className="flex gap-3">
+                  <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/10 bg-gray-900">
+                    {it.thumb ? (
+                      <img src={it.thumb} alt="" className="h-full w-full object-contain" />
+                    ) : (
+                      <span className="text-[9px] text-gray-600">no preview</span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-white">{it.name}</p>
+                    <p className="truncate text-[11px] text-gray-500">{it.brandName}</p>
+                    <span
+                      className={`mt-1 inline-block rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${sourceBadge(it.source)}`}
+                    >
+                      {it.source === "ROTATION3D" ? "Rotation3D" : "Drift"}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setHero(it)}
+                    disabled={busy === it.itemId}
+                    className={`rounded-lg py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${
+                      it.isHero
+                        ? "border border-amber-400/40 bg-amber-400/15 text-amber-200"
+                        : "border border-gray-700 text-gray-300 hover:bg-gray-800"
+                    }`}
+                  >
+                    {it.isHero ? "★ Hero" : "Hero"}
+                  </button>
+                  <button
+                    onClick={() => remove(it.itemId)}
+                    disabled={busy === it.itemId}
+                    className="rounded-lg border border-gray-700 py-1.5 text-[11px] font-bold uppercase tracking-widest text-gray-300 transition-colors hover:border-rose-500/40 hover:text-rose-300 disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {loading ? (
-        <div className="py-10 text-center">
-          <LoadingSpinner size="sm" />
-        </div>
-      ) : products.length === 0 ? (
-        <p className="py-10 text-center text-xs text-gray-500">
-          No ready drifts yet. Featured picks come from READY/PUBLISHED clips.
-        </p>
-      ) : (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {products.map((p) => (
-            <div
-              key={p.id}
-              className={`rounded-xl border p-3 transition-colors ${
-                p.featured
-                  ? "border-brand-accent/50 bg-brand-accent/[0.06]"
-                  : "border-gray-700/60 bg-gray-950/50"
+      {/* Candidate picker */}
+      <div className={card}>
+        <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Add to landing</h2>
+        <p className="mt-1 text-xs text-gray-400">Pick from drifts or Rotation3D spins.</p>
+        <div className="mt-3 flex gap-2">
+          {(["DRIFT", "ROTATION3D"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`flex-1 rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                tab === t ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"
               }`}
             >
-              <div className="flex gap-3">
-                <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/10 bg-gray-900">
-                  {p.thumb ? (
-                    <img src={p.thumb} alt="" className="h-full w-full object-contain" />
-                  ) : (
-                    <span className="text-[9px] text-gray-600">no preview</span>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-white">{p.name}</p>
-                  <p className="truncate text-[11px] text-gray-500">{p.brandName}</p>
-                  <p className="text-[11px]">
-                    <span className={statusColor(p.status)}>{p.status}</span>
-                  </p>
-                </div>
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => toggle(p, "heroFeatured")}
-                  disabled={busyId === p.id}
-                  className={`rounded-lg py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${
-                    p.heroFeatured
-                      ? "border border-amber-400/40 bg-amber-400/15 text-amber-200"
-                      : "border border-gray-700 text-gray-300 hover:bg-gray-800"
-                  }`}
-                >
-                  {p.heroFeatured ? "★ Hero" : "Hero"}
-                </button>
-                <button
-                  onClick={() => toggle(p, "featured")}
-                  disabled={busyId === p.id}
-                  className={`rounded-lg py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${
-                    p.featured
-                      ? "border border-brand-accent/40 bg-brand-accent/15 text-brand-accent"
-                      : "border border-gray-700 text-gray-300 hover:bg-gray-800"
-                  }`}
-                >
-                  {p.featured ? "✓ Showcase" : "Showcase"}
-                </button>
-              </div>
-            </div>
+              {t === "DRIFT" ? "Drifts" : "Rotation3D"}
+            </button>
           ))}
         </div>
-      )}
+        <input
+          className={`${input} mt-3`}
+          placeholder="Search…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <div className="mt-3 max-h-[520px] space-y-2 overflow-y-auto pr-1">
+          {loading ? (
+            <div className="py-6 text-center">
+              <LoadingSpinner size="sm" />
+            </div>
+          ) : pool.length === 0 ? (
+            <p className="py-6 text-center text-[11px] text-gray-500">
+              {ql ? "No matches." : "Nothing available to add."}
+            </p>
+          ) : (
+            pool.map((c) => (
+              <div
+                key={`${c.source}:${c.id}`}
+                className="flex items-center gap-2 rounded-lg border border-gray-700/60 bg-gray-950/50 p-2"
+              >
+                <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-md border border-white/10 bg-gray-900">
+                  {c.thumb ? <img src={c.thumb} alt="" className="h-full w-full object-contain" /> : null}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium text-white">{c.name}</p>
+                  <p className="truncate text-[10px] text-gray-500">{c.brandName}</p>
+                </div>
+                <button
+                  onClick={() => add(c.source, c.id)}
+                  disabled={busy === c.source + c.id}
+                  className="shrink-0 rounded-md border border-brand-accent/40 bg-brand-accent/15 px-2.5 py-1 text-[11px] font-bold text-brand-accent hover:bg-brand-accent/25 disabled:opacity-50"
+                >
+                  + Add
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -497,7 +588,7 @@ export default function DriftAdminPanel() {
       </div>
 
       {mode === "showcase" ? (
-        <ShowcasePanel />
+        <LandingPanel />
       ) : (
         <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
           {/* Brands column */}

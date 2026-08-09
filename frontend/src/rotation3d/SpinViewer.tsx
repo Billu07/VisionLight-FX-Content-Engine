@@ -1123,6 +1123,8 @@ const R3D_CSS = `
 .r3d-hero .r3d-hint.r3d-gone{opacity:0}
 .r3d-hero .r3d-hand{width:32px;height:32px}
 .r3d-hero .r3d-hand svg{width:15px;height:15px}
+.r3d-hero .r3d-drift-arrow{width:34px;height:34px}
+.r3d-hero .r3d-drift-arrow svg{width:16px;height:16px}
 .r3d-hero .r3d-hint span{font-size:11px}
 /* mobile: keep controls off the product + clear of each other */
 @media (max-width:560px){
