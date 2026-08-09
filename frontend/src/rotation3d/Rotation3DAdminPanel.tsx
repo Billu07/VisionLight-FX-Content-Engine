@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { apiEndpoints } from "../lib/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import BrandProductEditModal from "./BrandProductEditModal";
+import Rotation3DBrandDashboard from "./Rotation3DBrandDashboard";
 
 /**
  * Team (SuperAdmin) console for Rotation3D — lives inside SuperAdminDashboard as
@@ -248,6 +249,7 @@ export default function Rotation3DAdminPanel() {
   const [backfilling, setBackfilling] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [brandView, setBrandView] = useState(false);
   // Search/filter for the brand list + the selected brand's product list.
   const [brandQuery, setBrandQuery] = useState("");
   const [productQuery, setProductQuery] = useState("");
@@ -661,6 +663,28 @@ export default function Rotation3DAdminPanel() {
                 </button>
               </div>
 
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => setBrandView(false)}
+                  className={`rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors ${!brandView ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"}`}
+                >
+                  Team tools
+                </button>
+                <button
+                  onClick={() => setBrandView(true)}
+                  className={`rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors ${brandView ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"}`}
+                >
+                  Brand dashboard
+                </button>
+              </div>
+
+              {brandView ? (
+                <div className="mt-4">
+                  <Rotation3DBrandDashboard adminOrgId={selected.id} />
+                </div>
+              ) : (
+              <>
+
               {/* Brand vanity link (rotation3d.com/{slug}) */}
               <div className="mt-4 rounded-lg border border-gray-700/60 bg-gray-950/50 p-4">
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-300">Brand link</p>
@@ -892,6 +916,8 @@ export default function Rotation3DAdminPanel() {
                   ))
                 )}
               </div>
+              </>
+              )}
             </>
           )}
         </div>

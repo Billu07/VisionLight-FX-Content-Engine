@@ -42,11 +42,20 @@ function ProductCard({
   product,
   onSaved,
   brandSlug,
+  adminOrgId,
 }: {
   product: Product;
   onSaved: () => void;
   brandSlug?: string | null;
+  adminOrgId?: string;
 }) {
+  // Brand-view: superadmin edits any brand's product via org-scoped endpoints.
+  const updateProduct = (data: Record<string, unknown>) =>
+    adminOrgId
+      ? apiEndpoints.r3dAdminUpdateProduct(adminOrgId, product.id, data)
+      : apiEndpoints.r3dUpdateProduct(product.id, data);
+  const fetchShareCard = () =>
+    adminOrgId ? apiEndpoints.r3dAdminShareCard(adminOrgId, product.id) : apiEndpoints.r3dShareCard(product.id);
   const [linkCopied, setLinkCopied] = useState(false);
   const playerLink =
     brandSlug && product.slug
@@ -79,7 +88,7 @@ function ProductCard({
   const saveFrame = async () => {
     setSavingFrame(true);
     try {
-      await apiEndpoints.r3dUpdateProduct(product.id, { defaultFrame: frameIdx });
+      await updateProduct({ defaultFrame: frameIdx });
       onSaved();
       setShowFrame(false);
     } catch {
@@ -100,7 +109,7 @@ function ProductCard({
     setSlugSaving(true);
     setSlugNote("");
     try {
-      await apiEndpoints.r3dUpdateProduct(product.id, { slug });
+      await updateProduct({ slug });
       onSaved();
       setSlugNote("Saved");
     } catch (e: any) {
@@ -128,7 +137,7 @@ function ProductCard({
     setSaving(true);
     setNote("");
     try {
-      await apiEndpoints.r3dUpdateProduct(product.id, {
+      await updateProduct({
         ctaPrimary: { label: p1Label, url: p1Url },
         ctaSecondary: { label: p2Label, url: p2Url },
         background: bg,
@@ -159,7 +168,7 @@ function ProductCard({
   const downloadShareCard = async () => {
     setCardBusy(true);
     try {
-      const res = await apiEndpoints.r3dShareCard(product.id);
+      const res = await fetchShareCard();
       const url = URL.createObjectURL(res.data as Blob);
       const a = document.createElement("a");
       a.href = url;
@@ -713,7 +722,10 @@ function BrandingPanel() {
   );
 }
 
-export default function Rotation3DBrandDashboard() {
+export default function Rotation3DBrandDashboard({ adminOrgId }: { adminOrgId?: string } = {}) {
+  // Superadmin brand-view: the same dashboard, embedded in the superadmin panel
+  // and pointed at any brand via org-scoped endpoints (no page chrome).
+  const admin = !!adminOrgId;
   const { user, logout } = useAuth();
   const { exitReadOnly, exiting: exitingReadOnly } = useExitReadOnly();
   const navigate = useNavigate();
@@ -727,7 +739,9 @@ export default function Rotation3DBrandDashboard() {
     setLoading(true);
     setError("");
     try {
-      const res = await apiEndpoints.r3dMyProducts();
+      const res = admin
+        ? await apiEndpoints.r3dBrandProducts(adminOrgId!)
+        : await apiEndpoints.r3dMyProducts();
       setProducts(res.data.products || []);
       setBrandSlug(res.data.brandSlug || null);
     } catch (e: any) {
@@ -739,7 +753,25 @@ export default function Rotation3DBrandDashboard() {
 
   useEffect(() => {
     void load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminOrgId]);
+
+  const productsView = loading ? (
+    <div className="py-20 text-center">
+      <LoadingSpinner size="lg" variant="neon" />
+    </div>
+  ) : error ? (
+    <div className={`${panel} text-sm text-rose-300`}>{error}</div>
+  ) : products.length === 0 ? (
+    <div className={`${panel} text-center text-sm text-gray-400`}>No products for this brand yet.</div>
+  ) : (
+    products.map((p) => (
+      <ProductCard key={p.id} product={p} onSaved={load} brandSlug={brandSlug} adminOrgId={adminOrgId} />
+    ))
+  );
+
+  // Embedded brand-view: just the products (full brand controls), no page chrome.
+  if (admin) return <div className="space-y-4">{productsView}</div>;
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-studio-gradient font-sans text-white">

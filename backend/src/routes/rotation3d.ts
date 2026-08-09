@@ -1037,4 +1037,79 @@ export async function recoverOrphanedRot3dJobs() {
   }
 }
 
+// ── Superadmin brand-view versions of the brand's own embed + share-card, so the
+// embedded brand dashboard works for any brand (org-scoped by :orgId). ──
+
+router.post(
+  "/api/rotation3d/brands/:orgId/products/:id/embed",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { orgId, id } = req.params;
+    const owned = await prisma.rot3dProduct.findFirst({
+      where: { id, organizationId: orgId },
+      select: { id: true },
+    });
+    if (!owned) return res.status(404).json({ error: "Product not found" });
+    const allowedDomains = Array.isArray(req.body?.allowedDomains)
+      ? req.body.allowedDomains.map((d: unknown) => String(d).trim().toLowerCase()).filter(Boolean)
+      : [];
+    const token = crypto.randomBytes(12).toString("hex");
+    const embed = await prisma.rot3dEmbed.upsert({
+      where: { productId: owned.id },
+      create: { productId: owned.id, token, allowedDomains },
+      update: { token, allowedDomains },
+    });
+    res.json({ embed });
+  },
+);
+
+router.get(
+  "/api/rotation3d/brands/:orgId/products/:id/share-card",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { orgId, id } = req.params;
+    const product = await prisma.rot3dProduct.findFirst({
+      where: { id, organizationId: orgId },
+      include: { spin: true },
+    });
+    if (!product) return res.status(404).json({ error: "Product not found" });
+    const org = await prisma.organization.findUnique({
+      where: { id: orgId },
+      select: {
+        name: true,
+        slug: true,
+        brandConfigs: { select: { logoUrl: true, companyName: true, primaryColor: true }, take: 1 },
+      },
+    });
+    const bc = org?.brandConfigs?.[0];
+    const brandSlug: string | null = org?.slug || null;
+    const manifest: any = product.spin?.manifest || {};
+    const frames: string[] = Array.isArray(manifest.frames) ? manifest.frames : [];
+    const df = Math.min(Math.max(0, product.defaultFrame || 0), Math.max(0, frames.length - 1));
+    const frameUrl = frames[df] || frames[0] || null;
+    const productUrl =
+      brandSlug && product.slug
+        ? `https://rotation3d.com/${brandSlug}/${product.slug}`
+        : `https://rotation3d.com/p/${product.id}`;
+    try {
+      const png = await buildShareCard({
+        productUrl,
+        frameUrl,
+        logoUrl: bc?.logoUrl || null,
+        productName: product.name,
+        brandName: bc?.companyName || org?.name || "Rotation3D",
+        primaryColor: bc?.primaryColor || null,
+      });
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Content-Disposition", `attachment; filename="${product.slug || "rotation3d"}-share.png"`);
+      res.send(png);
+    } catch (e: any) {
+      console.error("[r3d] admin share-card error:", e);
+      res.status(500).json({ error: "Could not generate the share card" });
+    }
+  },
+);
+
 export default router;
