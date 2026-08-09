@@ -70,6 +70,7 @@ export default function DriftCaptionEditor({
   const [frame, setFrame] = useState(0);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const stageRef = useRef<HTMLDivElement>(null);
   const [stageH, setStageH] = useState(360);
@@ -149,6 +150,34 @@ export default function DriftCaptionEditor({
     }
   };
 
+  // Save the current captions, then download the ZIP (original + captioned +
+  // captioned-2x MP4s). Saving first guarantees the export matches what's shown.
+  const exportZip = async () => {
+    setExporting(true);
+    setSavedMsg("Rendering video… this can take a moment");
+    try {
+      await apiEndpoints.driftSaveCaptions(
+        productId,
+        captions.map((c, i) => ({ ...c, order: i })),
+      );
+      const res = await apiEndpoints.driftExportZip(productId);
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${productName.replace(/[^a-z0-9-_]+/gi, "-") || "drift"}-export.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setSavedMsg("Downloaded");
+      setTimeout(() => setSavedMsg(""), 2000);
+    } catch {
+      setSavedMsg("Export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const activeOnFrame = (c: Caption) => frame >= c.startFrame && frame <= c.endFrame;
   const current = sel >= 0 ? captions[sel] : null;
 
@@ -163,8 +192,16 @@ export default function DriftCaptionEditor({
           <div className="flex items-center gap-2">
             {savedMsg && <span className="text-[11px] text-emerald-300">{savedMsg}</span>}
             <button
+              onClick={exportZip}
+              disabled={exporting || saving || loading || !!error}
+              title="Save + download original, captioned, and 2× MP4s (ZIP)"
+              className="rounded-lg border border-gray-600 px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-gray-200 hover:bg-gray-800 disabled:opacity-50"
+            >
+              {exporting ? "Rendering…" : "⬇ Download ZIP"}
+            </button>
+            <button
               onClick={save}
-              disabled={saving || loading || !!error}
+              disabled={saving || exporting || loading || !!error}
               className="rounded-lg border border-brand-accent/40 bg-brand-accent/15 px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-brand-accent hover:bg-brand-accent/25 disabled:opacity-50"
             >
               {saving ? "Saving…" : "Save captions"}

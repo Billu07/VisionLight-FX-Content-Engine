@@ -16,6 +16,7 @@ import { uploadManagedBuffer } from "../utils/managedStorage";
 import { buildSpinFromVideo } from "../services/rotation3d/pipeline";
 import { enqueueProcessing, processingQueueDepth } from "../services/rotation3d/processingQueue";
 import { buildShareCard } from "../services/rotation3d/shareCard";
+import { streamDriftExportZip } from "../services/driftExport";
 
 // Drift (drift.li) — a separate product line running the same interactive
 // spin/path player as Rotation3D, but with its own brand orgs
@@ -1086,6 +1087,49 @@ router.get(
     } catch (e: any) {
       console.error(`[${NS}] share-card error:`, e);
       res.status(500).json({ error: "Could not generate the share card" });
+    }
+  },
+);
+
+// Export a ZIP of the drift as video: original.mp4 + captioned.mp4 +
+// captioned-2x.mp4 (captions baked in at their frame ranges, 2-clip aware).
+// Rendered server-side so it's smooth regardless of live-playback stutter.
+// Owner (org-scoped) or superadmin. Heavy + in-process — on-demand only.
+router.get(
+  "/api/drift/my/products/:id/export.zip",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const isSuper = req.user?.role === "SUPERADMIN";
+    const orgId = req.user?.organizationId;
+    const product = await prisma.driftProduct.findFirst({
+      where: isSuper ? { id: req.params.id } : { id: req.params.id, organizationId: orgId || "" },
+      include: { spin: true },
+    });
+    if (!product || !product.spin) return res.status(404).json({ error: "Drift not found" });
+
+    const m: any = product.spin.manifest || {};
+    const framesA: string[] = Array.isArray(m.frames) ? m.frames : [];
+    const sm: any = product.spin.secondManifest;
+    const framesB: string[] = sm && Array.isArray(sm.frames) ? sm.frames : [];
+    const frames = framesB.length ? [...framesA, ...framesB] : framesA;
+    if (frames.length === 0) return res.status(400).json({ error: "No frames to export" });
+
+    const caps = await prisma.driftCaption.findMany({ where: { productId: product.id } });
+    // Remap clip-B captions into the combined index space (offset by A's length).
+    const captions = caps.map((c) =>
+      c.clip === "B"
+        ? { ...c, startFrame: c.startFrame + framesA.length, endFrame: c.endFrame + framesA.length }
+        : c,
+    );
+    const baseName =
+      (product.slug || "drift").replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 50) ||
+      "drift";
+
+    try {
+      await streamDriftExportZip({ frames, captions: captions as any, fps: 30, baseName, res });
+    } catch (e: any) {
+      console.error("[drift] export failed:", e);
+      if (!res.headersSent) res.status(500).json({ error: "Export failed" });
     }
   },
 );

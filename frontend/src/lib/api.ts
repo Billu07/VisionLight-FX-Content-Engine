@@ -321,6 +321,8 @@ export const apiEndpoints = {
   driftGetCaptions: (id: string) => api.get(`/api/drift/my/products/${id}/captions`),
   driftSaveCaptions: (id: string, captions: unknown[]) =>
     api.put(`/api/drift/my/products/${id}/captions`, { captions }),
+  driftExportZip: (id: string) =>
+    api.get(`/api/drift/my/products/${id}/export.zip`, { responseType: "blob", timeout: 600000 }),
   driftUploadSourceImages: (
     formData: FormData,
     options?: { onUploadProgress?: (e: AxiosProgressEvent) => void },
