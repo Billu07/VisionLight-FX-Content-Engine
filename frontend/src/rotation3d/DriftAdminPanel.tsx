@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { apiEndpoints } from "../lib/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import DriftCaptionEditor from "./DriftCaptionEditor";
+import BrandProductEditModal from "./BrandProductEditModal";
 
 /**
  * Team (SuperAdmin) console for Drift (drift.li) — lives inside
@@ -21,6 +22,11 @@ type Product = {
   slug: string;
   status: string;
   loopEnabled?: boolean;
+  title?: string | null;
+  description?: string | null;
+  defaultFrame?: number;
+  ctaPrimary?: { label?: string; url?: string } | null;
+  ctaSecondary?: { label?: string; url?: string } | null;
   spin?: { frameCount: number; secondFrameCount?: number | null; status: string } | null;
   _count?: { sourceImages: number; videos: number; captions: number };
 };
@@ -369,6 +375,7 @@ export default function DriftAdminPanel() {
   const [slugMsg, setSlugMsg] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editingCaptions, setEditingCaptions] = useState<{ id: string; name: string } | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [brandQuery, setBrandQuery] = useState("");
   const [productQuery, setProductQuery] = useState("");
   const [productStatus, setProductStatus] = useState("ALL");
@@ -900,6 +907,12 @@ export default function DriftAdminPanel() {
                           {(p.status === "READY" || p.status === "PUBLISHED") && (
                             <>
                               <button
+                                onClick={() => setEditingProduct(p)}
+                                className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
+                              >
+                                Edit
+                              </button>
+                              <button
                                 onClick={() => setEditingCaptions({ id: p.id, name: p.name })}
                                 className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
                               >
@@ -954,6 +967,18 @@ export default function DriftAdminPanel() {
           productId={editingCaptions.id}
           productName={editingCaptions.name}
           onClose={() => setEditingCaptions(null)}
+        />
+      )}
+
+      {editingProduct && selected && (
+        <BrandProductEditModal
+          product={editingProduct}
+          showLoop
+          onSave={async (data) => {
+            await apiEndpoints.driftAdminUpdateProduct(selected.id, editingProduct.id, data);
+            await loadProducts(selected, true);
+          }}
+          onClose={() => setEditingProduct(null)}
         />
       )}
     </div>

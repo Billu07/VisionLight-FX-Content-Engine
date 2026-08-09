@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiEndpoints } from "../lib/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
+import BrandProductEditModal from "./BrandProductEditModal";
 
 /**
  * Team (SuperAdmin) console for Rotation3D — lives inside SuperAdminDashboard as
@@ -15,6 +16,11 @@ type Product = {
   name: string;
   slug: string;
   status: string;
+  title?: string | null;
+  description?: string | null;
+  defaultFrame?: number;
+  ctaPrimary?: { label?: string; url?: string } | null;
+  ctaSecondary?: { label?: string; url?: string } | null;
   spin?: { frameCount: number; status: string } | null;
   _count?: { sourceImages: number; videos: number };
 };
@@ -241,6 +247,7 @@ export default function Rotation3DAdminPanel() {
   const [slugMsg, setSlugMsg] = useState("");
   const [backfilling, setBackfilling] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   // Search/filter for the brand list + the selected brand's product list.
   const [brandQuery, setBrandQuery] = useState("");
   const [productQuery, setProductQuery] = useState("");
@@ -845,6 +852,12 @@ export default function Rotation3DAdminPanel() {
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
+                        <button
+                          onClick={() => setEditingProduct(p)}
+                          className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
+                        >
+                          Edit
+                        </button>
                         {(p.status === "READY" || p.status === "PUBLISHED") && (
                           <>
                             <button
@@ -883,6 +896,17 @@ export default function Rotation3DAdminPanel() {
           )}
         </div>
       </div>
+      )}
+
+      {editingProduct && selected && (
+        <BrandProductEditModal
+          product={editingProduct}
+          onSave={async (data) => {
+            await apiEndpoints.r3dAdminUpdateProduct(selected.id, editingProduct.id, data);
+            await loadProducts(selected, true);
+          }}
+          onClose={() => setEditingProduct(null)}
+        />
       )}
     </div>
   );

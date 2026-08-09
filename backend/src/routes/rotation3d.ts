@@ -249,6 +249,48 @@ router.get(
   },
 );
 
+// Superadmin edits a brand's product as the brand admin would (brand-view: the
+// superadmin can make the same per-product edits for any brand). Org-scoped by :orgId.
+router.patch(
+  "/api/rotation3d/brands/:orgId/products/:id",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { orgId, id } = req.params;
+    const owned = await prisma.rot3dProduct.findFirst({
+      where: { id, organizationId: orgId },
+      select: { id: true },
+    });
+    if (!owned) return res.status(404).json({ error: "Product not found" });
+
+    const data: Record<string, unknown> = {};
+    if ("ctaPrimary" in req.body) data.ctaPrimary = cta(req.body.ctaPrimary) ?? null;
+    if ("ctaSecondary" in req.body) data.ctaSecondary = cta(req.body.ctaSecondary) ?? null;
+    if ("defaultFrame" in req.body) data.defaultFrame = Math.max(0, Number(req.body.defaultFrame) || 0);
+    if ("background" in req.body) data.background = String(req.body.background || "").slice(0, 40);
+    if ("title" in req.body) data.title = req.body.title ? String(req.body.title).slice(0, 120) : null;
+    if ("description" in req.body)
+      data.description = req.body.description ? String(req.body.description).slice(0, 600) : null;
+    if (typeof req.body.publish === "boolean") data.status = req.body.publish ? "PUBLISHED" : "READY";
+    if (typeof req.body.slug === "string" && req.body.slug.trim()) {
+      const s = slugify(req.body.slug);
+      const clash = await prisma.rot3dProduct.findFirst({
+        where: { organizationId: orgId, slug: s, NOT: { id: owned.id } },
+        select: { id: true },
+      });
+      if (clash) return res.status(409).json({ error: "That product link is already taken" });
+      data.slug = s;
+    }
+
+    const product = await prisma.rot3dProduct.update({
+      where: { id: owned.id },
+      data,
+      include: { spin: true, embed: true },
+    });
+    res.json({ product });
+  },
+);
+
 // Source images a brand has sent in (raw product photos) for the team to work from.
 router.get(
   "/api/rotation3d/brands/:orgId/source-images",

@@ -251,6 +251,8 @@ export const apiEndpoints = {
   r3dMyProducts: () => api.get("/api/rotation3d/my/products"),
   r3dUpdateProduct: (id: string, data: Record<string, unknown>) =>
     api.patch(`/api/rotation3d/my/products/${id}`, data),
+  r3dAdminUpdateProduct: (orgId: string, id: string, data: Record<string, unknown>) =>
+    api.patch(`/api/rotation3d/brands/${orgId}/products/${id}`, data),
   r3dUploadSourceImages: (
     formData: FormData,
     options?: { onUploadProgress?: (e: AxiosProgressEvent) => void },

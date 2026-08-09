@@ -51,11 +51,13 @@ const VISIONLIGHT_CANONICAL_DOMAIN =
   ) || "visualfx.studio";
 const ROTATION3D_CANONICAL_DOMAIN =
   sanitizeDomain(process.env.ROTATION3D_CANONICAL_DOMAIN) || "rotation3d.com";
+const DRIFT_CANONICAL_DOMAIN = sanitizeDomain(process.env.DRIFT_CANONICAL_DOMAIN) || "drift.li";
 
 const getCanonicalDomainForUser = (user: any) => {
   const orgRoutingDomain = sanitizeDomain(user?.organization?.routingDomain || null);
   if (orgRoutingDomain) return orgRoutingDomain;
   if (user?.view === "ROTATION3D") return ROTATION3D_CANONICAL_DOMAIN;
+  if (user?.view === "DRIFT") return DRIFT_CANONICAL_DOMAIN;
   return user?.view === "PICDRIFT"
     ? PICDRIFT_CANONICAL_DOMAIN
     : VISIONLIGHT_CANONICAL_DOMAIN;
@@ -79,7 +81,9 @@ const buildPublicProfileOption = (user: any) => {
       ? "PICDRIFT"
       : user?.view === "ROTATION3D"
         ? "ROTATION3D"
-        : "VISIONLIGHT";
+        : user?.view === "DRIFT"
+          ? "DRIFT"
+          : "VISIONLIGHT";
   return {
     id: user.id,
     email: user.email,

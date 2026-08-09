@@ -40,6 +40,7 @@ import DriftLanding from "./rotation3d/DriftLanding";
 import Rotation3DPlayer from "./rotation3d/Rotation3DPlayer";
 import BrandShowcasePage from "./rotation3d/BrandShowcasePage";
 import Rotation3DBrandDashboard from "./rotation3d/Rotation3DBrandDashboard";
+import DriftBrandDashboard from "./rotation3d/DriftBrandDashboard";
 import { isRotation3dSite, isDriftSite } from "./lib/branding";
 
 const queryClient = new QueryClient({
@@ -171,6 +172,13 @@ const AppEntry = () => {
     return (
       <ErrorBoundary>
         <Rotation3DBrandDashboard />
+      </ErrorBoundary>
+    );
+  }
+  if (user?.view === "DRIFT") {
+    return (
+      <ErrorBoundary>
+        <DriftBrandDashboard />
       </ErrorBoundary>
     );
   }
