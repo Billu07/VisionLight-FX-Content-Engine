@@ -376,9 +376,31 @@ export default function DriftAdminPanel() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editingCaptions, setEditingCaptions] = useState<{ id: string; name: string } | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [exportingId, setExportingId] = useState<string | null>(null);
   const [brandQuery, setBrandQuery] = useState("");
   const [productQuery, setProductQuery] = useState("");
   const [productStatus, setProductStatus] = useState("ALL");
+
+  const downloadProduct = async (p: Product) => {
+    setExportingId(p.id);
+    setMsg({ kind: "ok", text: `Rendering "${p.name}" — this can take a moment…` });
+    try {
+      const res = await apiEndpoints.driftExportZip(p.id);
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${p.name.replace(/[^a-z0-9-_]+/gi, "-") || "drift"}-export.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setMsg({ kind: "ok", text: "Download ready." });
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e?.response?.data?.error || "Export failed" });
+    } finally {
+      setExportingId(null);
+    }
+  };
 
   const copyProductLink = async (p: Product) => {
     const link =
@@ -917,6 +939,13 @@ export default function DriftAdminPanel() {
                                 className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
                               >
                                 Captions
+                              </button>
+                              <button
+                                onClick={() => downloadProduct(p)}
+                                disabled={exportingId === p.id}
+                                className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-50"
+                              >
+                                {exportingId === p.id ? "Rendering…" : "⬇ Download"}
                               </button>
                               <SecondClipButton
                                 orgId={selected.id}

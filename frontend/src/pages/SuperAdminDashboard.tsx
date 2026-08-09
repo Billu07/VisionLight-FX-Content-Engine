@@ -1278,9 +1278,9 @@ export default function SuperAdminDashboard() {
       }
 
       startReadOnlyImpersonation(target.id, target.email);
-      // Rotation3D brands aren't project-scoped — their share cards + links live
-      // on the brand dashboard at /app, so send the operator straight there.
-      if (target.view === "ROTATION3D") {
+      // Rotation3D/Drift brands aren't project-scoped — their controls live on the
+      // brand dashboard at /app, so send the operator straight there.
+      if (target.view === "ROTATION3D" || target.view === "DRIFT") {
         navigate("/app");
         return;
       }

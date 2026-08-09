@@ -20,7 +20,7 @@ export default function Projects() {
   // Rotation3D brand admins have no generation projects — route them to their
   // brand dashboard if they ever land on this page.
   useEffect(() => {
-    if (user?.view === "ROTATION3D") navigate("/app", { replace: true });
+    if (user?.view === "ROTATION3D" || user?.view === "DRIFT") navigate("/app", { replace: true });
   }, [user?.view, navigate]);
 
   const [newProjectName, setNewProjectName] = useState("");
