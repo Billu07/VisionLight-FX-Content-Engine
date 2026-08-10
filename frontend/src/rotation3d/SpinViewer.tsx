@@ -402,6 +402,13 @@ export default function SpinViewer({
       const scale = Math.min(W, H) * (hero ? 0.23 : 0.25) * zoom;
       const cx = W / 2 + panX * DPR, cy = H * 0.47 + panY * DPR;
 
+      // Drift: pin the "drag to drift" hint just UNDER the product (anchor its top
+      // to the product's bottom edge), so it's never over the video on any screen.
+      if (driftMode && hintRef.current) {
+        hintRef.current.style.top = (cy + scale) / DPR + 14 + "px";
+        hintRef.current.style.bottom = "auto";
+      }
+
       // Drift has no grounding shadow (per spec); Rotation3D keeps its contact shadow.
       if (!driftMode) {
         ctx.save();
@@ -1158,8 +1165,10 @@ const R3D_CSS = `
 .r3d-drift .r3d-scrim-bot{display:none}
 .r3d-drift .r3d-rot span{display:none}
 .r3d-drift .r3d-rot{gap:0;padding:6px 12px}
-/* "drag to drift" sits UNDER the product on desktop too (was over it at 28%). */
-.r3d-drift .r3d-hint{opacity:.72;top:auto;bottom:calc(200px + env(safe-area-inset-bottom))}
+/* "drag to drift" is positioned imperatively just under the product (see draw). */
+.r3d-drift .r3d-hint{opacity:.72;gap:6px}
+.r3d-drift-hand{width:28px;height:28px}
+.r3d-drift-hand svg{width:19px;height:19px}
 .r3d-drift-hand{width:34px;height:34px;display:grid;place-items:center;color:#eef1f6}
 .r3d-drift-hand svg{width:22px;height:22px}
 .r3d-drift-arrow{width:52px;height:52px;border-radius:50%;border:1px solid var(--r3d-line);background:rgba(11,15,25,.4);backdrop-filter:blur(8px);display:grid;place-items:center;animation:r3dsway 1.8s ease-in-out infinite}
