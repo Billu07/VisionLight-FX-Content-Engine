@@ -42,7 +42,20 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
   const [editing, setEditing] = useState<Product | null>(null);
   const [captions, setCaptions] = useState<{ id: string; name: string } | null>(null);
   const [exportingId, setExportingId] = useState<string | null>(null);
+  const [embedCopied, setEmbedCopied] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  // Full-player embed (captions + headlines + description all render inside).
+  const copyEmbed = async (p: Product) => {
+    const code = `<iframe src="${PLAYER_ORIGIN}/embed/${p.id}" width="100%" height="560" style="border:0;border-radius:16px" allowfullscreen></iframe>`;
+    try {
+      await navigator.clipboard.writeText(code);
+      setEmbedCopied(p.id);
+      setTimeout(() => setEmbedCopied(null), 1500);
+    } catch {
+      /* clipboard blocked */
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -172,6 +185,12 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
                         className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-50"
                       >
                         {exportingId === p.id ? "Rendering…" : "⬇ Download"}
+                      </button>
+                      <button
+                        onClick={() => copyEmbed(p)}
+                        className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
+                      >
+                        {embedCopied === p.id ? "Copied!" : "Embed"}
                       </button>
                       <a
                         href={productLink(p)}

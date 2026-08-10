@@ -448,9 +448,12 @@ export default function SpinViewer({
       const nav = (((spin * (yaw - startYaw)) % TWO_PI + TWO_PI) % TWO_PI) / TWO_PI;
       if (degRef.current) degRef.current.textContent = (Math.round(nav * 360) % 360) + "°";
       if (fillRef.current) fillRef.current.style.left = nav * 100 + "%";
-      // Drift dual headline: crossfade headline 1 → 2 as you drag start → end.
-      if (head1Ref.current) head1Ref.current.style.opacity = String(1 - nav);
-      if (head2Ref.current) head2Ref.current.style.opacity = String(nav);
+      // Drift dual headline: crossfade headline 1 → 2 as you drag start → end
+      // (only when there are two headlines; a single one stays fully visible).
+      if (head1Ref.current && head2Ref.current) {
+        head1Ref.current.style.opacity = String(1 - nav);
+        head2Ref.current.style.opacity = String(nav);
+      }
     };
 
     const tick = () => {
@@ -954,11 +957,11 @@ export default function SpinViewer({
         </div>
       </div>
 
-      {!hero && driftMode && titleEnd ? (
+      {!hero && driftMode && (title || description) ? (
         <div className="r3d-heads" aria-hidden>
           <div className="r3d-heads-stack">
-            <div className="r3d-head" ref={head1Ref}>{title}</div>
-            <div className="r3d-head" ref={head2Ref} style={{ opacity: 0 }}>{titleEnd}</div>
+            {title && <div className="r3d-head" ref={head1Ref}>{title}</div>}
+            {titleEnd && <div className="r3d-head" ref={head2Ref} style={{ opacity: 0 }}>{titleEnd}</div>}
           </div>
           {description && <div className="r3d-heads-desc">{description}</div>}
         </div>
@@ -1135,13 +1138,21 @@ const R3D_CSS = `
 .r3d-drift .r3d-scrim-bot{display:none}
 .r3d-drift .r3d-rot span{display:none}
 .r3d-drift .r3d-rot{gap:0;padding:6px 12px}
-.r3d-drift .r3d-hint{opacity:.72}
+/* "drag to drift" sits UNDER the product on desktop too (was over it at 28%). */
+.r3d-drift .r3d-hint{opacity:.72;top:auto;bottom:calc(200px + env(safe-area-inset-bottom))}
 .r3d-drift-arrow{width:52px;height:52px;border-radius:50%;border:1px solid var(--r3d-line);background:rgba(11,15,25,.4);backdrop-filter:blur(8px);display:grid;place-items:center;animation:r3dsway 1.8s ease-in-out infinite}
 .r3d-drift-arrow svg{width:24px;height:24px;color:#eef1f6;transition:transform .25s}
 .r3d-hint.r3d-back .r3d-drift-arrow svg{transform:scaleX(-1)}
 @media (prefers-reduced-motion:reduce){.r3d-drift-arrow{animation:none}}
-/* Drift: "Powered By Drift Link" sits UNDER the frame, not at the top. */
-.r3d-drift .r3d-powered-badge{top:auto;bottom:calc(20px + env(safe-area-inset-bottom))}
+/* Drift: "Powered By Drift Link" sits UNDER the player, above the CTA, a bit bigger. */
+.r3d-drift .r3d-powered-badge{top:auto;bottom:calc(78px + env(safe-area-inset-bottom));font-size:12px}
+.r3d-drift .r3d-powered-badge svg{width:14px;height:14px}
+/* Drift: lift the CTA a touch off the very edge (standard spacing). */
+.r3d-drift .r3d-ctas{padding-bottom:calc(22px + env(safe-area-inset-bottom))}
+/* Drift mobile: hide reset + fullscreen (keep it clean). */
+@media (max-width:560px){
+  .r3d-drift [data-reset],.r3d-drift [data-fs]{display:none!important}
+}
 /* Drift: crossfading dual headline (headline 1 at start → headline 2 at the end). */
 .r3d-heads{position:absolute;left:0;right:0;top:calc(64px + env(safe-area-inset-top));z-index:4;display:flex;flex-direction:column;align-items:center;padding:0 20px;pointer-events:none;text-align:center}
 .r3d-heads-stack{display:grid;place-items:center}
