@@ -14,6 +14,8 @@ type EditProduct = {
   title?: string | null;
   titleEnd?: string | null;
   description?: string | null;
+  helperStart?: string | null;
+  helperEnd?: string | null;
   status?: string;
   defaultFrame?: number;
   loopEnabled?: boolean;
@@ -40,6 +42,8 @@ export default function BrandProductEditModal({
   const frameMax = Math.max(0, (product.spin?.frameCount || 1) - 1);
   const [title, setTitle] = useState(product.title || "");
   const [titleEnd, setTitleEnd] = useState(product.titleEnd || "");
+  const [helperStart, setHelperStart] = useState(product.helperStart || "");
+  const [helperEnd, setHelperEnd] = useState(product.helperEnd || "");
   const [description, setDescription] = useState(product.description || "");
   const [ctaPLabel, setCtaPLabel] = useState(product.ctaPrimary?.label || "");
   const [ctaPUrl, setCtaPUrl] = useState(product.ctaPrimary?.url || "");
@@ -67,6 +71,8 @@ export default function BrandProductEditModal({
     if (showLoop) {
       data.loopEnabled = loopEnabled;
       data.titleEnd = titleEnd.trim() || null;
+      data.helperStart = helperStart.trim() || null;
+      data.helperEnd = helperEnd.trim() || null;
     }
     try {
       await onSave(data);
@@ -113,6 +119,28 @@ export default function BrandProductEditModal({
                 onChange={(e) => setTitleEnd(e.target.value)}
                 placeholder="Crossfades in as you drag to the end"
               />
+            </div>
+          )}
+          {showLoop && (
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={label}>Helper — forward (start)</label>
+                <input
+                  className={`${field} mt-1`}
+                  value={helperStart}
+                  onChange={(e) => setHelperStart(e.target.value)}
+                  placeholder="e.g. Drift to Hatch"
+                />
+              </div>
+              <div>
+                <label className={label}>Helper — reverse (end)</label>
+                <input
+                  className={`${field} mt-1`}
+                  value={helperEnd}
+                  onChange={(e) => setHelperEnd(e.target.value)}
+                  placeholder="e.g. Drift to Start"
+                />
+              </div>
             </div>
           )}
           <div>

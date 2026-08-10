@@ -23,6 +23,8 @@ type Item = {
   title?: string | null;
   titleEnd?: string | null;
   description?: string | null;
+  helperStart?: string | null;
+  helperEnd?: string | null;
   brandName: string;
   defaultFrame: number;
   background: string | null;
@@ -89,6 +91,8 @@ function PlayerModal({ item, onClose }: { item: Item; onClose: () => void }) {
           title={item.title}
           titleEnd={item.titleEnd}
           description={item.description}
+          helperStart={item.helperStart}
+          helperEnd={item.helperEnd}
           background={item.background || undefined}
           primaryColor={DRIFT_PRIMARY}
           secondaryColor={DRIFT_SECONDARY}

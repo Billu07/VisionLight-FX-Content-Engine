@@ -71,6 +71,10 @@ export type SpinViewerProps = {
   description?: string | null;
   /** Drift second headline — crossfades in as you drag toward the end frame. */
   titleEnd?: string | null;
+  /** Drift drag-helper text: forward (at start) and reverse (at end). The arrow +
+   * text swap when you reach the end / return to the start. */
+  helperStart?: string | null;
+  helperEnd?: string | null;
   /** rendered rotation clip — enables the "Video" tab in the view selector */
   videoUrl?: string | null;
   /** Lab feature (off by default): show the thumbnail view selector (stills) */
@@ -152,6 +156,8 @@ export default function SpinViewer({
   title,
   description,
   titleEnd,
+  helperStart,
+  helperEnd,
   showViewSelector = false,
   enableLoop = false,
   driftMode = false,
@@ -173,6 +179,7 @@ export default function SpinViewer({
   const fillRef = useRef<HTMLDivElement>(null);
   const head1Ref = useRef<HTMLDivElement>(null);
   const head2Ref = useRef<HTMLDivElement>(null);
+  const helperTextRef = useRef<HTMLSpanElement>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<SVGCircleElement>(null);
   const pctRef = useRef<HTMLDivElement>(null);
@@ -231,6 +238,15 @@ export default function SpinViewer({
     // toggles auto-rotate on demand.
     let loopOn = false;
     let idleSpin = false;
+    // Drift drag-helper: direction-aware text + arrow. Flips to "reverse" at the
+    // end frame and back to "forward" at the start.
+    let helperBack = false;
+    const fwdHelper = helperStart || "Drag to drift";
+    const backHelper = helperEnd || "Drag to start";
+    const syncHelper = () => {
+      hintRef.current?.classList.toggle("r3d-back", helperBack);
+      if (helperTextRef.current) helperTextRef.current.textContent = helperBack ? backHelper : fwdHelper;
+    };
     let dirty = true, lastYaw = NaN, lastZoom = NaN, lastPX = 0, lastPY = 0;
     let touchZoomed = false;
     let scrimHidden = false;
@@ -454,6 +470,11 @@ export default function SpinViewer({
         head1Ref.current.style.opacity = String(1 - nav);
         head2Ref.current.style.opacity = String(nav);
       }
+      // Drift helper flips to "reverse" near the end frame, back near the start.
+      if (driftMode) {
+        if (nav >= 0.92 && !helperBack) { helperBack = true; syncHelper(); }
+        else if (nav <= 0.08 && helperBack) { helperBack = false; syncHelper(); }
+      }
     };
 
     const tick = () => {
@@ -575,8 +596,6 @@ export default function SpinViewer({
         yaw += d;
         clampScrub();
         yawVel = (d / dt) * 16;
-        // Drift: point the arrow the way you're dragging (right = forward, left = back).
-        if (driftMode && dx !== 0) hintRef.current?.classList.toggle("r3d-back", dx < 0);
         const lim = 130 * (zoomTarget - 1);
         panTY = Math.max(-lim, Math.min(lim, panTY + dy));
         panY = panTY;
@@ -587,8 +606,6 @@ export default function SpinViewer({
         yaw += d;
         clampScrub();
         yawVel = (d / dt) * 16;
-        // Drift: point the arrow the way you're dragging (right = forward, left = back).
-        if (driftMode && dx !== 0) hintRef.current?.classList.toggle("r3d-back", dx < 0);
       }
       lastX = e.clientX;
       lastY = e.clientY;
@@ -907,7 +924,7 @@ export default function SpinViewer({
       document.documentElement.classList.remove("r3d-fs-lock");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manifest, FRAMES, DEFAULT_FRAME, hero, driftMode, loopScrub]);
+  }, [manifest, FRAMES, DEFAULT_FRAME, hero, driftMode, loopScrub, helperStart, helperEnd]);
 
   const fireCta = (which: "primary" | "secondary", cta?: SpinCta) => {
     if (!cta) return;
@@ -985,10 +1002,13 @@ export default function SpinViewer({
       <div className="r3d-hint" ref={hintRef}>
         {driftMode ? (
           <>
+            <div className="r3d-drift-hand" aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-7-4l-2.5-4a2 2 0 0 1 3.4-2L8 14" /></svg>
+            </div>
             <div className="r3d-drift-arrow" aria-hidden>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
             </div>
-            <span>Drag to drift</span>
+            <span ref={helperTextRef}>{helperStart || "Drag to drift"}</span>
           </>
         ) : (
           <>
@@ -1140,6 +1160,8 @@ const R3D_CSS = `
 .r3d-drift .r3d-rot{gap:0;padding:6px 12px}
 /* "drag to drift" sits UNDER the product on desktop too (was over it at 28%). */
 .r3d-drift .r3d-hint{opacity:.72;top:auto;bottom:calc(200px + env(safe-area-inset-bottom))}
+.r3d-drift-hand{width:34px;height:34px;display:grid;place-items:center;color:#eef1f6}
+.r3d-drift-hand svg{width:22px;height:22px}
 .r3d-drift-arrow{width:52px;height:52px;border-radius:50%;border:1px solid var(--r3d-line);background:rgba(11,15,25,.4);backdrop-filter:blur(8px);display:grid;place-items:center;animation:r3dsway 1.8s ease-in-out infinite}
 .r3d-drift-arrow svg{width:24px;height:24px;color:#eef1f6;transition:transform .25s}
 .r3d-hint.r3d-back .r3d-drift-arrow svg{transform:scaleX(-1)}

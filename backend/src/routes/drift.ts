@@ -676,6 +676,10 @@ async function applyProductPatch(
   if (typeof body.loopEnabled === "boolean") data.loopEnabled = body.loopEnabled;
   if ("title" in body) data.title = body.title ? String(body.title).slice(0, 120) : null;
   if ("titleEnd" in body) data.titleEnd = body.titleEnd ? String(body.titleEnd).slice(0, 120) : null;
+  if ("helperStart" in body)
+    data.helperStart = body.helperStart ? String(body.helperStart).slice(0, 40) : null;
+  if ("helperEnd" in body)
+    data.helperEnd = body.helperEnd ? String(body.helperEnd).slice(0, 40) : null;
   if ("description" in body)
     data.description = body.description ? String(body.description).slice(0, 600) : null;
   if (typeof body.publish === "boolean") data.status = body.publish ? "PUBLISHED" : "READY";
@@ -864,6 +868,8 @@ const publicProductPayload = (p: any, bc: any, orgName: string, captions: any[])
   title: p.title,
   titleEnd: p.titleEnd,
   description: p.description,
+  helperStart: p.helperStart,
+  helperEnd: p.helperEnd,
   defaultFrame: p.defaultFrame,
   loopEnabled: p.loopEnabled,
   background: p.background,
@@ -1186,6 +1192,7 @@ async function resolveLandingItem(item: {
   return {
     itemId: item.id, source: "DRIFT", id: p.id, name: p.name,
     title: p.title, titleEnd: p.titleEnd, description: p.description,
+    helperStart: p.helperStart, helperEnd: p.helperEnd,
     brandName: p.organization?.name || "", defaultFrame: p.defaultFrame,
     background: p.background, loopEnabled: p.loopEnabled, manifest: m,
     secondManifest: p.spin.secondManifest ?? null,

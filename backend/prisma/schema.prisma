@@ -496,6 +496,8 @@ model DriftProduct {
   title           String? // headline 1 (shown at the start frame)
   titleEnd        String? // headline 2 (crossfades in as you drag toward the end)
   description     String? // optional blurb shown under the headline
+  helperStart     String? // drag-helper text at the start (forward), e.g. "Drift to Hatch"
+  helperEnd       String? // drag-helper text at the end (reverse), e.g. "Drift to Start"
   status          String   @default("DRAFT") // DRAFT | PROCESSING | READY | PUBLISHED | ARCHIVED
   defaultFrame    Int      @default(0)
   loopEnabled     Boolean  @default(true) // player auto-loop/continuous playback toggle

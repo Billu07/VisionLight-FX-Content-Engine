@@ -174,6 +174,8 @@ export default function Rotation3DPlayer() {
       title={p.title}
       description={p.description}
       titleEnd={drift ? p.titleEnd : undefined}
+      helperStart={drift ? p.helperStart : undefined}
+      helperEnd={drift ? p.helperEnd : undefined}
       videoUrl={p.videoUrl}
       showViewSelector={p.showViewSelector}
       enableLoop={drift ? false : getPlayerBranding().loopByDefault}
