@@ -172,7 +172,7 @@ export default function BrandProductEditModal({
             {showLoop && (
               <label className="flex items-center gap-2 text-xs text-gray-300">
                 <input type="checkbox" checked={loopEnabled} onChange={(e) => setLoopEnabled(e.target.checked)} className="h-4 w-4 accent-brand-accent" />
-                Loop enabled
+                Loop (drag wraps end → start)
               </label>
             )}
           </div>

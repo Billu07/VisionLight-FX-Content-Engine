@@ -82,6 +82,9 @@ export type SpinViewerProps = {
   driftMode?: boolean;
   /** Drift on-frame text overlays, shown while their frame range is active. */
   captions?: SpinCaption[];
+  /** Loop on/off (per drift): true = dragging wraps end→start seamlessly;
+   * false = dragging clamps at the first/last frame. Default true (360 spins). */
+  loopScrub?: boolean;
 };
 
 const clampZoom = (z: number) => Math.max(0.7, Math.min(2.8, z));
@@ -153,6 +156,7 @@ export default function SpinViewer({
   enableLoop = false,
   driftMode = false,
   captions,
+  loopScrub = true,
 }: SpinViewerProps) {
   const hero = variant === "hero";
   const playerBrand = getPlayerBranding();
@@ -214,6 +218,13 @@ export default function SpinViewer({
     const spin = driftMode ? 1 : -1;
     let yaw = (START_FRAME / FRAMES) * TWO_PI;
     let yawVel = 0;
+    // Loop off: clamp the drag between the first and last frame (no wrap).
+    const endYaw = (FRAMES - 1) * (TWO_PI / FRAMES);
+    const clampScrub = () => {
+      if (loopScrub) return;
+      if (yaw < 0) { yaw = 0; yawVel = 0; }
+      else if (yaw > endYaw) { yaw = endYaw; yawVel = 0; }
+    };
     let zoom = 1, zoomTarget = 1;
     let panX = 0, panY = 0, panTX = 0, panTY = 0;
     // Start paused — no autoplay. The loop/play button (shown when enableLoop)
@@ -446,6 +457,7 @@ export default function SpinViewer({
       if (!alive) return;
       if (idleSpin) yaw += spin * 0.004;
       else if (Math.abs(yawVel) > 0.00003) { yaw += yawVel; yawVel *= 0.94; }
+      clampScrub();
       zoom += (zoomTarget - zoom) * 0.18; // eased zoom for a premium feel
       if (zoomTarget <= 1.1) { panTX = 0; panTY = 0; }
       panX += (panTX - panX) * 0.2;
@@ -558,6 +570,7 @@ export default function SpinViewer({
         const k = 0.006;
         const d = spin * dx * k;
         yaw += d;
+        clampScrub();
         yawVel = (d / dt) * 16;
         // Drift: point the arrow the way you're dragging (right = forward, left = back).
         if (driftMode && dx !== 0) hintRef.current?.classList.toggle("r3d-back", dx < 0);
@@ -569,6 +582,7 @@ export default function SpinViewer({
         const k = 0.006;
         const d = spin * dx * k;
         yaw += d;
+        clampScrub();
         yawVel = (d / dt) * 16;
         // Drift: point the arrow the way you're dragging (right = forward, left = back).
         if (driftMode && dx !== 0) hintRef.current?.classList.toggle("r3d-back", dx < 0);
@@ -890,7 +904,7 @@ export default function SpinViewer({
       document.documentElement.classList.remove("r3d-fs-lock");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manifest, FRAMES, DEFAULT_FRAME, hero, driftMode]);
+  }, [manifest, FRAMES, DEFAULT_FRAME, hero, driftMode, loopScrub]);
 
   const fireCta = (which: "primary" | "secondary", cta?: SpinCta) => {
     if (!cta) return;

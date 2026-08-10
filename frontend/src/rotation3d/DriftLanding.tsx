@@ -83,6 +83,7 @@ function PlayerModal({ item, onClose }: { item: Item; onClose: () => void }) {
         <SpinViewer
           manifest={manifest}
           driftMode
+          loopScrub={item.loopEnabled}
           brandName="Drift Link"
           productName={item.name}
           title={item.title}

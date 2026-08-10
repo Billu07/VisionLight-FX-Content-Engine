@@ -420,7 +420,7 @@ export default function DriftAdminPanel() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [frames, setFrames] = useState(60);
   const [bgMode, setBgMode] = useState("keep");
-  const [loopDefault, setLoopDefault] = useState(true);
+  const [loopDefault, setLoopDefault] = useState(false); // Drift defaults to no loop
   const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [processing, setProcessing] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
