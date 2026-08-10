@@ -12,6 +12,7 @@ type EditProduct = {
   name: string;
   slug?: string;
   title?: string | null;
+  titleEnd?: string | null;
   description?: string | null;
   status?: string;
   defaultFrame?: number;
@@ -38,6 +39,7 @@ export default function BrandProductEditModal({
 }) {
   const frameMax = Math.max(0, (product.spin?.frameCount || 1) - 1);
   const [title, setTitle] = useState(product.title || "");
+  const [titleEnd, setTitleEnd] = useState(product.titleEnd || "");
   const [description, setDescription] = useState(product.description || "");
   const [ctaPLabel, setCtaPLabel] = useState(product.ctaPrimary?.label || "");
   const [ctaPUrl, setCtaPUrl] = useState(product.ctaPrimary?.url || "");
@@ -62,7 +64,10 @@ export default function BrandProductEditModal({
       publish,
     };
     if (slug.trim()) data.slug = slug.trim();
-    if (showLoop) data.loopEnabled = loopEnabled;
+    if (showLoop) {
+      data.loopEnabled = loopEnabled;
+      data.titleEnd = titleEnd.trim() || null;
+    }
     try {
       await onSave(data);
       onClose();
@@ -96,9 +101,20 @@ export default function BrandProductEditModal({
 
         <div className="space-y-3.5">
           <div>
-            <label className={label}>Title</label>
+            <label className={label}>{showLoop ? "Headline 1 (start)" : "Title"}</label>
             <input className={`${field} mt-1`} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Optional display title" />
           </div>
+          {showLoop && (
+            <div>
+              <label className={label}>Headline 2 (end)</label>
+              <input
+                className={`${field} mt-1`}
+                value={titleEnd}
+                onChange={(e) => setTitleEnd(e.target.value)}
+                placeholder="Crossfades in as you drag to the end"
+              />
+            </div>
+          )}
           <div>
             <label className={label}>Description</label>
             <textarea

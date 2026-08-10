@@ -173,9 +173,10 @@ export default function Rotation3DPlayer() {
       productName={p.name || "Product"}
       title={p.title}
       description={p.description}
+      titleEnd={drift ? p.titleEnd : undefined}
       videoUrl={p.videoUrl}
       showViewSelector={p.showViewSelector}
-      enableLoop={drift ? p.loopEnabled ?? true : getPlayerBranding().loopByDefault}
+      enableLoop={drift ? false : getPlayerBranding().loopByDefault}
       driftMode={drift}
       captions={captions}
       logoUrl={p.logoUrl}

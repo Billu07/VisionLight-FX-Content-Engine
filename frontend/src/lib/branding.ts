@@ -80,11 +80,11 @@ export const PLAYER_BRANDING: Record<PlayerBrand, PlayerBranding> = {
     loopByDefault: false,
   },
   drift: {
-    name: "Drift",
+    name: "Drift Link",
     url: "https://drift.li",
     primary: "#22d3ee",
     secondary: "#3b82f6",
-    loopByDefault: true,
+    loopByDefault: false,
   },
 };
 

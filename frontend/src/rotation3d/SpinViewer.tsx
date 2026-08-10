@@ -69,6 +69,8 @@ export type SpinViewerProps = {
   /** optional product info shown beside the player (desktop right / mobile top) */
   title?: string | null;
   description?: string | null;
+  /** Drift second headline — crossfades in as you drag toward the end frame. */
+  titleEnd?: string | null;
   /** rendered rotation clip — enables the "Video" tab in the view selector */
   videoUrl?: string | null;
   /** Lab feature (off by default): show the thumbnail view selector (stills) */
@@ -146,6 +148,7 @@ export default function SpinViewer({
   showBrand = true,
   title,
   description,
+  titleEnd,
   showViewSelector = false,
   enableLoop = false,
   driftMode = false,
@@ -164,6 +167,8 @@ export default function SpinViewer({
   const hintRef = useRef<HTMLDivElement>(null);
   const degRef = useRef<HTMLSpanElement>(null);
   const fillRef = useRef<HTMLDivElement>(null);
+  const head1Ref = useRef<HTMLDivElement>(null);
+  const head2Ref = useRef<HTMLDivElement>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<SVGCircleElement>(null);
   const pctRef = useRef<HTMLDivElement>(null);
@@ -432,6 +437,9 @@ export default function SpinViewer({
       const nav = (((spin * (yaw - startYaw)) % TWO_PI + TWO_PI) % TWO_PI) / TWO_PI;
       if (degRef.current) degRef.current.textContent = (Math.round(nav * 360) % 360) + "°";
       if (fillRef.current) fillRef.current.style.left = nav * 100 + "%";
+      // Drift dual headline: crossfade headline 1 → 2 as you drag start → end.
+      if (head1Ref.current) head1Ref.current.style.opacity = String(1 - nav);
+      if (head2Ref.current) head2Ref.current.style.opacity = String(nav);
     };
 
     const tick = () => {
@@ -918,7 +926,7 @@ export default function SpinViewer({
           </div>
         </div>
         <div className="r3d-tools">
-          {enableLoop && (
+          {enableLoop && !driftMode && (
             <button className="r3d-iconbtn" data-loop title="Play / pause auto-rotate" aria-label="Toggle auto-rotate">
               <svg ref={loopIconRef} viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 5h4v14H6zM14 5h4v14h-4z" /></svg>
             </button>
@@ -932,12 +940,20 @@ export default function SpinViewer({
         </div>
       </div>
 
-      {!hero && (title || description) && (
+      {!hero && driftMode && titleEnd ? (
+        <div className="r3d-heads" aria-hidden>
+          <div className="r3d-heads-stack">
+            <div className="r3d-head" ref={head1Ref}>{title}</div>
+            <div className="r3d-head" ref={head2Ref} style={{ opacity: 0 }}>{titleEnd}</div>
+          </div>
+          {description && <div className="r3d-heads-desc">{description}</div>}
+        </div>
+      ) : !hero && (title || description) ? (
         <div className="r3d-info" aria-hidden>
           {title && <div className="r3d-info-title">{title}</div>}
           {description && <div className="r3d-info-desc">{description}</div>}
         </div>
-      )}
+      ) : null}
 
       <div className="r3d-zoomcol">
         <button className="r3d-iconbtn" data-z="1" aria-label="Zoom in">+</button>
@@ -1022,7 +1038,7 @@ export default function SpinViewer({
         aria-label={`Powered by ${playerBrand.name}`}
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
-        <span>Powered by <b>{playerBrand.name}</b></span>
+        <span>{driftMode ? "Powered By " : "Powered by "}<b>{playerBrand.name}</b></span>
       </a>
 
       <div className="r3d-loader" ref={loaderRef}>
@@ -1110,6 +1126,17 @@ const R3D_CSS = `
 .r3d-drift-arrow svg{width:24px;height:24px;color:#eef1f6;transition:transform .25s}
 .r3d-hint.r3d-back .r3d-drift-arrow svg{transform:scaleX(-1)}
 @media (prefers-reduced-motion:reduce){.r3d-drift-arrow{animation:none}}
+/* Drift: "Powered By Drift Link" sits UNDER the frame, not at the top. */
+.r3d-drift .r3d-powered-badge{top:auto;bottom:calc(20px + env(safe-area-inset-bottom))}
+/* Drift: crossfading dual headline (headline 1 at start → headline 2 at the end). */
+.r3d-heads{position:absolute;left:0;right:0;top:calc(64px + env(safe-area-inset-top));z-index:4;display:flex;flex-direction:column;align-items:center;padding:0 20px;pointer-events:none;text-align:center}
+.r3d-heads-stack{display:grid;place-items:center}
+.r3d-head{grid-area:1/1;font-size:22px;font-weight:800;line-height:1.15;letter-spacing:-.01em;color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.6);transition:opacity .25s}
+.r3d-heads-desc{margin-top:8px;font-size:14px;line-height:1.5;color:#d3dae7;text-shadow:0 1px 10px rgba(0,0,0,.6);max-width:42ch}
+@media (max-width:560px){
+  .r3d-drift .r3d-info-title,.r3d-drift .r3d-head{font-size:26px}
+  .r3d-drift .r3d-info-desc,.r3d-drift .r3d-heads-desc{font-size:16px}
+}
 .r3d-loader{position:absolute;inset:0;z-index:20;display:grid;place-items:center;background:linear-gradient(to bottom right,#111827,#0B0F19);transition:opacity .5s}
 .r3d-loader.r3d-gone{opacity:0;pointer-events:none}
 .r3d-ring{width:64px;height:64px;transform:rotate(-90deg)}

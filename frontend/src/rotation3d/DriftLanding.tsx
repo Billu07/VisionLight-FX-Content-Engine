@@ -20,6 +20,9 @@ type Item = {
   source: string;
   id: string;
   name: string;
+  title?: string | null;
+  titleEnd?: string | null;
+  description?: string | null;
   brandName: string;
   defaultFrame: number;
   background: string | null;
@@ -80,9 +83,11 @@ function PlayerModal({ item, onClose }: { item: Item; onClose: () => void }) {
         <SpinViewer
           manifest={manifest}
           driftMode
-          enableLoop
-          brandName="drift.li"
+          brandName="Drift Link"
           productName={item.name}
+          title={item.title}
+          titleEnd={item.titleEnd}
+          description={item.description}
           background={item.background || undefined}
           primaryColor={DRIFT_PRIMARY}
           secondaryColor={DRIFT_SECONDARY}
@@ -126,7 +131,7 @@ export default function DriftLanding() {
 
       <header className="dl-header">
         <div className="dl-word">
-          drift<span>.li</span>
+          Drift Link<span>&nbsp;Interactive</span>
         </div>
         <button className="dl-login" onClick={() => setShowLogin(true)}>
           Log in
@@ -180,7 +185,7 @@ export default function DriftLanding() {
 
       <footer className="dl-footer">
         <div className="dl-word">
-          drift<span>.li</span>
+          Drift Link<span>&nbsp;Interactive</span>
         </div>
         <span>Interactive drift paths</span>
       </footer>

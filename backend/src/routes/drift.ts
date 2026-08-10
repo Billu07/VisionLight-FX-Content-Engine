@@ -675,6 +675,7 @@ async function applyProductPatch(
   if ("background" in body) data.background = String(body.background || "").slice(0, 40);
   if (typeof body.loopEnabled === "boolean") data.loopEnabled = body.loopEnabled;
   if ("title" in body) data.title = body.title ? String(body.title).slice(0, 120) : null;
+  if ("titleEnd" in body) data.titleEnd = body.titleEnd ? String(body.titleEnd).slice(0, 120) : null;
   if ("description" in body)
     data.description = body.description ? String(body.description).slice(0, 600) : null;
   if (typeof body.publish === "boolean") data.status = body.publish ? "PUBLISHED" : "READY";
@@ -861,6 +862,7 @@ const publicProductPayload = (p: any, bc: any, orgName: string, captions: any[])
   name: p.name,
   slug: p.slug,
   title: p.title,
+  titleEnd: p.titleEnd,
   description: p.description,
   defaultFrame: p.defaultFrame,
   loopEnabled: p.loopEnabled,
@@ -1166,6 +1168,7 @@ async function resolveLandingItem(item: {
     const m = p.spin.manifest as any;
     return {
       itemId: item.id, source: "ROTATION3D", id: p.id, name: p.name,
+      title: p.title, titleEnd: null, description: p.description,
       brandName: p.organization?.name || "", defaultFrame: p.defaultFrame,
       background: p.background, loopEnabled: true, manifest: m, secondManifest: null,
       rank: item.rank, isHero: item.isHero, thumb: landingThumb(m, p.defaultFrame),
@@ -1182,6 +1185,7 @@ async function resolveLandingItem(item: {
   const m = p.spin.manifest as any;
   return {
     itemId: item.id, source: "DRIFT", id: p.id, name: p.name,
+    title: p.title, titleEnd: p.titleEnd, description: p.description,
     brandName: p.organization?.name || "", defaultFrame: p.defaultFrame,
     background: p.background, loopEnabled: p.loopEnabled, manifest: m,
     secondManifest: p.spin.secondManifest ?? null,
