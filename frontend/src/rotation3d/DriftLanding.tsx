@@ -4,11 +4,11 @@ import { apiEndpoints } from "../lib/api";
 import { LoginModal } from "../components/LoginModal";
 
 /**
- * drift.li landing — crafted, premium SaaS feel (matches the picdrift studio
- * design language: layered gradient base, frosted header, gradient headlines,
- * pill CTAs, fanned preview cards, a 3D-tilted showcase panel). Content is the
- * curated drifts; clicking any opens a smooth full-screen interactive modal
- * built from the manifest already on the page (works for Drift + Rotation3D).
+ * drift.li landing — a cinematic "gallery in motion": an infinite auto-scrolling
+ * poster reel (two rows drifting opposite ways) over a grain + aurora backdrop,
+ * then an asymmetric bento explore grid. Clicking any drift opens a smooth
+ * full-screen interactive modal built from the manifest already on the page
+ * (works for Drift + Rotation3D-sourced items). Cyan/blue cinematic theme.
  */
 
 const DRIFT_PRIMARY = "#22d3ee";
@@ -82,28 +82,33 @@ function PlayerModal({ item, onClose }: { item: Item; onClose: () => void }) {
   );
 }
 
-// A poster card — the building block used in the hero fan and the grid.
-function Poster({ it, onOpen }: { it: Item; onOpen: () => void }) {
+// A single reel card (used in the marquee rows).
+function ReelCard({ it, onOpen }: { it: Item; onOpen: () => void }) {
   return (
-    <button type="button" onClick={onOpen} className="group text-left">
-      <div className="relative aspect-[4/5] overflow-hidden rounded-[1.4rem] border border-white/10 bg-gradient-to-b from-[#0c1830] to-[#070c1a] shadow-[0_20px_50px_-24px_rgba(3,10,30,0.9)] transition-all duration-500 group-hover:-translate-y-1.5 group-hover:border-cyan-300/40 group-hover:shadow-[0_34px_70px_-28px_rgba(34,211,238,0.45)]">
-        {it.thumb ? (
-          <img src={it.thumb} alt={it.name} loading="lazy" className="h-full w-full object-contain p-[7%] transition-transform duration-700 group-hover:scale-[1.05]" />
-        ) : (
-          <div className="h-full w-full" />
-        )}
-        <span className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100" style={{ background: "radial-gradient(60% 60% at 50% 42%, rgba(34,211,238,0.16), transparent 70%)" }} />
-        <span className="absolute left-3.5 top-3.5 rounded-full border border-white/15 bg-black/35 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-white/80 backdrop-blur-sm">
-          {it.source === "ROTATION3D" ? "Rotation3D" : "Drift"}
-        </span>
-        <span className="absolute bottom-3.5 left-3.5 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold text-cyan-100 opacity-0 backdrop-blur-md transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100" style={{ transform: "translateY(6px)" }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={DRIFT_PRIMARY} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
-          interact
-        </span>
+    <button type="button" onClick={onOpen} className="dl-reel-card group" aria-label={it.name}>
+      <div className="dl-reel-art">
+        {it.thumb ? <img src={it.thumb} alt={it.name} loading="lazy" /> : null}
+        <span className="dl-reel-glow" />
+        <span className="dl-reel-tag">{it.source === "ROTATION3D" ? "R3D" : "Drift"}</span>
+        <span className="dl-reel-name">{it.name}</span>
       </div>
-      <div className="mt-3 flex items-baseline justify-between gap-3 px-0.5">
-        <span className="truncate text-[15px] font-semibold text-slate-100">{it.name}</span>
-        {it.brandName && <span className="shrink-0 text-[11px] text-slate-500">{it.brandName}</span>}
+    </button>
+  );
+}
+
+// A bento tile (varied size in the explore grid).
+function BentoTile({ it, onOpen, big }: { it: Item; onOpen: () => void; big?: boolean }) {
+  return (
+    <button type="button" onClick={onOpen} className={`dl-bento group ${big ? "dl-bento-big" : ""}`} aria-label={it.name}>
+      <div className="dl-bento-art">
+        {it.thumb ? <img src={it.thumb} alt={it.name} loading="lazy" /> : null}
+        <span className="dl-bento-glow" />
+      </div>
+      <div className="dl-bento-meta">
+        <span className="dl-bento-name">{it.name}</span>
+        <span className="dl-bento-go">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
+        </span>
       </div>
     </button>
   );
@@ -128,150 +133,103 @@ export default function DriftLanding() {
   }, []);
 
   const hero = items.find((i) => i.isHero) || items[0] || null;
-  const rest = items.filter((i) => i !== hero);
-  const fan = items.slice(0, 4);
-  const fanRot = ["-9deg", "-3deg", "4deg", "10deg"];
-  const fanX = ["0%", "24%", "48%", "70%"];
-  const fanY = ["16%", "4%", "9%", "1%"];
+
+  // Build a reel long enough to loop smoothly (repeat sparse sets), then split.
+  const reel = useMemo(() => {
+    if (items.length === 0) return { a: [] as Item[], b: [] as Item[] };
+    let pool = [...items];
+    while (pool.length < 8) pool = [...pool, ...items];
+    const half = Math.ceil(pool.length / 2);
+    return { a: pool.slice(0, half), b: pool.slice(half).concat(pool.slice(0, half)).slice(0, half) };
+  }, [items]);
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-[#060a18] text-white" style={{ fontFamily: '"Bai Jamjuree",ui-sans-serif,system-ui,sans-serif' }}>
+    <div className="dl-root">
       <style>{CSS}</style>
-
-      {/* Layered gradient atmosphere */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_10%,rgba(34,211,238,0.16),transparent_40%),radial-gradient(circle_at_84%_16%,rgba(59,130,246,0.28),transparent_44%),radial-gradient(circle_at_50%_62%,rgba(11,14,34,0.6),transparent_60%)]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[50%] bg-gradient-to-r from-[#04121f] via-[#0b1c48] to-[#0a2a52]" />
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-[-160px] h-[66%] bg-gradient-to-r from-[#0e3a6b] via-[#2a5ad8] to-[#123a86] opacity-90"
-        style={{ clipPath: "polygon(0 18%, 100% 0, 100% 100%, 0 100%)" }}
-      />
+      <div className="dl-aurora" aria-hidden />
+      <div className="dl-grain" aria-hidden />
 
       {/* Header */}
-      <header className="relative z-20 border-b border-white/10 bg-[#0a1024]/60 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6">
-          <div className="text-[20px] font-extrabold tracking-tight text-white">
-            Drift Link<span className="ml-1 bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent">Interactive</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="hidden text-xs font-medium uppercase tracking-[0.18em] text-slate-400 sm:inline">Interactive drift paths</span>
-            <button
-              onClick={() => setShowLogin(true)}
-              className="rounded-full border border-white/30 bg-white/5 px-5 py-1.5 text-sm font-semibold text-white transition hover:bg-white/12"
-            >
-              Log in
-            </button>
-          </div>
+      <header className="dl-header">
+        <div className="dl-word">
+          Drift Link<span>Interactive</span>
+        </div>
+        <div className="dl-nav">
+          <span className="dl-nav-tag">Interactive drift paths</span>
+          <button className="dl-login" onClick={() => setShowLogin(true)}>
+            Log in
+          </button>
         </div>
       </header>
 
-      <main className="relative z-10">
-        {/* Hero */}
-        <section className="mx-auto grid w-full max-w-7xl items-center gap-10 px-4 pb-16 pt-14 sm:px-6 lg:grid-cols-[1fr_1.15fr] lg:pt-20">
-          <div className="max-w-xl">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-400/[0.07] px-3.5 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-200">
-              <span className="h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.9)]" />
-              Motion you can hold
-            </div>
-            <h1 className="text-4xl font-black leading-[1.03] tracking-tight text-white sm:text-5xl lg:text-6xl">
-              Drag anything
-              <span className="mt-1 block bg-gradient-to-r from-cyan-300 via-sky-300 to-blue-400 bg-clip-text text-transparent">
-                to life.
-              </span>
-            </h1>
-            <p className="mt-5 max-w-md text-lg leading-relaxed text-slate-300 sm:text-xl">
-              Real footage turned into an interactive path you scrub with a finger — headlines, captions, and CTAs that move with the motion.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              {hero && (
-                <button
-                  onClick={() => setActive(hero)}
-                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 px-7 py-3 text-sm font-black text-[#04121a] shadow-[0_16px_40px_-14px_rgba(34,211,238,0.65)] transition hover:from-cyan-300 hover:to-blue-400"
-                >
-                  Explore the drift
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
-                </button>
-              )}
-              <button
-                onClick={() => setShowLogin(true)}
-                className="rounded-full border border-white/40 bg-white/5 px-7 py-3 text-sm font-bold text-white transition hover:bg-white/12"
-              >
-                Log in
-              </button>
+      {/* Hero */}
+      <section className="dl-hero">
+        <div className="dl-eyebrow">
+          <span className="dl-dot" />
+          Motion you can hold
+        </div>
+        <h1 className="dl-title">
+          Drag anything <em>to life.</em>
+        </h1>
+        <p className="dl-sub">
+          Real footage, turned into an interactive path you scrub with a finger — headlines, captions, and
+          calls-to-action that move with the shot.
+        </p>
+        <div className="dl-cta-row">
+          {hero && (
+            <button className="dl-cta" onClick={() => setActive(hero)}>
+              Explore the drift
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
+            </button>
+          )}
+          <button className="dl-cta-ghost" onClick={() => setShowLogin(true)}>
+            Log in
+          </button>
+        </div>
+      </section>
+
+      {/* Signature marquee gallery */}
+      {items.length > 0 && (
+        <section className="dl-reel-wrap" aria-label="Drift gallery">
+          <div className="dl-reel-row">
+            <div className="dl-reel-track">
+              {[...reel.a, ...reel.a].map((it, i) => (
+                <ReelCard key={`a${i}`} it={it} onOpen={() => setActive(it)} />
+              ))}
             </div>
           </div>
-
-          {/* Fanned preview cards */}
-          <div className="relative h-[320px] sm:h-[380px] lg:h-[420px]">
-            {fan.length > 0 ? (
-              <div className="absolute inset-0 origin-top-left scale-[0.72] sm:scale-90 lg:scale-100">
-                {fan.map((it, i) => (
-                  <button
-                    key={it.itemId}
-                    type="button"
-                    onClick={() => setActive(it)}
-                    className="dl-fan group absolute h-[280px] w-[188px] overflow-hidden rounded-[1.6rem] border border-white/15 bg-gradient-to-b from-[#0d1b34] to-[#070d1e] p-2.5 shadow-[0_26px_50px_-18px_rgba(3,8,28,0.85)] transition-all duration-500 hover:z-10 hover:-translate-y-2 hover:border-cyan-300/45 sm:h-[310px] sm:w-[210px]"
-                    style={{ left: fanX[i], top: fanY[i], transform: `rotate(${fanRot[i]})` }}
-                  >
-                    <div className="relative h-full w-full overflow-hidden rounded-[1.1rem] border border-white/10 bg-[#060b16]">
-                      {it.thumb ? (
-                        <img src={it.thumb} alt={it.name} className="h-full w-full object-contain p-[9%]" loading={i === 0 ? "eager" : "lazy"} />
-                      ) : null}
-                      <span className="absolute left-2.5 top-2.5 rounded-full border border-white/20 bg-black/30 px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest text-white/85 backdrop-blur-sm">
-                        {it.source === "ROTATION3D" ? "R3D" : "Drift"}
-                      </span>
-                      <span className="absolute inset-x-2.5 bottom-2.5 truncate rounded-lg bg-black/40 px-2 py-1 text-center text-[11px] font-bold text-white/90 backdrop-blur-sm">
-                        {it.name}
-                      </span>
-                    </div>
-                  </button>
-                ))}
-                {hero && (
-                  <button
-                    type="button"
-                    onClick={() => setActive(hero)}
-                    aria-label="Explore the hero drift"
-                    className="absolute left-1/2 top-[38%] flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border border-white/30 bg-white/20 shadow-[0_12px_30px_rgba(5,10,35,0.55)] backdrop-blur-xl transition hover:scale-105 hover:bg-white/30 sm:h-20 sm:w-20"
-                  >
-                    <div className="ml-1 h-0 w-0 border-y-[11px] border-l-[17px] border-y-transparent border-l-white" />
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="grid h-full place-items-center rounded-[1.6rem] border border-dashed border-white/12 text-sm text-slate-500">
-                {loading ? "Loading…" : "Nothing showcased yet."}
-              </div>
-            )}
+          <div className="dl-reel-row">
+            <div className="dl-reel-track dl-reel-rev">
+              {[...reel.b, ...reel.b].map((it, i) => (
+                <ReelCard key={`b${i}`} it={it} onOpen={() => setActive(it)} />
+              ))}
+            </div>
           </div>
         </section>
+      )}
 
-        {/* Showcase grid in a 3D-tilted panel */}
-        {rest.length > 0 && (
-          <section className="mx-auto w-full max-w-7xl px-4 pb-20 sm:px-6">
-            <div className="dl-panel relative rounded-[2rem] border border-cyan-300/20 bg-[#070d24]/85 p-4 shadow-[0_28px_80px_-30px_rgba(8,14,42,0.7)] backdrop-blur-sm sm:p-7">
-              <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-gradient-to-br from-cyan-300/[0.06] via-transparent to-blue-500/[0.1]" />
-              <div className="relative rounded-[1.5rem] border border-white/10 bg-gradient-to-br from-[#080c22] to-[#06081a] p-4 sm:p-6">
-                <div className="mb-5 flex items-baseline justify-between">
-                  <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-slate-200">Explore drifts</h2>
-                  <span className="text-xs text-slate-500">{rest.length} interactive</span>
-                </div>
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                  {rest.map((it) => (
-                    <Poster key={it.itemId} it={it} onOpen={() => setActive(it)} />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-      </main>
-
-      <footer className="relative z-10 border-t border-white/8">
-        <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-3 px-4 py-8 text-xs text-slate-500 sm:flex-row sm:px-6">
-          <div className="text-[15px] font-extrabold tracking-tight text-slate-300">
-            Drift Link<span className="ml-1 bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent">Interactive</span>
+      {/* Bento explore */}
+      {items.length > 0 ? (
+        <section className="dl-explore">
+          <div className="dl-explore-head">
+            <h2>The gallery</h2>
+            <span>{items.length} interactive drift{items.length === 1 ? "" : "s"}</span>
           </div>
-          <span className="tracking-[0.06em]">Interactive drift paths · {"©"} 2026</span>
+          <div className="dl-bento-grid">
+            {items.map((it, i) => (
+              <BentoTile key={it.itemId} it={it} onOpen={() => setActive(it)} big={i === 0} />
+            ))}
+          </div>
+        </section>
+      ) : (
+        <section className="dl-empty">{loading ? "Loading the gallery…" : "Nothing showcased yet."}</section>
+      )}
+
+      <footer className="dl-footer">
+        <div className="dl-word dl-word-sm">
+          Drift Link<span>Interactive</span>
         </div>
+        <span>Interactive drift paths · © 2026</span>
       </footer>
 
       {active && <PlayerModal item={active} onClose={() => setActive(null)} />}
@@ -280,7 +238,88 @@ export default function DriftLanding() {
   );
 }
 
+const GRAIN =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
+
 const CSS = `
+.dl-root{position:relative;min-height:100dvh;background:#050912;color:#e9eef7;font-family:"Bai Jamjuree",ui-sans-serif,system-ui,sans-serif;overflow-x:hidden;isolation:isolate}
+.dl-aurora{position:fixed;inset:0;z-index:-2;pointer-events:none;background:
+  radial-gradient(45% 55% at 15% 8%, rgba(34,211,238,.16), transparent 70%),
+  radial-gradient(50% 55% at 85% 12%, rgba(59,130,246,.22), transparent 70%),
+  radial-gradient(60% 60% at 50% 100%, rgba(37,99,235,.16), transparent 70%),
+  linear-gradient(to bottom,#050912,#070c1a 60%,#04080f)}
+.dl-grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.045;background-image:${GRAIN};background-size:140px 140px}
+
+.dl-header{position:relative;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:20px clamp(18px,5vw,56px);border-bottom:1px solid rgba(255,255,255,.07);background:rgba(6,10,22,.5);backdrop-filter:blur(18px)}
+.dl-word{font-weight:800;font-size:21px;letter-spacing:-.02em;color:#fff}
+.dl-word span{margin-left:6px;background:linear-gradient(120deg,${DRIFT_PRIMARY},${DRIFT_SECONDARY});-webkit-background-clip:text;background-clip:text;color:transparent}
+.dl-word-sm{font-size:15px}
+.dl-nav{display:flex;align-items:center;gap:18px}
+.dl-nav-tag{display:none;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#7387a1}
+@media(min-width:640px){.dl-nav-tag{display:inline}}
+.dl-login{padding:9px 20px;border-radius:999px;border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.05);color:#fff;font-family:inherit;font-weight:600;font-size:13px;cursor:pointer;transition:background .2s,border-color .2s}
+.dl-login:hover{background:rgba(34,211,238,.12);border-color:rgba(34,211,238,.5)}
+
+.dl-hero{position:relative;z-index:2;max-width:940px;margin:0 auto;text-align:center;padding:clamp(48px,9vw,110px) 22px clamp(28px,4vw,44px)}
+.dl-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 15px;border-radius:999px;border:1px solid rgba(34,211,238,.25);background:rgba(34,211,238,.06);font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#a6ecf7;margin-bottom:22px}
+.dl-dot{width:6px;height:6px;border-radius:50%;background:${DRIFT_PRIMARY};box-shadow:0 0 10px rgba(34,211,238,.9)}
+.dl-title{margin:0;font-size:clamp(40px,7.4vw,86px);line-height:1.0;font-weight:800;letter-spacing:-.035em;color:#fff}
+.dl-title em{font-style:normal;background:linear-gradient(120deg,${DRIFT_PRIMARY},#7dd3fc,${DRIFT_SECONDARY});-webkit-background-clip:text;background-clip:text;color:transparent}
+.dl-sub{margin:22px auto 0;max-width:52ch;font-size:clamp(15px,1.7vw,19px);line-height:1.6;color:#9fb2c9}
+.dl-cta-row{margin-top:32px;display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+.dl-cta{display:inline-flex;align-items:center;gap:10px;padding:14px 26px;border-radius:999px;border:none;cursor:pointer;font-family:inherit;font-weight:800;font-size:14px;color:#04121a;background:linear-gradient(120deg,${DRIFT_PRIMARY},${DRIFT_SECONDARY});box-shadow:0 16px 44px -14px rgba(34,211,238,.6);transition:transform .2s,box-shadow .2s}
+.dl-cta:hover{transform:translateY(-2px);box-shadow:0 22px 54px -16px rgba(34,211,238,.75)}
+.dl-cta-ghost{padding:14px 26px;border-radius:999px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.05);color:#fff;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;transition:background .2s}
+.dl-cta-ghost:hover{background:rgba(255,255,255,.12)}
+
+/* Signature marquee gallery */
+.dl-reel-wrap{position:relative;z-index:2;display:flex;flex-direction:column;gap:16px;padding:clamp(20px,4vw,44px) 0}
+.dl-reel-wrap::before,.dl-reel-wrap::after{content:"";position:absolute;top:0;bottom:0;width:12vw;max-width:180px;z-index:3;pointer-events:none}
+.dl-reel-wrap::before{left:0;background:linear-gradient(to right,#050912,transparent)}
+.dl-reel-wrap::after{right:0;background:linear-gradient(to left,#050912,transparent)}
+.dl-reel-row{overflow:hidden}
+.dl-reel-track{display:flex;gap:18px;width:max-content;padding:0 9px;animation:dlreel 60s linear infinite}
+.dl-reel-rev{animation-direction:reverse;animation-duration:72s}
+.dl-reel-wrap:hover .dl-reel-track{animation-play-state:paused}
+@keyframes dlreel{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.dl-reel-card{flex:0 0 auto;width:clamp(180px,20vw,236px);padding:0;border:0;background:transparent;cursor:pointer}
+.dl-reel-art{position:relative;aspect-ratio:4/5;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.09);background:linear-gradient(180deg,#0c1830,#070c1a);transition:transform .4s cubic-bezier(.2,.7,.2,1),border-color .4s,box-shadow .4s}
+.dl-reel-art img{width:100%;height:100%;object-fit:contain;padding:8%;transition:transform .6s cubic-bezier(.2,.7,.2,1)}
+.dl-reel-glow{position:absolute;inset:0;opacity:0;transition:opacity .4s;background:radial-gradient(60% 60% at 50% 42%,rgba(34,211,238,.18),transparent 70%)}
+.dl-reel-card:hover .dl-reel-art{transform:translateY(-6px) scale(1.02);border-color:rgba(34,211,238,.5);box-shadow:0 30px 60px -28px rgba(34,211,238,.55)}
+.dl-reel-card:hover .dl-reel-art img{transform:scale(1.06)}
+.dl-reel-card:hover .dl-reel-glow{opacity:1}
+.dl-reel-tag{position:absolute;left:12px;top:12px;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(4,8,18,.5);padding:3px 9px;font-size:8px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.85);backdrop-filter:blur(6px)}
+.dl-reel-name{position:absolute;left:12px;right:12px;bottom:12px;text-align:center;font-size:12px;font-weight:700;color:#eaf1fa;background:rgba(4,8,18,.45);border-radius:9px;padding:5px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;backdrop-filter:blur(6px);opacity:0;transform:translateY(6px);transition:opacity .3s,transform .3s}
+.dl-reel-card:hover .dl-reel-name{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){.dl-reel-track{animation:none}}
+
+/* Bento explore */
+.dl-explore{position:relative;z-index:2;max-width:1240px;margin:0 auto;padding:clamp(30px,5vw,64px) clamp(18px,5vw,40px) 60px}
+.dl-explore-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px;padding-bottom:16px;border-bottom:1px solid rgba(255,255,255,.08)}
+.dl-explore-head h2{margin:0;font-size:clamp(20px,2.4vw,28px);font-weight:800;letter-spacing:-.02em;color:#fff}
+.dl-explore-head span{font-size:12px;color:#6c7f99;letter-spacing:.04em}
+.dl-bento-grid{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:170px;gap:14px}
+.dl-bento{position:relative;overflow:hidden;border-radius:20px;border:1px solid rgba(255,255,255,.08);background:linear-gradient(180deg,#0b1626,#070c18);padding:0;cursor:pointer;transition:transform .4s cubic-bezier(.2,.7,.2,1),border-color .4s,box-shadow .4s}
+.dl-bento-big{grid-column:span 2;grid-row:span 2}
+.dl-bento:hover{transform:translateY(-4px);border-color:rgba(34,211,238,.45);box-shadow:0 30px 66px -30px rgba(34,211,238,.5)}
+.dl-bento-art{position:absolute;inset:0}
+.dl-bento-art img{width:100%;height:100%;object-fit:contain;padding:8%;transition:transform .6s cubic-bezier(.2,.7,.2,1)}
+.dl-bento:hover .dl-bento-art img{transform:scale(1.05)}
+.dl-bento-glow{position:absolute;inset:0;opacity:0;transition:opacity .4s;background:radial-gradient(55% 55% at 50% 42%,rgba(34,211,238,.15),transparent 70%)}
+.dl-bento:hover .dl-bento-glow{opacity:1}
+.dl-bento-meta{position:absolute;inset:auto 0 0 0;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;background:linear-gradient(to top,rgba(4,8,16,.85),transparent)}
+.dl-bento-name{font-size:13px;font-weight:600;color:#eaf1fa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dl-bento-big .dl-bento-name{font-size:16px}
+.dl-bento-go{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;border:1px solid rgba(34,211,238,.4);background:rgba(34,211,238,.12);color:${DRIFT_PRIMARY};flex:none;opacity:0;transform:translateX(-4px);transition:opacity .3s,transform .3s}
+.dl-bento:hover .dl-bento-go{opacity:1;transform:none}
+@media(max-width:860px){.dl-bento-grid{grid-template-columns:repeat(2,1fr);grid-auto-rows:150px}.dl-bento-big{grid-column:span 2;grid-row:span 2}}
+
+.dl-empty{position:relative;z-index:2;text-align:center;padding:100px 20px;color:#6b7c93;font-size:14px}
+.dl-footer{position:relative;z-index:2;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:space-between;padding:26px clamp(18px,5vw,40px);border-top:1px solid rgba(255,255,255,.07);color:#5f7089;font-size:12px;letter-spacing:.04em}
+@media(min-width:640px){.dl-footer{flex-direction:row}}
+
+/* Modal */
 .dl-modal{position:fixed;inset:0;z-index:200;display:grid;place-items:center;padding:clamp(14px,3vw,40px);background:rgba(3,6,12,.82);backdrop-filter:blur(10px);animation:dlfade .25s ease}
 @keyframes dlfade{from{opacity:0}to{opacity:1}}
 .dl-modal-stage{position:relative;width:min(1080px,94vw);height:min(78vh,760px);border-radius:22px;overflow:hidden;border:1px solid rgba(255,255,255,.12);box-shadow:0 50px 120px -40px rgba(0,0,0,.8)}
