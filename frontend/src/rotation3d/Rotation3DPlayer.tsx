@@ -174,6 +174,7 @@ export default function Rotation3DPlayer() {
       title={p.title}
       description={p.description}
       titleEnd={drift ? p.titleEnd : undefined}
+      descriptionEnd={drift ? p.descriptionEnd : undefined}
       helperStart={drift ? p.helperStart : undefined}
       helperEnd={drift ? p.helperEnd : undefined}
       videoUrl={p.videoUrl}

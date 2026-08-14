@@ -23,6 +23,7 @@ type Item = {
   title?: string | null;
   titleEnd?: string | null;
   description?: string | null;
+  descriptionEnd?: string | null;
   helperStart?: string | null;
   helperEnd?: string | null;
   brandName: string;
@@ -91,6 +92,7 @@ function PlayerModal({ item, onClose }: { item: Item; onClose: () => void }) {
           title={item.title}
           titleEnd={item.titleEnd}
           description={item.description}
+          descriptionEnd={item.descriptionEnd}
           helperStart={item.helperStart}
           helperEnd={item.helperEnd}
           background={item.background || undefined}

@@ -14,6 +14,7 @@ type EditProduct = {
   title?: string | null;
   titleEnd?: string | null;
   description?: string | null;
+  descriptionEnd?: string | null;
   helperStart?: string | null;
   helperEnd?: string | null;
   status?: string;
@@ -45,6 +46,7 @@ export default function BrandProductEditModal({
   const [helperStart, setHelperStart] = useState(product.helperStart || "");
   const [helperEnd, setHelperEnd] = useState(product.helperEnd || "");
   const [description, setDescription] = useState(product.description || "");
+  const [descriptionEnd, setDescriptionEnd] = useState(product.descriptionEnd || "");
   const [ctaPLabel, setCtaPLabel] = useState(product.ctaPrimary?.label || "");
   const [ctaPUrl, setCtaPUrl] = useState(product.ctaPrimary?.url || "");
   const [ctaSLabel, setCtaSLabel] = useState(product.ctaSecondary?.label || "");
@@ -71,6 +73,7 @@ export default function BrandProductEditModal({
     if (showLoop) {
       data.loopEnabled = loopEnabled;
       data.titleEnd = titleEnd.trim() || null;
+      data.descriptionEnd = descriptionEnd.trim() || null;
       data.helperStart = helperStart.trim() || null;
       data.helperEnd = helperEnd.trim() || null;
     }
@@ -144,14 +147,25 @@ export default function BrandProductEditModal({
             </div>
           )}
           <div>
-            <label className={label}>Description</label>
+            <label className={label}>{showLoop ? "Description 1 (start)" : "Description"}</label>
             <textarea
               className={`${field} mt-1 min-h-[60px] resize-y`}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional blurb shown beside the player"
+              placeholder="Optional blurb shown under the headline"
             />
           </div>
+          {showLoop && (
+            <div>
+              <label className={label}>Description 2 (end)</label>
+              <textarea
+                className={`${field} mt-1 min-h-[60px] resize-y`}
+                value={descriptionEnd}
+                onChange={(e) => setDescriptionEnd(e.target.value)}
+                placeholder="Dissolves in with headline 2 at the end"
+              />
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-2">
             <div>

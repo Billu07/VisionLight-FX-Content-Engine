@@ -69,8 +69,10 @@ export type SpinViewerProps = {
   /** optional product info shown beside the player (desktop right / mobile top) */
   title?: string | null;
   description?: string | null;
-  /** Drift second headline — crossfades in as you drag toward the end frame. */
+  /** Drift second headline — dissolves in when you reach the end frame. */
   titleEnd?: string | null;
+  /** Drift second description — dissolves in with headline 2 at the end. */
+  descriptionEnd?: string | null;
   /** Drift drag-helper text: forward (at start) and reverse (at end). The arrow +
    * text swap when you reach the end / return to the start. */
   helperStart?: string | null;
@@ -156,6 +158,7 @@ export default function SpinViewer({
   title,
   description,
   titleEnd,
+  descriptionEnd,
   helperStart,
   helperEnd,
   showViewSelector = false,
@@ -179,6 +182,8 @@ export default function SpinViewer({
   const fillRef = useRef<HTMLDivElement>(null);
   const head1Ref = useRef<HTMLDivElement>(null);
   const head2Ref = useRef<HTMLDivElement>(null);
+  const desc1Ref = useRef<HTMLDivElement>(null);
+  const desc2Ref = useRef<HTMLDivElement>(null);
   const helperTextRef = useRef<HTMLSpanElement>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<SVGCircleElement>(null);
@@ -246,6 +251,27 @@ export default function SpinViewer({
     const syncHelper = () => {
       hintRef.current?.classList.toggle("r3d-back", helperBack);
       if (helperTextRef.current) helperTextRef.current.textContent = helperBack ? backHelper : fwdHelper;
+    };
+    // Hand sequence: shown at start → hidden on first move → shown again at the end
+    // → hidden for good. And headline/description dissolve to #2 AT the end frame.
+    let helperPhase = 0; // 0 start-shown, 1 hidden, 2 end-shown, 3 done
+    let atEnd = false;
+    const hideHelper = () => hintRef.current?.classList.add("r3d-gone");
+    const showHelper = (back: boolean) => {
+      helperBack = back;
+      syncHelper();
+      hintRef.current?.classList.remove("r3d-gone");
+    };
+    const setHeadState = (end: boolean) => {
+      if (head1Ref.current) head1Ref.current.style.opacity = end ? "0" : "1";
+      if (head2Ref.current) head2Ref.current.style.opacity = end ? "1" : "0";
+      if (desc1Ref.current) desc1Ref.current.style.opacity = end ? "0" : "1";
+      if (desc2Ref.current) desc2Ref.current.style.opacity = end ? "1" : "0";
+    };
+    const advanceHelperOnDrag = () => {
+      if (!driftMode) return;
+      if (helperPhase === 0) { hideHelper(); helperPhase = 1; }
+      else if (helperPhase === 2) { hideHelper(); helperPhase = 3; }
     };
     let dirty = true, lastYaw = NaN, lastZoom = NaN, lastPX = 0, lastPY = 0;
     let touchZoomed = false;
@@ -471,16 +497,17 @@ export default function SpinViewer({
       const nav = (((spin * (yaw - startYaw)) % TWO_PI + TWO_PI) % TWO_PI) / TWO_PI;
       if (degRef.current) degRef.current.textContent = (Math.round(nav * 360) % 360) + "°";
       if (fillRef.current) fillRef.current.style.left = nav * 100 + "%";
-      // Drift dual headline: crossfade headline 1 → 2 as you drag start → end
-      // (only when there are two headlines; a single one stays fully visible).
-      if (head1Ref.current && head2Ref.current) {
-        head1Ref.current.style.opacity = String(1 - nav);
-        head2Ref.current.style.opacity = String(nav);
-      }
-      // Drift helper flips to "reverse" near the end frame, back near the start.
+      // Drift: the END frame is the trigger — dissolve headline/description 1 → 2
+      // and bring the helper back (reverse). Revert at the start. CSS handles the fade.
       if (driftMode) {
-        if (nav >= 0.92 && !helperBack) { helperBack = true; syncHelper(); }
-        else if (nav <= 0.08 && helperBack) { helperBack = false; syncHelper(); }
+        if (nav >= 0.92 && !atEnd) {
+          atEnd = true;
+          setHeadState(true);
+          if (helperPhase === 1) { showHelper(true); helperPhase = 2; }
+        } else if (nav <= 0.08 && atEnd) {
+          atEnd = false;
+          setHeadState(false);
+        }
       }
     };
 
@@ -568,6 +595,7 @@ export default function SpinViewer({
         try { stage.setPointerCapture(e.pointerId); } catch { /* ignore */ }
         stage.classList.add("r3d-grabbing");
         engage();
+        advanceHelperOnDrag();
       } else {
         axis = ""; // at rest → first move picks rotate vs page-scroll
       }
@@ -587,6 +615,7 @@ export default function SpinViewer({
           try { stage.setPointerCapture(e.pointerId); } catch { /* ignore */ }
           stage.classList.add("r3d-grabbing");
           engage();
+          advanceHelperOnDrag();
         } else {
           axis = "scroll"; // vertical → hand it back to the page
           dragging = false;
@@ -648,7 +677,8 @@ export default function SpinViewer({
       if (!pointers.size) up();
       if (isControl(e.target)) return;
       const now = performance.now();
-      if (now - lastTap < 300) {
+      // Drift: no double-tap zoom (accidental double-taps caused a jarring zoom).
+      if (!driftMode && now - lastTap < 300) {
         if (zoomTarget > 1.2) {
           zoomTarget = 1; panTX = 0; panTY = 0;
         } else {
@@ -937,7 +967,8 @@ export default function SpinViewer({
     if (!cta) return;
     onCtaClick?.(which, cta);
     if (cta.url && cta.url !== "#") {
-      if (cta.newTab === false) window.location.href = cta.url;
+      // Drift CTAs open in the SAME window (ad landing behavior); others honor newTab.
+      if (driftMode || cta.newTab === false) window.location.href = cta.url;
       else window.open(cta.url, "_blank", "noopener");
     }
   };
@@ -981,13 +1012,20 @@ export default function SpinViewer({
         </div>
       </div>
 
-      {!hero && driftMode && (title || description) ? (
+      {!hero && driftMode && (title || description || titleEnd || descriptionEnd) ? (
         <div className="r3d-heads" aria-hidden>
           <div className="r3d-heads-stack">
             {title && <div className="r3d-head" ref={head1Ref}>{title}</div>}
             {titleEnd && <div className="r3d-head" ref={head2Ref} style={{ opacity: 0 }}>{titleEnd}</div>}
           </div>
-          {description && <div className="r3d-heads-desc">{description}</div>}
+          {(description || descriptionEnd) && (
+            <div className="r3d-heads-desc-stack">
+              {description && <div className="r3d-heads-desc" ref={desc1Ref}>{description}</div>}
+              {descriptionEnd && (
+                <div className="r3d-heads-desc" ref={desc2Ref} style={{ opacity: 0 }}>{descriptionEnd}</div>
+              )}
+            </div>
+          )}
         </div>
       ) : !hero && (title || description) ? (
         <div className="r3d-info" aria-hidden>
@@ -1167,14 +1205,16 @@ const R3D_CSS = `
 .r3d-drift .r3d-rot{gap:0;padding:6px 12px}
 /* "drag to drift" is positioned imperatively just under the product (see draw). */
 .r3d-drift .r3d-hint{opacity:.72;gap:6px}
-.r3d-drift-hand{width:28px;height:28px}
+/* the drift helper hides between its start/end appearances (hand sequence) */
+.r3d-drift .r3d-hint.r3d-gone{opacity:0}
+.r3d-drift-hand{width:28px;height:28px;color:#eef1f6;animation:r3dsway 1.8s ease-in-out infinite}
 .r3d-drift-hand svg{width:19px;height:19px}
 .r3d-drift-hand{width:34px;height:34px;display:grid;place-items:center;color:#eef1f6}
 .r3d-drift-hand svg{width:22px;height:22px}
-.r3d-drift-arrow{width:52px;height:52px;border-radius:50%;border:1px solid var(--r3d-line);background:rgba(11,15,25,.4);backdrop-filter:blur(8px);display:grid;place-items:center;animation:r3dsway 1.8s ease-in-out infinite}
+.r3d-drift-arrow{width:52px;height:52px;border-radius:50%;border:1px solid var(--r3d-line);background:rgba(11,15,25,.4);backdrop-filter:blur(8px);display:grid;place-items:center}
 .r3d-drift-arrow svg{width:24px;height:24px;color:#eef1f6;transition:transform .25s}
 .r3d-hint.r3d-back .r3d-drift-arrow svg{transform:scaleX(-1)}
-@media (prefers-reduced-motion:reduce){.r3d-drift-arrow{animation:none}}
+@media (prefers-reduced-motion:reduce){.r3d-drift-hand{animation:none}}
 /* Drift: "Powered By Drift Link" sits UNDER the player, above the CTA, a bit bigger. */
 .r3d-drift .r3d-powered-badge{top:auto;bottom:calc(78px + env(safe-area-inset-bottom));font-size:12px}
 .r3d-drift .r3d-powered-badge svg{width:14px;height:14px}
@@ -1187,8 +1227,9 @@ const R3D_CSS = `
 /* Drift: crossfading dual headline (headline 1 at start → headline 2 at the end). */
 .r3d-heads{position:absolute;left:0;right:0;top:calc(64px + env(safe-area-inset-top));z-index:4;display:flex;flex-direction:column;align-items:center;padding:0 20px;pointer-events:none;text-align:center}
 .r3d-heads-stack{display:grid;place-items:center}
-.r3d-head{grid-area:1/1;font-size:22px;font-weight:800;line-height:1.15;letter-spacing:-.01em;color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.6);transition:opacity .25s}
-.r3d-heads-desc{margin-top:8px;font-size:14px;line-height:1.5;color:#d3dae7;text-shadow:0 1px 10px rgba(0,0,0,.6);max-width:42ch}
+.r3d-head{grid-area:1/1;font-size:22px;font-weight:800;line-height:1.15;letter-spacing:-.01em;color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.6);transition:opacity .5s ease}
+.r3d-heads-desc-stack{display:grid;place-items:center;margin-top:8px}
+.r3d-heads-desc{grid-area:1/1;font-size:14px;line-height:1.5;color:#d3dae7;text-shadow:0 1px 10px rgba(0,0,0,.6);max-width:42ch;transition:opacity .5s ease}
 @media (max-width:560px){
   .r3d-drift .r3d-info-title,.r3d-drift .r3d-head{font-size:26px}
   .r3d-drift .r3d-info-desc,.r3d-drift .r3d-heads-desc{font-size:16px}

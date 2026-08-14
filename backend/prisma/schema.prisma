@@ -495,7 +495,8 @@ model DriftProduct {
   name            String
   title           String? // headline 1 (shown at the start frame)
   titleEnd        String? // headline 2 (crossfades in as you drag toward the end)
-  description     String? // optional blurb shown under the headline
+  description     String? // description 1 (under headline 1, at the start)
+  descriptionEnd  String? // description 2 (under headline 2, dissolves in at the end)
   helperStart     String? // drag-helper text at the start (forward), e.g. "Drift to Hatch"
   helperEnd       String? // drag-helper text at the end (reverse), e.g. "Drift to Start"
   status          String   @default("DRAFT") // DRAFT | PROCESSING | READY | PUBLISHED | ARCHIVED
