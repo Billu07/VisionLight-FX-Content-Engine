@@ -66,6 +66,11 @@ export type SpinViewerProps = {
   showControls?: boolean;
   showCtas?: boolean;
   showBrand?: boolean;
+  /** Finer embed toggles (top-left): hide the logo, the profile (brand) name,
+   * or the product title independently. Default all shown. */
+  showLogo?: boolean;
+  showName?: boolean;
+  showTitle?: boolean;
   /** optional product info shown beside the player (desktop right / mobile top) */
   title?: string | null;
   description?: string | null;
@@ -155,6 +160,9 @@ export default function SpinViewer({
   showControls = true,
   showCtas = true,
   showBrand = true,
+  showLogo = true,
+  showName = true,
+  showTitle = true,
   title,
   description,
   titleEnd,
@@ -974,7 +982,7 @@ export default function SpinViewer({
   };
 
   return (
-    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
+    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${!showLogo ? "r3d-no-logo" : ""} ${!showName ? "r3d-no-name" : ""} ${!showTitle ? "r3d-no-title" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
       style={stageStyle}
       tabIndex={hero ? -1 : 0}
       aria-label="Interactive 360 degree product viewer. Drag to rotate.">
@@ -1335,6 +1343,9 @@ const R3D_CSS = `
 .r3d-no-controls .r3d-zoomcol,.r3d-no-controls .r3d-tools,.r3d-no-controls .r3d-rot{display:none!important}
 .r3d-no-ctas .r3d-ctas{display:none!important}
 .r3d-no-brand .r3d-brand,.r3d-no-brand .r3d-powered{display:none!important}
+.r3d-no-logo .r3d-logo-img,.r3d-no-logo .r3d-logo{display:none!important}
+.r3d-no-name .r3d-kicker{display:none!important}
+.r3d-no-title .r3d-name{display:none!important}
 /* light background → flip text + controls to dark for contrast */
 .r3d-light .r3d-logo-img{filter:drop-shadow(0 0 1px rgba(0,0,0,.55)) drop-shadow(0 1px 5px rgba(0,0,0,.3))}
 .r3d-light .r3d-name{color:#0b0f19}

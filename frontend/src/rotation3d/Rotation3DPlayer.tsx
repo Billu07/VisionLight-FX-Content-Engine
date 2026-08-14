@@ -81,6 +81,9 @@ export default function Rotation3DPlayer() {
   const showCtas = search.get("cta") !== "0";
   const showControls = search.get("controls") !== "0";
   const showBrand = search.get("brand") !== "0";
+  const showLogo = search.get("logo") !== "0";
+  const showName = search.get("name") !== "0";
+  const showTitle = search.get("title") !== "0";
   const bySlug = !!(brandSlug && productSlug);
   const isDemo = !bySlug && (!productId || productId === "demo");
   // drift.li serves the same player against its own data (/api/drift/*).
@@ -190,6 +193,9 @@ export default function Rotation3DPlayer() {
       showControls={showControls}
       showCtas={showCtas}
       showBrand={showBrand}
+      showLogo={showLogo}
+      showName={showName}
+      showTitle={showTitle}
       ctaPrimary={toCta(p.ctaPrimary)}
       ctaSecondary={toCta(p.ctaSecondary)}
       onCtaClick={(which) =>

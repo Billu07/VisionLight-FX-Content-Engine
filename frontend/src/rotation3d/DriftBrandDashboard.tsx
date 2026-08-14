@@ -31,6 +31,85 @@ type Product = {
 const statusColor = (s: string) =>
   s === "PUBLISHED" ? "text-emerald-300" : s === "READY" ? "text-cyan-300" : s === "PROCESSING" ? "text-amber-300" : s === "FAILED" ? "text-rose-300" : "text-gray-400";
 
+// Embed builder: full interactive player + toggles for the top-left elements.
+function DriftEmbedModal({ product, onClose }: { product: { id: string; name: string }; onClose: () => void }) {
+  const [logo, setLogo] = useState(true);
+  const [name, setName] = useState(true);
+  const [title, setTitle] = useState(true);
+  const [cta, setCta] = useState(true);
+  const [controls, setControls] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  const params: string[] = [];
+  if (!logo) params.push("logo=0");
+  if (!name) params.push("name=0");
+  if (!title) params.push("title=0");
+  if (!cta) params.push("cta=0");
+  if (!controls) params.push("controls=0");
+  const url = `${PLAYER_ORIGIN}/embed/${product.id}${params.length ? "?" + params.join("&") : ""}`;
+  const code = `<iframe src="${url}" width="100%" height="560" style="border:0;border-radius:16px" allowfullscreen></iframe>`;
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard blocked */
+    }
+  };
+  const cb = "h-4 w-4 accent-cyan-400";
+  const row = "flex items-center gap-2 text-xs text-gray-300";
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg rounded-2xl border border-gray-700 bg-gray-900 p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Embed</h2>
+            <p className="text-[11px] text-gray-500">{product.name}</p>
+          </div>
+          <button onClick={onClose} className="text-2xl leading-none text-gray-500 hover:text-white">
+            ×
+          </button>
+        </div>
+        <p className="mb-3 text-xs text-gray-400">
+          Full interactive player (captions + headlines). Toggle what shows in the top-left.
+        </p>
+        <div className="grid grid-cols-2 gap-2.5">
+          <label className={row}><input type="checkbox" checked={logo} onChange={(e) => setLogo(e.target.checked)} className={cb} />Logo</label>
+          <label className={row}><input type="checkbox" checked={name} onChange={(e) => setName(e.target.checked)} className={cb} />Profile name</label>
+          <label className={row}><input type="checkbox" checked={title} onChange={(e) => setTitle(e.target.checked)} className={cb} />Title</label>
+          <label className={row}><input type="checkbox" checked={cta} onChange={(e) => setCta(e.target.checked)} className={cb} />CTA buttons</label>
+          <label className={row}><input type="checkbox" checked={controls} onChange={(e) => setControls(e.target.checked)} className={cb} />Zoom / fullscreen</label>
+        </div>
+        <div className="mt-4 rounded-lg border border-gray-700 bg-gray-950 p-3">
+          <code className="block whitespace-pre-wrap break-all text-[10px] leading-relaxed text-gray-400">{code}</code>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg border border-gray-700 px-4 py-2 text-xs font-semibold text-gray-300 hover:bg-gray-800"
+          >
+            Preview ↗
+          </a>
+          <button
+            onClick={copy}
+            className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-cyan-200 hover:bg-cyan-500/20"
+          >
+            {copied ? "Copied!" : "Copy embed code"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: string } = {}) {
   // Superadmin brand-view: same dashboard embedded in the superadmin Drift tab,
   // pointed at any brand via org-scoped endpoints (no page chrome).
@@ -42,20 +121,8 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
   const [editing, setEditing] = useState<Product | null>(null);
   const [captions, setCaptions] = useState<{ id: string; name: string } | null>(null);
   const [exportingId, setExportingId] = useState<string | null>(null);
-  const [embedCopied, setEmbedCopied] = useState<string | null>(null);
+  const [embedProduct, setEmbedProduct] = useState<Product | null>(null);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
-
-  // Full-player embed (captions + headlines + description all render inside).
-  const copyEmbed = async (p: Product) => {
-    const code = `<iframe src="${PLAYER_ORIGIN}/embed/${p.id}" width="100%" height="560" style="border:0;border-radius:16px" allowfullscreen></iframe>`;
-    try {
-      await navigator.clipboard.writeText(code);
-      setEmbedCopied(p.id);
-      setTimeout(() => setEmbedCopied(null), 1500);
-    } catch {
-      /* clipboard blocked */
-    }
-  };
 
   const load = async () => {
     setLoading(true);
@@ -187,10 +254,10 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
                         {exportingId === p.id ? "Rendering…" : "⬇ Download"}
                       </button>
                       <button
-                        onClick={() => copyEmbed(p)}
+                        onClick={() => setEmbedProduct(p)}
                         className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
                       >
-                        {embedCopied === p.id ? "Copied!" : "Embed"}
+                        Embed
                       </button>
                       <a
                         href={productLink(p)}
@@ -224,6 +291,7 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
       {captions && (
         <DriftCaptionEditor productId={captions.id} productName={captions.name} onClose={() => setCaptions(null)} />
       )}
+      {embedProduct && <DriftEmbedModal product={embedProduct} onClose={() => setEmbedProduct(null)} />}
     </div>
   );
 }
