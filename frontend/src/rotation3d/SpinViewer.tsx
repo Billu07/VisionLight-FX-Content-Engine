@@ -436,10 +436,12 @@ export default function SpinViewer({
       const scale = Math.min(W, H) * (hero ? 0.23 : 0.25) * zoom;
       const cx = W / 2 + panX * DPR, cy = H * 0.47 + panY * DPR;
 
-      // Drift: pin the "drag to drift" hint just UNDER the product (anchor its top
-      // to the product's bottom edge), so it's never over the video on any screen.
+      // Drift: pin the "drag to drift" hint just UNDER the product, but clamp it so
+      // it never descends into the "Powered by" / CTA line at the bottom.
       if (driftMode && hintRef.current) {
-        hintRef.current.style.top = (cy + scale) / DPR + 14 + "px";
+        const under = (cy + scale) / DPR + 14;
+        const maxTop = H / DPR - 210; // keep ~210px of clear space below for the stack
+        hintRef.current.style.top = Math.min(under, maxTop) + "px";
         hintRef.current.style.bottom = "auto";
       }
 
@@ -1209,8 +1211,9 @@ const R3D_CSS = `
 /* Drift player chrome: "drag to drift" arrow (flips with drag direction), no
    bottom scrim, and the angle number hidden (the scrubber track stays). */
 .r3d-drift .r3d-scrim-bot{display:none}
-.r3d-drift .r3d-rot span{display:none}
-.r3d-drift .r3d-rot{gap:0;padding:6px 12px}
+/* Drift: hide the angle scrubber entirely — the drag helper + headline dissolve
+   convey position, and it was colliding with the helper arrow. */
+.r3d-drift .r3d-rot{display:none!important}
 /* "drag to drift" is positioned imperatively just under the product (see draw). */
 .r3d-drift .r3d-hint{opacity:.72;gap:6px}
 /* the drift helper hides between its start/end appearances (hand sequence) */
