@@ -488,6 +488,19 @@ export default function DriftAdminPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products, selected]);
 
+  const [heroId, setHeroId] = useState<string | null>(null);
+  const setLandingHero = async (p: Product) => {
+    setHeroId(p.id);
+    try {
+      await apiEndpoints.driftLandingSetHero("DRIFT", p.id);
+      setMsg({ kind: "ok", text: `"${p.name}" is now the drift.li landing hero.` });
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e?.response?.data?.error || "Could not set the landing hero" });
+    } finally {
+      setHeroId(null);
+    }
+  };
+
   const deleteProduct = async (p: Product) => {
     if (!window.confirm(`Delete "${p.name}"? This removes its drift and can't be undone.`)) return;
     try {
@@ -977,6 +990,14 @@ export default function DriftAdminPanel() {
                                 onChange={() => loadProducts(selected, true)}
                                 onMsg={setMsg}
                               />
+                              <button
+                                onClick={() => setLandingHero(p)}
+                                disabled={heroId === p.id}
+                                title="Feature this drift as the drift.li landing hero"
+                                className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-[11px] font-semibold text-amber-200 hover:bg-amber-400/20 disabled:opacity-50"
+                              >
+                                {heroId === p.id ? "Setting…" : "★ Landing"}
+                              </button>
                               <button
                                 onClick={() => copyProductLink(p)}
                                 className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"

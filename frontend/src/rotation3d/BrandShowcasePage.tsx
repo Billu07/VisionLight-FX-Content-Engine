@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams, Navigate } from "react-router-dom";
 import SpinViewer, { type SpinManifest } from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
-import { isSpinPlayerSite } from "../lib/branding";
+import { isSpinPlayerSite, isDriftSite } from "../lib/branding";
 
 /**
  * Public brand showcase — rotation3d.com/{brandSlug}: a grid of all the brand's
@@ -142,11 +142,13 @@ export default function BrandShowcasePage({ embed = false }: { embed?: boolean }
   }>({ loading: true });
   const [page, setPage] = useState(0);
 
+  // drift.li serves this same showcase against its own brands/products.
+  const drift = isDriftSite();
+
   useEffect(() => {
     if (!brandSlug) return;
     let alive = true;
-    apiEndpoints
-      .r3dPublicBrand(brandSlug)
+    (drift ? apiEndpoints.driftPublicBrand : apiEndpoints.r3dPublicBrand)(brandSlug)
       .then((r) => {
         if (alive) setState({ loading: false, brand: r.data.brand, products: r.data.products || [] });
       })
@@ -214,7 +216,7 @@ export default function BrandShowcasePage({ embed = false }: { embed?: boolean }
                     >
                       {p.name}
                     </Link>
-                    <span className="text-xs text-gray-500">Drag to rotate</span>
+                    <span className="text-xs text-gray-500">{drift ? "Drag to drift" : "Drag to rotate"}</span>
                   </div>
                 </div>
               ))}

@@ -353,6 +353,8 @@ export const apiEndpoints = {
     api.post("/api/drift/landing", { source, productId }),
   driftLandingUpdate: (id: string, changes: Record<string, unknown>) =>
     api.patch(`/api/drift/landing/${id}`, changes),
+  driftLandingSetHero: (source: string, productId: string) =>
+    api.post("/api/drift/landing/set-hero", { source, productId }),
   driftLandingRemove: (id: string) => api.delete(`/api/drift/landing/${id}`),
   driftPublicLanding: () => api.get("/api/drift/public/landing"),
 

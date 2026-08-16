@@ -1278,6 +1278,30 @@ router.post(
   },
 );
 
+// One-click: make a drift/spin THE landing hero — upsert its landing item and
+// set it as the single hero in one call (used from the drift product list so a
+// superadmin doesn't have to add-then-hero across the curation tab).
+router.post(
+  "/api/drift/landing/set-hero",
+  authenticateToken,
+  requireSuperAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const source = req.body?.source === "ROTATION3D" ? "ROTATION3D" : "DRIFT";
+    const productId = String(req.body?.productId || "");
+    if (!productId) return res.status(400).json({ error: "productId is required" });
+    const item = await prisma.driftLandingItem.upsert({
+      where: { source_productId: { source, productId } },
+      create: { source, productId, isHero: true },
+      update: { isHero: true },
+    });
+    await prisma.driftLandingItem.updateMany({
+      where: { isHero: true, id: { not: item.id } },
+      data: { isHero: false },
+    });
+    res.json({ item });
+  },
+);
+
 // Reorder / set the single hero.
 router.patch(
   "/api/drift/landing/:id",

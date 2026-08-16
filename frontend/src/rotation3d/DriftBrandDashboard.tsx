@@ -35,14 +35,23 @@ const statusColor = (s: string) =>
   s === "PUBLISHED" ? "text-emerald-300" : s === "READY" ? "text-cyan-300" : s === "PROCESSING" ? "text-amber-300" : s === "FAILED" ? "text-rose-300" : "text-gray-400";
 
 // Embed builder: full interactive player + toggles for the top-left elements.
+const EMBED_RATIOS = [
+  { key: "portrait", label: "Portrait 4:5", w: 4, h: 5 },
+  { key: "square", label: "Square 1:1", w: 1, h: 1 },
+  { key: "vertical", label: "Reel 9:16", w: 9, h: 16 },
+  { key: "wide", label: "Wide 16:9", w: 16, h: 9 },
+] as const;
+
 function DriftEmbedModal({ product, onClose }: { product: { id: string; name: string }; onClose: () => void }) {
   const [logo, setLogo] = useState(true);
   const [name, setName] = useState(true);
   const [title, setTitle] = useState(true);
   const [cta, setCta] = useState(true);
   const [controls, setControls] = useState(true);
+  const [ratioKey, setRatioKey] = useState<(typeof EMBED_RATIOS)[number]["key"]>("portrait");
   const [copied, setCopied] = useState(false);
 
+  const ratio = EMBED_RATIOS.find((r) => r.key === ratioKey) || EMBED_RATIOS[0];
   const params: string[] = [];
   if (!logo) params.push("logo=0");
   if (!name) params.push("name=0");
@@ -50,7 +59,12 @@ function DriftEmbedModal({ product, onClose }: { product: { id: string; name: st
   if (!cta) params.push("cta=0");
   if (!controls) params.push("controls=0");
   const url = `${PLAYER_ORIGIN}/embed/${product.id}${params.length ? "?" + params.join("&") : ""}`;
-  const code = `<iframe src="${url}" width="100%" height="560" style="border:0;border-radius:16px" allowfullscreen></iframe>`;
+  // Responsive wrapper: the iframe fills a fixed-aspect box so the player keeps
+  // the same size/ratio as the platform at any container width (no letterbox,
+  // no fixed pixel height that squishes on mobile).
+  const code = `<div style="position:relative;width:100%;max-width:520px;margin:0 auto;aspect-ratio:${ratio.w}/${ratio.h}">
+  <iframe src="${url}" style="position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:16px" allowfullscreen loading="lazy"></iframe>
+</div>`;
 
   const copy = async () => {
     try {
@@ -88,6 +102,36 @@ function DriftEmbedModal({ product, onClose }: { product: { id: string; name: st
           <label className={row}><input type="checkbox" checked={title} onChange={(e) => setTitle(e.target.checked)} className={cb} />Title</label>
           <label className={row}><input type="checkbox" checked={cta} onChange={(e) => setCta(e.target.checked)} className={cb} />CTA buttons</label>
           <label className={row}><input type="checkbox" checked={controls} onChange={(e) => setControls(e.target.checked)} className={cb} />Zoom / fullscreen</label>
+        </div>
+
+        <div className="mt-4">
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Aspect ratio</p>
+          <div className="flex flex-wrap gap-2">
+            {EMBED_RATIOS.map((r) => (
+              <button
+                key={r.key}
+                onClick={() => setRatioKey(r.key)}
+                className={`rounded-lg border px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                  ratioKey === r.key
+                    ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-200"
+                    : "border-gray-700 text-gray-300 hover:bg-gray-800"
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4 grid place-items-center rounded-xl border border-gray-800 bg-gray-950 p-3">
+          <div style={{ position: "relative", width: "100%", maxWidth: 240, aspectRatio: `${ratio.w}/${ratio.h}` }}>
+            <iframe
+              src={url}
+              title="Embed preview"
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, borderRadius: 12 }}
+              allowFullScreen
+            />
+          </div>
         </div>
         <div className="mt-4 rounded-lg border border-gray-700 bg-gray-950 p-3">
           <code className="block whitespace-pre-wrap break-all text-[10px] leading-relaxed text-gray-400">{code}</code>
