@@ -19,10 +19,10 @@ const RANGES = [7, 30, 90] as const;
 
 function Stat({ label, value, hint }: { label: string; value: number; hint?: string }) {
   return (
-    <div className="rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-white">{value.toLocaleString()}</p>
-      {hint && <p className="text-[11px] text-gray-500">{hint}</p>}
+    <div className="d-stat">
+      <p className="d-eyebrow">{label}</p>
+      <p className="n">{value.toLocaleString()}</p>
+      {hint && <p className="d-faint text-[11px]">{hint}</p>}
     </div>
   );
 }
@@ -46,7 +46,7 @@ export default function DriftAnalytics({ adminOrgId }: { adminOrgId?: string } =
   }, [admin, adminOrgId, days]);
 
   if (loading) return <div className="py-16 text-center"><LoadingSpinner size="sm" /></div>;
-  if (!data) return <div className="py-16 text-center text-sm text-gray-500">No analytics yet.</div>;
+  if (!data) return <div className="d-empty">No analytics yet.</div>;
 
   const peak = Math.max(1, ...data.series.map((d) => d.views + d.ctas + d.leads));
   const ctr = data.totals.VIEW ? Math.round((data.totals.CTA_CLICK / data.totals.VIEW) * 100) : 0;
@@ -54,16 +54,10 @@ export default function DriftAnalytics({ adminOrgId }: { adminOrgId?: string } =
   return (
     <div>
       <div className="mb-5 flex items-center justify-between">
-        <p className="text-sm text-gray-400">Last {data.days} days</p>
-        <div className="flex gap-1.5">
+        <p className="d-sub">Last {data.days} days</p>
+        <div className="d-tabs">
           {RANGES.map((r) => (
-            <button
-              key={r}
-              onClick={() => setDays(r)}
-              className={`rounded-lg px-3 py-1.5 text-[11px] font-bold transition-colors ${
-                days === r ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"
-              }`}
-            >
+            <button key={r} onClick={() => setDays(r)} className={`d-tab ${days === r ? "active" : ""}`}>
               {r}d
             </button>
           ))}
@@ -78,8 +72,8 @@ export default function DriftAnalytics({ adminOrgId }: { adminOrgId?: string } =
       </div>
 
       {/* Daily stacked bars: views (cyan) · CTAs (indigo) · leads (emerald). */}
-      <div className="mb-6 rounded-xl border border-white/8 bg-white/[0.02] p-4">
-        <div className="mb-3 flex items-center gap-4 text-[11px] text-gray-400">
+      <div className="d-card d-card-pad mb-6">
+        <div className="d-muted mb-3 flex items-center gap-4 text-[11px]">
           <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm" style={{ background: "#22d3ee" }} />Views</span>
           <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm" style={{ background: "#6366f1" }} />CTA clicks</span>
           <span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm" style={{ background: "#34d399" }} />Leads</span>
@@ -101,26 +95,26 @@ export default function DriftAnalytics({ adminOrgId }: { adminOrgId?: string } =
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-white/8">
-        <table className="w-full text-sm">
+      <div className="d-card" style={{ overflowX: "auto" }}>
+        <table className="d-table">
           <thead>
-            <tr className="border-b border-white/8 text-left text-[11px] uppercase tracking-wider text-gray-500">
-              <th className="px-4 py-2.5 font-semibold">Drift</th>
-              <th className="px-4 py-2.5 text-right font-semibold">Views</th>
-              <th className="px-4 py-2.5 text-right font-semibold">CTAs</th>
-              <th className="px-4 py-2.5 text-right font-semibold">Leads</th>
+            <tr>
+              <th>Drift</th>
+              <th style={{ textAlign: "right" }}>Views</th>
+              <th style={{ textAlign: "right" }}>CTAs</th>
+              <th style={{ textAlign: "right" }}>Leads</th>
             </tr>
           </thead>
           <tbody>
             {data.byProduct.length === 0 ? (
-              <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-500">No activity in this range.</td></tr>
+              <tr><td colSpan={4} className="d-muted" style={{ textAlign: "center", padding: "32px" }}>No activity in this range.</td></tr>
             ) : (
               data.byProduct.map((p) => (
-                <tr key={p.productId} className="border-b border-white/5 last:border-0">
-                  <td className="px-4 py-2.5 text-gray-200">{p.name}</td>
-                  <td className="px-4 py-2.5 text-right text-gray-300">{p.views.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-right text-gray-300">{p.ctas.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-right text-gray-300">{p.leads.toLocaleString()}</td>
+                <tr key={p.productId}>
+                  <td>{p.name}</td>
+                  <td style={{ textAlign: "right" }}>{p.views.toLocaleString()}</td>
+                  <td style={{ textAlign: "right" }}>{p.ctas.toLocaleString()}</td>
+                  <td style={{ textAlign: "right" }}>{p.leads.toLocaleString()}</td>
                 </tr>
               ))
             )}

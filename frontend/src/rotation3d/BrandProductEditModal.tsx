@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DriftThemeStyles, readDriftTheme } from "./driftUiTheme";
 
 /**
  * The per-product edit controls a brand admin has, in a modal — used by the
@@ -31,9 +32,8 @@ type EditProduct = {
 
 const BG_SWATCHES = ["transparent", "#ffffff", "#000000", "#0b0f14", "#f5f5f4", "#e11d48", "#2563eb"];
 
-const field =
-  "w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-brand-accent";
-const label = "block text-[11px] font-semibold uppercase tracking-wider text-gray-400";
+const field = "d-input";
+const label = "d-label";
 
 export default function BrandProductEditModal({
   product,
@@ -114,17 +114,19 @@ export default function BrandProductEditModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+    <div className="drift-ui fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" data-theme={readDriftTheme()} onClick={onClose}>
+      <DriftThemeStyles />
       <div
-        className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-gray-700 bg-gray-900 p-5 shadow-2xl"
+        className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl p-5 shadow-2xl"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Edit product</h2>
-            <p className="text-[11px] text-gray-500">{product.name}</p>
+            <h2 className="d-h2">Edit product</h2>
+            <p className="d-faint text-[11px]">{product.name}</p>
           </div>
-          <button onClick={onClose} className="text-2xl leading-none text-gray-500 hover:text-white">
+          <button onClick={onClose} className="d-btn ghost sm" style={{ fontSize: 20, padding: "2px 8px" }}>
             ×
           </button>
         </div>
@@ -223,8 +225,8 @@ export default function BrandProductEditModal({
           </div>
 
           {showLoop && forms && (
-            <div className="grid grid-cols-2 gap-2 rounded-lg border border-gray-800 bg-gray-950/40 p-2.5">
-              <div className="col-span-2 text-[11px] text-gray-500">
+            <div className="d-hair grid grid-cols-2 gap-2 p-2.5">
+              <div className="col-span-2 d-faint text-[11px]">
                 Attach a lead form to a CTA — it opens in-player instead of a link.
               </div>
               <div>
@@ -263,7 +265,7 @@ export default function BrandProductEditModal({
           <div>
             <label className={label}>Product link</label>
             <div className="mt-1 flex items-center gap-1.5">
-              <span className="font-mono text-xs text-gray-500">/{"{brand}"}/</span>
+              <span className="d-faint font-mono text-xs">/{"{brand}"}/</span>
               <input className={field} value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="product-name" />
             </div>
           </div>
@@ -300,7 +302,7 @@ export default function BrandProductEditModal({
                   className="h-7 w-9 cursor-pointer rounded-md border border-gray-600 bg-transparent p-0"
                   title="Custom color"
                 />
-                <span className="font-mono text-[11px] text-gray-500">{background}</span>
+                <span className="d-faint font-mono text-[11px]">{background}</span>
               </div>
             </div>
           )}
@@ -320,11 +322,11 @@ export default function BrandProductEditModal({
 
           {showLoop && (
             <div className="flex flex-wrap gap-4">
-              <label className="flex items-center gap-2 text-xs text-gray-300">
+              <label className="d-muted flex items-center gap-2 text-xs">
                 <input type="checkbox" checked={hideLogo} onChange={(e) => setHideLogo(e.target.checked)} className="h-4 w-4 accent-brand-accent" />
                 Hide brand logo in player
               </label>
-              <label className="flex items-center gap-2 text-xs text-gray-300">
+              <label className="d-muted flex items-center gap-2 text-xs">
                 <input type="checkbox" checked={hideName} onChange={(e) => setHideName(e.target.checked)} className="h-4 w-4 accent-brand-accent" />
                 Hide brand name in player
               </label>
@@ -332,12 +334,12 @@ export default function BrandProductEditModal({
           )}
 
           <div className="flex flex-wrap gap-4 pt-1">
-            <label className="flex items-center gap-2 text-xs text-gray-300">
+            <label className="d-muted flex items-center gap-2 text-xs">
               <input type="checkbox" checked={publish} onChange={(e) => setPublish(e.target.checked)} className="h-4 w-4 accent-brand-accent" />
               Published (live)
             </label>
             {showLoop && (
-              <label className="flex items-center gap-2 text-xs text-gray-300">
+              <label className="d-muted flex items-center gap-2 text-xs">
                 <input type="checkbox" checked={loopEnabled} onChange={(e) => setLoopEnabled(e.target.checked)} className="h-4 w-4 accent-brand-accent" />
                 Loop (drag wraps end → start)
               </label>
@@ -346,14 +348,10 @@ export default function BrandProductEditModal({
         </div>
 
         <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg border border-gray-700 px-4 py-2 text-xs font-semibold text-gray-300 hover:bg-gray-800">
+          <button onClick={onClose} className="d-btn">
             Cancel
           </button>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="rounded-lg border border-brand-accent/40 bg-brand-accent/15 px-4 py-2 text-xs font-bold uppercase tracking-widest text-brand-accent hover:bg-brand-accent/25 disabled:opacity-50"
-          >
+          <button onClick={save} disabled={saving} className="d-btn primary">
             {saving ? "Saving…" : "Save changes"}
           </button>
         </div>

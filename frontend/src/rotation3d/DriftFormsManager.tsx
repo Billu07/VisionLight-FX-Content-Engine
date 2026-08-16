@@ -46,12 +46,10 @@ const FIELD_TYPES: { value: FormField["type"]; label: string; hasOptions?: boole
 ];
 const hasOptions = (t: FormField["type"]) => t === "select" || t === "radio" || t === "checkbox";
 
-const field =
-  "w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-brand-accent";
-const label = "block text-[11px] font-semibold uppercase tracking-wider text-gray-400";
-const btn = "rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800";
-const btnAccent =
-  "rounded-lg border border-brand-accent/40 bg-brand-accent/15 px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-brand-accent hover:bg-brand-accent/25 disabled:opacity-50";
+const field = "d-input";
+const label = "d-label";
+const btn = "d-btn sm";
+const btnAccent = "d-btn primary";
 
 const keyFromLabel = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "field";
@@ -122,12 +120,13 @@ function FormBuilderModal({
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div
-        className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-gray-700 bg-gray-900 shadow-2xl"
+        className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl shadow-2xl"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-gray-800 px-5 py-3">
-          <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Form builder</h2>
-          <button onClick={onClose} className="text-2xl leading-none text-gray-500 hover:text-white">×</button>
+        <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: "1px solid var(--border)" }}>
+          <h2 className="d-h2">Form builder</h2>
+          <button onClick={onClose} className="d-btn ghost sm" style={{ fontSize: 20, padding: "2px 8px" }}>×</button>
         </div>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
@@ -140,7 +139,7 @@ function FormBuilderModal({
               <label className={label}>Form name</label>
               <input className={`${field} mt-1`} value={name} onChange={(e) => setName(e.target.value)} />
             </div>
-            <label className="mt-6 flex items-center gap-2 text-xs text-gray-300">
+            <label className="d-muted mt-6 flex items-center gap-2 text-xs">
               <input
                 type="checkbox"
                 checked={def.multiStep}
@@ -152,7 +151,7 @@ function FormBuilderModal({
           </div>
 
           {def.steps.map((step, si) => (
-            <div key={si} className="rounded-xl border border-gray-700/70 bg-gray-950/40 p-3">
+            <div key={si} className="d-hair p-3">
               <div className="mb-2 flex items-center gap-2">
                 {def.multiStep ? (
                   <input
@@ -162,7 +161,7 @@ function FormBuilderModal({
                     placeholder={`Step ${si + 1} title`}
                   />
                 ) : (
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Fields</span>
+                  <span className="d-eyebrow">Fields</span>
                 )}
                 {def.multiStep && def.steps.length > 1 && (
                   <button onClick={() => removeStep(si)} className="shrink-0 px-2 text-lg leading-none text-gray-600 hover:text-rose-400">×</button>
@@ -171,12 +170,13 @@ function FormBuilderModal({
 
               <div className="space-y-2">
                 {step.fields.map((f, fi) => (
-                  <div key={fi} className="rounded-lg border border-gray-700/60 bg-gray-900/60 p-2.5">
+                  <div key={fi} className="rounded-lg p-2.5" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
                     <div className="flex flex-wrap items-center gap-2">
                       <select
                         value={f.type}
                         onChange={(e) => setField(si, fi, { type: e.target.value as FormField["type"] })}
-                        className="rounded-lg border border-gray-700 bg-gray-950 px-2 py-1.5 text-xs text-white"
+                        className="d-select"
+                        style={{ width: "auto", padding: "7px 9px", fontSize: 12.5 }}
                       >
                         {FIELD_TYPES.map((t) => (
                           <option key={t.value} value={t.value}>{t.label}</option>
@@ -189,13 +189,13 @@ function FormBuilderModal({
                         placeholder={f.type === "consent" ? "Consent text" : "Field label"}
                       />
                       {f.type !== "consent" && f.type !== "hidden" && (
-                        <label className="flex items-center gap-1.5 text-[11px] text-gray-300">
+                        <label className="d-muted flex items-center gap-1.5 text-[11px]">
                           <input type="checkbox" checked={!!f.required} onChange={(e) => setField(si, fi, { required: e.target.checked })} className="h-3.5 w-3.5 accent-brand-accent" />
                           Req
                         </label>
                       )}
                       {f.type === "consent" && (
-                        <label className="flex items-center gap-1.5 text-[11px] text-gray-300">
+                        <label className="d-muted flex items-center gap-1.5 text-[11px]">
                           <input type="checkbox" checked={!!f.required} onChange={(e) => setField(si, fi, { required: e.target.checked })} className="h-3.5 w-3.5 accent-brand-accent" />
                           Req
                         </label>
@@ -229,8 +229,8 @@ function FormBuilderModal({
             <button onClick={addStep} className={btn}>+ Add step</button>
           )}
 
-          <div className="rounded-xl border border-gray-700/70 bg-gray-950/40 p-3">
-            <label className="flex items-center gap-2 text-xs text-gray-300">
+          <div className="d-hair p-3">
+            <label className="d-muted flex items-center gap-2 text-xs">
               <input
                 type="checkbox"
                 checked={def.consent.enabled}
@@ -265,7 +265,7 @@ function FormBuilderModal({
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-gray-800 px-5 py-3">
+        <div className="flex justify-end gap-2 px-5 py-3.5" style={{ borderTop: "1px solid var(--border)" }}>
           <button onClick={onClose} className={btn}>Cancel</button>
           <button onClick={save} disabled={saving} className={btnAccent}>{saving ? "Saving…" : "Save form"}</button>
         </div>
@@ -310,21 +310,19 @@ function LeadsView({ admin, adminOrgId }: { admin: boolean; adminOrgId?: string 
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-gray-400">{leads.length} lead(s)</p>
+        <p className="d-sub">{leads.length} lead(s)</p>
         <div className="flex gap-2">
           <button onClick={load} className={btn}>↻ Refresh</button>
-          <button onClick={exportCsv} disabled={!leads.length} className={`${btn} disabled:opacity-40`}>⬇ Export CSV</button>
+          <button onClick={exportCsv} disabled={!leads.length} className={btn}>⬇ Export CSV</button>
         </div>
       </div>
       {leads.length === 0 ? (
-        <div className="rounded-2xl border border-white/8 bg-white/[0.02] py-16 text-center text-sm text-gray-500">
-          No leads yet. They'll appear here as people submit your forms.
-        </div>
+        <div className="d-empty">No leads yet. They'll appear here as people submit your forms.</div>
       ) : (
         <div className="space-y-2">
           {leads.map((l) => (
-            <div key={l.id} className="rounded-xl border border-white/8 bg-white/[0.02] p-3.5">
-              <div className="mb-1.5 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+            <div key={l.id} className="d-card d-card-pad">
+              <div className="d-faint mb-1.5 flex flex-wrap items-center gap-2 text-[11px]">
                 <span>{new Date(l.createdAt).toLocaleString()}</span>
                 {l.source?.drift && <span>· {l.source.drift}</span>}
                 {l.source?.cta && <span>· CTA: {l.source.cta}</span>}
@@ -332,8 +330,8 @@ function LeadsView({ admin, adminOrgId }: { admin: boolean; adminOrgId?: string 
               <div className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
                 {Object.entries(l.data || {}).map(([k, v]) => (
                   <div key={k} className="flex gap-2">
-                    <span className="shrink-0 text-gray-500">{k}:</span>
-                    <span className="min-w-0 break-words text-gray-200">{String(v)}</span>
+                    <span className="d-faint shrink-0">{k}:</span>
+                    <span className="min-w-0 break-words">{String(v)}</span>
                   </div>
                 ))}
               </div>
@@ -398,17 +396,13 @@ export default function DriftFormsManager({ adminOrgId }: { adminOrgId?: string 
   return (
     <div>
       <div className="mb-5 flex items-center gap-2">
-        {(["forms", "leads"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`rounded-lg px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors ${
-              tab === t ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"
-            }`}
-          >
-            {t === "forms" ? "Forms" : "Leads"}
-          </button>
-        ))}
+        <div className="d-tabs">
+          {(["forms", "leads"] as const).map((t) => (
+            <button key={t} onClick={() => setTab(t)} className={`d-tab ${tab === t ? "active" : ""}`}>
+              {t === "forms" ? "Forms" : "Leads"}
+            </button>
+          ))}
+        </div>
         <div className="flex-1" />
         {tab === "forms" && (
           <button onClick={() => setEditing("new")} className={btnAccent}>+ New form</button>
@@ -416,13 +410,9 @@ export default function DriftFormsManager({ adminOrgId }: { adminOrgId?: string 
       </div>
 
       {msg && (
-        <div
-          className={`mb-4 flex items-center justify-between rounded-xl border p-3 text-sm ${
-            msg.kind === "ok" ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-200" : "border-rose-400/20 bg-rose-500/10 text-rose-200"
-          }`}
-        >
-          {msg.text}
-          <button onClick={() => setMsg(null)} className="text-lg">×</button>
+        <div className={`d-banner ${msg.kind === "ok" ? "ok" : "err"}`} style={{ marginBottom: 16 }}>
+          <span>{msg.text}</span>
+          <button onClick={() => setMsg(null)} className="d-btn ghost sm" style={{ padding: "2px 8px" }}>×</button>
         </div>
       )}
 
@@ -431,25 +421,23 @@ export default function DriftFormsManager({ adminOrgId }: { adminOrgId?: string 
       ) : loading ? (
         <div className="py-16 text-center"><LoadingSpinner size="sm" /></div>
       ) : forms.length === 0 ? (
-        <div className="rounded-2xl border border-white/8 bg-white/[0.02] py-16 text-center text-sm text-gray-500">
-          No forms yet. Create one, then attach it to a drift's CTA button.
-        </div>
+        <div className="d-empty">No forms yet. Create one, then attach it to a drift's CTA button.</div>
       ) : (
         <div className="grid gap-3">
           {forms.map((f) => (
-            <div key={f.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
+            <div key={f.id} className="d-row">
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">{f.name}</p>
-                <p className="text-[11px] text-gray-500">
+                <p className="truncate" style={{ fontWeight: 650 }}>{f.name}</p>
+                <p className="d-faint text-[11px]">
                   {fieldCount(f)} field(s){f.definition?.multiStep ? ` · ${f.definition.steps.length} steps` : ""}
                   {f._count ? ` · ${f._count.leads} lead(s)` : ""}
                   {f.webhookUrl ? " · webhook" : ""}
                 </p>
-                <p className="mt-0.5 select-all font-mono text-[10px] text-gray-600">id: {f.id}</p>
+                <p className="d-faint mt-0.5 select-all font-mono text-[10px]">id: {f.id}</p>
               </div>
               <div className="flex shrink-0 gap-2">
                 <button onClick={() => setEditing(f)} className={btn}>Edit</button>
-                <button onClick={() => removeForm(f)} className="px-1.5 text-lg leading-none text-gray-600 hover:text-rose-400">×</button>
+                <button onClick={() => removeForm(f)} className="d-btn danger sm">Delete</button>
               </div>
             </div>
           ))}

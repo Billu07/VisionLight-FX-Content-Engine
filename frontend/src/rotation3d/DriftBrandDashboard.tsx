@@ -7,6 +7,7 @@ import DriftCaptionEditor from "./DriftCaptionEditor";
 import DriftFormsManager from "./DriftFormsManager";
 import DriftAnalytics from "./DriftAnalytics";
 import DriftDomains from "./DriftDomains";
+import { useDriftTheme, DriftThemeStyles, ThemeToggle } from "./driftUiTheme";
 
 /**
  * Drift brand-admin home (/app for view="DRIFT"). The brand's own drifts with the
@@ -34,8 +35,8 @@ type Product = {
   spin?: { frameCount?: number; secondFrameCount?: number | null } | null;
 };
 
-const statusColor = (s: string) =>
-  s === "PUBLISHED" ? "text-emerald-300" : s === "READY" ? "text-cyan-300" : s === "PROCESSING" ? "text-amber-300" : s === "FAILED" ? "text-rose-300" : "text-gray-400";
+const statusPill = (s: string) =>
+  s === "PUBLISHED" ? "ok" : s === "READY" ? "accent" : s === "PROCESSING" ? "warn" : s === "FAILED" ? "err" : "";
 
 // Embed builder: full interactive player + toggles for the top-left elements.
 const EMBED_RATIOS = [
@@ -78,25 +79,26 @@ function DriftEmbedModal({ product, onClose }: { product: { id: string; name: st
       /* clipboard blocked */
     }
   };
-  const cb = "h-4 w-4 accent-cyan-400";
-  const row = "flex items-center gap-2 text-xs text-gray-300";
+  const cb = "h-4 w-4";
+  const row = "d-muted flex items-center gap-2 text-xs";
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg rounded-2xl border border-gray-700 bg-gray-900 p-5 shadow-2xl"
+        className="w-full max-w-lg rounded-2xl p-5 shadow-2xl"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Embed</h2>
-            <p className="text-[11px] text-gray-500">{product.name}</p>
+            <h2 className="d-h2">Embed</h2>
+            <p className="d-faint text-[11px]">{product.name}</p>
           </div>
-          <button onClick={onClose} className="text-2xl leading-none text-gray-500 hover:text-white">
+          <button onClick={onClose} className="d-btn ghost sm" style={{ fontSize: 20, padding: "2px 8px" }}>
             ×
           </button>
         </div>
-        <p className="mb-3 text-xs text-gray-400">
+        <p className="d-sub mb-3 text-xs">
           Full interactive player (captions + headlines). Toggle what shows in the top-left.
         </p>
         <div className="grid grid-cols-2 gap-2.5">
@@ -108,17 +110,13 @@ function DriftEmbedModal({ product, onClose }: { product: { id: string; name: st
         </div>
 
         <div className="mt-4">
-          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Aspect ratio</p>
-          <div className="flex flex-wrap gap-2">
+          <p className="d-label">Aspect ratio</p>
+          <div className="mt-1.5 flex flex-wrap gap-2">
             {EMBED_RATIOS.map((r) => (
               <button
                 key={r.key}
                 onClick={() => setRatioKey(r.key)}
-                className={`rounded-lg border px-3 py-1.5 text-[11px] font-semibold transition-colors ${
-                  ratioKey === r.key
-                    ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-200"
-                    : "border-gray-700 text-gray-300 hover:bg-gray-800"
-                }`}
+                className={`d-btn sm ${ratioKey === r.key ? "soft" : ""}`}
               >
                 {r.label}
               </button>
@@ -126,7 +124,7 @@ function DriftEmbedModal({ product, onClose }: { product: { id: string; name: st
           </div>
         </div>
 
-        <div className="mt-4 grid place-items-center rounded-xl border border-gray-800 bg-gray-950 p-3">
+        <div className="d-hair mt-4 grid place-items-center p-3">
           <div style={{ position: "relative", width: "100%", maxWidth: 240, aspectRatio: `${ratio.w}/${ratio.h}` }}>
             <iframe
               src={url}
@@ -136,22 +134,14 @@ function DriftEmbedModal({ product, onClose }: { product: { id: string; name: st
             />
           </div>
         </div>
-        <div className="mt-4 rounded-lg border border-gray-700 bg-gray-950 p-3">
-          <code className="block whitespace-pre-wrap break-all text-[10px] leading-relaxed text-gray-400">{code}</code>
+        <div className="d-hair mt-4 p-3">
+          <code className="d-muted block whitespace-pre-wrap break-all text-[10px] leading-relaxed">{code}</code>
         </div>
         <div className="mt-4 flex justify-end gap-2">
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-lg border border-gray-700 px-4 py-2 text-xs font-semibold text-gray-300 hover:bg-gray-800"
-          >
+          <a href={url} target="_blank" rel="noopener noreferrer" className="d-btn">
             Preview ↗
           </a>
-          <button
-            onClick={copy}
-            className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-cyan-200 hover:bg-cyan-500/20"
-          >
+          <button onClick={copy} className="d-btn primary">
             {copied ? "Copied!" : "Copy embed code"}
           </button>
         </div>
@@ -182,6 +172,7 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
   const [brandPixelSaved, setBrandPixelSaved] = useState("");
   const [pixelSaving, setPixelSaving] = useState(false);
   const [view, setView] = useState<"drifts" | "forms" | "analytics" | "domain">("drifts");
+  const [theme, toggleTheme] = useDriftTheme();
   const [formsList, setFormsList] = useState<{ id: string; name: string }[]>([]);
 
   const load = async () => {
@@ -312,37 +303,40 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
   };
 
   return (
-    <div className={admin ? "text-gray-100" : "min-h-[100dvh] bg-[#05070d] text-gray-100"} style={{ fontFamily: '"Bai Jamjuree",ui-sans-serif,system-ui,sans-serif' }}>
+    <div className={`drift-ui ${admin ? "" : "d-page"}`} data-theme={theme}>
+      <DriftThemeStyles />
       {!admin && (
-      <header className="flex items-center justify-between border-b border-white/8 px-6 py-4">
-        <div className="text-xl font-extrabold tracking-tight text-white">
-          drift<span style={{ color: "#22d3ee" }}>.li</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="hidden text-xs text-gray-500 sm:inline">{user?.email}</span>
-          <button
-            onClick={logout}
-            className="rounded-lg border border-gray-700 px-3.5 py-1.5 text-xs font-semibold text-gray-300 hover:bg-gray-800"
-          >
-            Log out
-          </button>
-        </div>
-      </header>
+        <header className="d-topbar">
+          <div className="d-wordmark">
+            drift<i>.li</i>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <span className="d-faint hidden text-xs sm:inline">{user?.email}</span>
+            <ThemeToggle theme={theme} onToggle={toggleTheme} />
+            <button onClick={logout} className="d-btn sm">
+              Log out
+            </button>
+          </div>
+        </header>
       )}
 
-      <main className={admin ? "" : "mx-auto max-w-5xl px-6 py-8"}>
-        <div className="mb-5 flex items-center gap-2">
-          {(["drifts", "forms", "analytics", "domain"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setView(t)}
-              className={`rounded-lg px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                view === t ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"
-              }`}
-            >
-              {t === "drifts" ? "Drifts" : t === "forms" ? "Forms & Leads" : t === "analytics" ? "Analytics" : "Domain"}
-            </button>
-          ))}
+      <main className={admin ? "" : "d-main"}>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="d-tabs">
+            {(["drifts", "forms", "analytics", "domain"] as const).map((t) => (
+              <button key={t} onClick={() => setView(t)} className={`d-tab ${view === t ? "active" : ""}`}>
+                {t === "drifts" ? "Drifts" : t === "forms" ? "Forms & Leads" : t === "analytics" ? "Analytics" : "Domain"}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            {view === "drifts" && (
+              <button onClick={load} className="d-btn ghost sm">
+                ↻ Refresh
+              </button>
+            )}
+            {admin && <ThemeToggle theme={theme} onToggle={toggleTheme} />}
+          </div>
         </div>
 
         {view === "analytics" ? (
@@ -353,61 +347,60 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
           <DriftFormsManager adminOrgId={adminOrgId} />
         ) : (
         <>
-        <div className="mb-6 flex items-end justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-white">Your drifts</h1>
-            <p className="mt-1 text-sm text-gray-400">Edit details, add captions, and download the captioned video.</p>
+        <div className="d-card d-card-pad mb-6">
+          <div className="d-eyebrow" style={{ marginBottom: 12 }}>Brand settings</div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {!admin && (
+              <div>
+                <label className="d-label">Brand name</label>
+                <div className="flex gap-2">
+                  <input
+                    className="d-input"
+                    value={brandName}
+                    onChange={(e) => setBrandName(e.target.value)}
+                    placeholder="Your brand / profile name"
+                  />
+                  <button
+                    onClick={saveBrandName}
+                    disabled={brandSaving || !brandName.trim() || brandName.trim() === brandNameSaved}
+                    className="d-btn soft"
+                  >
+                    {brandSaving ? "…" : "Save"}
+                  </button>
+                </div>
+              </div>
+            )}
+            <div>
+              <label className="d-label">Meta Pixel ID</label>
+              <div className="flex gap-2">
+                <input
+                  className="d-input"
+                  value={brandPixel}
+                  onChange={(e) => setBrandPixel(e.target.value)}
+                  placeholder="Brand-default pixel (a drift can override)"
+                  inputMode="numeric"
+                />
+                <button
+                  onClick={savePixel}
+                  disabled={pixelSaving || brandPixel.trim() === brandPixelSaved}
+                  className="d-btn soft"
+                >
+                  {pixelSaving ? "…" : "Save"}
+                </button>
+              </div>
+            </div>
           </div>
-          <button onClick={load} className="text-xs text-gray-400 hover:text-white">
-            ↻ refresh
-          </button>
         </div>
 
-        {!admin && (
-          <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Brand name</span>
-            <input
-              value={brandName}
-              onChange={(e) => setBrandName(e.target.value)}
-              placeholder="Your brand / profile name"
-              className="min-w-0 flex-1 rounded-lg border border-gray-700 bg-gray-950 px-3 py-1.5 text-sm text-white outline-none focus:border-cyan-400"
-            />
-            <button
-              onClick={saveBrandName}
-              disabled={brandSaving || !brandName.trim() || brandName.trim() === brandNameSaved}
-              className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-widest text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-40"
-            >
-              {brandSaving ? "Saving…" : "Save"}
-            </button>
-          </div>
-        )}
-
-        <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Meta Pixel</span>
-          <input
-            value={brandPixel}
-            onChange={(e) => setBrandPixel(e.target.value)}
-            placeholder="Brand-default pixel id (a drift can override it)"
-            inputMode="numeric"
-            className="min-w-0 flex-1 rounded-lg border border-gray-700 bg-gray-950 px-3 py-1.5 text-sm text-white outline-none focus:border-cyan-400"
-          />
-          <button
-            onClick={savePixel}
-            disabled={pixelSaving || brandPixel.trim() === brandPixelSaved}
-            className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-widest text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-40"
-          >
-            {pixelSaving ? "Saving…" : "Save"}
-          </button>
+        <div className="mb-3 flex items-baseline justify-between">
+          <h1 className="d-h1">Your drifts</h1>
+          <span className="d-faint text-xs">{products.length} total</span>
         </div>
 
         {msg && (
-          <div
-            className={`mb-5 flex items-center justify-between rounded-xl border p-3.5 text-sm font-medium ${
-              msg.kind === "ok" ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-200" : "border-rose-400/20 bg-rose-500/10 text-rose-200"
-            }`}
-          >
-            {msg.text}
-            <button onClick={() => setMsg(null)} className="text-lg">
+          <div className={`d-banner ${msg.kind === "ok" ? "ok" : "err"}`} style={{ marginBottom: 20 }}>
+            <span>{msg.text}</span>
+            <button onClick={() => setMsg(null)} className="d-btn ghost sm" style={{ padding: "2px 8px" }}>
               ×
             </button>
           </div>
@@ -418,64 +411,40 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
             <LoadingSpinner size="sm" />
           </div>
         ) : products.length === 0 ? (
-          <div className="rounded-2xl border border-white/8 bg-white/[0.02] py-16 text-center text-sm text-gray-500">
-            No drifts yet. Once the team publishes your drifts they'll appear here.
-          </div>
+          <div className="d-empty">No drifts yet. Once the team publishes your drifts they'll appear here.</div>
         ) : (
           <div className="grid gap-3">
             {products.map((p) => (
-              <div key={p.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
+              <div key={p.id} className="d-row">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-white">{p.title || p.name}</p>
-                  <p className="text-[11px] text-gray-500">
-                    <span className={statusColor(p.status)}>{p.status}</span>
-                    {p.spin?.frameCount ? ` · ${p.spin.frameCount} frames` : ""}
-                    {p.spin?.secondFrameCount ? " · +2nd clip" : ""}
-                    {p.loopEnabled ? " · loop" : ""}
+                  <p className="truncate" style={{ fontWeight: 650 }}>{p.title || p.name}</p>
+                  <p className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
+                    <span className={`d-pill ${statusPill(p.status)}`}>{p.status}</span>
+                    <span className="d-faint">
+                      {p.spin?.frameCount ? `${p.spin.frameCount} frames` : ""}
+                      {p.spin?.secondFrameCount ? " · +2nd clip" : ""}
+                      {p.loopEnabled ? " · loop" : ""}
+                    </span>
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
-                  <button
-                    onClick={() => setEditing(p)}
-                    className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
-                  >
-                    Edit
-                  </button>
+                  <button onClick={() => setEditing(p)} className="d-btn sm">Edit</button>
                   {(p.status === "READY" || p.status === "PUBLISHED") && (
                     <>
-                      <button
-                        onClick={() => setCaptions({ id: p.id, name: p.name })}
-                        className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
-                      >
-                        Captions
-                      </button>
-                      <button
-                        onClick={() => download(p)}
-                        disabled={exportingId === p.id}
-                        className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-50"
-                      >
+                      <button onClick={() => setCaptions({ id: p.id, name: p.name })} className="d-btn sm">Captions</button>
+                      <button onClick={() => download(p)} disabled={exportingId === p.id} className="d-btn soft sm">
                         {exportingId === p.id ? "Rendering…" : "⬇ Download"}
                       </button>
-                      <button
-                        onClick={() => setEmbedProduct(p)}
-                        className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
-                      >
-                        Embed
-                      </button>
+                      <button onClick={() => setEmbedProduct(p)} className="d-btn sm">Embed</button>
                       <button
                         onClick={() => shareCard(p)}
                         disabled={cardId === p.id}
-                        className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800 disabled:opacity-50"
+                        className="d-btn sm"
                         title="Download a social share card (frame + QR to the player)"
                       >
                         {cardId === p.id ? "Making…" : "Share card"}
                       </button>
-                      <a
-                        href={productLink(p)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
-                      >
+                      <a href={productLink(p)} target="_blank" rel="noopener noreferrer" className="d-btn sm">
                         View ↗
                       </a>
                     </>
