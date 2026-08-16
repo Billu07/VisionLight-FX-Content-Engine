@@ -17,5 +17,14 @@ build
 .DS_Store
 Thumbs.db
 
+# Scratch screenshots / reference images dropped at the repo root (not app assets)
+/*.jpeg
+/*.jpg
+/*.webp
+/WhatsApp*.jpeg
+/cloudflare/
+/package.png
+/upload-ref.png
+
 # Gemini CLI
 .gemini/
