@@ -191,6 +191,8 @@ function HeroLanding({ product }: { product: any }) {
           ctaSecondary={toCta(product.ctaSecondary)}
           showLogo={false}
           showName={false}
+          showTitle={false}
+          showTools={false}
           onCtaClick={(which) => {
             if (product.id) apiEndpoints.driftTrackEvent(product.id, "CTA_CLICK", { which }).catch(() => undefined);
             if (product.metaPixelId) track("CTAClick", { which, content_name: product.name }, true);

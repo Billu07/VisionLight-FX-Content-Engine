@@ -75,6 +75,8 @@ export type SpinViewerProps = {
   showLogo?: boolean;
   showName?: boolean;
   showTitle?: boolean;
+  /** hide the top-right tool buttons (reset + fullscreen) — e.g. the landing player */
+  showTools?: boolean;
   /** optional product info shown beside the player (desktop right / mobile top) */
   title?: string | null;
   description?: string | null;
@@ -169,6 +171,7 @@ export default function SpinViewer({
   showLogo = true,
   showName = true,
   showTitle = true,
+  showTools = true,
   title,
   description,
   titleEnd,
@@ -446,18 +449,6 @@ export default function SpinViewer({
       const scale = Math.min(W, H) * (hero ? 0.23 : 0.25) * zoom;
       const cx = W / 2 + panX * DPR, cy = H * 0.47 + panY * DPR;
 
-      // Drift: pin the "drag to drift" hint just UNDER the product, but clamp it so
-      // its BOTTOM edge always clears the "Powered by" badge (bottom:100px) + CTAs.
-      // Reserve = badge/CTA zone (140px) + the hint's own height, measured live so
-      // a taller/shorter helper never overlaps the badge.
-      if (driftMode && hintRef.current) {
-        const under = (cy + scale) / DPR + 14;
-        const hintH = hintRef.current.offsetHeight || 110;
-        const maxTop = H / DPR - (140 + hintH);
-        hintRef.current.style.top = Math.max(12, Math.min(under, maxTop)) + "px";
-        hintRef.current.style.bottom = "auto";
-      }
-
       // Drift has no grounding shadow (per spec); Rotation3D keeps its contact shadow.
       if (!driftMode) {
         ctx.save();
@@ -483,6 +474,19 @@ export default function SpinViewer({
           headsRef.current.style.top = "";
           headsRef.current.style.bottom = "";
         }
+      }
+
+      // Drift: pin the "drag to drift" helper just UNDER the product's rendered
+      // bottom (the real frame rect when drawn; the box half-height otherwise —
+      // the old code used `scale`, i.e. half the true height, so the arrow landed
+      // INSIDE the frame). Clamp so its bottom clears the powered-by badge + CTAs.
+      if (driftMode && hintRef.current) {
+        const frameBottomCss = (realMode && frameRect.h > 0 ? frameRect.y + frameRect.h : cy + scale * 2.1) / DPR;
+        const under = frameBottomCss + 16;
+        const hintH = hintRef.current.offsetHeight || 110;
+        const maxTop = H / DPR - (140 + hintH);
+        hintRef.current.style.top = Math.max(12, Math.min(under, maxTop)) + "px";
+        hintRef.current.style.bottom = "auto";
       }
 
       // Drift on-frame captions — visible while this frame is within range.
@@ -1024,7 +1028,7 @@ export default function SpinViewer({
   const [activeForm, setActiveForm] = useState<{ form: OverlayForm; which: "primary" | "secondary" } | null>(null);
 
   return (
-    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${!showLogo ? "r3d-no-logo" : ""} ${!showName ? "r3d-no-name" : ""} ${!showTitle ? "r3d-no-title" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
+    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${!showLogo ? "r3d-no-logo" : ""} ${!showName ? "r3d-no-name" : ""} ${!showTitle ? "r3d-no-title" : ""} ${!showTools ? "r3d-no-tools" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
       style={stageStyle}
       tabIndex={hero ? -1 : 0}
       aria-label="Interactive 360 degree product viewer. Drag to rotate.">
@@ -1402,6 +1406,7 @@ const R3D_CSS = `
 .r3d-no-logo .r3d-logo-img,.r3d-no-logo .r3d-logo{display:none!important}
 .r3d-no-name .r3d-kicker{display:none!important}
 .r3d-no-title .r3d-name{display:none!important}
+.r3d-no-tools [data-reset],.r3d-no-tools [data-fs]{display:none!important}
 /* light background → flip text + controls to dark for contrast */
 .r3d-light .r3d-logo-img{filter:drop-shadow(0 0 1px rgba(0,0,0,.55)) drop-shadow(0 1px 5px rgba(0,0,0,.3))}
 .r3d-light .r3d-name{color:#0b0f19}
