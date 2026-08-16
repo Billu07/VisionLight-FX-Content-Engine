@@ -96,7 +96,10 @@ const cta = (v: unknown) => {
   const o = v as any;
   const label = typeof o.label === "string" ? o.label.slice(0, 40) : "";
   const url = typeof o.url === "string" ? o.url.slice(0, 2000) : "";
-  return { label, url };
+  // A CTA can open a lead-capture form instead of a link (formId set → the
+  // player shows the in-page form overlay rather than navigating to url).
+  const formId = typeof o.formId === "string" && o.formId ? o.formId.slice(0, 40) : null;
+  return { label, url, formId };
 };
 
 // Normalize one caption from client input. Returns null for empty text.
@@ -866,8 +869,22 @@ router.post(
 
 // ─────────────────────────── PUBLIC (no auth) ───────────────────────────
 
+// Any lead-forms a product's CTAs point at, keyed by id, so the player can open
+// the form overlay without a second round-trip.
+async function resolveCtaForms(p: any): Promise<Record<string, any>> {
+  const ids = [p.ctaPrimary?.formId, p.ctaSecondary?.formId].filter(Boolean) as string[];
+  if (!ids.length) return {};
+  const forms = await prisma.driftForm.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, name: true, definition: true },
+  });
+  const map: Record<string, any> = {};
+  for (const f of forms) map[f.id] = f;
+  return map;
+}
+
 // Shape a full player payload for a Drift product record (with brand + spin).
-const publicProductPayload = (p: any, bc: any, orgName: string, captions: any[]) => ({
+const publicProductPayload = async (p: any, bc: any, orgName: string, captions: any[]) => ({
   id: p.id,
   name: p.name,
   slug: p.slug,
@@ -885,6 +902,7 @@ const publicProductPayload = (p: any, bc: any, orgName: string, captions: any[])
   background: p.background,
   ctaPrimary: p.ctaPrimary,
   ctaSecondary: p.ctaSecondary,
+  forms: await resolveCtaForms(p),
   brandName: bc?.companyName || orgName || "",
   logoUrl: bc?.logoUrl || null,
   primaryColor: bc?.primaryColor || null,
@@ -982,7 +1000,7 @@ router.get(
         where: { productId: product.id },
         orderBy: [{ clip: "asc" }, { startFrame: "asc" }, { order: "asc" }],
       });
-      res.json({ product: { ...publicProductPayload(product, org.brandConfigs?.[0], org.name, captions), brandSlug: org.slug } });
+      res.json({ product: { ...(await publicProductPayload(product, org.brandConfigs?.[0], org.name, captions)), brandSlug: org.slug } });
     } catch {
       res.status(404).json({ error: "Not found" });
     }
@@ -1016,7 +1034,7 @@ router.get(
     });
     const bc = product.organization?.brandConfigs?.[0];
     res.json({
-      product: publicProductPayload(product, bc, product.organization?.name || "", captions),
+      product: await publicProductPayload(product, bc, product.organization?.name || "", captions),
     });
   },
 );
@@ -1223,6 +1241,284 @@ router.get(
     }
   },
 );
+
+// ─────────────────────────── FORMS + LEADS ───────────────────────────
+// Brands build lead-capture forms and attach them to a player CTA. Submissions
+// land as DriftLead rows (Leads tab + CSV) and optionally POST to a webhook.
+
+const FIELD_TYPES = new Set([
+  "text", "email", "phone", "textarea", "select", "radio", "checkbox", "consent", "hidden",
+]);
+
+const sanitizeFormField = (f: any) => {
+  if (!f || typeof f !== "object") return null;
+  const type = FIELD_TYPES.has(f.type) ? f.type : "text";
+  const key = (typeof f.key === "string" && f.key ? f.key : "field")
+    .replace(/[^a-zA-Z0-9_]/g, "_")
+    .slice(0, 40);
+  const out: any = {
+    key,
+    type,
+    label: typeof f.label === "string" ? f.label.slice(0, 120) : "",
+    placeholder: typeof f.placeholder === "string" ? f.placeholder.slice(0, 120) : "",
+    required: !!f.required,
+    options: Array.isArray(f.options)
+      ? f.options.slice(0, 30).map((o: any) => String(o).slice(0, 120)).filter(Boolean)
+      : [],
+  };
+  if (type === "hidden" && typeof f.value === "string") out.value = f.value.slice(0, 300);
+  return out;
+};
+
+const sanitizeFormDefinition = (raw: any) => {
+  const d = raw && typeof raw === "object" ? raw : {};
+  const steps = (Array.isArray(d.steps) ? d.steps : [])
+    .slice(0, 10)
+    .map((s: any) => ({
+      title: typeof s?.title === "string" ? s.title.slice(0, 120) : "",
+      fields: (Array.isArray(s?.fields) ? s.fields : [])
+        .slice(0, 30)
+        .map(sanitizeFormField)
+        .filter(Boolean),
+    }))
+    .filter((s: any) => s.fields.length);
+  if (!steps.length) steps.push({ title: "", fields: [] });
+  const consent = d.consent && typeof d.consent === "object"
+    ? { enabled: !!d.consent.enabled, text: typeof d.consent.text === "string" ? d.consent.text.slice(0, 500) : "" }
+    : { enabled: false, text: "" };
+  return {
+    multiStep: !!d.multiStep,
+    steps,
+    consent,
+    submitLabel: typeof d.submitLabel === "string" && d.submitLabel.trim() ? d.submitLabel.slice(0, 40) : "Submit",
+    successMessage:
+      typeof d.successMessage === "string" && d.successMessage.trim()
+        ? d.successMessage.slice(0, 300)
+        : "Thanks — we'll be in touch.",
+  };
+};
+
+const allFields = (def: any): any[] =>
+  (Array.isArray(def?.steps) ? def.steps : []).flatMap((s: any) => (Array.isArray(s?.fields) ? s.fields : []));
+
+// Shared org-scoped form operations (brand /my derives org from the user;
+// superadmin /brands/:orgId passes it explicitly).
+async function listDriftForms(orgId: string) {
+  const forms = await prisma.driftForm.findMany({
+    where: { organizationId: orgId },
+    orderBy: { updatedAt: "desc" },
+    include: { _count: { select: { leads: true } } },
+  });
+  return forms;
+}
+
+async function createDriftForm(orgId: string, body: any) {
+  return prisma.driftForm.create({
+    data: {
+      organizationId: orgId,
+      name: String(body?.name || "Untitled form").slice(0, 120),
+      definition: sanitizeFormDefinition(body?.definition) as any,
+      webhookUrl: typeof body?.webhookUrl === "string" && body.webhookUrl.trim() ? body.webhookUrl.trim().slice(0, 500) : null,
+    },
+  });
+}
+
+async function updateDriftForm(orgId: string, id: string, body: any) {
+  const owned = await prisma.driftForm.findFirst({ where: { id, organizationId: orgId }, select: { id: true } });
+  if (!owned) return null;
+  const data: Record<string, unknown> = {};
+  if (typeof body?.name === "string" && body.name.trim()) data.name = body.name.slice(0, 120);
+  if ("definition" in (body || {})) data.definition = sanitizeFormDefinition(body.definition) as any;
+  if ("webhookUrl" in (body || {}))
+    data.webhookUrl = body.webhookUrl ? String(body.webhookUrl).trim().slice(0, 500) : null;
+  return prisma.driftForm.update({ where: { id: owned.id }, data });
+}
+
+async function listDriftLeads(orgId: string, filter: { formId?: string; productId?: string }) {
+  return prisma.driftLead.findMany({
+    where: {
+      organizationId: orgId,
+      ...(filter.formId ? { formId: filter.formId } : {}),
+      ...(filter.productId ? { productId: filter.productId } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    take: 2000,
+  });
+}
+
+const csvCell = (v: unknown) => {
+  const s = v == null ? "" : typeof v === "object" ? JSON.stringify(v) : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
+const leadsToCsv = (leads: any[]) => {
+  const dataKeys = Array.from(
+    new Set(leads.flatMap((l) => (l.data && typeof l.data === "object" ? Object.keys(l.data) : []))),
+  );
+  const header = ["createdAt", "drift", "cta", ...dataKeys];
+  const rows = leads.map((l) => [
+    new Date(l.createdAt).toISOString(),
+    l.source?.drift || l.productId || "",
+    l.source?.cta || "",
+    ...dataKeys.map((k) => (l.data ? l.data[k] : "")),
+  ]);
+  return [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\n");
+};
+
+// ── Brand-admin form + lead endpoints (org from the logged-in user) ──
+router.get("/api/drift/my/forms", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = requireOrg(req, res);
+  if (!orgId) return;
+  res.json({ forms: await listDriftForms(orgId) });
+});
+
+router.post("/api/drift/my/forms", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = requireOrg(req, res);
+  if (!orgId) return;
+  res.status(201).json({ form: await createDriftForm(orgId, req.body) });
+});
+
+router.patch("/api/drift/my/forms/:id", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = requireOrg(req, res);
+  if (!orgId) return;
+  const form = await updateDriftForm(orgId, req.params.id, req.body);
+  if (!form) return res.status(404).json({ error: "Form not found" });
+  res.json({ form });
+});
+
+router.delete("/api/drift/my/forms/:id", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = requireOrg(req, res);
+  if (!orgId) return;
+  await prisma.driftForm.deleteMany({ where: { id: req.params.id, organizationId: orgId } });
+  res.json({ ok: true });
+});
+
+router.get("/api/drift/my/leads", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = requireOrg(req, res);
+  if (!orgId) return;
+  const leads = await listDriftLeads(orgId, {
+    formId: req.query.formId ? String(req.query.formId) : undefined,
+    productId: req.query.productId ? String(req.query.productId) : undefined,
+  });
+  res.json({ leads });
+});
+
+router.get("/api/drift/my/leads.csv", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = requireOrg(req, res);
+  if (!orgId) return;
+  const leads = await listDriftLeads(orgId, {
+    formId: req.query.formId ? String(req.query.formId) : undefined,
+    productId: req.query.productId ? String(req.query.productId) : undefined,
+  });
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="drift-leads.csv"`);
+  res.send(leadsToCsv(leads));
+});
+
+// ── Superadmin brand-view (org explicit in the path) ──
+router.get("/api/drift/brands/:orgId/forms", authenticateToken, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  res.json({ forms: await listDriftForms(req.params.orgId) });
+});
+router.post("/api/drift/brands/:orgId/forms", authenticateToken, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  res.status(201).json({ form: await createDriftForm(req.params.orgId, req.body) });
+});
+router.patch("/api/drift/brands/:orgId/forms/:id", authenticateToken, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  const form = await updateDriftForm(req.params.orgId, req.params.id, req.body);
+  if (!form) return res.status(404).json({ error: "Form not found" });
+  res.json({ form });
+});
+router.delete("/api/drift/brands/:orgId/forms/:id", authenticateToken, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  await prisma.driftForm.deleteMany({ where: { id: req.params.id, organizationId: req.params.orgId } });
+  res.json({ ok: true });
+});
+router.get("/api/drift/brands/:orgId/leads", authenticateToken, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  res.json({
+    leads: await listDriftLeads(req.params.orgId, {
+      formId: req.query.formId ? String(req.query.formId) : undefined,
+      productId: req.query.productId ? String(req.query.productId) : undefined,
+    }),
+  });
+});
+router.get("/api/drift/brands/:orgId/leads.csv", authenticateToken, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  const leads = await listDriftLeads(req.params.orgId, {
+    formId: req.query.formId ? String(req.query.formId) : undefined,
+    productId: req.query.productId ? String(req.query.productId) : undefined,
+  });
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="drift-leads.csv"`);
+  res.send(leadsToCsv(leads));
+});
+
+// ── Public: fetch a form's definition + submit a lead ──
+router.get("/api/drift/public/forms/:id", async (req: AuthenticatedRequest, res: Response) => {
+  const form = await prisma.driftForm.findUnique({
+    where: { id: req.params.id },
+    select: { id: true, name: true, definition: true },
+  });
+  if (!form) return res.status(404).json({ error: "Not found" });
+  res.json({ form });
+});
+
+router.post("/api/drift/public/forms/:id/submit", async (req: AuthenticatedRequest, res: Response) => {
+  const form = await prisma.driftForm.findUnique({ where: { id: req.params.id } });
+  if (!form) return res.status(404).json({ error: "Form not found" });
+  const def: any = form.definition || {};
+  const incoming = req.body?.data && typeof req.body.data === "object" ? req.body.data : {};
+  const fields = allFields(def);
+
+  // Keep only known keys; validate required; carry hidden defaults.
+  const data: Record<string, unknown> = {};
+  for (const f of fields) {
+    if (f.type === "consent") {
+      if (f.required && !incoming[f.key]) return res.status(400).json({ error: "Please provide consent to continue" });
+      data[f.key] = !!incoming[f.key];
+      continue;
+    }
+    if (f.type === "hidden") {
+      data[f.key] = typeof incoming[f.key] === "string" ? String(incoming[f.key]).slice(0, 300) : f.value ?? "";
+      continue;
+    }
+    const v = incoming[f.key];
+    const val = v == null ? "" : String(v).slice(0, 2000);
+    if (f.required && !val.trim()) return res.status(400).json({ error: `"${f.label || f.key}" is required` });
+    data[f.key] = val;
+  }
+  if (def.consent?.enabled && !incoming.__consent && !fields.some((f: any) => f.type === "consent")) {
+    return res.status(400).json({ error: "Please provide consent to continue" });
+  }
+
+  const productId = typeof req.body?.productId === "string" ? req.body.productId : null;
+  const source = {
+    drift: req.body?.source?.drift ? String(req.body.source.drift).slice(0, 160) : null,
+    cta: req.body?.source?.cta ? String(req.body.source.cta).slice(0, 40) : null,
+    referrer: typeof req.headers.referer === "string" ? req.headers.referer.slice(0, 300) : null,
+    ua: typeof req.headers["user-agent"] === "string" ? String(req.headers["user-agent"]).slice(0, 300) : null,
+  };
+
+  const lead = await prisma.driftLead.create({
+    data: {
+      organizationId: form.organizationId,
+      formId: form.id,
+      productId: productId || null,
+      data: data as any,
+      source: source as any,
+    },
+  });
+
+  // Fire the webhook without blocking the response (best-effort).
+  if (form.webhookUrl) {
+    const payload = JSON.stringify({ formId: form.id, formName: form.name, leadId: lead.id, data, source, createdAt: lead.createdAt });
+    void (async () => {
+      try {
+        await fetch(form.webhookUrl as string, { method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
+      } catch (e) {
+        console.error(`[${NS}] lead webhook failed:`, e);
+      }
+    })();
+  }
+
+  res.status(201).json({ ok: true, successMessage: def.successMessage || "Thanks — we'll be in touch." });
+});
 
 // ─────────────────────────── LANDING CURATION ───────────────────────────
 // Cross-line: a landing item points at a DriftProduct or a Rot3dProduct.

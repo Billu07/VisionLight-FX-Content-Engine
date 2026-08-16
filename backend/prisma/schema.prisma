@@ -80,6 +80,8 @@ model Organization {
   driftProducts     DriftProduct[]
   driftSourceImages DriftSourceImage[]
   driftEvents       DriftEvent[]
+  driftForms        DriftForm[]
+  driftLeads        DriftLead[]
 }
 
 model User {
@@ -523,6 +525,7 @@ model DriftProduct {
   embed        DriftEmbed?
   captions     DriftCaption[]
   events       DriftEvent[]
+  leads        DriftLead[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -622,6 +625,44 @@ model DriftEvent {
 
   @@index([productId])
   @@index([organizationId, ts])
+}
+
+// A lead-capture form a brand builds and attaches to a player CTA. The whole
+// builder output (steps → fields, consent, copy) lives in `definition` JSON so
+// the shape can evolve without migrations; webhookUrl is a scalar for easy edits.
+model DriftForm {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  definition     Json // { multiStep, steps:[{title?, fields:[{key,type,label,placeholder?,required?,options?[]}]}], consent:{enabled,text}, submitLabel, successMessage }
+  webhookUrl     String? // optional POST target per new lead
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  leads        DriftLead[]
+
+  @@index([organizationId])
+}
+
+// A submitted lead. `data` is the field key → value map; `source` carries where
+// it came from (drift id/name, which CTA, referrer, user-agent).
+model DriftLead {
+  id             String   @id @default(uuid())
+  organizationId String
+  formId         String?
+  productId      String?
+  data           Json
+  source         Json?
+  createdAt      DateTime @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  form         DriftForm?    @relation(fields: [formId], references: [id], onDelete: SetNull)
+  product      DriftProduct? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([formId])
+  @@index([productId])
 }
 
 // drift.li landing showcase curation. Cross-line: an item points at EITHER a
