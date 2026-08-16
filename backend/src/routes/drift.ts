@@ -1968,6 +1968,44 @@ router.get("/api/drift/public/landing", async (_req: AuthenticatedRequest, res: 
   }
 });
 
+// The hero DRIFT set as THE drift.li landing — drift.li/ renders this drift's
+// full interactive player in place of the gallery. Returns the complete player
+// payload (or { product: null } to fall back to the gallery landing).
+router.get("/api/drift/public/landing-hero", async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const hero = await prisma.driftLandingItem.findFirst({
+      where: { isHero: true, source: "DRIFT" },
+      select: { productId: true },
+    });
+    if (!hero) return res.json({ product: null });
+    const product = await prisma.driftProduct.findFirst({
+      where: { id: hero.productId, status: { in: ["READY", "PUBLISHED"] } },
+      include: {
+        spin: true,
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            metaPixelId: true,
+            brandConfigs: { select: { logoUrl: true, companyName: true, primaryColor: true, secondaryColor: true }, take: 1 },
+          },
+        },
+      },
+    });
+    if (!product || !product.spin) return res.json({ product: null });
+    const captions = await prisma.driftCaption.findMany({
+      where: { productId: product.id },
+      orderBy: [{ clip: "asc" }, { startFrame: "asc" }, { order: "asc" }],
+    });
+    const bc = product.organization?.brandConfigs?.[0];
+    const payload = await publicProductPayload(product, bc, product.organization?.name || "", captions, product.organization?.metaPixelId);
+    res.json({ product: { ...payload, brandSlug: product.organization?.slug || null } });
+  } catch {
+    res.json({ product: null });
+  }
+});
+
 // Called once at server startup — mark orphaned PROCESSING products FAILED.
 export async function recoverOrphanedDriftJobs() {
   try {

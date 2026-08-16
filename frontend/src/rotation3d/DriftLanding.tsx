@@ -2,6 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
 import { LoginModal } from "../components/LoginModal";
+import { initMetaPixel, track } from "./metaPixel";
+
+const toCta = (c: any) =>
+  c && typeof c === "object" && c.label && ((c.url && c.url !== "#") || c.formId)
+    ? { label: String(c.label), url: c.url && c.url !== "#" ? String(c.url) : undefined, formId: c.formId || undefined }
+    : undefined;
 
 /**
  * drift.li landing — a cinematic "gallery in motion": an infinite auto-scrolling
@@ -114,14 +120,106 @@ function BentoTile({ it, onOpen, big }: { it: Item; onOpen: () => void; big?: bo
   );
 }
 
+// When a superadmin designates a drift as THE drift.li landing, the root renders
+// that drift's full interactive player in place of the gallery — the drift's own
+// logo/name hidden, drift.li branding in the header.
+const HERO_CSS = `
+.dl-hero-root{position:fixed;inset:0;background:#05070d;overflow:hidden}
+.dl-hero-header{position:absolute;top:0;left:0;right:0;z-index:30;display:flex;align-items:center;justify-content:space-between;
+  padding:14px clamp(16px,4vw,32px);pointer-events:none}
+.dl-hero-header .dl-word{font-size:19px;font-weight:800;letter-spacing:-.01em;color:#fff}
+.dl-hero-header .dl-word span{margin-left:7px;font-weight:600;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#22d3ee}
+.dl-hero-login{pointer-events:auto;cursor:pointer;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);
+  color:#e8edf4;border-radius:11px;padding:8px 16px;font-size:12.5px;font-weight:650;backdrop-filter:blur(8px);transition:background .16s}
+.dl-hero-login:hover{background:rgba(255,255,255,.12)}
+.dl-hero-stage{position:absolute;inset:0}
+`;
+
+function HeroLanding({ product }: { product: any }) {
+  const [showLogin, setShowLogin] = useState(false);
+  const framesA: string[] = Array.isArray(product.manifest?.frames) ? product.manifest.frames : [];
+  const framesB: string[] = product.secondManifest && Array.isArray(product.secondManifest.frames) ? product.secondManifest.frames : [];
+  const combined = framesB.length ? [...framesA, ...framesB] : framesA;
+  let captions = product.captions;
+  if (captions && framesB.length) {
+    captions = captions.map((c: any) =>
+      c.clip === "B"
+        ? { ...c, clip: "A", startFrame: c.startFrame + framesA.length, endFrame: c.endFrame + framesA.length }
+        : c,
+    );
+  }
+
+  useEffect(() => {
+    if (product?.metaPixelId) {
+      initMetaPixel(product.metaPixelId);
+      track("ViewContent", { content_name: product.name });
+    }
+    if (product?.id) apiEndpoints.driftTrackEvent(product.id, "VIEW").catch(() => undefined);
+  }, [product]);
+
+  return (
+    <div className="dl-hero-root">
+      <style>{HERO_CSS}</style>
+      <header className="dl-hero-header">
+        <div className="dl-word">
+          Drift Link<span>Interactive</span>
+        </div>
+        <button className="dl-hero-login" onClick={() => setShowLogin(true)}>
+          Log in
+        </button>
+      </header>
+      <div className="dl-hero-stage">
+        <SpinViewer
+          manifest={{ frameCount: combined.length || product.manifest?.frameCount || 0, frames: combined, defaultFrame: product.defaultFrame ?? 0 }}
+          driftMode
+          loopScrub={product.loopEnabled ?? false}
+          brandName="Drift Link"
+          productName={product.name}
+          title={product.title}
+          titleEnd={product.titleEnd}
+          description={product.description}
+          descriptionEnd={product.descriptionEnd}
+          helperStart={product.helperStart}
+          helperEnd={product.helperEnd}
+          background={product.background || undefined}
+          primaryColor={product.primaryColor || DRIFT_PRIMARY}
+          secondaryColor={product.secondaryColor || DRIFT_SECONDARY}
+          captions={captions}
+          forms={product.forms}
+          productId={product.id}
+          ctaPrimary={toCta(product.ctaPrimary)}
+          ctaSecondary={toCta(product.ctaSecondary)}
+          showLogo={false}
+          showName={false}
+          onCtaClick={(which) => {
+            if (product.id) apiEndpoints.driftTrackEvent(product.id, "CTA_CLICK", { which }).catch(() => undefined);
+            if (product.metaPixelId) track("CTAClick", { which, content_name: product.name }, true);
+          }}
+        />
+      </div>
+      <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
+    </div>
+  );
+}
+
 export default function DriftLanding() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<Item | null>(null);
   const [showLogin, setShowLogin] = useState(false);
+  const [landingHero, setLandingHero] = useState<any>(null);
+  const [heroChecked, setHeroChecked] = useState(false);
 
   useEffect(() => {
     let alive = true;
+    // Check for a designated landing drift first; only load the gallery if none.
+    apiEndpoints
+      .driftPublicLandingHero()
+      .then((r) => {
+        if (alive) setLandingHero(r.data?.product || null);
+      })
+      .catch(() => alive && setLandingHero(null))
+      .finally(() => alive && setHeroChecked(true));
     apiEndpoints
       .driftPublicLanding()
       .then((r) => alive && setItems(r.data.items || []))
@@ -131,6 +229,11 @@ export default function DriftLanding() {
       alive = false;
     };
   }, []);
+
+  // A designated landing drift takes over the whole page.
+  if (heroChecked && landingHero) return <HeroLanding product={landingHero} />;
+  // Avoid a flash of the gallery before the hero check resolves.
+  if (!heroChecked) return <div style={{ position: "fixed", inset: 0, background: "#05070d" }} />;
 
   const hero = items.find((i) => i.isHero) || items[0] || null;
 

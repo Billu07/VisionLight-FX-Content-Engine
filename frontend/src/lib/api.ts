@@ -406,6 +406,7 @@ export const apiEndpoints = {
   driftResolveHost: (host: string) => api.get("/api/drift/public/resolve-host", { params: { host } }),
   driftLandingRemove: (id: string) => api.delete(`/api/drift/landing/${id}`),
   driftPublicLanding: () => api.get("/api/drift/public/landing"),
+  driftPublicLandingHero: () => api.get("/api/drift/public/landing-hero"),
 
   byokGetActivationStatus: (checkoutSessionId: string) =>
     api.get("/api/byok/activation-status", { params: { checkoutSessionId } }),

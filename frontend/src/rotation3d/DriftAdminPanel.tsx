@@ -500,12 +500,18 @@ export default function DriftAdminPanel() {
 
   const [heroId, setHeroId] = useState<string | null>(null);
   const setLandingHero = async (p: Product) => {
+    if (
+      !window.confirm(
+        `Make "${p.name}" the drift.li landing page?\n\nThe whole drift.li homepage will become this drift's interactive player (its own logo/name hidden, drift.li branding in the header), replacing the gallery. You can revert it from the Landing showcase tab.`,
+      )
+    )
+      return;
     setHeroId(p.id);
     try {
       await apiEndpoints.driftLandingSetHero("DRIFT", p.id);
-      setMsg({ kind: "ok", text: `"${p.name}" is now the drift.li landing hero.` });
+      setMsg({ kind: "ok", text: `"${p.name}" is now the drift.li landing page.` });
     } catch (e: any) {
-      setMsg({ kind: "err", text: e?.response?.data?.error || "Could not set the landing hero" });
+      setMsg({ kind: "err", text: e?.response?.data?.error || "Could not set the landing page" });
     } finally {
       setHeroId(null);
     }
@@ -1003,10 +1009,10 @@ export default function DriftAdminPanel() {
                               <button
                                 onClick={() => setLandingHero(p)}
                                 disabled={heroId === p.id}
-                                title="Feature this drift as the drift.li landing hero"
+                                title="Make this drift the drift.li landing page (full-screen player)"
                                 className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-[11px] font-semibold text-amber-200 hover:bg-amber-400/20 disabled:opacity-50"
                               >
-                                {heroId === p.id ? "Setting…" : "★ Landing"}
+                                {heroId === p.id ? "Setting…" : "★ Set as landing"}
                               </button>
                               <button
                                 onClick={() => copyProductLink(p)}
