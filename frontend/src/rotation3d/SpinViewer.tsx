@@ -412,6 +412,9 @@ export default function SpinViewer({
       return null;
     };
 
+    // The rendered frame image rect (device px) — captions are positioned
+    // relative to THIS (matching the editor + export), not the whole canvas.
+    let frameRect = { x: 0, y: 0, w: 0, h: 0 };
     const drawFrameImage = (frame: number, cx: number, cy: number, scale: number) => {
       const img = nearestLoaded(frame);
       if (!img) return;
@@ -420,7 +423,9 @@ export default function SpinViewer({
       const ar = img.naturalWidth / img.naturalHeight;
       let w = box, h = box / ar;
       if (h > box) { h = box; w = box * ar; }
-      ctx.drawImage(img, cx - w / 2, cy - h / 2, w, h);
+      const x = cx - w / 2, y = cy - h / 2;
+      frameRect = { x, y, w, h };
+      ctx.drawImage(img, x, y, w, h);
     };
 
     const draw = () => {
@@ -454,19 +459,20 @@ export default function SpinViewer({
       else drawSynthetic(q, cx, cy, scale);
 
       // Drift on-frame captions — visible while this frame is within range.
+      // Positioned relative to the rendered FRAME rect (matches editor + export).
       const caps = captionsRef.current;
-      if (caps && caps.length) {
+      if (caps && caps.length && frameRect.w > 0) {
         for (const c of caps) {
           if (c.clip && c.clip !== "A") continue; // clip B not consumed yet
           if (frame < c.startFrame || frame > c.endFrame) continue;
-          const fs = Math.max(9, (c.fontSize ?? 0.05) * H);
+          const fs = Math.max(9, (c.fontSize ?? 0.05) * frameRect.h);
           const lines = String(c.text || "").split("\n");
           if (!lines.some((l) => l.trim())) continue;
           ctx.save();
           ctx.font = `${c.fontWeight ?? 600} ${fs}px "Bai Jamjuree", ui-sans-serif, system-ui, sans-serif`;
           ctx.textAlign = c.align === "left" ? "left" : c.align === "right" ? "right" : "center";
           ctx.textBaseline = "middle";
-          const px = c.x * W, py = c.y * H, lh = fs * 1.25;
+          const px = frameRect.x + c.x * frameRect.w, py = frameRect.y + c.y * frameRect.h, lh = fs * 1.25;
           if (c.background) {
             let maxW = 0;
             for (const ln of lines) maxW = Math.max(maxW, ctx.measureText(ln).width);

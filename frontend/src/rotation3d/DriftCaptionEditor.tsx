@@ -74,6 +74,8 @@ export default function DriftCaptionEditor({
 
   const stageRef = useRef<HTMLDivElement>(null);
   const [stageH, setStageH] = useState(360);
+  const [stageW, setStageW] = useState(640);
+  const [frameAR, setFrameAR] = useState(1); // natural aspect (w/h) of the spin frame
   const dragRef = useRef<{ i: number } | null>(null);
 
   const frameMax = Math.max(0, frames.length - 1);
@@ -105,11 +107,30 @@ export default function DriftCaptionEditor({
   useLayoutEffect(() => {
     const el = stageRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setStageH(el.clientHeight || 360));
+    const measure = () => {
+      setStageH(el.clientHeight || 360);
+      setStageW(el.clientWidth || 640);
+    };
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
-    setStageH(el.clientHeight || 360);
+    measure();
     return () => ro.disconnect();
   }, [loading]);
+
+  // The frame image is drawn object-contain (letterboxed) inside the stage box.
+  // Captions are normalized to the FRAME, so map them to the frame's rendered rect
+  // — matching the player and the export bake exactly (fixes the "jumps to top" bug).
+  const frameBox = () => {
+    const sAR = stageW / Math.max(1, stageH);
+    if (frameAR > sAR) {
+      const fw = stageW;
+      const fh = fw / frameAR;
+      return { fx: 0, fy: (stageH - fh) / 2, fw, fh };
+    }
+    const fh = stageH;
+    const fw = fh * frameAR;
+    return { fx: (stageW - fw) / 2, fy: 0, fw, fh };
+  };
 
   const update = (i: number, patch: Partial<Caption>) =>
     setCaptions((prev) => prev.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
@@ -127,8 +148,10 @@ export default function DriftCaptionEditor({
   const onStagePointerMove = (e: React.PointerEvent) => {
     if (!dragRef.current || !stageRef.current) return;
     const r = stageRef.current.getBoundingClientRect();
-    const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
-    const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+    const { fx, fy, fw, fh } = frameBox();
+    // Map the pointer to the frame's rendered rect (not the whole stage box).
+    const x = Math.min(1, Math.max(0, (e.clientX - r.left - fx) / Math.max(1, fw)));
+    const y = Math.min(1, Math.max(0, (e.clientY - r.top - fy) / Math.max(1, fh)));
     update(dragRef.current.i, { x, y });
   };
   const endDrag = () => (dragRef.current = null);
@@ -229,7 +252,17 @@ export default function DriftCaptionEditor({
                 style={{ minHeight: 260 }}
               >
                 {frames[frame] && (
-                  <img src={frames[frame]} alt="" className="h-full w-full object-contain" draggable={false} />
+                  <img
+                    src={frames[frame]}
+                    alt=""
+                    className="h-full w-full object-contain"
+                    draggable={false}
+                    onLoad={(e) => {
+                      const im = e.currentTarget;
+                      if (im.naturalWidth && im.naturalHeight)
+                        setFrameAR(im.naturalWidth / im.naturalHeight);
+                    }}
+                  />
                 )}
                 {captions.map((c, i) =>
                   activeOnFrame(c) ? (
@@ -244,12 +277,12 @@ export default function DriftCaptionEditor({
                         sel === i ? "outline outline-2 outline-brand-accent" : ""
                       }`}
                       style={{
-                        left: `${c.x * 100}%`,
-                        top: `${c.y * 100}%`,
+                        left: frameBox().fx + c.x * frameBox().fw,
+                        top: frameBox().fy + c.y * frameBox().fh,
                         transform: "translate(-50%,-50%)",
                         color: c.color,
                         fontWeight: c.fontWeight,
-                        fontSize: Math.max(9, c.fontSize * stageH),
+                        fontSize: Math.max(9, c.fontSize * frameBox().fh),
                         textAlign: c.align,
                         background: c.background || "transparent",
                         borderRadius: c.background ? 6 : 0,
