@@ -504,6 +504,7 @@ model DriftProduct {
   loopEnabled     Boolean  @default(true) // player auto-loop/continuous playback toggle
   hideLogo        Boolean  @default(false) // hide the brand logo in the platform player (not just embed)
   hideName        Boolean  @default(false) // hide the brand/profile name in the platform player
+  thumbnailUrl    String? // captioned-frame snapshot used as the poster (else the default frame)
   background      String? // "transparent" | hex
   ctaPrimary      Json? // { label, url }
   ctaSecondary    Json? // { label, url }

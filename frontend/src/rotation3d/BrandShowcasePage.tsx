@@ -19,6 +19,7 @@ type P = {
   name: string;
   defaultFrame?: number;
   background?: string | null;
+  thumbnailUrl?: string | null;
   manifest?: { frameCount?: number; frames?: string[]; framesMobile?: string[] };
 };
 
@@ -53,6 +54,8 @@ const galleryMan = (p: P): SpinManifest => {
 };
 
 const posterFor = (p: P): string | undefined => {
+  // A captioned-frame snapshot wins when set; otherwise the default spin frame.
+  if (p.thumbnailUrl) return p.thumbnailUrl;
   const src = p.manifest?.framesMobile?.length ? p.manifest.framesMobile : p.manifest?.frames;
   if (!src || src.length === 0) return undefined;
   const d = Math.min(src.length - 1, Math.max(0, p.defaultFrame ?? 0));

@@ -71,6 +71,7 @@ export default function DriftCaptionEditor({
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [snapping, setSnapping] = useState(false);
 
   const stageRef = useRef<HTMLDivElement>(null);
   const [stageH, setStageH] = useState(360);
@@ -201,6 +202,26 @@ export default function DriftCaptionEditor({
     }
   };
 
+  // Snapshot the CURRENT frame (with its captions baked in server-side) as the
+  // product poster. Saves captions first so the baked frame matches the preview.
+  const snapshot = async () => {
+    setSnapping(true);
+    setSavedMsg("Capturing thumbnail…");
+    try {
+      await apiEndpoints.driftSaveCaptions(
+        productId,
+        captions.map((c, i) => ({ ...c, order: i })),
+      );
+      await apiEndpoints.driftSetThumbnail(productId, frame);
+      setSavedMsg("Thumbnail set");
+      setTimeout(() => setSavedMsg(""), 1800);
+    } catch (e: any) {
+      setSavedMsg(e?.response?.data?.error || "Could not set thumbnail");
+    } finally {
+      setSnapping(false);
+    }
+  };
+
   const activeOnFrame = (c: Caption) => frame >= c.startFrame && frame <= c.endFrame;
   const current = sel >= 0 ? captions[sel] : null;
 
@@ -214,6 +235,14 @@ export default function DriftCaptionEditor({
           </div>
           <div className="flex items-center gap-2">
             {savedMsg && <span className="text-[11px] text-emerald-300">{savedMsg}</span>}
+            <button
+              onClick={snapshot}
+              disabled={snapping || exporting || saving || loading || !!error}
+              title="Use this captioned frame as the drift's poster/thumbnail"
+              className="rounded-lg border border-gray-600 px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-gray-200 hover:bg-gray-800 disabled:opacity-50"
+            >
+              {snapping ? "Capturing…" : "📸 Set thumbnail"}
+            </button>
             <button
               onClick={exportZip}
               disabled={exporting || saving || loading || !!error}

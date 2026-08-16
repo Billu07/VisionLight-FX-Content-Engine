@@ -92,6 +92,30 @@ function oneCaptionSvg(W: number, H: number, c: ExportCaption): string {
   return `<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">${bg}${texts}</svg>`;
 }
 
+// Render a single spin frame with its active captions baked in (same SVG overlay
+// logic as the video export, so the thumbnail matches the downloaded MP4). Used
+// for the "snapshot a captioned frame as the poster" action. Returns a PNG.
+export async function renderCaptionedFramePng(opts: {
+  frameUrl: string;
+  captions: ExportCaption[];
+  frame: number;
+}): Promise<Buffer> {
+  const r = await axios.get(opts.frameUrl, { responseType: "arraybuffer", timeout: 30000 });
+  const base = sharp(Buffer.from(r.data as ArrayBuffer));
+  const meta = await base.metadata();
+  const W = meta.width || 1080;
+  const H = meta.height || 1080;
+  const active = opts.captions.filter(
+    (c) =>
+      (c.clip || "A") === "A" &&
+      String(c.text || "").trim() &&
+      opts.frame >= c.startFrame &&
+      opts.frame <= c.endFrame,
+  );
+  const overlays = active.map((c) => ({ input: Buffer.from(oneCaptionSvg(W, H, c)), top: 0, left: 0 }));
+  return base.composite(overlays).png().toBuffer();
+}
+
 // Build a filter_complex graph: scale each clip to W×H, concat (if 2 clips) into
 // [base], then chain a time-gated overlay for each caption PNG.
 function buildGraph(

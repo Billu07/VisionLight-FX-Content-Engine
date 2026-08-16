@@ -327,6 +327,9 @@ export const apiEndpoints = {
     api.put(`/api/drift/my/products/${id}/captions`, { captions }),
   driftExportZip: (id: string) =>
     api.get(`/api/drift/my/products/${id}/export.zip`, { responseType: "blob", timeout: 600000 }),
+  driftSetThumbnail: (id: string, frame: number) =>
+    api.post(`/api/drift/my/products/${id}/thumbnail`, { frame }),
+  driftResetThumbnail: (id: string) => api.delete(`/api/drift/my/products/${id}/thumbnail`),
   driftUploadSourceImages: (
     formData: FormData,
     options?: { onUploadProgress?: (e: AxiosProgressEvent) => void },

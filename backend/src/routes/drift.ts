@@ -16,7 +16,7 @@ import { uploadManagedBuffer } from "../utils/managedStorage";
 import { buildSpinFromVideo } from "../services/rotation3d/pipeline";
 import { enqueueProcessing, processingQueueDepth } from "../services/rotation3d/processingQueue";
 import { buildShareCard } from "../services/rotation3d/shareCard";
-import { streamDriftExportZip } from "../services/driftExport";
+import { streamDriftExportZip, renderCaptionedFramePng } from "../services/driftExport";
 
 // Drift (drift.li) — a separate product line running the same interactive
 // spin/path player as Rotation3D, but with its own brand orgs
@@ -881,6 +881,7 @@ const publicProductPayload = (p: any, bc: any, orgName: string, captions: any[])
   loopEnabled: p.loopEnabled,
   hideLogo: p.hideLogo,
   hideName: p.hideName,
+  thumbnailUrl: p.thumbnailUrl,
   background: p.background,
   ctaPrimary: p.ctaPrimary,
   ctaSecondary: p.ctaSecondary,
@@ -912,6 +913,7 @@ router.get("/api/drift/public/featured", async (_req: AuthenticatedRequest, res:
       defaultFrame: p.defaultFrame,
       loopEnabled: p.loopEnabled,
       background: p.background,
+      thumbnailUrl: p.thumbnailUrl,
       brandName: p.organization?.name || "",
       featured: p.featured,
       heroFeatured: p.heroFeatured,
@@ -949,7 +951,8 @@ router.get("/api/drift/public/b/:brandSlug", async (req: AuthenticatedRequest, r
         .filter((p) => p.spin)
         .map((p) => ({
           id: p.id, slug: p.slug, name: p.name, defaultFrame: p.defaultFrame,
-          loopEnabled: p.loopEnabled, background: p.background, manifest: p.spin!.manifest,
+          loopEnabled: p.loopEnabled, background: p.background, thumbnailUrl: p.thumbnailUrl,
+          manifest: p.spin!.manifest,
         })),
     });
   } catch {
@@ -1042,6 +1045,67 @@ router.post("/api/drift/public/events", async (req: AuthenticatedRequest, res: R
   });
   res.json({ ok: true });
 });
+
+// Snapshot a captioned frame as the product poster. The client sends the frame
+// index; we bake the frame's active captions server-side (same overlay as the
+// video export → pixel-identical), upload it, and set thumbnailUrl. Owner or
+// superadmin. Rendering server-side avoids canvas CORS tainting on the client.
+router.post(
+  "/api/drift/my/products/:id/thumbnail",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const isSuper = req.user?.role === "SUPERADMIN";
+    const orgId = req.user?.organizationId;
+    const product = await prisma.driftProduct.findFirst({
+      where: isSuper ? { id: req.params.id } : { id: req.params.id, organizationId: orgId || "" },
+      include: { spin: { select: { manifest: true } } },
+    });
+    if (!product || !product.spin) return res.status(404).json({ error: "Product not found" });
+    const m: any = product.spin.manifest || {};
+    const frames: string[] = Array.isArray(m.frames) ? m.frames : [];
+    if (!frames.length) return res.status(400).json({ error: "This drift has no frames yet" });
+    const frame = Math.min(Math.max(0, Math.floor(Number(req.body?.frame) || 0)), frames.length - 1);
+    const frameUrl = frames[frame];
+    if (!frameUrl) return res.status(400).json({ error: "That frame is unavailable" });
+
+    try {
+      const captions = await prisma.driftCaption.findMany({ where: { productId: product.id } });
+      const png = await renderCaptionedFramePng({ frameUrl, captions: captions as any, frame });
+      const url = await uploadManagedBuffer({
+        buffer: png,
+        contentType: "image/png",
+        keyPrefix: `${NS}/org_${product.organizationId}/thumb`,
+        fallbackExtension: "png",
+      });
+      const updated = await prisma.driftProduct.update({
+        where: { id: product.id },
+        data: { thumbnailUrl: url },
+        select: { id: true, thumbnailUrl: true },
+      });
+      res.json({ product: updated });
+    } catch (e: any) {
+      console.error(`[${NS}] thumbnail render error:`, e);
+      res.status(500).json({ error: "Could not save the thumbnail" });
+    }
+  },
+);
+
+// Reset the poster back to the default spin frame.
+router.delete(
+  "/api/drift/my/products/:id/thumbnail",
+  authenticateToken,
+  async (req: AuthenticatedRequest, res: Response) => {
+    const isSuper = req.user?.role === "SUPERADMIN";
+    const orgId = req.user?.organizationId;
+    const product = await prisma.driftProduct.findFirst({
+      where: isSuper ? { id: req.params.id } : { id: req.params.id, organizationId: orgId || "" },
+      select: { id: true },
+    });
+    if (!product) return res.status(404).json({ error: "Product not found" });
+    await prisma.driftProduct.update({ where: { id: product.id }, data: { thumbnailUrl: null } });
+    res.json({ ok: true });
+  },
+);
 
 // Downloadable social "share card": start frame + QR to the product link.
 router.get(
@@ -1208,7 +1272,7 @@ async function resolveLandingItem(item: {
     brandName: p.organization?.name || "", defaultFrame: p.defaultFrame,
     background: p.background, loopEnabled: p.loopEnabled, manifest: m,
     secondManifest: p.spin.secondManifest ?? null,
-    rank: item.rank, isHero: item.isHero, thumb: landingThumb(m, p.defaultFrame),
+    rank: item.rank, isHero: item.isHero, thumb: p.thumbnailUrl || landingThumb(m, p.defaultFrame),
   };
 }
 
@@ -1253,7 +1317,7 @@ router.get(
           return {
             source, id: p.id, name: p.name,
             brandName: p.organization?.name || "",
-            thumb: frames[p.defaultFrame] || frames[0] || null,
+            thumb: p.thumbnailUrl || frames[p.defaultFrame] || frames[0] || null,
           };
         });
     res.json({ drift: map(drifts, "DRIFT"), rotation3d: map(spins, "ROTATION3D") });
