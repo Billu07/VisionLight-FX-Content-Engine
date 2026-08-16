@@ -679,6 +679,8 @@ async function applyProductPatch(
   if (typeof body.loopEnabled === "boolean") data.loopEnabled = body.loopEnabled;
   if (typeof body.hideLogo === "boolean") data.hideLogo = body.hideLogo;
   if (typeof body.hideName === "boolean") data.hideName = body.hideName;
+  if ("metaPixelId" in body)
+    data.metaPixelId = body.metaPixelId ? String(body.metaPixelId).replace(/[^0-9]/g, "").slice(0, 32) || null : null;
   if ("name" in body && String(body.name || "").trim())
     data.name = String(body.name).trim().slice(0, 120);
   if ("title" in body) data.title = body.title ? String(body.title).slice(0, 120) : null;
@@ -884,7 +886,7 @@ async function resolveCtaForms(p: any): Promise<Record<string, any>> {
 }
 
 // Shape a full player payload for a Drift product record (with brand + spin).
-const publicProductPayload = async (p: any, bc: any, orgName: string, captions: any[]) => ({
+const publicProductPayload = async (p: any, bc: any, orgName: string, captions: any[], orgPixelId?: string | null) => ({
   id: p.id,
   name: p.name,
   slug: p.slug,
@@ -899,6 +901,7 @@ const publicProductPayload = async (p: any, bc: any, orgName: string, captions: 
   hideLogo: p.hideLogo,
   hideName: p.hideName,
   thumbnailUrl: p.thumbnailUrl,
+  metaPixelId: p.metaPixelId || orgPixelId || null,
   background: p.background,
   ctaPrimary: p.ctaPrimary,
   ctaSecondary: p.ctaSecondary,
@@ -986,7 +989,7 @@ router.get(
       const org = await prisma.organization.findFirst({
         where: { slug: req.params.brandSlug, productLine: "DRIFT" },
         select: {
-          id: true, name: true, slug: true,
+          id: true, name: true, slug: true, metaPixelId: true,
           brandConfigs: { select: { logoUrl: true, companyName: true, primaryColor: true, secondaryColor: true }, take: 1 },
         },
       });
@@ -1000,7 +1003,7 @@ router.get(
         where: { productId: product.id },
         orderBy: [{ clip: "asc" }, { startFrame: "asc" }, { order: "asc" }],
       });
-      res.json({ product: { ...(await publicProductPayload(product, org.brandConfigs?.[0], org.name, captions)), brandSlug: org.slug } });
+      res.json({ product: { ...(await publicProductPayload(product, org.brandConfigs?.[0], org.name, captions, org.metaPixelId)), brandSlug: org.slug } });
     } catch {
       res.status(404).json({ error: "Not found" });
     }
@@ -1019,6 +1022,7 @@ router.get(
           select: {
             id: true,
             name: true,
+            metaPixelId: true,
             brandConfigs: {
               select: { logoUrl: true, companyName: true, primaryColor: true, secondaryColor: true },
               take: 1,
@@ -1034,7 +1038,7 @@ router.get(
     });
     const bc = product.organization?.brandConfigs?.[0];
     res.json({
-      product: await publicProductPayload(product, bc, product.organization?.name || "", captions),
+      product: await publicProductPayload(product, bc, product.organization?.name || "", captions, product.organization?.metaPixelId),
     });
   },
 );
@@ -1518,6 +1522,41 @@ router.post("/api/drift/public/forms/:id/submit", async (req: AuthenticatedReque
   }
 
   res.status(201).json({ ok: true, successMessage: def.successMessage || "Thanks — we'll be in touch." });
+});
+
+// ─────────────────────────── BRAND SETTINGS ───────────────────────────
+// Brand-level drift settings that live on the Organization (currently the
+// default Meta Pixel id). Per-drift overrides live on DriftProduct.
+
+const sanitizePixel = (v: unknown) =>
+  typeof v === "string" && v.trim() ? String(v).replace(/[^0-9]/g, "").slice(0, 32) || null : null;
+
+async function getBrandSettings(orgId: string) {
+  const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { metaPixelId: true } });
+  return { metaPixelId: org?.metaPixelId || null };
+}
+async function patchBrandSettings(orgId: string, body: any) {
+  const data: Record<string, unknown> = {};
+  if ("metaPixelId" in (body || {})) data.metaPixelId = sanitizePixel(body.metaPixelId);
+  await prisma.organization.update({ where: { id: orgId }, data });
+  return getBrandSettings(orgId);
+}
+
+router.get("/api/drift/my/brand-settings", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = requireOrg(req, res);
+  if (!orgId) return;
+  res.json({ settings: await getBrandSettings(orgId) });
+});
+router.patch("/api/drift/my/brand-settings", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = requireOrg(req, res);
+  if (!orgId) return;
+  res.json({ settings: await patchBrandSettings(orgId, req.body) });
+});
+router.get("/api/drift/brands/:orgId/brand-settings", authenticateToken, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  res.json({ settings: await getBrandSettings(req.params.orgId) });
+});
+router.patch("/api/drift/brands/:orgId/brand-settings", authenticateToken, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  res.json({ settings: await patchBrandSettings(req.params.orgId, req.body) });
 });
 
 // ─────────────────────────── LANDING CURATION ───────────────────────────

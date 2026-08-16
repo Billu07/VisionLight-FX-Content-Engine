@@ -23,6 +23,7 @@ type EditProduct = {
   background?: string | null;
   hideLogo?: boolean;
   hideName?: boolean;
+  metaPixelId?: string | null;
   ctaPrimary?: { label?: string; url?: string; formId?: string | null } | null;
   ctaSecondary?: { label?: string; url?: string; formId?: string | null } | null;
   spin?: { frameCount?: number } | null;
@@ -68,6 +69,7 @@ export default function BrandProductEditModal({
   const [background, setBackground] = useState(product.background || "transparent");
   const [hideLogo, setHideLogo] = useState(product.hideLogo ?? false);
   const [hideName, setHideName] = useState(product.hideName ?? false);
+  const [metaPixelId, setMetaPixelId] = useState(product.metaPixelId || "");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
@@ -100,6 +102,7 @@ export default function BrandProductEditModal({
       data.background = background;
       data.hideLogo = hideLogo;
       data.hideName = hideName;
+      data.metaPixelId = metaPixelId.trim() || null;
     }
     try {
       await onSave(data);
@@ -299,6 +302,19 @@ export default function BrandProductEditModal({
                 />
                 <span className="font-mono text-[11px] text-gray-500">{background}</span>
               </div>
+            </div>
+          )}
+
+          {showLoop && (
+            <div>
+              <label className={label}>Meta Pixel ID (this drift — overrides brand default)</label>
+              <input
+                className={`${field} mt-1`}
+                value={metaPixelId}
+                onChange={(e) => setMetaPixelId(e.target.value)}
+                placeholder="e.g. 1234567890 — leave blank to use the brand default"
+                inputMode="numeric"
+              />
             </div>
           )}
 

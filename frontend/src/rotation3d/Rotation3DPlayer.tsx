@@ -3,6 +3,7 @@ import { useParams, useSearchParams, Navigate } from "react-router-dom";
 import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
 import { isSpinPlayerSite, isDriftSite, getPlayerBranding } from "../lib/branding";
+import { initMetaPixel, track } from "./metaPixel";
 
 /**
  * Public Rotation3D player (rotation3d.com/p/:id and /embed/:id). Fetches the
@@ -129,6 +130,16 @@ export default function Rotation3DPlayer() {
     };
   }, [productId, brandSlug, productSlug, isDemo, bySlug]);
 
+  // Drift ad tracking: load the brand's Meta Pixel and log a ViewContent once
+  // the product resolves (per-drift id, or the brand default, from the payload).
+  useEffect(() => {
+    const d = state.data;
+    if (drift && d?.metaPixelId) {
+      initMetaPixel(d.metaPixelId);
+      track("ViewContent", { content_name: d.name });
+    }
+  }, [state.data, drift]);
+
   // vanity URLs are Rotation3D-host only — on other domains fall through to "/"
   if (bySlug && !isSpinPlayerSite()) return <Navigate to="/" replace />;
 
@@ -204,9 +215,10 @@ export default function Rotation3DPlayer() {
       ctaSecondary={toCta(p.ctaSecondary)}
       forms={drift ? p.forms : undefined}
       productId={p.id}
-      onCtaClick={(which) =>
-        p?.id && trackEvent(p.id, "CTA_CLICK", { which }).catch(() => undefined)
-      }
+      onCtaClick={(which) => {
+        if (p?.id) trackEvent(p.id, "CTA_CLICK", { which }).catch(() => undefined);
+        if (drift && p.metaPixelId) track("CTAClick", { which, content_name: p.name }, true);
+      }}
     />
   );
 }

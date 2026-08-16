@@ -176,6 +176,9 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
   const [brandName, setBrandName] = useState("");
   const [brandNameSaved, setBrandNameSaved] = useState("");
   const [brandSaving, setBrandSaving] = useState(false);
+  const [brandPixel, setBrandPixel] = useState("");
+  const [brandPixelSaved, setBrandPixelSaved] = useState("");
+  const [pixelSaving, setPixelSaving] = useState(false);
   const [view, setView] = useState<"drifts" | "forms">("drifts");
   const [formsList, setFormsList] = useState<{ id: string; name: string }[]>([]);
 
@@ -217,6 +220,34 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
       })
       .catch(() => undefined);
   }, [admin]);
+
+  // Brand-default Meta Pixel (both modes).
+  useEffect(() => {
+    (admin ? apiEndpoints.driftAdminBrandSettings(adminOrgId!) : apiEndpoints.driftBrandSettings())
+      .then((r) => {
+        const p = r.data?.settings?.metaPixelId || "";
+        setBrandPixel(p);
+        setBrandPixelSaved(p);
+      })
+      .catch(() => undefined);
+  }, [admin, adminOrgId]);
+
+  const savePixel = async () => {
+    if (brandPixel.trim() === brandPixelSaved) return;
+    setPixelSaving(true);
+    try {
+      const data = { metaPixelId: brandPixel.trim() || null };
+      admin
+        ? await apiEndpoints.driftAdminUpdateBrandSettings(adminOrgId!, data)
+        : await apiEndpoints.driftUpdateBrandSettings(data);
+      setBrandPixelSaved(brandPixel.trim());
+      setMsg({ kind: "ok", text: "Meta Pixel saved." });
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e?.response?.data?.error || "Could not save the pixel" });
+    } finally {
+      setPixelSaving(false);
+    }
+  };
 
   const saveBrandName = async () => {
     const next = brandName.trim();
@@ -344,6 +375,24 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
             </button>
           </div>
         )}
+
+        <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Meta Pixel</span>
+          <input
+            value={brandPixel}
+            onChange={(e) => setBrandPixel(e.target.value)}
+            placeholder="Brand-default pixel id (a drift can override it)"
+            inputMode="numeric"
+            className="min-w-0 flex-1 rounded-lg border border-gray-700 bg-gray-950 px-3 py-1.5 text-sm text-white outline-none focus:border-cyan-400"
+          />
+          <button
+            onClick={savePixel}
+            disabled={pixelSaving || brandPixel.trim() === brandPixelSaved}
+            className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-widest text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-40"
+          >
+            {pixelSaving ? "Saving…" : "Save"}
+          </button>
+        </div>
 
         {msg && (
           <div

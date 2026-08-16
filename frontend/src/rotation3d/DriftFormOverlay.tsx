@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { apiEndpoints } from "../lib/api";
+import { track } from "./metaPixel";
 import type { FormDefinition, FormField } from "./DriftFormsManager";
 
 /**
@@ -86,6 +87,7 @@ export default function DriftFormOverlay({
         productId,
         source: { drift: productName, cta: which },
       });
+      track("Lead", { content_name: productName });
       setDone(r.data?.successMessage || def.successMessage || "Thanks — we'll be in touch.");
     } catch (e: any) {
       setErr(e?.response?.data?.error || "Something went wrong. Please try again.");

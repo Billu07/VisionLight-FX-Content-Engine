@@ -380,6 +380,13 @@ export const apiEndpoints = {
   driftPublicForm: (id: string) => api.get(`/api/drift/public/forms/${id}`),
   driftSubmitForm: (id: string, payload: Record<string, unknown>) =>
     api.post(`/api/drift/public/forms/${id}/submit`, payload),
+
+  // Brand-level drift settings (Meta Pixel default).
+  driftBrandSettings: () => api.get("/api/drift/my/brand-settings"),
+  driftUpdateBrandSettings: (data: Record<string, unknown>) => api.patch("/api/drift/my/brand-settings", data),
+  driftAdminBrandSettings: (orgId: string) => api.get(`/api/drift/brands/${orgId}/brand-settings`),
+  driftAdminUpdateBrandSettings: (orgId: string, data: Record<string, unknown>) =>
+    api.patch(`/api/drift/brands/${orgId}/brand-settings`, data),
   driftLandingRemove: (id: string) => api.delete(`/api/drift/landing/${id}`),
   driftPublicLanding: () => api.get("/api/drift/public/landing"),
 
