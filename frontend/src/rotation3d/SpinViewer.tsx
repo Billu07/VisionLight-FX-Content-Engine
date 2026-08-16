@@ -193,6 +193,7 @@ export default function SpinViewer({
   const desc1Ref = useRef<HTMLDivElement>(null);
   const desc2Ref = useRef<HTMLDivElement>(null);
   const helperTextRef = useRef<HTMLSpanElement>(null);
+  const handRef = useRef<HTMLDivElement>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<SVGCircleElement>(null);
   const pctRef = useRef<HTMLDivElement>(null);
@@ -262,14 +263,11 @@ export default function SpinViewer({
     };
     // Hand sequence: shown at start → hidden on first move → shown again at the end
     // → hidden for good. And headline/description dissolve to #2 AT the end frame.
+    // The ARROW + TEXT always stay; only the HAND runs the show/hide sequence.
     let helperPhase = 0; // 0 start-shown, 1 hidden, 2 end-shown, 3 done
     let atEnd = false;
-    const hideHelper = () => hintRef.current?.classList.add("r3d-gone");
-    const showHelper = (back: boolean) => {
-      helperBack = back;
-      syncHelper();
-      hintRef.current?.classList.remove("r3d-gone");
-    };
+    const hideHand = () => handRef.current?.classList.add("r3d-gone");
+    const showHand = () => handRef.current?.classList.remove("r3d-gone");
     const setHeadState = (end: boolean) => {
       if (head1Ref.current) head1Ref.current.style.opacity = end ? "0" : "1";
       if (head2Ref.current) head2Ref.current.style.opacity = end ? "1" : "0";
@@ -278,8 +276,8 @@ export default function SpinViewer({
     };
     const advanceHelperOnDrag = () => {
       if (!driftMode) return;
-      if (helperPhase === 0) { hideHelper(); helperPhase = 1; }
-      else if (helperPhase === 2) { hideHelper(); helperPhase = 3; }
+      if (helperPhase === 0) { hideHand(); helperPhase = 1; }
+      else if (helperPhase === 2) { hideHand(); helperPhase = 3; }
     };
     let dirty = true, lastYaw = NaN, lastZoom = NaN, lastPX = 0, lastPY = 0;
     let touchZoomed = false;
@@ -513,10 +511,12 @@ export default function SpinViewer({
         if (nav >= 0.92 && !atEnd) {
           atEnd = true;
           setHeadState(true);
-          if (helperPhase === 1) { showHelper(true); helperPhase = 2; }
+          helperBack = true; syncHelper(); // arrow + text flip to reverse (always visible)
+          if (helperPhase === 1) { showHand(); helperPhase = 2; } // hand reappears at the end
         } else if (nav <= 0.08 && atEnd) {
           atEnd = false;
           setHeadState(false);
+          helperBack = false; syncHelper(); // arrow + text flip back to forward
         }
       }
     };
@@ -1057,7 +1057,7 @@ export default function SpinViewer({
       <div className="r3d-hint" ref={hintRef}>
         {driftMode ? (
           <>
-            <div className="r3d-drift-hand" aria-hidden>
+            <div className="r3d-drift-hand" ref={handRef} aria-hidden>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-7-4l-2.5-4a2 2 0 0 1 3.4-2L8 14" /></svg>
             </div>
             <div className="r3d-drift-arrow" aria-hidden>
@@ -1130,7 +1130,7 @@ export default function SpinViewer({
         aria-label={`Powered by ${playerBrand.name}`}
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
-        <span>{driftMode ? "Powered By " : "Powered by "}<b>{playerBrand.name}</b></span>
+        <span>{driftMode ? <>Powered by <b>Drift Link Interactive</b></> : <>Powered by <b>{playerBrand.name}</b></>}</span>
       </a>
 
       <div className="r3d-loader" ref={loaderRef}>
@@ -1218,8 +1218,10 @@ const R3D_CSS = `
 .r3d-drift .r3d-hint{opacity:.72;gap:6px}
 /* the drift helper hides between its start/end appearances (hand sequence) */
 .r3d-drift .r3d-hint.r3d-gone{opacity:0}
-.r3d-drift-hand{width:28px;height:28px;color:#eef1f6;animation:r3dsway 1.8s ease-in-out infinite}
+.r3d-drift-hand{width:28px;height:28px;color:#eef1f6;animation:r3dsway 1.8s ease-in-out infinite;transition:opacity .3s}
 .r3d-drift-hand svg{width:19px;height:19px}
+/* only the hand hides between its start/end appearances; arrow + text stay */
+.r3d-drift-hand.r3d-gone{opacity:0}
 .r3d-drift-hand{width:34px;height:34px;display:grid;place-items:center;color:#eef1f6}
 .r3d-drift-hand svg{width:22px;height:22px}
 .r3d-drift-arrow{width:52px;height:52px;border-radius:50%;border:1px solid var(--r3d-line);background:rgba(11,15,25,.4);backdrop-filter:blur(8px);display:grid;place-items:center}
@@ -1227,7 +1229,7 @@ const R3D_CSS = `
 .r3d-hint.r3d-back .r3d-drift-arrow svg{transform:scaleX(-1)}
 @media (prefers-reduced-motion:reduce){.r3d-drift-hand{animation:none}}
 /* Drift: "Powered By Drift Link" sits UNDER the player, above the CTA, a bit bigger. */
-.r3d-drift .r3d-powered-badge{top:auto;bottom:calc(78px + env(safe-area-inset-bottom));font-size:12px}
+.r3d-drift .r3d-powered-badge{top:auto;bottom:calc(100px + env(safe-area-inset-bottom));font-size:12px}
 .r3d-drift .r3d-powered-badge svg{width:14px;height:14px}
 /* Drift: lift the CTA a touch off the very edge (standard spacing). */
 .r3d-drift .r3d-ctas{padding-bottom:calc(22px + env(safe-area-inset-bottom))}

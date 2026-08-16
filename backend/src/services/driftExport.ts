@@ -99,6 +99,7 @@ function buildGraph(
   W: number,
   H: number,
   pngs: { t0: number; t1: number }[],
+  speed = 1,
 ): { filter: string; map: string } {
   const lines: string[] = [];
   if (numVideos === 2) {
@@ -115,6 +116,10 @@ function buildGraph(
     lines.push(`[${cur}][${inIdx}:v]overlay=0:0:enable='between(t,${p.t0.toFixed(3)},${p.t1.toFixed(3)})'[${next}]`);
     cur = next;
   });
+  if (speed !== 1) {
+    lines.push(`[${cur}]setpts=${(1 / speed).toFixed(4)}*PTS[sped]`);
+    cur = "sped";
+  }
   return { filter: lines.join(";"), map: cur };
 }
 
@@ -123,15 +128,19 @@ const runGraph = (
   filter: string,
   map: string,
   out: string,
-  extraVf?: string,
 ): Promise<void> =>
   new Promise((resolve, reject) => {
     const cmd = ffmpeg();
     inputs.forEach((i) => cmd.input(i));
+    // complexFilter(spec, map) already maps the output label — do NOT also add a
+    // separate -map (that double-maps and makes ffmpeg fail).
     cmd.complexFilter(filter, map);
-    const opts = ["-map", `[${map}]`, "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-y"];
-    if (extraVf) opts.push("-filter:v", extraVf); // applied after -map (e.g. setpts for 2×)
-    cmd.outputOptions(opts).output(out).on("end", () => resolve()).on("error", (e: Error) => reject(e)).run();
+    cmd
+      .outputOptions(["-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-y"])
+      .output(out)
+      .on("end", () => resolve())
+      .on("error", (e: Error) => reject(e))
+      .run();
   });
 
 /**
@@ -195,8 +204,8 @@ export async function streamDriftExportZip(opts: {
     const cap = buildGraph(videoFiles.length, W, H, pngTimes);
     await runGraph([...videoFiles, ...pngInputs], cap.filter, cap.map, captionedMp4);
 
-    const two = buildGraph(videoFiles.length, W, H, pngTimes);
-    await runGraph([...videoFiles, ...pngInputs], two.filter, two.map, captioned2x, "setpts=0.5*PTS");
+    const two = buildGraph(videoFiles.length, W, H, pngTimes, 2);
+    await runGraph([...videoFiles, ...pngInputs], two.filter, two.map, captioned2x);
 
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", `attachment; filename="${baseName}-drift-export.zip"`);
