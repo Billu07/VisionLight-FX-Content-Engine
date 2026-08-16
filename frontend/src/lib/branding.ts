@@ -43,10 +43,34 @@ export const isDriftHost = (hostname: string): boolean =>
 
 export const isDriftSite = (): boolean => {
   if (typeof window === "undefined") return false;
-  return isDriftHost(window.location.hostname);
+  return isDriftHost(window.location.hostname) || !!_customDriftBrandSlug;
 };
 
 export type PlayerBrand = "rotation3d" | "drift";
+
+// A brand's custom domain (Cloudflare for SaaS) resolved at app boot → this host
+// serves that brand's drift space. Set once by the boot gate; drift routing then
+// treats the host like drift.li but scoped to this brand.
+let _customDriftBrandSlug: string | null = null;
+export const setResolvedDriftHost = (brandSlug: string | null) => {
+  _customDriftBrandSlug = brandSlug;
+};
+export const getResolvedDriftBrandSlug = (): string | null => _customDriftBrandSlug;
+
+// Hosts that are obviously the platform's own (studio/known) — skip custom-domain
+// resolution for these so their boot is never delayed by a lookup.
+export const looksLikePlatformHost = (hostname: string): boolean => {
+  const h = hostname.trim().toLowerCase();
+  return (
+    h === "localhost" ||
+    /^(\d{1,3}\.){3}\d{1,3}$/.test(h) ||
+    h.includes("picdrift") ||
+    h.includes("visualfx") ||
+    h.includes("byok") ||
+    isRotation3dHost(h) ||
+    isDriftHost(h)
+  );
+};
 
 // Which spin-player surface (if any) the current host serves. Used to gate the
 // shared player/showcase routes and to pick the skin.
@@ -54,7 +78,7 @@ export const getPlayerBrand = (): PlayerBrand | null => {
   if (typeof window === "undefined") return null;
   const h = window.location.hostname;
   if (isRotation3dHost(h)) return "rotation3d";
-  if (isDriftHost(h)) return "drift";
+  if (isDriftHost(h) || _customDriftBrandSlug) return "drift";
   return null;
 };
 

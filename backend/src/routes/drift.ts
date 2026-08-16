@@ -17,6 +17,13 @@ import { buildSpinFromVideo } from "../services/rotation3d/pipeline";
 import { enqueueProcessing, processingQueueDepth } from "../services/rotation3d/processingQueue";
 import { buildShareCard } from "../services/rotation3d/shareCard";
 import { streamDriftExportZip, renderCaptionedFramePng } from "../services/driftExport";
+import {
+  cloudflareConfigured,
+  createCustomHostname,
+  getCustomHostname,
+  deleteCustomHostname,
+  DRIFT_DOMAIN_TARGET,
+} from "../services/cloudflareDomains";
 
 // Drift (drift.li) — a separate product line running the same interactive
 // spin/path player as Rotation3D, but with its own brand orgs
@@ -1557,6 +1564,149 @@ router.get("/api/drift/brands/:orgId/brand-settings", authenticateToken, require
 });
 router.patch("/api/drift/brands/:orgId/brand-settings", authenticateToken, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
   res.json({ settings: await patchBrandSettings(req.params.orgId, req.body) });
+});
+
+// ─────────────────────────── CUSTOM DOMAINS ───────────────────────────
+// Cloudflare-for-SaaS custom hostnames: a brand points their domain at our
+// fallback origin and we register it with Cloudflare (SSL + proxy). Falls back
+// to just recording the CNAME instructions when CF env isn't configured.
+
+const HOSTNAME_RE = /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/;
+const normHost = (v: unknown) =>
+  String(v || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/.*$/, "")
+    .replace(/:.*$/, "");
+
+const publicDomain = (d: any) => ({
+  id: d.id,
+  hostname: d.hostname,
+  status: d.status,
+  sslStatus: d.sslStatus,
+  verification: d.verification,
+  cnameTarget: DRIFT_DOMAIN_TARGET,
+  createdAt: d.createdAt,
+});
+
+async function listDomains(orgId: string) {
+  const domains = await prisma.driftDomain.findMany({ where: { organizationId: orgId }, orderBy: { createdAt: "desc" } });
+  return domains.map(publicDomain);
+}
+
+async function addDomain(orgId: string, hostnameRaw: unknown) {
+  const hostname = normHost(hostnameRaw);
+  if (!HOSTNAME_RE.test(hostname)) return { error: "Enter a valid domain, e.g. drift.yourbrand.com" as string };
+  if (/(^|\.)drift\.li$/.test(hostname)) return { error: "That's already a drift.li domain" };
+  const clash = await prisma.driftDomain.findUnique({ where: { hostname }, select: { id: true } });
+  if (clash) return { error: "That domain is already connected" };
+
+  let cfHostnameId: string | null = null;
+  let status = "pending";
+  let sslStatus: string | null = null;
+  let verification: any = { target: DRIFT_DOMAIN_TARGET };
+  if (cloudflareConfigured()) {
+    try {
+      const cf = await createCustomHostname(hostname);
+      cfHostnameId = cf.cfHostnameId;
+      status = cf.status;
+      sslStatus = cf.sslStatus;
+      verification = cf.verification;
+    } catch (e: any) {
+      return { error: e?.response?.data?.errors?.[0]?.message || "Cloudflare rejected that domain" };
+    }
+  }
+  const domain = await prisma.driftDomain.create({
+    data: { organizationId: orgId, hostname, cfHostnameId, status, sslStatus, verification },
+  });
+  return { domain: publicDomain(domain) };
+}
+
+async function refreshDomain(orgId: string, id: string) {
+  const d = await prisma.driftDomain.findFirst({ where: { id, organizationId: orgId } });
+  if (!d) return { error: "Not found", code: 404 };
+  if (!d.cfHostnameId || !cloudflareConfigured()) return { domain: publicDomain(d) };
+  try {
+    const cf = await getCustomHostname(d.cfHostnameId);
+    const active = cf.status === "active" && (cf.sslStatus === "active" || !cf.sslStatus);
+    const updated = await prisma.driftDomain.update({
+      where: { id: d.id },
+      data: { status: active ? "active" : cf.status, sslStatus: cf.sslStatus, verification: cf.verification as any },
+    });
+    return { domain: publicDomain(updated) };
+  } catch {
+    return { domain: publicDomain(d) };
+  }
+}
+
+async function removeDomain(orgId: string, id: string) {
+  const d = await prisma.driftDomain.findFirst({ where: { id, organizationId: orgId } });
+  if (!d) return;
+  if (d.cfHostnameId && cloudflareConfigured()) {
+    try {
+      await deleteCustomHostname(d.cfHostnameId);
+    } catch {
+      /* keep going — remove our record regardless */
+    }
+  }
+  await prisma.driftDomain.delete({ where: { id: d.id } }).catch(() => undefined);
+}
+
+router.get("/api/drift/my/domains", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = requireOrg(req, res);
+  if (!orgId) return;
+  res.json({ domains: await listDomains(orgId), cloudflare: cloudflareConfigured(), cnameTarget: DRIFT_DOMAIN_TARGET });
+});
+router.post("/api/drift/my/domains", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = requireOrg(req, res);
+  if (!orgId) return;
+  const r = await addDomain(orgId, req.body?.hostname);
+  if ("error" in r) return res.status(400).json({ error: r.error });
+  res.status(201).json(r);
+});
+router.post("/api/drift/my/domains/:id/refresh", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = requireOrg(req, res);
+  if (!orgId) return;
+  const r = await refreshDomain(orgId, req.params.id);
+  if ("error" in r) return res.status(r.code || 400).json({ error: r.error });
+  res.json(r);
+});
+router.delete("/api/drift/my/domains/:id", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = requireOrg(req, res);
+  if (!orgId) return;
+  await removeDomain(orgId, req.params.id);
+  res.json({ ok: true });
+});
+// Superadmin brand-view
+router.get("/api/drift/brands/:orgId/domains", authenticateToken, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  res.json({ domains: await listDomains(req.params.orgId), cloudflare: cloudflareConfigured(), cnameTarget: DRIFT_DOMAIN_TARGET });
+});
+router.post("/api/drift/brands/:orgId/domains", authenticateToken, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  const r = await addDomain(req.params.orgId, req.body?.hostname);
+  if ("error" in r) return res.status(400).json({ error: r.error });
+  res.status(201).json(r);
+});
+router.post("/api/drift/brands/:orgId/domains/:id/refresh", authenticateToken, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  const r = await refreshDomain(req.params.orgId, req.params.id);
+  if ("error" in r) return res.status(r.code || 400).json({ error: r.error });
+  res.json(r);
+});
+router.delete("/api/drift/brands/:orgId/domains/:id", authenticateToken, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  await removeDomain(req.params.orgId, req.params.id);
+  res.json({ ok: true });
+});
+
+// Public: which brand does a custom host serve? Used by the SPA when it loads on
+// a domain that isn't drift.li/rotation3d, to render that brand's drift space.
+router.get("/api/drift/public/resolve-host", async (req: AuthenticatedRequest, res: Response) => {
+  const host = normHost(req.query.host);
+  if (!host) return res.status(400).json({ error: "host is required" });
+  const d = await prisma.driftDomain.findUnique({ where: { hostname: host } });
+  if (!d) return res.status(404).json({ error: "Not mapped" });
+  const org = await prisma.organization.findUnique({ where: { id: d.organizationId }, select: { slug: true } });
+  if (!org?.slug) return res.status(404).json({ error: "Not mapped" });
+  res.json({ brandSlug: org.slug, status: d.status });
 });
 
 // ─────────────────────────── ANALYTICS ───────────────────────────

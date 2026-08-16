@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -41,7 +41,15 @@ import Rotation3DPlayer from "./rotation3d/Rotation3DPlayer";
 import BrandShowcasePage from "./rotation3d/BrandShowcasePage";
 import Rotation3DBrandDashboard from "./rotation3d/Rotation3DBrandDashboard";
 import DriftBrandDashboard from "./rotation3d/DriftBrandDashboard";
-import { isRotation3dSite, isDriftSite } from "./lib/branding";
+import {
+  isRotation3dSite,
+  isDriftHost,
+  looksLikePlatformHost,
+  getPlayerBrand,
+  getResolvedDriftBrandSlug,
+  setResolvedDriftHost,
+} from "./lib/branding";
+import { apiEndpoints } from "./lib/api";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -254,6 +262,50 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// The "/" element. Custom drift domains (resolved at boot) show that brand's
+// showcase; drift.li itself shows the generic landing; rotation3d its landing;
+// everything else the studio marketing site.
+const RootRoute = () => {
+  if (isRotation3dSite()) return <Rotation3DLanding />;
+  const customBrand = getResolvedDriftBrandSlug();
+  if (customBrand) return <BrandShowcasePage brandSlugOverride={customBrand} />;
+  if (typeof window !== "undefined" && isDriftHost(window.location.hostname)) return <DriftLanding />;
+  return <MarketingSite />;
+};
+
+// For hosts that aren't a known platform host, resolve whether it's a brand's
+// custom drift domain BEFORE rendering routes (so drift routing is set up). Known
+// hosts (rotation3d/drift/studio) skip the lookup and render immediately.
+const AppBootGate = ({ children }: { children: React.ReactNode }) => {
+  const [ready, setReady] = useState(
+    () =>
+      typeof window === "undefined" ||
+      looksLikePlatformHost(window.location.hostname) ||
+      getPlayerBrand() !== null,
+  );
+  useEffect(() => {
+    if (ready) return;
+    let alive = true;
+    apiEndpoints
+      .driftResolveHost(window.location.hostname)
+      .then((r) => {
+        if (alive && r.data?.brandSlug) setResolvedDriftHost(r.data.brandSlug);
+      })
+      .catch(() => undefined)
+      .finally(() => alive && setReady(true));
+    return () => {
+      alive = false;
+    };
+  }, [ready]);
+  if (!ready)
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-950">
+        <LoadingSpinner size="lg" variant="neon" />
+      </div>
+    );
+  return <>{children}</>;
+};
+
 function App() {
   useAutoAppRefresh();
 
@@ -293,24 +345,14 @@ function App() {
             },
           }}
         />
+        <AppBootGate>
         <Router>
           <Routes>
             {/* Public Routes. On the Rotation3D host, "/" is the Rotation3D
                 landing; every other domain keeps the studio marketing site.
                 The rest of the routes (auth, chooser, dashboards) are shared,
                 so brands can log in on rotation3d.com too. */}
-            <Route
-              path="/"
-              element={
-                isRotation3dSite() ? (
-                  <Rotation3DLanding />
-                ) : isDriftSite() ? (
-                  <DriftLanding />
-                ) : (
-                  <MarketingSite />
-                )
-              }
-            />
+            <Route path="/" element={<RootRoute />} />
             {/* Rotation3D public player + iframe embed (linked from rotation3d.com) */}
             <Route path="/p/:productId" element={<Rotation3DPlayer />} />
             <Route path="/embed/:productId" element={<Rotation3DPlayer />} />
@@ -373,6 +415,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Router>
+        </AppBootGate>
       </BrandProvider>
     </QueryClientProvider>
   );

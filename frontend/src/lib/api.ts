@@ -390,6 +390,20 @@ export const apiEndpoints = {
   driftMyAnalytics: (days = 30) => api.get("/api/drift/my/analytics", { params: { days } }),
   driftBrandAnalytics: (orgId: string, days = 30) =>
     api.get(`/api/drift/brands/${orgId}/analytics`, { params: { days } }),
+
+  // Custom domains (Cloudflare for SaaS).
+  driftMyDomains: () => api.get("/api/drift/my/domains"),
+  driftAddDomain: (hostname: string) => api.post("/api/drift/my/domains", { hostname }),
+  driftRefreshDomain: (id: string) => api.post(`/api/drift/my/domains/${id}/refresh`),
+  driftDeleteDomain: (id: string) => api.delete(`/api/drift/my/domains/${id}`),
+  driftBrandDomains: (orgId: string) => api.get(`/api/drift/brands/${orgId}/domains`),
+  driftBrandAddDomain: (orgId: string, hostname: string) =>
+    api.post(`/api/drift/brands/${orgId}/domains`, { hostname }),
+  driftBrandRefreshDomain: (orgId: string, id: string) =>
+    api.post(`/api/drift/brands/${orgId}/domains/${id}/refresh`),
+  driftBrandDeleteDomain: (orgId: string, id: string) =>
+    api.delete(`/api/drift/brands/${orgId}/domains/${id}`),
+  driftResolveHost: (host: string) => api.get("/api/drift/public/resolve-host", { params: { host } }),
   driftLandingRemove: (id: string) => api.delete(`/api/drift/landing/${id}`),
   driftPublicLanding: () => api.get("/api/drift/public/landing"),
 

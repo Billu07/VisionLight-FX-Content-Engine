@@ -135,8 +135,15 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function BrandShowcasePage({ embed = false }: { embed?: boolean }) {
-  const { brandSlug } = useParams();
+export default function BrandShowcasePage({
+  embed = false,
+  brandSlugOverride,
+}: {
+  embed?: boolean;
+  brandSlugOverride?: string;
+}) {
+  const params = useParams();
+  const brandSlug = brandSlugOverride || params.brandSlug;
   const [state, setState] = useState<{
     loading: boolean;
     brand?: Brand;
