@@ -5,6 +5,7 @@ import { LoadingSpinner } from "../components/LoadingSpinner";
 import BrandProductEditModal from "./BrandProductEditModal";
 import DriftCaptionEditor from "./DriftCaptionEditor";
 import DriftFormsManager from "./DriftFormsManager";
+import DriftAnalytics from "./DriftAnalytics";
 
 /**
  * Drift brand-admin home (/app for view="DRIFT"). The brand's own drifts with the
@@ -179,7 +180,7 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
   const [brandPixel, setBrandPixel] = useState("");
   const [brandPixelSaved, setBrandPixelSaved] = useState("");
   const [pixelSaving, setPixelSaving] = useState(false);
-  const [view, setView] = useState<"drifts" | "forms">("drifts");
+  const [view, setView] = useState<"drifts" | "forms" | "analytics">("drifts");
   const [formsList, setFormsList] = useState<{ id: string; name: string }[]>([]);
 
   const load = async () => {
@@ -330,7 +331,7 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
 
       <main className={admin ? "" : "mx-auto max-w-5xl px-6 py-8"}>
         <div className="mb-5 flex items-center gap-2">
-          {(["drifts", "forms"] as const).map((t) => (
+          {(["drifts", "forms", "analytics"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setView(t)}
@@ -338,12 +339,14 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
                 view === t ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"
               }`}
             >
-              {t === "drifts" ? "Drifts" : "Forms & Leads"}
+              {t === "drifts" ? "Drifts" : t === "forms" ? "Forms & Leads" : "Analytics"}
             </button>
           ))}
         </div>
 
-        {view === "forms" ? (
+        {view === "analytics" ? (
+          <DriftAnalytics adminOrgId={adminOrgId} />
+        ) : view === "forms" ? (
           <DriftFormsManager adminOrgId={adminOrgId} />
         ) : (
         <>

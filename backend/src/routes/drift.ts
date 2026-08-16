@@ -1559,6 +1559,78 @@ router.patch("/api/drift/brands/:orgId/brand-settings", authenticateToken, requi
   res.json({ settings: await patchBrandSettings(req.params.orgId, req.body) });
 });
 
+// ─────────────────────────── ANALYTICS ───────────────────────────
+// Per-brand engagement from DriftEvent (VIEW/ROTATE/ZOOM/CTA_CLICK) + leads,
+// aggregated into totals, a daily series, and a per-drift breakdown.
+
+async function buildDriftAnalytics(orgId: string, days: number) {
+  const span = Math.min(365, Math.max(1, days || 30));
+  const since = new Date(Date.now() - span * 86400000);
+  const [events, leads, products] = await Promise.all([
+    prisma.driftEvent.findMany({
+      where: { organizationId: orgId, ts: { gte: since } },
+      select: { type: true, ts: true, productId: true },
+      take: 100000,
+    }),
+    prisma.driftLead.findMany({
+      where: { organizationId: orgId, createdAt: { gte: since } },
+      select: { createdAt: true, productId: true },
+      take: 100000,
+    }),
+    prisma.driftProduct.findMany({ where: { organizationId: orgId }, select: { id: true, name: true } }),
+  ]);
+
+  const totals = { VIEW: 0, ROTATE: 0, ZOOM: 0, CTA_CLICK: 0, LEADS: leads.length };
+  for (const e of events) if (e.type in totals) (totals as any)[e.type]++;
+
+  // Daily buckets (oldest → newest), keyed YYYY-MM-DD.
+  const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+  const series: Record<string, { date: string; views: number; ctas: number; leads: number }> = {};
+  for (let i = span - 1; i >= 0; i--) {
+    const k = dayKey(new Date(Date.now() - i * 86400000));
+    series[k] = { date: k, views: 0, ctas: 0, leads: 0 };
+  }
+  for (const e of events) {
+    const b = series[dayKey(e.ts)];
+    if (!b) continue;
+    if (e.type === "VIEW") b.views++;
+    else if (e.type === "CTA_CLICK") b.ctas++;
+  }
+  for (const l of leads) {
+    const b = series[dayKey(l.createdAt)];
+    if (b) b.leads++;
+  }
+
+  const nameOf = new Map(products.map((p) => [p.id, p.name]));
+  const per: Record<string, { productId: string; name: string; views: number; ctas: number; leads: number }> = {};
+  const bump = (pid: string | null, key: "views" | "ctas" | "leads") => {
+    if (!pid) return;
+    if (!per[pid]) per[pid] = { productId: pid, name: nameOf.get(pid) || "—", views: 0, ctas: 0, leads: 0 };
+    per[pid][key]++;
+  };
+  for (const e of events) {
+    if (e.type === "VIEW") bump(e.productId, "views");
+    else if (e.type === "CTA_CLICK") bump(e.productId, "ctas");
+  }
+  for (const l of leads) bump(l.productId, "leads");
+
+  return {
+    days: span,
+    totals,
+    series: Object.values(series),
+    byProduct: Object.values(per).sort((a, b) => b.views - a.views),
+  };
+}
+
+router.get("/api/drift/my/analytics", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = requireOrg(req, res);
+  if (!orgId) return;
+  res.json({ analytics: await buildDriftAnalytics(orgId, Number(req.query.days) || 30) });
+});
+router.get("/api/drift/brands/:orgId/analytics", authenticateToken, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  res.json({ analytics: await buildDriftAnalytics(req.params.orgId, Number(req.query.days) || 30) });
+});
+
 // ─────────────────────────── LANDING CURATION ───────────────────────────
 // Cross-line: a landing item points at a DriftProduct or a Rot3dProduct.
 

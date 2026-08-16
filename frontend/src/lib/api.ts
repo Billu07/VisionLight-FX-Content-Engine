@@ -387,6 +387,9 @@ export const apiEndpoints = {
   driftAdminBrandSettings: (orgId: string) => api.get(`/api/drift/brands/${orgId}/brand-settings`),
   driftAdminUpdateBrandSettings: (orgId: string, data: Record<string, unknown>) =>
     api.patch(`/api/drift/brands/${orgId}/brand-settings`, data),
+  driftMyAnalytics: (days = 30) => api.get("/api/drift/my/analytics", { params: { days } }),
+  driftBrandAnalytics: (orgId: string, days = 30) =>
+    api.get(`/api/drift/brands/${orgId}/analytics`, { params: { days } }),
   driftLandingRemove: (id: string) => api.delete(`/api/drift/landing/${id}`),
   driftPublicLanding: () => api.get("/api/drift/public/landing"),
 
