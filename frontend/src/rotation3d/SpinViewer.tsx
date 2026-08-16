@@ -447,11 +447,14 @@ export default function SpinViewer({
       const cx = W / 2 + panX * DPR, cy = H * 0.47 + panY * DPR;
 
       // Drift: pin the "drag to drift" hint just UNDER the product, but clamp it so
-      // it never descends into the "Powered by" / CTA line at the bottom.
+      // its BOTTOM edge always clears the "Powered by" badge (bottom:100px) + CTAs.
+      // Reserve = badge/CTA zone (140px) + the hint's own height, measured live so
+      // a taller/shorter helper never overlaps the badge.
       if (driftMode && hintRef.current) {
         const under = (cy + scale) / DPR + 14;
-        const maxTop = H / DPR - 210; // keep ~210px of clear space below for the stack
-        hintRef.current.style.top = Math.min(under, maxTop) + "px";
+        const hintH = hintRef.current.offsetHeight || 110;
+        const maxTop = H / DPR - (140 + hintH);
+        hintRef.current.style.top = Math.max(12, Math.min(under, maxTop)) + "px";
         hintRef.current.style.bottom = "auto";
       }
 
