@@ -193,8 +193,8 @@ export default function Rotation3DPlayer() {
       showControls={showControls}
       showCtas={showCtas}
       showBrand={showBrand}
-      showLogo={showLogo}
-      showName={showName}
+      showLogo={showLogo && !(drift && p.hideLogo)}
+      showName={showName && !(drift && p.hideName)}
       showTitle={showTitle}
       ctaPrimary={toCta(p.ctaPrimary)}
       ctaSecondary={toCta(p.ctaSecondary)}

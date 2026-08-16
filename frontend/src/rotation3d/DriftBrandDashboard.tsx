@@ -20,6 +20,9 @@ type Product = {
   slug: string;
   status: string;
   loopEnabled?: boolean;
+  hideLogo?: boolean;
+  hideName?: boolean;
+  background?: string | null;
   title?: string | null;
   description?: string | null;
   defaultFrame?: number;
@@ -123,6 +126,11 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [embedProduct, setEmbedProduct] = useState<Product | null>(null);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  // Brand name (organization identity) — brand admins edit their own; superadmin
+  // brand-view (admin mode) edits names via the product/org tools elsewhere.
+  const [brandName, setBrandName] = useState("");
+  const [brandNameSaved, setBrandNameSaved] = useState("");
+  const [brandSaving, setBrandSaving] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -143,8 +151,57 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminOrgId]);
 
+  // Load the brand's current display name (own dashboard only).
+  useEffect(() => {
+    if (admin) return;
+    apiEndpoints
+      .getBrandConfig()
+      .then((r) => {
+        const n = r.data?.config?.companyName || "";
+        setBrandName(n);
+        setBrandNameSaved(n);
+      })
+      .catch(() => undefined);
+  }, [admin]);
+
+  const saveBrandName = async () => {
+    const next = brandName.trim();
+    if (!next || next === brandNameSaved) return;
+    setBrandSaving(true);
+    try {
+      await apiEndpoints.updateBrandConfig({ companyName: next });
+      setBrandNameSaved(next);
+      setMsg({ kind: "ok", text: "Brand name updated." });
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e?.response?.data?.error || "Could not update the brand name" });
+    } finally {
+      setBrandSaving(false);
+    }
+  };
+
   const productLink = (p: Product) =>
     brandSlug && p.slug ? `${PLAYER_ORIGIN}/${brandSlug}/${p.slug}` : `${PLAYER_ORIGIN}/p/${p.id}`;
+
+  const [cardId, setCardId] = useState<string | null>(null);
+  const shareCard = async (p: Product) => {
+    setCardId(p.id);
+    try {
+      const res = await apiEndpoints.driftShareCard(p.id);
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${p.slug || p.name.replace(/[^a-z0-9-_]+/gi, "-") || "drift"}-share.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setMsg({ kind: "ok", text: "Share card downloaded." });
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e?.response?.data?.error || "Could not generate the share card" });
+    } finally {
+      setCardId(null);
+    }
+  };
 
   const download = async (p: Product) => {
     setExportingId(p.id);
@@ -196,6 +253,25 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
             ↻ refresh
           </button>
         </div>
+
+        {!admin && (
+          <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Brand name</span>
+            <input
+              value={brandName}
+              onChange={(e) => setBrandName(e.target.value)}
+              placeholder="Your brand / profile name"
+              className="min-w-0 flex-1 rounded-lg border border-gray-700 bg-gray-950 px-3 py-1.5 text-sm text-white outline-none focus:border-cyan-400"
+            />
+            <button
+              onClick={saveBrandName}
+              disabled={brandSaving || !brandName.trim() || brandName.trim() === brandNameSaved}
+              className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-widest text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-40"
+            >
+              {brandSaving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        )}
 
         {msg && (
           <div
@@ -258,6 +334,14 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
                         className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
                       >
                         Embed
+                      </button>
+                      <button
+                        onClick={() => shareCard(p)}
+                        disabled={cardId === p.id}
+                        className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800 disabled:opacity-50"
+                        title="Download a social share card (frame + QR to the player)"
+                      >
+                        {cardId === p.id ? "Making…" : "Share card"}
                       </button>
                       <a
                         href={productLink(p)}

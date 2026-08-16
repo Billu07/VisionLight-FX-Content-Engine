@@ -674,6 +674,10 @@ async function applyProductPatch(
   if ("defaultFrame" in body) data.defaultFrame = Math.max(0, Number(body.defaultFrame) || 0);
   if ("background" in body) data.background = String(body.background || "").slice(0, 40);
   if (typeof body.loopEnabled === "boolean") data.loopEnabled = body.loopEnabled;
+  if (typeof body.hideLogo === "boolean") data.hideLogo = body.hideLogo;
+  if (typeof body.hideName === "boolean") data.hideName = body.hideName;
+  if ("name" in body && String(body.name || "").trim())
+    data.name = String(body.name).trim().slice(0, 120);
   if ("title" in body) data.title = body.title ? String(body.title).slice(0, 120) : null;
   if ("titleEnd" in body) data.titleEnd = body.titleEnd ? String(body.titleEnd).slice(0, 120) : null;
   if ("helperStart" in body)
@@ -875,6 +879,8 @@ const publicProductPayload = (p: any, bc: any, orgName: string, captions: any[])
   helperEnd: p.helperEnd,
   defaultFrame: p.defaultFrame,
   loopEnabled: p.loopEnabled,
+  hideLogo: p.hideLogo,
+  hideName: p.hideName,
   background: p.background,
   ctaPrimary: p.ctaPrimary,
   ctaSecondary: p.ctaSecondary,
@@ -1042,13 +1048,16 @@ router.get(
   "/api/drift/my/products/:id/share-card",
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
-    const orgId = requireOrg(req, res);
-    if (!orgId) return;
+    // Owner (org-scoped) or superadmin brand-view — mirror export.zip's scoping.
+    const isSuper = req.user?.role === "SUPERADMIN";
     const product = await prisma.driftProduct.findFirst({
-      where: { id: req.params.id, organizationId: orgId },
+      where: isSuper
+        ? { id: req.params.id }
+        : { id: req.params.id, organizationId: req.user?.organizationId || "" },
       include: { spin: true },
     });
     if (!product) return res.status(404).json({ error: "Product not found" });
+    const orgId = product.organizationId;
 
     let org: any = null;
     try {

@@ -188,6 +188,7 @@ export default function SpinViewer({
   const hintRef = useRef<HTMLDivElement>(null);
   const degRef = useRef<HTMLSpanElement>(null);
   const fillRef = useRef<HTMLDivElement>(null);
+  const headsRef = useRef<HTMLDivElement>(null);
   const head1Ref = useRef<HTMLDivElement>(null);
   const head2Ref = useRef<HTMLDivElement>(null);
   const desc1Ref = useRef<HTMLDivElement>(null);
@@ -457,6 +458,23 @@ export default function SpinViewer({
 
       if (realMode) drawFrameImage(frame, cx, cy, scale);
       else drawSynthetic(q, cx, cy, scale);
+
+      // Drift on mobile: the canvas frame is vertically centered but the headline
+      // block is pinned near the top — on tall phones that strands the copy far
+      // above the product. Anchor the headline block's BOTTOM just above the frame
+      // so it reads as one unit (desktop keeps the CSS top-pin).
+      if (driftMode && headsRef.current) {
+        const cssW = cv.clientWidth || W / DPR;
+        const frameTopCss = (realMode ? frameRect.y : cy - scale * 2.1) / DPR;
+        if (cssW <= 640 && frameTopCss > 0) {
+          const hCss = cv.clientHeight || H / DPR;
+          headsRef.current.style.top = "auto";
+          headsRef.current.style.bottom = Math.max(12, hCss - frameTopCss + 14) + "px";
+        } else {
+          headsRef.current.style.top = "";
+          headsRef.current.style.bottom = "";
+        }
+      }
 
       // Drift on-frame captions — visible while this frame is within range.
       // Positioned relative to the rendered FRAME rect (matches editor + export).
@@ -1029,7 +1047,7 @@ export default function SpinViewer({
       </div>
 
       {!hero && driftMode && (title || description || titleEnd || descriptionEnd) ? (
-        <div className="r3d-heads" aria-hidden>
+        <div className="r3d-heads" aria-hidden ref={headsRef}>
           <div className="r3d-heads-stack">
             {title && <div className="r3d-head" ref={head1Ref}>{title}</div>}
             {titleEnd && <div className="r3d-head" ref={head2Ref} style={{ opacity: 0 }}>{titleEnd}</div>}

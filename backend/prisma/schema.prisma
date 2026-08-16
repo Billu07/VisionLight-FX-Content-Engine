@@ -502,6 +502,8 @@ model DriftProduct {
   status          String   @default("DRAFT") // DRAFT | PROCESSING | READY | PUBLISHED | ARCHIVED
   defaultFrame    Int      @default(0)
   loopEnabled     Boolean  @default(true) // player auto-loop/continuous playback toggle
+  hideLogo        Boolean  @default(false) // hide the brand logo in the platform player (not just embed)
+  hideName        Boolean  @default(false) // hide the brand/profile name in the platform player
   background      String? // "transparent" | hex
   ctaPrimary      Json? // { label, url }
   ctaSecondary    Json? // { label, url }

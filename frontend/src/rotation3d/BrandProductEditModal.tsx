@@ -20,10 +20,15 @@ type EditProduct = {
   status?: string;
   defaultFrame?: number;
   loopEnabled?: boolean;
+  background?: string | null;
+  hideLogo?: boolean;
+  hideName?: boolean;
   ctaPrimary?: { label?: string; url?: string } | null;
   ctaSecondary?: { label?: string; url?: string } | null;
   spin?: { frameCount?: number } | null;
 };
+
+const BG_SWATCHES = ["transparent", "#ffffff", "#000000", "#0b0f14", "#f5f5f4", "#e11d48", "#2563eb"];
 
 const field =
   "w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-brand-accent";
@@ -41,6 +46,7 @@ export default function BrandProductEditModal({
   onClose: () => void;
 }) {
   const frameMax = Math.max(0, (product.spin?.frameCount || 1) - 1);
+  const [name, setName] = useState(product.name || "");
   const [title, setTitle] = useState(product.title || "");
   const [titleEnd, setTitleEnd] = useState(product.titleEnd || "");
   const [helperStart, setHelperStart] = useState(product.helperStart || "");
@@ -55,6 +61,9 @@ export default function BrandProductEditModal({
   const [slug, setSlug] = useState(product.slug || "");
   const [publish, setPublish] = useState(product.status === "PUBLISHED");
   const [loopEnabled, setLoopEnabled] = useState(product.loopEnabled ?? true);
+  const [background, setBackground] = useState(product.background || "transparent");
+  const [hideLogo, setHideLogo] = useState(product.hideLogo ?? false);
+  const [hideName, setHideName] = useState(product.hideName ?? false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
@@ -62,6 +71,7 @@ export default function BrandProductEditModal({
     setSaving(true);
     setErr("");
     const data: Record<string, unknown> = {
+      name: name.trim() || product.name,
       title: title.trim() || null,
       description: description.trim() || null,
       ctaPrimary: ctaPLabel.trim() && ctaPUrl.trim() ? { label: ctaPLabel.trim(), url: ctaPUrl.trim() } : null,
@@ -76,6 +86,9 @@ export default function BrandProductEditModal({
       data.descriptionEnd = descriptionEnd.trim() || null;
       data.helperStart = helperStart.trim() || null;
       data.helperEnd = helperEnd.trim() || null;
+      data.background = background;
+      data.hideLogo = hideLogo;
+      data.hideName = hideName;
     }
     try {
       await onSave(data);
@@ -109,6 +122,15 @@ export default function BrandProductEditModal({
         )}
 
         <div className="space-y-3.5">
+          <div>
+            <label className={label}>{showLoop ? "Drift name" : "Product name"}</label>
+            <input
+              className={`${field} mt-1`}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Internal product name"
+            />
+          </div>
           <div>
             <label className={label}>{showLoop ? "Headline 1 (start)" : "Title"}</label>
             <input className={`${field} mt-1`} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Optional display title" />
@@ -205,6 +227,56 @@ export default function BrandProductEditModal({
               <input className={field} value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="product-name" />
             </div>
           </div>
+
+          {showLoop && (
+            <div>
+              <label className={label}>Player background</label>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                {BG_SWATCHES.map((bg) => (
+                  <button
+                    key={bg}
+                    type="button"
+                    onClick={() => setBackground(bg)}
+                    title={bg}
+                    className={`h-7 w-7 rounded-md border ${
+                      background === bg ? "border-brand-accent ring-2 ring-brand-accent/40" : "border-gray-600"
+                    }`}
+                    style={
+                      bg === "transparent"
+                        ? {
+                            backgroundImage:
+                              "linear-gradient(45deg,#555 25%,transparent 25%),linear-gradient(-45deg,#555 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#555 75%),linear-gradient(-45deg,transparent 75%,#555 75%)",
+                            backgroundSize: "8px 8px",
+                            backgroundPosition: "0 0,0 4px,4px -4px,-4px 0",
+                          }
+                        : { background: bg }
+                    }
+                  />
+                ))}
+                <input
+                  type="color"
+                  value={background === "transparent" ? "#000000" : background}
+                  onChange={(e) => setBackground(e.target.value)}
+                  className="h-7 w-9 cursor-pointer rounded-md border border-gray-600 bg-transparent p-0"
+                  title="Custom color"
+                />
+                <span className="font-mono text-[11px] text-gray-500">{background}</span>
+              </div>
+            </div>
+          )}
+
+          {showLoop && (
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 text-xs text-gray-300">
+                <input type="checkbox" checked={hideLogo} onChange={(e) => setHideLogo(e.target.checked)} className="h-4 w-4 accent-brand-accent" />
+                Hide brand logo in player
+              </label>
+              <label className="flex items-center gap-2 text-xs text-gray-300">
+                <input type="checkbox" checked={hideName} onChange={(e) => setHideName(e.target.checked)} className="h-4 w-4 accent-brand-accent" />
+                Hide brand name in player
+              </label>
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-4 pt-1">
             <label className="flex items-center gap-2 text-xs text-gray-300">
