@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { getPlayerBranding } from "../lib/branding";
+import DriftFormOverlay, { type OverlayForm } from "./DriftFormOverlay";
 
 /**
  * Rotation3D — reusable interactive 360° spin viewer.
@@ -26,7 +27,7 @@ export type SpinManifest = {
   defaultFrame?: number;
 };
 
-export type SpinCta = { label: string; url: string; newTab?: boolean };
+export type SpinCta = { label: string; url?: string; newTab?: boolean; formId?: string };
 
 /** On-frame text overlay (Drift). Visible while the current frame is within
  * [startFrame, endFrame]; position/size are normalized to the canvas (0..1). */
@@ -50,6 +51,9 @@ export type SpinViewerProps = {
   brandName?: string;
   ctaPrimary?: SpinCta;
   ctaSecondary?: SpinCta;
+  /** lead-forms a CTA may open (keyed by id), + the product id for lead source */
+  forms?: Record<string, OverlayForm>;
+  productId?: string;
   /** called before navigation so callers can record analytics (CTA_CLICK) */
   onCtaClick?: (which: "primary" | "secondary", cta: SpinCta) => void;
   className?: string;
@@ -150,6 +154,8 @@ export default function SpinViewer({
   brandName = "Rotation3D",
   ctaPrimary,
   ctaSecondary,
+  forms,
+  productId,
   onCtaClick,
   className,
   variant = "full",
@@ -1000,12 +1006,19 @@ export default function SpinViewer({
   const fireCta = (which: "primary" | "secondary", cta?: SpinCta) => {
     if (!cta) return;
     onCtaClick?.(which, cta);
+    // A CTA with an attached form opens the in-player form overlay (same page).
+    const form = cta.formId && forms ? forms[cta.formId] : undefined;
+    if (form) {
+      setActiveForm({ form, which });
+      return;
+    }
     if (cta.url && cta.url !== "#") {
       // Drift CTAs open in the SAME window (ad landing behavior); others honor newTab.
       if (driftMode || cta.newTab === false) window.location.href = cta.url;
       else window.open(cta.url, "_blank", "noopener");
     }
   };
+  const [activeForm, setActiveForm] = useState<{ form: OverlayForm; which: "primary" | "secondary" } | null>(null);
 
   return (
     <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${!showLogo ? "r3d-no-logo" : ""} ${!showName ? "r3d-no-name" : ""} ${!showTitle ? "r3d-no-title" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
@@ -1112,6 +1125,17 @@ export default function SpinViewer({
             </button>
           )}
         </div>
+      )}
+
+      {activeForm && (
+        <DriftFormOverlay
+          form={activeForm.form}
+          which={activeForm.which}
+          productId={productId}
+          productName={productName}
+          accent={primaryColor}
+          onClose={() => setActiveForm(null)}
+        />
       )}
 
       {view > 0 && stills[view - 1] && (

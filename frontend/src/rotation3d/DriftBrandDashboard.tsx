@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import BrandProductEditModal from "./BrandProductEditModal";
 import DriftCaptionEditor from "./DriftCaptionEditor";
+import DriftFormsManager from "./DriftFormsManager";
 
 /**
  * Drift brand-admin home (/app for view="DRIFT"). The brand's own drifts with the
@@ -175,6 +176,8 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
   const [brandName, setBrandName] = useState("");
   const [brandNameSaved, setBrandNameSaved] = useState("");
   const [brandSaving, setBrandSaving] = useState(false);
+  const [view, setView] = useState<"drifts" | "forms">("drifts");
+  const [formsList, setFormsList] = useState<{ id: string; name: string }[]>([]);
 
   const load = async () => {
     setLoading(true);
@@ -194,6 +197,13 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminOrgId]);
+
+  // Forms available to attach to a CTA (refreshed when the Forms tab may edit them).
+  useEffect(() => {
+    (admin ? apiEndpoints.driftBrandForms(adminOrgId!) : apiEndpoints.driftMyForms())
+      .then((r) => setFormsList((r.data.forms || []).map((f: any) => ({ id: f.id, name: f.name }))))
+      .catch(() => undefined);
+  }, [admin, adminOrgId, view]);
 
   // Load the brand's current display name (own dashboard only).
   useEffect(() => {
@@ -288,6 +298,24 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
       )}
 
       <main className={admin ? "" : "mx-auto max-w-5xl px-6 py-8"}>
+        <div className="mb-5 flex items-center gap-2">
+          {(["drifts", "forms"] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setView(t)}
+              className={`rounded-lg px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors ${
+                view === t ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"
+              }`}
+            >
+              {t === "drifts" ? "Drifts" : "Forms & Leads"}
+            </button>
+          ))}
+        </div>
+
+        {view === "forms" ? (
+          <DriftFormsManager adminOrgId={adminOrgId} />
+        ) : (
+        <>
         <div className="mb-6 flex items-end justify-between">
           <div>
             <h1 className="text-lg font-bold text-white">Your drifts</h1>
@@ -402,12 +430,15 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
             ))}
           </div>
         )}
+        </>
+        )}
       </main>
 
       {editing && (
         <BrandProductEditModal
           product={editing}
           showLoop
+          forms={formsList}
           onSave={async (data) => {
             if (admin) await apiEndpoints.driftAdminUpdateProduct(adminOrgId!, editing.id, data);
             else await apiEndpoints.driftUpdateProduct(editing.id, data);

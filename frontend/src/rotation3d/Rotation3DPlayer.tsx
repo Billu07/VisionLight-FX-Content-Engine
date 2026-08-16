@@ -11,8 +11,12 @@ import { isSpinPlayerSite, isDriftSite, getPlayerBranding } from "../lib/brandin
  */
 
 const toCta = (c: any) =>
-  c && typeof c === "object" && c.label && c.url && c.url !== "#"
-    ? { label: String(c.label), url: String(c.url) }
+  c && typeof c === "object" && c.label && ((c.url && c.url !== "#") || c.formId)
+    ? {
+        label: String(c.label),
+        url: c.url && c.url !== "#" ? String(c.url) : undefined,
+        formId: c.formId || undefined,
+      }
     : undefined;
 
 function Placeholder({ title, sub, showHome }: { title: string; sub: string; showHome?: boolean }) {
@@ -198,6 +202,8 @@ export default function Rotation3DPlayer() {
       showTitle={showTitle}
       ctaPrimary={toCta(p.ctaPrimary)}
       ctaSecondary={toCta(p.ctaSecondary)}
+      forms={drift ? p.forms : undefined}
+      productId={p.id}
       onCtaClick={(which) =>
         p?.id && trackEvent(p.id, "CTA_CLICK", { which }).catch(() => undefined)
       }

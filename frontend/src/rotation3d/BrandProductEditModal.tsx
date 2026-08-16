@@ -23,8 +23,8 @@ type EditProduct = {
   background?: string | null;
   hideLogo?: boolean;
   hideName?: boolean;
-  ctaPrimary?: { label?: string; url?: string } | null;
-  ctaSecondary?: { label?: string; url?: string } | null;
+  ctaPrimary?: { label?: string; url?: string; formId?: string | null } | null;
+  ctaSecondary?: { label?: string; url?: string; formId?: string | null } | null;
   spin?: { frameCount?: number } | null;
 };
 
@@ -37,11 +37,13 @@ const label = "block text-[11px] font-semibold uppercase tracking-wider text-gra
 export default function BrandProductEditModal({
   product,
   showLoop,
+  forms,
   onSave,
   onClose,
 }: {
   product: EditProduct;
   showLoop?: boolean;
+  forms?: { id: string; name: string }[];
   onSave: (data: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
 }) {
@@ -55,8 +57,10 @@ export default function BrandProductEditModal({
   const [descriptionEnd, setDescriptionEnd] = useState(product.descriptionEnd || "");
   const [ctaPLabel, setCtaPLabel] = useState(product.ctaPrimary?.label || "");
   const [ctaPUrl, setCtaPUrl] = useState(product.ctaPrimary?.url || "");
+  const [ctaPForm, setCtaPForm] = useState(product.ctaPrimary?.formId || "");
   const [ctaSLabel, setCtaSLabel] = useState(product.ctaSecondary?.label || "");
   const [ctaSUrl, setCtaSUrl] = useState(product.ctaSecondary?.url || "");
+  const [ctaSForm, setCtaSForm] = useState(product.ctaSecondary?.formId || "");
   const [defaultFrame, setDefaultFrame] = useState(product.defaultFrame ?? 0);
   const [slug, setSlug] = useState(product.slug || "");
   const [publish, setPublish] = useState(product.status === "PUBLISHED");
@@ -74,8 +78,15 @@ export default function BrandProductEditModal({
       name: name.trim() || product.name,
       title: title.trim() || null,
       description: description.trim() || null,
-      ctaPrimary: ctaPLabel.trim() && ctaPUrl.trim() ? { label: ctaPLabel.trim(), url: ctaPUrl.trim() } : null,
-      ctaSecondary: ctaSLabel.trim() && ctaSUrl.trim() ? { label: ctaSLabel.trim(), url: ctaSUrl.trim() } : null,
+      // A CTA is valid with a link OR an attached form (form wins in the player).
+      ctaPrimary:
+        ctaPLabel.trim() && (ctaPUrl.trim() || ctaPForm)
+          ? { label: ctaPLabel.trim(), url: ctaPUrl.trim(), formId: ctaPForm || null }
+          : null,
+      ctaSecondary:
+        ctaSLabel.trim() && (ctaSUrl.trim() || ctaSForm)
+          ? { label: ctaSLabel.trim(), url: ctaSUrl.trim(), formId: ctaSForm || null }
+          : null,
       defaultFrame,
       publish,
     };
@@ -207,6 +218,32 @@ export default function BrandProductEditModal({
               <input className={`${field} mt-1`} value={ctaSUrl} onChange={(e) => setCtaSUrl(e.target.value)} placeholder="https://…" />
             </div>
           </div>
+
+          {showLoop && forms && (
+            <div className="grid grid-cols-2 gap-2 rounded-lg border border-gray-800 bg-gray-950/40 p-2.5">
+              <div className="col-span-2 text-[11px] text-gray-500">
+                Attach a lead form to a CTA — it opens in-player instead of a link.
+              </div>
+              <div>
+                <label className={label}>Primary CTA → form</label>
+                <select className={`${field} mt-1`} value={ctaPForm} onChange={(e) => setCtaPForm(e.target.value)}>
+                  <option value="">No form (use link)</option>
+                  {forms.map((f) => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={label}>Secondary CTA → form</label>
+                <select className={`${field} mt-1`} value={ctaSForm} onChange={(e) => setCtaSForm(e.target.value)}>
+                  <option value="">No form (use link)</option>
+                  {forms.map((f) => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className={label}>Start frame ({defaultFrame} / {frameMax})</label>

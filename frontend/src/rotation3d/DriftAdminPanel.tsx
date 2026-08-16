@@ -368,6 +368,7 @@ export default function DriftAdminPanel() {
   } | null>(null);
 
   const [selected, setSelected] = useState<Brand | null>(null);
+  const [formsList, setFormsList] = useState<{ id: string; name: string }[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [brandSlug, setBrandSlug] = useState<string | null>(null);
@@ -487,6 +488,15 @@ export default function DriftAdminPanel() {
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products, selected]);
+
+  // Forms for the selected brand — so the edit modal can attach one to a CTA.
+  useEffect(() => {
+    if (!selected) return setFormsList([]);
+    apiEndpoints
+      .driftBrandForms(selected.id)
+      .then((r) => setFormsList((r.data.forms || []).map((f: any) => ({ id: f.id, name: f.name }))))
+      .catch(() => setFormsList([]));
+  }, [selected]);
 
   const [heroId, setHeroId] = useState<string | null>(null);
   const setLandingHero = async (p: Product) => {
@@ -1050,6 +1060,7 @@ export default function DriftAdminPanel() {
         <BrandProductEditModal
           product={editingProduct}
           showLoop
+          forms={formsList}
           onSave={async (data) => {
             await apiEndpoints.driftAdminUpdateProduct(selected.id, editingProduct.id, data);
             await loadProducts(selected, true);

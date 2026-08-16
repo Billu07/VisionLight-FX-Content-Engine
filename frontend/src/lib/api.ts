@@ -358,6 +358,28 @@ export const apiEndpoints = {
     api.patch(`/api/drift/landing/${id}`, changes),
   driftLandingSetHero: (source: string, productId: string) =>
     api.post("/api/drift/landing/set-hero", { source, productId }),
+
+  // Forms + leads (#11). Brand admin (/my) and superadmin brand-view (/brands/:orgId).
+  driftMyForms: () => api.get("/api/drift/my/forms"),
+  driftCreateForm: (data: Record<string, unknown>) => api.post("/api/drift/my/forms", data),
+  driftUpdateForm: (id: string, data: Record<string, unknown>) => api.patch(`/api/drift/my/forms/${id}`, data),
+  driftDeleteForm: (id: string) => api.delete(`/api/drift/my/forms/${id}`),
+  driftMyLeads: (params?: Record<string, string>) => api.get("/api/drift/my/leads", { params }),
+  driftMyLeadsCsv: (params?: Record<string, string>) =>
+    api.get("/api/drift/my/leads.csv", { params, responseType: "blob" }),
+  driftBrandForms: (orgId: string) => api.get(`/api/drift/brands/${orgId}/forms`),
+  driftBrandCreateForm: (orgId: string, data: Record<string, unknown>) =>
+    api.post(`/api/drift/brands/${orgId}/forms`, data),
+  driftBrandUpdateForm: (orgId: string, id: string, data: Record<string, unknown>) =>
+    api.patch(`/api/drift/brands/${orgId}/forms/${id}`, data),
+  driftBrandDeleteForm: (orgId: string, id: string) => api.delete(`/api/drift/brands/${orgId}/forms/${id}`),
+  driftBrandLeads: (orgId: string, params?: Record<string, string>) =>
+    api.get(`/api/drift/brands/${orgId}/leads`, { params }),
+  driftBrandLeadsCsv: (orgId: string, params?: Record<string, string>) =>
+    api.get(`/api/drift/brands/${orgId}/leads.csv`, { params, responseType: "blob" }),
+  driftPublicForm: (id: string) => api.get(`/api/drift/public/forms/${id}`),
+  driftSubmitForm: (id: string, payload: Record<string, unknown>) =>
+    api.post(`/api/drift/public/forms/${id}/submit`, payload),
   driftLandingRemove: (id: string) => api.delete(`/api/drift/landing/${id}`),
   driftPublicLanding: () => api.get("/api/drift/public/landing"),
 
