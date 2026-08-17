@@ -458,16 +458,20 @@ export default function SpinViewer({
       // ~1.05×min, which fills a wide desktop viewport and pushed the helper onto
       // the frame). Cap the box by the vertical budget (viewport minus the helper's
       // measured height + bottom stack) and the width, on every aspect ratio.
+      // Landing sits the product a touch HIGHER (0.40H) and as large as fits so
+      // it reads big on a wide desktop, while still leaving room below for the
+      // drag helper + powered-by/CTA (a viewport-filling product leaves none).
+      const cyFactor = landing ? 0.4 : 0.47;
       let base = Math.min(W, H) * (hero ? 0.23 : 0.25);
       if (landing) {
         const hintCss = hintRef.current?.offsetHeight || 110;
-        const reserve = (156 + hintCss) * DPR; // room to keep clear below the product
-        const capH = (1.06 * H - 2 * reserve) / 4.2; // box centered at 0.47H stays above the reserve
+        const reserve = (hintCss + 130) * DPR; // helper + gap + powered/CTA zone below
+        const capH = (2 * ((H - reserve) - cyFactor * H)) / 4.2; // box bottom stays above the reserve
         const capW = (W * 0.94) / 4.2; // and fits the width
         base = Math.min(base, capW, Math.max(capH, Math.min(W, H) * 0.12));
       }
       const scale = base * zoom;
-      const cx = W / 2 + panX * DPR, cy = H * 0.47 + panY * DPR;
+      const cx = W / 2 + panX * DPR, cy = H * cyFactor + panY * DPR;
 
       // Drift has no grounding shadow (per spec); Rotation3D keeps its contact shadow.
       if (!driftMode) {
@@ -486,7 +490,9 @@ export default function SpinViewer({
       if (driftMode && headsRef.current) {
         const cssW = cv.clientWidth || W / DPR;
         const frameTopCss = (realMode ? frameRect.y : cy - scale * 2.1) / DPR;
-        if (cssW <= 640 && frameTopCss > 0) {
+        // Anchor above the frame on mobile AND on the landing (where the product
+        // sits higher) so the headline never overlaps the product.
+        if ((cssW <= 640 || landing) && frameTopCss > 0) {
           const hCss = cv.clientHeight || H / DPR;
           headsRef.current.style.top = "auto";
           headsRef.current.style.bottom = Math.max(12, hCss - frameTopCss + 14) + "px";
@@ -504,7 +510,9 @@ export default function SpinViewer({
         const frameBottomCss = (realMode && frameRect.h > 0 ? frameRect.y + frameRect.h : cy + scale * 2.1) / DPR;
         const under = frameBottomCss + 16;
         const hintH = hintRef.current.offsetHeight || 110;
-        const maxTop = H / DPR - (140 + hintH);
+        // Landing reserves a tighter bottom zone (it has no scrubber) so the bigger
+        // product's helper still tucks just beneath it; product page keeps 140.
+        const maxTop = H / DPR - ((landing ? 120 : 140) + hintH);
         hintRef.current.style.top = Math.max(12, Math.min(under, maxTop)) + "px";
         hintRef.current.style.bottom = "auto";
       }
