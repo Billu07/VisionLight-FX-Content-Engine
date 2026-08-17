@@ -85,7 +85,7 @@ function DriftEmbedModal({ product, onClose }: { product: { id: string; name: st
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg rounded-2xl p-5 shadow-2xl"
+        className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl p-5 shadow-2xl"
         style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -125,7 +125,7 @@ function DriftEmbedModal({ product, onClose }: { product: { id: string; name: st
         </div>
 
         <div className="d-hair mt-4 grid place-items-center p-3">
-          <div style={{ position: "relative", width: "100%", maxWidth: 240, aspectRatio: `${ratio.w}/${ratio.h}` }}>
+          <div style={{ position: "relative", width: "100%", maxWidth: ratio.h > ratio.w ? 260 : 320, aspectRatio: `${ratio.w}/${ratio.h}`, marginInline: "auto" }}>
             <iframe
               src={url}
               title="Embed preview"

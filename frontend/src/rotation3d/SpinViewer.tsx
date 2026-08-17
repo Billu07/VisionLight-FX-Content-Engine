@@ -1256,20 +1256,22 @@ const R3D_CSS = `
    dark bg → faint light ring (protects dark logos); light bg override below */
 .r3d-logo-img{height:34px;max-width:130px;object-fit:contain;flex:none;filter:drop-shadow(0 0 2px rgba(0,0,0,.45)) drop-shadow(0 0 6px rgba(255,255,255,.14))}
 .r3d-titles{min-width:0}
-.r3d-kicker{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--r3d-muted)}
-.r3d-name{font-weight:600;font-size:16px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.r3d-tools{display:flex;gap:8px;flex:none}
-.r3d-iconbtn{width:40px;height:40px;border-radius:12px;border:1px solid var(--r3d-line);background:var(--r3d-glass);backdrop-filter:blur(10px);color:#eef1f6;display:grid;place-items:center;cursor:pointer;transition:background .2s,transform .1s;font-size:20px;line-height:1}
+.r3d-kicker{font-size:clamp(9px,2.6vmin,11px);letter-spacing:.14em;text-transform:uppercase;color:var(--r3d-muted)}
+.r3d-name{font-weight:600;font-size:clamp(13px,4vmin,16px);line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r3d-tools{display:flex;gap:clamp(6px,1.8vmin,8px);flex:none}
+/* Chrome scales fluidly with the container (embeds/mobile) but is bounded so
+   desktop stays as designed and touch targets don't get too small. */
+.r3d-iconbtn{width:clamp(32px,9vmin,40px);height:clamp(32px,9vmin,40px);border-radius:clamp(9px,2.6vmin,12px);border:1px solid var(--r3d-line);background:var(--r3d-glass);backdrop-filter:blur(10px);color:#eef1f6;display:grid;place-items:center;cursor:pointer;transition:background .2s,transform .1s;font-size:clamp(15px,4.5vmin,20px);line-height:1}
 .r3d-iconbtn:hover{background:var(--r3d-glass2)}
 .r3d-iconbtn:active{transform:translateY(1px)}
-.r3d-iconbtn svg{width:18px;height:18px}
+.r3d-iconbtn svg{width:clamp(14px,4vmin,18px);height:clamp(14px,4vmin,18px)}
 .r3d-zoomcol{position:absolute;right:14px;bottom:calc(146px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;z-index:6}
 /* angle indicator — subtle blurred pill so it reads on the product's shadow/platform */
 .r3d-rot{position:absolute;left:50%;bottom:calc(128px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:8px;color:var(--r3d-muted);font-size:11px;font-weight:500;background:rgba(11,15,25,.45);border:1px solid var(--r3d-line);border-radius:999px;padding:5px 11px;backdrop-filter:blur(8px)}
 .r3d-track{position:relative;width:132px;height:3px;border-radius:2px;background:rgba(255,255,255,.12)}
 .r3d-fill{position:absolute;top:-3px;width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,var(--r3d-primary),var(--r3d-secondary));box-shadow:var(--r3d-glow);transform:translateX(-50%)}
-.r3d-ctas{position:absolute;left:0;right:0;bottom:0;z-index:5;display:flex;gap:12px;padding:14px 16px calc(16px + env(safe-area-inset-bottom));max-width:640px;margin:0 auto}
-.r3d-cta{flex:1;text-align:center;padding:14px 16px;border-radius:14px;font-weight:600;font-size:15px;color:#fff;cursor:pointer;border:1px solid var(--r3d-line);font-family:inherit;transition:transform .12s,filter .2s,background .2s}
+.r3d-ctas{position:absolute;left:0;right:0;bottom:0;z-index:5;display:flex;gap:clamp(8px,2.4vmin,12px);padding:clamp(10px,2.8vmin,14px) clamp(12px,3.4vmin,16px) calc(clamp(12px,3.4vmin,16px) + env(safe-area-inset-bottom));max-width:640px;margin:0 auto}
+.r3d-cta{flex:1;text-align:center;padding:clamp(9px,3vmin,14px) clamp(11px,3.4vmin,16px);border-radius:clamp(10px,3vmin,14px);font-weight:600;font-size:clamp(12.5px,3.4vmin,15px);color:#fff;cursor:pointer;border:1px solid var(--r3d-line);font-family:inherit;transition:transform .12s,filter .2s,background .2s}
 .r3d-primary{border:none;background:linear-gradient(135deg,var(--r3d-primary),var(--r3d-secondary));box-shadow:0 10px 30px -10px var(--r3d-secondary)}
 .r3d-primary:hover{filter:brightness(1.08)}
 .r3d-ghost{background:var(--r3d-glass);backdrop-filter:blur(10px)}
@@ -1281,7 +1283,7 @@ const R3D_CSS = `
 .r3d-hint.r3d-gone{opacity:0}
 .r3d-hand{width:52px;height:52px;border-radius:50%;border:1px solid var(--r3d-line);background:rgba(11,15,25,.4);backdrop-filter:blur(8px);display:grid;place-items:center;animation:r3dsway 1.8s ease-in-out infinite}
 .r3d-hand svg{width:24px;height:24px;color:#eef1f6}
-.r3d-hint span{font-size:13px;color:#eef1f6;text-shadow:0 1px 10px #000}
+.r3d-hint span{font-size:clamp(10px,3.4vmin,13px);color:#eef1f6;text-shadow:0 1px 10px #000}
 @keyframes r3dsway{0%,100%{transform:translateX(-12px)}50%{transform:translateX(12px)}}
 /* Drift player chrome: "drag to drift" arrow (flips with drag direction), no
    bottom scrim, and the angle number hidden (the scrubber track stays). */
@@ -1297,15 +1299,15 @@ const R3D_CSS = `
 .r3d-drift-hand svg{width:19px;height:19px}
 /* only the hand hides between its start/end appearances; arrow + text stay */
 .r3d-drift-hand.r3d-gone{opacity:0}
-.r3d-drift-hand{width:34px;height:34px;display:grid;place-items:center;color:#eef1f6}
-.r3d-drift-hand svg{width:22px;height:22px}
-.r3d-drift-arrow{width:52px;height:52px;border-radius:50%;border:1px solid var(--r3d-line);background:rgba(11,15,25,.4);backdrop-filter:blur(8px);display:grid;place-items:center}
-.r3d-drift-arrow svg{width:24px;height:24px;color:#eef1f6;transition:transform .25s}
+.r3d-drift-hand{width:clamp(26px,7.5vmin,34px);height:clamp(26px,7.5vmin,34px);display:grid;place-items:center;color:#eef1f6}
+.r3d-drift-hand svg{width:clamp(17px,5vmin,22px);height:clamp(17px,5vmin,22px)}
+.r3d-drift-arrow{width:clamp(38px,11vmin,52px);height:clamp(38px,11vmin,52px);border-radius:50%;border:1px solid var(--r3d-line);background:rgba(11,15,25,.4);backdrop-filter:blur(8px);display:grid;place-items:center}
+.r3d-drift-arrow svg{width:clamp(18px,5.4vmin,24px);height:clamp(18px,5.4vmin,24px);color:#eef1f6;transition:transform .25s}
 .r3d-hint.r3d-back .r3d-drift-arrow svg{transform:scaleX(-1)}
 @media (prefers-reduced-motion:reduce){.r3d-drift-hand{animation:none}}
 /* Drift: "Powered By Drift Link" sits UNDER the player, above the CTA, a bit bigger. */
-.r3d-drift .r3d-powered-badge{top:auto;bottom:calc(100px + env(safe-area-inset-bottom));font-size:12px}
-.r3d-drift .r3d-powered-badge svg{width:14px;height:14px}
+.r3d-drift .r3d-powered-badge{top:auto;bottom:calc(100px + env(safe-area-inset-bottom));font-size:clamp(10px,3vmin,12px)}
+.r3d-drift .r3d-powered-badge svg{width:clamp(12px,3.4vmin,14px);height:clamp(12px,3.4vmin,14px)}
 /* Drift: lift the CTA a touch off the very edge (standard spacing). */
 .r3d-drift .r3d-ctas{padding-bottom:calc(22px + env(safe-area-inset-bottom))}
 /* Drift mobile: hide reset + fullscreen (keep it clean). */
@@ -1315,12 +1317,15 @@ const R3D_CSS = `
 /* Drift: crossfading dual headline (headline 1 at start → headline 2 at the end). */
 .r3d-heads{position:absolute;left:0;right:0;top:calc(64px + env(safe-area-inset-top));z-index:4;display:flex;flex-direction:column;align-items:center;padding:0 20px;pointer-events:none;text-align:center}
 .r3d-heads-stack{display:grid;place-items:center}
-.r3d-head{grid-area:1/1;font-size:22px;font-weight:800;line-height:1.15;letter-spacing:-.01em;color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.6);transition:opacity .5s ease}
+.r3d-head{grid-area:1/1;font-size:clamp(17px,5.6vmin,24px);font-weight:800;line-height:1.15;letter-spacing:-.01em;color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.6);transition:opacity .5s ease}
 .r3d-heads-desc-stack{display:grid;place-items:center;margin-top:8px}
-.r3d-heads-desc{grid-area:1/1;font-size:14px;line-height:1.5;color:#d3dae7;text-shadow:0 1px 10px rgba(0,0,0,.6);max-width:42ch;transition:opacity .5s ease}
+.r3d-heads-desc{grid-area:1/1;font-size:clamp(12px,3.7vmin,15px);line-height:1.5;color:#d3dae7;text-shadow:0 1px 10px rgba(0,0,0,.6);max-width:42ch;transition:opacity .5s ease}
+/* Drift headlines read a touch larger; still fluid so small embeds stay tidy. */
+.r3d-drift .r3d-head{font-size:clamp(18px,6.2vmin,27px)}
+.r3d-drift .r3d-heads-desc{font-size:clamp(13px,4vmin,17px)}
 @media (max-width:560px){
-  .r3d-drift .r3d-info-title,.r3d-drift .r3d-head{font-size:26px}
-  .r3d-drift .r3d-info-desc,.r3d-drift .r3d-heads-desc{font-size:16px}
+  .r3d-drift .r3d-info-title{font-size:26px}
+  .r3d-drift .r3d-info-desc{font-size:16px}
 }
 .r3d-loader{position:absolute;inset:0;z-index:20;display:grid;place-items:center;background:linear-gradient(to bottom right,#111827,#0B0F19);transition:opacity .5s}
 .r3d-loader.r3d-gone{opacity:0;pointer-events:none}
