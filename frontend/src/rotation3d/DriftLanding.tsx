@@ -193,6 +193,8 @@ function HeroLanding({ product }: { product: any }) {
           showName={false}
           showTitle={false}
           showTools={false}
+          landing
+          loaderLabel={product.title || "Loading…"}
           onCtaClick={(which) => {
             if (product.id) apiEndpoints.driftTrackEvent(product.id, "CTA_CLICK", { which }).catch(() => undefined);
             if (product.metaPixelId) track("CTAClick", { which, content_name: product.name }, true);

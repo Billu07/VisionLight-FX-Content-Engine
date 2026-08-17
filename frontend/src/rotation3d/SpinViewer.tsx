@@ -77,6 +77,11 @@ export type SpinViewerProps = {
   showTitle?: boolean;
   /** hide the top-right tool buttons (reset + fullscreen) — e.g. the landing player */
   showTools?: boolean;
+  /** full-page landing takeover: cap the product size on wide screens so it
+   * doesn't fill the viewport (leaves clean room for the helper + CTAs below) */
+  landing?: boolean;
+  /** override the initial loader caption (default "Optimizing frames…") */
+  loaderLabel?: string;
   /** optional product info shown beside the player (desktop right / mobile top) */
   title?: string | null;
   description?: string | null;
@@ -172,6 +177,8 @@ export default function SpinViewer({
   showName = true,
   showTitle = true,
   showTools = true,
+  landing = false,
+  loaderLabel,
   title,
   description,
   titleEnd,
@@ -446,7 +453,20 @@ export default function SpinViewer({
       ctx.clearRect(0, 0, W, H);
       // Default size matches what used to be the "first zoom" size (~×1.25) so
       // the product reads bigger on load; hero/gallery tiles stay compact.
-      const scale = Math.min(W, H) * (hero ? 0.23 : 0.25) * zoom;
+      // On the full-page landing, size the product so it always leaves clean room
+      // BELOW it for the drag helper + powered-by + CTAs (default sizing draws it
+      // ~1.05×min, which fills a wide desktop viewport and pushed the helper onto
+      // the frame). Cap the box by the vertical budget (viewport minus the helper's
+      // measured height + bottom stack) and the width, on every aspect ratio.
+      let base = Math.min(W, H) * (hero ? 0.23 : 0.25);
+      if (landing) {
+        const hintCss = hintRef.current?.offsetHeight || 110;
+        const reserve = (156 + hintCss) * DPR; // room to keep clear below the product
+        const capH = (1.06 * H - 2 * reserve) / 4.2; // box centered at 0.47H stays above the reserve
+        const capW = (W * 0.94) / 4.2; // and fits the width
+        base = Math.min(base, capW, Math.max(capH, Math.min(W, H) * 0.12));
+      }
+      const scale = base * zoom;
       const cx = W / 2 + panX * DPR, cy = H * 0.47 + panY * DPR;
 
       // Drift has no grounding shadow (per spec); Rotation3D keeps its contact shadow.
@@ -1201,7 +1221,7 @@ export default function SpinViewer({
             <circle className="r3d-ring-fg" ref={ringRef} cx="32" cy="32" r="27" />
           </svg>
           <div className="r3d-pct" ref={pctRef}>0%</div>
-          <div className="r3d-lbl">Optimizing frames…</div>
+          <div className="r3d-lbl">{loaderLabel || "Optimizing frames…"}</div>
           <div className="r3d-powered">Powered by {playerBrand.name}</div>
         </div>
       </div>
