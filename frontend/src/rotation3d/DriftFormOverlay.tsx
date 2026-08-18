@@ -119,7 +119,7 @@ export default function DriftFormOverlay({
       `}</style>
 
       <div className="fo-head">
-        <button className="fo-back" onClick={onClose}>← Back to product</button>
+        <button className="fo-back" onClick={onClose}>← Back to drift</button>
         <div style={{ flex: 1 }} />
         {def.multiStep && steps.length > 1 && (
           <span className="fo-steps">Step {step + 1} / {steps.length}</span>
@@ -131,7 +131,7 @@ export default function DriftFormOverlay({
           <div>
             <div style={{ fontSize: 44, marginBottom: 12 }}>✓</div>
             <p style={{ fontSize: 17, fontWeight: 600 }}>{done}</p>
-            <button className="fo-back" style={{ marginTop: 16 }} onClick={onClose}>← Back to product</button>
+            <button className="fo-back" style={{ marginTop: 16 }} onClick={onClose}>← Back to drift</button>
           </div>
         </div>
       ) : (

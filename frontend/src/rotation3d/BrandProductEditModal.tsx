@@ -123,7 +123,7 @@ export default function BrandProductEditModal({
       >
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="d-h2">Edit product</h2>
+            <h2 className="d-h2">{showLoop ? "Edit drift" : "Edit product"}</h2>
             <p className="d-faint text-[11px]">{product.name}</p>
           </div>
           <button onClick={onClose} className="d-btn ghost sm" style={{ fontSize: 20, padding: "2px 8px" }}>
@@ -263,7 +263,7 @@ export default function BrandProductEditModal({
           </div>
 
           <div>
-            <label className={label}>Product link</label>
+            <label className={label}>{showLoop ? "Drift link" : "Product link"}</label>
             <div className="mt-1 flex items-center gap-1.5">
               <span className="d-faint font-mono text-xs">/{"{brand}"}/</span>
               <input className={field} value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="product-name" />
