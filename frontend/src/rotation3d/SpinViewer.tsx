@@ -658,8 +658,10 @@ export default function SpinViewer({
       // Pan (moving the frame around) only unlocks once you're zoomed in a few
       // clicks; below that a turn stays anchored so it can't wobble. Each zoom
       // click is ×1.2, so 1.2^4 ≈ 2.07 → ~1.9 is the 4th zoom-in click.
-      if (zoomTarget > 1.9) {
-        axis = "rotatepan"; // deep zoom → spin (x) + vertical pan (y) to inspect
+      if (zoomTarget > 1.9 && !driftMode) {
+        // Rotation3D: deep zoom → spin (x) + vertical pan (y) to inspect.
+        // Drift stays rotate-only when zoomed — no up/down movement (per spec).
+        axis = "rotatepan";
         try { stage.setPointerCapture(e.pointerId); } catch { /* ignore */ }
         stage.classList.add("r3d-grabbing");
         engage();
