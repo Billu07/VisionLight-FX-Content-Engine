@@ -486,14 +486,18 @@ export default function SpinViewer({
       // above the product. Anchor the headline block's BOTTOM just above the frame
       // so it reads as one unit (desktop keeps the CSS top-pin).
       if (driftMode && headsRef.current) {
-        const cssW = cv.clientWidth || W / DPR;
         const frameTopCss = (realMode ? frameRect.y : cy - scale * 2.1) / DPR;
-        // Anchor above the frame on mobile so the headline never overlaps the
-        // product; on desktop/landing it keeps the top pin (hero-style overlay).
-        if (cssW <= 640 && frameTopCss > 0) {
+        // Headline + description track just ABOVE the product's top edge, so they
+        // follow the product as you zoom in/out (they stay one unit) — clamped so
+        // the block never pushes up past the header. When the product's top is off
+        // the top of the screen (very zoomed in), fall back to the CSS top pin.
+        if (frameTopCss > 8) {
           const hCss = cv.clientHeight || H / DPR;
+          const blockH = headsRef.current.offsetHeight || 60;
+          const want = hCss - frameTopCss + 12; // sit 12px above the product top
+          const maxBottom = hCss - (56 + blockH); // keep the block's top ≥ ~56px
           headsRef.current.style.top = "auto";
-          headsRef.current.style.bottom = Math.max(12, hCss - frameTopCss + 14) + "px";
+          headsRef.current.style.bottom = Math.max(12, Math.min(want, maxBottom)) + "px";
         } else {
           headsRef.current.style.top = "";
           headsRef.current.style.bottom = "";
