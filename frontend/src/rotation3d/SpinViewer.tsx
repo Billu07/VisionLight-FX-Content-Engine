@@ -458,17 +458,15 @@ export default function SpinViewer({
       // ~1.05×min, which fills a wide desktop viewport and pushed the helper onto
       // the frame). Cap the box by the vertical budget (viewport minus the helper's
       // measured height + bottom stack) and the width, on every aspect ratio.
-      // Landing sits the product a touch HIGHER (0.40H) and as large as fits so
-      // it reads big on a wide desktop, while still leaving room below for the
-      // drag helper + powered-by/CTA (a viewport-filling product leaves none).
-      const cyFactor = landing ? 0.4 : 0.47;
+      // Landing shows the product BIG (like a ~2x zoom) — capped only so it never
+      // overflows the viewport. At that size it fills the screen, so the drag arrow
+      // rides as a bottom-centered overlay (pinned to the bottom, not the middle).
+      const cyFactor = landing ? 0.46 : 0.47;
       let base = Math.min(W, H) * (hero ? 0.23 : 0.25);
       if (landing) {
-        const hintCss = hintRef.current?.offsetHeight || 110;
-        const reserve = (hintCss + 130) * DPR; // helper + gap + powered/CTA zone below
-        const capH = (2 * ((H - reserve) - cyFactor * H)) / 4.2; // box bottom stays above the reserve
-        const capW = (W * 0.94) / 4.2; // and fits the width
-        base = Math.min(base, capW, Math.max(capH, Math.min(W, H) * 0.12));
+        const capH = (H * 0.95) / 4.2; // don't overflow the height
+        const capW = (W * 0.94) / 4.2; // and fit the width
+        base = Math.min(capH, capW);
       }
       const scale = base * zoom;
       const cx = W / 2 + panX * DPR, cy = H * cyFactor + panY * DPR;
@@ -490,9 +488,9 @@ export default function SpinViewer({
       if (driftMode && headsRef.current) {
         const cssW = cv.clientWidth || W / DPR;
         const frameTopCss = (realMode ? frameRect.y : cy - scale * 2.1) / DPR;
-        // Anchor above the frame on mobile AND on the landing (where the product
-        // sits higher) so the headline never overlaps the product.
-        if ((cssW <= 640 || landing) && frameTopCss > 0) {
+        // Anchor above the frame on mobile so the headline never overlaps the
+        // product; on desktop/landing it keeps the top pin (hero-style overlay).
+        if (cssW <= 640 && frameTopCss > 0) {
           const hCss = cv.clientHeight || H / DPR;
           headsRef.current.style.top = "auto";
           headsRef.current.style.bottom = Math.max(12, hCss - frameTopCss + 14) + "px";
