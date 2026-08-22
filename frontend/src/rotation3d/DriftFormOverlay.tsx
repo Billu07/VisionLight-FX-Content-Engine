@@ -111,7 +111,7 @@ export default function DriftFormOverlay({
         .r3d-formoverlay .fo-in:focus{border-color:${btnColor}}
         .r3d-formoverlay .fo-field{margin-bottom:16px}
         .r3d-formoverlay .fo-opt{display:flex;align-items:center;gap:10px;padding:9px 0;font-size:15px;color:#e2e8f0}
-        .r3d-formoverlay .fo-foot{padding:14px 18px calc(16px + env(safe-area-inset-bottom));border-top:1px solid rgba(255,255,255,.08);display:flex;gap:10px;max-width:520px;width:100%;margin:0 auto}
+        .r3d-formoverlay .fo-foot{display:flex;gap:10px;margin-top:6px;padding-bottom:calc(6px + env(safe-area-inset-bottom))}
         .r3d-formoverlay .fo-btn{flex:1;border:0;border-radius:14px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;color:#04121a}
         .r3d-formoverlay .fo-ghost{flex:0 0 auto;background:rgba(255,255,255,.08);color:#e2e8f0;border:1px solid rgba(255,255,255,.14)}
         .r3d-formoverlay .fo-err{color:#fda4af;font-size:13px;margin-bottom:12px}
@@ -200,19 +200,20 @@ export default function DriftFormOverlay({
                 {def.consent.text || "I agree to be contacted."}
               </label>
             )}
-          </div>
 
-          <div className="fo-foot">
-            {def.multiStep && step > 0 && (
-              <button className="fo-btn fo-ghost" onClick={back}>Back</button>
-            )}
-            {isLast ? (
-              <button className="fo-btn" style={{ background: btnColor }} onClick={submit} disabled={submitting}>
-                {submitting ? "Sending…" : def.submitLabel || "Submit"}
-              </button>
-            ) : (
-              <button className="fo-btn" style={{ background: btnColor }} onClick={next}>Continue</button>
-            )}
+            {/* Buttons flow right after the fields, not pinned to the bottom. */}
+            <div className="fo-foot">
+              {def.multiStep && step > 0 && (
+                <button className="fo-btn fo-ghost" onClick={back}>Back</button>
+              )}
+              {isLast ? (
+                <button className="fo-btn" style={{ background: btnColor }} onClick={submit} disabled={submitting}>
+                  {submitting ? "Sending…" : def.submitLabel || "Submit"}
+                </button>
+              ) : (
+                <button className="fo-btn" style={{ background: btnColor }} onClick={next}>Continue</button>
+              )}
+            </div>
           </div>
         </>
       )}

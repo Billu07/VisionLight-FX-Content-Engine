@@ -352,8 +352,13 @@ export default function SpinViewer({
 
     const fit = () => {
       const r = stage.getBoundingClientRect();
-      cv.width = Math.round(r.width * DPR);
-      cv.height = Math.round(r.height * DPR);
+      const w = Math.round(r.width * DPR), h = Math.round(r.height * DPR);
+      // Only re-size the backing store on a REAL change — setting cv.width/height
+      // (even to the same value) clears the canvas, so skipping no-op resizes avoids
+      // flicker during the resize bursts in-app browsers fire while overscrolling.
+      if (w === cv.width && h === cv.height) return;
+      cv.width = w;
+      cv.height = h;
       dirty = true;
     };
 
@@ -1248,7 +1253,11 @@ const R3D_CSS = `
   --r3d-glass:rgba(255,255,255,.05);--r3d-glass2:rgba(255,255,255,.09);
   --r3d-line:rgba(255,255,255,.10);--r3d-muted:#9aa3b6;
   --r3d-glow:0 0 24px rgba(34,211,238,.18);
-  position:relative;height:100dvh;width:100%;overflow:hidden;outline:none;
+  /* svh (stable small-viewport height) instead of dvh: in in-app browsers
+     (Instagram etc.) dvh fluctuates as the chrome shows/hides and on rubber-band
+     overscroll, which resized the canvas and SQUISHED the render. svh doesn't
+     change on scroll, so the stage — and the canvas — stay stable. */
+  position:relative;height:100vh;height:100svh;width:100%;overflow:hidden;outline:none;overscroll-behavior:none;
   font-family:"Bai Jamjuree",ui-sans-serif,system-ui,sans-serif;color:#eef1f6;
   background:radial-gradient(120% 80% at 50% -10%,#1a2336 0%,rgba(17,24,39,0) 55%),linear-gradient(to bottom right,#111827,#0B0F19);
   touch-action:pan-y;user-select:none;-webkit-user-select:none;

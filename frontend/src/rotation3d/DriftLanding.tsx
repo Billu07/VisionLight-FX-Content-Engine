@@ -124,7 +124,7 @@ function BentoTile({ it, onOpen, big }: { it: Item; onOpen: () => void; big?: bo
 // that drift's full interactive player in place of the gallery — the drift's own
 // logo/name hidden, drift.li branding in the header.
 const HERO_CSS = `
-.dl-hero-root{position:fixed;inset:0;background:#05070d;overflow:hidden}
+.dl-hero-root{position:fixed;inset:0;background:#05070d;overflow:hidden;overscroll-behavior:none}
 .dl-hero-header{position:absolute;top:0;left:0;right:0;z-index:30;display:flex;align-items:center;justify-content:space-between;
   padding:14px clamp(16px,4vw,32px);pointer-events:none}
 .dl-hero-header .dl-word{font-size:19px;font-weight:800;letter-spacing:-.01em;color:#fff}
