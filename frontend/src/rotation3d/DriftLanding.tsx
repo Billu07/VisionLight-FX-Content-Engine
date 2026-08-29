@@ -124,7 +124,7 @@ function BentoTile({ it, onOpen, big }: { it: Item; onOpen: () => void; big?: bo
 // that drift's full interactive player in place of the gallery — the drift's own
 // logo/name hidden, drift.li branding in the header.
 const HERO_CSS = `
-.dl-hero-root{position:fixed;inset:0;background:#05070d;overflow:hidden;overscroll-behavior:none}
+.dl-hero-root{position:fixed;top:0;left:0;right:0;height:100vh;height:100svh;background:#05070d;overflow:hidden;overscroll-behavior:none}
 .dl-hero-header{position:absolute;top:0;left:0;right:0;z-index:30;display:flex;align-items:center;justify-content:space-between;
   padding:14px clamp(16px,4vw,32px);pointer-events:none}
 .dl-hero-header .dl-word{font-size:19px;font-weight:800;letter-spacing:-.01em;color:#fff}
@@ -137,17 +137,56 @@ const HERO_CSS = `
 
 function HeroLanding({ product }: { product: any }) {
   const [showLogin, setShowLogin] = useState(false);
-  const framesA: string[] = Array.isArray(product.manifest?.frames) ? product.manifest.frames : [];
-  const framesB: string[] = product.secondManifest && Array.isArray(product.secondManifest.frames) ? product.secondManifest.frames : [];
-  const combined = framesB.length ? [...framesA, ...framesB] : framesA;
-  let captions = product.captions;
-  if (captions && framesB.length) {
-    captions = captions.map((c: any) =>
-      c.clip === "B"
-        ? { ...c, clip: "A", startFrame: c.startFrame + framesA.length, endFrame: c.endFrame + framesA.length }
-        : c,
-    );
-  }
+  // Memoize the frame list + manifest so an incidental re-render (a resize event,
+  // a state change) never hands SpinViewer a fresh manifest object — that would
+  // re-run its preload effect and flash the full loader mid-session.
+  const combined = useMemo<string[]>(() => {
+    const framesA: string[] = Array.isArray(product.manifest?.frames) ? product.manifest.frames : [];
+    const framesB: string[] = product.secondManifest && Array.isArray(product.secondManifest.frames) ? product.secondManifest.frames : [];
+    return framesB.length ? [...framesA, ...framesB] : framesA;
+  }, [product]);
+  const captions = useMemo(() => {
+    const framesALen = Array.isArray(product.manifest?.frames) ? product.manifest.frames.length : 0;
+    const hasB = product.secondManifest && Array.isArray(product.secondManifest.frames) && product.secondManifest.frames.length;
+    if (product.captions && hasB) {
+      return product.captions.map((c: any) =>
+        c.clip === "B"
+          ? { ...c, clip: "A", startFrame: c.startFrame + framesALen, endFrame: c.endFrame + framesALen }
+          : c,
+      );
+    }
+    return product.captions;
+  }, [product]);
+  const heroManifest = useMemo(
+    () => ({ frameCount: combined.length || product.manifest?.frameCount || 0, frames: combined, defaultFrame: product.defaultFrame ?? 0 }),
+    [combined, product],
+  );
+
+  // Full-screen takeover: lock the document so the in-app browser can't
+  // pull-to-refresh (reload) or scroll the body behind the fixed player.
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prev = {
+      htmlOverflow: html.style.overflow,
+      htmlOB: html.style.overscrollBehavior,
+      bodyOverflow: body.style.overflow,
+      bodyOB: body.style.overscrollBehavior,
+      bodyBg: body.style.background,
+    };
+    html.style.overflow = "hidden";
+    html.style.overscrollBehavior = "none";
+    body.style.overflow = "hidden";
+    body.style.overscrollBehavior = "none";
+    body.style.background = "#05070d";
+    return () => {
+      html.style.overflow = prev.htmlOverflow;
+      html.style.overscrollBehavior = prev.htmlOB;
+      body.style.overflow = prev.bodyOverflow;
+      body.style.overscrollBehavior = prev.bodyOB;
+      body.style.background = prev.bodyBg;
+    };
+  }, []);
 
   useEffect(() => {
     if (product?.metaPixelId) {
@@ -170,7 +209,7 @@ function HeroLanding({ product }: { product: any }) {
       </header>
       <div className="dl-hero-stage">
         <SpinViewer
-          manifest={{ frameCount: combined.length || product.manifest?.frameCount || 0, frames: combined, defaultFrame: product.defaultFrame ?? 0 }}
+          manifest={heroManifest}
           driftMode
           loopScrub={product.loopEnabled ?? false}
           brandName="Drift Link"

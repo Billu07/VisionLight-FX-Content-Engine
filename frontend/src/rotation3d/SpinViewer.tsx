@@ -876,7 +876,12 @@ export default function SpinViewer({
       }
     };
     const onFsChange = () => { syncFsIcon(); scheduleLandscapeZoom(); };
-    const onOrient = () => { fit(); scheduleLandscapeZoom(); };
+    // Re-fit AND repaint synchronously. fit() resizes the backing store; drawing
+    // right away (instead of waiting for the next RAF) means the canvas is never
+    // shown for a frame at the old buffer size stretched into the new box — which
+    // is the squish/distortion seen when an in-app browser resizes the viewport.
+    const refit = () => { fit(); draw(); };
+    const onOrient = () => { refit(); scheduleLandscapeZoom(); };
 
     // control buttons (delegated within the stage)
     const onClick = (e: MouseEvent) => {
@@ -909,6 +914,15 @@ export default function SpinViewer({
     window.addEventListener("orientationchange", onOrient);
     const orientMql = window.matchMedia?.("(orientation: landscape)");
     orientMql?.addEventListener?.("change", onOrient);
+    // A ResizeObserver catches box changes the window 'resize' event can miss or
+    // report late (in-app browser chrome animating in/out, container reflow) and
+    // fires as soon as the stage's box actually changes — so the backing store
+    // tracks the display and never lags it into a stretched frame.
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(() => refit());
+      ro.observe(stage);
+    }
 
     // --- loading / preload ---
     const C = 2 * Math.PI * 27;
@@ -1040,6 +1054,7 @@ export default function SpinViewer({
       window.removeEventListener("resize", onOrient);
       window.removeEventListener("orientationchange", onOrient);
       orientMql?.removeEventListener?.("change", onOrient);
+      ro?.disconnect();
       // undo pseudo-fullscreen if we unmount while it's active
       stage.classList.remove("r3d-pseudo-fs");
       document.documentElement.classList.remove("r3d-fs-lock");
@@ -1065,7 +1080,7 @@ export default function SpinViewer({
   const [activeForm, setActiveForm] = useState<{ form: OverlayForm; which: "primary" | "secondary" } | null>(null);
 
   return (
-    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${!showLogo ? "r3d-no-logo" : ""} ${!showName ? "r3d-no-name" : ""} ${!showTitle ? "r3d-no-title" : ""} ${!showTools ? "r3d-no-tools" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
+    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${landing ? "r3d-landing" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${!showLogo ? "r3d-no-logo" : ""} ${!showName ? "r3d-no-name" : ""} ${!showTitle ? "r3d-no-title" : ""} ${!showTools ? "r3d-no-tools" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
       style={stageStyle}
       tabIndex={hero ? -1 : 0}
       aria-label="Interactive 360 degree product viewer. Drag to rotate.">
@@ -1264,6 +1279,18 @@ const R3D_CSS = `
   -webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;
 }
 .r3d-stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab}
+/* Full-page landing takeover: the player owns the whole screen, so the drag
+   surface (the canvas) hands NO touch gesture to the browser. touch-action:none
+   stops the in-app browser (Instagram, etc.) from turning a vertical drag into
+   pull-to-refresh (a full page RELOAD that re-shows the loader) or a chrome
+   show/hide (which reflows + clips the bottom CTAs). Scrubbing still works — it's
+   driven by pointer events, which fire regardless. It's scoped to the CANVAS (not
+   the stage) so the lead-form overlay above it can still scroll on touch, and so
+   embeds — which don't get .r3d-landing — keep touch-action:pan-y for host-page
+   scroll. The canvas is inset:0 (fills the stage) and the hint/headline overlays
+   are pointer-events:none, so touches fall through to it across the whole surface. */
+.r3d-stage.r3d-landing canvas{touch-action:none}
+.r3d-stage.r3d-landing{overscroll-behavior:none}
 .r3d-stage.r3d-grabbing canvas{cursor:grabbing}
 .r3d-scrim-top{position:absolute;top:0;left:0;right:0;height:120px;pointer-events:none;background:linear-gradient(to bottom,rgba(11,15,25,.55),transparent);transition:opacity .3s}
 .r3d-scrim-bot{position:absolute;bottom:0;left:0;right:0;height:190px;pointer-events:none;background:linear-gradient(to top,rgba(11,15,25,.72),transparent);transition:opacity .3s}
