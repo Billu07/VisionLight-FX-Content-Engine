@@ -417,7 +417,7 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
             {products.map((p) => (
               <div key={p.id} className="d-row">
                 <div className="min-w-0">
-                  <p className="truncate" style={{ fontWeight: 650 }}>{p.title || p.name}</p>
+                  <p className="truncate" style={{ fontWeight: 650 }}>{p.name}</p>
                   <p className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
                     <span className={`d-pill ${statusPill(p.status)}`}>{p.status}</span>
                     <span className="d-faint">
