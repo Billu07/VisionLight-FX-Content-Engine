@@ -42,7 +42,7 @@ export const STUDIO_PRICING_PLANS: PricingPlan[] = [
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=a97eb2df-59b6-4500-ba93-618171001d4b&checkoutFlowId=e90e22a5-29ed-4093-b268-7838c0fca777",
     features: [
       "PicDrift",
-      "Seedance 2.0, Kling 3.0, VEO 3.1",
+      "Seedance 2.0, Kling 3.0, H3 Max",
       "5 Team Members",
       "20 Project Timelines",
       "2GB Storage",
@@ -59,7 +59,7 @@ export const STUDIO_PRICING_PLANS: PricingPlan[] = [
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=4785cf91-670a-416f-8bb1-637b926bf2a0&checkoutFlowId=893f469b-9e21-4baa-bb7b-3217b96aa285",
     features: [
       "PicDrift",
-      "Seedance 2.0, Kling 3.0, VEO 3.1",
+      "Seedance 2.0, Kling 3.0, H3 Max",
       "20 Team Members",
       "200 Project Timelines",
       "5GB Storage",
@@ -111,7 +111,7 @@ export const BYOK_PRICING_PACKAGES: PricingPlan[] = [
     annualPrice: "$1,188/yr",
     checkoutUrl:
       "https://www.picdrift.com/pricing-plans/checkout-1?planId=a97eb2df-59b6-4500-ba93-618171001d4b&checkoutFlowId=e90e22a5-29ed-4093-b268-7838c0fca777",
-    features: ["PicDrift + FX models", "Seedance 2.0, Kling 3.0, VEO 3.1", "5 Team Members", "Studio Admin"],
+    features: ["PicDrift + FX models", "Seedance 2.0, Kling 3.0, H3 Max", "5 Team Members", "Studio Admin"],
     highlight: "Most Popular",
     featured: true,
   },

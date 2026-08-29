@@ -44,7 +44,8 @@ const isRecoverableProvider = (provider: string | null | undefined) => {
     value.includes("kie") ||
     value.includes("seedance-fal") ||
     value.includes("kling") ||
-    value.includes("veo")
+    value.includes("veo") ||
+    value.includes("minimax")
   );
 };
 

@@ -37,7 +37,6 @@ import type {
 const { picdriftLogo, fxLogo, driftLogo } = dashboardAssets;
 const MAX_PICFX_REFERENCE_IMAGES = 5;
 const MAX_VEO_IMAGE_BYTES = 8 * 1024 * 1024;
-const MAX_VEO_REFERENCE_IMAGES = 5;
 const MAX_VIDEOFX2_REFERENCES = 12;
 const MAX_TOPAZ_REFERENCES = 1;
 const TIMELINE_PAGE_SIZE = 15;
@@ -135,11 +134,9 @@ const BYOK_PLAN_BUTTON_CLASSES: Record<ByokPlanCode, string> = {
 };
 
 type DashboardBgMode = "current" | "original";
-type VeoMode =
-  | "image_to_video"
-  | "first_last_frame"
-  | "extend_video"
-  | "reference_to_video";
+// The "veo" engine slot now drives MiniMax H3 Max. H3 Max supports text-to-video
+// (prompt only), image-to-video (first frame), and first-to-last keyframes.
+type VeoMode = "text_to_video" | "image_to_video" | "first_last_frame";
 
 type AutoProcessTaskStatus = "PROCESSING" | "READY" | "FAILED";
 
@@ -375,16 +372,20 @@ function Dashboard() {
     picDriftMode === "plus" &&
     picDriftMultiShot;
 
-  // Veo Settings
+  // H3 Max Settings (the "veo" engine slot drives MiniMax H3 Max).
   const [veoMode, setVeoMode] = useState<VeoMode>("image_to_video");
-  const [veoDuration, setVeoDuration] = useState<4 | 6 | 8>(8);
-  const [veoResolution, setVeoResolution] = useState<"720p" | "1080p" | "4k">(
-    "1080p",
+  const [veoDuration, setVeoDuration] = useState<number>(8); // seconds, 5–15
+  const [veoResolution, setVeoResolution] = useState<"480p" | "768p">("768p");
+  // H3 Max text-to-video aspect ratio (image modes follow the frame). Kept
+  // separate from the global 16:9/9:16 `aspectRatio` so all six fal options work.
+  const [veoAspectRatio, setVeoAspectRatio] = useState<
+    "21:9" | "16:9" | "4:3" | "1:1" | "3:4" | "9:16"
+  >("16:9");
+  const [veoPromptExpansion, setVeoPromptExpansion] = useState<"balanced" | "quality">(
+    "balanced",
   );
-  const [veoGenerateAudio, setVeoGenerateAudio] = useState(true);
-  const [veoNegativePrompt, setVeoNegativePrompt] = useState("");
+  const [veoSafetyChecker, setVeoSafetyChecker] = useState(true);
   const [veoSeed, setVeoSeed] = useState("");
-  const [veoAutoFix, setVeoAutoFix] = useState(true);
   const [veoSourceFile, setVeoSourceFile] = useState<File | null>(null);
   const [veoSourceUrl, setVeoSourceUrl] = useState<string | null>(null);
   const [veoFrames, setVeoFrames] = useState<{ first: File | null; last: File | null }>({
@@ -398,8 +399,6 @@ function Dashboard() {
     first: null,
     last: null,
   });
-  const [veoReferenceFiles, setVeoReferenceFiles] = useState<File[]>([]);
-  const [veoReferenceUrls, setVeoReferenceUrls] = useState<string[]>([]);
   // Continuous upscale factor (1–8×, matching Topaz's upscale_factor float). The
   // backend clamps to 1–8 and prices ≥4× at the higher tier.
   const [topazUpscaleFactor, setTopazUpscaleFactor] = useState<number>(2);
@@ -418,7 +417,6 @@ function Dashboard() {
     "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "21:9" | "auto"
   >("9:16");
   const [videoFx2GenerateAudio, setVideoFx2GenerateAudio] = useState(true);
-  const [aspectRatio, setAspectRatio] = useState<"16:9" | "9:16">("9:16");
   const [videoFx2Resolution, setVideoFx2Resolution] = useState<
     "480p" | "720p" | "1080p"
   >(
@@ -713,7 +711,7 @@ function Dashboard() {
           VFX_STUDIO: {
             features: [
               "PicDrift",
-              "Seedance 2.0, Kling 3.0, VEO 3.1",
+              "Seedance 2.0, Kling 3.0, H3 Max",
               "5 Team Members",
               "20 Project Timelines",
               "2GB Storage",
@@ -722,7 +720,7 @@ function Dashboard() {
           VFX_STUDIO_AGENCY: {
             features: [
               "PicDrift",
-              "Seedance 2.0, Kling 3.0, VEO 3.1",
+              "Seedance 2.0, Kling 3.0, H3 Max",
               "20 Team Members",
               "200 Project Timelines",
               "5GB Storage",
@@ -772,8 +770,6 @@ function Dashboard() {
     setVeoSourceUrl(null);
     setVeoFrames({ first: null, last: null });
     setVeoFrameUrls({ first: null, last: null });
-    setVeoReferenceFiles([]);
-    setVeoReferenceUrls([]);
   }, [activeEngine, studioMode, videoFxMode]);
 
   useEffect(() => {
@@ -840,25 +836,22 @@ function Dashboard() {
 
   useEffect(() => {
     if (activeEngine !== "veo") return;
-    if (veoMode === "first_last_frame") {
-      setVeoSourceFile(null);
-      setVeoSourceUrl(null);
-      setVeoReferenceFiles([]);
-      setVeoReferenceUrls([]);
-      return;
-    }
-    if (veoMode === "reference_to_video") {
+    if (veoMode === "text_to_video") {
+      // Prompt-only: no frames or source needed.
       setVeoSourceFile(null);
       setVeoSourceUrl(null);
       setVeoFrames({ first: null, last: null });
       setVeoFrameUrls({ first: null, last: null });
-      setVeoDuration(8);
       return;
     }
+    if (veoMode === "first_last_frame") {
+      setVeoSourceFile(null);
+      setVeoSourceUrl(null);
+      return;
+    }
+    // image_to_video
     setVeoFrames({ first: null, last: null });
     setVeoFrameUrls({ first: null, last: null });
-    setVeoReferenceFiles([]);
-    setVeoReferenceUrls([]);
   }, [activeEngine, veoMode]);
 
   useEffect(() => {
@@ -1459,8 +1452,6 @@ function Dashboard() {
     setVeoSourceUrl(url);
     setVeoFrames({ first: null, last: null });
     setVeoFrameUrls({ first: null, last: null });
-    setVeoReferenceFiles([]);
-    setVeoReferenceUrls([]);
   };
 
   const setVeoFrame = (slot: "first" | "last", file: File, url: string) => {
@@ -1468,34 +1459,11 @@ function Dashboard() {
     setVeoFrameUrls((prev) => ({ ...prev, [slot]: url }));
     setVeoSourceFile(null);
     setVeoSourceUrl(null);
-    setVeoReferenceFiles([]);
-    setVeoReferenceUrls([]);
   };
 
   const removeVeoFrame = (slot: "first" | "last") => {
     setVeoFrames((prev) => ({ ...prev, [slot]: null }));
     setVeoFrameUrls((prev) => ({ ...prev, [slot]: null }));
-  };
-
-  const addVeoReference = (file: File, url: string) => {
-    if (veoReferenceUrls.includes(url)) return;
-    if (veoReferenceFiles.length >= MAX_VEO_REFERENCE_IMAGES) {
-      alert(
-        `Reference-to-video mode supports up to ${MAX_VEO_REFERENCE_IMAGES} images.`,
-      );
-      return;
-    }
-    setVeoReferenceFiles((prev) => [...prev, file]);
-    setVeoReferenceUrls((prev) => [...prev, url]);
-    setVeoSourceFile(null);
-    setVeoSourceUrl(null);
-    setVeoFrames({ first: null, last: null });
-    setVeoFrameUrls({ first: null, last: null });
-  };
-
-  const removeVeoReference = (index: number) => {
-    setVeoReferenceFiles((prev) => prev.filter((_, i) => i !== index));
-    setVeoReferenceUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
   const getCurrentVideoFxMode = () => {
@@ -1763,37 +1731,18 @@ function Dashboard() {
         setReferenceImages((prev) => [...prev, file]);
         setReferenceImageUrls((prev) => [...prev, url]);
       } else if (activeEngine === "veo") {
-        if (veoMode === "extend_video") {
-          if (!isVideoFile(file)) {
-            alert("Extend mode requires a video source.");
-            setActiveLibrarySlot(null);
-            return;
-          }
-          setVeoSingleSource(file, url);
-        } else if (veoMode === "image_to_video") {
+        if (veoMode === "image_to_video") {
           if (isVideoFile(file)) {
             alert("Image-to-video mode requires an image source.");
             setActiveLibrarySlot(null);
             return;
           }
           if (file.size > MAX_VEO_IMAGE_BYTES) {
-            alert("Image source must be 8MB or smaller for Veo 3.1.");
+            alert("Image source must be 8MB or smaller for H3 Max.");
             setActiveLibrarySlot(null);
             return;
           }
           setVeoSingleSource(file, url);
-        } else if (veoMode === "reference_to_video") {
-          if (isVideoFile(file)) {
-            alert("Reference-to-video mode requires image references.");
-            setActiveLibrarySlot(null);
-            return;
-          }
-          if (file.size > MAX_VEO_IMAGE_BYTES) {
-            alert("Each reference image must be 8MB or smaller for Veo 3.1.");
-            setActiveLibrarySlot(null);
-            return;
-          }
-          addVeoReference(file, url);
         } else {
           if (isVideoFile(file)) {
             alert("First/Last mode requires image frames only.");
@@ -1801,7 +1750,7 @@ function Dashboard() {
             return;
           }
           if (file.size > MAX_VEO_IMAGE_BYTES) {
-            alert("Frame image must be 8MB or smaller for Veo 3.1.");
+            alert("Frame image must be 8MB or smaller for H3 Max.");
             setActiveLibrarySlot(null);
             return;
           }
@@ -1867,10 +1816,9 @@ function Dashboard() {
         setVideoFx2Aspect(r);
       }
 
-      // C. VEO 3.1
+      // C. H3 MAX
       else if (activeEngine === "veo") {
-        if (r === "16:9") setAspectRatio("16:9");
-        else if (r === "9:16") setAspectRatio("9:16");
+        if (r !== "auto") setVeoAspectRatio(r);
       }
 
       // D. STUDIO / GEMINI
@@ -1991,26 +1939,12 @@ function Dashboard() {
     }
 
     if (activeEngine === "veo") {
-      if (veoMode === "extend_video" && newFiles.some((file) => !isVideoFile(file))) {
-        alert("Extend mode requires video input.");
+      if (newFiles.some((file) => isVideoFile(file))) {
+        alert("H3 Max requires image input.");
         return;
       }
-      if (
-        (veoMode === "image_to_video" ||
-          veoMode === "first_last_frame" ||
-          veoMode === "reference_to_video") &&
-        newFiles.some((file) => isVideoFile(file))
-      ) {
-        alert("This mode requires image input.");
-        return;
-      }
-      if (
-        (veoMode === "image_to_video" ||
-          veoMode === "first_last_frame" ||
-          veoMode === "reference_to_video") &&
-        newFiles.some((file) => file.size > MAX_VEO_IMAGE_BYTES)
-      ) {
-        alert("Image input must be 8MB or smaller for Veo 3.1.");
+      if (newFiles.some((file) => file.size > MAX_VEO_IMAGE_BYTES)) {
+        alert("Image input must be 8MB or smaller for H3 Max.");
         return;
       }
     }
@@ -2022,12 +1956,7 @@ function Dashboard() {
       maxFiles = isGptCarousel ? MAX_PICFX_REFERENCE_IMAGES : studioMode === "carousel" ? 14 : MAX_PICFX_REFERENCE_IMAGES;
     }
     if (activeEngine === "veo") {
-      maxFiles =
-        veoMode === "first_last_frame"
-          ? 2
-          : veoMode === "reference_to_video"
-            ? MAX_VEO_REFERENCE_IMAGES
-            : 1;
+      maxFiles = veoMode === "first_last_frame" ? 2 : 1;
     }
 
     if (newFiles.length + referenceImages.length > maxFiles) {
@@ -2037,41 +1966,6 @@ function Dashboard() {
     setReferenceImages((prev) => [...prev, ...newFiles]);
     const newUrls = newFiles.map((file) => URL.createObjectURL(file));
     setReferenceImageUrls((prev) => [...prev, ...newUrls]);
-  };
-
-  const handleVeoReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    const remainingSlots = MAX_VEO_REFERENCE_IMAGES - veoReferenceFiles.length;
-    if (remainingSlots <= 0) {
-      alert(
-        `Reference-to-video mode supports up to ${MAX_VEO_REFERENCE_IMAGES} images.`,
-      );
-      e.target.value = "";
-      return;
-    }
-
-    const usableFiles = files.slice(0, remainingSlots);
-    if (usableFiles.length < files.length) {
-      alert(
-        `Reference-to-video mode supports up to ${MAX_VEO_REFERENCE_IMAGES} images.`,
-      );
-    }
-
-    for (const file of usableFiles) {
-      if (isVideoFile(file)) {
-        alert("Reference-to-video mode requires image references.");
-        continue;
-      }
-      if (file.size > MAX_VEO_IMAGE_BYTES) {
-        alert("Each reference image must be 8MB or smaller for Veo 3.1.");
-        continue;
-      }
-      addVeoReference(file, URL.createObjectURL(file));
-    }
-
-    e.target.value = "";
   };
 
   // New: add to sequence logic
@@ -2286,24 +2180,6 @@ function Dashboard() {
           window.scrollTo({ top: 0, behavior: "smooth" });
           return;
         }
-        if (veoMode === "reference_to_video") {
-          if (item.type === "VIDEO") {
-            alert("Reference-to-video accepts images only.");
-            return;
-          }
-          addVeoReference(file, previewUrl);
-          window.scrollTo({ top: 0, behavior: "smooth" });
-          return;
-        }
-        if (veoMode === "extend_video") {
-          if (item.type !== "VIDEO") {
-            alert("Extend mode accepts videos only.");
-            return;
-          }
-          setVeoSingleSource(file, previewUrl);
-          window.scrollTo({ top: 0, behavior: "smooth" });
-          return;
-        }
         if (veoMode === "image_to_video") {
           if (item.type === "VIDEO") {
             alert("Image-to-video accepts images only.");
@@ -2460,42 +2336,28 @@ function Dashboard() {
         videoFxExtraRefs.forEach((file) => formData.append("referenceImages", file));
       }
     } else if (activeEngine === "veo") {
+      // MiniMax H3 Max
       formData.append("mediaType", "video");
-      formData.append("model", "veo-3");
-      formData.append("veoMode", veoMode);
-      formData.append(
-        "duration",
-        veoMode === "extend_video"
-          ? "7"
-          : veoMode === "reference_to_video"
-            ? "8"
-            : veoDuration.toString(),
-      );
-      formData.append(
-        "resolution",
-        veoMode === "extend_video" ? "720p" : veoResolution,
-      );
-      formData.append("aspectRatio", aspectRatio); // Reuse aspect ratio state
-      formData.append("generateAudio", veoGenerateAudio.toString());
-      formData.append("autoFix", veoAutoFix.toString());
+      formData.append("model", "minimax-h3-max");
+      formData.append("h3Mode", veoMode);
+      formData.append("duration", veoDuration.toString());
+      formData.append("resolution", veoResolution);
+      // aspect_ratio applies to text-to-video; image modes follow the frame.
+      formData.append("aspectRatio", veoAspectRatio);
+      formData.append("promptExpansion", veoPromptExpansion);
+      formData.append("enableSafetyChecker", veoSafetyChecker.toString());
 
-      if (veoMode !== "reference_to_video" && veoNegativePrompt.trim()) {
-        formData.append("negativePrompt", veoNegativePrompt.trim());
-      }
-      if (veoMode !== "reference_to_video" && veoSeed.trim()) {
+      if (veoSeed.trim()) {
         formData.append("seed", veoSeed.trim());
       }
 
       if (veoMode === "first_last_frame") {
         if (veoFrames.first) formData.append("referenceImages", veoFrames.first);
         if (veoFrames.last) formData.append("referenceImages", veoFrames.last);
-      } else if (veoMode === "reference_to_video") {
-        veoReferenceFiles.forEach((file) =>
-          formData.append("referenceImages", file),
-        );
-      } else if (veoSourceFile) {
+      } else if (veoMode === "image_to_video" && veoSourceFile) {
         formData.append("referenceImages", veoSourceFile);
       }
+      // text_to_video sends no image inputs.
     } else if (activeEngine === "topaz") {
       formData.append("mediaType", "video");
       formData.append("model", "topaz-upscale-video");
@@ -2549,48 +2411,24 @@ function Dashboard() {
           return;
         }
         if (veoFrames.first.size > MAX_VEO_IMAGE_BYTES || veoFrames.last.size > MAX_VEO_IMAGE_BYTES) {
-          alert("Each frame image must be 8MB or smaller for Veo 3.1.");
+          alert("Each frame image must be 8MB or smaller for H3 Max.");
           return;
         }
-      } else if (veoMode === "reference_to_video") {
-        if (veoReferenceFiles.length === 0) {
-          alert("Please provide at least one reference image.");
-          return;
-        }
-        if (veoReferenceFiles.length > MAX_VEO_REFERENCE_IMAGES) {
-          alert(
-            `Reference-to-video mode supports up to ${MAX_VEO_REFERENCE_IMAGES} images.`,
-          );
-          return;
-        }
-        if (
-          veoReferenceFiles.some(
-            (file) => isVideoFile(file) || file.size > MAX_VEO_IMAGE_BYTES,
-          )
-        ) {
-          alert("All reference images must be image files up to 8MB.");
-          return;
-        }
-      } else if (!veoSourceFile) {
-        alert(
-          veoMode === "extend_video"
-            ? "Please upload a source video for extend mode."
-            : "Please upload a source image for image-to-video mode.",
-        );
-        return;
-      } else if (veoMode === "extend_video" && !isVideoFile(veoSourceFile)) {
-        alert("Extend mode requires a video source.");
-        return;
       } else if (veoMode === "image_to_video") {
+        if (!veoSourceFile) {
+          alert("Please upload a source image for image-to-video mode.");
+          return;
+        }
         if (isVideoFile(veoSourceFile)) {
           alert("Image-to-video mode requires an image source.");
           return;
         }
         if (veoSourceFile.size > MAX_VEO_IMAGE_BYTES) {
-          alert("Source image must be 8MB or smaller for Veo 3.1.");
+          alert("Source image must be 8MB or smaller for H3 Max.");
           return;
         }
       }
+      // text_to_video needs only the prompt (validated globally).
     }
 
     if (activeEngine === "openai") {
@@ -4120,14 +3958,14 @@ function Dashboard() {
                           </div>
                         </div>
 
-                        {/* VEO 3.1 POOL */}
+                        {/* H3 MAX POOL */}
                         <div className="flex items-center min-w-0">
                           <div className="flex flex-col">
                             <span className="text-indigo-400 font-medium text-lg sm:text-sm md:text-base leading-none tracking-wide">
                               {formatBal(credits.creditsVideoFX3)}
                             </span>
                             <span className="text-[10px] sm:text-[8px] md:text-[9px] text-gray-400 uppercase font-medium tracking-widest mt-1 leading-tight whitespace-normal">
-                              Veo 3.1
+                              H3 Max
                             </span>
                           </div>
                         </div>
@@ -4944,7 +4782,7 @@ function Dashboard() {
                                   : "text-gray-400 hover:text-white"
                                   }`}
                               >
-                                Veo 3.1
+                                H3 Max
                               </button>
                               <button
                                 type="button"
@@ -6027,7 +5865,7 @@ function Dashboard() {
                                   </div>
                                 )}
 
-                              {/* VEO 3.1 SETTINGS */}
+                              {/* H3 MAX SETTINGS */}
                               {currentVisualTab === "videofx" &&
                                 activeEngine === "veo" && (
                                   <div className="space-y-6 animate-in fade-in duration-500">
@@ -6035,12 +5873,11 @@ function Dashboard() {
                                       <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
                                         Generation Mode
                                       </label>
-                                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                      <div className="grid grid-cols-3 gap-2">
                                         {[
+                                          { id: "text_to_video", label: "Text" },
                                           { id: "image_to_video", label: "Image" },
                                           { id: "first_last_frame", label: "First + Last" },
-                                          { id: "extend_video", label: "Extend" },
-                                          { id: "reference_to_video", label: "References" },
                                         ].map((mode) => (
                                           <button
                                             key={mode.id}
@@ -6056,50 +5893,40 @@ function Dashboard() {
                                           </button>
                                         ))}
                                       </div>
-                                      {veoMode === "extend_video" && (
-                                        <p className="text-[10px] text-amber-300/90">
-                                          Extend mode follows platform API limits: fixed 7s duration and 720p output.
-                                        </p>
-                                      )}
-                                      {veoMode === "reference_to_video" && (
-                                        <p className="text-[10px] text-amber-300/90">
-                                          Reference mode follows platform API limits: fixed 8s duration and multi-image input.
-                                        </p>
-                                      )}
+                                      <p className="text-[10px] text-slate-500">
+                                        {veoMode === "text_to_video"
+                                          ? "Generate from your prompt alone — no image needed."
+                                          : veoMode === "first_last_frame"
+                                            ? "Animate a transition from a first frame to a last frame."
+                                            : "Animate a single image as the opening frame."}
+                                      </p>
                                     </div>
 
                                     <div className="space-y-3">
                                       <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
                                         Canvas Ratio
                                       </label>
-                                      <div className="grid grid-cols-2 gap-3">
-                                        {[
-                                          {
-                                            ratio: "16:9",
-                                            label: "Cinematic Landscape",
-                                          },
-                                          {
-                                            ratio: "9:16",
-                                            label: "Social Portrait",
-                                          },
-                                        ].map(({ ratio, label }) => (
+                                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                                        {(["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"] as const).map((ratio) => (
                                           <button
                                             key={ratio}
                                             type="button"
-                                            onClick={() =>
-                                              setAspectRatio(ratio as any)
-                                            }
-                                            className={`py-4 px-4 rounded-xl border transition-all text-center ${aspectRatio === ratio
-                                              ? "border-indigo-500 bg-indigo-500/10 text-indigo-100 shadow-[0_0_20px_rgba(99,102,241,0.1)]"
+                                            onClick={() => setVeoAspectRatio(ratio)}
+                                            disabled={veoMode !== "text_to_video"}
+                                            className={`py-2 px-2 rounded-xl border transition-all text-center text-[11px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed ${veoAspectRatio === ratio
+                                              ? "border-indigo-500 bg-indigo-500/10 text-indigo-100"
                                               : "border-slate-800 bg-slate-900/40 text-slate-500 hover:border-slate-700"
                                               }`}
                                           >
-                                            <div className="text-xs font-medium tracking-tight">
-                                              {label}
-                                            </div>
+                                            {ratio}
                                           </button>
                                         ))}
                                       </div>
+                                      {veoMode !== "text_to_video" && (
+                                        <p className="text-[10px] text-slate-500">
+                                          Image modes follow the aspect ratio of your frame.
+                                        </p>
+                                      )}
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-6">
@@ -6108,14 +5935,11 @@ function Dashboard() {
                                           Resolution
                                         </label>
                                         <div className="flex bg-slate-900/60 p-1 rounded-xl border border-slate-800">
-                                          {["720p", "1080p", "4k"].map((res) => (
+                                          {(["480p", "768p"] as const).map((res) => (
                                             <button
                                               key={res}
                                               type="button"
-                                              onClick={() =>
-                                                setVeoResolution(res as any)
-                                              }
-                                              disabled={veoMode === "extend_video"}
+                                              onClick={() => setVeoResolution(res)}
                                               className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${veoResolution === res
                                                 ? "bg-indigo-500 text-white"
                                                 : "text-slate-500 hover:text-slate-300"
@@ -6128,76 +5952,69 @@ function Dashboard() {
                                       </div>
 
                                       <div className="space-y-3">
-                                        <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
-                                          Duration
+                                        <label className="flex items-center justify-between text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
+                                          <span>Duration</span>
+                                          <span className="text-indigo-100 normal-case tracking-normal">{veoDuration}s</span>
                                         </label>
-                                        <div className="flex bg-slate-900/60 p-1 rounded-xl border border-slate-800">
-                                          {[4, 6, 8].map((sec) => (
-                                            <button
-                                              key={sec}
-                                              type="button"
-                                              onClick={() =>
-                                                setVeoDuration(sec as any)
-                                              }
-                                              disabled={
-                                                veoMode === "extend_video" ||
-                                                veoMode === "reference_to_video"
-                                              }
-                                              className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${veoDuration === sec
-                                                ? "bg-indigo-500 text-white"
-                                                : "text-slate-500 hover:text-slate-300"
-                                                }`}
-                                            >
-                                              {sec}s
-                                            </button>
-                                          ))}
+                                        <input
+                                          type="range"
+                                          min={5}
+                                          max={15}
+                                          step={1}
+                                          value={veoDuration}
+                                          onChange={(e) => setVeoDuration(Number(e.target.value))}
+                                          className="w-full accent-indigo-500"
+                                        />
+                                        <div className="flex justify-between text-[9px] text-slate-500">
+                                          <span>5s</span>
+                                          <span>15s</span>
                                         </div>
                                       </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-6">
-                                      <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-800 bg-slate-900/40">
-                                        <input
-                                          type="checkbox"
-                                          checked={veoGenerateAudio}
-                                          onChange={(e) => setVeoGenerateAudio(e.target.checked)}
-                                          className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500"
-                                        />
-                                        <div>
-                                          <div className="text-xs font-semibold text-indigo-100">Generate Audio</div>
-                                          <div className="text-[10px] text-slate-400">API `generate_audio`</div>
-                                        </div>
+                                    <div className="space-y-3">
+                                      <label className="block text-[10px] font-bold text-indigo-300 uppercase tracking-[0.2em] ml-1">
+                                        Prompt Expansion
                                       </label>
-                                      <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-800 bg-slate-900/40">
-                                        <input
-                                          type="checkbox"
-                                          checked={veoAutoFix}
-                                          onChange={(e) => setVeoAutoFix(e.target.checked)}
-                                          className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500"
-                                        />
-                                        <div>
-                                          <div className="text-xs font-semibold text-indigo-100">Auto Fix Prompt</div>
-                                          <div className="text-[10px] text-slate-400">API `auto_fix`</div>
-                                        </div>
-                                      </label>
+                                      <div className="flex bg-slate-900/60 p-1 rounded-xl border border-slate-800">
+                                        {([
+                                          { id: "balanced", label: "Balanced · ~1s" },
+                                          { id: "quality", label: "Quality · ~30s" },
+                                        ] as const).map((opt) => (
+                                          <button
+                                            key={opt.id}
+                                            type="button"
+                                            onClick={() => setVeoPromptExpansion(opt.id)}
+                                            className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${veoPromptExpansion === opt.id
+                                              ? "bg-indigo-500 text-white"
+                                              : "text-slate-500 hover:text-slate-300"
+                                              }`}
+                                          >
+                                            {opt.label}
+                                          </button>
+                                        ))}
+                                      </div>
                                     </div>
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                      <input
-                                        type="text"
-                                        value={veoNegativePrompt}
-                                        onChange={(e) => setVeoNegativePrompt(e.target.value)}
-                                        placeholder="Negative prompt (optional)"
-                                        disabled={veoMode === "reference_to_video"}
-                                        className="w-full bg-slate-900/60 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500"
-                                      />
+                                      <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-800 bg-slate-900/40">
+                                        <input
+                                          type="checkbox"
+                                          checked={veoSafetyChecker}
+                                          onChange={(e) => setVeoSafetyChecker(e.target.checked)}
+                                          className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500"
+                                        />
+                                        <div>
+                                          <div className="text-xs font-semibold text-indigo-100">Safety Checker</div>
+                                          <div className="text-[10px] text-slate-400">API `enable_safety_checker`</div>
+                                        </div>
+                                      </label>
                                       <input
                                         type="number"
                                         min="0"
                                         value={veoSeed}
                                         onChange={(e) => setVeoSeed(e.target.value)}
                                         placeholder="Seed (optional)"
-                                        disabled={veoMode === "reference_to_video"}
                                         className="w-full bg-slate-900/60 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500"
                                       />
                                     </div>
@@ -6222,11 +6039,9 @@ function Dashboard() {
                                       <span className="text-[9px] text-slate-500 uppercase tracking-widest font-medium">
                                         {veoMode === "first_last_frame"
                                           ? "First + Last Frames"
-                                          : veoMode === "extend_video"
-                                            ? "Video Extend Source"
-                                            : veoMode === "reference_to_video"
-                                              ? "Reference Image Stack"
-                                              : "Single Image Source"}
+                                          : veoMode === "text_to_video"
+                                            ? "Prompt Only"
+                                            : "Single Image Source"}
                                       </span>
                                     )}
                                   </div>
@@ -6237,7 +6052,14 @@ function Dashboard() {
                                   )}
 
                                   {activeEngine === "veo" ? (
-                                    veoMode === "first_last_frame" ? (
+                                    veoMode === "text_to_video" ? (
+                                      <div className="rounded-xl border border-dashed border-indigo-500/30 bg-slate-900/40 p-5 text-center animate-in fade-in duration-500">
+                                        <p className="text-xs font-semibold text-indigo-200">Prompt-only generation</p>
+                                        <p className="mt-1 text-[10px] text-slate-500">
+                                          H3 Max builds the video from your prompt — no image needed.
+                                        </p>
+                                      </div>
+                                    ) : veoMode === "first_last_frame" ? (
                                       <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-700">
                                         <div className="grid grid-cols-2 gap-4">
                                           {(["first", "last"] as const).map((slot) => {
@@ -6303,69 +6125,6 @@ function Dashboard() {
                                           Provide both first and last frame images.
                                         </p>
                                       </div>
-                                    ) : veoMode === "reference_to_video" ? (
-                                      <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-700">
-                                        <div className="w-full border-2 border-dashed border-indigo-500/30 rounded-xl hover:border-indigo-400 hover:bg-indigo-900/10 transition-all p-4">
-                                          <div className="flex items-center justify-center gap-8">
-                                            <label className="cursor-pointer flex flex-col items-center group-hover:scale-105 transition-transform">
-                                              <span className="text-[10px] mb-1 px-2 py-0.5 rounded border border-indigo-400/30 text-indigo-100">
-                                                Upload
-                                              </span>
-                                              <span className="text-xs text-indigo-300 font-bold group-hover:text-white">
-                                                Upload Images
-                                              </span>
-                                              <input
-                                                type="file"
-                                                className="hidden"
-                                                accept="image/*"
-                                                multiple
-                                                onChange={handleVeoReferenceUpload}
-                                              />
-                                            </label>
-                                            <div className="h-8 w-px bg-indigo-500/30" />
-                                            <button
-                                              type="button"
-                                              onClick={() => {
-                                                setLibrarySource("field");
-                                                setActiveLibrarySlot("generic");
-                                              }}
-                                              className="flex flex-col items-center group-hover:scale-105 transition-transform"
-                                            >
-                                              <span className="text-[10px] mb-1 px-2 py-0.5 rounded border border-indigo-400/30 text-indigo-100">
-                                                Library
-                                              </span>
-                                              <span className="text-xs text-indigo-300 font-bold group-hover:text-white">
-                                                From Library
-                                              </span>
-                                            </button>
-                                          </div>
-                                          <p className="text-[10px] text-slate-500 text-center mt-3">
-                                            Add up to {MAX_VEO_REFERENCE_IMAGES} image references (max 8MB each).
-                                          </p>
-                                        </div>
-                                        {veoReferenceUrls.length > 0 && (
-                                          <div className="grid grid-cols-5 gap-2 animate-in fade-in">
-                                            {veoReferenceUrls.map((url, index) => (
-                                              <div
-                                                key={`${url}_${index}`}
-                                                className="relative aspect-square group"
-                                              >
-                                                <img
-                                                  src={url}
-                                                  className="w-full h-full object-cover rounded-lg border border-indigo-500/20"
-                                                />
-                                                <button
-                                                  type="button"
-                                                  onClick={() => removeVeoReference(index)}
-                                                  className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
-                                                >
-                                                  x
-                                                </button>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        )}
-                                      </div>
                                     ) : (
                                     <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-700">
                                       <div className="flex justify-between items-center">
@@ -6373,27 +6132,17 @@ function Dashboard() {
                                           Source Asset
                                         </label>
                                         <span className="text-[9px] text-indigo-400/60 uppercase tracking-widest font-medium">
-                                          {veoMode === "extend_video" ? "Video Source" : "Image Source"}
+                                          Image Source
                                         </span>
                                       </div>
 
                                       <div className="w-full h-32 border-2 border-dashed border-indigo-500/30 rounded-xl hover:border-indigo-400 hover:bg-indigo-900/10 transition-all group relative flex items-center justify-center overflow-hidden">
                                         {veoSourceUrl ? (
                                           <>
-                                            {veoMode === "extend_video" ? (
-                                              <video
-                                                src={veoSourceUrl}
-                                                className="w-full h-full object-contain"
-                                                muted
-                                                autoPlay
-                                                loop
-                                              />
-                                            ) : (
-                                              <img
-                                                src={veoSourceUrl}
-                                                className="w-full h-full object-contain"
-                                              />
-                                            )}
+                                            <img
+                                              src={veoSourceUrl}
+                                              className="w-full h-full object-contain"
+                                            />
                                             <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                                               <button
                                                 type="button"
@@ -6404,9 +6153,7 @@ function Dashboard() {
                                               </button>
                                             </div>
                                             <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-md rounded-md text-[9px] font-bold text-white uppercase tracking-wider border border-white/10">
-                                              {veoMode === "extend_video"
-                                                ? "Extend Video Mode"
-                                                : "Image-to-Video Mode"}
+                                              Image-to-Video Mode
                                             </div>
                                           </>
                                         ) : (
@@ -6421,21 +6168,16 @@ function Dashboard() {
                                               <input
                                                 type="file"
                                                 className="hidden"
-                                                accept={veoMode === "extend_video" ? "video/*" : "image/*"}
+                                                accept="image/*"
                                                 onChange={(e) => {
                                                   const file = e.target.files?.[0];
                                                   if (!file) return;
-                                                  const isVideo = isVideoFile(file);
-                                                  if (veoMode === "extend_video" && !isVideo) {
-                                                    alert("Extend mode requires a video source.");
-                                                    return;
-                                                  }
-                                                  if (veoMode === "image_to_video" && isVideo) {
+                                                  if (isVideoFile(file)) {
                                                     alert("Image-to-video mode requires an image source.");
                                                     return;
                                                   }
-                                                  if (!isVideo && file.size > MAX_VEO_IMAGE_BYTES) {
-                                                    alert("Image input must be 8MB or smaller for Veo 3.1.");
+                                                  if (file.size > MAX_VEO_IMAGE_BYTES) {
+                                                    alert("Image input must be 8MB or smaller for H3 Max.");
                                                     return;
                                                   }
                                                   setVeoSingleSource(file, URL.createObjectURL(file));
@@ -6462,9 +6204,7 @@ function Dashboard() {
                                         )}
                                       </div>
                                       <p className="text-[10px] text-slate-500 text-center">
-                                        {veoMode === "extend_video"
-                                          ? "Upload a source video to continue it."
-                                          : "Upload one image source to animate it."}
+                                        Upload one image source to animate it.
                                       </p>
                                     </div>
                                     )

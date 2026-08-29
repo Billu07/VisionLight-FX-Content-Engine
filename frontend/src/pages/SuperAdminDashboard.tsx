@@ -185,7 +185,7 @@ const COVERAGE_WALLETS = [
   { key: "creditsImageFX", label: "Image FX (Nano/GPT 2)", provider: "fal" },
   { key: "creditsVideoFX1", label: "Topaz Upscale", provider: "fal" },
   { key: "creditsVideoFX2", label: "Seedance 2.0", provider: "fal" },
-  { key: "creditsVideoFX3", label: "Veo 3.1", provider: "fal" },
+  { key: "creditsVideoFX3", label: "H3 Max", provider: "fal" },
 ] as const;
 
 type CoverageWalletKey = (typeof COVERAGE_WALLETS)[number]["key"];
@@ -312,21 +312,21 @@ const COVERAGE_VARIANTS = [
   },
   {
     id: "veo3_4s",
-    label: "Veo 3.1 4s",
+    label: "H3 Max 5–6s",
     provider: "fal",
     wallet: "creditsVideoFX3",
     deductionKey: "priceVideoFX3_4s",
   },
   {
     id: "veo3_6s",
-    label: "Veo 3.1 6s",
+    label: "H3 Max 7–10s",
     provider: "fal",
     wallet: "creditsVideoFX3",
     deductionKey: "priceVideoFX3_6s",
   },
   {
     id: "veo3_8s",
-    label: "Veo 3.1 8s",
+    label: "H3 Max 11–15s",
     provider: "fal",
     wallet: "creditsVideoFX3",
     deductionKey: "priceVideoFX3_8s",
@@ -2510,7 +2510,7 @@ export default function SuperAdminDashboard() {
                     <th className="p-6 text-center">View</th>
                     <th className="p-6 text-center">PicDrift</th>
                     <th className="p-6 text-center">PicFX</th>
-                    <th className="p-6 text-center">Video Engines (Kling / Topaz / Seedance / Veo 3.1)</th>
+                    <th className="p-6 text-center">Video Engines (Kling / Topaz / Seedance / H3 Max)</th>
                     <th className="p-6 text-right">Coverage (USD)</th>
                     <th className="p-6 text-right">Actions</th>
                   </tr>
@@ -2538,7 +2538,7 @@ export default function SuperAdminDashboard() {
                           <input type="number" step="1" min="0" title="Kling 3.0" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsPicDriftPlus) - u.creditsPicDriftPlus, creditType: "creditsPicDriftPlus" })} />
                           <input type="number" step="1" min="0" title="Topaz Upscale" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1, creditType: "creditsVideoFX1" })} />
                           <input type="number" step="1" min="0" title="Seedance 2.0" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2, creditType: "creditsVideoFX2" })} />
-                          <input type="number" step="1" min="0" title="Veo 3.1" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3, creditType: "creditsVideoFX3" })} />
+                          <input type="number" step="1" min="0" title="H3 Max" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3, creditType: "creditsVideoFX3" })} />
                         </div>
                       </td>
                       <td className="p-6 text-right text-sm font-semibold text-brand-accent">
@@ -3090,9 +3090,9 @@ export default function SuperAdminDashboard() {
                         { key: "priceVideoFX2_4s", label: "Seedance 2.0 · 4s" },
                         { key: "priceVideoFX2_8s", label: "Seedance 2.0 · 8s" },
                         { key: "priceVideoFX2_12s", label: "Seedance 2.0 · 12s" },
-                        { key: "priceVideoFX3_4s", label: "Veo 3.1 · 4s" },
-                        { key: "priceVideoFX3_6s", label: "Veo 3.1 · 6s" },
-                        { key: "priceVideoFX3_8s", label: "Veo 3.1 · 8s" },
+                        { key: "priceVideoFX3_4s", label: "H3 Max · 5–6s" },
+                        { key: "priceVideoFX3_6s", label: "H3 Max · 7–10s" },
+                        { key: "priceVideoFX3_8s", label: "H3 Max · 11–15s" },
                       ].map(({ key, label }) => (
                         <div key={key} className="flex justify-between items-center">
                           <span className="text-[10px] text-gray-400 uppercase font-bold">

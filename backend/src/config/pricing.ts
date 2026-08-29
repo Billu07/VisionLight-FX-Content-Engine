@@ -173,10 +173,19 @@ export const calculateGranularCost = (
     return settings.priceVideoFX2_12s;
   }
 
-  // 5. Veo 3.1
+  // 5. Veo 3.1 (legacy — retained for any in-flight/historical jobs)
   if (mediaType === "video" && model === "veo-3") {
     if (duration === 6) return settings.priceVideoFX3_6s;
     if (duration === 8) return settings.priceVideoFX3_8s;
+    return settings.priceVideoFX3_4s;
+  }
+
+  // 5b. MiniMax H3 Max — 5–15s. Reuse the VideoFX3 tiers, mapped across the range:
+  //     5–6s → 4s tier, 7–10s → 6s tier, 11–15s → 8s tier.
+  if (mediaType === "video" && model === "minimax-h3-max") {
+    const d = Number(duration || 5);
+    if (d >= 11) return settings.priceVideoFX3_8s;
+    if (d >= 7) return settings.priceVideoFX3_6s;
     return settings.priceVideoFX3_4s;
   }
 
@@ -229,7 +238,7 @@ export const getTargetPool = (
     return "creditsVideoFX1";
   if (model?.includes("seedance-fal") || model?.includes("sora-2"))
     return "creditsVideoFX2";
-  if (model === "veo-3") return "creditsVideoFX3";
+  if (model === "veo-3" || model === "minimax-h3-max") return "creditsVideoFX3";
 
   // Editor fallback
   return "creditsImageFX";

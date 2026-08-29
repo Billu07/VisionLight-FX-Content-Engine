@@ -270,6 +270,7 @@ const requiresFalForRequest = (mediaType: unknown, model: unknown): boolean => {
     normalizedModel.includes("kling") ||
     normalizedModel.includes("seedance-fal") ||
     normalizedModel === "veo-3" ||
+    normalizedModel === "minimax-h3-max" ||
     normalizedModel === "topaz-upscale-video"
   );
 };
@@ -1582,6 +1583,9 @@ router.post(
         seed,
         autoFix,
         veoMode,
+        h3Mode,
+        promptExpansion,
+        enableSafetyChecker,
         videoGenerationMode,
         projectId,
       } = req.body;
@@ -1780,6 +1784,9 @@ router.post(
         seed,
         autoFix,
         veoMode,
+        h3Mode,
+        promptExpansion,
+        enableSafetyChecker,
         videoGenerationMode,
         imageReference: primaryRefUrl,
         imageReferences: uploadedUrls,

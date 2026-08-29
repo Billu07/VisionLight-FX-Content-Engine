@@ -302,11 +302,14 @@ export const videoLogic = {
     const isKling = model.includes("kling");
     const isKling3 = model === "kling-3";
 
-    // Check for Veo
+    // Check for Veo (legacy — retained so any in-flight/historical Veo jobs still
+    // submit and poll; the studio picker now offers MiniMax H3 Max instead).
     const isVeo = model === "veo-3";
+    // MiniMax H3 Max — replaces Veo 3.1 as the studio's video model.
+    const isH3Max = model === "minimax-h3-max";
 
     const isUnsupported =
-      !isKling && !isVeo && !isSeedanceFal && !isTopazUpscale;
+      !isKling && !isVeo && !isH3Max && !isSeedanceFal && !isTopazUpscale;
     const isPro = model.includes("pro") || model.includes("Pro");
     const videoGenerationMode =
       typeof params.videoGenerationMode === "string"
@@ -400,6 +403,9 @@ export const videoLogic = {
         rawRefUrl &&
         params.hasReferenceImage &&
         !isVeo &&
+        // H3 Max image-to-video follows the input frame's aspect ratio, so pass
+        // the raw frame (strict canvas fitting would distort it).
+        !isH3Max &&
         !isSeedanceFal;
 
       if (shouldPreprocessReference) {
@@ -578,6 +584,107 @@ export const videoLogic = {
           },
           // Queue submit should return quickly; a hang here would otherwise leave
           // the post stuck in PROCESSING with nothing queued on fal.
+          timeout: 120000,
+        });
+        externalId = submitRes.data.request_id;
+        statusUrl = submitRes.data.status_url;
+      } else if (isH3Max) {
+        provider = "minimax-h3-max";
+        const refUrls = (params.imageReferences || []).filter(
+          (url: any): url is string => typeof url === "string" && url.length > 0,
+        );
+        const frameUrls = refUrls.filter(
+          (u: string) => !isLikelyVideoUrl(u) && !isLikelyAudioUrl(u),
+        );
+        const firstFrameUrl =
+          frameUrls[0] ||
+          (params.imageReference && !isLikelyVideoUrl(params.imageReference)
+            ? params.imageReference
+            : "");
+        const lastFrameUrl = frameUrls[1] || "";
+
+        // H3 Max renders 5–15s at 480P/768P. Clamp to the supported range.
+        const requestedDuration = Number(params.duration);
+        const duration = Number.isFinite(requestedDuration)
+          ? Math.min(15, Math.max(5, Math.round(requestedDuration)))
+          : 5;
+        params.duration = duration;
+        const resolution = /480/.test(String(params.resolution)) ? "480P" : "768P";
+
+        // Mode: explicit from the studio, else derived from what was supplied.
+        let h3Mode = typeof params.h3Mode === "string" ? params.h3Mode : "";
+        if (
+          h3Mode !== "text_to_video" &&
+          h3Mode !== "image_to_video" &&
+          h3Mode !== "first_last_frame"
+        ) {
+          if (firstFrameUrl && lastFrameUrl) h3Mode = "first_last_frame";
+          else if (firstFrameUrl) h3Mode = "image_to_video";
+          else h3Mode = "text_to_video";
+        }
+        params.h3Mode = h3Mode;
+
+        const payload: any = {
+          prompt: finalPrompt,
+          duration,
+          resolution,
+          enable_safety_checker: toBoolean(params.enableSafetyChecker, true),
+          prompt_expansion_mode:
+            params.promptExpansion === "quality" ? "quality" : "balanced",
+        };
+        if (
+          params.seed !== undefined &&
+          params.seed !== null &&
+          `${params.seed}`.trim() !== ""
+        ) {
+          const parsedSeed = Number(params.seed);
+          if (Number.isFinite(parsedSeed)) {
+            payload.seed = Math.max(0, Math.floor(parsedSeed));
+          }
+        }
+
+        let endpoint = "minimax/h3-max/text-to-video";
+        if (h3Mode === "text_to_video") {
+          endpoint = "minimax/h3-max/text-to-video";
+          // Text-to-video is the only mode with an aspect-ratio control; the
+          // image modes follow the supplied frame. targetRatioString is already
+          // one of H3 Max's supported values (21:9/16:9/4:3/1:1/3:4/9:16).
+          payload.aspect_ratio = targetRatioString;
+        } else {
+          if (!firstFrameUrl) {
+            throw new Error(
+              "MiniMax H3 Max image mode requires a first-frame image.",
+            );
+          }
+          endpoint = "minimax/h3-max/image-to-video";
+          payload.image_url = getOptimizedUrl(firstFrameUrl);
+          if (h3Mode === "first_last_frame") {
+            if (!lastFrameUrl) {
+              throw new Error(
+                "MiniMax H3 Max first/last mode requires both a first and a last frame image.",
+              );
+            }
+            payload.end_image_url = getOptimizedUrl(lastFrameUrl);
+          }
+        }
+
+        console.log(
+          `H3 Max Request: ${endpoint}`,
+          JSON.stringify(payload, null, 2),
+        );
+
+        const falKey = apiKeys?.falApiKey;
+        if (!falKey)
+          throw new Error(
+            "API Key is missing. Please configure your Fal AI key in the Admin Panel.",
+          );
+
+        const url = `https://queue.fal.run/${endpoint}`;
+        const submitRes = await axios.post(url, payload, {
+          headers: {
+            Authorization: `Key ${falKey}`,
+            "Content-Type": "application/json",
+          },
           timeout: 120000,
         });
         externalId = submitRes.data.request_id;
@@ -1026,6 +1133,7 @@ export const videoLogic = {
       } else if (
         provider.includes("kling") ||
         provider.includes("veo") ||
+        provider.includes("minimax") ||
         provider.includes("seedance-fal") ||
         provider.includes("topaz-upscale")
       ) {

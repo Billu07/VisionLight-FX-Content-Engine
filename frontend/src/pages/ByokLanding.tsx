@@ -52,7 +52,7 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
     retentionLabel: "",
     features: [
       "Full Studio Access",
-      "Seedance 2.0, Kling 3.0, VEO 3.1",
+      "Seedance 2.0, Kling 3.0, H3 Max",
       "5 Renders / Day",
       "3 Project Timelines",
       "14 Day Trial",
@@ -143,7 +143,7 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
     retentionLabel: "PicDrift + FX Models",
     features: [
       "PicDrift",
-      "Seedance 2.0, Kling 3.0, VEO 3.1",
+      "Seedance 2.0, Kling 3.0, H3 Max",
       "5 Team Members",
       "20 Project Timelines",
       "2GB Storage",
@@ -168,7 +168,7 @@ const BYOK_LANDING_PLANS: ByokLandingPlan[] = [
     retentionLabel: "PicDrift + FX Models",
     features: [
       "PicDrift",
-      "Seedance 2.0, Kling 3.0, VEO 3.1",
+      "Seedance 2.0, Kling 3.0, H3 Max",
       "20 Team Members",
       "200 Project Timelines",
       "5GB Storage",
@@ -640,7 +640,7 @@ export const ByokLanding = () => {
               <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-slate-200">
                 <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Seedance 2.0</span>
                 <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Kling 3.0</span>
-                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Veo 3.1</span>
+                <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">H3 Max</span>
                 <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1">Topaz</span>
               </div>
             </article>

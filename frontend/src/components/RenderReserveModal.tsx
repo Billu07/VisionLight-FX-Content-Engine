@@ -149,19 +149,19 @@ export function RenderReserveModal({
       wallet: "Seedance 2.0",
     },
     {
-      label: "Veo 3.1 · 4s",
+      label: "H3 Max · 5–6s",
       key: "priceVideoFX3_4s",
-      wallet: "Veo 3.1",
+      wallet: "H3 Max",
     },
     {
-      label: "Veo 3.1 · 6s",
+      label: "H3 Max · 7–10s",
       key: "priceVideoFX3_6s",
-      wallet: "Veo 3.1",
+      wallet: "H3 Max",
     },
     {
-      label: "Veo 3.1 · 8s",
+      label: "H3 Max · 11–15s",
       key: "priceVideoFX3_8s",
-      wallet: "Veo 3.1",
+      wallet: "H3 Max",
     },
   ];
 
@@ -273,7 +273,7 @@ export function RenderReserveModal({
               />
               <Section
                 title="Video Engines"
-                subtitle="Topaz Upscale, Seedance 2.0, and Veo 3.1 tiers."
+                subtitle="Topaz Upscale, Seedance 2.0, and H3 Max tiers."
                 items={videoEngines}
                 accent="bg-cyan-400"
               />

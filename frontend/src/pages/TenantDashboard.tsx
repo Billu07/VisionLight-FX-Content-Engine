@@ -66,7 +66,7 @@ const COVERAGE_WALLETS = [
   { key: "creditsImageFX", label: "Image FX (Nano/GPT 2)", provider: "fal" },
   { key: "creditsVideoFX1", label: "Topaz Upscale", provider: "fal" },
   { key: "creditsVideoFX2", label: "Seedance 2.0", provider: "fal" },
-  { key: "creditsVideoFX3", label: "Veo 3.1", provider: "fal" },
+  { key: "creditsVideoFX3", label: "H3 Max", provider: "fal" },
 ] as const;
 
 type CoverageWalletKey = (typeof COVERAGE_WALLETS)[number]["key"];
@@ -88,9 +88,9 @@ const COVERAGE_VARIANTS = [
   { id: "seedance_fal_4s", label: "Seedance 2.0 4s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_4s" },
   { id: "seedance_fal_8s", label: "Seedance 2.0 8s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_8s" },
   { id: "seedance_fal_12s", label: "Seedance 2.0 12s", provider: "fal", wallet: "creditsVideoFX2", deductionKey: "priceVideoFX2_12s" },
-  { id: "veo3_4s", label: "Veo 3.1 4s", provider: "fal", wallet: "creditsVideoFX3", deductionKey: "priceVideoFX3_4s" },
-  { id: "veo3_6s", label: "Veo 3.1 6s", provider: "fal", wallet: "creditsVideoFX3", deductionKey: "priceVideoFX3_6s" },
-  { id: "veo3_8s", label: "Veo 3.1 8s", provider: "fal", wallet: "creditsVideoFX3", deductionKey: "priceVideoFX3_8s" },
+  { id: "veo3_4s", label: "H3 Max 5–6s", provider: "fal", wallet: "creditsVideoFX3", deductionKey: "priceVideoFX3_4s" },
+  { id: "veo3_6s", label: "H3 Max 7–10s", provider: "fal", wallet: "creditsVideoFX3", deductionKey: "priceVideoFX3_6s" },
+  { id: "veo3_8s", label: "H3 Max 11–15s", provider: "fal", wallet: "creditsVideoFX3", deductionKey: "priceVideoFX3_8s" },
 ] as const;
 
 const PICDRIFT_PRICING_KEYS = [
@@ -723,7 +723,7 @@ export default function TenantDashboard() {
                     <th className="p-5 text-center">PicDrift</th>
                     <th className="p-5 text-center">PicFX</th>
                     {!isPicdriftTenant && (
-                      <th className="p-5 text-center">Video Engines (Kling / Topaz / Seedance / Veo 3.1)</th>
+                      <th className="p-5 text-center">Video Engines (Kling / Topaz / Seedance / H3 Max)</th>
                     )}
                     <th className="p-5 text-right">Coverage (USD)</th>
                     <th className="p-5 text-right">Actions</th>
@@ -758,7 +758,7 @@ export default function TenantDashboard() {
                             <input type="number" step="1" min="0" title="Kling 3.0" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsPicDriftPlus", (toInt(e.target.value, u.creditsPicDriftPlus) - u.creditsPicDriftPlus).toString())} />
                             <input type="number" step="1" min="0" title="Topaz Upscale" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX1", (toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1).toString())} />
                             <input type="number" step="1" min="0" title="Seedance 2.0" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX2", (toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2).toString())} />
-                            <input type="number" step="1" min="0" title="Veo 3.1" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX3", (toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3).toString())} />
+                            <input type="number" step="1" min="0" title="H3 Max" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateUserCredits(u.id, "creditsVideoFX3", (toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3).toString())} />
                           </div>
                         </td>
                       )}
