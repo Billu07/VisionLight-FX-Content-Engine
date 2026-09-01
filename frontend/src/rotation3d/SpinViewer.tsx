@@ -426,10 +426,23 @@ export default function SpinViewer({
     const nearestLoaded = (frame: number): HTMLImageElement | null => {
       if (isReady(imgs[frame])) return imgs[frame];
       for (let d = 1; d <= FRAMES; d++) {
-        const a = (((frame - d) % FRAMES) + FRAMES) % FRAMES;
-        const b = (frame + d) % FRAMES;
-        if (isReady(imgs[a])) return imgs[a];
-        if (isReady(imgs[b])) return imgs[b];
+        if (loopScrub) {
+          // Looping: the timeline wraps, so the neighbour past either end is valid.
+          const a = (((frame - d) % FRAMES) + FRAMES) % FRAMES;
+          const b = (frame + d) % FRAMES;
+          if (isReady(imgs[a])) return imgs[a];
+          if (isReady(imgs[b])) return imgs[b];
+        } else {
+          // Non-looping drift: DON'T wrap. Wrapping made the end frame fall back to
+          // the START frame while frames were still streaming in (the flip-flop
+          // flash on first load) — clamp the search to the real bounds instead so a
+          // not-yet-decoded end frame shows its nearest loaded NEIGHBOUR, not frame 0.
+          const a = frame - d;
+          const b = frame + d;
+          if (a >= 0 && isReady(imgs[a])) return imgs[a];
+          if (b < FRAMES && isReady(imgs[b])) return imgs[b];
+          if (a < 0 && b >= FRAMES) break; // both directions exhausted
+        }
       }
       return null;
     };
@@ -1253,8 +1266,8 @@ export default function SpinViewer({
             <circle className="r3d-ring-fg" ref={ringRef} cx="32" cy="32" r="27" />
           </svg>
           <div className="r3d-pct" ref={pctRef}>0%</div>
-          <div className="r3d-lbl">{loaderLabel || "Optimizing frames…"}</div>
-          <div className="r3d-powered">Powered by {playerBrand.name}</div>
+          <div className="r3d-lbl">{driftMode ? "Loading…" : loaderLabel || "Optimizing frames…"}</div>
+          <div className="r3d-powered">Powered by <b>{driftMode ? "Drift Link Interactive" : playerBrand.name}</b></div>
         </div>
       </div>
     </div>
@@ -1385,6 +1398,8 @@ const R3D_CSS = `
 .r3d-pct{font-weight:600;font-size:13px;color:var(--r3d-muted)}
 .r3d-lbl{font-size:12px;color:var(--r3d-muted);letter-spacing:.14em;text-transform:uppercase}
 .r3d-powered{margin-top:4px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--r3d-muted);opacity:.65}
+.r3d-powered b{font-weight:700}
+.r3d-drift .r3d-powered b{color:#22d3ee}
 @media (prefers-reduced-motion:reduce){.r3d-hand{animation:none}}
 /* pseudo-fullscreen (iOS fallback): fix the stage to fill the viewport */
 .r3d-pseudo-fs{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;z-index:2147483000!important;margin:0!important}
@@ -1420,10 +1435,12 @@ const R3D_CSS = `
    brand toggle (brand=0 only hides the tenant's own logo/name). Bottom-left, above
    the CTA bar; drops to the edge when there are no CTAs; hidden on hero tiles. */
 /* subtle "Powered by Rotation3D" caption at the TOP, clear of the bottom controls */
-.r3d-powered-badge{position:absolute;left:50%;transform:translateX(-50%);top:calc(60px + env(safe-area-inset-top));z-index:6;display:flex;align-items:center;gap:5px;color:var(--r3d-muted);font-size:10px;letter-spacing:.03em;line-height:1;text-decoration:none;opacity:.7;text-shadow:0 1px 6px rgba(0,0,0,.55);transition:opacity .2s}
+.r3d-powered-badge{position:absolute;left:50%;transform:translateX(-50%);top:calc(60px + env(safe-area-inset-top));z-index:6;display:flex;align-items:center;gap:5px;white-space:nowrap;color:var(--r3d-muted);font-size:10px;letter-spacing:.03em;line-height:1;text-decoration:none;opacity:.7;text-shadow:0 1px 6px rgba(0,0,0,.55);transition:opacity .2s}
 .r3d-powered-badge:hover{opacity:1}
 .r3d-powered-badge svg{width:12px;height:12px;color:var(--r3d-secondary)}
 .r3d-powered-badge b{font-weight:700}
+/* Drift: match the "Drift Link Interactive" wordmark accent (cyan) used in the landing header. */
+.r3d-drift .r3d-powered-badge b{color:#22d3ee}
 .r3d-hero .r3d-powered-badge{display:none!important}
 .r3d-light .r3d-powered-badge{color:#5b6472;text-shadow:none}
 
