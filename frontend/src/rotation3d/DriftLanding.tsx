@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
+import { getResolvedDriftBrandSlug } from "../lib/branding";
 import { LoginModal } from "../components/LoginModal";
 import { initMetaPixel, track } from "./metaPixel";
 
@@ -19,6 +20,12 @@ const toCta = (c: any) =>
 
 const DRIFT_PRIMARY = "#22d3ee";
 const DRIFT_SECONDARY = "#3b82f6";
+
+// Legal docs shown only on the drift.li landing takeover (not on the players).
+const DRIFT_TERMS_URL =
+  "https://docs.google.com/document/d/1fBXABIgmCxjwK6oMxeSGDZ6ny-PdFwe7Orhd_L02oOQ/edit?usp=sharing";
+const DRIFT_PRIVACY_URL =
+  "https://docs.google.com/document/d/1f5mEo1Fcc64gzGEyQmz81ReW_PqlhZS87tpffaVgNt0/edit?usp=sharing";
 
 type Item = {
   itemId: string;
@@ -125,10 +132,18 @@ function BentoTile({ it, onOpen, big }: { it: Item; onOpen: () => void; big?: bo
 // logo/name hidden, drift.li branding in the header.
 const HERO_CSS = `
 .dl-hero-root{position:fixed;top:0;left:0;right:0;height:100vh;height:100svh;background:#05070d;overflow:hidden;overscroll-behavior:none}
-.dl-hero-header{position:absolute;top:0;left:0;right:0;z-index:30;display:flex;align-items:center;justify-content:space-between;
+.dl-hero-header{position:absolute;top:0;left:0;right:0;z-index:30;display:flex;align-items:flex-start;justify-content:space-between;
   padding:14px clamp(16px,4vw,32px);pointer-events:none}
+.dl-hero-brand{display:flex;flex-direction:column;gap:3px}
 .dl-hero-header .dl-word{font-size:19px;font-weight:800;letter-spacing:-.01em;color:#fff}
 .dl-hero-header .dl-word span{margin-left:7px;font-weight:600;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#22d3ee}
+.dl-word-brand{display:flex;align-items:center;gap:9px}
+.dl-word-brand .dl-word-brandname{font-size:19px;font-weight:800;letter-spacing:-.01em;color:#fff}
+.dl-hero-logo{height:26px;width:auto;max-width:140px;object-fit:contain;display:block}
+.dl-hero-legal{pointer-events:auto;display:flex;align-items:center;gap:7px;font-size:11px;line-height:1}
+.dl-hero-legal a{color:rgba(255,255,255,.55);text-decoration:none;transition:color .16s}
+.dl-hero-legal a:hover{color:#22d3ee}
+.dl-hero-legal span{color:rgba(255,255,255,.28)}
 .dl-hero-login{pointer-events:auto;cursor:pointer;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);
   color:#e8edf4;border-radius:11px;padding:8px 16px;font-size:12.5px;font-weight:650;backdrop-filter:blur(8px);transition:background .16s}
 .dl-hero-login:hover{background:rgba(255,255,255,.12)}
@@ -137,6 +152,13 @@ const HERO_CSS = `
 
 function HeroLanding({ product }: { product: any }) {
   const [showLogin, setShowLogin] = useState(false);
+  // A brand can set its own Terms/Privacy for its landing; fall back to Drift Link's.
+  const termsUrl = product.termsUrl || DRIFT_TERMS_URL;
+  const privacyUrl = product.privacyUrl || DRIFT_PRIVACY_URL;
+  // On a brand's custom domain the header shows the brand's own logo/name.
+  const brandScoped = !!product.brandScoped;
+  const brandLogo = product.brandLogo || null;
+  const brandName = product.brandName || "Drift";
   // Memoize the frame list + manifest so an incidental re-render (a resize event,
   // a state change) never hands SpinViewer a fresh manifest object — that would
   // re-run its preload effect and flash the full loader mid-session.
@@ -200,8 +222,22 @@ function HeroLanding({ product }: { product: any }) {
     <div className="dl-hero-root">
       <style>{HERO_CSS}</style>
       <header className="dl-hero-header">
-        <div className="dl-word">
-          Drift Link<span>Interactive</span>
+        <div className="dl-hero-brand">
+          {brandScoped ? (
+            <div className="dl-word dl-word-brand">
+              {brandLogo ? <img className="dl-hero-logo" src={brandLogo} alt={brandName} /> : null}
+              <span className="dl-word-brandname">{brandName}</span>
+            </div>
+          ) : (
+            <div className="dl-word">
+              Drift Link<span>Interactive</span>
+            </div>
+          )}
+          <div className="dl-hero-legal">
+            <a href={termsUrl} target="_blank" rel="noopener noreferrer">Terms</a>
+            <span aria-hidden>·</span>
+            <a href={privacyUrl} target="_blank" rel="noopener noreferrer">Privacy</a>
+          </div>
         </div>
         <button className="dl-hero-login" onClick={() => setShowLogin(true)}>
           Log in
@@ -233,7 +269,6 @@ function HeroLanding({ product }: { product: any }) {
           showTitle={false}
           showTools={false}
           landing
-          loaderLabel={product.title || "Loading…"}
           onCtaClick={(which) => {
             if (product.id) apiEndpoints.driftTrackEvent(product.id, "CTA_CLICK", { which }).catch(() => undefined);
             if (product.metaPixelId) track("CTAClick", { which, content_name: product.name }, true);
@@ -268,9 +303,11 @@ export default function DriftLanding() {
 
   useEffect(() => {
     let alive = true;
+    // On a brand's custom domain, scope the hero to that brand's landing drift.
+    const brandSlug = getResolvedDriftBrandSlug();
     // Check for a designated landing drift first; only load the gallery if none.
     apiEndpoints
-      .driftPublicLandingHero()
+      .driftPublicLandingHero(brandSlug)
       .then((r) => {
         if (alive) setLandingHero(r.data?.product || null);
       })
@@ -290,6 +327,15 @@ export default function DriftLanding() {
   if (heroChecked && landingHero) return <HeroLanding product={landingHero} />;
   // Avoid a flash of the gallery before the hero check resolves.
   if (!heroChecked) return <div style={{ position: "fixed", inset: 0, background: "#05070d" }} />;
+  // On a brand's custom domain with no landing drift set, don't fall back to the
+  // drift.li gallery (it would leak other brands' drifts) — show a quiet placeholder.
+  if (getResolvedDriftBrandSlug()) {
+    return (
+      <div style={{ position: "fixed", inset: 0, background: "#05070d", display: "grid", placeItems: "center", color: "#5b6472", fontFamily: '"Bai Jamjuree",system-ui,sans-serif', fontSize: 14, padding: 24, textAlign: "center" }}>
+        Nothing here yet.
+      </div>
+    );
+  }
 
   const hero = items.find((i) => i.isHero) || items[0] || null;
 

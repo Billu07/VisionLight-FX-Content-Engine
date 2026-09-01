@@ -171,6 +171,14 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
   const [brandPixel, setBrandPixel] = useState("");
   const [brandPixelSaved, setBrandPixelSaved] = useState("");
   const [pixelSaving, setPixelSaving] = useState(false);
+  const [brandTerms, setBrandTerms] = useState("");
+  const [brandTermsSaved, setBrandTermsSaved] = useState("");
+  const [brandPrivacy, setBrandPrivacy] = useState("");
+  const [brandPrivacySaved, setBrandPrivacySaved] = useState("");
+  const [legalSaving, setLegalSaving] = useState(false);
+  const [brandHero, setBrandHero] = useState("");
+  const [brandHeroSaved, setBrandHeroSaved] = useState("");
+  const [heroSaving, setHeroSaving] = useState(false);
   const [view, setView] = useState<"drifts" | "forms" | "analytics" | "domain">("drifts");
   const [theme, toggleTheme] = useDriftTheme();
   const [formsList, setFormsList] = useState<{ id: string; name: string }[]>([]);
@@ -221,6 +229,15 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
         const p = r.data?.settings?.metaPixelId || "";
         setBrandPixel(p);
         setBrandPixelSaved(p);
+        const t = r.data?.settings?.termsUrl || "";
+        setBrandTerms(t);
+        setBrandTermsSaved(t);
+        const pr = r.data?.settings?.privacyUrl || "";
+        setBrandPrivacy(pr);
+        setBrandPrivacySaved(pr);
+        const h = r.data?.settings?.landingHeroProductId || "";
+        setBrandHero(h);
+        setBrandHeroSaved(h);
       })
       .catch(() => undefined);
   }, [admin, adminOrgId]);
@@ -239,6 +256,46 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
       setMsg({ kind: "err", text: e?.response?.data?.error || "Could not save the pixel" });
     } finally {
       setPixelSaving(false);
+    }
+  };
+
+  const legalDirty =
+    brandTerms.trim() !== brandTermsSaved || brandPrivacy.trim() !== brandPrivacySaved;
+  const saveLegal = async () => {
+    if (!legalDirty) return;
+    setLegalSaving(true);
+    try {
+      const data = {
+        termsUrl: brandTerms.trim() || null,
+        privacyUrl: brandPrivacy.trim() || null,
+      };
+      admin
+        ? await apiEndpoints.driftAdminUpdateBrandSettings(adminOrgId!, data)
+        : await apiEndpoints.driftUpdateBrandSettings(data);
+      setBrandTermsSaved(brandTerms.trim());
+      setBrandPrivacySaved(brandPrivacy.trim());
+      setMsg({ kind: "ok", text: "Landing legal links saved." });
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e?.response?.data?.error || "Could not save the links" });
+    } finally {
+      setLegalSaving(false);
+    }
+  };
+
+  const saveHero = async () => {
+    if (brandHero === brandHeroSaved) return;
+    setHeroSaving(true);
+    try {
+      const data = { landingHeroProductId: brandHero || null };
+      admin
+        ? await apiEndpoints.driftAdminUpdateBrandSettings(adminOrgId!, data)
+        : await apiEndpoints.driftUpdateBrandSettings(data);
+      setBrandHeroSaved(brandHero);
+      setMsg({ kind: "ok", text: "Landing drift saved." });
+    } catch (e: any) {
+      setMsg({ kind: "err", text: e?.response?.data?.error || "Could not save the landing drift" });
+    } finally {
+      setHeroSaving(false);
     }
   };
 
@@ -386,6 +443,64 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
                   className="d-btn soft"
                 >
                   {pixelSaving ? "…" : "Save"}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="d-label">Landing legal links</label>
+              <p className="d-faint mb-2 text-[11px]">
+                Shown on your drift.li landing page. Must start with https://
+              </p>
+              <div className="flex flex-col gap-2">
+                <input
+                  className="d-input"
+                  value={brandTerms}
+                  onChange={(e) => setBrandTerms(e.target.value)}
+                  placeholder="Terms URL (https://…)"
+                  inputMode="url"
+                />
+                <input
+                  className="d-input"
+                  value={brandPrivacy}
+                  onChange={(e) => setBrandPrivacy(e.target.value)}
+                  placeholder="Privacy URL (https://…)"
+                  inputMode="url"
+                />
+                <button
+                  onClick={saveLegal}
+                  disabled={legalSaving || !legalDirty}
+                  className="d-btn soft self-start"
+                >
+                  {legalSaving ? "…" : "Save links"}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="d-label">Landing page drift</label>
+              <p className="d-faint mb-2 text-[11px]">
+                The drift shown full-screen at your custom domain's root.
+              </p>
+              <div className="flex gap-2">
+                <select
+                  className="d-input"
+                  value={brandHero}
+                  onChange={(e) => setBrandHero(e.target.value)}
+                >
+                  <option value="">None (no landing takeover)</option>
+                  {products
+                    .filter((p) => p.status === "READY" || p.status === "PUBLISHED")
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  onClick={saveHero}
+                  disabled={heroSaving || brandHero === brandHeroSaved}
+                  className="d-btn soft"
+                >
+                  {heroSaving ? "…" : "Save"}
                 </button>
               </div>
             </div>

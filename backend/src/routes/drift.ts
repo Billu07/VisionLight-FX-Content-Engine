@@ -686,6 +686,7 @@ async function applyProductPatch(
   if (typeof body.loopEnabled === "boolean") data.loopEnabled = body.loopEnabled;
   if (typeof body.hideLogo === "boolean") data.hideLogo = body.hideLogo;
   if (typeof body.hideName === "boolean") data.hideName = body.hideName;
+  if (typeof body.hideTitle === "boolean") data.hideTitle = body.hideTitle;
   if ("metaPixelId" in body)
     data.metaPixelId = body.metaPixelId ? String(body.metaPixelId).replace(/[^0-9]/g, "").slice(0, 32) || null : null;
   if ("name" in body && String(body.name || "").trim())
@@ -907,6 +908,7 @@ const publicProductPayload = async (p: any, bc: any, orgName: string, captions: 
   loopEnabled: p.loopEnabled,
   hideLogo: p.hideLogo,
   hideName: p.hideName,
+  hideTitle: p.hideTitle,
   thumbnailUrl: p.thumbnailUrl,
   metaPixelId: p.metaPixelId || orgPixelId || null,
   background: p.background,
@@ -1538,13 +1540,45 @@ router.post("/api/drift/public/forms/:id/submit", async (req: AuthenticatedReque
 const sanitizePixel = (v: unknown) =>
   typeof v === "string" && v.trim() ? String(v).replace(/[^0-9]/g, "").slice(0, 32) || null : null;
 
+// Only accept http(s) URLs — these are rendered into an href, so a javascript:
+// (or other scheme) value would be an XSS vector. Empty/invalid → null (cleared).
+const sanitizeUrl = (v: unknown): string | null => {
+  if (typeof v !== "string") return null;
+  const s = v.trim();
+  if (!s) return null;
+  return /^https?:\/\//i.test(s) ? s.slice(0, 2048) : null;
+};
+
 async function getBrandSettings(orgId: string) {
-  const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { metaPixelId: true } });
-  return { metaPixelId: org?.metaPixelId || null };
+  const org = await prisma.organization.findUnique({
+    where: { id: orgId },
+    select: { metaPixelId: true, termsUrl: true, privacyUrl: true, landingHeroProductId: true },
+  });
+  return {
+    metaPixelId: org?.metaPixelId || null,
+    termsUrl: org?.termsUrl || null,
+    privacyUrl: org?.privacyUrl || null,
+    landingHeroProductId: org?.landingHeroProductId || null,
+  };
 }
 async function patchBrandSettings(orgId: string, body: any) {
   const data: Record<string, unknown> = {};
   if ("metaPixelId" in (body || {})) data.metaPixelId = sanitizePixel(body.metaPixelId);
+  if ("termsUrl" in (body || {})) data.termsUrl = sanitizeUrl(body.termsUrl);
+  if ("privacyUrl" in (body || {})) data.privacyUrl = sanitizeUrl(body.privacyUrl);
+  if ("landingHeroProductId" in (body || {})) {
+    // Only accept one of THIS brand's drifts (or null to clear).
+    const raw = body.landingHeroProductId;
+    if (!raw) {
+      data.landingHeroProductId = null;
+    } else {
+      const owned = await prisma.driftProduct.findFirst({
+        where: { id: String(raw), organizationId: orgId },
+        select: { id: true },
+      });
+      data.landingHeroProductId = owned ? owned.id : null;
+    }
+  }
   await prisma.organization.update({ where: { id: orgId }, data });
   return getBrandSettings(orgId);
 }
@@ -1971,15 +2005,31 @@ router.get("/api/drift/public/landing", async (_req: AuthenticatedRequest, res: 
 // The hero DRIFT set as THE drift.li landing — drift.li/ renders this drift's
 // full interactive player in place of the gallery. Returns the complete player
 // payload (or { product: null } to fall back to the gallery landing).
-router.get("/api/drift/public/landing-hero", async (_req: AuthenticatedRequest, res: Response) => {
+router.get("/api/drift/public/landing-hero", async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const hero = await prisma.driftLandingItem.findFirst({
-      where: { isHero: true, source: "DRIFT" },
-      select: { productId: true },
-    });
-    if (!hero) return res.json({ product: null });
+    // On a brand's custom domain the frontend passes ?brand=<slug>; scope the hero
+    // to THAT brand's designated landing drift. drift.li (no brand) uses the single
+    // global hero. A brand with no landing drift set → no takeover (gallery/null).
+    const brandSlug =
+      typeof req.query.brand === "string" ? req.query.brand.trim().toLowerCase() : "";
+    let heroProductId: string | null = null;
+    if (brandSlug) {
+      const org = await prisma.organization.findFirst({
+        where: { slug: brandSlug },
+        select: { landingHeroProductId: true },
+      });
+      heroProductId = org?.landingHeroProductId || null;
+      if (!heroProductId) return res.json({ product: null });
+    } else {
+      const hero = await prisma.driftLandingItem.findFirst({
+        where: { isHero: true, source: "DRIFT" },
+        select: { productId: true },
+      });
+      heroProductId = hero?.productId || null;
+    }
+    if (!heroProductId) return res.json({ product: null });
     const product = await prisma.driftProduct.findFirst({
-      where: { id: hero.productId, status: { in: ["READY", "PUBLISHED"] } },
+      where: { id: heroProductId, status: { in: ["READY", "PUBLISHED"] } },
       include: {
         spin: true,
         organization: {
@@ -1988,6 +2038,8 @@ router.get("/api/drift/public/landing-hero", async (_req: AuthenticatedRequest, 
             name: true,
             slug: true,
             metaPixelId: true,
+            termsUrl: true,
+            privacyUrl: true,
             brandConfigs: { select: { logoUrl: true, companyName: true, primaryColor: true, secondaryColor: true }, take: 1 },
           },
         },
@@ -2000,7 +2052,18 @@ router.get("/api/drift/public/landing-hero", async (_req: AuthenticatedRequest, 
     });
     const bc = product.organization?.brandConfigs?.[0];
     const payload = await publicProductPayload(product, bc, product.organization?.name || "", captions, product.organization?.metaPixelId);
-    res.json({ product: { ...payload, brandSlug: product.organization?.slug || null } });
+    res.json({
+      product: {
+        ...payload,
+        brandSlug: product.organization?.slug || null,
+        termsUrl: product.organization?.termsUrl || null,
+        privacyUrl: product.organization?.privacyUrl || null,
+        // Brand-scoped landings (custom domains) show the brand's own header branding.
+        brandScoped: !!brandSlug,
+        brandName: bc?.companyName || product.organization?.name || null,
+        brandLogo: bc?.logoUrl || null,
+      },
+    });
   } catch {
     res.json({ product: null });
   }

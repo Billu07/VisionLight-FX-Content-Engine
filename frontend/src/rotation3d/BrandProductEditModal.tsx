@@ -24,6 +24,7 @@ type EditProduct = {
   background?: string | null;
   hideLogo?: boolean;
   hideName?: boolean;
+  hideTitle?: boolean;
   metaPixelId?: string | null;
   ctaPrimary?: { label?: string; url?: string; formId?: string | null } | null;
   ctaSecondary?: { label?: string; url?: string; formId?: string | null } | null;
@@ -69,6 +70,7 @@ export default function BrandProductEditModal({
   const [background, setBackground] = useState(product.background || "transparent");
   const [hideLogo, setHideLogo] = useState(product.hideLogo ?? false);
   const [hideName, setHideName] = useState(product.hideName ?? false);
+  const [hideTitle, setHideTitle] = useState(product.hideTitle ?? false);
   const [metaPixelId, setMetaPixelId] = useState(product.metaPixelId || "");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -102,6 +104,7 @@ export default function BrandProductEditModal({
       data.background = background;
       data.hideLogo = hideLogo;
       data.hideName = hideName;
+      data.hideTitle = hideTitle;
       data.metaPixelId = metaPixelId.trim() || null;
     }
     try {
@@ -329,6 +332,10 @@ export default function BrandProductEditModal({
               <label className="d-muted flex items-center gap-2 text-xs">
                 <input type="checkbox" checked={hideName} onChange={(e) => setHideName(e.target.checked)} className="h-4 w-4 accent-brand-accent" />
                 Hide brand name in player
+              </label>
+              <label className="d-muted flex items-center gap-2 text-xs">
+                <input type="checkbox" checked={hideTitle} onChange={(e) => setHideTitle(e.target.checked)} className="h-4 w-4 accent-brand-accent" />
+                Hide drift title in player
               </label>
             </div>
           )}

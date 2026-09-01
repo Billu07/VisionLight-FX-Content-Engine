@@ -78,6 +78,9 @@ model Organization {
   rot3dEvents       Rot3dEvent[]
 
   metaPixelId       String? // brand-default Meta (Facebook) Pixel id for drift players
+  termsUrl          String? // brand's Terms link shown on their drift.li landing takeover
+  privacyUrl        String? // brand's Privacy link shown on their drift.li landing takeover
+  landingHeroProductId String? // the brand's own drift shown full-screen at their custom-domain root
 
   driftProducts     DriftProduct[]
   driftSourceImages DriftSourceImage[]
@@ -509,6 +512,7 @@ model DriftProduct {
   loopEnabled     Boolean  @default(true) // player auto-loop/continuous playback toggle
   hideLogo        Boolean  @default(false) // hide the brand logo in the platform player (not just embed)
   hideName        Boolean  @default(false) // hide the brand/profile name in the platform player
+  hideTitle       Boolean  @default(false) // hide the drift's own title/name (.r3d-name) in the platform player
   thumbnailUrl    String? // captioned-frame snapshot used as the poster (else the default frame)
   metaPixelId     String? // per-drift Meta Pixel id — overrides the brand default
   background      String? // "transparent" | hex
