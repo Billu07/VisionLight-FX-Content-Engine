@@ -467,6 +467,17 @@ export default function SpinViewer({
       ctx.drawImage(img, x, y, w, h);
     };
 
+    // Drift scrub-track accent — the brand's own primary→secondary (cyan→blue by
+    // default), parsed once for the progress fill drawn on the frame's bottom edge.
+    const hexToRgb = (hex: string | null | undefined, fb: number[]): number[] => {
+      const m = /^#?([0-9a-fA-F]{6})$/.exec(String(hex || "").trim());
+      if (!m) return fb;
+      const n = parseInt(m[1], 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    };
+    const accentA = hexToRgb(primaryColor, [34, 211, 238]); // cyan
+    const accentB = hexToRgb(secondaryColor, [59, 130, 246]); // blue
+
     const draw = () => {
       const step = TWO_PI / FRAMES;
       const q = Math.round(yaw / step) * step;
@@ -599,24 +610,45 @@ export default function SpinViewer({
         }
       }
 
-      // Drift scrub-progress: a subtle dot riding the frame's bottom edge from the
-      // start frame (left) to the end frame (right) — a quiet "how far we've
-      // drifted" cue. Colour eases red → blue to echo the before → after idea.
+      // Drift scrub-progress: a hairline track on the frame's bottom edge — a faint
+      // full-width rail, the "drifted" portion filled in the brand accent
+      // (cyan→blue), and a small glowing head at the current position. The
+      // video-scrubber / story-bar language: subtle, shows position AND range, and
+      // reads like the frame's own bottom edge is filling as you drift.
       if (driftMode && realMode && frameRect.w > 0) {
-        const dotProg = loopScrub
+        const prog = loopScrub
           ? (((yaw % TWO_PI) + TWO_PI) % TWO_PI) / TWO_PI
           : Math.max(0, Math.min(1, endYaw > 0 ? yaw / endYaw : 0));
-        const dotX = frameRect.x + dotProg * frameRect.w;
-        const dotY = frameRect.y + frameRect.h; // the frame's bottom edge
-        const cr = Math.round(239 + (59 - 239) * dotProg);
-        const cg = Math.round(68 + (130 - 68) * dotProg);
-        const cb = Math.round(68 + (246 - 68) * dotProg);
+        const railY = frameRect.y + frameRect.h; // the frame's bottom edge
+        const x0 = frameRect.x;
+        const headX = x0 + prog * frameRect.w;
         ctx.save();
-        ctx.shadowColor = `rgba(${cr},${cg},${cb},.5)`;
-        ctx.shadowBlur = 7 * DPR;
-        ctx.fillStyle = `rgba(${cr},${cg},${cb},.9)`;
+        ctx.lineCap = "round";
+        // faint full-width rail
+        ctx.strokeStyle = "rgba(255,255,255,.12)";
+        ctx.lineWidth = Math.max(1, 1.4 * DPR);
         ctx.beginPath();
-        ctx.arc(dotX, dotY, 3.2 * DPR, 0, TWO_PI);
+        ctx.moveTo(x0, railY);
+        ctx.lineTo(x0 + frameRect.w, railY);
+        ctx.stroke();
+        // filled portion — brand accent gradient (start → head)
+        if (prog > 0.002) {
+          const grad = ctx.createLinearGradient(x0, 0, headX, 0);
+          grad.addColorStop(0, `rgba(${accentA[0]},${accentA[1]},${accentA[2]},.7)`);
+          grad.addColorStop(1, `rgba(${accentB[0]},${accentB[1]},${accentB[2]},.95)`);
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = Math.max(1.5, 1.9 * DPR);
+          ctx.beginPath();
+          ctx.moveTo(x0, railY);
+          ctx.lineTo(headX, railY);
+          ctx.stroke();
+        }
+        // soft head at the current position
+        ctx.shadowColor = `rgba(${accentB[0]},${accentB[1]},${accentB[2]},.55)`;
+        ctx.shadowBlur = 8 * DPR;
+        ctx.fillStyle = `rgba(${accentB[0]},${accentB[1]},${accentB[2]},1)`;
+        ctx.beginPath();
+        ctx.arc(headX, railY, 2.6 * DPR, 0, TWO_PI);
         ctx.fill();
         ctx.restore();
       }
