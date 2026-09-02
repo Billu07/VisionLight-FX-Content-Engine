@@ -99,6 +99,10 @@ export type SpinViewerProps = {
    * text swap when you reach the end / return to the start. */
   helperStart?: string | null;
   helperEnd?: string | null;
+  /** Drift landing legal links — rendered under the powered badge when provided
+   * (the standalone player passes neither, so it shows no legal row). */
+  termsUrl?: string | null;
+  privacyUrl?: string | null;
   /** rendered rotation clip — enables the "Video" tab in the view selector */
   videoUrl?: string | null;
   /** Lab feature (off by default): show the thumbnail view selector (stills) */
@@ -193,6 +197,8 @@ export default function SpinViewer({
   descriptionEnd,
   helperStart,
   helperEnd,
+  termsUrl,
+  privacyUrl,
   showViewSelector = false,
   enableLoop = false,
   driftMode = false,
@@ -222,6 +228,7 @@ export default function SpinViewer({
   const cueRef = useRef<HTMLDivElement>(null);
   const ctasRef = useRef<HTMLDivElement>(null);
   const poweredRef = useRef<HTMLAnchorElement>(null);
+  const legalRef = useRef<HTMLDivElement>(null);
   const introHandRef = useRef<HTMLDivElement>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<SVGCircleElement>(null);
@@ -637,13 +644,12 @@ export default function SpinViewer({
           const naturalCueTop = topPx + handH + 7; // 7px column gap (see .r3d-drift .r3d-hint)
           const cueTop = Math.max(naturalCueTop, frameBottomCss + 16);
           cueRef.current.style.marginTop = cueTop - naturalCueTop + "px";
-          // Mobile bottom stack (phones only): the CTA row + powered badge are
-          // bottom-anchored, so a fixed CSS offset can't track the frame/cue (they
-          // scale with the viewport + product aspect). Drive them from JS — buttons a
-          // comfortable gap under the cue, and the "Powered by" badge tucked just
-          // under the buttons rather than pinned to the very bottom. The badge tuck is
-          // player-only: the landing keeps its badge + Terms/Privacy grouped at the
-          // bottom. Desktop clears both overrides and keeps the CSS values.
+          // Mobile bottom stack (phones only): the CTA row, powered badge, and legal
+          // row are bottom-anchored, so a fixed CSS offset can't track the frame/cue
+          // (they scale with the viewport + product aspect). Drive them from JS —
+          // buttons a comfortable gap under the cue, then the "Powered by" badge and
+          // (landing) Terms/Privacy tucked under the buttons rather than pinned to the
+          // very bottom. Desktop clears the overrides and keeps the CSS values.
           const firstBtn = ctasRef.current?.firstElementChild as HTMLElement | null;
           if (isNarrow && ctasRef.current && firstBtn) {
             const stageH = H / DPR;
@@ -654,15 +660,27 @@ export default function SpinViewer({
             );
             ctasRef.current.style.paddingBottom =
               "calc(" + Math.round(pb) + "px + env(safe-area-inset-bottom))";
-            if (poweredRef.current && !landing) {
+            // Tuck the powered badge just under the buttons, then the legal row
+            // (landing only) just under the badge — so the whole attribution block
+            // travels with the buttons instead of stranding at the very bottom.
+            let stackBottom = pb; // bottom edge (from stage bottom) of the row above
+            if (poweredRef.current) {
               const badgeH = poweredRef.current.offsetHeight || 16;
-              const badgeBottom = Math.max(10, pb - 12 - badgeH); // sit 12px under the buttons
+              const badgeBottom = Math.max(10, stackBottom - 12 - badgeH);
               poweredRef.current.style.bottom =
                 "calc(" + Math.round(badgeBottom) + "px + env(safe-area-inset-bottom))";
+              stackBottom = badgeBottom;
+            }
+            if (legalRef.current) {
+              const legalH = legalRef.current.offsetHeight || 14;
+              const legalBottom = Math.max(8, stackBottom - 8 - legalH);
+              legalRef.current.style.bottom =
+                "calc(" + Math.round(legalBottom) + "px + env(safe-area-inset-bottom))";
             }
           } else {
             if (ctasRef.current) ctasRef.current.style.paddingBottom = "";
             if (poweredRef.current) poweredRef.current.style.bottom = "";
+            if (legalRef.current) legalRef.current.style.bottom = "";
           }
         }
         // Horizontal: align the cue to the frame's edge (see placeHelperX — it
@@ -1476,6 +1494,14 @@ export default function SpinViewer({
         <span>{driftMode ? <>Powered by <b>Drift Link Interactive</b></> : <>Powered by <b>{playerBrand.name}</b></>}</span>
       </a>
 
+      {driftMode && termsUrl ? (
+        <div className="r3d-legal" ref={legalRef}>
+          <a href={termsUrl} target="_blank" rel="noopener noreferrer">Terms</a>
+          <span aria-hidden>·</span>
+          <a href={privacyUrl || termsUrl} target="_blank" rel="noopener noreferrer">Privacy</a>
+        </div>
+      ) : null}
+
       <div className="r3d-loader" ref={loaderRef}>
         <div className="r3d-loadwrap">
           <svg className="r3d-ring" viewBox="0 0 64 64">
@@ -1615,6 +1641,14 @@ const R3D_CSS = `
 /* Drift: "Powered By Drift Link" sits UNDER the player, above the CTA, a bit bigger. */
 .r3d-drift .r3d-powered-badge{top:auto;bottom:calc(36px + env(safe-area-inset-bottom));font-size:clamp(10px,3vmin,12px)}
 .r3d-drift .r3d-powered-badge svg{width:clamp(12px,3.4vmin,14px);height:clamp(12px,3.4vmin,14px)}
+/* Drift landing legal (Terms · Privacy): sits just UNDER the powered badge; on
+   phones the draw loop repositions both to tuck under the CTA buttons. */
+.r3d-drift .r3d-legal{position:absolute;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:8px;font-size:11px;line-height:1;white-space:nowrap;pointer-events:auto}
+.r3d-drift .r3d-legal a{color:rgba(255,255,255,.6);text-decoration:none;transition:color .16s}
+.r3d-drift .r3d-legal a:hover{color:#22d3ee}
+.r3d-drift .r3d-legal span{color:rgba(255,255,255,.28)}
+.r3d-drift.r3d-light .r3d-legal a{color:rgba(0,0,0,.55)}
+.r3d-drift.r3d-light .r3d-legal span{color:rgba(0,0,0,.3)}
 /* Drift: lift the CTA a touch off the very edge (standard spacing). */
 .r3d-drift .r3d-ctas{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
 /* Right (secondary) CTA is purple; the left (primary) stays the brand blue. */

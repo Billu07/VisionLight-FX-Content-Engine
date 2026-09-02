@@ -139,11 +139,8 @@ const HERO_CSS = `
 .dl-word-brand{display:flex;align-items:center;gap:9px}
 .dl-word-brand .dl-word-brandname{font-size:19px;font-weight:800;letter-spacing:-.01em;color:#fff}
 .dl-hero-logo{height:26px;width:auto;max-width:140px;object-fit:contain;display:block}
-/* Terms/Privacy sit UNDER the CTA buttons, centered at the very bottom. */
-.dl-hero-legal-bottom{position:absolute;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:31;display:flex;align-items:center;gap:8px;font-size:11px;line-height:1;pointer-events:auto}
-.dl-hero-legal-bottom a{color:rgba(255,255,255,.62);text-decoration:none;transition:color .16s}
-.dl-hero-legal-bottom a:hover{color:#22d3ee}
-.dl-hero-legal-bottom span{color:rgba(255,255,255,.3)}
+/* Terms/Privacy now render INSIDE the player (SpinViewer .r3d-legal), just under
+   the "Powered by" badge, so they travel with the bottom stack on phones. */
 .dl-hero-login{pointer-events:auto;cursor:pointer;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);
   color:#e8edf4;border-radius:11px;padding:8px 16px;font-size:12.5px;font-weight:650;backdrop-filter:blur(8px);transition:background .16s}
 .dl-hero-login:hover{background:rgba(255,255,255,.12)}
@@ -249,6 +246,8 @@ function HeroLanding({ product }: { product: any }) {
           descriptionEnd={product.descriptionEnd}
           helperStart={product.helperStart}
           helperEnd={product.helperEnd}
+          termsUrl={termsUrl}
+          privacyUrl={privacyUrl}
           background={product.background || undefined}
           primaryColor={product.primaryColor || DRIFT_PRIMARY}
           secondaryColor={product.secondaryColor || DRIFT_SECONDARY}
@@ -269,11 +268,6 @@ function HeroLanding({ product }: { product: any }) {
             if (product.metaPixelId) track("CTAClick", { which, content_name: product.name }, true);
           }}
         />
-      </div>
-      <div className="dl-hero-legal-bottom">
-        <a href={termsUrl} target="_blank" rel="noopener noreferrer">Terms</a>
-        <span aria-hidden>·</span>
-        <a href={privacyUrl} target="_blank" rel="noopener noreferrer">Privacy</a>
       </div>
       <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
     </div>
