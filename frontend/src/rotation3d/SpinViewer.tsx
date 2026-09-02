@@ -549,13 +549,12 @@ export default function SpinViewer({
       // INSIDE the frame). Clamp so its bottom clears the powered-by badge + CTAs.
       if (driftMode && hintRef.current) {
         const frameBottomCss = (realMode && frameRect.h > 0 ? frameRect.y + frameRect.h : cy + scale * 2.1) / DPR;
-        // Mobile: lift the hand a touch higher into the bottom of the frame, and
-        // reserve more room below — the powered badge + CTAs are raised by the same
-        // amount in CSS so the whole bottom cluster shifts up together, consistently.
-        // Gate on the SAME 560px viewport width as that CSS (not isMobileViewport,
-        // which is true on short laptop windows too and would lift the hand on PC).
+        // Mobile only: lift the hand up ONTO the bottom of the frame (it otherwise
+        // sits at the very bottom edge). Gated on the SAME 560px viewport width as
+        // the badge/CTA CSS lift — never on PC (isMobileViewport is true on short
+        // laptop windows too, which would lift the hand on desktop).
         const mobileLift =
-          typeof window !== "undefined" && window.innerWidth <= 560 ? 22 : 0;
+          typeof window !== "undefined" && window.innerWidth <= 560 ? 44 : 0;
         const under = frameBottomCss + 16 - mobileLift;
         const hintH = hintRef.current.offsetHeight || 110;
         // Reserve the same tighter bottom zone for every drift surface so the helper
