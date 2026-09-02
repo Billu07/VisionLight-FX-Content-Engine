@@ -212,6 +212,7 @@ export default function Rotation3DPlayer() {
       showName={showName && !(drift && p.hideName)}
       showTitle={showTitle && !(drift && p.hideTitle)}
       mobileZoom={drift ? !!p.mobileZoom : true}
+      introHint={drift}
       ctaPrimary={toCta(p.ctaPrimary)}
       ctaSecondary={toCta(p.ctaSecondary)}
       forms={drift ? p.forms : undefined}

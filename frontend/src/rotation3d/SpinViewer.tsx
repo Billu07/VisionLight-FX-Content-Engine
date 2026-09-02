@@ -83,6 +83,9 @@ export type SpinViewerProps = {
   /** full-page landing takeover: cap the product size on wide screens so it
    * doesn't fill the viewport (leaves clean room for the helper + CTAs below) */
   landing?: boolean;
+  /** show the one-time first-visit drag demo (a finger drags across the frame
+   * while the content scrubs). Runs once per visitor (localStorage), drift only. */
+  introHint?: boolean;
   /** override the initial loader caption (default "Optimizing frames…") */
   loaderLabel?: string;
   /** optional product info shown beside the player (desktop right / mobile top) */
@@ -182,6 +185,7 @@ export default function SpinViewer({
   showTools = true,
   mobileZoom = true,
   landing = false,
+  introHint = false,
   loaderLabel,
   title,
   description,
@@ -215,6 +219,7 @@ export default function SpinViewer({
   const desc2Ref = useRef<HTMLDivElement>(null);
   const helperTextRef = useRef<HTMLSpanElement>(null);
   const handRef = useRef<HTMLDivElement>(null);
+  const introHandRef = useRef<HTMLDivElement>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<SVGCircleElement>(null);
   const pctRef = useRef<HTMLDivElement>(null);
@@ -306,6 +311,42 @@ export default function SpinViewer({
     let interacted = false;
     let raf = 0;
     let alive = true;
+
+    // --- one-time intro gesture ("show, don't tell") ---
+    // On a visitor's FIRST drift, a finger drags across the frame while the content
+    // scrubs in sync, then eases back — so they realise it's draggable. Runs once
+    // ever (localStorage) and cancels the instant they touch it.
+    let introActive = false;
+    let introStart = 0;
+    let introRange = 0;
+    const INTRO_IN = 380, INTRO_OUT = 820, INTRO_HOLD = 240, INTRO_BACK = 720, INTRO_FADE = 300;
+    const INTRO_TOTAL = INTRO_IN + INTRO_OUT + INTRO_HOLD + INTRO_BACK + INTRO_FADE;
+    const introEase = (k: number) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
+    const endIntro = () => {
+      if (!introActive) return;
+      introActive = false;
+      introHandRef.current?.classList.remove("r3d-intro-on");
+      stage.classList.remove("r3d-introing");
+      yaw = 0; // back to the start frame
+      yawVel = 0;
+      dirty = true;
+    };
+    const startIntro = () => {
+      if (introActive || !driftMode || !introHint || FRAMES < 4) return;
+      // Respect reduced-motion: skip the auto-demo (the static hint still guides).
+      if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
+      try {
+        if (localStorage.getItem("drift-intro-seen")) return;
+        localStorage.setItem("drift-intro-seen", "1");
+      } catch {
+        /* private mode / blocked storage → still show it this once */
+      }
+      introRange = endYaw * 0.45; // demo ~45% of the drift (not the full reveal)
+      introStart = performance.now();
+      introActive = true;
+      introHandRef.current?.classList.add("r3d-intro-on");
+      stage.classList.add("r3d-introing"); // hides the resting hint during the demo
+    };
 
     // --- frame images (real mode) ---
     // On phones, prefer the lighter mobile frame set (much smaller download →
@@ -680,9 +721,36 @@ export default function SpinViewer({
 
     const tick = () => {
       if (!alive) return;
-      if (idleSpin) yaw += spin * 0.004;
-      else if (Math.abs(yawVel) > 0.00003) { yaw += yawVel; yawVel *= 0.94; }
-      clampScrub();
+      // The one-time intro owns the scrub while it plays; physics resumes after.
+      let introHandProg = -1;
+      let introAlpha = 1;
+      if (introActive) {
+        const t = performance.now() - introStart;
+        if (t >= INTRO_TOTAL) {
+          endIntro();
+        } else {
+          let scrubK = 0;
+          if (t < INTRO_IN) {
+            introAlpha = t / INTRO_IN; // fade the finger in over the start frame
+          } else if (t < INTRO_IN + INTRO_OUT) {
+            scrubK = introEase((t - INTRO_IN) / INTRO_OUT); // drag forward
+          } else if (t < INTRO_IN + INTRO_OUT + INTRO_HOLD) {
+            scrubK = 1; // brief hold at the peek
+          } else if (t < INTRO_IN + INTRO_OUT + INTRO_HOLD + INTRO_BACK) {
+            scrubK = 1 - introEase((t - INTRO_IN - INTRO_OUT - INTRO_HOLD) / INTRO_BACK); // ease back
+          } else {
+            introAlpha = 1 - (t - INTRO_IN - INTRO_OUT - INTRO_HOLD - INTRO_BACK) / INTRO_FADE; // release
+          }
+          yaw = scrubK * introRange;
+          introHandProg = scrubK;
+          dirty = true;
+        }
+      }
+      if (!introActive) {
+        if (idleSpin) yaw += spin * 0.004;
+        else if (Math.abs(yawVel) > 0.00003) { yaw += yawVel; yawVel *= 0.94; }
+        clampScrub();
+      }
       zoom += (zoomTarget - zoom) * 0.18; // eased zoom for a premium feel
       if (zoomTarget <= 1.1) { panTX = 0; panTY = 0; }
       panX += (panTX - panX) * 0.2;
@@ -712,6 +780,14 @@ export default function SpinViewer({
       ) {
         draw();
         lastYaw = yaw; lastZoom = zoom; lastPX = panX; lastPY = panY; dirty = false;
+      }
+      // Move the intro finger across the frame in sync with the scrub.
+      if (introHandProg >= 0 && introHandRef.current && frameRect.w > 0) {
+        const fx = frameRect.x / DPR, fw = frameRect.w / DPR;
+        const fy = frameRect.y / DPR, fh = frameRect.h / DPR;
+        introHandRef.current.style.left = fx + (0.3 + 0.4 * introHandProg) * fw + "px";
+        introHandRef.current.style.top = fy + fh * 0.52 + "px";
+        introHandRef.current.style.opacity = String(Math.max(0, Math.min(1, introAlpha)));
       }
       raf = requestAnimationFrame(tick);
     };
@@ -824,6 +900,7 @@ export default function SpinViewer({
     };
 
     const onDown = (e: PointerEvent) => {
+      if (introActive) endIntro(); // the user is taking over — stop the demo
       if (isControl(e.target)) return;
       pointers.set(e.pointerId, e);
       if (pointers.size === 2) { dragging = false; axis = ""; return; } // pinch
@@ -1048,6 +1125,7 @@ export default function SpinViewer({
         } else {
           loaderRef.current?.classList.add("r3d-gone");
           if (!hero) stage.focus({ preventScroll: true });
+          window.setTimeout(startIntro, 550); // one-time first-visit drag demo
         }
       };
       requestAnimationFrame(sweep);
@@ -1256,6 +1334,13 @@ export default function SpinViewer({
         )}
       </div>
 
+      {driftMode && introHint && (
+        <div className="r3d-intro" ref={introHandRef} aria-hidden>
+          <span className="r3d-intro-ring" />
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-7-4l-2.5-4a2 2 0 0 1 3.4-2L8 14" /></svg>
+        </div>
+      )}
+
       {(ctaPrimary || ctaSecondary) && (
         <div className="r3d-ctas">
           {ctaPrimary && (
@@ -1438,6 +1523,17 @@ const R3D_CSS = `
 .r3d-drift-arrow svg{width:clamp(18px,5.4vmin,24px);height:clamp(18px,5.4vmin,24px);color:#eef1f6;transition:transform .25s}
 .r3d-hint.r3d-back .r3d-drift-arrow svg{transform:scaleX(-1)}
 @media (prefers-reduced-motion:reduce){.r3d-drift-hand{animation:none}}
+/* One-time first-visit drag demo — a finger (with a touch ripple) drags across
+   the frame while the content scrubs. Position + opacity are driven from the RAF
+   loop; the ring pulses only while the demo is on. */
+.r3d-intro{position:absolute;left:0;top:0;z-index:8;transform:translate(-50%,-50%);pointer-events:none;opacity:0;display:grid;place-items:center;color:#fff}
+.r3d-intro svg{width:clamp(30px,8vmin,40px);height:clamp(30px,8vmin,40px);filter:drop-shadow(0 2px 10px rgba(0,0,0,.7))}
+.r3d-intro-ring{position:absolute;width:clamp(46px,12vmin,60px);height:clamp(46px,12vmin,60px);border-radius:50%;background:rgba(255,255,255,.16);border:1.5px solid rgba(255,255,255,.55);box-shadow:0 0 18px rgba(255,255,255,.25)}
+.r3d-intro.r3d-intro-on .r3d-intro-ring{animation:r3dintropulse 1.15s ease-in-out infinite}
+@keyframes r3dintropulse{0%,100%{transform:scale(.82);opacity:.55}50%{transform:scale(1.08);opacity:.95}}
+/* during the demo, hide the resting hint so there's just the one moving finger */
+.r3d-introing .r3d-hint{opacity:0!important}
+@media (prefers-reduced-motion:reduce){.r3d-intro-ring{animation:none}}
 /* Drift: "Powered By Drift Link" sits UNDER the player, above the CTA, a bit bigger. */
 .r3d-drift .r3d-powered-badge{top:auto;bottom:calc(100px + env(safe-area-inset-bottom));font-size:clamp(10px,3vmin,12px)}
 .r3d-drift .r3d-powered-badge svg{width:clamp(12px,3.4vmin,14px);height:clamp(12px,3.4vmin,14px)}
