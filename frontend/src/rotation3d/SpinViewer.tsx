@@ -605,6 +605,19 @@ export default function SpinViewer({
         const maxTop = H / DPR - ((capFit ? 130 : 140) + hintH);
         hintRef.current.style.top = Math.max(12, Math.min(under, maxTop)) + "px";
         hintRef.current.style.bottom = "auto";
+        // Horizontal: align the cue to the frame's LEFT edge going forward, RIGHT
+        // edge going backward (the arrow leads the swipe direction, see r3d-back).
+        if (frameRect.w > 0) {
+          const stageW = W / DPR;
+          if (helperBack) {
+            hintRef.current.style.left = "auto";
+            hintRef.current.style.right = Math.max(8, stageW - (frameRect.x + frameRect.w) / DPR) + "px";
+          } else {
+            hintRef.current.style.right = "auto";
+            hintRef.current.style.left = Math.max(8, frameRect.x / DPR) + "px";
+          }
+          hintRef.current.style.transform = "none";
+        }
       }
 
       // Drift on-frame captions — visible while this frame is within range.
@@ -1316,13 +1329,10 @@ export default function SpinViewer({
       <div className="r3d-hint" ref={hintRef}>
         {driftMode ? (
           <>
-            <div className="r3d-drift-hand" ref={handRef} aria-hidden>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-7-4l-2.5-4a2 2 0 0 1 3.4-2L8 14" /></svg>
-            </div>
-            <div className="r3d-drift-arrow" aria-hidden>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
-            </div>
             <span ref={helperTextRef}>{helperStart || "Drag to drift"}</span>
+            <span className="r3d-drift-arrow" aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
+            </span>
           </>
         ) : (
           <>
@@ -1510,7 +1520,12 @@ const R3D_CSS = `
    convey position, and it was colliding with the helper arrow. */
 .r3d-drift .r3d-rot{display:none!important}
 /* "drag to drift" is positioned imperatively just under the product (see draw). */
-.r3d-drift .r3d-hint{opacity:.96;gap:6px}
+/* Drift helper: an inline [text + arrow] cue. JS aligns it to the frame's LEFT
+   edge going forward and its RIGHT edge going backward; row-reverse puts the arrow
+   on the leading (swipe-direction) side of the text. */
+.r3d-drift .r3d-hint{opacity:.96;flex-direction:row;align-items:center;gap:9px}
+.r3d-drift .r3d-hint.r3d-back{flex-direction:row-reverse}
+.r3d-drift .r3d-hint span{font-size:clamp(12px,3.8vmin,15px);font-weight:650}
 /* the drift helper hides between its start/end appearances (hand sequence) */
 .r3d-drift .r3d-hint.r3d-gone{opacity:0}
 .r3d-drift-hand{width:28px;height:28px;color:#eef1f6;animation:r3dsway 1.8s ease-in-out infinite;transition:opacity .3s}
@@ -1519,8 +1534,12 @@ const R3D_CSS = `
 .r3d-drift-hand.r3d-gone{opacity:0}
 .r3d-drift-hand{width:clamp(26px,7.5vmin,34px);height:clamp(26px,7.5vmin,34px);display:grid;place-items:center;color:#eef1f6}
 .r3d-drift-hand svg{width:clamp(17px,5vmin,22px);height:clamp(17px,5vmin,22px)}
-.r3d-drift-arrow{width:clamp(38px,11vmin,52px);height:clamp(38px,11vmin,52px);border-radius:50%;border:1px solid var(--r3d-line);background:rgba(11,15,25,.4);backdrop-filter:blur(8px);display:grid;place-items:center}
-.r3d-drift-arrow svg{width:clamp(18px,5.4vmin,24px);height:clamp(18px,5.4vmin,24px);color:#eef1f6;transition:transform .25s}
+.r3d-drift-arrow{display:inline-flex;align-items:center;color:#22d3ee;flex:none;animation:r3darrownudge 1.4s ease-in-out infinite}
+.r3d-drift .r3d-hint.r3d-back .r3d-drift-arrow{animation:r3darrownudgeback 1.4s ease-in-out infinite}
+.r3d-drift-arrow svg{width:clamp(20px,6vmin,26px);height:clamp(20px,6vmin,26px);filter:drop-shadow(0 1px 3px rgba(0,0,0,.9));transition:transform .25s}
+@keyframes r3darrownudge{0%,100%{transform:translateX(0)}50%{transform:translateX(5px)}}
+@keyframes r3darrownudgeback{0%,100%{transform:translateX(0)}50%{transform:translateX(-5px)}}
+@media (prefers-reduced-motion:reduce){.r3d-drift-arrow{animation:none!important}}
 .r3d-hint.r3d-back .r3d-drift-arrow svg{transform:scaleX(-1)}
 @media (prefers-reduced-motion:reduce){.r3d-drift-hand{animation:none}}
 /* One-time first-visit drag demo — a finger (with a touch ripple) drags across
@@ -1603,12 +1622,10 @@ const R3D_CSS = `
   .r3d-hint{bottom:max(26%,200px)}
   .r3d-zoomcol{bottom:calc(146px + env(safe-area-inset-bottom))}
   .r3d-cta{padding:13px 12px;font-size:14px}
-  /* Drift mobile: bigger drag hand + arrow, buttons lifted higher, badge kept
-     clear above them (leaving room below the buttons for the landing legal links). */
-  .r3d-drift-hand{width:40px;height:40px}
-  .r3d-drift-hand svg{width:27px;height:27px}
-  .r3d-drift-arrow{width:58px;height:58px}
-  .r3d-drift-arrow svg{width:28px;height:28px}
+  /* Drift mobile: bigger arrow + text, buttons lifted higher, badge kept clear
+     above them (leaving room below the buttons for the landing legal links). */
+  .r3d-drift-arrow svg{width:32px;height:32px}
+  .r3d-drift .r3d-hint span{font-size:16px}
   .r3d-drift .r3d-powered-badge{bottom:calc(36px + env(safe-area-inset-bottom))}
   .r3d-drift .r3d-ctas{padding-bottom:calc(78px + env(safe-area-inset-bottom))}
   /* +/- zoom controls are off on phones by default (superadmin can turn them on). */
