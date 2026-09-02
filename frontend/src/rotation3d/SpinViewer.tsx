@@ -220,6 +220,7 @@ export default function SpinViewer({
   const helperTextRef = useRef<HTMLSpanElement>(null);
   const handRef = useRef<HTMLDivElement>(null);
   const cueRef = useRef<HTMLDivElement>(null);
+  const ctasRef = useRef<HTMLDivElement>(null);
   const introHandRef = useRef<HTMLDivElement>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<SVGCircleElement>(null);
@@ -635,7 +636,29 @@ export default function SpinViewer({
         if (cueRef.current) {
           const handH = handRef.current?.offsetHeight || 28;
           const naturalCueTop = topPx + handH + 7; // 7px column gap (see .r3d-drift .r3d-hint)
-          cueRef.current.style.marginTop = Math.max(0, frameBottomCss + 16 - naturalCueTop) + "px";
+          const cueTop = Math.max(naturalCueTop, frameBottomCss + 16);
+          cueRef.current.style.marginTop = cueTop - naturalCueTop + "px";
+          // Mobile: bring the CTA buttons UP to a consistent ~18px gap under the cue.
+          // The row is bottom-anchored, so a fixed CSS padding-bottom can't track the
+          // frame/cue (they scale with the viewport + product aspect) — on tall/wide
+          // frames that stranded a big gap. Drive padding-bottom from JS so the
+          // buttons follow the cue; the powered badge stays pinned at the bottom (per
+          // the client's layout). Desktop keeps the CSS value (clear the override).
+          const firstBtn = ctasRef.current?.firstElementChild as HTMLElement | null;
+          if (ctasRef.current) {
+            if (isNarrow && firstBtn) {
+              const stageH = H / DPR;
+              const cueBottom = cueTop + (cueRef.current.offsetHeight || 26);
+              const pb = Math.max(
+                60,
+                Math.min(stageH - firstBtn.offsetHeight - (cueBottom + 18), stageH * 0.6),
+              );
+              ctasRef.current.style.paddingBottom =
+                "calc(" + Math.round(pb) + "px + env(safe-area-inset-bottom))";
+            } else {
+              ctasRef.current.style.paddingBottom = "";
+            }
+          }
         }
         // Horizontal: align the cue to the frame's edge (see placeHelperX — it
         // also runs on the direction flip so the anchor never lags the arrow).
@@ -1379,7 +1402,7 @@ export default function SpinViewer({
       )}
 
       {(ctaPrimary || ctaSecondary) && (
-        <div className="r3d-ctas">
+        <div className="r3d-ctas" ref={ctasRef}>
           {ctaPrimary && (
             <button className="r3d-cta r3d-primary" onClick={() => fireCta("primary", ctaPrimary)}>
               {ctaPrimary.label}
