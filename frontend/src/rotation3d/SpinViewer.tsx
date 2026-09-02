@@ -590,15 +590,11 @@ export default function SpinViewer({
       // INSIDE the frame). Clamp so its bottom clears the powered-by badge + CTAs.
       if (driftMode && hintRef.current) {
         const frameBottomCss = (realMode && frameRect.h > 0 ? frameRect.y + frameRect.h : cy + scale * 2.1) / DPR;
-        const frameHcss = (realMode && frameRect.h > 0 ? frameRect.h : scale * 4.2) / DPR;
-        // Mobile: sit the hand a consistent FRACTION up from the frame's bottom
-        // edge (~10% of the frame height) rather than a fixed px lift — so the hand
-        // lands at the same spot on the frame on every device, big or small. Gated
-        // on the SAME 560px viewport width as the badge/CTA CSS lift; PC keeps the
-        // hand 16px below the frame (isMobileViewport is true on short laptop
-        // windows too, which would lift the hand on desktop).
-        const isNarrow = typeof window !== "undefined" && window.innerWidth <= 560;
-        const under = isNarrow ? frameBottomCss - frameHcss * 0.16 : frameBottomCss + 16;
+        // Sit the whole helper cluster (hand + text + arrow) just UNDER the frame's
+        // bottom edge on every device. Mobile briefly lifted it ~16% ONTO the frame,
+        // which put the text/arrow on the product AND stranded an empty gap between
+        // the frame and the CTAs — dropping the helper into that gap fixes both.
+        const under = frameBottomCss + 16;
         const hintH = hintRef.current.offsetHeight || 110;
         // Safety clamp: never let the helper cluster drop so low it overlaps the
         // powered badge + CTAs (tighter reserve for drift surfaces via capFit).
