@@ -303,6 +303,16 @@ export default function SpinViewer({
         el.style.left = Math.max(8, frameRect.x / DPR) + "px";
       }
       el.style.transform = "none";
+      // The HAND rides at the FRAME'S CENTRE (a finger dragging the middle of the
+      // product), independent of the cue's edge alignment. The column is anchored to
+      // the frame edge, so shift the hand back to centre with position:relative left
+      // (leaves the sway's transform untouched). Same magnitude either way → dead
+      // centre whichever edge the column is on, so it stays put across the flip.
+      if (handRef.current) {
+        const handW = handRef.current.offsetWidth || 28;
+        const halfIn = Math.max(0, frameRect.w / DPR / 2 - handW / 2);
+        handRef.current.style.left = (helperBack ? -halfIn : halfIn) + "px";
+      }
     };
     const syncHelper = () => {
       hintRef.current?.classList.toggle("r3d-back", helperBack);
@@ -1584,7 +1594,7 @@ const R3D_CSS = `
 .r3d-drift-hand svg{width:19px;height:19px}
 /* only the hand hides between its start/end appearances; arrow + text stay */
 .r3d-drift-hand.r3d-gone{opacity:0}
-.r3d-drift-hand{width:clamp(26px,7.5vmin,34px);height:clamp(26px,7.5vmin,34px);display:grid;place-items:center;color:#eef1f6}
+.r3d-drift-hand{position:relative;width:clamp(26px,7.5vmin,34px);height:clamp(26px,7.5vmin,34px);display:grid;place-items:center;color:#eef1f6}
 .r3d-drift-hand svg{width:clamp(17px,5vmin,22px);height:clamp(17px,5vmin,22px)}
 .r3d-drift-arrow{display:inline-flex;align-items:center;color:#22d3ee;flex:none;animation:r3darrownudge 1.4s ease-in-out infinite}
 .r3d-drift .r3d-hint.r3d-back .r3d-drift-arrow{animation:r3darrownudgeback 1.4s ease-in-out infinite}
