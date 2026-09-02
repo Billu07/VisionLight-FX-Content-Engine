@@ -283,9 +283,29 @@ export default function SpinViewer({
     let helperBack = false;
     const fwdHelper = helperStart || "Drag to drift";
     const backHelper = helperEnd || "Drag to start";
+    // Anchor the helper cue to the frame's LEFT edge going forward, RIGHT edge
+    // going backward (the arrow leads the swipe). Called every frame from draw()
+    // AND from syncHelper, so the left/right anchor flips in the SAME frame as the
+    // text/arrow. Otherwise, if the product settles on the exact frame the
+    // direction flips, tick()'s idle guard stops calling draw() and the reverse
+    // cue stays stranded on the frame's LEFT edge (the "end helper on the left" bug).
+    const placeHelperX = () => {
+      const el = hintRef.current;
+      if (!driftMode || !el || frameRect.w <= 0) return;
+      const stageW = cv.width / DPR;
+      if (helperBack) {
+        el.style.left = "auto";
+        el.style.right = Math.max(8, stageW - (frameRect.x + frameRect.w) / DPR) + "px";
+      } else {
+        el.style.right = "auto";
+        el.style.left = Math.max(8, frameRect.x / DPR) + "px";
+      }
+      el.style.transform = "none";
+    };
     const syncHelper = () => {
       hintRef.current?.classList.toggle("r3d-back", helperBack);
       if (helperTextRef.current) helperTextRef.current.textContent = helperBack ? backHelper : fwdHelper;
+      placeHelperX();
     };
     // Hand sequence: shown at start → hidden on first move → shown again at the end
     // → hidden for good. And headline/description dissolve to #2 AT the end frame.
@@ -601,19 +621,9 @@ export default function SpinViewer({
         const maxTop = H / DPR - ((capFit ? 130 : 140) + hintH);
         hintRef.current.style.top = Math.max(12, Math.min(under, maxTop)) + "px";
         hintRef.current.style.bottom = "auto";
-        // Horizontal: align the cue to the frame's LEFT edge going forward, RIGHT
-        // edge going backward (the arrow leads the swipe direction, see r3d-back).
-        if (frameRect.w > 0) {
-          const stageW = W / DPR;
-          if (helperBack) {
-            hintRef.current.style.left = "auto";
-            hintRef.current.style.right = Math.max(8, stageW - (frameRect.x + frameRect.w) / DPR) + "px";
-          } else {
-            hintRef.current.style.right = "auto";
-            hintRef.current.style.left = Math.max(8, frameRect.x / DPR) + "px";
-          }
-          hintRef.current.style.transform = "none";
-        }
+        // Horizontal: align the cue to the frame's edge (see placeHelperX — it
+        // also runs on the direction flip so the anchor never lags the arrow).
+        placeHelperX();
       }
 
       // Drift on-frame captions — visible while this frame is within range.
