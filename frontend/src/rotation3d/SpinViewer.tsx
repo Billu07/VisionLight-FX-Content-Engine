@@ -221,6 +221,7 @@ export default function SpinViewer({
   const handRef = useRef<HTMLDivElement>(null);
   const cueRef = useRef<HTMLDivElement>(null);
   const ctasRef = useRef<HTMLDivElement>(null);
+  const poweredRef = useRef<HTMLAnchorElement>(null);
   const introHandRef = useRef<HTMLDivElement>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<SVGCircleElement>(null);
@@ -303,16 +304,6 @@ export default function SpinViewer({
         el.style.left = Math.max(8, frameRect.x / DPR) + "px";
       }
       el.style.transform = "none";
-      // The HAND rides at the FRAME'S CENTRE (a finger dragging the middle of the
-      // product), independent of the cue's edge alignment. The column is anchored to
-      // the frame edge, so shift the hand back to centre with position:relative left
-      // (leaves the sway's transform untouched). Same magnitude either way → dead
-      // centre whichever edge the column is on, so it stays put across the flip.
-      if (handRef.current) {
-        const handW = handRef.current.offsetWidth || 28;
-        const halfIn = Math.max(0, frameRect.w / DPR / 2 - handW / 2);
-        handRef.current.style.left = (helperBack ? -halfIn : halfIn) + "px";
-      }
     };
     const syncHelper = () => {
       hintRef.current?.classList.toggle("r3d-back", helperBack);
@@ -623,15 +614,14 @@ export default function SpinViewer({
       if (driftMode && hintRef.current) {
         const frameBottomCss = (realMode && frameRect.h > 0 ? frameRect.y + frameRect.h : cy + scale * 2.1) / DPR;
         const frameHcss = (realMode && frameRect.h > 0 ? frameRect.h : scale * 4.2) / DPR;
-        // Anchor the column by the HAND (it's the top item): on phones the hand
-        // rides ~16% UP onto the frame — its carefully-tuned spot — while desktop
-        // keeps it 16px under. The text+arrow CUE is then pushed the rest of the way
-        // DOWN (below) so it always clears the frame; that way the hand stays exactly
-        // put and only the cue moves under the product. Gate the mobile lift on the
-        // same 560px width as the badge/CTA CSS (isMobileViewport is also true on
-        // short laptop windows, which would wrongly lift the hand on desktop).
+        // Anchor the column by the HAND (it's the top item): it rides ~16% UP onto
+        // the frame on EVERY device (desktop included — leaving it under the frame
+        // stranded the text even lower). The text+arrow CUE is then pushed the rest
+        // of the way DOWN so it always clears the frame; the hand stays put, only the
+        // cue moves under the product. isNarrow gates the mobile-only bottom stack
+        // below (buttons + badge), not the hand lift.
         const isNarrow = typeof window !== "undefined" && window.innerWidth <= 560;
-        const under = isNarrow ? frameBottomCss - frameHcss * 0.16 : frameBottomCss + 16;
+        const under = frameBottomCss - frameHcss * 0.16;
         const hintH = hintRef.current.offsetHeight || 110;
         // Safety clamp: never let the helper cluster drop so low it overlaps the
         // powered badge + CTAs (tighter reserve for drift surfaces via capFit).
@@ -639,35 +629,40 @@ export default function SpinViewer({
         const topPx = Math.max(12, Math.min(under, maxTop));
         hintRef.current.style.top = topPx + "px";
         hintRef.current.style.bottom = "auto";
-        // Push the CUE down so its top lands ~16px under the frame's bottom edge,
-        // wherever the hand is anchored (0 when it already sits under the frame, e.g.
-        // desktop). This is what keeps the text/arrow off the product on mobile
-        // without dragging the hand down with it.
+        // Push the CUE down so its top lands ~16px under the frame's bottom edge
+        // (the hand is now up on the frame on every device, so this always runs).
+        // Keeps the text/arrow off the product without dragging the hand down.
         if (cueRef.current) {
           const handH = handRef.current?.offsetHeight || 28;
           const naturalCueTop = topPx + handH + 7; // 7px column gap (see .r3d-drift .r3d-hint)
           const cueTop = Math.max(naturalCueTop, frameBottomCss + 16);
           cueRef.current.style.marginTop = cueTop - naturalCueTop + "px";
-          // Mobile: bring the CTA buttons UP to a consistent ~18px gap under the cue.
-          // The row is bottom-anchored, so a fixed CSS padding-bottom can't track the
-          // frame/cue (they scale with the viewport + product aspect) — on tall/wide
-          // frames that stranded a big gap. Drive padding-bottom from JS so the
-          // buttons follow the cue; the powered badge stays pinned at the bottom (per
-          // the client's layout). Desktop keeps the CSS value (clear the override).
+          // Mobile bottom stack (phones only): the CTA row + powered badge are
+          // bottom-anchored, so a fixed CSS offset can't track the frame/cue (they
+          // scale with the viewport + product aspect). Drive them from JS — buttons a
+          // comfortable gap under the cue, and the "Powered by" badge tucked just
+          // under the buttons rather than pinned to the very bottom. The badge tuck is
+          // player-only: the landing keeps its badge + Terms/Privacy grouped at the
+          // bottom. Desktop clears both overrides and keeps the CSS values.
           const firstBtn = ctasRef.current?.firstElementChild as HTMLElement | null;
-          if (ctasRef.current) {
-            if (isNarrow && firstBtn) {
-              const stageH = H / DPR;
-              const cueBottom = cueTop + (cueRef.current.offsetHeight || 26);
-              const pb = Math.max(
-                60,
-                Math.min(stageH - firstBtn.offsetHeight - (cueBottom + 18), stageH * 0.6),
-              );
-              ctasRef.current.style.paddingBottom =
-                "calc(" + Math.round(pb) + "px + env(safe-area-inset-bottom))";
-            } else {
-              ctasRef.current.style.paddingBottom = "";
+          if (isNarrow && ctasRef.current && firstBtn) {
+            const stageH = H / DPR;
+            const cueBottom = cueTop + (cueRef.current.offsetHeight || 26);
+            const pb = Math.max(
+              64,
+              Math.min(stageH - firstBtn.offsetHeight - (cueBottom + 40), stageH * 0.55),
+            );
+            ctasRef.current.style.paddingBottom =
+              "calc(" + Math.round(pb) + "px + env(safe-area-inset-bottom))";
+            if (poweredRef.current && !landing) {
+              const badgeH = poweredRef.current.offsetHeight || 16;
+              const badgeBottom = Math.max(10, pb - 12 - badgeH); // sit 12px under the buttons
+              poweredRef.current.style.bottom =
+                "calc(" + Math.round(badgeBottom) + "px + env(safe-area-inset-bottom))";
             }
+          } else {
+            if (ctasRef.current) ctasRef.current.style.paddingBottom = "";
+            if (poweredRef.current) poweredRef.current.style.bottom = "";
           }
         }
         // Horizontal: align the cue to the frame's edge (see placeHelperX — it
@@ -1470,6 +1465,7 @@ export default function SpinViewer({
       )}
 
       <a
+        ref={poweredRef}
         className="r3d-powered-badge"
         href={playerBrand.url}
         target="_blank"
@@ -1594,7 +1590,8 @@ const R3D_CSS = `
 .r3d-drift-hand svg{width:19px;height:19px}
 /* only the hand hides between its start/end appearances; arrow + text stay */
 .r3d-drift-hand.r3d-gone{opacity:0}
-.r3d-drift-hand{position:relative;width:clamp(26px,7.5vmin,34px);height:clamp(26px,7.5vmin,34px);display:grid;place-items:center;color:#eef1f6}
+/* hand is centred over the cue's text (the column's width = the cue), not the frame */
+.r3d-drift-hand{align-self:center;width:clamp(26px,7.5vmin,34px);height:clamp(26px,7.5vmin,34px);display:grid;place-items:center;color:#eef1f6}
 .r3d-drift-hand svg{width:clamp(17px,5vmin,22px);height:clamp(17px,5vmin,22px)}
 .r3d-drift-arrow{display:inline-flex;align-items:center;color:#22d3ee;flex:none;animation:r3darrownudge 1.4s ease-in-out infinite}
 .r3d-drift .r3d-hint.r3d-back .r3d-drift-arrow{animation:r3darrownudgeback 1.4s ease-in-out infinite}
