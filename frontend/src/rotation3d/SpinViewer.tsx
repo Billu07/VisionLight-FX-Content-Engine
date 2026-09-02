@@ -1329,10 +1329,15 @@ export default function SpinViewer({
       <div className="r3d-hint" ref={hintRef}>
         {driftMode ? (
           <>
-            <span ref={helperTextRef}>{helperStart || "Drag to drift"}</span>
-            <span className="r3d-drift-arrow" aria-hidden>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
-            </span>
+            <div className="r3d-drift-hand" ref={handRef} aria-hidden>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-7-4l-2.5-4a2 2 0 0 1 3.4-2L8 14" /></svg>
+            </div>
+            <div className="r3d-drift-cue">
+              <span ref={helperTextRef}>{helperStart || "Drag to drift"}</span>
+              <span className="r3d-drift-arrow" aria-hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
+              </span>
+            </div>
           </>
         ) : (
           <>
@@ -1523,8 +1528,10 @@ const R3D_CSS = `
 /* Drift helper: an inline [text + arrow] cue. JS aligns it to the frame's LEFT
    edge going forward and its RIGHT edge going backward; row-reverse puts the arrow
    on the leading (swipe-direction) side of the text. */
-.r3d-drift .r3d-hint{opacity:.96;flex-direction:row;align-items:center;gap:9px}
-.r3d-drift .r3d-hint.r3d-back{flex-direction:row-reverse}
+.r3d-drift .r3d-hint{opacity:.96;flex-direction:column;align-items:flex-start;gap:7px}
+.r3d-drift .r3d-hint.r3d-back{align-items:flex-end}
+.r3d-drift-cue{display:flex;align-items:center;gap:9px}
+.r3d-drift .r3d-hint.r3d-back .r3d-drift-cue{flex-direction:row-reverse}
 .r3d-drift .r3d-hint span{font-size:clamp(12px,3.8vmin,15px);font-weight:650}
 /* the drift helper hides between its start/end appearances (hand sequence) */
 .r3d-drift .r3d-hint.r3d-gone{opacity:0}
@@ -1559,7 +1566,9 @@ const R3D_CSS = `
 /* Drift: lift the CTA a touch off the very edge (standard spacing). */
 .r3d-drift .r3d-ctas{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
 /* Right (secondary) CTA is purple; the left (primary) stays the brand blue. */
-.r3d-drift .r3d-cta.r3d-ghost{background:linear-gradient(135deg,#7c3aed,#a855f7);border:none;color:#fff;backdrop-filter:none;box-shadow:0 10px 30px -12px rgba(124,58,237,.7)}
+/* Drift CTAs: solid colours (no gradient) — left blue, right purple, all drifts. */
+.r3d-drift .r3d-cta.r3d-primary{background:#3b82f6;border:none;box-shadow:0 10px 30px -12px rgba(59,130,246,.6)}
+.r3d-drift .r3d-cta.r3d-ghost{background:#8b5cf6;border:none;color:#fff;backdrop-filter:none;box-shadow:0 10px 30px -12px rgba(139,92,246,.6)}
 .r3d-drift .r3d-cta.r3d-ghost:hover{filter:brightness(1.08)}
 /* Bottom stack (drift): CTA buttons up top, then the "Powered by" badge, then
    the landing's Terms/Privacy at the very bottom — see the badge + ctas rules. */
@@ -1624,6 +1633,8 @@ const R3D_CSS = `
   .r3d-cta{padding:13px 12px;font-size:14px}
   /* Drift mobile: bigger arrow + text, buttons lifted higher, badge kept clear
      above them (leaving room below the buttons for the landing legal links). */
+  .r3d-drift-hand{width:40px;height:40px}
+  .r3d-drift-hand svg{width:27px;height:27px}
   .r3d-drift-arrow svg{width:32px;height:32px}
   .r3d-drift .r3d-hint span{font-size:16px}
   .r3d-drift .r3d-powered-badge{bottom:calc(36px + env(safe-area-inset-bottom))}
