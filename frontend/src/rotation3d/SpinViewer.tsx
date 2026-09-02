@@ -535,7 +535,10 @@ export default function SpinViewer({
         // Mobile: lift the hand a touch higher into the bottom of the frame, and
         // reserve more room below — the powered badge + CTAs are raised by the same
         // amount in CSS so the whole bottom cluster shifts up together, consistently.
-        const mobileLift = isMobileViewport ? 22 : 0;
+        // Gate on the SAME 560px viewport width as that CSS (not isMobileViewport,
+        // which is true on short laptop windows too and would lift the hand on PC).
+        const mobileLift =
+          typeof window !== "undefined" && window.innerWidth <= 560 ? 22 : 0;
         const under = frameBottomCss + 16 - mobileLift;
         const hintH = hintRef.current.offsetHeight || 110;
         // Landing reserves a tighter bottom zone (it has no scrubber) so the bigger
