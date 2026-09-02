@@ -483,9 +483,15 @@ export default function SpinViewer({
       // Landing shows the product BIG (like a ~2x zoom) — capped only so it never
       // overflows the viewport. At that size it fills the screen, so the drag arrow
       // rides as a bottom-centered overlay (pinned to the bottom, not the middle).
-      const cyFactor = landing ? 0.46 : 0.47;
+      // Every drift surface (the landing AND the standalone/embedded player) caps
+      // the product size so it leaves clean room BELOW for the drag helper +
+      // powered badge + CTAs — otherwise the bigger default sizing pushes the frame
+      // down and the helper gets clamped up ONTO the image (landing vs player
+      // inconsistency). Hero/gallery tiles keep the compact default.
+      const capFit = landing || (driftMode && !hero);
+      const cyFactor = capFit ? 0.46 : 0.47;
       let base = Math.min(W, H) * (hero ? 0.23 : 0.25);
-      if (landing) {
+      if (capFit) {
         const capH = (H * 0.95) / 4.2; // don't overflow the height
         const capW = (W * 0.94) / 4.2; // and fit the width
         base = Math.min(capH, capW);
@@ -541,9 +547,10 @@ export default function SpinViewer({
           typeof window !== "undefined" && window.innerWidth <= 560 ? 22 : 0;
         const under = frameBottomCss + 16 - mobileLift;
         const hintH = hintRef.current.offsetHeight || 110;
-        // Landing reserves a tighter bottom zone (it has no scrubber) so the bigger
-        // product's helper still tucks just beneath it; product page keeps 140.
-        const maxTop = H / DPR - ((landing ? 120 : 140) + hintH + mobileLift);
+        // Reserve the same tighter bottom zone for every drift surface so the helper
+        // tucks just beneath the frame on both the landing and the player (capFit);
+        // non-drift/rotation3d keeps 140.
+        const maxTop = H / DPR - ((capFit ? 120 : 140) + hintH + mobileLift);
         hintRef.current.style.top = Math.max(12, Math.min(under, maxTop)) + "px";
         hintRef.current.style.bottom = "auto";
       }
