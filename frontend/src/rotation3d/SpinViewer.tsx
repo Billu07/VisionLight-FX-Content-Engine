@@ -599,6 +599,28 @@ export default function SpinViewer({
         }
       }
 
+      // Drift scrub-progress: a subtle dot riding the frame's bottom edge from the
+      // start frame (left) to the end frame (right) — a quiet "how far we've
+      // drifted" cue. Colour eases red → blue to echo the before → after idea.
+      if (driftMode && realMode && frameRect.w > 0) {
+        const dotProg = loopScrub
+          ? (((yaw % TWO_PI) + TWO_PI) % TWO_PI) / TWO_PI
+          : Math.max(0, Math.min(1, endYaw > 0 ? yaw / endYaw : 0));
+        const dotX = frameRect.x + dotProg * frameRect.w;
+        const dotY = frameRect.y + frameRect.h; // the frame's bottom edge
+        const cr = Math.round(239 + (59 - 239) * dotProg);
+        const cg = Math.round(68 + (130 - 68) * dotProg);
+        const cb = Math.round(68 + (246 - 68) * dotProg);
+        ctx.save();
+        ctx.shadowColor = `rgba(${cr},${cg},${cb},.5)`;
+        ctx.shadowBlur = 7 * DPR;
+        ctx.fillStyle = `rgba(${cr},${cg},${cb},.9)`;
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, 3.2 * DPR, 0, TWO_PI);
+        ctx.fill();
+        ctx.restore();
+      }
+
       // Navigator: 0° at the start frame (DEFAULT_FRAME), counting up as you
       // drag forward (right). Measured relative to the start so the readout
       // begins at 0°; circular, so dragging back past the start wraps toward 360°.
