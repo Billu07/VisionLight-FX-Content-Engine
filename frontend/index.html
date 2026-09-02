@@ -13,6 +13,17 @@
     <link rel="preconnect" href="https://visualfx.studio" crossorigin />
     <meta name="theme-color" content="#6366f1" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Social share preview (Open Graph + Twitter). Crawlers read these from the
+         STATIC HTML and DON'T run JS, so the JS tab-title script below can't fix
+         them — per-domain values (e.g. drift.li) must be swapped at the edge/server.
+         See cloudflare/drift-og-worker.js for the drift.li override. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="PicDrift Studio" />
+    <meta property="og:title" content="PicDrift Studio - AI Content Generation Studio" />
+    <meta property="og:description" content="Create scroll-stopping content with AI — images, video, and interactive product drifts." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="PicDrift Studio - AI Content Generation Studio" />
+    <meta name="twitter:description" content="Create scroll-stopping content with AI — images, video, and interactive product drifts." />
     <title>PicDrift Studio - AI Content Generation Studio</title>
     <script>
       // Domain-aware browser tab title. Runs before React so there is no flash
