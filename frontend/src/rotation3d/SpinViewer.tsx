@@ -56,12 +56,6 @@ export type SpinViewerProps = {
   productId?: string;
   /** called before navigation so callers can record analytics (CTA_CLICK) */
   onCtaClick?: (which: "primary" | "secondary", cta: SpinCta) => void;
-  /** SPA-navigate a same-site drift CTA instead of a hard reload. Return true if
-   * handled (SpinViewer then skips window.location); false → normal navigation. */
-  onNavigate?: (url: string) => boolean;
-  /** fired once the frames are revealed (the loader is fading) — lets the host
-   * hand off a drift-to-drift transition overlay. */
-  onReady?: () => void;
   className?: string;
   /** "full" = full-screen player with chrome; "hero" = contained, chrome-less
    * spinning object that fills its parent (used as a landing/hero visual) */
@@ -173,8 +167,6 @@ export default function SpinViewer({
   forms,
   productId,
   onCtaClick,
-  onNavigate,
-  onReady,
   className,
   variant = "full",
   logoUrl,
@@ -1056,7 +1048,6 @@ export default function SpinViewer({
         } else {
           loaderRef.current?.classList.add("r3d-gone");
           if (!hero) stage.focus({ preventScroll: true });
-          onReady?.(); // frames revealed — host can fade out a transition overlay
         }
       };
       requestAnimationFrame(sweep);
@@ -1166,10 +1157,7 @@ export default function SpinViewer({
       return;
     }
     if (cta.url && cta.url !== "#") {
-      // A same-site drift target navigates via the SPA (poster cross-fade, no
-      // reload) when the host wires onNavigate; anything it doesn't claim falls
-      // through. Drift CTAs otherwise open in the SAME window (ad landing behavior).
-      if (driftMode && onNavigate && onNavigate(cta.url)) return;
+      // Drift CTAs open in the SAME window (ad landing behavior); others honor newTab.
       if (driftMode || cta.newTab === false) window.location.href = cta.url;
       else window.open(cta.url, "_blank", "noopener");
     }
