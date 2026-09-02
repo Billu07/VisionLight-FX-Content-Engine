@@ -602,7 +602,7 @@ export default function SpinViewer({
         const hintH = hintRef.current.offsetHeight || 110;
         // Safety clamp: never let the helper cluster drop so low it overlaps the
         // powered badge + CTAs (tighter reserve for drift surfaces via capFit).
-        const maxTop = H / DPR - ((capFit ? 120 : 140) + hintH);
+        const maxTop = H / DPR - ((capFit ? 130 : 140) + hintH);
         hintRef.current.style.top = Math.max(12, Math.min(under, maxTop)) + "px";
         hintRef.current.style.bottom = "auto";
       }
@@ -1407,7 +1407,7 @@ export default function SpinViewer({
         aria-label={`Powered by ${playerBrand.name}`}
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
-        <span>{driftMode ? <b>Drift Link Interactive</b> : <>Powered by <b>{playerBrand.name}</b></>}</span>
+        <span>{driftMode ? <>Powered by <b>Drift Link Interactive</b></> : <>Powered by <b>{playerBrand.name}</b></>}</span>
       </a>
 
       <div className="r3d-loader" ref={loaderRef}>
@@ -1535,15 +1535,15 @@ const R3D_CSS = `
 .r3d-introing .r3d-hint{opacity:0!important}
 @media (prefers-reduced-motion:reduce){.r3d-intro-ring{animation:none}}
 /* Drift: "Powered By Drift Link" sits UNDER the player, above the CTA, a bit bigger. */
-.r3d-drift .r3d-powered-badge{top:auto;bottom:calc(100px + env(safe-area-inset-bottom));font-size:clamp(10px,3vmin,12px)}
+.r3d-drift .r3d-powered-badge{top:auto;bottom:calc(36px + env(safe-area-inset-bottom));font-size:clamp(10px,3vmin,12px)}
 .r3d-drift .r3d-powered-badge svg{width:clamp(12px,3.4vmin,14px);height:clamp(12px,3.4vmin,14px)}
 /* Drift: lift the CTA a touch off the very edge (standard spacing). */
-.r3d-drift .r3d-ctas{padding-bottom:calc(22px + env(safe-area-inset-bottom))}
+.r3d-drift .r3d-ctas{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
 /* Right (secondary) CTA is purple; the left (primary) stays the brand blue. */
 .r3d-drift .r3d-cta.r3d-ghost{background:linear-gradient(135deg,#7c3aed,#a855f7);border:none;color:#fff;backdrop-filter:none;box-shadow:0 10px 30px -12px rgba(124,58,237,.7)}
 .r3d-drift .r3d-cta.r3d-ghost:hover{filter:brightness(1.08)}
-/* Landing: leave room below the CTAs for the Terms/Privacy links under them. */
-.r3d-landing .r3d-ctas{padding-bottom:calc(46px + env(safe-area-inset-bottom))}
+/* Bottom stack (drift): CTA buttons up top, then the "Powered by" badge, then
+   the landing's Terms/Privacy at the very bottom — see the badge + ctas rules. */
 /* Drift mobile: hide reset + fullscreen (keep it clean). */
 @media (max-width:560px){
   .r3d-drift [data-reset],.r3d-drift [data-fs]{display:none!important}
@@ -1609,8 +1609,8 @@ const R3D_CSS = `
   .r3d-drift-hand svg{width:27px;height:27px}
   .r3d-drift-arrow{width:58px;height:58px}
   .r3d-drift-arrow svg{width:28px;height:28px}
-  .r3d-drift .r3d-powered-badge{bottom:calc(140px + env(safe-area-inset-bottom))}
-  .r3d-drift .r3d-ctas{padding-bottom:calc(60px + env(safe-area-inset-bottom))}
+  .r3d-drift .r3d-powered-badge{bottom:calc(36px + env(safe-area-inset-bottom))}
+  .r3d-drift .r3d-ctas{padding-bottom:calc(78px + env(safe-area-inset-bottom))}
   /* +/- zoom controls are off on phones by default (superadmin can turn them on). */
   .r3d-no-mobile-zoom .r3d-zoomcol{display:none!important}
 }
