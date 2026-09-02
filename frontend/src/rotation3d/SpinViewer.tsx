@@ -219,6 +219,7 @@ export default function SpinViewer({
   const desc2Ref = useRef<HTMLDivElement>(null);
   const helperTextRef = useRef<HTMLSpanElement>(null);
   const handRef = useRef<HTMLDivElement>(null);
+  const cueRef = useRef<HTMLDivElement>(null);
   const introHandRef = useRef<HTMLDivElement>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<SVGCircleElement>(null);
@@ -610,17 +611,32 @@ export default function SpinViewer({
       // INSIDE the frame). Clamp so its bottom clears the powered-by badge + CTAs.
       if (driftMode && hintRef.current) {
         const frameBottomCss = (realMode && frameRect.h > 0 ? frameRect.y + frameRect.h : cy + scale * 2.1) / DPR;
-        // Sit the whole helper cluster (hand + text + arrow) just UNDER the frame's
-        // bottom edge on every device. Mobile briefly lifted it ~16% ONTO the frame,
-        // which put the text/arrow on the product AND stranded an empty gap between
-        // the frame and the CTAs — dropping the helper into that gap fixes both.
-        const under = frameBottomCss + 16;
+        const frameHcss = (realMode && frameRect.h > 0 ? frameRect.h : scale * 4.2) / DPR;
+        // Anchor the column by the HAND (it's the top item): on phones the hand
+        // rides ~16% UP onto the frame — its carefully-tuned spot — while desktop
+        // keeps it 16px under. The text+arrow CUE is then pushed the rest of the way
+        // DOWN (below) so it always clears the frame; that way the hand stays exactly
+        // put and only the cue moves under the product. Gate the mobile lift on the
+        // same 560px width as the badge/CTA CSS (isMobileViewport is also true on
+        // short laptop windows, which would wrongly lift the hand on desktop).
+        const isNarrow = typeof window !== "undefined" && window.innerWidth <= 560;
+        const under = isNarrow ? frameBottomCss - frameHcss * 0.16 : frameBottomCss + 16;
         const hintH = hintRef.current.offsetHeight || 110;
         // Safety clamp: never let the helper cluster drop so low it overlaps the
         // powered badge + CTAs (tighter reserve for drift surfaces via capFit).
         const maxTop = H / DPR - ((capFit ? 130 : 140) + hintH);
-        hintRef.current.style.top = Math.max(12, Math.min(under, maxTop)) + "px";
+        const topPx = Math.max(12, Math.min(under, maxTop));
+        hintRef.current.style.top = topPx + "px";
         hintRef.current.style.bottom = "auto";
+        // Push the CUE down so its top lands ~16px under the frame's bottom edge,
+        // wherever the hand is anchored (0 when it already sits under the frame, e.g.
+        // desktop). This is what keeps the text/arrow off the product on mobile
+        // without dragging the hand down with it.
+        if (cueRef.current) {
+          const handH = handRef.current?.offsetHeight || 28;
+          const naturalCueTop = topPx + handH + 7; // 7px column gap (see .r3d-drift .r3d-hint)
+          cueRef.current.style.marginTop = Math.max(0, frameBottomCss + 16 - naturalCueTop) + "px";
+        }
         // Horizontal: align the cue to the frame's edge (see placeHelperX — it
         // also runs on the direction flip so the anchor never lags the arrow).
         placeHelperX();
@@ -1338,7 +1354,7 @@ export default function SpinViewer({
             <div className="r3d-drift-hand" ref={handRef} aria-hidden>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-7-4l-2.5-4a2 2 0 0 1 3.4-2L8 14" /></svg>
             </div>
-            <div className="r3d-drift-cue">
+            <div className="r3d-drift-cue" ref={cueRef}>
               <span ref={helperTextRef}>{helperStart || "Drag to drift"}</span>
               <span className="r3d-drift-arrow" aria-hidden>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
