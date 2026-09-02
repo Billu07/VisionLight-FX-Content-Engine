@@ -549,18 +549,19 @@ export default function SpinViewer({
       // INSIDE the frame). Clamp so its bottom clears the powered-by badge + CTAs.
       if (driftMode && hintRef.current) {
         const frameBottomCss = (realMode && frameRect.h > 0 ? frameRect.y + frameRect.h : cy + scale * 2.1) / DPR;
-        // Mobile only: lift the hand up ONTO the bottom of the frame (it otherwise
-        // sits at the very bottom edge). Gated on the SAME 560px viewport width as
-        // the badge/CTA CSS lift — never on PC (isMobileViewport is true on short
-        // laptop windows too, which would lift the hand on desktop).
-        const mobileLift =
-          typeof window !== "undefined" && window.innerWidth <= 560 ? 44 : 0;
-        const under = frameBottomCss + 16 - mobileLift;
+        const frameHcss = (realMode && frameRect.h > 0 ? frameRect.h : scale * 4.2) / DPR;
+        // Mobile: sit the hand a consistent FRACTION up from the frame's bottom
+        // edge (~10% of the frame height) rather than a fixed px lift — so the hand
+        // lands at the same spot on the frame on every device, big or small. Gated
+        // on the SAME 560px viewport width as the badge/CTA CSS lift; PC keeps the
+        // hand 16px below the frame (isMobileViewport is true on short laptop
+        // windows too, which would lift the hand on desktop).
+        const isNarrow = typeof window !== "undefined" && window.innerWidth <= 560;
+        const under = isNarrow ? frameBottomCss - frameHcss * 0.1 : frameBottomCss + 16;
         const hintH = hintRef.current.offsetHeight || 110;
-        // Reserve the same tighter bottom zone for every drift surface so the helper
-        // tucks just beneath the frame on both the landing and the player (capFit);
-        // non-drift/rotation3d keeps 140.
-        const maxTop = H / DPR - ((capFit ? 120 : 140) + hintH + mobileLift);
+        // Safety clamp: never let the helper cluster drop so low it overlaps the
+        // powered badge + CTAs (tighter reserve for drift surfaces via capFit).
+        const maxTop = H / DPR - ((capFit ? 120 : 140) + hintH);
         hintRef.current.style.top = Math.max(12, Math.min(under, maxTop)) + "px";
         hintRef.current.style.bottom = "auto";
       }
