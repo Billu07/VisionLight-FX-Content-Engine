@@ -77,6 +77,9 @@ export type SpinViewerProps = {
   showTitle?: boolean;
   /** hide the top-right tool buttons (reset + fullscreen) — e.g. the landing player */
   showTools?: boolean;
+  /** show the +/- zoom controls on mobile (phones). Off by default on drifts;
+   * desktop always shows them. */
+  mobileZoom?: boolean;
   /** full-page landing takeover: cap the product size on wide screens so it
    * doesn't fill the viewport (leaves clean room for the helper + CTAs below) */
   landing?: boolean;
@@ -177,6 +180,7 @@ export default function SpinViewer({
   showName = true,
   showTitle = true,
   showTools = true,
+  mobileZoom = true,
   landing = false,
   loaderLabel,
   title,
@@ -528,11 +532,15 @@ export default function SpinViewer({
       // INSIDE the frame). Clamp so its bottom clears the powered-by badge + CTAs.
       if (driftMode && hintRef.current) {
         const frameBottomCss = (realMode && frameRect.h > 0 ? frameRect.y + frameRect.h : cy + scale * 2.1) / DPR;
-        const under = frameBottomCss + 16;
+        // Mobile: lift the hand a touch higher into the bottom of the frame, and
+        // reserve more room below — the powered badge + CTAs are raised by the same
+        // amount in CSS so the whole bottom cluster shifts up together, consistently.
+        const mobileLift = isMobileViewport ? 22 : 0;
+        const under = frameBottomCss + 16 - mobileLift;
         const hintH = hintRef.current.offsetHeight || 110;
         // Landing reserves a tighter bottom zone (it has no scrubber) so the bigger
         // product's helper still tucks just beneath it; product page keeps 140.
-        const maxTop = H / DPR - ((landing ? 120 : 140) + hintH);
+        const maxTop = H / DPR - ((landing ? 120 : 140) + hintH + mobileLift);
         hintRef.current.style.top = Math.max(12, Math.min(under, maxTop)) + "px";
         hintRef.current.style.bottom = "auto";
       }
@@ -1093,7 +1101,7 @@ export default function SpinViewer({
   const [activeForm, setActiveForm] = useState<{ form: OverlayForm; which: "primary" | "secondary" } | null>(null);
 
   return (
-    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${landing ? "r3d-landing" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${!showLogo ? "r3d-no-logo" : ""} ${!showName ? "r3d-no-name" : ""} ${!showTitle ? "r3d-no-title" : ""} ${!showTools ? "r3d-no-tools" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
+    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${landing ? "r3d-landing" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${!showLogo ? "r3d-no-logo" : ""} ${!showName ? "r3d-no-name" : ""} ${!showTitle ? "r3d-no-title" : ""} ${!showTools ? "r3d-no-tools" : ""} ${!mobileZoom ? "r3d-no-mobile-zoom" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
       style={stageStyle}
       tabIndex={hero ? -1 : 0}
       aria-label="Interactive 360 degree product viewer. Drag to rotate.">
@@ -1250,7 +1258,7 @@ export default function SpinViewer({
         aria-label={`Powered by ${playerBrand.name}`}
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
-        <span>{driftMode ? <>Powered by <b>Drift Link Interactive</b></> : <>Powered by <b>{playerBrand.name}</b></>}</span>
+        <span>{driftMode ? <b>Drift Link Interactive</b> : <>Powered by <b>{playerBrand.name}</b></>}</span>
       </a>
 
       <div className="r3d-loader" ref={loaderRef}>
@@ -1267,7 +1275,7 @@ export default function SpinViewer({
           </svg>
           <div className="r3d-pct" ref={pctRef}>0%</div>
           <div className="r3d-lbl">{driftMode ? "Loading…" : loaderLabel || "Optimizing frames…"}</div>
-          <div className="r3d-powered">Powered by <b>{driftMode ? "Drift Link Interactive" : playerBrand.name}</b></div>
+          <div className="r3d-powered">{driftMode ? <b>Drift Link Interactive</b> : <>Powered by <b>{playerBrand.name}</b></>}</div>
         </div>
       </div>
     </div>
@@ -1430,6 +1438,12 @@ const R3D_CSS = `
   .r3d-hint{bottom:max(26%,200px)}
   .r3d-zoomcol{bottom:calc(146px + env(safe-area-inset-bottom))}
   .r3d-cta{padding:13px 12px;font-size:14px}
+  /* Drift mobile: lift the bottom cluster up ~22px so it lines up with the
+     raised hand (see the mobileLift in draw), keeping the spacing consistent. */
+  .r3d-drift .r3d-powered-badge{bottom:calc(122px + env(safe-area-inset-bottom))}
+  .r3d-drift .r3d-ctas{padding-bottom:calc(44px + env(safe-area-inset-bottom))}
+  /* +/- zoom controls are off on phones by default (superadmin can turn them on). */
+  .r3d-no-mobile-zoom .r3d-zoomcol{display:none!important}
 }
 /* persistent viral attribution — shows on every embed regardless of the tenant
    brand toggle (brand=0 only hides the tenant's own logo/name). Bottom-left, above

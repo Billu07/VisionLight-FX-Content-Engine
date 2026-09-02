@@ -1066,6 +1066,7 @@ export default function DriftAdminPanel() {
         <BrandProductEditModal
           product={editingProduct}
           showLoop
+          adminControls
           forms={formsList}
           onSave={async (data) => {
             await apiEndpoints.driftAdminUpdateProduct(selected.id, editingProduct.id, data);

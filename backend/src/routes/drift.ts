@@ -687,6 +687,7 @@ async function applyProductPatch(
   if (typeof body.hideLogo === "boolean") data.hideLogo = body.hideLogo;
   if (typeof body.hideName === "boolean") data.hideName = body.hideName;
   if (typeof body.hideTitle === "boolean") data.hideTitle = body.hideTitle;
+  if (typeof body.mobileZoom === "boolean") data.mobileZoom = body.mobileZoom;
   if ("metaPixelId" in body)
     data.metaPixelId = body.metaPixelId ? String(body.metaPixelId).replace(/[^0-9]/g, "").slice(0, 32) || null : null;
   if ("name" in body && String(body.name || "").trim())
@@ -909,6 +910,7 @@ const publicProductPayload = async (p: any, bc: any, orgName: string, captions: 
   hideLogo: p.hideLogo,
   hideName: p.hideName,
   hideTitle: p.hideTitle,
+  mobileZoom: p.mobileZoom,
   thumbnailUrl: p.thumbnailUrl,
   metaPixelId: p.metaPixelId || orgPixelId || null,
   background: p.background,

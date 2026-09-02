@@ -25,6 +25,7 @@ type EditProduct = {
   hideLogo?: boolean;
   hideName?: boolean;
   hideTitle?: boolean;
+  mobileZoom?: boolean;
   metaPixelId?: string | null;
   ctaPrimary?: { label?: string; url?: string; formId?: string | null } | null;
   ctaSecondary?: { label?: string; url?: string; formId?: string | null } | null;
@@ -39,12 +40,15 @@ const label = "d-label";
 export default function BrandProductEditModal({
   product,
   showLoop,
+  adminControls,
   forms,
   onSave,
   onClose,
 }: {
   product: EditProduct;
   showLoop?: boolean;
+  /** superadmin-only controls (e.g. the mobile zoom toggle) */
+  adminControls?: boolean;
   forms?: { id: string; name: string }[];
   onSave: (data: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
@@ -71,6 +75,7 @@ export default function BrandProductEditModal({
   const [hideLogo, setHideLogo] = useState(product.hideLogo ?? false);
   const [hideName, setHideName] = useState(product.hideName ?? false);
   const [hideTitle, setHideTitle] = useState(product.hideTitle ?? false);
+  const [mobileZoom, setMobileZoom] = useState(product.mobileZoom ?? false);
   const [metaPixelId, setMetaPixelId] = useState(product.metaPixelId || "");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -105,6 +110,7 @@ export default function BrandProductEditModal({
       data.hideLogo = hideLogo;
       data.hideName = hideName;
       data.hideTitle = hideTitle;
+      if (adminControls) data.mobileZoom = mobileZoom;
       data.metaPixelId = metaPixelId.trim() || null;
     }
     try {
@@ -336,6 +342,15 @@ export default function BrandProductEditModal({
               <label className="d-muted flex items-center gap-2 text-xs">
                 <input type="checkbox" checked={hideTitle} onChange={(e) => setHideTitle(e.target.checked)} className="h-4 w-4 accent-brand-accent" />
                 Hide drift title in player
+              </label>
+            </div>
+          )}
+
+          {showLoop && adminControls && (
+            <div className="flex flex-wrap gap-4">
+              <label className="d-muted flex items-center gap-2 text-xs">
+                <input type="checkbox" checked={mobileZoom} onChange={(e) => setMobileZoom(e.target.checked)} className="h-4 w-4 accent-brand-accent" />
+                Show zoom controls on mobile
               </label>
             </div>
           )}

@@ -268,6 +268,7 @@ function HeroLanding({ product }: { product: any }) {
           showName={false}
           showTitle={false}
           showTools={false}
+          mobileZoom={!!product.mobileZoom}
           landing
           onCtaClick={(which) => {
             if (product.id) apiEndpoints.driftTrackEvent(product.id, "CTA_CLICK", { which }).catch(() => undefined);
