@@ -132,18 +132,18 @@ function BentoTile({ it, onOpen, big }: { it: Item; onOpen: () => void; big?: bo
 // logo/name hidden, drift.li branding in the header.
 const HERO_CSS = `
 .dl-hero-root{position:fixed;top:0;left:0;right:0;height:100vh;height:100svh;background:#05070d;overflow:hidden;overscroll-behavior:none}
-.dl-hero-header{position:absolute;top:0;left:0;right:0;z-index:30;display:flex;align-items:flex-start;justify-content:space-between;
+.dl-hero-header{position:absolute;top:0;left:0;right:0;z-index:30;display:flex;align-items:center;justify-content:space-between;
   padding:14px clamp(16px,4vw,32px);pointer-events:none}
-.dl-hero-brand{display:flex;flex-direction:column;gap:3px}
 .dl-hero-header .dl-word{font-size:19px;font-weight:800;letter-spacing:-.01em;color:#fff}
 .dl-hero-header .dl-word span{margin-left:7px;font-weight:600;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#22d3ee}
 .dl-word-brand{display:flex;align-items:center;gap:9px}
 .dl-word-brand .dl-word-brandname{font-size:19px;font-weight:800;letter-spacing:-.01em;color:#fff}
 .dl-hero-logo{height:26px;width:auto;max-width:140px;object-fit:contain;display:block}
-.dl-hero-legal{pointer-events:auto;display:flex;align-items:center;gap:7px;font-size:11px;line-height:1}
-.dl-hero-legal a{color:rgba(255,255,255,.55);text-decoration:none;transition:color .16s}
-.dl-hero-legal a:hover{color:#22d3ee}
-.dl-hero-legal span{color:rgba(255,255,255,.28)}
+/* Terms/Privacy sit UNDER the CTA buttons, centered at the very bottom. */
+.dl-hero-legal-bottom{position:absolute;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:31;display:flex;align-items:center;gap:8px;font-size:11px;line-height:1;pointer-events:auto}
+.dl-hero-legal-bottom a{color:rgba(255,255,255,.62);text-decoration:none;transition:color .16s}
+.dl-hero-legal-bottom a:hover{color:#22d3ee}
+.dl-hero-legal-bottom span{color:rgba(255,255,255,.3)}
 .dl-hero-login{pointer-events:auto;cursor:pointer;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);
   color:#e8edf4;border-radius:11px;padding:8px 16px;font-size:12.5px;font-weight:650;backdrop-filter:blur(8px);transition:background .16s}
 .dl-hero-login:hover{background:rgba(255,255,255,.12)}
@@ -222,23 +222,16 @@ function HeroLanding({ product }: { product: any }) {
     <div className="dl-hero-root">
       <style>{HERO_CSS}</style>
       <header className="dl-hero-header">
-        <div className="dl-hero-brand">
-          {brandScoped ? (
-            <div className="dl-word dl-word-brand">
-              {brandLogo ? <img className="dl-hero-logo" src={brandLogo} alt={brandName} /> : null}
-              <span className="dl-word-brandname">{brandName}</span>
-            </div>
-          ) : (
-            <div className="dl-word">
-              Drift Link<span>Interactive</span>
-            </div>
-          )}
-          <div className="dl-hero-legal">
-            <a href={termsUrl} target="_blank" rel="noopener noreferrer">Terms</a>
-            <span aria-hidden>·</span>
-            <a href={privacyUrl} target="_blank" rel="noopener noreferrer">Privacy</a>
+        {brandScoped ? (
+          <div className="dl-word dl-word-brand">
+            {brandLogo ? <img className="dl-hero-logo" src={brandLogo} alt={brandName} /> : null}
+            <span className="dl-word-brandname">{brandName}</span>
           </div>
-        </div>
+        ) : (
+          <div className="dl-word">
+            Drift Link<span>Interactive</span>
+          </div>
+        )}
         <button className="dl-hero-login" onClick={() => setShowLogin(true)}>
           Log in
         </button>
@@ -276,6 +269,11 @@ function HeroLanding({ product }: { product: any }) {
             if (product.metaPixelId) track("CTAClick", { which, content_name: product.name }, true);
           }}
         />
+      </div>
+      <div className="dl-hero-legal-bottom">
+        <a href={termsUrl} target="_blank" rel="noopener noreferrer">Terms</a>
+        <span aria-hidden>·</span>
+        <a href={privacyUrl} target="_blank" rel="noopener noreferrer">Privacy</a>
       </div>
       <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
     </div>

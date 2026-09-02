@@ -598,7 +598,7 @@ export default function SpinViewer({
         // hand 16px below the frame (isMobileViewport is true on short laptop
         // windows too, which would lift the hand on desktop).
         const isNarrow = typeof window !== "undefined" && window.innerWidth <= 560;
-        const under = isNarrow ? frameBottomCss - frameHcss * 0.1 : frameBottomCss + 16;
+        const under = isNarrow ? frameBottomCss - frameHcss * 0.16 : frameBottomCss + 16;
         const hintH = hintRef.current.offsetHeight || 110;
         // Safety clamp: never let the helper cluster drop so low it overlaps the
         // powered badge + CTAs (tighter reserve for drift surfaces via capFit).
@@ -1501,7 +1501,7 @@ const R3D_CSS = `
 .r3d-hint.r3d-gone{opacity:0}
 .r3d-hand{width:52px;height:52px;border-radius:50%;border:1px solid var(--r3d-line);background:rgba(11,15,25,.4);backdrop-filter:blur(8px);display:grid;place-items:center;animation:r3dsway 1.8s ease-in-out infinite}
 .r3d-hand svg{width:24px;height:24px;color:#eef1f6}
-.r3d-hint span{font-size:clamp(10px,3.4vmin,13px);color:#eef1f6;text-shadow:0 1px 10px #000}
+.r3d-hint span{font-size:clamp(10px,3.4vmin,13px);font-weight:600;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.95),0 2px 14px rgba(0,0,0,.75)}
 @keyframes r3dsway{0%,100%{transform:translateX(-12px)}50%{transform:translateX(12px)}}
 /* Drift player chrome: "drag to drift" arrow (flips with drag direction), no
    bottom scrim, and the angle number hidden (the scrubber track stays). */
@@ -1510,7 +1510,7 @@ const R3D_CSS = `
    convey position, and it was colliding with the helper arrow. */
 .r3d-drift .r3d-rot{display:none!important}
 /* "drag to drift" is positioned imperatively just under the product (see draw). */
-.r3d-drift .r3d-hint{opacity:.72;gap:6px}
+.r3d-drift .r3d-hint{opacity:.96;gap:6px}
 /* the drift helper hides between its start/end appearances (hand sequence) */
 .r3d-drift .r3d-hint.r3d-gone{opacity:0}
 .r3d-drift-hand{width:28px;height:28px;color:#eef1f6;animation:r3dsway 1.8s ease-in-out infinite;transition:opacity .3s}
@@ -1539,6 +1539,11 @@ const R3D_CSS = `
 .r3d-drift .r3d-powered-badge svg{width:clamp(12px,3.4vmin,14px);height:clamp(12px,3.4vmin,14px)}
 /* Drift: lift the CTA a touch off the very edge (standard spacing). */
 .r3d-drift .r3d-ctas{padding-bottom:calc(22px + env(safe-area-inset-bottom))}
+/* Right (secondary) CTA is purple; the left (primary) stays the brand blue. */
+.r3d-drift .r3d-cta.r3d-ghost{background:linear-gradient(135deg,#7c3aed,#a855f7);border:none;color:#fff;backdrop-filter:none;box-shadow:0 10px 30px -12px rgba(124,58,237,.7)}
+.r3d-drift .r3d-cta.r3d-ghost:hover{filter:brightness(1.08)}
+/* Landing: leave room below the CTAs for the Terms/Privacy links under them. */
+.r3d-landing .r3d-ctas{padding-bottom:calc(46px + env(safe-area-inset-bottom))}
 /* Drift mobile: hide reset + fullscreen (keep it clean). */
 @media (max-width:560px){
   .r3d-drift [data-reset],.r3d-drift [data-fs]{display:none!important}
@@ -1598,10 +1603,14 @@ const R3D_CSS = `
   .r3d-hint{bottom:max(26%,200px)}
   .r3d-zoomcol{bottom:calc(146px + env(safe-area-inset-bottom))}
   .r3d-cta{padding:13px 12px;font-size:14px}
-  /* Drift mobile: lift the bottom cluster up ~22px so it lines up with the
-     raised hand (see the mobileLift in draw), keeping the spacing consistent. */
-  .r3d-drift .r3d-powered-badge{bottom:calc(122px + env(safe-area-inset-bottom))}
-  .r3d-drift .r3d-ctas{padding-bottom:calc(44px + env(safe-area-inset-bottom))}
+  /* Drift mobile: bigger drag hand + arrow, buttons lifted higher, badge kept
+     clear above them (leaving room below the buttons for the landing legal links). */
+  .r3d-drift-hand{width:40px;height:40px}
+  .r3d-drift-hand svg{width:27px;height:27px}
+  .r3d-drift-arrow{width:58px;height:58px}
+  .r3d-drift-arrow svg{width:28px;height:28px}
+  .r3d-drift .r3d-powered-badge{bottom:calc(140px + env(safe-area-inset-bottom))}
+  .r3d-drift .r3d-ctas{padding-bottom:calc(60px + env(safe-area-inset-bottom))}
   /* +/- zoom controls are off on phones by default (superadmin can turn them on). */
   .r3d-no-mobile-zoom .r3d-zoomcol{display:none!important}
 }
