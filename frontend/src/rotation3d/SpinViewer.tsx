@@ -644,12 +644,13 @@ export default function SpinViewer({
           const naturalCueTop = topPx + handH + 7; // 7px column gap (see .r3d-drift .r3d-hint)
           const cueTop = Math.max(naturalCueTop, frameBottomCss + 16);
           cueRef.current.style.marginTop = cueTop - naturalCueTop + "px";
-          // Mobile bottom stack (phones only): the CTA row, powered badge, and legal
-          // row are bottom-anchored, so a fixed CSS offset can't track the frame/cue
-          // (they scale with the viewport + product aspect). Drive them from JS —
-          // buttons a comfortable gap under the cue, then the "Powered by" badge and
-          // (landing) Terms/Privacy tucked under the buttons rather than pinned to the
-          // very bottom. Desktop clears the overrides and keeps the CSS values.
+          // Mobile bottom stack (phones only): the CTA row + powered badge are
+          // bottom-anchored, so a fixed CSS offset can't track the frame/cue (they
+          // scale with the viewport + product aspect). Drive them from JS — buttons a
+          // comfortable gap under the cue, and the "Powered by" badge tucked just
+          // under the buttons rather than pinned to the very bottom. Terms/Privacy
+          // (.r3d-legal) deliberately stay bottom-aligned via CSS. Desktop clears the
+          // overrides and keeps the CSS values.
           const firstBtn = ctasRef.current?.firstElementChild as HTMLElement | null;
           if (isNarrow && ctasRef.current && firstBtn) {
             const stageH = H / DPR;
@@ -660,27 +661,15 @@ export default function SpinViewer({
             );
             ctasRef.current.style.paddingBottom =
               "calc(" + Math.round(pb) + "px + env(safe-area-inset-bottom))";
-            // Tuck the powered badge just under the buttons, then the legal row
-            // (landing only) just under the badge — so the whole attribution block
-            // travels with the buttons instead of stranding at the very bottom.
-            let stackBottom = pb; // bottom edge (from stage bottom) of the row above
             if (poweredRef.current) {
               const badgeH = poweredRef.current.offsetHeight || 16;
-              const badgeBottom = Math.max(10, stackBottom - 12 - badgeH);
+              const badgeBottom = Math.max(10, pb - 12 - badgeH); // sit 12px under the buttons
               poweredRef.current.style.bottom =
                 "calc(" + Math.round(badgeBottom) + "px + env(safe-area-inset-bottom))";
-              stackBottom = badgeBottom;
-            }
-            if (legalRef.current) {
-              const legalH = legalRef.current.offsetHeight || 14;
-              const legalBottom = Math.max(8, stackBottom - 8 - legalH);
-              legalRef.current.style.bottom =
-                "calc(" + Math.round(legalBottom) + "px + env(safe-area-inset-bottom))";
             }
           } else {
             if (ctasRef.current) ctasRef.current.style.paddingBottom = "";
             if (poweredRef.current) poweredRef.current.style.bottom = "";
-            if (legalRef.current) legalRef.current.style.bottom = "";
           }
         }
         // Horizontal: align the cue to the frame's edge (see placeHelperX — it
