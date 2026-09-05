@@ -56,6 +56,10 @@ export type SpinViewerProps = {
   productId?: string;
   /** called before navigation so callers can record analytics (CTA_CLICK) */
   onCtaClick?: (which: "primary" | "secondary", cta: SpinCta) => void;
+  /** Given a CTA url, navigate in-app (SPA) if it points to another drift on this
+   * host and return true; return false to let the player navigate normally. Lets a
+   * drift→drift CTA swap instantly and keep fullscreen instead of a full reload. */
+  onInternalNavigate?: (url: string) => boolean;
   className?: string;
   /** "full" = full-screen player with chrome; "hero" = contained, chrome-less
    * spinning object that fills its parent (used as a landing/hero visual) */
@@ -174,6 +178,7 @@ export default function SpinViewer({
   forms,
   productId,
   onCtaClick,
+  onInternalNavigate,
   className,
   variant = "full",
   logoUrl,
@@ -1058,7 +1063,10 @@ export default function SpinViewer({
     // <video>), so requestFullscreen is undefined there and the button did
     // nothing on iPhone. Fall back to a CSS "pseudo fullscreen" that fixes the
     // stage to fill the viewport — works on every mobile browser.
-    let pseudoFs = false;
+    // Re-derive from the DOM: this effect re-runs when the drift SWAPS (a new
+    // manifest), and pseudo-fullscreen must survive that swap — so pick up the
+    // class that's already on the stage rather than resetting to false.
+    let pseudoFs = stage.classList.contains("r3d-pseudo-fs");
     const nativeFsActive = () =>
       !!(document.fullscreenElement || (document as any).webkitFullscreenElement);
     const ENTER_ICON = '<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>';
@@ -1313,12 +1321,22 @@ export default function SpinViewer({
       window.removeEventListener("orientationchange", onOrient);
       orientMql?.removeEventListener?.("change", onOrient);
       ro?.disconnect();
-      // undo pseudo-fullscreen if we unmount while it's active
-      stage.classList.remove("r3d-pseudo-fs");
-      document.documentElement.classList.remove("r3d-fs-lock");
+      // NB: pseudo-fullscreen classes are intentionally NOT torn down here — this
+      // cleanup also runs on a drift swap (deps change), and immersive mode must
+      // persist across it. Real unmount teardown lives in the effect below.
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manifest, FRAMES, DEFAULT_FRAME, hero, driftMode, loopScrub, helperStart, helperEnd]);
+
+  // Unmount-only: drop pseudo-fullscreen if the player leaves the page while it's
+  // active (a dep-change re-run of the effect above must NOT do this).
+  useEffect(() => {
+    const stage = stageRef.current;
+    return () => {
+      stage?.classList.remove("r3d-pseudo-fs");
+      document.documentElement.classList.remove("r3d-fs-lock");
+    };
+  }, []);
 
   const fireCta = (which: "primary" | "secondary", cta?: SpinCta) => {
     if (!cta) return;
@@ -1330,6 +1348,9 @@ export default function SpinViewer({
       return;
     }
     if (cta.url && cta.url !== "#") {
+      // A CTA to another drift on this host swaps in-app (instant + keeps fullscreen)
+      // rather than a full reload. Falls through to normal navigation otherwise.
+      if (onInternalNavigate && onInternalNavigate(cta.url)) return;
       // Drift CTAs open in the SAME window (ad landing behavior); others honor newTab.
       if (driftMode || cta.newTab === false) window.location.href = cta.url;
       else window.open(cta.url, "_blank", "noopener");
