@@ -20,6 +20,55 @@ const toCta = (c: any) =>
       }
     : undefined;
 
+/**
+ * Fetch-phase loader. Rendered while the manifest is loading, BEFORE SpinViewer
+ * mounts. It deliberately mirrors SpinViewer's own `.r3d-loader` (same dark
+ * gradient, same 64px gradient ring, same "Loading…" + powered line) so the
+ * hand-off to the real loader is seamless — the viewer sees one continuous
+ * loading screen instead of a generic card flashing before the configured one.
+ */
+function FullscreenLoader({ drift }: { drift: boolean }) {
+  const c0 = drift ? "#22d3ee" : "var(--primary-brand,#6366f1)";
+  const c1 = drift ? "#3b82f6" : "var(--secondary-brand,#8b5cf6)";
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 20,
+        display: "grid",
+        placeItems: "center",
+        background: "linear-gradient(to bottom right, #111827, #0B0F19)",
+        fontFamily: '"Bai Jamjuree", ui-sans-serif, system-ui, sans-serif',
+      }}
+    >
+      <style>{"@keyframes r3dfetchspin{to{transform:rotate(360deg)}}"}</style>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+        <svg width="64" height="64" viewBox="0 0 64 64" style={{ animation: "r3dfetchspin .9s linear infinite" }}>
+          <defs>
+            <linearGradient id="r3dfetchg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor={c0} />
+              <stop offset="1" stopColor={c1} />
+            </linearGradient>
+          </defs>
+          <circle cx="32" cy="32" r="27" fill="none" stroke="rgba(255,255,255,.10)" strokeWidth={5} />
+          <circle cx="32" cy="32" r="27" fill="none" stroke="url(#r3dfetchg)" strokeWidth={5} strokeLinecap="round" strokeDasharray="170" strokeDashoffset="118" />
+        </svg>
+        <div style={{ fontSize: 12, color: "#9aa3b6", letterSpacing: ".14em", textTransform: "uppercase" }}>Loading…</div>
+        <div style={{ marginTop: 4, fontSize: 10, letterSpacing: ".16em", textTransform: "uppercase", color: "#9aa3b6", opacity: 0.65 }}>
+          {drift ? (
+            <b style={{ fontWeight: 700, color: "#22d3ee" }}>Drift Link Interactive</b>
+          ) : (
+            <>
+              Powered by <b style={{ fontWeight: 700 }}>{getPlayerBranding().name}</b>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Placeholder({ title, sub, showHome }: { title: string; sub: string; showHome?: boolean }) {
   return (
     <div
@@ -156,7 +205,7 @@ export default function Rotation3DPlayer() {
     );
   }
 
-  if (state.loading) return <Placeholder title="Loading…" sub="Preparing the spin." />;
+  if (state.loading) return <FullscreenLoader drift={drift} />;
   if (state.error === "not_found")
     return <Placeholder title="Not found" sub="This product isn't available yet." showHome />;
   if (state.error || !state.data)
