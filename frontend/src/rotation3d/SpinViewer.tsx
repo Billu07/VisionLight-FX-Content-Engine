@@ -284,6 +284,17 @@ export default function SpinViewer({
     };
     let zoom = 1, zoomTarget = 1;
     let panX = 0, panY = 0, panTX = 0, panTY = 0;
+    // Desktop drift sizing: on a wide, fine-pointer screen the default cap leaves a
+    // landscape/squarish drift small with big side margins. When the drift shows NO
+    // headline, let it fill more of the viewport width (aspect-aware in draw(), so a
+    // portrait drift never crops and stays its current size); when a headline IS
+    // shown, keep the smaller size so the copy has clean room above the product.
+    const hasHeadline = !!(driftMode && (title || titleEnd));
+    let bigDesktop = false;
+    const updateBigDesktop = () => {
+      bigDesktop = window.matchMedia?.("(min-width:1000px) and (pointer:fine)")?.matches ?? false;
+    };
+    updateBigDesktop();
     // Start paused — no autoplay. The loop/play button (shown when enableLoop)
     // toggles auto-rotate on demand.
     let loopOn = false;
@@ -574,9 +585,23 @@ export default function SpinViewer({
       const cyFactor = capFit ? 0.46 : 0.47;
       let base = Math.min(W, H) * (hero ? 0.23 : 0.25);
       if (capFit) {
-        const capH = (H * 0.95) / 4.2; // don't overflow the height
-        const capW = (W * 0.94) / 4.2; // and fit the width
-        base = Math.min(capH, capW);
+        // box (the frame's largest side) = base * 4.2. Cap it so the frame fits the
+        // viewport, leaving clean room below for the drag helper + CTAs.
+        if (bigDesktop && !hasHeadline) {
+          // Desktop, no headline → fill the screen. Allow more WIDTH so a landscape
+          // drift isn't stranded small, but stay aspect-aware off the loaded frame's
+          // ratio: a portrait drift stays height-bound (unchanged), only wide content
+          // grows. Height budget stays 0.95 so it never crops top/bottom.
+          const img0 = realMode ? nearestLoaded(frame) : null;
+          const ar0 = img0 ? img0.naturalWidth / img0.naturalHeight : 1;
+          const availW = W * 0.9, availH = H * 0.95;
+          const boxMax = ar0 >= 1 ? Math.min(availW, availH * ar0) : Math.min(availH, availW / ar0);
+          base = boxMax / 4.2;
+        } else {
+          const capH = (H * 0.95) / 4.2; // don't overflow the height
+          const capW = (W * 0.94) / 4.2; // and fit the width
+          base = Math.min(capH, capW);
+        }
       }
       const scale = base * zoom;
       const cx = W / 2 + panX * DPR, cy = H * cyFactor + panY * DPR;
@@ -1113,7 +1138,7 @@ export default function SpinViewer({
     // shown for a frame at the old buffer size stretched into the new box — which
     // is the squish/distortion seen when an in-app browser resizes the viewport.
     const refit = () => { fit(); draw(); };
-    const onOrient = () => { refit(); scheduleLandscapeZoom(); };
+    const onOrient = () => { updateBigDesktop(); refit(); scheduleLandscapeZoom(); };
 
     // control buttons (delegated within the stage)
     const onClick = (e: MouseEvent) => {
@@ -1744,6 +1769,21 @@ const R3D_CSS = `
   .r3d-zoomcol{bottom:52px}
   .r3d-scrim-bot{height:150px}
   .r3d-scrim-top{height:64px}
+  /* Drift landscape (rotated phone): a proper immersive, near-fullscreen experience.
+     The portrait bottom-stack JS is off in landscape (it keys on a narrow WIDTH), so
+     the CTAs were left with their portrait offset and floated over the middle of the
+     product. Pull them into a compact bottom control bar (clear of side notches),
+     lift the drag helper just above it, and tuck the attribution to the corners so
+     the product owns the screen. */
+  .r3d-drift .r3d-ctas{padding:8px calc(16px + env(safe-area-inset-right)) calc(26px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));gap:10px;max-width:520px}
+  .r3d-drift .r3d-cta{padding:9px 14px;font-size:13px}
+  .r3d-drift .r3d-hint{bottom:88px}
+  .r3d-drift .r3d-drift-hand{width:30px;height:30px}
+  .r3d-drift .r3d-drift-hand svg{width:19px;height:19px}
+  .r3d-drift .r3d-hint span{font-size:13px}
+  .r3d-drift .r3d-drift-arrow svg{width:22px;height:22px}
+  .r3d-drift .r3d-powered-badge{top:calc(8px + env(safe-area-inset-top));bottom:auto}
+  .r3d-drift .r3d-legal{bottom:calc(8px + env(safe-area-inset-bottom))}
 }
 /* thumbnail-box view selector (e-commerce style): interactive 360° + 4 stills.
    Selecting a still shows it large (.r3d-media) with the canvas hidden. */
