@@ -24,6 +24,7 @@ import {
   deleteCustomHostname,
   DRIFT_DOMAIN_TARGET,
 } from "../services/cloudflareDomains";
+import { sendNewLeadEmail, sendBrandAdminInviteEmail } from "../services/mail";
 
 // Drift (drift.li) — a separate product line running the same interactive
 // spin/path player as Rotation3D, but with its own brand orgs
@@ -285,6 +286,16 @@ router.post(
         admin = created?.authIdentityReused
           ? { email: adminEmail, reused: true }
           : { email: adminEmail, tempPassword };
+        // Email the new admin their sign-in details (best-effort; skips if the
+        // identity was reused — they already have a password — or email is off).
+        if (!created?.authIdentityReused) {
+          void sendBrandAdminInviteEmail({
+            email: adminEmail,
+            name: adminName,
+            brandName: name,
+            tempPassword,
+          }).catch((e) => console.error(`[${NS}] admin invite email failed:`, e));
+        }
       } catch (e: any) {
         return res.status(201).json({
           brand: org,
@@ -1531,6 +1542,15 @@ router.post("/api/drift/public/forms/:id/submit", async (req: AuthenticatedReque
       }
     })();
   }
+
+  // Notify the brand's admins by email (best-effort; no-op if email isn't set up).
+  void sendNewLeadEmail({
+    organizationId: form.organizationId,
+    formName: form.name,
+    data,
+    source: { drift: source.drift, cta: source.cta },
+    createdAt: lead.createdAt,
+  }).catch((e) => console.error(`[${NS}] lead email failed:`, e));
 
   res.status(201).json({ ok: true, successMessage: def.successMessage || "Thanks — we'll be in touch." });
 });
