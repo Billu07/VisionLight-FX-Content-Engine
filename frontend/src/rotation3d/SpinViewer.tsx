@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { getPlayerBranding } from "../lib/branding";
 import DriftFormOverlay, { type OverlayForm } from "./DriftFormOverlay";
 
@@ -60,6 +60,9 @@ export type SpinViewerProps = {
    * host and return true; return false to let the player navigate normally. Lets a
    * drift→drift CTA swap instantly and keep fullscreen instead of a full reload. */
   onInternalNavigate?: (url: string) => boolean;
+  /** This drift was prefetched (frames warmed) before mount — skip the loader and
+   * just fade it in, so a hop off the landing/another drift feels instant. */
+  instant?: boolean;
   className?: string;
   /** "full" = full-screen player with chrome; "hero" = contained, chrome-less
    * spinning object that fills its parent (used as a landing/hero visual) */
@@ -179,6 +182,7 @@ export default function SpinViewer({
   productId,
   onCtaClick,
   onInternalNavigate,
+  instant = false,
   className,
   variant = "full",
   logoUrl,
@@ -240,11 +244,24 @@ export default function SpinViewer({
   const pctRef = useRef<HTMLDivElement>(null);
   const fsIconRef = useRef<SVGSVGElement>(null);
   const loopIconRef = useRef<SVGSVGElement>(null);
+  // Crossfade overlay: on a drift SWAP we snapshot the outgoing frame into this img
+  // and fade it out as the new drift paints underneath — so the change is a smooth
+  // dissolve, not a hard cut. false until the first swap so it never blocks anything.
+  const xfadeRef = useRef<HTMLImageElement>(null);
+  // false only on the very first effect run; true on every re-run (a drift swap).
+  const swappedRef = useRef(false);
   // Captions live in a ref so updating them doesn't re-init the render engine.
   const captionsRef = useRef<SpinCaption[] | undefined>(captions);
   useEffect(() => {
     captionsRef.current = captions;
   }, [captions]);
+  // Gate the drag helper BEFORE paint on mount and every drift swap, so it fades in
+  // at its anchored spot instead of dropping from the CSS default. The render loop
+  // removes the class once the helper is placed under a real frame. (Kept out of the
+  // JSX className so a re-render can't re-add it after the loop clears it.)
+  useLayoutEffect(() => {
+    if (driftMode) hintRef.current?.classList.add("r3d-hint-init");
+  }, [manifest, driftMode]);
   // E-commerce-style thumbnail selector: box 0 = interactive 360° (default),
   // boxes 1..4 = stills from different angles. Clicking a still box shows it large.
   const [view, setView] = useState(0);
@@ -666,6 +683,9 @@ export default function SpinViewer({
         const topPx = Math.max(12, Math.min(under, maxTop));
         hintRef.current.style.top = topPx + "px";
         hintRef.current.style.bottom = "auto";
+        // The helper is now anchored under a REAL frame — reveal it (it starts gated
+        // so it fades in at its place instead of dropping from the CSS default).
+        if (realMode && frameRect.w > 0) hintRef.current.classList.remove("r3d-hint-init");
         // Push the CUE down so its top lands ~16px under the frame's bottom edge
         // (the hand is now up on the frame on every device, so this always runs).
         // Keeps the text/arrow off the product without dragging the hand down.
@@ -1227,6 +1247,7 @@ export default function SpinViewer({
           requestAnimationFrame(sweep);
         } else {
           loaderRef.current?.classList.add("r3d-gone");
+          hintRef.current?.classList.remove("r3d-hint-init"); // safety: never leave the hint gated
           if (!hero) stage.focus({ preventScroll: true });
           window.setTimeout(startIntro, 550); // one-time first-visit drag demo
         }
@@ -1299,6 +1320,49 @@ export default function SpinViewer({
       step();
     }
 
+    // --- transition in: a drift that was prefetched (instant) or swapped to in
+    // place (this effect re-running) skips the loader and dissolves in, instead of
+    // flashing a loader or hard-cutting. Re-gate the drag helper until it's placed
+    // under the new frame, so the hand fades in at its spot rather than dropping. ---
+    const isSwap = swappedRef.current;
+    swappedRef.current = true;
+    if (instant || isSwap) {
+      loaderRef.current?.classList.add("r3d-gone");
+      let crossfaded = false;
+      if (isSwap && xfadeRef.current) {
+        // Crossfade: snapshot the OUTGOING frame (still on the canvas — before fit()
+        // clears it) and fade it out over the incoming drift.
+        try {
+          const x = xfadeRef.current;
+          x.src = cv.toDataURL();
+          x.style.transition = "none";
+          x.style.opacity = "1";
+          x.hidden = false;
+          requestAnimationFrame(() => {
+            const xx = xfadeRef.current;
+            if (xx) { xx.style.transition = "opacity .34s ease"; xx.style.opacity = "0"; }
+          });
+          window.setTimeout(() => { if (xfadeRef.current) xfadeRef.current.hidden = true; }, 480);
+          crossfaded = true;
+        } catch {
+          /* cross-origin frames taint the canvas → fall back to a plain fade-in */
+        }
+      }
+      if (!crossfaded) {
+        cv.style.transition = "none";
+        cv.style.opacity = "0";
+        requestAnimationFrame(() => {
+          const c = canvasRef.current;
+          if (c) { c.style.transition = "opacity .34s ease"; c.style.opacity = "1"; }
+        });
+        // Restore CSS control once faded in (so the view-selector's opacity rule works).
+        window.setTimeout(() => {
+          const c = canvasRef.current;
+          if (c) { c.style.opacity = ""; c.style.transition = ""; }
+        }, 430);
+      }
+    }
+
     fit();
     tick();
     if (enableLoop) syncLoopIcon();
@@ -1365,6 +1429,8 @@ export default function SpinViewer({
       aria-label="Interactive 360 degree product viewer. Drag to rotate.">
       <style>{R3D_CSS}</style>
       <canvas ref={canvasRef} />
+      {/* crossfade snapshot of the previous drift, faded out on a swap (see effect) */}
+      <img className="r3d-xfade" ref={xfadeRef} alt="" aria-hidden hidden />
       <div className="r3d-scrim-top" />
       <div className="r3d-scrim-bot" />
 
@@ -1537,7 +1603,7 @@ export default function SpinViewer({
         </div>
       ) : null}
 
-      <div className="r3d-loader" ref={loaderRef}>
+      <div className={`r3d-loader ${instant ? "r3d-gone" : ""}`} ref={loaderRef}>
         <div className="r3d-loadwrap">
           <svg className="r3d-ring" viewBox="0 0 64 64">
             <defs>
@@ -1576,6 +1642,11 @@ const R3D_CSS = `
   -webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;
 }
 .r3d-stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab}
+/* crossfade snapshot overlay: sits just above the canvas, below the chrome */
+.r3d-xfade{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none;z-index:1}
+/* drag helper starts gated (hidden) on a drift until it's placed under the frame,
+   then fades in at its spot — instead of dropping from the CSS default position */
+.r3d-drift .r3d-hint.r3d-hint-init{opacity:0}
 /* Full-page landing takeover: the player owns the whole screen, so the drag
    surface (the canvas) hands NO touch gesture to the browser. touch-action:none
    stops the in-app browser (Instagram, etc.) from turning a vertical drag into

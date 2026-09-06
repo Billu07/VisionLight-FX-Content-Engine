@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
 import { getResolvedDriftBrandSlug } from "../lib/branding";
+import { resolveDriftTarget, prefetchDriftTargets } from "./driftNav";
 import { LoginModal } from "../components/LoginModal";
 import { initMetaPixel, track } from "./metaPixel";
 
@@ -149,6 +151,15 @@ const HERO_CSS = `
 
 function HeroLanding({ product }: { product: any }) {
   const [showLogin, setShowLogin] = useState(false);
+  const navigate = useNavigate();
+  // A CTA on the hero that points to another drift on this host swaps in-app
+  // instead of a full reload — instant + no loader (its target is prefetched below).
+  const onInternalNavigate = (url: string): boolean => {
+    const t = resolveDriftTarget(url);
+    if (!t) return false;
+    navigate(t.path);
+    return true;
+  };
   // A brand can set its own Terms/Privacy for its landing; fall back to Drift Link's.
   const termsUrl = product.termsUrl || DRIFT_TERMS_URL;
   const privacyUrl = product.privacyUrl || DRIFT_PRIVACY_URL;
@@ -215,6 +226,12 @@ function HeroLanding({ product }: { product: any }) {
     if (product?.id) apiEndpoints.driftTrackEvent(product.id, "VIEW").catch(() => undefined);
   }, [product]);
 
+  // Warm the drift(s) this hero's CTAs point at, so the first hop off the landing is
+  // instant (no loader) — the player reads them straight from the shared cache.
+  useEffect(() => {
+    prefetchDriftTargets(product);
+  }, [product]);
+
   return (
     <div className="dl-hero-root">
       <style>{HERO_CSS}</style>
@@ -263,6 +280,7 @@ function HeroLanding({ product }: { product: any }) {
           mobileZoom={!!product.mobileZoom}
           landing
           introHint
+          onInternalNavigate={onInternalNavigate}
           onCtaClick={(which) => {
             if (product.id) apiEndpoints.driftTrackEvent(product.id, "CTA_CLICK", { which }).catch(() => undefined);
             if (product.metaPixelId) track("CTAClick", { which, content_name: product.name }, true);

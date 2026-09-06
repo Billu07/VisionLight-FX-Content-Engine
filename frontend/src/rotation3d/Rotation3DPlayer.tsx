@@ -4,6 +4,7 @@ import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
 import { isSpinPlayerSite, isDriftSite, getPlayerBranding } from "../lib/branding";
 import { initMetaPixel, track } from "./metaPixel";
+import { resolveDriftTarget, prefetchDriftTargets, getCachedDrift, cacheDrift, driftKey } from "./driftNav";
 
 /**
  * Public Rotation3D player (rotation3d.com/p/:id and /embed/:id). Fetches the
@@ -19,67 +20,6 @@ const toCta = (c: any) =>
         formId: c.formId || undefined,
       }
     : undefined;
-
-// Session cache of fetched drift products + the frames we've already warmed. A CTA
-// that points to another drift on this same host is prefetched here so clicking it
-// swaps the next drift in INSTANTLY (no loader) — and because we swap in place
-// (React Router param change, same player element) fullscreen is never dropped.
-const driftCache = new Map<string, any>();
-const warmedFrames = new Set<string>();
-
-// First-segment paths that are app routes, not brand vanity — never treat a CTA to
-// one of these as an internal drift to prefetch / SPA-navigate.
-const RESERVED_SEG = new Set([
-  "p", "embed", "app", "admin", "projects", "studios", "pricing", "terms",
-  "privacy", "demo", "rotation3d", "billing", "auth", "support-handoff",
-  "reset-password", "api",
-]);
-
-type DriftTarget =
-  | { productId: string; path: string }
-  | { bySlug: true; brandSlug: string; productSlug: string; path: string };
-
-// Parse a CTA url into an internal drift target we can prefetch + SPA-navigate to,
-// or null (external / non-drift → let the browser navigate normally). Same-origin
-// only, so a CTA to an unrelated site is never intercepted.
-function parseDriftTarget(raw: string | undefined): DriftTarget | null {
-  if (!raw) return null;
-  try {
-    const u = new URL(raw, window.location.origin);
-    if (u.origin !== window.location.origin) return null;
-    const segs = u.pathname.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
-    const path = u.pathname + u.search;
-    if ((segs[0] === "p" || segs[0] === "embed") && segs[1]) return { productId: segs[1], path };
-    if (segs.length === 2 && !RESERVED_SEG.has(segs[0])) {
-      return { bySlug: true, brandSlug: segs[0], productSlug: segs[1], path };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-const targetKey = (t: DriftTarget) => ("bySlug" in t ? `${t.brandSlug}/${t.productSlug}` : t.productId);
-
-// Decode a spread of a drift's frames ahead of time so the swap paints immediately
-// instead of loading them on demand when it becomes visible.
-function warmFrames(product: any) {
-  const m = product?.manifest || {};
-  const a: string[] = Array.isArray(m.frames) ? m.frames : [];
-  const secondM = product?.secondManifest;
-  const b: string[] = secondM && Array.isArray(secondM.frames) ? secondM.frames : [];
-  const all = [...a, ...b];
-  if (!all.length) return;
-  const step = Math.max(1, Math.floor(all.length / 12)); // ~12 frames spread around the loop
-  for (let i = 0; i < all.length; i += step) {
-    const url = all[i];
-    if (!url || warmedFrames.has(url)) continue;
-    warmedFrames.add(url);
-    const img = new Image();
-    img.decoding = "async";
-    img.src = url;
-  }
-}
 
 /**
  * Fetch-phase loader. Rendered while the manifest is loading, BEFORE SpinViewer
@@ -212,33 +152,16 @@ export default function Rotation3DPlayer() {
   // The drift currently being shown. Keeping this (and the SpinViewer below) MOUNTED
   // across route changes is what lets a drift→drift jump be instant and stay
   // fullscreen: we never unmount the player element, we just swap its data.
-  const cacheKey = bySlug ? `${brandSlug}/${productSlug}` : productId || "";
-  const [data, setData] = useState<any>(() => (isDemo ? null : driftCache.get(cacheKey) || null));
+  const cacheKey = driftKey(bySlug, brandSlug, productSlug, productId);
+  const [data, setData] = useState<any>(() => (isDemo ? null : getCachedDrift(cacheKey) || null));
   const [error, setError] = useState<"not_found" | "error" | undefined>(undefined);
+  // True when the FIRST drift shown was already prefetched (from the landing or a
+  // previous drift): SpinViewer then skips its loader and just fades the drift in.
+  const [instant] = useState(() => (isDemo || !drift ? false : !!getCachedDrift(cacheKey)));
 
-  // Prefetch every drift a CTA points at, so its click is an instant swap.
+  // Prefetch every drift a CTA points at (drift only), so its click is an instant swap.
   const prefetchNeighbors = (product: any) => {
-    if (!drift) return;
-    for (const cta of [product?.ctaPrimary, product?.ctaSecondary]) {
-      const url = cta && typeof cta === "object" ? cta.url : undefined;
-      const t = parseDriftTarget(url);
-      if (!t) continue;
-      const k = targetKey(t);
-      if (!k || driftCache.has(k)) {
-        if (k && driftCache.has(k)) warmFrames(driftCache.get(k));
-        continue;
-      }
-      const req = "bySlug" in t ? pubBrandProduct(t.brandSlug, t.productSlug) : pubProduct(t.productId);
-      req
-        .then((r) => {
-          const d = r.data.product;
-          if (d) {
-            driftCache.set(k, d);
-            warmFrames(d);
-          }
-        })
-        .catch(() => undefined);
-    }
+    if (drift) prefetchDriftTargets(product);
   };
 
   useEffect(() => {
@@ -247,7 +170,7 @@ export default function Rotation3DPlayer() {
     // Captured at effect start: is a drift already on screen? If so this is a
     // TRANSITION (keep it up on failure); if not, it's the first load (may error).
     const hadData = !!data;
-    const cached = driftCache.get(cacheKey);
+    const cached = getCachedDrift(cacheKey);
     if (cached) {
       // Instant: we already have this drift (prefetched or revisited). Swap it in
       // without a loader — the player element stays mounted, so fullscreen holds.
@@ -268,7 +191,7 @@ export default function Rotation3DPlayer() {
       .then((res) => {
         if (!alive) return;
         const d = res.data.product;
-        driftCache.set(cacheKey, d);
+        cacheDrift(cacheKey, d);
         setData(d);
         setError(undefined);
         if (d?.id) trackEvent(d.id, "VIEW").catch(() => undefined);
@@ -299,7 +222,7 @@ export default function Rotation3DPlayer() {
   // (SPA) instead of a full reload, so the swap is instant and fullscreen survives.
   // Returns true when handled; SpinViewer falls back to a normal navigation on false.
   const onInternalNavigate = (url: string): boolean => {
-    const t = parseDriftTarget(url);
+    const t = resolveDriftTarget(url);
     if (!t) return false;
     navigate(t.path);
     return true;
@@ -393,6 +316,7 @@ export default function Rotation3DPlayer() {
       ctaSecondary={toCta(p.ctaSecondary)}
       forms={drift ? p.forms : undefined}
       productId={p.id}
+      instant={instant}
       onInternalNavigate={drift ? onInternalNavigate : undefined}
       onCtaClick={(which) => {
         if (p?.id) trackEvent(p.id, "CTA_CLICK", { which }).catch(() => undefined);
