@@ -54,8 +54,11 @@ export const cacheDrift = (key: string, product: any) => {
   if (key && product) driftCache.set(key, product);
 };
 
-// Decode a spread of a drift's frames ahead of time (the default frame first) so the
-// swap paints immediately instead of loading frames on demand when it appears.
+// Preload a drift's frames ahead of time so it swaps in fully-formed — the default
+// frame first (painted immediately), then a coarse spread (a usable spin right
+// away), then EVERY remaining frame in the background so there's no progressive
+// sharpen when it appears. The browser caps requests per host, so this just queues;
+// `warmedFrames` dedupes so re-calling is cheap.
 export function warmFrames(product: any) {
   const m = product?.manifest || {};
   const a: string[] = Array.isArray(m.frames) ? m.frames : [];
@@ -71,8 +74,9 @@ export function warmFrames(product: any) {
     img.src = url;
   };
   warm(a[product?.defaultFrame ?? 0] || a[0]); // the frame shown first
-  const step = Math.max(1, Math.floor(all.length / 16)); // ~16 spread around the loop
+  const step = Math.max(1, Math.floor(all.length / 16)); // a coarse ring first
   for (let i = 0; i < all.length; i += step) warm(all[i]);
+  for (const url of all) warm(url); // then the full set (deduped)
 }
 
 // Prefetch every drift a CTA on `product` points at (same host), so its click is an

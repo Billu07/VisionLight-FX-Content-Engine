@@ -558,6 +558,13 @@ export default function SpinViewer({
     // The rendered frame image rect (device px) — captions are positioned
     // relative to THIS (matching the editor + export), not the whole canvas.
     let frameRect = { x: 0, y: 0, w: 0, h: 0 };
+    // Drag-helper reveal: it starts gated (hidden) and is only revealed once its
+    // anchor under the frame has STOPPED moving — the frame + mobile viewport settle
+    // over the first beat, and revealing on the first frame let the hand visibly
+    // drift down into place. Reveal on a few stable frames, or a timeout fallback.
+    let hintRevealed = false;
+    let hintStableFrames = 0;
+    let lastHintTop = -1;
     const drawFrameImage = (frame: number, cx: number, cy: number, scale: number) => {
       const img = nearestLoaded(frame);
       if (!img) return;
@@ -683,9 +690,17 @@ export default function SpinViewer({
         const topPx = Math.max(12, Math.min(under, maxTop));
         hintRef.current.style.top = topPx + "px";
         hintRef.current.style.bottom = "auto";
-        // The helper is now anchored under a REAL frame — reveal it (it starts gated
-        // so it fades in at its place instead of dropping from the CSS default).
-        if (realMode && frameRect.w > 0) hintRef.current.classList.remove("r3d-hint-init");
+        // Reveal the helper only once its anchor has settled (top stopped moving for a
+        // few frames) on a REAL frame — so it fades in AT its place instead of visibly
+        // dropping while the frame/viewport settle over the first beat.
+        if (!hintRevealed && realMode && frameRect.w > 0) {
+          hintStableFrames = Math.abs(topPx - lastHintTop) < 1.5 ? hintStableFrames + 1 : 0;
+          lastHintTop = topPx;
+          if (hintStableFrames >= 5) {
+            hintRevealed = true;
+            hintRef.current.classList.remove("r3d-hint-init");
+          }
+        }
         // Push the CUE down so its top lands ~16px under the frame's bottom edge
         // (the hand is now up on the frame on every device, so this always runs).
         // Keeps the text/arrow off the product without dragging the hand down.
@@ -1247,7 +1262,6 @@ export default function SpinViewer({
           requestAnimationFrame(sweep);
         } else {
           loaderRef.current?.classList.add("r3d-gone");
-          hintRef.current?.classList.remove("r3d-hint-init"); // safety: never leave the hint gated
           if (!hero) stage.focus({ preventScroll: true });
           window.setTimeout(startIntro, 550); // one-time first-visit drag demo
         }
@@ -1367,11 +1381,17 @@ export default function SpinViewer({
     tick();
     if (enableLoop) syncLoopIcon();
     scheduleLandscapeZoom(); // apply landscape 2× if we mount already held sideways
+    // Fallback: never leave the drag helper gated if its anchor never fully settles.
+    const hintRevealTimer = window.setTimeout(() => {
+      hintRevealed = true;
+      hintRef.current?.classList.remove("r3d-hint-init");
+    }, 1200);
 
     return () => {
       alive = false;
       if (revealTimer) clearTimeout(revealTimer);
       if (landscapeZoomTimer) clearTimeout(landscapeZoomTimer);
+      clearTimeout(hintRevealTimer);
       cancelAnimationFrame(raf);
       stage.removeEventListener("pointerdown", onDown);
       stage.removeEventListener("pointermove", onMove);
