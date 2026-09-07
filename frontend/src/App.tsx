@@ -43,6 +43,10 @@ import Rotation3DBrandDashboard from "./rotation3d/Rotation3DBrandDashboard";
 import DriftBrandDashboard from "./rotation3d/DriftBrandDashboard";
 import TourAuth from "./tour/TourAuth";
 import AuthCallback from "./tour/AuthCallback";
+import CreatorRoute from "./tour/CreatorRoute";
+import TourHome from "./tour/TourHome";
+import TourBuilder from "./tour/TourBuilder";
+import TourPlay from "./tour/TourPlay";
 import {
   isRotation3dSite,
   isDriftHost,
@@ -373,6 +377,24 @@ function App() {
             {/* drift.li creator suite — auth. Google/email-confirm links land on /auth/callback. */}
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/tour/start" element={<TourAuth />} />
+            {/* creator home + builder (signed-in creators), and the public tour entry */}
+            <Route
+              path="/tour"
+              element={
+                <CreatorRoute>
+                  <TourHome />
+                </CreatorRoute>
+              }
+            />
+            <Route
+              path="/tour/:id/edit"
+              element={
+                <CreatorRoute>
+                  <TourBuilder />
+                </CreatorRoute>
+              }
+            />
+            <Route path="/tour/:slug" element={<TourPlay />} />
             <Route
               path="/billing/return"
               element={<BillingReturn />}

@@ -228,14 +228,41 @@ auto-creates a `User`. Extend so a **TOUR** signup provisions a **personal Organ
 canonical-domain logic to handle `DRIFT`/`TOUR` (today it silently falls back to VisionLight).
 Add a `view==="TOUR"` branch in `App.tsx AppEntry` → the creator home.
 
-## 5. Frontend — creator home/profile (Phase 4)
+## 5. Frontend — creator home/profile (Phase 4) — SHIPPED 2026-09-08
+
+As shipped (`frontend/src/tour/`, all on the scoped `.d-*` system + a few `.t-*` layout classes in
+`tourUi.tsx`; light/dark; mobile-first): `TourHome.tsx` = `/tour` behind `CreatorRoute` — greeting,
+plan usage chips (tours x/y, stops per tour, clip length, "Free plan"), **Create a tour** (inline
+name → `POST /my/flows` → builder), the tours grid (thumb, Live/Draft pill, ready/total stops,
+building/failed pills, Edit / Play / Copy link / Delete), the client's **demo card** (from
+`/public/flows/tour/demo`, hide-able per browser), an empty state with the 3 steps, and the
+**UpgradeCard** when `usedFlows >= maxFlows` (mailto today; Stripe flips it). Polls while a tour is
+building. `TourShell` = wordmark → home, theme toggle, log out. `/tour/:slug` (`TourPlay.tsx`)
+resolves a published tour and hands off to the player at its entry drift (`/tour/demo` = demo).
+
+Original design notes:
 
 - Route `/tour` (add **before** the `/:brandSlug` catch-alls) behind a protected gate.
 - A personalized **home**: their tours as a gallery of "maps", a prominent **Create a Tour**
   button, the **Demo tour** card (client-seeded, read-only, hide-able), plan/usage (1/1 free),
   upgrade CTA. Studio/SaaS vibe on `.d-*`, mobile-first.
 
-## 6. Frontend — tour builder wizard (Phase 5)
+## 6. Frontend — tour builder wizard (Phase 5) — SHIPPED 2026-09-08
+
+As shipped: `TourBuilder.tsx` = `/tour/:id/edit`. Editable tour name (blur-save), status pill,
+Preview / Tour settings / Publish–Unpublish, live link + copy when published. The **map** is a
+vertical list of numbered stop cards; the next empty slot is an **upload drop-zone** (tap or drop;
+client-side type + duration check via `<video>` metadata, progress bar via `onUploadProgress`,
+then "Building…" until the poll (3s) flips it to Ready). Each stop card: thumb/spinner/failed
+state, Title, Headline, **Button label + link picker** (this tour's stops, the creator's other
+stops, or a custom drift.li/picdrift.com link), Background (colour / transparent / auto),
+read-only "Auto link → next stop" line, ↑/↓ reorder (calls `/steps/reorder` → relink), Open,
+Remove, Replace clip / Try another clip (FAILED). Slot `maxStepsPerFlow+1` shows the UpgradeCard.
+Tour settings: Next-button label, description, last-stop button (label + picker; empty = "Restart
+tour"). Desktop adds a sticky **live preview** (the real player via `/embed/{productId}`) and the
+path chain. Publish is disabled until every stop is Ready; on publish the link is copied.
+
+Original design notes:
 
 - **Create a Tour** → a mobile-first wizard. 3 ordered **slots** (marked/numbered). Per slot:
   video upload (≤5s clip; validate duration client-side), Title, Headline, custom button
@@ -291,8 +318,8 @@ Root cause: `adminUi.tablePanel` is `overflow-hidden` with tables that have no i
    quota gates, restricted step patch, publish/unpublish, public read (see §3).
 3. **P3 Auth** — ✅ shipped 2026-09-08: `/tour/start`, `/auth/callback`, creator provisioning,
    `CreatorRoute` guard, DRIFT/TOUR canonical-domain fix. Supabase dashboard steps in §13 are owed.
-4. **P4 Creator home** — `/tour` route + home/profile + demo card + usage/upgrade.
-5. **P5 Builder** — the 3-slot wizard, upload/progress/poll, side map, reorder UI.
+4. **P4 Creator home** — ✅ shipped 2026-09-08 (`TourHome`, `TourShell`, `TourPlay`).
+5. **P5 Builder** — ✅ shipped 2026-09-08 (`TourBuilder`: slots, upload/progress/poll, map, reorder, preview).
 6. **P6 Landing + demo** — the intro section + View Demo flow.
 7. **P7 Emails** — client notifications + nurturing.
 8. **P8 Mobile pass** — admin-panel responsive fixes (parallel).

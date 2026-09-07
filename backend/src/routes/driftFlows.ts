@@ -130,15 +130,20 @@ router.get("/api/drift/my/flows", authenticateToken, async (req: AuthenticatedRe
   const kindRaw = req.query.kind;
   const kind = kindRaw !== undefined ? parseFlowKind(kindRaw) : null;
   if (kindRaw !== undefined && !kind) return res.status(400).json({ error: "Unknown flow kind" });
-  const [flows, quota] = await Promise.all([
+  const [flows, quota, org] = await Promise.all([
     prisma.driftFlow.findMany({
       where: { organizationId: orgId, ...(kind ? { kind } : {}) },
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
       include: flowInclude,
     }),
     flowQuota(orgId),
+    prisma.organization.findUnique({ where: { id: orgId }, select: { name: true, slug: true } }),
   ]);
-  res.json({ flows: flows.map(serializeFlow), quota });
+  res.json({
+    flows: flows.map(serializeFlow),
+    quota,
+    creator: { name: org?.name ?? null, handle: org?.slug ?? null },
+  });
 });
 
 // Create a flow. Plan gate: maxFlows (all kinds count) → 403 { upgrade: true }.
