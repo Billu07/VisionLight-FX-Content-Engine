@@ -1,5 +1,6 @@
 import { prisma, dbService } from "./database";
 import { uniqueOrgSlug } from "../routes/drift";
+import { sendCreatorSignupNoticeEmail, sendCreatorWelcomeEmail } from "./mail";
 
 // Self-serve creator accounts for the drift.li creator suite (Tour). A creator is
 // a personal Organization (productLine "TOUR" — its own product line, like
@@ -97,6 +98,7 @@ export async function provisionCreator(
         select: { id: true, name: true },
       });
       console.log(`[${NS}] ${email}: converted profile ${updated.id} → creator org ${org.id} (${slug})`);
+      notifyNewCreator({ email, name: updated.name ?? name, organizationId: org.id, converted: true });
       return { profileId: updated.id, organizationId: org.id, name: updated.name ?? null, created: true, converted: true };
     }
   }
@@ -111,5 +113,14 @@ export async function provisionCreator(
     role: "ADMIN",
   });
   console.log(`[${NS}] ${email}: new creator profile ${created.id} in org ${org.id} (${slug})`);
+  notifyNewCreator({ email, name: created.name ?? name, organizationId: org.id, converted: false });
   return { profileId: created.id, organizationId: org.id, name: created.name ?? null, created: true, converted: false };
+}
+
+// Welcome the creator + tell the client. Best-effort; never blocks signup.
+function notifyNewCreator(p: { email: string; name: string | null; organizationId: string; converted: boolean }) {
+  void sendCreatorWelcomeEmail({ email: p.email, name: p.name }).catch((e) =>
+    console.error(`[${NS}] welcome email failed:`, e),
+  );
+  void sendCreatorSignupNoticeEmail(p).catch((e) => console.error(`[${NS}] signup notice failed:`, e));
 }

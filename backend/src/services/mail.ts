@@ -253,3 +253,137 @@ export async function sendBrandAdminInviteEmail(params: {
     html,
   });
 }
+
+// ─────────────────────────── Creator suite (drift.li/tour) ───────────────────────────
+// Event-driven emails for self-serve creators + the client's own notifications.
+// Auth mails (confirm / reset) come from Supabase's SMTP, not from here.
+
+const CREATOR_HOME_URL = `${APP_URL}/tour`;
+const kindNoun = (kind?: string | null) => (kind || "TOUR").toLowerCase();
+
+/** Welcome a brand-new creator with the three steps to a first tour. */
+export async function sendCreatorWelcomeEmail(params: { email: string; name?: string | null }): Promise<void> {
+  if (!mailConfigured()) return;
+  const html = renderEmail({
+    heading: "Your creator space is ready",
+    intro: `Hi${params.name ? ` ${params.name}` : ""}, welcome to drift.li. You can now turn short phone clips into an interactive tour people scrub with a finger. Your first tour is free: three stops, five-second clips, one link to share.`,
+    bodyHtml:
+      `<ol style="margin:0 0 6px 18px;padding:0;color:#3a4150;font-size:14px;line-height:1.7">` +
+      `<li>Film 3 short clips — hold the phone steady and move slowly through the space.</li>` +
+      `<li>Upload them; we build every stop while you write a title, a headline and a button.</li>` +
+      `<li>Publish. The stops link themselves — even if you reorder them later.</li>` +
+      `</ol>`,
+    ctaLabel: "Create your first tour",
+    ctaUrl: CREATOR_HOME_URL,
+    footnote: "Reply to this email if you get stuck — a person reads it.",
+  });
+  await sendMail({ to: params.email, subject: "Welcome to drift.li — your creator space is ready", html });
+}
+
+/** Tell the client a creator signed up (goes to ADMIN_EMAILS). */
+export async function sendCreatorSignupNoticeEmail(params: {
+  email: string;
+  name?: string | null;
+  organizationId: string;
+  converted: boolean;
+}): Promise<void> {
+  if (!mailConfigured() || !ADMIN_EMAILS.length) return;
+  const html = renderEmail({
+    heading: "New creator signup",
+    intro: "Someone just created a creator space on drift.li.",
+    rows: [
+      ["Email", params.email],
+      ["Name", params.name || "—"],
+      ["Org", params.organizationId],
+      ["Profile", params.converted ? "new signup (converted in place)" : "added to an existing login"],
+    ],
+    footnote: "Creator-suite notification for the drift.li team.",
+  });
+  await sendMail({ to: ADMIN_EMAILS, subject: `New creator: ${params.email}`, html });
+}
+
+/** Tell the client a creator started a flow. */
+export async function sendFlowCreatedNoticeEmail(params: {
+  creatorEmail: string;
+  creatorName?: string | null;
+  flowName: string;
+  kind?: string | null;
+}): Promise<void> {
+  if (!mailConfigured() || !ADMIN_EMAILS.length) return;
+  const noun = kindNoun(params.kind);
+  const html = renderEmail({
+    heading: `New ${noun} started`,
+    intro: `${params.creatorName || params.creatorEmail} created a ${noun} called "${params.flowName}".`,
+    rows: [
+      ["Creator", `${params.creatorName ? `${params.creatorName} · ` : ""}${params.creatorEmail}`],
+      ["Kind", noun],
+    ],
+    footnote: "Creator-suite notification for the drift.li team.",
+  });
+  await sendMail({ to: ADMIN_EMAILS, subject: `New ${noun}: ${params.flowName}`, html });
+}
+
+/** A flow went live: congratulate the creator with the link, notify the client. */
+export async function sendFlowPublishedEmails(params: {
+  creatorEmail: string;
+  creatorName?: string | null;
+  flowName: string;
+  kind?: string | null;
+  publicPath: string;
+  steps: number;
+}): Promise<void> {
+  if (!mailConfigured()) return;
+  const noun = kindNoun(params.kind);
+  const url = `${APP_URL}${params.publicPath}`;
+  const creatorHtml = renderEmail({
+    heading: `Your ${noun} is live`,
+    intro: `"${params.flowName}" is published with ${params.steps} ${params.steps === 1 ? "stop" : "stops"}. Share the link anywhere — it opens straight into the first stop, and every button carries people along the path.`,
+    rows: [["Link", url]],
+    ctaLabel: `Open your ${noun}`,
+    ctaUrl: url,
+    footnote: "Want more stops, more tours or longer clips? Reply to this email and we'll set you up.",
+  });
+  await sendMail({ to: params.creatorEmail, subject: `Your ${noun} "${params.flowName}" is live`, html: creatorHtml });
+  if (ADMIN_EMAILS.length) {
+    const noticeHtml = renderEmail({
+      heading: `${noun[0].toUpperCase()}${noun.slice(1)} published`,
+      intro: `${params.creatorName || params.creatorEmail} published "${params.flowName}".`,
+      rows: [
+        ["Creator", params.creatorEmail],
+        ["Stops", String(params.steps)],
+        ["Link", url],
+      ],
+      ctaLabel: "Open it",
+      ctaUrl: url,
+      footnote: "Creator-suite notification for the drift.li team.",
+    });
+    await sendMail({ to: ADMIN_EMAILS, subject: `Published: ${params.flowName}`, html: noticeHtml });
+  }
+}
+
+// Nudge at most once a week per creator (in-memory; resets on restart — it's a nudge).
+const upgradeNudgeSentAt = new Map<string, number>();
+const UPGRADE_NUDGE_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** The creator hit a plan limit: a friendly "want more?" mail (throttled). */
+export async function sendUpgradeNudgeEmail(params: {
+  email: string;
+  name?: string | null;
+  kind?: string | null;
+  limit: string;
+}): Promise<void> {
+  if (!mailConfigured()) return;
+  const key = params.email.toLowerCase();
+  const last = upgradeNudgeSentAt.get(key) || 0;
+  if (Date.now() - last < UPGRADE_NUDGE_INTERVAL_MS) return;
+  upgradeNudgeSentAt.set(key, Date.now());
+  const noun = kindNoun(params.kind);
+  const html = renderEmail({
+    heading: "Want to build more?",
+    intro: `Hi${params.name ? ` ${params.name}` : ""}, you've reached the free plan's limit (${params.limit}). Paid plans unlock more ${noun}s, more stops per ${noun} and longer clips — and early creators get first access.`,
+    ctaLabel: "Tell us what you need",
+    ctaUrl: "mailto:web@drift.li?subject=Upgrade%20my%20drift.li%20plan",
+    footnote: "You'll get this at most once a week.",
+  });
+  await sendMail({ to: params.email, subject: "Ready for more than one tour?", html });
+}

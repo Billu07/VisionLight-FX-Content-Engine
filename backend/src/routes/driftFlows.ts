@@ -8,6 +8,7 @@ import { prisma } from "../services/database";
 import { authenticateToken, type AuthenticatedRequest } from "../middleware/auth";
 import { probeClipInfo } from "../services/rotation3d/pipeline";
 import { processClip, uniqueSlug } from "./drift";
+import { sendFlowCreatedNoticeEmail, sendFlowPublishedEmails, sendUpgradeNudgeEmail } from "../services/mail";
 import {
   CLIP_DURATION_TOLERANCE_S,
   FlowError,
@@ -158,6 +159,14 @@ router.post("/api/drift/my/flows", authenticateToken, async (req: AuthenticatedR
 
   const quota = await flowQuota(orgId);
   if (!isSuperAdmin(req) && quota.usedFlows >= quota.maxFlows) {
+    if (req.user?.email) {
+      void sendUpgradeNudgeEmail({
+        email: req.user.email,
+        name: req.user.name,
+        kind,
+        limit: `${quota.maxFlows} ${noun}${quota.maxFlows === 1 ? "" : "s"}`,
+      }).catch(() => undefined);
+    }
     return res.status(403).json({
       error: `Your plan includes ${quota.maxFlows} ${noun}${quota.maxFlows === 1 ? "" : "s"}. Upgrade to create more.`,
       upgrade: true,
@@ -185,6 +194,14 @@ router.post("/api/drift/my/flows", authenticateToken, async (req: AuthenticatedR
     select: { id: true },
   });
   console.log(`[${NS}] org ${orgId} created ${kind} flow ${created.id} (${slug})`);
+  if (req.user?.email) {
+    void sendFlowCreatedNoticeEmail({
+      creatorEmail: req.user.email,
+      creatorName: req.user.name,
+      flowName: name,
+      kind,
+    }).catch(() => undefined);
+  }
   const flow = await loadFlow(orgId, created.id);
   res.status(201).json({ flow: serializeFlow(flow), quota: { ...quota, usedFlows: quota.usedFlows + 1 } });
 });
@@ -285,7 +302,18 @@ router.post("/api/drift/my/flows/:id/publish", authenticateToken, async (req: Au
   } catch (err) {
     return handle(res, err);
   }
-  res.json({ flow: serializeFlow(await loadFlow(orgId, flow.id)) });
+  const published = serializeFlow(await loadFlow(orgId, flow.id));
+  if (req.user?.email) {
+    void sendFlowPublishedEmails({
+      creatorEmail: req.user.email,
+      creatorName: req.user.name,
+      flowName: published.name,
+      kind: published.kind,
+      publicPath: published.publicPath,
+      steps: published.counts.steps,
+    }).catch(() => undefined);
+  }
+  res.json({ flow: published });
 });
 
 router.post("/api/drift/my/flows/:id/unpublish", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {

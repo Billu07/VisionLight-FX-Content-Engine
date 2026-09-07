@@ -385,6 +385,9 @@ export default function DriftLanding() {
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>
             )}
           </button>
+          <a className="dl-start" href="/tour/start">
+            Start free
+          </a>
           <button className="dl-login" onClick={() => setShowLogin(true)}>
             Log in
           </button>
@@ -436,6 +439,91 @@ export default function DriftLanding() {
           </div>
         </section>
       )}
+
+      {/* Creator suite — tour / view / memory / path (self-serve) */}
+      <section className="dl-suite" id="create" aria-label="Make your own drift path">
+        <div className="dl-suite-panel">
+          <div className="dl-suite-head">
+            <div className="dl-eyebrow">
+              <span className="dl-dot" />
+              New · Make your own
+            </div>
+            <h2 className="dl-suite-title">
+              Your phone. Your path. <em>One link.</em>
+            </h2>
+            <p className="dl-suite-sub">
+              Drift Link now builds itself around your clips. Film a few seconds, and we turn them into
+              interactive paths you connect with buttons — a home tour, a view worth keeping, a memory lane,
+              or a full path with forms in between.
+            </p>
+          </div>
+
+          <div className="dl-suite-grid">
+            <a className="dl-suite-tile is-live" href="/tour/start">
+              <span className="dl-suite-ico" aria-hidden>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" /></svg>
+              </span>
+              <span className="dl-suite-name">
+                Tour <b>Live</b>
+              </span>
+              <span className="dl-suite-copy">A guided walkthrough — a home, a venue, a space — stop by stop.</span>
+            </a>
+            <div className="dl-suite-tile">
+              <span className="dl-suite-ico" aria-hidden>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3.5" /><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" /></svg>
+              </span>
+              <span className="dl-suite-name">
+                View <b className="soon">Soon</b>
+              </span>
+              <span className="dl-suite-copy">Capture a view — a sunset, a skyline — and keep it as something you can hold.</span>
+            </div>
+            <div className="dl-suite-tile">
+              <span className="dl-suite-ico" aria-hidden>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21s-7-4.6-7-10a7 7 0 0 1 14 0c0 5.4-7 10-7 10z" /><circle cx="12" cy="11" r="2.5" /></svg>
+              </span>
+              <span className="dl-suite-name">
+                Memory <b className="soon">Soon</b>
+              </span>
+              <span className="dl-suite-copy">A memory lane of moments, strung together in the order they happened.</span>
+            </div>
+            <div className="dl-suite-tile">
+              <span className="dl-suite-ico" aria-hidden>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h6v6H4z" /><path d="M14 12h6v6h-6z" /><path d="M10 9h4v3" /><path d="M7 12v5h7" /></svg>
+              </span>
+              <span className="dl-suite-name">
+                Path <b className="soon">Soon</b>
+              </span>
+              <span className="dl-suite-copy">The most flexible: drifts plus pages and forms in between — a whole campaign.</span>
+            </div>
+          </div>
+
+          <div className="dl-suite-steps">
+            <div className="dl-suite-step">
+              <b>1</b>
+              <span>Upload up to three clips, five seconds each</span>
+            </div>
+            <div className="dl-suite-step">
+              <b>2</b>
+              <span>Add a title, a headline and a button per stop</span>
+            </div>
+            <div className="dl-suite-step">
+              <b>3</b>
+              <span>Publish one link — the stops link themselves</span>
+            </div>
+          </div>
+
+          <div className="dl-cta-row dl-suite-cta">
+            <a className="dl-cta-ghost" href="/tour/start?intent=demo">
+              View demo
+            </a>
+            <a className="dl-cta" href="/tour/start">
+              Start your free trial
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
+            </a>
+          </div>
+          <p className="dl-suite-fine">Free forever for your first tour · 3 stops · 5-second clips · no card needed</p>
+        </div>
+      </section>
 
       {/* Bento explore */}
       {items.length > 0 ? (
@@ -561,6 +649,36 @@ const CSS = `
 .dl-reel-name{position:absolute;left:12px;right:12px;bottom:12px;text-align:center;font-size:12px;font-weight:700;color:var(--dl-name-t);background:var(--dl-name-bg);border-radius:9px;padding:5px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;backdrop-filter:blur(6px);opacity:0;transform:translateY(6px);transition:opacity .3s,transform .3s}
 .dl-reel-card:hover .dl-reel-name{opacity:1;transform:none}
 @media(prefers-reduced-motion:reduce){.dl-reel-track{animation:none}}
+
+/* Header "Start free" */
+.dl-start{display:none;padding:9px 18px;border-radius:999px;border:1px solid transparent;background:var(--dl-accent-grad);color:#fff;font-family:inherit;font-weight:800;font-size:13px;text-decoration:none;box-shadow:0 10px 30px -14px rgba(34,211,238,.6);transition:transform .2s}
+.dl-start:hover{transform:translateY(-1px)}
+@media(min-width:520px){.dl-start{display:inline-flex}}
+
+/* Creator suite */
+.dl-suite{position:relative;z-index:2;max-width:1240px;margin:0 auto;padding:clamp(18px,4vw,40px) clamp(18px,5vw,40px) 0}
+.dl-suite-panel{position:relative;overflow:hidden;border-radius:28px;border:1px solid var(--dl-border);background:var(--dl-bento);padding:clamp(24px,4.5vw,52px) clamp(18px,4vw,48px) clamp(24px,4vw,40px)}
+.dl-suite-panel::before{content:"";position:absolute;inset:-40% -20% auto;height:80%;background:radial-gradient(50% 60% at 50% 50%,rgba(34,211,238,.16),transparent 70%);pointer-events:none}
+.dl-suite-head{position:relative;text-align:center;max-width:760px;margin:0 auto}
+.dl-suite-title{margin:0;font-size:clamp(28px,4.6vw,52px);line-height:1.04;font-weight:800;letter-spacing:-.03em;color:var(--dl-text)}
+.dl-suite-title em{font-style:normal;background:var(--dl-title-grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.dl-suite-sub{margin:16px auto 0;max-width:58ch;font-size:clamp(14.5px,1.5vw,17px);line-height:1.6;color:var(--dl-text2)}
+.dl-suite-grid{position:relative;display:grid;gap:12px;margin-top:clamp(24px,3.5vw,40px);grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.dl-suite-tile{display:grid;gap:10px;align-content:start;padding:18px 18px 20px;border-radius:18px;border:1px solid var(--dl-tile-b);background:var(--dl-tile);color:var(--dl-text);text-decoration:none;transition:transform .35s cubic-bezier(.2,.7,.2,1),border-color .35s,box-shadow .35s}
+.dl-suite-tile.is-live{border-color:var(--dl-eb-b);box-shadow:0 24px 50px -30px rgba(34,211,238,.45);cursor:pointer}
+.dl-suite-tile.is-live:hover{transform:translateY(-4px);box-shadow:0 30px 60px -28px rgba(34,211,238,.55)}
+.dl-suite-ico{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--dl-eb-bg);border:1px solid var(--dl-eb-b);color:var(--dl-accent)}
+.dl-suite-name{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:800;letter-spacing:-.01em}
+.dl-suite-name b{font-size:9.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:var(--dl-accent-grad);color:#fff}
+.dl-suite-name b.soon{background:var(--dl-glass2);color:var(--dl-text3)}
+.dl-suite-copy{font-size:13.5px;line-height:1.55;color:var(--dl-text2)}
+.dl-suite-steps{position:relative;display:grid;gap:10px;margin:clamp(20px,3vw,30px) auto 0;max-width:820px;grid-template-columns:1fr}
+@media(min-width:720px){.dl-suite-steps{grid-template-columns:repeat(3,1fr)}}
+.dl-suite-step{display:flex;gap:10px;align-items:center;padding:12px 14px;border-radius:14px;border:1px solid var(--dl-border);background:var(--dl-glass);font-size:13.5px;color:var(--dl-text2)}
+.dl-suite-step b{display:grid;place-items:center;width:26px;height:26px;border-radius:8px;flex:none;background:var(--dl-eb-bg);border:1px solid var(--dl-eb-b);color:var(--dl-accent);font-size:12px}
+.dl-suite-cta{position:relative;margin-top:clamp(22px,3vw,30px)}
+.dl-suite-cta a{text-decoration:none}
+.dl-suite-fine{position:relative;margin:14px 0 0;text-align:center;font-size:12px;letter-spacing:.02em;color:var(--dl-text3)}
 
 /* Bento explore */
 .dl-explore{position:relative;z-index:2;max-width:1240px;margin:0 auto;padding:clamp(30px,5vw,64px) clamp(18px,5vw,40px) 60px}

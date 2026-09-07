@@ -274,7 +274,17 @@ Original design notes:
   upgrade prompt.
 - Keep the field set tiny (Title, Headline, Button, Bg) per the spec; add only if needed.
 
-## 7. Landing intro + demo flow (Phase 6)
+## 7. Landing intro + demo flow (Phase 6) — SHIPPED 2026-09-08
+
+As shipped: `DriftLanding.tsx` gains a **creator-suite section** (`.dl-suite*`, between the reel and
+the gallery): eyebrow, headline, four tiles (Tour = Live, View/Memory/Path = Soon), a 3-step strip,
+CTAs **View demo** → `/tour/start?intent=demo` and **Start your free trial** → `/tour/start`, fine
+print (free forever: 1 tour · 3 stops · 5s clips). The header gets a **Start free** pill. Demo flow:
+signup → `/tour/demo` (`TourPlay` resolves the client's `isDemo` PUBLISHED tour → its entry drift;
+the client seeds it from their superadmin account with the same builder, pointing step buttons /
+the last-stop button at `/tour/start`). Themed light/dark with the existing `--dl-*` tokens.
+
+Original design notes:
 
 - In `DriftLanding.tsx`, add a new `.dl-*` **section** introducing the four variants
   (tour/view/memory/path) — creative, organized, SaaS feel. Two CTAs: **View Demo** |
@@ -283,7 +293,15 @@ Original design notes:
   isDemo=true`, played via the normal player) with periodic "Start free trial" CTAs → ends at
   the creator home. Decide entry: a dedicated `/tour/demo` that loads the demo tour's entry drift.
 
-## 8. Emails (Phase 7) — reuse `mail.ts`
+## 8. Emails (Phase 7) — SHIPPED 2026-09-08
+
+As shipped (`services/mail.ts`, fire-and-forget from the routes): creator **welcome** (3 steps +
+CTA `/tour`) and a **client notice** on signup (`ADMIN_EMAILS`); client notice on **flow created**;
+creator "your tour is live" + client notice on **publish**; an **upgrade nudge** to the creator when
+they hit `maxFlows` (throttled to once a week per email, in-memory). Drip/nurture sequences (day-2,
+day-7…) need a scheduler + sent-state → later. Auth mails (confirm/reset) come from Supabase SMTP.
+
+Original design notes:
 
 - **To client** (`ADMIN_EMAILS` / a configured address): on new creator signup, on tour
   created/published. New `sendMail` templates via `renderEmail`.
@@ -320,8 +338,8 @@ Root cause: `adminUi.tablePanel` is `overflow-hidden` with tables that have no i
    `CreatorRoute` guard, DRIFT/TOUR canonical-domain fix. Supabase dashboard steps in §13 are owed.
 4. **P4 Creator home** — ✅ shipped 2026-09-08 (`TourHome`, `TourShell`, `TourPlay`).
 5. **P5 Builder** — ✅ shipped 2026-09-08 (`TourBuilder`: slots, upload/progress/poll, map, reorder, preview).
-6. **P6 Landing + demo** — the intro section + View Demo flow.
-7. **P7 Emails** — client notifications + nurturing.
+6. **P6 Landing + demo** — ✅ shipped 2026-09-08 (landing section + `/tour/demo` entry; the client seeds the demo).
+7. **P7 Emails** — ✅ shipped 2026-09-08 (welcome, signup/created/published notices, upgrade nudge; drips later).
 8. **P8 Mobile pass** — admin-panel responsive fixes (parallel).
 9. **Later:** Stripe (flip the quota gate to paid), analytics rollup, `/view` `/memory` `/path`.
 
