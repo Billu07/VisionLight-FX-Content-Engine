@@ -95,8 +95,8 @@ export default function DriftAnalytics({ adminOrgId }: { adminOrgId?: string } =
         </div>
       </div>
 
-      <div className="d-card" style={{ overflowX: "auto" }}>
-        <table className="d-table">
+      <div className="d-card" style={{ overflowX: "auto", overscrollBehaviorX: "contain", WebkitOverflowScrolling: "touch" }}>
+        <table className="d-table" style={{ minWidth: 420 }}>
           <thead>
             <tr>
               <th>Drift</th>

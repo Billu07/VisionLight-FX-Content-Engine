@@ -152,6 +152,34 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
   `maxFlows`/`maxStepsPerFlow`/`maxClipSeconds` (free tier 1/3/5). Shipped 2026-09-08
   (TOUR_PLAN.md §2).
 
+## drift.li creator suite (Tour) — CODE DONE 2026-09-08 (P1–P8), awaiting deploy + ops
+
+Self-serve creators build **tours** (ordered `DriftFlow` steps of drifts). A creator = personal
+Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADMIN User
+(`view "TOUR"`). Status/details: TOUR_PLAN.md (§2–§8 "as shipped", §11 log, §13 ops).
+
+- **Backend**: `services/driftFlows.ts` (`relinkFlow()` = single source of truth for every step's
+  auto "Next" CTA → relative `/p/{id}`, quotas, serializers, link validation), `routes/driftFlows.ts`
+  (`/api/drift/my/flows/*` CRUD + clip upload/replace + reorder + publish; `GET
+  /api/drift/public/flows/:kind/:slug`), `services/driftCreator.ts` + `routes/driftCreator.ts`
+  (`POST /api/drift/creator/signup` — idempotent provisioning; the auth middleware allow-lists
+  `/api/drift/creator/*` before workspace selection), `pipeline.probeClipInfo` (duration + fps),
+  creator email templates at the end of `services/mail.ts`.
+- **Frontend** `src/tour/`: `TourAuth` (/tour/start), `AuthCallback` (/auth/callback), `CreatorRoute`
+  (guard), `TourHome` (/tour), `TourBuilder` (/tour/:id/edit), `TourPlay` (/tour/:slug),
+  `tourUi`/`tourSession`/`types`; the landing's creator section is `.dl-suite` in `DriftLanding.tsx`.
+  Routes sit before the `/:brandSlug` catch-alls; `driftNav.RESERVED_SEG` + backend `RESERVED_SLUGS`
+  reserve tour/view/memory/path.
+- **Rules**: creator button links = drift.li / picdrift.com / same-site paths only (server-validated,
+  env `DRIFT_CREATOR_LINK_HOSTS`); a flow-step drift's `ctaPrimary` is flow-managed (the generic
+  product patch drops it); product/form deletes cascade the step → the product delete route relinks.
+  Supabase stays on the default (implicit) auth flow — do NOT switch to PKCE (breaks reset/confirm
+  links opened in another browser).
+- **Ops owed**: Supabase dashboard (Google provider, redirect allow-list incl. `/auth/callback`,
+  Confirm email ON, custom SMTP = web@drift.li — TOUR_PLAN.md §13); seed the demo tour from the
+  superadmin account (build in /tour, tick "Use as the public demo" in Tour settings, publish, point
+  its buttons at `/tour/start`).
+
 ## Transactional email — DONE (2026-09-06)
 
 - `backend/src/services/mail.ts` — nodemailer SMTP, env-driven, defaults to
@@ -191,7 +219,7 @@ Four new client-facing locations on drift.li, each a variant of the same idea (b
 interactive drift paths from phone clips). **Priority #1: `/tour`.** Others: `/view`,
 `/memory`, `/path` (variants, defined later).
 
-### drift.li/tour (P1 data model shipped 2026-09-08; P2 creator API next — see TOUR_PLAN.md)
+### drift.li/tour (P1–P8 code shipped 2026-09-08 — see TOUR_PLAN.md; next: deploy, Supabase ops, demo seed, Stripe)
 
 A self-serve, mobile-first builder where a user creates an **interactive tour** =
 multiple drifts connected by buttons into a guided path (e.g. a real-estate home tour),

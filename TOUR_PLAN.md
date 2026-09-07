@@ -314,7 +314,16 @@ Original design notes:
 Per-step tracking reuses `DriftEvent` (VIEW/CTA_CLICK) already logged by the player; add a
 tour-scoped rollup (drop-off per step, step click counts) keyed by product→stop.
 
-## 10. Admin-panel mobile-first pass (Phase 8, parallelizable)
+## 10. Admin-panel mobile-first pass (Phase 8) — SHIPPED 2026-09-08
+
+As shipped: adminUi gains tableScroll (horizontal scroll container with touch momentum + overscroll
+contain) and tabBarScroll (one swipeable tab row below xl). Every table in SuperAdminDashboard (10),
+AdminDashboard (4), TenantDashboard (4) and DriftAnalytics now sits in a scroll container with a real
+min-width; Subscription Management and All Platform Users also stack into cards below md (pure
+Tailwind display classes, no JSX duplication); section headers wrap; the Team Members Remove button
+is always visible on touch devices. Layout-only, no logic changes.
+
+Original notes:
 
 Root cause: `adminUi.tablePanel` is `overflow-hidden` with tables that have no inner
 `overflow-x-auto` → clipped/unreachable on mobile. Fix:
@@ -340,7 +349,7 @@ Root cause: `adminUi.tablePanel` is `overflow-hidden` with tables that have no i
 5. **P5 Builder** — ✅ shipped 2026-09-08 (`TourBuilder`: slots, upload/progress/poll, map, reorder, preview).
 6. **P6 Landing + demo** — ✅ shipped 2026-09-08 (landing section + `/tour/demo` entry; the client seeds the demo).
 7. **P7 Emails** — ✅ shipped 2026-09-08 (welcome, signup/created/published notices, upgrade nudge; drips later).
-8. **P8 Mobile pass** — admin-panel responsive fixes (parallel).
+8. **P8 Mobile pass** — ✅ shipped 2026-09-08 (19 tables + tab strips; two tables stack into cards on phones).
 9. **Later:** Stripe (flip the quota gate to paid), analytics rollup, `/view` `/memory` `/path`.
 
 ## 12. Edge cases & watch-outs

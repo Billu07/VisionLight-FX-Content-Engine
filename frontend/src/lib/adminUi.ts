@@ -13,6 +13,9 @@ export const adminUi = {
     "text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-300",
   tabBar:
     "flex w-full flex-wrap items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.05] p-1.5 shadow-[0_18px_45px_rgba(2,8,23,0.32)] backdrop-blur-xl xl:w-auto",
+  /** Append to `tabBar`: one swipeable row below xl (no awkward wrapping), wraps as before from xl up. */
+  tabBarScroll:
+    "flex-nowrap overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden xl:flex-wrap xl:overflow-visible",
   tab:
     "shrink-0 whitespace-nowrap rounded-lg px-3.5 py-2 text-[11px] font-bold uppercase tracking-[0.12em] transition-colors",
   tabActive: "bg-brand-accent text-gray-950 shadow-sm",
@@ -21,6 +24,13 @@ export const adminUi = {
     "rounded-2xl border border-white/10 bg-gray-900/45 shadow-[0_22px_50px_rgba(2,8,23,0.42)] backdrop-blur-xl",
   tablePanel:
     "overflow-hidden rounded-2xl border border-white/10 bg-gray-900/45 shadow-[0_22px_50px_rgba(2,8,23,0.42)] backdrop-blur-xl",
+  /**
+   * Horizontal scroll container for wide tables (give the <table> a min-w-[…]).
+   * Use as an inner wrapper inside `tablePanel` (which clips), or append it to
+   * `tablePanel` itself for header-less panels.
+   */
+  tableScroll:
+    "overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]",
   panelHeader:
     "border-b border-white/10 p-5 sm:p-6",
   sectionTitle:

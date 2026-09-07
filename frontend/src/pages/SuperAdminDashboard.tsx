@@ -1490,7 +1490,7 @@ export default function SuperAdminDashboard() {
           </div>
 
           <div className="flex w-full flex-col gap-3 xl:min-w-0 xl:flex-1 xl:items-end">
-            <div className={`${adminUi.tabBar} xl:!w-full`}>
+            <div className={`${adminUi.tabBar} ${adminUi.tabBarScroll} xl:!w-full`}>
               <button
                 onClick={() => navigate("/app")}
                 className={`${adminUi.tab} border border-brand-accent/20 text-brand-accent hover:bg-brand-accent/10`}
@@ -1758,7 +1758,7 @@ export default function SuperAdminDashboard() {
         {/* TAB CONTENT: GLOBAL PRESETS */}
         {activeTab === "global-presets" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className={adminUi.sectionTitle}>Global Prompt Presets</h2>
                 <p className={adminUi.sectionCopy}>These presets automatically appear in every user's PromptFX menu.</p>
@@ -1775,8 +1775,8 @@ export default function SuperAdminDashboard() {
               </button>
             </div>
 
-            <div className={adminUi.tablePanel}>
-              <table className="w-full text-left">
+            <div className={`${adminUi.tablePanel} ${adminUi.tableScroll}`}>
+              <table className="w-full min-w-[640px] text-left">
                 <thead className={adminUi.tableHead}>
                   <tr>
                     <th className="p-6">Preset Name</th>
@@ -1834,7 +1834,7 @@ export default function SuperAdminDashboard() {
         {/* TAB CONTENT: EDITOR PRESETS (PicFX + Convert) */}
         {activeTab === "editor-presets" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className={adminUi.sectionTitle}>Editor Prompt Presets</h2>
                 <p className={adminUi.sectionCopy}>These presets appear only in the asset-library editor — the PicFX and Convert tabs. They are isolated from the global presets above.</p>
@@ -1851,8 +1851,8 @@ export default function SuperAdminDashboard() {
               </button>
             </div>
 
-            <div className={adminUi.tablePanel}>
-              <table className="w-full text-left">
+            <div className={`${adminUi.tablePanel} ${adminUi.tableScroll}`}>
+              <table className="w-full min-w-[640px] text-left">
                 <thead className={adminUi.tableHead}>
                   <tr>
                     <th className="p-6">Preset Name</th>
@@ -1920,7 +1920,7 @@ export default function SuperAdminDashboard() {
               {creditRequests.length === 0 ? (
                 <div className="p-6 text-xs text-gray-500 italic">No pending render requests across all tenants.</div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className={adminUi.tableScroll}>
                   <table className="w-full text-left min-w-[900px]">
                     <thead className={adminUi.tableHead}>
                       <tr>
@@ -1954,7 +1954,7 @@ export default function SuperAdminDashboard() {
               )}
             </div>
 
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className={adminUi.sectionTitle}>Subscription Management</h2>
               <button
                 onClick={() => setShowTenantModal(true)}
@@ -1964,9 +1964,9 @@ export default function SuperAdminDashboard() {
               </button>
             </div>
 
-            <div className={adminUi.tablePanel}>
-              <table className="w-full text-left">
-                <thead className={adminUi.tableHead}>
+            <div className={`${adminUi.tablePanel} ${adminUi.tableScroll}`}>
+              <table className="block w-full text-left md:table md:min-w-[900px]">
+                <thead className={`hidden md:table-header-group ${adminUi.tableHead}`}>
                   <tr>
                     <th className="p-6">Organization</th>
                     <th className="p-6 text-center">Status</th>
@@ -1974,10 +1974,10 @@ export default function SuperAdminDashboard() {
                     <th className="p-6 text-right">Operations</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="block md:table-row-group">
                   {tenants.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="p-10 text-center text-sm text-gray-300/80">
+                    <tr className="block md:table-row">
+                      <td colSpan={4} className="block p-10 text-center text-sm text-gray-300/80 md:table-cell">
                         No organizations created yet.
                       </td>
                     </tr>
@@ -1996,8 +1996,8 @@ export default function SuperAdminDashboard() {
                       !!organizationAdmin &&
                       enteringDashboardUserId === organizationAdmin.id;
                     return (
-                      <tr key={t.id} className={adminUi.tableRow}>
-                        <td className="p-6">
+                      <tr key={t.id} className={`block py-3 md:table-row ${adminUi.tableRow}`}>
+                        <td className="block px-5 py-2 md:table-cell md:p-6">
                           <div className="font-bold text-white">{t.name}</div>
                           <div className="mt-1 text-xs text-cyan-200/80 font-mono">
                             {organizationAdmin?.email || "No admin email"}
@@ -2035,7 +2035,7 @@ export default function SuperAdminDashboard() {
                             )}
                           </div>
                         </td>
-                        <td className="p-6 text-center">
+                        <td className="block px-5 py-2 md:table-cell md:p-6 md:text-center">
                           {t.isDefault ? (
                             <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-emerald-300">
                               System
@@ -2051,13 +2051,13 @@ export default function SuperAdminDashboard() {
                             </span>
                           )}
                         </td>
-                        <td className="p-6 text-center">
+                        <td className="block px-5 py-2 md:table-cell md:p-6 md:text-center">
                           <div className="text-sm font-semibold text-gray-200">{t.maxUsers} users</div>
                           <div className="mt-1 text-xs text-gray-500">{t.maxProjectsTotal} projects</div>
                           <div className="mt-2 text-xs text-gray-400">
                             {mbToGb(Number(t.storageSummary?.usedMb || 0)).toFixed(2)}GB / {mbToGb(Number(t.maxStorageMb || 0)).toFixed(2)}GB
                           </div>
-                          <div className="mx-auto mt-2 h-1.5 w-36 overflow-hidden rounded-full bg-gray-900/90">
+                          <div className="mt-2 h-1.5 w-36 overflow-hidden rounded-full bg-gray-900/90 md:mx-auto">
                             <div
                               className={`h-full rounded-full ${
                                 Number(t.storageSummary?.usagePercent || 0) >= 90
@@ -2078,8 +2078,8 @@ export default function SuperAdminDashboard() {
                             />
                           </div>
                         </td>
-                        <td className="p-6 text-right">
-                          <div className="flex gap-2 justify-end">
+                        <td className="block px-5 py-2 md:table-cell md:p-6 md:text-right">
+                          <div className="flex flex-wrap gap-2 md:justify-end">
                             {canEnterDashboard(organizationAdmin?.id) ? (
                               <button
                                 className={`${adminUi.amberButton} disabled:cursor-wait disabled:opacity-70`}
@@ -2152,9 +2152,9 @@ export default function SuperAdminDashboard() {
                   </select>
                 </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px] text-left">
-                  <thead className={adminUi.tableHead}>
+              <div className={adminUi.tableScroll}>
+                <table className="block w-full text-left md:table md:min-w-[900px]">
+                  <thead className={`hidden md:table-header-group ${adminUi.tableHead}`}>
                     <tr>
                       <th className="p-5">User</th>
                       <th className="p-5">Organization</th>
@@ -2163,20 +2163,20 @@ export default function SuperAdminDashboard() {
                       <th className="p-5 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="block md:table-row-group">
                     {visibleUsers.map((u) => {
                       const org = tenants.find((t) => t.id === u.organizationId);
                       return (
-                        <tr key={u.id} className={adminUi.tableRow}>
-                          <td className="p-5">
+                        <tr key={u.id} className={`block py-3 md:table-row ${adminUi.tableRow}`}>
+                          <td className="block px-5 py-1.5 md:table-cell md:p-5">
                             <div className="font-bold text-white text-sm">{u.name || "Unnamed User"}</div>
                             <div className="text-[10px] text-gray-500 font-mono">{u.email}</div>
                           </td>
-                          <td className="p-5 text-xs text-gray-400">{org?.name || "Default / Unassigned"}</td>
-                          <td className="p-5 text-center text-[10px] font-bold uppercase tracking-[0.14em] text-gray-300">{u.role}</td>
-                          <td className="p-5 text-center text-[10px] font-bold uppercase tracking-[0.14em] text-gray-400">{u.view}</td>
-                          <td className="p-5 text-right">
-                            <div className="flex justify-end gap-2">
+                          <td className="block px-5 py-1.5 text-xs text-gray-400 md:table-cell md:p-5"><span className="mr-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500 md:hidden">Org</span>{org?.name || "Default / Unassigned"}</td>
+                          <td className="block px-5 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-300 md:table-cell md:p-5 md:text-center"><span className="mr-2 text-gray-500 md:hidden">Role</span>{u.role}</td>
+                          <td className="block px-5 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-400 md:table-cell md:p-5 md:text-center"><span className="mr-2 text-gray-500 md:hidden">View</span>{u.view}</td>
+                          <td className="block px-5 py-1.5 md:table-cell md:p-5 md:text-right">
+                            <div className="flex flex-wrap gap-2 md:justify-end">
                               {canEnterDashboard(u.id) ? (
                                 <button
                                   onClick={() => handleEnterReadOnlyDashboard(u)}
@@ -2288,7 +2288,7 @@ export default function SuperAdminDashboard() {
                   No BYOK organizations yet.
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className={adminUi.tableScroll}>
                   <table className="w-full min-w-[1100px] text-left">
                     <thead className={adminUi.tableHead}>
                       <tr>
@@ -2445,7 +2445,7 @@ export default function SuperAdminDashboard() {
               {byokWebhookEvents.length === 0 ? (
                 <div className="p-6 text-xs text-gray-500 italic">No webhook events for current filter.</div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className={adminUi.tableScroll}>
                   <table className="w-full min-w-[1250px] text-left">
                     <thead className={adminUi.tableHead}>
                       <tr>
@@ -2493,7 +2493,7 @@ export default function SuperAdminDashboard() {
         {/* TAB CONTENT: MY AGENCY */}
         {activeTab === "my-agency" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className={adminUi.sectionTitle}>Default Agency Team</h2>
               <button
                 onClick={() => setShowAddTeamModal(true)}
@@ -2502,7 +2502,7 @@ export default function SuperAdminDashboard() {
                 Add Team Member
               </button>
             </div>
-            <div className={`${adminUi.tablePanel} overflow-x-auto`}>
+            <div className={`${adminUi.tablePanel} ${adminUi.tableScroll}`}>
               <table className="w-full text-left min-w-[1000px]">
                 <thead className={adminUi.tableHead}>
                   <tr>
@@ -2602,7 +2602,7 @@ export default function SuperAdminDashboard() {
         {/* TAB CONTENT: DEMO LEADS */}
         {activeTab === "demo-leads" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className={adminUi.sectionTitle}>Picdrift Demo Users</h2>
               <button
                 onClick={() => setShowDemoModal(true)}
@@ -2939,8 +2939,8 @@ export default function SuperAdminDashboard() {
                     USD per render. Implied USD/credit is auto-calculated from configured platform deductions.
                   </p>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-0">
+                <div className={adminUi.tableScroll}>
+                  <table className="w-full min-w-[600px]">
                     <thead>
                       <tr className="border-b border-white/10 text-[10px] uppercase tracking-[0.14em] text-gray-500">
                         <th className="py-3 text-left">Generation Variant</th>
@@ -2982,8 +2982,8 @@ export default function SuperAdminDashboard() {
                 <p className="mt-4 text-[10px] uppercase tracking-[0.14em] text-gray-500">
                   Wallet USD/credit uses the highest implied variant rate per wallet (conservative mode).
                 </p>
-                <div className="overflow-x-auto mt-3">
-                  <table className="w-full min-w-0">
+                <div className={`${adminUi.tableScroll} mt-3`}>
+                  <table className="w-full min-w-[600px]">
                     <thead>
                       <tr className="border-b border-white/10 text-[10px] uppercase tracking-[0.14em] text-gray-500">
                         <th className="py-3 text-left">Wallet</th>

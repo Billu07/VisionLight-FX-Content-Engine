@@ -547,7 +547,7 @@ export default function TenantDashboard() {
           </div>
 
           <div className="flex flex-col gap-3 w-full xl:w-auto xl:flex-row xl:items-center">
-            <div className={adminUi.tabBar}>
+            <div className={`${adminUi.tabBar} ${adminUi.tabBarScroll}`}>
               <button
                 onClick={() => navigate("/app")}
                 className={`${adminUi.tab} border border-brand-accent/20 text-brand-accent hover:bg-brand-accent/10`}
@@ -668,39 +668,41 @@ export default function TenantDashboard() {
               {creditRequests.length === 0 ? (
                 <div className="p-6 text-xs text-gray-500 italic">No pending render requests.</div>
               ) : (
-                <table className="w-full text-left min-w-[700px]">
-                  <thead className={adminUi.tableHead}>
-                    <tr>
-                      <th className="p-5">Requester</th>
-                      <th className="p-5">Email</th>
-                      <th className="p-5">Submitted</th>
-                      <th className="p-5 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {creditRequests.map((r) => (
-                      <tr key={r.id} className={adminUi.tableRow}>
-                        <td className="p-5 text-sm text-white">{r.user?.name || r.name || "Unknown User"}</td>
-                        <td className="p-5 text-xs text-gray-400 font-mono">{r.user?.email || r.email}</td>
-                        <td className="p-5 text-xs text-gray-500">
-                          {new Date(r.createdAt).toLocaleString()}
-                        </td>
-                        <td className="p-5 text-right">
-                          <button
-                            onClick={() => handleResolveCreditRequest(r.id)}
-                            className={adminUi.primaryButton}
-                          >
-                            Mark Resolved
-                          </button>
-                        </td>
+                <div className={adminUi.tableScroll}>
+                  <table className="w-full text-left min-w-[700px]">
+                    <thead className={adminUi.tableHead}>
+                      <tr>
+                        <th className="p-5">Requester</th>
+                        <th className="p-5">Email</th>
+                        <th className="p-5">Submitted</th>
+                        <th className="p-5 text-right">Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {creditRequests.map((r) => (
+                        <tr key={r.id} className={adminUi.tableRow}>
+                          <td className="p-5 text-sm text-white">{r.user?.name || r.name || "Unknown User"}</td>
+                          <td className="p-5 text-xs text-gray-400 font-mono">{r.user?.email || r.email}</td>
+                          <td className="p-5 text-xs text-gray-500">
+                            {new Date(r.createdAt).toLocaleString()}
+                          </td>
+                          <td className="p-5 text-right">
+                            <button
+                              onClick={() => handleResolveCreditRequest(r.id)}
+                              className={adminUi.primaryButton}
+                            >
+                              Mark Resolved
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
 
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className={adminUi.sectionTitle}>Team Members</h2>
               <button
                 onClick={() => setShowAddUserModal(true)}
@@ -710,7 +712,7 @@ export default function TenantDashboard() {
               </button>
             </div>
 
-            <div className={`${adminUi.tablePanel} overflow-x-auto`}>
+            <div className={`${adminUi.tablePanel} ${adminUi.tableScroll}`}>
               <table
                 className={`w-full text-left ${
                   isPicdriftTenant ? "min-w-[860px]" : "min-w-[1000px]"
@@ -798,7 +800,7 @@ export default function TenantDashboard() {
                             </span>
                           ) : (
                             <button
-                              className={`${adminUi.dangerButton} opacity-0 group-hover:opacity-100`}
+                              className={`${adminUi.dangerButton} md:opacity-0 md:group-hover:opacity-100`}
                               onClick={async () => {
                                 if (
                                   await confirmAction(`Remove "${u.email}" from team?`, {
@@ -869,7 +871,7 @@ export default function TenantDashboard() {
                     Read-only USD reference per render. Implied USD/credit is auto-calculated from platform deductions.
                   </p>
                 </div>
-                <div className="overflow-x-auto">
+                <div className={adminUi.tableScroll}>
                   <table className="w-full min-w-[760px]">
                     <thead>
                       <tr className="border-b border-white/10 text-[10px] uppercase tracking-[0.14em] text-gray-500">
@@ -904,7 +906,7 @@ export default function TenantDashboard() {
                 <p className="mt-4 text-[10px] uppercase tracking-[0.14em] text-gray-500">
                   Wallet USD/credit uses the highest implied variant rate per wallet (conservative mode).
                 </p>
-                <div className="overflow-x-auto mt-3">
+                <div className={`${adminUi.tableScroll} mt-3`}>
                   <table className="w-full min-w-[760px]">
                     <thead>
                       <tr className="border-b border-white/10 text-[10px] uppercase tracking-[0.14em] text-gray-500">
