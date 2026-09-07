@@ -22,9 +22,30 @@ engine + auth (2026-09-08).
   (`productLine="TOUR"`) + a `User` (role `ADMIN`, `view="TOUR"`, `authUserId`=Supabase id).
   One Supabase identity → per-org `User` rows already works. This reuses drift products,
   storage, player, forms/leads wholesale — only the UX is new.
-- **Tour = new grouping model.** No collection concept exists today (drifts connect only via
-  hand-pasted CTA URLs). Add `DriftTour` + ordered `DriftTourStop`; the linear "Next" button
-  on each step is **auto-generated from stop order** (that is the "auto-relink on reorder").
+- **One shared model for all four variants.** No collection concept exists today (drifts
+  connect only via hand-pasted CTA URLs). Add a neutral **`DriftFlow`** (with `kind` =
+  TOUR | VIEW | MEMORY | PATH) + ordered polymorphic **`DriftFlowStep`** (a step is a drift,
+  and — for PATH — a form or an in-platform page). Tour ships with drift-only steps; the
+  form/page step types are reserved so `/view`, `/memory`, `/path` reuse the same tables with
+  no migration. The linear "Next" on each step is **auto-generated from step order** (the
+  "auto-relink on reorder").
+
+### 0.1 Resolved design answers (2026-09-08)
+
+- **URL scheme:** `/{kind}/{slug}` — `/tour/{slug}`, `/view/{slug}`, `/memory/{slug}`,
+  `/path/{slug}`. Reserve all four in `RESERVED_SLUGS`.
+- **Last-step "Next":** a **creator-customizable CTA** (they set label + a drift/picdrift
+  target; default suggestion "Start your free trial" for the demo).
+- **Step custom button:** **both** — a picker of the creator's own drifts AND free entry of
+  any drift/picdrift URL (server-validated to those two domains).
+- **The four variants** (same engine, different `kind` + allowed step types + copy):
+  - **tour** — a guided path of connected drifts (e.g. a real-estate home tour). Drift steps.
+  - **view** — people capture a *view* (a sunset on a date, etc.) on their phone; we make it
+    an interactive drift; they can string views together and link drifts. Drift steps.
+  - **memory** — a "memory lane" of drifts. Same shape as view/tour. Drift steps.
+  - **path** — the most customizable: drifts **plus forms and in-platform webpages/pages**
+    interleaved between steps — a full ad campaign or personal pathway (drift → page → form →
+    drift…). Adds FORM + PAGE step types (a new lightweight `DriftPage` builder, later).
 - **Playback reuses the existing player for free.** Each step is a normal `DriftProduct`
   whose auto "Next" CTA points at the next step's drift URL; `Rotation3DPlayer` +
   `driftNav.ts` already do the instant, fullscreen-preserving swap. No new player needed.
@@ -40,7 +61,7 @@ engine + auth (2026-09-08).
 (`driftUploadProductVideo`), `mail.ts`, `DriftEvent` for analytics, `DriftForm`/`DriftLead`.
 
 **Build new:**
-1. `DriftTour` + `DriftTourStop` models + `Organization.maxTours` (Phase 1).
+1. `DriftFlow` + `DriftFlowStep` models (shared by all 4 kinds) + `Organization.maxFlows` (Phase 1).
 2. Brand/creator-scoped clip-upload + tour CRUD/reorder API under `/api/drift/my/tours/*`
    (today video upload is **superadmin-only** — this is the main new backend surface) (P2).
 3. Self-serve signup: Google OAuth (net-new) + manual signup w/ email verify; TOUR account
@@ -54,44 +75,56 @@ engine + auth (2026-09-08).
 
 ## 2. Data model (Phase 1)
 
-Add to `backend/prisma/schema.prisma`:
+Add to `backend/prisma/schema.prisma`. **One shared model for tour/view/memory/path** —
+distinguished by `kind`; Tour only uses `stepType="DRIFT"`, the rest are reserved.
 
 ```prisma
-model DriftTour {
+model DriftFlow {
   id             String   @id @default(uuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  slug           String   // /tour/{slug} or /{creatorSlug}/{tourSlug}
+  kind           String   @default("TOUR")  // TOUR | VIEW | MEMORY | PATH
+  slug           String   // /{kind}/{slug}
   name           String
   title          String?
   description    String?
   status         String   @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
-  isDemo         Boolean  @default(false)    // the client-seeded demo tour
+  isDemo         Boolean  @default(false)    // client-seeded demo flow
   coverUrl       String?
-  order          Int      @default(0)        // creators can order their tours
+  endCta         Json?    // customizable last-step CTA { label, url }
+  order          Int      @default(0)        // creator can order their flows
   createdByUserId String?
-  stops          DriftTourStop[]
+  steps          DriftFlowStep[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-  @@unique([organizationId, slug])
+  @@unique([organizationId, kind, slug])
+  @@index([organizationId, kind])
 }
 
-model DriftTourStop {
+model DriftFlowStep {
   id        String @id @default(uuid())
-  tourId    String
-  tour      DriftTour @relation(fields: [tourId], references: [id], onDelete: Cascade)
-  productId String    // the DriftProduct (the drift for this step)
-  product   DriftProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
-  order     Int       // 0-based position in the tour
-  createdAt DateTime  @default(now())
-  @@unique([tourId, productId])
-  @@index([tourId, order])
+  flowId    String
+  flow      DriftFlow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  stepType  String @default("DRIFT")  // DRIFT | FORM | PAGE  (FORM/PAGE = path only, later)
+  order     Int                        // 0-based position
+  // exactly one ref is set per stepType:
+  productId String?  // DRIFT → DriftProduct
+  product   DriftProduct? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  formId    String?  // FORM → DriftForm (path)
+  pageId    String?  // PAGE → DriftPage (path; model added later)
+  customCta Json?    // this step's own button { label, url } (drift/picdrift only)
+  createdAt DateTime @default(now())
+  @@index([flowId, order])
 }
 ```
 
-- Add `tours DriftTour[]` + `tourStops`… relations to `Organization` and `DriftProduct`.
-- Add `Organization.maxTours Int @default(1)` (free tier) and (optional) `maxStopsPerTour
-  Int @default(3)`.
+- Add `flows DriftFlow[]` + the `DriftFlowStep` back-relation to `Organization` and
+  `DriftProduct`.
+- Add `Organization.maxFlows Int @default(1)` (free tier) + (optional) `maxStepsPerFlow Int
+  @default(3)`. (Naming: `maxFlows`, not `maxTours`, since it governs all four kinds — or
+  gate per-kind later.)
+- `DriftPage` (the in-platform page builder for PATH) is **out of scope for Tour** — reserve
+  the `PAGE` stepType + `pageId` column now; build the model when `/path` starts.
 - **Deploy:** no migration files in this repo → run **`npx prisma db push` on the VPS**
   after deploy (see CLAUDE.md). Flag this to the user every schema change.
 
@@ -99,38 +132,44 @@ model DriftTourStop {
 
 All under `authenticateToken` (NOT `requireSuperAdmin`), scoped to `req.user.organizationId`
 via the existing `requireOrg()`. Reserve `tour`,`view`,`memory`,`path` in `RESERVED_SLUGS`.
+Endpoints are **generic over flows** (`kind` in body/query; Tour = `kind="TOUR"`).
 
-- `GET  /api/drift/my/tours` — list the creator's tours (+ stop counts, statuses).
-- `POST /api/drift/my/tours` — create a tour. **Quota gate:** `count(tours) >= org.maxTours`
-  → `402/403 { upgrade: true }`. Fires client-notify email.
-- `GET/PATCH/DELETE /api/drift/my/tours/:id` — read/edit/delete (org-checked).
-- `POST /api/drift/my/tours/:id/stops` — **the clip upload.** `videoUpload.single("video")`
-  (reuse the 500MB disk multer). Body: title/headline/bgColor/customCta. Quota:
-  `stops >= org.maxStopsPerTour` → upgrade. Flow: create `DriftProduct{status:PROCESSING,
-  frameCount:180}` scoped to the creator org → create `DriftTourStop{order:last+1}` →
-  respond `201` → async `processClip({clip:"A", frameCount:180, ...})` (reuse verbatim) →
-  regenerate step links (below). Client polls product `status` for READY (same as today).
-- `PATCH /api/drift/my/tours/:id/stops/reorder` — body `stopIds[]` in new order → update
-  `order` → **regenerate the auto "Next" CTA** on every step.
-- `PATCH /api/drift/my/tours/:id/stops/:stopId` — edit that step's drift fields (title,
-  headline, bg, the ONE custom CTA) via a **restricted** `applyProductPatch` (see below).
-- `DELETE /api/drift/my/tours/:id/stops/:stopId` — remove; re-order + relink remainder.
-- `POST /api/drift/my/tours/:id/publish` — set `PUBLISHED`, publish all step products.
+- `GET  /api/drift/my/flows?kind=TOUR` — list the creator's flows (+ step counts, statuses).
+- `POST /api/drift/my/flows` — create (body: `kind`, name…). **Quota gate:** `count(flows
+  [of kind]) >= org.maxFlows` → `402/403 { upgrade: true }`. Fires client-notify email.
+- `GET/PATCH/DELETE /api/drift/my/flows/:id` — read/edit/delete (org-checked). PATCH can set
+  the customizable `endCta` (last-step CTA).
+- `POST /api/drift/my/flows/:id/steps` — **the clip upload** (DRIFT step).
+  `videoUpload.single("video")` (reuse the 500MB disk multer). Body: title/headline/bgColor/
+  customCta. Quota: `steps >= org.maxStepsPerFlow` → upgrade. Flow: create
+  `DriftProduct{status:PROCESSING, frameCount:180}` scoped to the creator org → create
+  `DriftFlowStep{stepType:"DRIFT", order:last+1, productId}` → respond `201` → async
+  `processClip({clip:"A", frameCount:180, ...})` (reuse verbatim) → regenerate step links
+  (below). Client polls product `status` for READY (same as today). (FORM/PAGE steps: path only, later.)
+- `PATCH /api/drift/my/flows/:id/steps/reorder` — body `stepIds[]` in new order → update
+  `order` → **regenerate the auto "Next" CTA** on every step (one transaction).
+- `PATCH /api/drift/my/flows/:id/steps/:stepId` — edit that step's drift fields (title,
+  headline, bg, its custom CTA) via a **restricted** patch (see below).
+- `DELETE /api/drift/my/flows/:id/steps/:stepId` — remove; re-order + relink remainder.
+- `POST /api/drift/my/flows/:id/publish` — set `PUBLISHED`, publish all step products.
 
-**Auto-link logic** (single source of truth = stop order): after any create/reorder/delete,
-for each step i, set `product.ctaPrimary = { label: nextLabel, url: <step i+1 drift URL> }`
-(last step → a configurable end CTA, e.g. "Start free trial" or loop to start). The step's
-**custom** button (user-set, drift/picdrift only) goes in `ctaSecondary`. Build drift URLs
-the same way the share-card route does (`/{brandSlug}/{slug}` or `/p/{id}`).
+**Auto-link logic** (single source of truth = step order): after any create/reorder/delete,
+for each step i, set `product.ctaPrimary = { label: nextLabel, url: <step i+1 drift URL> }`.
+The **last step** uses the flow's **customizable `endCta`** (creator sets label + a
+drift/picdrift target; default "Start your free trial"). The step's **custom** button goes in
+`ctaSecondary` — the builder offers **both** a picker of the creator's own drifts AND free
+entry of a drift/picdrift URL. Build drift URLs like the share-card route
+(`/{brandSlug}/{slug}` or `/p/{id}`). Do the whole regenerate in one transaction.
 
-**Field restriction for creators** (new `applyTourStopPatch`, a whitelist subset of
+**Field restriction for creators** (new `applyFlowStepPatch`, a whitelist subset of
 `applyProductPatch`): allow `title`, `titleEnd`(headline), `description`, `background`, and a
 **validated** custom CTA — `url` must resolve to a **drift or picdrift.com** target (reuse
 `resolveDriftTarget` logic server-side; reject external). Do NOT expose the full superadmin
 field set. `ctaPrimary` (the Next link) is system-managed, not user-editable.
 
-**Public read:** `GET /api/drift/public/tours/:slug` (or reuse per-product public payload +
-the entry drift). Playback needs nothing new — the entry step's drift URL + auto CTAs drive it.
+**Public read:** `GET /api/drift/public/flows/:kind/:slug` (or reuse the per-product public
+payload + the entry drift). Playback needs nothing new — the entry step's drift URL + auto
+CTAs drive the existing player.
 
 ## 4. Auth & creator account (Phase 3)
 
@@ -210,7 +249,7 @@ Root cause: `adminUi.tablePanel` is `overflow-hidden` with tables that have no i
 
 ## 11. Phasing (each shippable)
 
-1. **P1 Data model** — `DriftTour`/`DriftTourStop`/`maxTours`; `db push`.
+1. **P1 Data model** — `DriftFlow`/`DriftFlowStep`/`maxFlows`; `db push`.
 2. **P2 Creator API** — tour CRUD, clip upload (brand-scoped `processClip`), reorder+auto-link,
    quota gate, field-restricted patch, public read.
 3. **P3 Auth** — Supabase Google + manual+verify (dashboard setup), `/auth/callback`, TOUR
@@ -245,10 +284,13 @@ Root cause: `adminUi.tablePanel` is `overflow-hidden` with tables that have no i
 - VPS: `npx prisma db push` after each schema phase; the email env (already pending).
 - Stripe account (later).
 
-## 14. Open questions (confirm with user before/at execution)
+## 14. Open questions
 
-- Creator vanity URL scheme: `/tour/{tourSlug}` vs `/{creatorSlug}/{tourSlug}` vs `/p/{id}`.
-- Last-step "Next" behavior: loop to start, end screen, or a fixed CTA?
-- Custom step button: a picker of the creator's own drifts, or allow any drift/picdrift URL?
-- What exactly are `/view`, `/memory`, `/path`? (one-liner each to shape the shared foundation).
-- Does creator storage count against a quota?
+Resolved 2026-09-08 (see §0.1): URL `/{kind}/{slug}`; last-step = customizable `endCta`;
+custom button = picker **and** drift/picdrift URL; the four variants defined; the shared
+`DriftFlow` model reflects all of it.
+
+Still open (decide before/at execution, non-blocking for P1):
+- Does creator storage count against a quota? (drift media isn't metered today.)
+- Free-tier defaults: exactly `maxFlows=1`, `maxStepsPerFlow=3` — per-kind, or global?
+- `/path` FORM/PAGE steps + the `DriftPage` builder — design when `/path` starts (post-Tour).
