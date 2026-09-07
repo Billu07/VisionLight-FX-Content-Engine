@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import { confirmAction, notify } from "../lib/notifications";
+import { useAuth } from "../hooks/useAuth";
 import type { Flow, FlowStep, Quota } from "./types";
 import { isReady } from "./types";
 import { CREATOR_HOME } from "./tourSession";
@@ -449,7 +450,9 @@ function UploadSlot({
 export default function TourBuilder() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [flow, setFlow] = useState<Flow | null>(null);
+  const [demoSaving, setDemoSaving] = useState(false);
   const [quota, setQuota] = useState<Quota | null>(null);
   const [allOptions, setAllOptions] = useState<LinkOption[]>([]);
   const [missing, setMissing] = useState(false);
@@ -705,6 +708,34 @@ export default function TourBuilder() {
               Empty = "{DEFAULT_END}" back to stop 1.
             </span>
           </div>
+          {user?.role === "SUPERADMIN" && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+              <label className="t-inline" style={{ gap: 8, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={flow.isDemo}
+                  disabled={demoSaving}
+                  onChange={async (e) => {
+                    const on = e.target.checked;
+                    setDemoSaving(true);
+                    try {
+                      const r = await apiEndpoints.driftUpdateFlow(flow.id, { isDemo: on });
+                      applyFlow(r.data.flow);
+                      notify.success(on ? "This tour is now the public demo (/tour/demo)" : "No longer the demo tour");
+                    } catch (err) {
+                      notify.error(apiError(err));
+                    } finally {
+                      setDemoSaving(false);
+                    }
+                  }}
+                />
+                <span className="d-sub">
+                  Use as the public demo tour (<code className="d-code">/tour/demo</code>) — superadmin only. Publish it
+                  and point its buttons at <code className="d-code">/tour/start</code>.
+                </span>
+              </label>
+            </div>
+          )}
         </div>
       )}
 
