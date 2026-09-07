@@ -25,6 +25,7 @@ import {
   DRIFT_DOMAIN_TARGET,
 } from "../services/cloudflareDomains";
 import { sendNewLeadEmail, sendBrandAdminInviteEmail } from "../services/mail";
+import { relinkFlow, stepFlowIdForProduct, isFlowStepProduct } from "../services/driftFlows";
 
 // Drift (drift.li) — a separate product line running the same interactive
 // spin/path player as Rotation3D, but with its own brand orgs
@@ -49,12 +50,12 @@ const videoUpload = multer({
   limits: { fileSize: 500 * 1024 * 1024 },
 });
 
-const slugify = (s: string) =>
+export const slugify = (s: string) =>
   s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) ||
   "product";
 
 // Generate a slug unique within the org (append a short suffix on collision).
-const uniqueSlug = async (organizationId: string, name: string) => {
+export const uniqueSlug = async (organizationId: string, name: string) => {
   const base = slugify(name);
   for (let i = 0; i < 5; i++) {
     const slug = i === 0 ? base : `${base}-${crypto.randomBytes(2).toString("hex")}`;
@@ -72,6 +73,7 @@ const RESERVED_SLUGS = new Set([
   "p", "embed", "admin", "studios", "projects", "pricing", "terms", "privacy",
   "reset-password", "support-handoff", "auth", "billing", "demo", "rotation3d",
   "drift", "api", "www", "b", "assets", "favicon",
+  "tour", "view", "memory", "path", // drift.li creator suite (/{kind}/{slug})
 ]);
 
 // Globally-unique vanity slug for an organization.
@@ -141,7 +143,7 @@ const sanitizeCaption = (c: any, index: number) => {
 // Build the spin for a product's clip in the background (shared by primary and
 // second-clip uploads). Reuses the Rotation3D pipeline under the drift/ storage
 // namespace so Drift frames never mix with Rotation3D's.
-const processClip = (opts: {
+export const processClip = (opts: {
   clip: "A" | "B";
   productId: string;
   orgId: string;
@@ -186,12 +188,18 @@ const processClip = (opts: {
           create: { productId, frameCount: manifest.frameCount, manifest: manifest as any, status: "READY" },
           update: { frameCount: manifest.frameCount, manifest: manifest as any, status: "READY" },
         });
+        // Keep a background the creator/brand already chose (flow steps set it at
+        // upload); otherwise use the colour detected from the frames.
+        const existing = await prisma.driftProduct.findUnique({
+          where: { id: productId },
+          select: { background: true },
+        });
         await prisma.driftProduct.update({
           where: { id: productId },
           data: {
             status: "READY",
             defaultFrame: manifest.defaultFrame,
-            background: manifest.detectedBg ?? null,
+            background: existing?.background || (manifest.detectedBg ?? null),
           },
         });
       } else {
@@ -665,7 +673,15 @@ router.delete(
       select: { id: true },
     });
     if (!existing) return res.status(404).json({ error: "Product not found" });
+    // If this drift is a step of a creator flow the DB cascades the step away —
+    // re-derive that flow's links so the previous step's "Next" doesn't dangle.
+    const flowId = await stepFlowIdForProduct(existing.id);
     await prisma.driftProduct.delete({ where: { id: req.params.id } });
+    if (flowId) {
+      await relinkFlow(prisma, flowId).catch((err) =>
+        console.error(`[${NS}] relink after product delete failed:`, err),
+      );
+    }
     res.json({ ok: true });
   },
 );
@@ -689,6 +705,14 @@ async function applyProductPatch(
   body: any,
   res: Response,
 ) {
+  // A drift that is a step of a creator flow has flow-managed CTAs (the flow
+  // regenerates ctaPrimary = Next and mirrors the step's own button into
+  // ctaSecondary), so direct edits would only be overwritten — drop them.
+  if (("ctaPrimary" in body || "ctaSecondary" in body) && (await isFlowStepProduct(productId))) {
+    body = { ...body };
+    delete body.ctaPrimary;
+    delete body.ctaSecondary;
+  }
   const data: Record<string, unknown> = {};
   if ("ctaPrimary" in body) data.ctaPrimary = cta(body.ctaPrimary) ?? null;
   if ("ctaSecondary" in body) data.ctaSecondary = cta(body.ctaSecondary) ?? null;

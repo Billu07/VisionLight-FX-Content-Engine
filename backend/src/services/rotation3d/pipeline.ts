@@ -85,6 +85,43 @@ const probeDurationSeconds = (input: string): Promise<number> =>
     cmd.run();
   });
 
+/**
+ * Header-only probe of a clip: duration (seconds) and source frame rate (fps, 0
+ * when unknown). Used by the self-serve flow builder to enforce the per-plan clip
+ * length BEFORE queueing the heavy extraction, and to size the frame count to the
+ * source (no point asking for more frames than the clip has). Never throws.
+ */
+export const probeClipInfo = (input: string): Promise<{ duration: number; fps: number }> =>
+  new Promise((resolve) => {
+    let duration = 0;
+    let fps = 0;
+    let stderr = "";
+    const parseFps = (s: string) => {
+      const m = s.match(/(\d+(?:\.\d+)?)\s*fps/);
+      return m ? Number(m[1]) : 0;
+    };
+    const cmd = ffmpeg(input)
+      .outputOptions(["-frames:v", "1", "-f", "null"])
+      .output(NULL_DEVICE);
+    cmd.on("codecData", (data: any) => {
+      const m = String(data?.duration || "").match(/(\d+):(\d+):(\d+(?:\.\d+)?)/);
+      if (m) duration = Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
+      const details: string[] = Array.isArray(data?.video_details) ? data.video_details : [];
+      for (const d of details) {
+        const f = parseFps(String(d));
+        if (f > 0) fps = f;
+      }
+    });
+    cmd.on("stderr", (line: string) => {
+      if (stderr.length < 8000) stderr += `${line}\n`;
+    });
+    const done = () =>
+      resolve({ duration: duration || parseDuration(stderr), fps: fps || parseFps(stderr) });
+    cmd.on("end", done);
+    cmd.on("error", done);
+    cmd.run();
+  });
+
 // One ffmpeg pass extracts ~targetCount evenly-spaced frames as lossless PNG
 // (no intermediate JPEG generation loss).
 const extractFrames = (

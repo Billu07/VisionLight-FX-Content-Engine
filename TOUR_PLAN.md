@@ -106,7 +106,42 @@ shared model for tour/view/memory/path, distinguished by `kind`; Tour only uses
   first breaks every Organization query (65 of them, studio included) until the push runs.
   P1 was applied 2026-09-08 (schema pushed from a side branch before `main`; equivalent).
 
-## 3. Backend API (Phase 2) — `backend/src/routes/drift.ts`
+## 3. Backend API (Phase 2) — SHIPPED 2026-09-08
+
+As shipped (`backend/src/routes/driftFlows.ts` = routes, `backend/src/services/driftFlows.ts` =
+domain logic; the original design notes follow). All `/my/*` routes are `authenticateToken` +
+org-scoped like the other drift creator routes; SUPERADMIN skips quotas (demo seeding).
+
+- `GET /api/drift/my/flows[?kind=]` → `{ flows[], quota }`; `POST /api/drift/my/flows` (body
+  `kind, name, title?, description?, endCta?, nextLabel?`) → 201, or **403 `{ upgrade: true,
+  limit, used }`** at `maxFlows` (all kinds count).
+- `GET | PATCH | DELETE /api/drift/my/flows/:id` — PATCH: `name, title, description, coverUrl,
+  endCta, nextLabel, slug, order` (+ `isDemo` superadmin-only); endCta/nextLabel re-derive links.
+  DELETE removes the flow AND the drifts it created.
+- `POST /api/drift/my/flows/:id/publish | /unpublish` — publish needs ≥1 step and every step
+  READY (409 otherwise); flips step drifts to PUBLISHED / back to READY.
+- `POST /api/drift/my/flows/:id/steps` — multipart `video` + `name, title, titleEnd,
+  description, background, customCta(JSON)`. Server probes the clip (`probeClipInfo`: duration
+  + fps) → **≤ `maxClipSeconds` (+0.5s slack) else 400 `{ upgrade: true }`**; step quota → 403
+  `{ upgrade: true }`; frameCount = every source frame capped at 180 (no duplicated frames).
+  Creates the PROCESSING drift + step + relinks in one transaction, responds 201, then queues
+  `processClip` (reused verbatim). `POST …/steps/:stepId/clip` replaces the clip (the FAILED
+  "try again"). `PATCH …/steps/reorder` `{ stepIds }`; `PATCH …/steps/:stepId` (restricted set:
+  name/title/titleEnd/description/descriptionEnd/background/customCta); `DELETE …/steps/:stepId`.
+- `GET /api/drift/public/flows/:kind/:slug` — PUBLISHED only; `slug=demo` resolves the
+  `isDemo` flow of that kind. Returns the entry drift + viewable steps.
+- **Links:** `relinkFlow()` is the single source of truth — every step's `ctaPrimary` = `{
+  nextLabel, "/p/{nextProductId}" }` (relative, host-agnostic, exactly what the player swaps
+  in-app); the last step gets the flow's `endCta`, else "Restart tour" → the entry drift;
+  `customCta` mirrors into `ctaSecondary`; `order` normalized to 0..n-1. Runs inside the same
+  transaction as every step create/reorder/delete, and after a superadmin product delete.
+- **Guards in `routes/drift.ts`:** `applyProductPatch` drops `ctaPrimary/ctaSecondary` for
+  flow-step drifts (flow-managed); `processClip` keeps a pre-chosen `background`;
+  `RESERVED_SLUGS` += tour/view/memory/path; `slugify/uniqueSlug/processClip` exported.
+- Creator button links are validated server-side to drift.li / picdrift.com (+ same-site paths;
+  env `DRIFT_CREATOR_LINK_HOSTS` overrides). Not in P2 (deferred to P7): the create-notify email.
+
+Original design notes:
 
 All under `authenticateToken` (NOT `requireSuperAdmin`), scoped to `req.user.organizationId`
 via the existing `requireOrg()`. Reserve `tour`,`view`,`memory`,`path` in `RESERVED_SLUGS`.
@@ -229,8 +264,8 @@ Root cause: `adminUi.tablePanel` is `overflow-hidden` with tables that have no i
 
 1. **P1 Data model** — ✅ shipped 2026-09-08: `DriftFlow`/`DriftFlowStep`, `Organization.maxFlows`
    /`maxStepsPerFlow`/`maxClipSeconds` (see §2 for the rollout order).
-2. **P2 Creator API** — tour CRUD, clip upload (brand-scoped `processClip`), reorder+auto-link,
-   quota gate, field-restricted patch, public read.
+2. **P2 Creator API** — ✅ shipped 2026-09-08: flow CRUD, clip upload + replace, reorder + auto-link,
+   quota gates, restricted step patch, publish/unpublish, public read (see §3).
 3. **P3 Auth** — Supabase Google + manual+verify (dashboard setup), `/auth/callback`, TOUR
    provisioning, `toProfileOption`/`AppEntry` branches.
 4. **P4 Creator home** — `/tour` route + home/profile + demo card + usage/upgrade.

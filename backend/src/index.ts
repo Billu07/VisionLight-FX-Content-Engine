@@ -13,6 +13,7 @@ import mediaRouter from "./routes/media";
 import byokRouter from "./routes/byok";
 import rotation3dRouter, { recoverOrphanedRot3dJobs } from "./routes/rotation3d";
 import driftRouter, { recoverOrphanedDriftJobs } from "./routes/drift";
+import driftFlowsRouter from "./routes/driftFlows";
 import { mailConfigured, verifyMail } from "./services/mail";
 
 console.log("Environment Check:", {
@@ -50,6 +51,7 @@ app.use(mediaRouter);
 app.use(byokRouter);
 app.use(rotation3dRouter);
 app.use(driftRouter);
+app.use(driftFlowsRouter);
 
 app.use((req, res) => res.status(404).json({ error: "Route not found" }));
 app.use((error: any, req: Request, res: Response, next: NextFunction) => {
