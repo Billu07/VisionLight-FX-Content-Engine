@@ -35,14 +35,16 @@ One codebase, multiple product lines (scoped by host + `Organization.productLine
 
 ## Deploy flow (important)
 
-- Push to GitHub **`main`** → GitHub Actions (`.github/workflows/deploy.yml`) SSHes to
-  the VPS (`/var/www/myapp`), then: `git pull` → `cd backend && npm ci` → `prisma
-  migrate deploy` **only if `prisma/migrations/` exists and is non-empty** → `npm run
-  build` → `pm2 restart my-backend --update-env`. Frontend is built + served as static
-  by nginx (so `frontend/public/*` is at the domain root).
-- **Schema changes**: there are usually **no migration files**, so `prisma migrate
-  deploy` is skipped → schema changes need a **manual `npx prisma db push`** on the VPS.
-  Adding a Prisma field ⇒ tell the user to run it, or the queries error.
+- **Deploys are MANUAL.** Push to GitHub **`main`**, then the user runs the deploy commands
+  in their own SSH session (see "VPS operations" below). The GitHub Action
+  (`.github/workflows/deploy.yml`) exists but always aborts on its dirty-tree guard
+  (untracked ops files live in the VPS repo — verified 2026-09-08: 80/80 runs failed), so
+  treat it as a no-op; never wait for a green run. Frontend is built + served as static by
+  nginx (so `frontend/public/*` is at the domain root).
+- **Schema changes**: there are **no migration files**, so schema changes reach the DB only
+  via a **manual `npx prisma db push`** on the VPS — run it right after `git pull` and
+  BEFORE `npm run build`/restart (additive columns are invisible to the old build, so the DB
+  is ready before the new code starts). Always hand the user that ordering.
 - **Adding a backend dependency**: deploy uses `npm ci` (exact lockfile) — run `npm
   install <pkg>` locally so `package.json` + `package-lock.json` both update, or `npm
   ci` fails.
@@ -58,26 +60,30 @@ Server: `/var/www/myapp` on the VPS (IP `72.61.0.117`; shell prompt `root@srv111
 Backend `/var/www/myapp/backend`, frontend `/var/www/myapp/frontend`, pm2 process
 **`my-backend`**. The user runs these in their own SSH session; the agent only provides them.
 
-**On push to `main`, the deploy Action runs automatically** (`.github/workflows/deploy.yml`):
-fast-forwards the VPS repo → `cd backend && npm ci && [prisma migrate deploy only if
-prisma/migrations/ exists] && npm run build && pm2 restart my-backend --update-env` →
-`cd ../frontend && npm ci && npm run build` (nginx serves the frontend build). **Guards:** it
-ABORTS if the VPS working tree is dirty or can't fast-forward — so never hand-edit files on
-the VPS; keep it tracking `origin/main`. Usually the user does nothing after a push.
-
-**After a SCHEMA change** (new/changed Prisma model) — the ONE manual step, since the deploy
-skips migrations. **Preferred order (zero downtime):** push the commit to a **side branch**,
-apply the schema to the DB from that branch, THEN push `main`. Additive tables/columns are
-invisible to the running build, so nothing errors in between (`/tmp` keeps the VPS tree clean):
+**Standard deploy (manual, after every push to `main`)** — give the user only the parts that
+changed (skip `npm ci` when no dependency changed; skip the frontend block when only the
+backend changed):
 ```bash
-cd /var/www/myapp/backend
-git fetch origin <branch>
-git show origin/<branch>:backend/prisma/schema.prisma > /tmp/schema.prisma
-npx prisma db push --schema /tmp/schema.prisma --skip-generate   # additive → applies; destructive → refuses (good)
+cd /var/www/myapp && git pull --ff-only origin main
+cd backend && npm ci --no-audit --no-fund && npm run build && pm2 restart my-backend --update-env
+cd ../frontend && npm ci --no-audit --no-fund && npm run build
 ```
-Fallback if the code is already on `main`: run it immediately —
-`npx prisma db push && pm2 restart my-backend --update-env` — every Organization query
-(studio included) fails until it does.
+Keep the VPS tracking `origin/main` (never hand-edit tracked files there, or the ff-only pull
+fails). The Action in `.github/workflows/deploy.yml` is NOT the deploy path: it aborts every
+run because untracked ops files (`.env` backups, CSV exports, ad-hoc scripts) sit in the VPS
+tree. Optional cleanup: move them to `/var/www/ops-scratch/` and/or relax the guard to
+`git status --porcelain --untracked-files=no`.
+
+**Deploy with a SCHEMA change** (new/changed Prisma model) — same as above plus `db push`,
+in THIS order: pull → `db push` → build → restart. The old build keeps running while the DB
+gains the additive tables/columns (it ignores them), so there is no window where queries
+fail. Never restart before the push: every Organization query (studio included) errors until
+the columns exist.
+```bash
+cd /var/www/myapp && git pull --ff-only origin main
+cd backend && npx prisma db push --skip-generate      # additive → applies; destructive → refuses (stop and review)
+npm ci --no-audit --no-fund && npm run build && pm2 restart my-backend --update-env
+```
 
 **Manual deploy** (only if the Action fails / to force):
 ```bash
@@ -170,8 +176,8 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
 
 ## Gotchas
 
-- `prisma db push` is manual on the VPS (deploy doesn't migrate). New Prisma fields break
-  queries until pushed → apply from a side branch BEFORE pushing `main` (see VPS operations).
+- `prisma db push` is manual on the VPS (no migrations). New Prisma fields break queries
+  until pushed → run it right after `git pull`, BEFORE build/restart (see VPS operations).
 - Git pushes time out → background + verify.
 - `cloudflare/` is gitignored (`git add -f`).
 - Sensitive files: a prior `ss1.jpeg` held Google AI Studio API keys — never echo such

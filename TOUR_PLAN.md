@@ -99,13 +99,12 @@ shared model for tour/view/memory/path, distinguished by `kind`; Tour only uses
 - **Why it differs from the first draft:** per-kind (not per-org) slug uniqueness matches the
   URL scheme; `maxClipSeconds`, `settings`, `publishedAt`, step `updatedAt`, the `formId` FK
   and unique `productId` were added now so P2–P5 need no second `db push`.
-- **Schema rollout rule (used for P1; reuse for every schema phase):** commit → push to a
-  **side branch** → on the VPS apply the schema from that branch
-  (`git show origin/<branch>:backend/prisma/schema.prisma > /tmp/schema.prisma && npx prisma
-  db push --schema /tmp/schema.prisma --skip-generate`) → only then fast-forward `main`.
-  Additive tables/columns are invisible to the running build, so the DB is ready before the
-  new code restarts. Pushing `main` first breaks every Organization query (65 of them,
-  studio included) until the push runs.
+- **Schema rollout rule (every schema phase):** deploys are manual, so on the VPS run
+  `git pull --ff-only origin main` → `npx prisma db push --skip-generate` → `npm run build` →
+  `pm2 restart my-backend --update-env`, in that order. Additive tables/columns are invisible
+  to the still-running old build, so the DB is ready before the new code starts; restarting
+  first breaks every Organization query (65 of them, studio included) until the push runs.
+  P1 was applied 2026-09-08 (schema pushed from a side branch before `main`; equivalent).
 
 ## 3. Backend API (Phase 2) — `backend/src/routes/drift.ts`
 
