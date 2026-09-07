@@ -354,6 +354,18 @@ Root cause: `adminUi.tablePanel` is `overflow-hidden` with tables that have no i
 
 ## 12. Edge cases & watch-outs
 
+**Hardening applied after the 2026-09-08 code review** (keep these invariants): creator
+links reject backslashes/whitespace and relative paths must resolve on-site; adding a creator
+profile next to an existing studio/brand workspace needs `{ confirm: true }` (API 409
+`CREATOR_CONFIRM` otherwise — the UI always asks); in-place conversion only for a lone,
+org-less, minutes-old, project-less auto-created profile; plan limits are checked inside the
+create transactions behind a per-org row lock; temp uploads are removed on any failure before
+`processClip` is queued; builder forms resync only non-dirty fields; plan-limit errors carry
+`code: "PLAN_LIMIT"` + `details` (the axios wrapper exposes `status/code/details`, never
+`response`); `start/signup/login/callback` are reserved tour slugs; TOUR profiles route to
+`/tour` from the studio chooser, Projects and handoffs.
+
+
 - **Processing = concurrency 1, in-memory** (restart drops the queue → recovered to FAILED).
   Self-serve volume will need a durable queue (Redis/DB-backed) + retry + a real FAILED UX
   with re-upload. Flag before launch scale.
