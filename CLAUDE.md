@@ -52,6 +52,45 @@ One codebase, multiple product lines (scoped by host + `Organization.productLine
 - VPS IP: `72.61.0.117`. App path: `/var/www/myapp` (backend at `/var/www/myapp/backend`).
 - Restart + read logs: `pm2 restart my-backend --update-env`, `pm2 logs my-backend --lines N --nostream`.
 
+## VPS operations (commands to GUIDE the user — the agent cannot SSH)
+
+Server: `/var/www/myapp` on the VPS (IP `72.61.0.117`; shell prompt `root@srv1115586`).
+Backend `/var/www/myapp/backend`, frontend `/var/www/myapp/frontend`, pm2 process
+**`my-backend`**. The user runs these in their own SSH session; the agent only provides them.
+
+**On push to `main`, the deploy Action runs automatically** (`.github/workflows/deploy.yml`):
+fast-forwards the VPS repo → `cd backend && npm ci && [prisma migrate deploy only if
+prisma/migrations/ exists] && npm run build && pm2 restart my-backend --update-env` →
+`cd ../frontend && npm ci && npm run build` (nginx serves the frontend build). **Guards:** it
+ABORTS if the VPS working tree is dirty or can't fast-forward — so never hand-edit files on
+the VPS; keep it tracking `origin/main`. Usually the user does nothing after a push.
+
+**After a SCHEMA change** (new/changed Prisma model) — the ONE manual step, since the deploy
+skips migrations. Do it right after the schema-changing push (the app errors on missing
+columns until it runs):
+```bash
+cd /var/www/myapp/backend
+npx prisma db push                      # sync the DB to schema.prisma
+pm2 restart my-backend --update-env
+```
+
+**Manual deploy** (only if the Action fails / to force):
+```bash
+cd /var/www/myapp && git pull --ff-only origin main
+cd backend && npm ci --no-audit --no-fund && npm run build && pm2 restart my-backend --update-env
+cd ../frontend && npm ci --no-audit --no-fund && npm run build
+```
+
+**Everyday commands:**
+```bash
+pm2 restart my-backend --update-env             # restart backend, reload env
+pm2 logs my-backend --lines 100 --nostream      # recent logs (grep-able)
+pm2 status                                       # process state
+nano /var/www/myapp/backend/.env                 # edit env → then restart --update-env
+```
+Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backend --lines 80
+--nostream | grep -iE '\[mail\]|Environment Check'`.
+
 ## Conventions
 
 - **No central env module** — modules read `process.env.*` directly into module consts
