@@ -271,12 +271,14 @@ custom button = picker **and** drift/picdrift URL; the four variants defined; th
 `DriftFlow` model reflects all of it.
 
 Still open (decide before/at execution):
-- **Creator org marker (P3):** the draft says `productLine="TOUR"`, but `routes/drift.ts` gates
-  the public player + brand lookups on `productLine: "DRIFT"` (brand-slug resolve, org
-  checks), so TOUR orgs' drifts would 404 unless every gate is widened. Recommended: creators
-  ARE drift orgs (`productLine="DRIFT"`) plus an account marker (e.g. `accountType
-  BRAND|CREATOR`, one more column) and `User.view="CREATOR"`; only the superadmin brand list
-  then needs a filter. Decide at P3 (needs a `db push` if a column is added).
+- **Creator org marker — DECIDED 2026-09-08:** Tour is a separate product line from Drift
+  (the brand/superadmin platform), same pattern as ROTATION3D vs DRIFT → creators get their
+  own `productLine` (`"TOUR"`; rename to e.g. `"CREATOR"` at P3 if the four kinds are
+  siblings rather than one "Tour" umbrella). Verified impact: the public player route behind
+  `/p/{id}` has NO product-line filter, so tour steps play unchanged; only the two public
+  brand-slug lookups (`/api/drift/public/b/:brandSlug[/:productSlug]`) are DRIFT-only and tour
+  steps don't need them; every superadmin brand route is DRIFT-only, which correctly keeps
+  creators out of the brand admin/landing. No extra column needed.
 - Does creator storage count against a quota? (drift media isn't metered today.)
 - Free-tier defaults: exactly `maxFlows=1`, `maxStepsPerFlow=3` — per-kind, or global?
 - `/path` FORM/PAGE steps + the `DriftPage` builder — design when `/path` starts (post-Tour).
