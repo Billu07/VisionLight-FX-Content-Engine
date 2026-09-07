@@ -86,6 +86,22 @@ export default function TourAuth() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, user?.view]);
 
+  // Already signed in on a studio/brand profile: one tap provisions the creator space.
+  const signedInElsewhere = !isLoading && !!user && user.view !== "TOUR";
+  const continueSignedIn = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      rememberNext(next);
+      await ensureCreatorProfile();
+      navigate(next, { replace: true });
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const switchMode = (m: Mode) => {
     setMode(m);
     setError("");
@@ -265,6 +281,16 @@ export default function TourAuth() {
                     )}
                   </div>
 
+                  {signedInElsewhere && mode !== "forgot" && (
+                    <div className="d-banner" style={{ display: "grid", gap: 8 }}>
+                      <span>
+                        You're signed in as <strong>{user?.email}</strong>. Use that account for your creator space?
+                      </span>
+                      <button type="button" className="d-btn primary" onClick={continueSignedIn} disabled={busy}>
+                        {busy ? "One moment…" : "Continue with this account"}
+                      </button>
+                    </div>
+                  )}
                   {mode !== "forgot" && (
                     <>
                       <button type="button" className="d-btn ta-google" onClick={google} disabled={busy}>
