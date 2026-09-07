@@ -16,6 +16,9 @@ const NS = "drift-creator";
 export const CREATOR_PRODUCT_LINE = "TOUR";
 export const CREATOR_VIEW = "TOUR";
 const DOMAIN = "drift.li";
+// An auto-created profile counts as "untouched" only if validateSession made it
+// moments ago for this very signup — anything older is somebody's real account.
+const BARE_PROFILE_MAX_AGE_MS = 15 * 60 * 1000;
 
 export type CreatorIdentity = { authUserId: string; email: string; name?: string | null };
 
@@ -29,7 +32,30 @@ export type CreatorProvisionResult = {
   converted: boolean;
 };
 
+export type ExistingProfileSummary = { id: string; view: string; organizationName: string | null };
+
+/** Thrown when the identity already owns a studio/brand workspace and the caller
+ *  hasn't explicitly confirmed that a SEPARATE creator profile should be created. */
+export class CreatorConfirmationRequired extends Error {
+  status = 409;
+  code = "CREATOR_CONFIRM";
+  email: string;
+  profiles: ExistingProfileSummary[];
+  constructor(email: string, profiles: ExistingProfileSummary[]) {
+    super("This email already has a workspace. Confirm to create a separate creator space.");
+    this.email = email;
+    this.profiles = profiles;
+  }
+}
+
 const isCreatorProfile = (p: any) => p?.view === CREATOR_VIEW && !!p?.organizationId;
+
+const summarize = (profiles: any[]): ExistingProfileSummary[] =>
+  profiles.map((p) => ({
+    id: String(p.id),
+    view: String(p.view || "VISIONLIGHT"),
+    organizationName: p.organization?.name ?? null,
+  }));
 
 /** The identity's creator profile, or null. */
 export async function findCreatorProfile(authUserId: string, email: string) {
@@ -40,15 +66,17 @@ export async function findCreatorProfile(authUserId: string, email: string) {
 /**
  * Idempotent provisioning:
  * 1. an existing creator profile → returned as-is;
- * 2. an untouched auto-created profile (no org, default role/view, no projects) →
- *    converted in place, so a brand-new signup ends with ONE profile and never
- *    sees the workspace chooser;
- * 3. otherwise (an existing studio/brand user) → a second profile in a new
- *    personal org.
+ * 2. an untouched auto-created profile (the ONLY profile, no org, default role/view,
+ *    no projects, created minutes ago) → converted in place, so a brand-new signup
+ *    ends with ONE profile and never sees the workspace chooser;
+ * 3. otherwise the identity owns a real studio/brand workspace → ONLY with
+ *    `allowSecondProfile` (an explicit user confirmation) a second profile is
+ *    created in a new personal org; without it → CreatorConfirmationRequired.
  */
 export async function provisionCreator(
   identity: CreatorIdentity,
   displayName?: string | null,
+  opts?: { allowSecondProfile?: boolean },
 ): Promise<CreatorProvisionResult> {
   const email = identity.email.trim().toLowerCase();
   const profiles: any[] = await dbService.findUsersForAuthIdentity(identity.authUserId, email);
@@ -67,6 +95,22 @@ export async function provisionCreator(
     String(displayName || identity.name || email.split("@")[0] || "")
       .trim()
       .slice(0, 80) || "Creator";
+
+  // Decide the path BEFORE creating anything, so a refusal leaves no orphan org.
+  const candidate = profiles.length === 1 ? profiles[0] : null;
+  const looksUntouched =
+    !!candidate &&
+    !candidate.organizationId &&
+    (candidate.role || "USER") === "USER" &&
+    (candidate.view || "VISIONLIGHT") === "VISIONLIGHT" &&
+    Date.now() - new Date(candidate.createdAt).getTime() < BARE_PROFILE_MAX_AGE_MS;
+  const projects = looksUntouched ? await prisma.project.count({ where: { userId: candidate.id } }) : 1;
+  const bare = looksUntouched && projects === 0 ? candidate : null;
+
+  if (!bare && !opts?.allowSecondProfile) {
+    throw new CreatorConfirmationRequired(email, summarize(profiles));
+  }
+
   const slug = await uniqueOrgSlug(name);
   const org = await prisma.organization.create({
     data: {
@@ -80,27 +124,21 @@ export async function provisionCreator(
     select: { id: true },
   });
 
-  const bare = profiles.find(
-    (p) => !p.organizationId && (p.role || "USER") === "USER" && (p.view || "VISIONLIGHT") === "VISIONLIGHT",
-  );
   if (bare) {
-    const projects = await prisma.project.count({ where: { userId: bare.id } });
-    if (projects === 0) {
-      const updated = await prisma.user.update({
-        where: { id: bare.id },
-        data: {
-          organizationId: org.id,
-          view: CREATOR_VIEW,
-          role: "ADMIN",
-          name: bare.name || name,
-          authUserId: identity.authUserId,
-        },
-        select: { id: true, name: true },
-      });
-      console.log(`[${NS}] ${email}: converted profile ${updated.id} → creator org ${org.id} (${slug})`);
-      notifyNewCreator({ email, name: updated.name ?? name, organizationId: org.id, converted: true });
-      return { profileId: updated.id, organizationId: org.id, name: updated.name ?? null, created: true, converted: true };
-    }
+    const updated = await prisma.user.update({
+      where: { id: bare.id },
+      data: {
+        organizationId: org.id,
+        view: CREATOR_VIEW,
+        role: "ADMIN",
+        name: bare.name || name,
+        authUserId: identity.authUserId,
+      },
+      select: { id: true, name: true },
+    });
+    console.log(`[${NS}] ${email}: converted profile ${updated.id} → creator org ${org.id} (${slug})`);
+    notifyNewCreator({ email, name: updated.name ?? name, organizationId: org.id, converted: true });
+    return { profileId: updated.id, organizationId: org.id, name: updated.name ?? null, created: true, converted: true };
   }
 
   const created = await dbService.createUser({
@@ -112,7 +150,7 @@ export async function provisionCreator(
     organizationId: org.id,
     role: "ADMIN",
   });
-  console.log(`[${NS}] ${email}: new creator profile ${created.id} in org ${org.id} (${slug})`);
+  console.log(`[${NS}] ${email}: new creator profile ${created.id} in org ${org.id} (${slug}) — confirmed second profile`);
   notifyNewCreator({ email, name: created.name ?? name, organizationId: org.id, converted: false });
   return { profileId: created.id, organizationId: org.id, name: created.name ?? null, created: true, converted: false };
 }

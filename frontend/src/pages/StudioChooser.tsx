@@ -70,7 +70,10 @@ export default function StudioChooser() {
       setSelectingId(null);
       return;
     }
-    navigate(profile.view === "ROTATION3D" || profile.view === "DRIFT" ? "/app" : "/projects", { replace: true });
+    navigate(
+      profile.view === "TOUR" ? "/tour" : profile.view === "ROTATION3D" || profile.view === "DRIFT" ? "/app" : "/projects",
+      { replace: true },
+    );
   };
 
   if (isLoading) {
@@ -86,7 +89,12 @@ export default function StudioChooser() {
   }
 
   if (user && !profileSelectionRequired && profiles.length <= 1) {
-    return <Navigate to={user?.view === "ROTATION3D" || user?.view === "DRIFT" ? "/app" : "/projects"} replace />;
+    return (
+      <Navigate
+        to={user?.view === "TOUR" ? "/tour" : user?.view === "ROTATION3D" || user?.view === "DRIFT" ? "/app" : "/projects"}
+        replace
+      />
+    );
   }
 
   if ((!profileSelectionRequired && !user) || profiles.length === 0) {

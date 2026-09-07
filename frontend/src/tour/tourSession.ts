@@ -46,17 +46,37 @@ export function nextFromLocation(search: string): string {
   return CREATOR_HOME;
 }
 
+/** The identity already owns a studio/brand workspace: the backend refuses to add a
+ *  creator profile until the person explicitly confirms (never silently). */
+export class CreatorConfirmRequired extends Error {
+  readonly needsConfirmation = true;
+  email: string;
+  constructor(email: string) {
+    super("Confirm to create a separate creator space.");
+    this.email = email;
+  }
+}
+export const isConfirmRequired = (e: unknown): e is CreatorConfirmRequired =>
+  !!e && typeof e === "object" && (e as any).needsConfirmation === true;
+
 /**
  * Make sure the signed-in identity has a creator profile, activate it (the same
  * email may also own a studio/brand workspace) and refresh the auth store.
+ * Pass { confirm: true } only from an explicit "create my creator space" action.
  */
-export async function ensureCreatorProfile(name?: string): Promise<void> {
+export async function ensureCreatorProfile(name?: string, opts?: { confirm?: boolean }): Promise<void> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
   if (!session?.access_token) throw new Error("You're not signed in yet.");
   setAuthToken(session.access_token);
-  const r = await apiEndpoints.driftCreatorSignup(name);
+  let r;
+  try {
+    r = await apiEndpoints.driftCreatorSignup(name, opts?.confirm === true);
+  } catch (e: any) {
+    if (e?.code === "CREATOR_CONFIRM") throw new CreatorConfirmRequired(String(e?.details?.email || ""));
+    throw e;
+  }
   const profileId = r.data?.profileId as string | undefined;
   if (profileId) setActiveProfile(profileId, r.data?.name || undefined);
   await useAuth.getState().checkAuth();

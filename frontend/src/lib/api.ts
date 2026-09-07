@@ -346,7 +346,8 @@ export const apiEndpoints = {
   driftPublicBrandProduct: (brandSlug: string, productSlug: string) =>
     api.get(`/api/drift/public/b/${brandSlug}/${productSlug}`),
   // ── Creator suite (drift.li/tour|view|memory|path): account + flows ──
-  driftCreatorSignup: (name?: string) => api.post("/api/drift/creator/signup", { name }),
+  driftCreatorSignup: (name?: string, confirm?: boolean) =>
+    api.post("/api/drift/creator/signup", { name, confirm: confirm === true }),
   driftCreatorProfile: () => api.get("/api/drift/creator/profile"),
   driftMyFlows: (kind?: string) => api.get("/api/drift/my/flows", { params: kind ? { kind } : undefined }),
   driftCreateFlow: (data: Record<string, unknown>) => api.post("/api/drift/my/flows", data),

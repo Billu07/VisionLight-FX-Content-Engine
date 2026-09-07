@@ -1,6 +1,10 @@
 import { Router, Response } from "express";
 import { authenticateToken, type AuthenticatedRequest } from "../middleware/auth";
-import { findCreatorProfile, provisionCreator } from "../services/driftCreator";
+import {
+  CreatorConfirmationRequired,
+  findCreatorProfile,
+  provisionCreator,
+} from "../services/driftCreator";
 
 // Creator-account routes for the drift.li creator suite. These operate on the
 // signed-in IDENTITY (not a chosen workspace), so the auth middleware lets them
@@ -20,14 +24,26 @@ const identityOf = (req: AuthenticatedRequest) => {
 
 // Provision (or fetch) the caller's creator profile. Idempotent. Returns the
 // profile to activate (X-Active-User-Id) when the identity has several.
+// Body { name?, confirm? } — `confirm: true` is required to add a creator profile
+// next to an EXISTING studio/brand workspace (otherwise 409 CREATOR_CONFIRM), so
+// a brand admin who merely logs in never gets a creator org silently.
 router.post("/api/drift/creator/signup", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   const id = identityOf(req);
   if (!id.email || !id.authUserId) return res.status(400).json({ error: "No signed-in identity" });
   const name = typeof req.body?.name === "string" ? req.body.name.trim().slice(0, 80) : "";
+  const confirm = req.body?.confirm === true;
   try {
-    const result = await provisionCreator(id, name || null);
+    const result = await provisionCreator(id, name || null, { allowSecondProfile: confirm });
     res.status(result.created ? 201 : 200).json(result);
   } catch (err: any) {
+    if (err instanceof CreatorConfirmationRequired) {
+      return res.status(err.status).json({
+        error: err.message,
+        code: err.code,
+        needsConfirmation: true,
+        details: { email: err.email, profiles: err.profiles },
+      });
+    }
     console.error(`[${NS}] signup failed for ${id.email}:`, err);
     res.status(500).json({ error: "We couldn't set up your creator space. Please try again." });
   }

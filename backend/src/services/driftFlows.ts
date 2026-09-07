@@ -55,8 +55,18 @@ const CREATOR_LINK_HOSTS = (process.env.DRIFT_CREATOR_LINK_HOSTS || "drift.li,pi
 export function isCreatorLinkAllowed(url: string): boolean {
   const u = url.trim();
   if (!u) return false;
-  // A path on this site (/p/…, /brand/slug, /tour/…) — host-agnostic.
-  if (u.startsWith("/") && !u.startsWith("//")) return true;
+  // Browsers parse a backslash as a slash ("/\evil.com" → "//evil.com") — refuse them,
+  // and refuse embedded whitespace outright.
+  if (/[\\\s]/.test(u)) return false;
+  // A path on this site (/p/…, /brand/slug, /tour/…): must still be on-site once resolved.
+  if (u.startsWith("/")) {
+    if (u.startsWith("//")) return false;
+    try {
+      return new URL(u, "https://drift.li").origin === "https://drift.li";
+    } catch {
+      return false;
+    }
+  }
   try {
     const parsed = new URL(u);
     if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
@@ -120,6 +130,23 @@ export class FlowError extends Error {
 }
 
 type Db = Prisma.TransactionClient | typeof prisma;
+
+/** Serialize plan-limit checks per org (row lock on the org for the transaction). */
+const lockOrg = async (db: Prisma.TransactionClient, orgId: string) => {
+  await db.$queryRaw`SELECT id FROM "Organization" WHERE id = ${orgId} FOR UPDATE`;
+};
+
+const planLimit = (message: string, limit: number, used: number) =>
+  new FlowError(403, message, { upgrade: true, code: "PLAN_LIMIT", details: { upgrade: true, limit, used } });
+
+export const flowLimitError = (kind: FlowKind, limit: number, used: number) => {
+  const noun = kind.toLowerCase();
+  return planLimit(`Your plan includes ${limit} ${noun}${limit === 1 ? "" : "s"}. Upgrade to create more.`, limit, used);
+};
+export const stepLimitError = (kind: FlowKind, limit: number, used: number) => {
+  const noun = stepNoun(kind).toLowerCase();
+  return planLimit(`Your plan allows ${limit} ${noun}s per ${kind.toLowerCase()}. Upgrade to add more.`, limit, used);
+};
 
 const settingsOf = (flow: { settings: unknown }): Record<string, any> =>
   flow.settings && typeof flow.settings === "object" ? (flow.settings as Record<string, any>) : {};
@@ -225,7 +252,10 @@ export const slugifyFlow = (s: string) =>
   s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
 
 // Segments under /{kind}/ the app may need for itself; creators can't take them.
-const RESERVED_FLOW_SLUGS = new Set(["demo", "new", "create", "edit", "admin", "api", "me", "my"]);
+const RESERVED_FLOW_SLUGS = new Set([
+  "demo", "new", "create", "edit", "admin", "api", "me", "my",
+  "start", "signup", "login", "callback", // static /tour/* app routes
+]);
 
 export const isReservedFlowSlug = (slug: string) => RESERVED_FLOW_SLUGS.has(slug);
 
@@ -394,8 +424,16 @@ export async function createDriftStep(args: {
   description: string | null;
   background: string | null;
   customCta: CreatorCta | null;
+  /** plan limit (null = unlimited, e.g. superadmin) — enforced INSIDE the transaction */
+  maxSteps: number | null;
+  kind: FlowKind;
 }) {
   return prisma.$transaction(async (tx) => {
+    await lockOrg(tx, args.orgId);
+    if (args.maxSteps !== null) {
+      const used = await tx.driftFlowStep.count({ where: { flowId: args.flowId } });
+      if (used >= args.maxSteps) throw stepLimitError(args.kind, args.maxSteps, used);
+    }
     const last = await tx.driftFlowStep.findFirst({
       where: { flowId: args.flowId },
       orderBy: { order: "desc" },
@@ -476,6 +514,43 @@ export async function deleteFlow(flowId: string): Promise<void> {
     await tx.driftFlow.delete({ where: { id: flowId } });
   });
   console.log(`[${NS}] flow ${flowId} deleted`);
+}
+
+/** Create a flow with the plan limit enforced inside the transaction (per-org lock). */
+export async function createFlowWithQuota(args: {
+  orgId: string;
+  kind: FlowKind;
+  name: string;
+  title: string | null;
+  description: string | null;
+  endCta: CreatorCta | null;
+  nextLabel: string | null;
+  createdByUserId: string | null;
+  /** null = unlimited (superadmin) */
+  maxFlows: number | null;
+}): Promise<{ id: string; slug: string }> {
+  const slug = await uniqueFlowSlug(args.kind, args.name);
+  return prisma.$transaction(async (tx) => {
+    await lockOrg(tx, args.orgId);
+    if (args.maxFlows !== null) {
+      const used = await tx.driftFlow.count({ where: { organizationId: args.orgId } });
+      if (used >= args.maxFlows) throw flowLimitError(args.kind, args.maxFlows, used);
+    }
+    return tx.driftFlow.create({
+      data: {
+        organizationId: args.orgId,
+        kind: args.kind,
+        slug,
+        name: args.name,
+        title: args.title,
+        description: args.description,
+        endCta: args.endCta ? (args.endCta as any) : Prisma.DbNull,
+        settings: args.nextLabel ? { nextLabel: args.nextLabel } : Prisma.DbNull,
+        createdByUserId: args.createdByUserId,
+      },
+      select: { id: true, slug: true },
+    });
+  });
 }
 
 /** Publish (every step must be READY) or unpublish a flow and its step drifts. */

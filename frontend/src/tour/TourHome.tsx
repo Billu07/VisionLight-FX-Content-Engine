@@ -73,7 +73,7 @@ export default function TourHome() {
       navigate(`/tour/${r.data.flow.id}/edit`);
     } catch (e: any) {
       notify.error(apiError(e));
-      if (e?.response?.data?.upgrade) {
+      if (e?.code === "PLAN_LIMIT" || e?.details?.upgrade) {
         setCreating(false);
         load();
       }

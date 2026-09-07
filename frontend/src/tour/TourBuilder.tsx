@@ -125,15 +125,31 @@ function StepCard({
   const [replacing, setReplacing] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Re-sync the form when the server copy changes under us (poll/reorder).
+  // Re-sync a field from the server ONLY while it isn't being edited locally. The 3s
+  // poll and every relink refresh the server copy; typing must never be thrown away.
+  const serverRef = useRef({
+    name: p?.name || "",
+    title: p?.title || "",
+    btnLabel: step.customCta?.label || "",
+    btnUrl: step.customCta?.url || "",
+    bg: p?.background || "",
+  });
   useEffect(() => {
-    setName(p?.name || "");
-    setTitle(p?.title || "");
-    setBtnLabel(step.customCta?.label || "");
-    setBtnUrl(step.customCta?.url || "");
-    setBg(p?.background || "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step.updatedAt, p?.updatedAt]);
+    const next = {
+      name: p?.name || "",
+      title: p?.title || "",
+      btnLabel: step.customCta?.label || "",
+      btnUrl: step.customCta?.url || "",
+      bg: p?.background || "",
+    };
+    const prev = serverRef.current;
+    setName((v) => (v === prev.name ? next.name : v));
+    setTitle((v) => (v === prev.title ? next.title : v));
+    setBtnLabel((v) => (v === prev.btnLabel ? next.btnLabel : v));
+    setBtnUrl((v) => (v === prev.btnUrl ? next.btnUrl : v));
+    setBg((v) => (v === prev.bg ? next.bg : v));
+    serverRef.current = next;
+  }, [p?.name, p?.title, step.customCta?.label, step.customCta?.url, p?.background]);
 
   const dirty =
     name !== (p?.name || "") ||
@@ -383,7 +399,7 @@ function UploadSlot({
       notify.success("Clip uploaded — building your drift");
     } catch (e: any) {
       notify.error(apiError(e));
-      if (e?.response?.data?.upgrade) onAdded(flow, null);
+      if (e?.code === "PLAN_LIMIT" || e?.details?.upgrade) onAdded(flow, null);
     } finally {
       setProgress(null);
     }
@@ -467,13 +483,24 @@ export default function TourBuilder() {
   const [description, setDescription] = useState("");
   const [settingsSaving, setSettingsSaving] = useState(false);
 
+  // Tour-level fields follow the server copy only while they're not being edited.
+  const flowServerRef = useRef<{ name: string; nextLabel: string; endLabel: string; endUrl: string; description: string } | null>(null);
   const applyFlow = (f: Flow) => {
     setFlow(f);
-    setName(f.name);
-    setNextLabel(f.settings.nextLabel || "");
-    setEndLabel(f.endCta?.label || "");
-    setEndUrl(f.endCta?.url || "");
-    setDescription(f.description || "");
+    const next = {
+      name: f.name,
+      nextLabel: f.settings.nextLabel || "",
+      endLabel: f.endCta?.label || "",
+      endUrl: f.endCta?.url || "",
+      description: f.description || "",
+    };
+    const prev = flowServerRef.current;
+    setName((v) => (!prev || v === prev.name ? next.name : v));
+    setNextLabel((v) => (!prev || v === prev.nextLabel ? next.nextLabel : v));
+    setEndLabel((v) => (!prev || v === prev.endLabel ? next.endLabel : v));
+    setEndUrl((v) => (!prev || v === prev.endUrl ? next.endUrl : v));
+    setDescription((v) => (!prev || v === prev.description ? next.description : v));
+    flowServerRef.current = next;
     setSelectedId((cur) => (cur && f.steps.some((s) => s.id === cur) ? cur : f.steps[0]?.id || null));
   };
 
@@ -483,7 +510,7 @@ export default function TourBuilder() {
       applyFlow(r.data.flow);
       setQuota(r.data.quota);
     } catch (e: any) {
-      if (e?.response?.status === 404) setMissing(true);
+      if (e?.status === 404) setMissing(true);
       else notify.error(apiError(e));
     }
   };

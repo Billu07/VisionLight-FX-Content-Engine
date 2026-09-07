@@ -6,6 +6,7 @@ import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "../rotation3d/drif
 import {
   ensureCreatorProfile,
   errorMessage,
+  isConfirmRequired,
   nextFromLocation,
   rememberNext,
   signInWithGoogle,
@@ -63,7 +64,7 @@ const STYLES = `
 export default function TourAuth() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isLoading, checkAuth } = useAuth();
+  const { user, profiles, profileSelectionRequired, isLoading, checkAuth } = useAuth();
   const [theme, toggleTheme] = useDriftTheme();
 
   const params = new URLSearchParams(location.search);
@@ -86,20 +87,38 @@ export default function TourAuth() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, user?.view]);
 
-  // Already signed in on a studio/brand profile: one tap provisions the creator space.
-  const signedInElsewhere = !isLoading && !!user && user.view !== "TOUR";
+  // Already signed in on a studio/brand profile (or a multi-workspace login): the
+  // creator space is only ever created from this explicit confirmation.
+  const [confirmPending, setConfirmPending] = useState(false);
+  const signedInElsewhere = !isLoading && (user ? user.view !== "TOUR" : profileSelectionRequired);
+  const signedInEmail = user?.email || profiles[0]?.email || email.trim();
   const continueSignedIn = async () => {
     setBusy(true);
     setError("");
     try {
       rememberNext(next);
-      await ensureCreatorProfile();
+      await ensureCreatorProfile(undefined, { confirm: true });
       navigate(next, { replace: true });
     } catch (e) {
       setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
+  };
+
+  // Provision a brand-new identity right away; an existing studio/brand account is
+  // never converted silently — surface the confirmation instead.
+  const provisionOrAsk = async (displayName?: string) => {
+    try {
+      await ensureCreatorProfile(displayName);
+    } catch (e) {
+      if (!isConfirmRequired(e)) throw e;
+      await checkAuth();
+      setConfirmPending(true);
+      setNotice("You're signed in. Confirm below to create your creator space.");
+      return;
+    }
+    navigate(next, { replace: true });
   };
 
   const switchMode = (m: Mode) => {
@@ -135,7 +154,7 @@ export default function TourAuth() {
         setNotice("If that email has an account, a reset link is on its way.");
         return;
       }
-      if (password.length < 8) throw new Error("Use at least 8 characters for your password.");
+      if (mode === "signup" && password.length < 8) throw new Error("Use at least 8 characters for your password.");
       rememberNext(next);
       if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
@@ -157,14 +176,13 @@ export default function TourAuth() {
           setMode("sent");
           return;
         }
-        await ensureCreatorProfile(name.trim() || undefined);
+        await provisionOrAsk(name.trim() || undefined);
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email: em, password });
         if (error) throw error;
         if (!data.session) throw new Error("Unable to start a session.");
-        await ensureCreatorProfile();
+        await provisionOrAsk();
       }
-      navigate(next, { replace: true });
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -281,10 +299,11 @@ export default function TourAuth() {
                     )}
                   </div>
 
-                  {signedInElsewhere && mode !== "forgot" && (
+                  {(signedInElsewhere || confirmPending) && mode !== "forgot" && (
                     <div className="d-banner" style={{ display: "grid", gap: 8 }}>
                       <span>
-                        You're signed in as <strong>{user?.email}</strong>. Use that account for your creator space?
+                        You're signed in as <strong>{signedInEmail}</strong>, which already has a workspace. Create a
+                        separate creator space for it? Your existing workspace stays exactly as it is.
                       </span>
                       <button type="button" className="d-btn primary" onClick={continueSignedIn} disabled={busy}>
                         {busy ? "One moment…" : "Continue with this account"}
@@ -347,7 +366,7 @@ export default function TourAuth() {
                           placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
                           autoComplete={mode === "signup" ? "new-password" : "current-password"}
                           required
-                          minLength={8}
+                          minLength={mode === "signup" ? 8 : undefined}
                         />
                       </div>
                     )}

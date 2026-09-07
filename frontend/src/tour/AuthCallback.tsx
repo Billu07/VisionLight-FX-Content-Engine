@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { DriftThemeStyles, useDriftTheme } from "../rotation3d/driftUiTheme";
-import { CREATOR_START, ensureCreatorProfile, errorMessage, takeNext } from "./tourSession";
+import { CREATOR_START, ensureCreatorProfile, errorMessage, isConfirmRequired, takeNext } from "./tourSession";
 
 /**
  * /auth/callback — where Google sign-in and the email-confirmation link land.
@@ -46,6 +46,8 @@ export default function AuthCallback() {
   const navigate = useNavigate();
   const [theme] = useDriftTheme();
   const [error, setError] = useState("");
+  const [confirm, setConfirm] = useState<{ email: string; name: string } | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -56,7 +58,15 @@ export default function AuthCallback() {
       if (!session) throw new Error("We couldn't finish signing you in. Please try again.");
       const meta = (session.user?.user_metadata || {}) as Record<string, unknown>;
       const name = String(meta.full_name || meta.name || "").trim();
-      await ensureCreatorProfile(name || undefined);
+      try {
+        await ensureCreatorProfile(name || undefined);
+      } catch (e) {
+        if (!isConfirmRequired(e)) throw e;
+        // An existing studio/brand account signed in with Google: ask, never assume.
+        window.history.replaceState(null, "", "/auth/callback");
+        if (alive) setConfirm({ email: e.email || session.user?.email || "", name });
+        return;
+      }
       window.history.replaceState(null, "", "/auth/callback");
       navigate(takeNext(), { replace: true });
     })().catch((e) => {
@@ -72,7 +82,38 @@ export default function AuthCallback() {
     <div className="drift-ui d-page" data-theme={theme}>
       <DriftThemeStyles />
       <div style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: 20 }}>
-        {error ? (
+        {confirm ? (
+          <div className="d-card d-card-pad" style={{ maxWidth: 460, display: "grid", gap: 12 }}>
+            <div className="d-eyebrow">drift.li · creator suite</div>
+            <div className="d-h2" style={{ fontSize: 20 }}>Create a separate creator space?</div>
+            <p className="d-sub">
+              <strong style={{ color: "var(--text)" }}>{confirm.email}</strong> already has a workspace on this platform.
+              A creator space is a separate, personal workspace for tours — your existing workspace stays exactly as it is.
+            </p>
+            {error && <div className="d-banner err">{error}</div>}
+            <button
+              className="d-btn primary"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError("");
+                try {
+                  await ensureCreatorProfile(confirm.name || undefined, { confirm: true });
+                  navigate(takeNext(), { replace: true });
+                } catch (e) {
+                  setError(errorMessage(e));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {busy ? "Setting up…" : "Yes, create my creator space"}
+            </button>
+            <Link to="/" className="d-btn ghost" style={{ textDecoration: "none", justifySelf: "start" }}>
+              Not now
+            </Link>
+          </div>
+        ) : error ? (
           <div className="d-card d-card-pad" style={{ maxWidth: 420, display: "grid", gap: 12 }}>
             <div className="d-eyebrow">Sign-in</div>
             <div className="d-h2">That didn't go through</div>

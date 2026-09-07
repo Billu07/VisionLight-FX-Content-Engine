@@ -62,7 +62,7 @@ export default function CreatorRoute({ children }: { children: React.ReactNode }
     setBusy(true);
     setError("");
     try {
-      await ensureCreatorProfile();
+      await ensureCreatorProfile(undefined, { confirm: true });
     } catch (e) {
       setError(errorMessage(e));
     } finally {

@@ -15,6 +15,7 @@ import {
   STEP_MIN_FRAMES,
   STEP_TARGET_FRAMES,
   createDriftStep,
+  createFlowWithQuota,
   deleteFlow,
   deleteStep,
   flowInclude,
@@ -29,8 +30,8 @@ import {
   serializePublicFlow,
   setFlowPublished,
   slugifyFlow,
+  stepLimitError,
   stepNoun,
-  uniqueFlowSlug,
   type CreatorCta,
 } from "../services/driftFlows";
 
@@ -111,8 +112,8 @@ async function validateClip(
     res.status(400).json({
       error: `Clips must be ${quota.maxClipSeconds} seconds or shorter — this one is ${info.duration.toFixed(1)}s.`,
       upgrade: true,
-      limit: quota.maxClipSeconds,
-      duration: info.duration,
+      code: "CLIP_TOO_LONG",
+      details: { upgrade: true, limit: quota.maxClipSeconds, duration: info.duration },
     });
     return null;
   }
@@ -157,9 +158,27 @@ router.post("/api/drift/my/flows", authenticateToken, async (req: AuthenticatedR
   const name = str(req.body?.name, 80);
   if (!name) return res.status(400).json({ error: `Give your ${noun} a name` });
 
+  const endCta = parseCreatorCta(req.body?.endCta);
+  if (!endCta.ok) return res.status(400).json({ error: endCta.error });
+  const nextLabel = strOrNull(req.body?.nextLabel, 40) ?? null;
+
   const quota = await flowQuota(orgId);
-  if (!isSuperAdmin(req) && quota.usedFlows >= quota.maxFlows) {
-    if (req.user?.email) {
+  let created: { id: string; slug: string };
+  try {
+    // The limit is enforced inside the transaction (per-org lock): no double-create race.
+    created = await createFlowWithQuota({
+      orgId,
+      kind,
+      name,
+      title: strOrNull(req.body?.title, 120) ?? null,
+      description: strOrNull(req.body?.description, 600) ?? null,
+      endCta: endCta.cta,
+      nextLabel,
+      createdByUserId: req.user?.id || null,
+      maxFlows: isSuperAdmin(req) ? null : quota.maxFlows,
+    });
+  } catch (err) {
+    if (err instanceof FlowError && err.status === 403 && req.user?.email) {
       void sendUpgradeNudgeEmail({
         email: req.user.email,
         name: req.user.name,
@@ -167,32 +186,9 @@ router.post("/api/drift/my/flows", authenticateToken, async (req: AuthenticatedR
         limit: `${quota.maxFlows} ${noun}${quota.maxFlows === 1 ? "" : "s"}`,
       }).catch(() => undefined);
     }
-    return res.status(403).json({
-      error: `Your plan includes ${quota.maxFlows} ${noun}${quota.maxFlows === 1 ? "" : "s"}. Upgrade to create more.`,
-      upgrade: true,
-      limit: quota.maxFlows,
-      used: quota.usedFlows,
-    });
+    return handle(res, err);
   }
-  const endCta = parseCreatorCta(req.body?.endCta);
-  if (!endCta.ok) return res.status(400).json({ error: endCta.error });
-  const nextLabel = strOrNull(req.body?.nextLabel, 40) ?? null;
-
-  const slug = await uniqueFlowSlug(kind, name);
-  const created = await prisma.driftFlow.create({
-    data: {
-      organizationId: orgId,
-      kind,
-      slug,
-      name,
-      title: strOrNull(req.body?.title, 120) ?? null,
-      description: strOrNull(req.body?.description, 600) ?? null,
-      endCta: endCta.cta ? (endCta.cta as any) : Prisma.DbNull,
-      settings: nextLabel ? { nextLabel } : Prisma.DbNull,
-      createdByUserId: req.user?.id || null,
-    },
-    select: { id: true },
-  });
+  const slug = created.slug;
   console.log(`[${NS}] org ${orgId} created ${kind} flow ${created.id} (${slug})`);
   if (req.user?.email) {
     void sendFlowCreatedNoticeEmail({
@@ -364,13 +360,7 @@ router.post(
     const quota = await flowQuota(orgId);
     if (!isSuperAdmin(req) && flow.steps.length >= quota.maxStepsPerFlow) {
       await rmFile(file.path);
-      const noun = stepNoun(kind).toLowerCase();
-      return res.status(403).json({
-        error: `Your plan allows ${quota.maxStepsPerFlow} ${noun}s per ${kind.toLowerCase()}. Upgrade to add more.`,
-        upgrade: true,
-        limit: quota.maxStepsPerFlow,
-        used: flow.steps.length,
-      });
+      return handle(res, stepLimitError(kind, quota.maxStepsPerFlow, flow.steps.length));
     }
     const cta = parseCreatorCta(req.body?.customCta);
     if (!cta.ok) {
@@ -386,20 +376,33 @@ router.post(
     if (!clip) return;
 
     const name = str(req.body?.name, 120) || `${stepNoun(kind)} ${flow.steps.length + 1}`;
-    const slug = await uniqueSlug(orgId, name);
-    const { product, step } = await createDriftStep({
-      flowId: flow.id,
-      orgId,
-      userId: req.user?.id || null,
-      slug,
-      name,
-      title: strOrNull(req.body?.title, 120) ?? null,
-      titleEnd: strOrNull(req.body?.titleEnd, 120) ?? null,
-      description: strOrNull(req.body?.description, 600) ?? null,
-      background,
-      customCta: cta.cta,
-    });
-    const full = serializeFlow(await loadFlow(orgId, flow.id));
+    let product: { id: string };
+    let step: { id: string };
+    let full: ReturnType<typeof serializeFlow>;
+    try {
+      const slug = await uniqueSlug(orgId, name);
+      const created = await createDriftStep({
+        flowId: flow.id,
+        orgId,
+        userId: req.user?.id || null,
+        slug,
+        name,
+        title: strOrNull(req.body?.title, 120) ?? null,
+        titleEnd: strOrNull(req.body?.titleEnd, 120) ?? null,
+        description: strOrNull(req.body?.description, 600) ?? null,
+        background,
+        customCta: cta.cta,
+        maxSteps: isSuperAdmin(req) ? null : quota.maxStepsPerFlow,
+        kind,
+      });
+      product = created.product;
+      step = created.step;
+      full = serializeFlow(await loadFlow(orgId, flow.id));
+    } catch (err) {
+      // Nothing is queued yet — don't leave the (up to 500 MB) upload in the temp dir.
+      await rmFile(file.path);
+      return handle(res, err);
+    }
     res.status(201).json({ step: full.steps.find((s: any) => s.id === step.id) ?? null, flow: full });
 
     processClip({
@@ -441,8 +444,14 @@ router.post(
     const clip = await validateClip(orgId, file, res);
     if (!clip) return;
 
-    await prisma.driftProduct.update({ where: { id: step.productId }, data: { status: "PROCESSING" } });
-    const full = serializeFlow(await loadFlow(orgId, step.flowId));
+    let full: ReturnType<typeof serializeFlow>;
+    try {
+      await prisma.driftProduct.update({ where: { id: step.productId }, data: { status: "PROCESSING" } });
+      full = serializeFlow(await loadFlow(orgId, step.flowId));
+    } catch (err) {
+      await rmFile(file.path);
+      throw err;
+    }
     res.status(202).json({ step: full.steps.find((s: any) => s.id === step.id) ?? null, flow: full });
 
     processClip({

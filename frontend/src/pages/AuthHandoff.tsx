@@ -55,7 +55,9 @@ export function AuthHandoff() {
         setSupportSessionToken(sessionToken, label);
         window.history.replaceState(null, "", "/auth/handoff");
         await checkAuth();
-        navigate(nextPath, { replace: true });
+        // A creator (TOUR) profile has its own home; the handoff default is the studio.
+        const landed = useAuth.getState().user;
+        navigate(landed?.view === "TOUR" && nextPath === "/projects" ? "/tour" : nextPath, { replace: true });
       } catch (err: any) {
         if (!mounted) return;
         setError(err?.message || "Failed to establish workspace handoff session.");
