@@ -345,6 +345,43 @@ export const apiEndpoints = {
   driftPublicBrand: (brandSlug: string) => api.get(`/api/drift/public/b/${brandSlug}`),
   driftPublicBrandProduct: (brandSlug: string, productSlug: string) =>
     api.get(`/api/drift/public/b/${brandSlug}/${productSlug}`),
+  // ── Creator suite (drift.li/tour|view|memory|path): account + flows ──
+  driftCreatorSignup: (name?: string) => api.post("/api/drift/creator/signup", { name }),
+  driftCreatorProfile: () => api.get("/api/drift/creator/profile"),
+  driftMyFlows: (kind?: string) => api.get("/api/drift/my/flows", { params: kind ? { kind } : undefined }),
+  driftCreateFlow: (data: Record<string, unknown>) => api.post("/api/drift/my/flows", data),
+  driftFlow: (id: string) => api.get(`/api/drift/my/flows/${id}`),
+  driftUpdateFlow: (id: string, data: Record<string, unknown>) => api.patch(`/api/drift/my/flows/${id}`, data),
+  driftDeleteFlow: (id: string) => api.delete(`/api/drift/my/flows/${id}`),
+  driftPublishFlow: (id: string) => api.post(`/api/drift/my/flows/${id}/publish`),
+  driftUnpublishFlow: (id: string) => api.post(`/api/drift/my/flows/${id}/unpublish`),
+  driftAddFlowStep: (
+    id: string,
+    formData: FormData,
+    onUploadProgress?: (e: { loaded: number; total?: number }) => void,
+  ) =>
+    api.post(`/api/drift/my/flows/${id}/steps`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 600000,
+      onUploadProgress,
+    }),
+  driftReplaceFlowStepClip: (
+    id: string,
+    stepId: string,
+    formData: FormData,
+    onUploadProgress?: (e: { loaded: number; total?: number }) => void,
+  ) =>
+    api.post(`/api/drift/my/flows/${id}/steps/${stepId}/clip`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 600000,
+      onUploadProgress,
+    }),
+  driftReorderFlowSteps: (id: string, stepIds: string[]) =>
+    api.patch(`/api/drift/my/flows/${id}/steps/reorder`, { stepIds }),
+  driftUpdateFlowStep: (id: string, stepId: string, data: Record<string, unknown>) =>
+    api.patch(`/api/drift/my/flows/${id}/steps/${stepId}`, data),
+  driftDeleteFlowStep: (id: string, stepId: string) => api.delete(`/api/drift/my/flows/${id}/steps/${stepId}`),
+  driftPublicFlow: (kind: string, slug: string) => api.get(`/api/drift/public/flows/${kind}/${slug}`),
   driftShareCard: (id: string) =>
     api.get(`/api/drift/my/products/${id}/share-card`, { responseType: "blob" }),
   driftTrackEvent: (productId: string, type: string, meta?: Record<string, unknown>) =>

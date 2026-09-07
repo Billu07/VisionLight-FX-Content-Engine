@@ -184,7 +184,30 @@ field set. `ctaPrimary` (the Next link) is system-managed, not user-editable.
 payload + the entry drift). Playback needs nothing new — the entry step's drift URL + auto
 CTAs drive the existing player.
 
-## 4. Auth & creator account (Phase 3)
+## 4. Auth & creator account (Phase 3) — SHIPPED 2026-09-08
+
+As shipped:
+- **Backend** `services/driftCreator.ts` + `routes/driftCreator.ts`: `POST /api/drift/creator/signup`
+  (idempotent) → an existing TOUR profile is returned; an untouched auto-created profile (no org,
+  USER/VISIONLIGHT, no projects) is **converted in place** (one profile, no workspace chooser);
+  otherwise a **second profile** in a new personal org (`productLine "TOUR"`, `provisioningSource
+  "SELF_SERVE"`, `routingDomain drift.li`, org `slug` = handle, `tenantPlan "PAID"`). Returns
+  `{ profileId, organizationId, created, converted }`; the client activates the profile via
+  `X-Active-User-Id`. `GET /api/drift/creator/profile` for the guard. The auth middleware lets
+  `/api/drift/creator/*` through while a multi-profile email still has to pick a workspace.
+  `toProfileOption` (auth.ts) and `/api/auth/me` now map DRIFT/TOUR → drift.li (the old gap).
+- **Frontend** `src/tour/`: `TourAuth.tsx` = `/tour/start` (Google + email/password signup with
+  confirm-email "check your inbox" state, login, forgot; `?next=`, `?intent=demo`, `?mode=login`);
+  `AuthCallback.tsx` = `/auth/callback` (waits for the Supabase session from the OAuth/confirm
+  redirect, provisions, continues to the remembered target); `CreatorRoute.tsx` guard (signed
+  out → /tour/start; multi-profile → auto-activates the TOUR profile; studio/brand user → "create
+  my creator space"); `tourSession.ts` helpers. `AppEntry` sends `view "TOUR"` to `/tour`;
+  `driftNav` reserves tour/view/memory/path; `apiEndpoints.drift*Flow*` added.
+- **Deliberately NOT switched to PKCE:** the default (implicit) flow keeps password-reset and
+  confirmation links working when opened in a different browser; Google + confirm links work on
+  it too (`detectSessionInUrl` is on by default).
+
+Original design notes:
 
 **Supabase setup (dashboard, no code):** enable **Google** provider; turn **Confirm email**
 ON; set **custom SMTP** to `web@drift.li`. (These are user/ops steps — document them.)
@@ -266,8 +289,8 @@ Root cause: `adminUi.tablePanel` is `overflow-hidden` with tables that have no i
    /`maxStepsPerFlow`/`maxClipSeconds` (see §2 for the rollout order).
 2. **P2 Creator API** — ✅ shipped 2026-09-08: flow CRUD, clip upload + replace, reorder + auto-link,
    quota gates, restricted step patch, publish/unpublish, public read (see §3).
-3. **P3 Auth** — Supabase Google + manual+verify (dashboard setup), `/auth/callback`, TOUR
-   provisioning, `toProfileOption`/`AppEntry` branches.
+3. **P3 Auth** — ✅ shipped 2026-09-08: `/tour/start`, `/auth/callback`, creator provisioning,
+   `CreatorRoute` guard, DRIFT/TOUR canonical-domain fix. Supabase dashboard steps in §13 are owed.
 4. **P4 Creator home** — `/tour` route + home/profile + demo card + usage/upgrade.
 5. **P5 Builder** — the 3-slot wizard, upload/progress/poll, side map, reorder UI.
 6. **P6 Landing + demo** — the intro section + View Demo flow.
@@ -293,8 +316,20 @@ Root cause: `adminUi.tablePanel` is `overflow-hidden` with tables that have no i
 
 ## 13. Setup dependencies (user/ops)
 
-- Supabase dashboard: enable Google provider (+ Google Cloud OAuth client), turn on Confirm
-  email, set custom SMTP = web@drift.li, add `/auth/callback` to redirect allowlist.
+- **Supabase dashboard (P3 ops — code is ready, flows won't work until these are done):**
+  1. Authentication → Providers → **Google**: enable; paste the Google Cloud OAuth client id +
+     secret (Google Cloud Console → APIs & Services → Credentials → OAuth client, type Web;
+     authorized redirect URI = `https://<project-ref>.supabase.co/auth/v1/callback`).
+  2. Authentication → URL configuration: **Site URL** `https://drift.li`; **Redirect URLs** add
+     `https://drift.li/auth/callback`, `https://www.drift.li/auth/callback`,
+     `https://drift.li/reset-password` (+ `http://localhost:5173/auth/callback` for dev).
+  3. Authentication → Providers → Email: **Confirm email ON** (signups get a confirmation link
+     that lands on /auth/callback and logs them straight in).
+  4. Authentication → SMTP settings: **custom SMTP** = the web@drift.li mailbox (host
+     mail.privateemail.com, port 465/587, user web@drift.li, sender "drift.li
+     <web@drift.li>") so confirm/reset mails come from our domain.
+  5. Authentication → Email templates: brand the Confirm signup / Reset password copy
+     (optional, but worth 5 minutes).
 - VPS: `npx prisma db push` after each schema phase; the email env (already pending).
 - Stripe account (later).
 

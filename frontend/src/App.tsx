@@ -41,6 +41,8 @@ import Rotation3DPlayer from "./rotation3d/Rotation3DPlayer";
 import BrandShowcasePage from "./rotation3d/BrandShowcasePage";
 import Rotation3DBrandDashboard from "./rotation3d/Rotation3DBrandDashboard";
 import DriftBrandDashboard from "./rotation3d/DriftBrandDashboard";
+import TourAuth from "./tour/TourAuth";
+import AuthCallback from "./tour/AuthCallback";
 import {
   isRotation3dSite,
   isDriftHost,
@@ -176,6 +178,8 @@ const ProjectRoute = ({ children }: { children: React.ReactNode }) => {
 // keeps the exact existing project-scoped dashboard (no behavior change).
 const AppEntry = () => {
   const { user } = useAuth();
+  // drift.li creators (view "TOUR") have their own home under /tour.
+  if (user?.view === "TOUR") return <Navigate to="/tour" replace />;
   if (user?.view === "ROTATION3D") {
     return (
       <ErrorBoundary>
@@ -366,6 +370,9 @@ function App() {
             <Route path="/studios" element={<StudioChooser />} />
             <Route path="/support-handoff" element={<SupportHandoff />} />
             <Route path="/auth/handoff" element={<AuthHandoff />} />
+            {/* drift.li creator suite — auth. Google/email-confirm links land on /auth/callback. */}
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/tour/start" element={<TourAuth />} />
             <Route
               path="/billing/return"
               element={<BillingReturn />}

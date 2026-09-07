@@ -56,7 +56,11 @@ export const authenticateToken = async (
     if (!user) return res.status(401).json({ error: "Invalid or expired token" });
     const sessionUser: any = user;
 
-    if (sessionUser.profileSelectionRequired && req.originalUrl !== "/api/auth/me") {
+    // Routes that act on the signed-in IDENTITY (not a chosen workspace) work
+    // even while a multi-profile email still has to pick one.
+    const profileAgnostic =
+      req.originalUrl === "/api/auth/me" || req.originalUrl.startsWith("/api/drift/creator/");
+    if (sessionUser.profileSelectionRequired && !profileAgnostic) {
       return res.status(409).json({
         error: "Workspace selection required.",
         code: "PROFILE_SELECTION_REQUIRED",

@@ -77,7 +77,7 @@ const RESERVED_SLUGS = new Set([
 ]);
 
 // Globally-unique vanity slug for an organization.
-const uniqueOrgSlug = async (name: string): Promise<string> => {
+export const uniqueOrgSlug = async (name: string): Promise<string> => {
   const base = slugify(name);
   for (let i = 0; i < 8; i++) {
     const slug = i === 0 ? base : `${base}-${crypto.randomBytes(2).toString("hex")}`;
