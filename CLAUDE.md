@@ -66,13 +66,18 @@ ABORTS if the VPS working tree is dirty or can't fast-forward — so never hand-
 the VPS; keep it tracking `origin/main`. Usually the user does nothing after a push.
 
 **After a SCHEMA change** (new/changed Prisma model) — the ONE manual step, since the deploy
-skips migrations. Do it right after the schema-changing push (the app errors on missing
-columns until it runs):
+skips migrations. **Preferred order (zero downtime):** push the commit to a **side branch**,
+apply the schema to the DB from that branch, THEN push `main`. Additive tables/columns are
+invisible to the running build, so nothing errors in between (`/tmp` keeps the VPS tree clean):
 ```bash
 cd /var/www/myapp/backend
-npx prisma db push                      # sync the DB to schema.prisma
-pm2 restart my-backend --update-env
+git fetch origin <branch>
+git show origin/<branch>:backend/prisma/schema.prisma > /tmp/schema.prisma
+npx prisma db push --schema /tmp/schema.prisma --skip-generate   # additive → applies; destructive → refuses (good)
 ```
+Fallback if the code is already on `main`: run it immediately —
+`npx prisma db push && pm2 restart my-backend --update-env` — every Organization query
+(studio included) fails until it does.
 
 **Manual deploy** (only if the Action fails / to force):
 ```bash
@@ -134,6 +139,12 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
   `mobileZoom`, `loopEnabled`, …).
 - `DriftForm` (dynamic lead form; `definition` JSON, `webhookUrl`) → `DriftLead`
   (`data` JSON = viewer's answers, `source`).
+- `DriftFlow` (creator suite: tour/view/memory/path; `kind`, `slug` unique per kind →
+  `/{kind}/{slug}`, `status`, `endCta`, `settings`, `isDemo`) → ordered `DriftFlowStep`
+  (`stepType` DRIFT|FORM|PAGE, `order`, `productId` unique, `formId`, `customCta`). Step
+  order drives the auto "Next" CTA on each step's product. Quotas on `Organization`:
+  `maxFlows`/`maxStepsPerFlow`/`maxClipSeconds` (free tier 1/3/5). Shipped 2026-09-08
+  (TOUR_PLAN.md §2).
 
 ## Transactional email — DONE (2026-09-06)
 
@@ -160,7 +171,7 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
 ## Gotchas
 
 - `prisma db push` is manual on the VPS (deploy doesn't migrate). New Prisma fields break
-  queries until pushed.
+  queries until pushed → apply from a side branch BEFORE pushing `main` (see VPS operations).
 - Git pushes time out → background + verify.
 - `cloudflare/` is gitignored (`git add -f`).
 - Sensitive files: a prior `ss1.jpeg` held Google AI Studio API keys — never echo such
@@ -174,7 +185,7 @@ Four new client-facing locations on drift.li, each a variant of the same idea (b
 interactive drift paths from phone clips). **Priority #1: `/tour`.** Others: `/view`,
 `/memory`, `/path` (variants, defined later).
 
-### drift.li/tour (planning — see TOUR_PLAN.md once written)
+### drift.li/tour (P1 data model shipped 2026-09-08; P2 creator API next — see TOUR_PLAN.md)
 
 A self-serve, mobile-first builder where a user creates an **interactive tour** =
 multiple drifts connected by buttons into a guided path (e.g. a real-estate home tour),

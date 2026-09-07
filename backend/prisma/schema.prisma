@@ -82,12 +82,19 @@ model Organization {
   privacyUrl        String? // brand's Privacy link shown on their drift.li landing takeover
   landingHeroProductId String? // the brand's own drift shown full-screen at their custom-domain root
 
+  // drift.li self-serve creator quotas (free-tier defaults; raised per plan or by a
+  // superadmin). They gate DriftFlow (tour/view/memory/path) building — TOUR_PLAN.md.
+  maxFlows          Int     @default(1) // flows of any kind the org may create
+  maxStepsPerFlow   Int     @default(3) // steps (clips) per flow
+  maxClipSeconds    Int     @default(5) // longest source clip accepted per step
+
   driftProducts     DriftProduct[]
   driftSourceImages DriftSourceImage[]
   driftEvents       DriftEvent[]
   driftForms        DriftForm[]
   driftLeads        DriftLead[]
   driftDomains      DriftDomain[]
+  driftFlows        DriftFlow[]
 }
 
 model User {
@@ -535,6 +542,7 @@ model DriftProduct {
   captions     DriftCaption[]
   events       DriftEvent[]
   leads        DriftLead[]
+  flowStep     DriftFlowStep? // the flow step this drift belongs to (its ctaPrimary is then flow-managed)
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -650,6 +658,7 @@ model DriftForm {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   leads        DriftLead[]
+  flowSteps    DriftFlowStep[] // PATH flow steps that show this form
 
   @@index([organizationId])
 }
@@ -706,4 +715,65 @@ model DriftLandingItem {
 
   @@unique([source, productId])
   @@index([rank])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Drift flows — the drift.li self-serve creator suite (/tour, /view, /memory,
+// /path). A flow is an ORDERED path of steps. Each step is a normal DriftProduct
+// (or, in PATH flows later, a DriftForm / in-platform page), so playback reuses
+// the existing player untouched: every step's "Next" CTA (product.ctaPrimary) is
+// regenerated from step order, and the last step gets the flow's own endCta —
+// reordering can never break the path. Public URL: drift.li/{kind}/{slug}.
+// Quotas live on Organization (maxFlows / maxStepsPerFlow / maxClipSeconds).
+// See TOUR_PLAN.md. All additive.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model DriftFlow {
+  id              String    @id @default(uuid())
+  organizationId  String
+  kind            String    @default("TOUR") // TOUR | VIEW | MEMORY | PATH
+  slug            String // public path segment → /{kind}/{slug}; unique per kind
+  name            String // creator-facing name (home + builder)
+  title           String? // public title (cover, share card)
+  description     String?
+  status          String    @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
+  isDemo          Boolean   @default(false) // client-seeded demo flow (read-only for creators)
+  coverUrl        String? // cover image; falls back to the entry step's poster
+  endCta          Json? // last step's CTA { label, url } — creator-set, drift/picdrift targets only
+  settings        Json? // small presentation knobs { nextLabel?, theme?, … } so knobs need no migration
+  order           Int       @default(0) // the creator's ordering of their own flows
+  createdByUserId String?
+  publishedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  steps        DriftFlowStep[]
+
+  @@unique([kind, slug])
+  @@index([organizationId, kind])
+}
+
+// One stop on a flow. Exactly one target is set per stepType. `order` is the
+// 0-based position and the single source of truth for the auto "Next" links.
+// productId is unique: a drift belongs to at most one step, because the flow
+// owns that drift's ctaPrimary (two flows can't both write it).
+model DriftFlowStep {
+  id        String   @id @default(uuid())
+  flowId    String
+  stepType  String   @default("DRIFT") // DRIFT | FORM | PAGE (FORM/PAGE = PATH flows, later)
+  order     Int
+  productId String?  @unique // DRIFT → the step's drift
+  formId    String? // FORM → DriftForm (PATH)
+  pageId    String? // PAGE → DriftPage (PATH; model not built yet — column reserved)
+  customCta Json? // the step's own button { label, url } (drift/picdrift only) → mirrored to product.ctaSecondary
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  flow    DriftFlow     @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  product DriftProduct? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  form    DriftForm?    @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@index([flowId, order])
+  @@index([formId])
 }

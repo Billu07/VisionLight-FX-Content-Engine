@@ -4,8 +4,8 @@ Execution-ready plan for the self-serve **Tour** creator on drift.li. Written to
 picked up phase-by-phase (incl. by Fable 5 sessions). Read `CLAUDE.md` first for repo
 conventions, deploy flow, and the drift engine overview.
 
-Status: **planning complete, not started.** Grounded in a full recon of the existing
-engine + auth (2026-09-08).
+Status: **P1 (data model) shipped 2026-09-08 — P2 (creator API) is next.** Grounded in a
+full recon of the existing engine + auth (2026-09-08). Progress log: §11.
 
 ---
 
@@ -73,60 +73,39 @@ engine + auth (2026-09-08).
 
 ---
 
-## 2. Data model (Phase 1)
+## 2. Data model (Phase 1) — SHIPPED 2026-09-08
 
-Add to `backend/prisma/schema.prisma`. **One shared model for tour/view/memory/path** —
-distinguished by `kind`; Tour only uses `stepType="DRIFT"`, the rest are reserved.
+Source of truth: `backend/prisma/schema.prisma`, section "Drift flows" (end of file). One
+shared model for tour/view/memory/path, distinguished by `kind`; Tour only uses
+`stepType="DRIFT"`, FORM/PAGE are reserved for `/path`.
 
-```prisma
-model DriftFlow {
-  id             String   @id @default(uuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  kind           String   @default("TOUR")  // TOUR | VIEW | MEMORY | PATH
-  slug           String   // /{kind}/{slug}
-  name           String
-  title          String?
-  description    String?
-  status         String   @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
-  isDemo         Boolean  @default(false)    // client-seeded demo flow
-  coverUrl       String?
-  endCta         Json?    // customizable last-step CTA { label, url }
-  order          Int      @default(0)        // creator can order their flows
-  createdByUserId String?
-  steps          DriftFlowStep[]
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  @@unique([organizationId, kind, slug])
-  @@index([organizationId, kind])
-}
-
-model DriftFlowStep {
-  id        String @id @default(uuid())
-  flowId    String
-  flow      DriftFlow @relation(fields: [flowId], references: [id], onDelete: Cascade)
-  stepType  String @default("DRIFT")  // DRIFT | FORM | PAGE  (FORM/PAGE = path only, later)
-  order     Int                        // 0-based position
-  // exactly one ref is set per stepType:
-  productId String?  // DRIFT → DriftProduct
-  product   DriftProduct? @relation(fields: [productId], references: [id], onDelete: Cascade)
-  formId    String?  // FORM → DriftForm (path)
-  pageId    String?  // PAGE → DriftPage (path; model added later)
-  customCta Json?    // this step's own button { label, url } (drift/picdrift only)
-  createdAt DateTime @default(now())
-  @@index([flowId, order])
-}
-```
-
-- Add `flows DriftFlow[]` + the `DriftFlowStep` back-relation to `Organization` and
-  `DriftProduct`.
-- Add `Organization.maxFlows Int @default(1)` (free tier) + (optional) `maxStepsPerFlow Int
-  @default(3)`. (Naming: `maxFlows`, not `maxTours`, since it governs all four kinds — or
-  gate per-kind later.)
-- `DriftPage` (the in-platform page builder for PATH) is **out of scope for Tour** — reserve
-  the `PAGE` stepType + `pageId` column now; build the model when `/path` starts.
-- **Deploy:** no migration files in this repo → run **`npx prisma db push` on the VPS**
-  after deploy (see CLAUDE.md). Flag this to the user every schema change.
+- **`DriftFlow`** — `kind` (TOUR|VIEW|MEMORY|PATH), `slug` (**`@@unique([kind, slug])`, global
+  per kind — the public URL `/{kind}/{slug}` has no org segment**; on collision suffix like
+  `uniqueProductSlug`), `name`, `title`, `description`, `status` (DRAFT|PUBLISHED|ARCHIVED),
+  `isDemo`, `coverUrl`, `endCta Json` (customizable last-step CTA), `settings Json` (small
+  presentation knobs such as `nextLabel`/theme — put new knobs there, not in columns),
+  `order`, `createdByUserId`, `publishedAt`, timestamps. Relations: `organization` (cascade),
+  `steps`. Index `[organizationId, kind]`.
+- **`DriftFlowStep`** — `stepType` (DRIFT|FORM|PAGE), `order` (0-based; the single source of
+  truth for the auto "Next" links), `productId` (**`@unique`** — a drift belongs to at most
+  one step because the flow owns that drift's `ctaPrimary`), `formId` (FK → `DriftForm`,
+  cascade), `pageId` (reserved; no model yet), `customCta Json` (the step's own button →
+  mirrored to `product.ctaSecondary`), timestamps. Index `[flowId, order]`.
+- **Quotas on `Organization`**: `maxFlows=1`, `maxStepsPerFlow=3`, `maxClipSeconds=5` (free
+  tier; a superadmin or, later, the Stripe webhook raises them). Back-relations:
+  `Organization.driftFlows`, `DriftProduct.flowStep`, `DriftForm.flowSteps`.
+- **Cascade caveat for P2:** deleting a product/form removes its step at the DB level, so the
+  product/form delete routes must re-run the relink or the previous step's Next link dangles.
+- **Why it differs from the first draft:** per-kind (not per-org) slug uniqueness matches the
+  URL scheme; `maxClipSeconds`, `settings`, `publishedAt`, step `updatedAt`, the `formId` FK
+  and unique `productId` were added now so P2–P5 need no second `db push`.
+- **Schema rollout rule (used for P1; reuse for every schema phase):** commit → push to a
+  **side branch** → on the VPS apply the schema from that branch
+  (`git show origin/<branch>:backend/prisma/schema.prisma > /tmp/schema.prisma && npx prisma
+  db push --schema /tmp/schema.prisma --skip-generate`) → only then fast-forward `main`.
+  Additive tables/columns are invisible to the running build, so the DB is ready before the
+  new code restarts. Pushing `main` first breaks every Organization query (65 of them,
+  studio included) until the push runs.
 
 ## 3. Backend API (Phase 2) — `backend/src/routes/drift.ts`
 
@@ -187,7 +166,7 @@ ON; set **custom SMTP** to `web@drift.li`. (These are user/ops steps — documen
 
 **Backend provisioning:** on first authenticated call, `AuthService.validateSession`
 auto-creates a `User`. Extend so a **TOUR** signup provisions a **personal Organization**
-(`productLine="TOUR"`, `maxTours=1`, `tenantPlan="PAID"` or a FREE marker) + the `User`
+(`maxFlows=1`, `tenantPlan="PAID"` or a FREE marker; product-line marker — see §14) + the `User`
 (`role:"ADMIN"`, `view:"TOUR"`, `organizationId`=that org). Patch `toProfileOption()` +
 canonical-domain logic to handle `DRIFT`/`TOUR` (today it silently falls back to VisionLight).
 Add a `view==="TOUR"` branch in `App.tsx AppEntry` → the creator home.
@@ -249,7 +228,8 @@ Root cause: `adminUi.tablePanel` is `overflow-hidden` with tables that have no i
 
 ## 11. Phasing (each shippable)
 
-1. **P1 Data model** — `DriftFlow`/`DriftFlowStep`/`maxFlows`; `db push`.
+1. **P1 Data model** — ✅ shipped 2026-09-08: `DriftFlow`/`DriftFlowStep`, `Organization.maxFlows`
+   /`maxStepsPerFlow`/`maxClipSeconds` (see §2 for the rollout order).
 2. **P2 Creator API** — tour CRUD, clip upload (brand-scoped `processClip`), reorder+auto-link,
    quota gate, field-restricted patch, public read.
 3. **P3 Auth** — Supabase Google + manual+verify (dashboard setup), `/auth/callback`, TOUR
@@ -290,7 +270,13 @@ Resolved 2026-09-08 (see §0.1): URL `/{kind}/{slug}`; last-step = customizable 
 custom button = picker **and** drift/picdrift URL; the four variants defined; the shared
 `DriftFlow` model reflects all of it.
 
-Still open (decide before/at execution, non-blocking for P1):
+Still open (decide before/at execution):
+- **Creator org marker (P3):** the draft says `productLine="TOUR"`, but `routes/drift.ts` gates
+  the public player + brand lookups on `productLine: "DRIFT"` (brand-slug resolve, org
+  checks), so TOUR orgs' drifts would 404 unless every gate is widened. Recommended: creators
+  ARE drift orgs (`productLine="DRIFT"`) plus an account marker (e.g. `accountType
+  BRAND|CREATOR`, one more column) and `User.view="CREATOR"`; only the superadmin brand list
+  then needs a filter. Decide at P3 (needs a `db push` if a column is added).
 - Does creator storage count against a quota? (drift media isn't metered today.)
 - Free-tier defaults: exactly `maxFlows=1`, `maxStepsPerFlow=3` — per-kind, or global?
 - `/path` FORM/PAGE steps + the `DriftPage` builder — design when `/path` starts (post-Tour).
