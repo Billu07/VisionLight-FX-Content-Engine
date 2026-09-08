@@ -69,6 +69,69 @@ export const TOUR_STYLES = `
 .t-back:hover{color:var(--text)}
 .t-name-input{font-size:20px;font-weight:800;letter-spacing:-.01em;padding:8px 10px}
 .t-muted-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:12.5px;color:var(--muted)}
+
+/* ── Tour surface: calmer, warmer and deeper than the admin panel ──
+   A soft aurora wash behind everything, rounder cards with real depth, gradient
+   primary actions, a numbered route rail in the builder, and gentle entrances. */
+.t-page{position:relative;isolation:isolate}
+.t-page::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(52% 44% at 10% 0%, rgba(34,211,238,.13), transparent 70%),
+  radial-gradient(48% 40% at 100% 6%, rgba(59,130,246,.15), transparent 70%),
+  radial-gradient(60% 50% at 50% 112%, rgba(37,99,235,.10), transparent 70%)}
+.drift-ui[data-theme="light"].t-page::before{background:
+  radial-gradient(52% 44% at 10% 0%, rgba(8,145,178,.10), transparent 70%),
+  radial-gradient(48% 40% at 100% 6%, rgba(59,130,246,.10), transparent 70%)}
+.t-page .d-topbar{background:color-mix(in srgb, var(--bg) 68%, transparent)}
+.t-page .d-main{max-width:1120px}
+.t-page .d-card{border-radius:20px;box-shadow:0 1px 2px rgba(0,0,0,.18),0 18px 40px -28px rgba(0,0,0,.55)}
+.drift-ui[data-theme="light"].t-page .d-card{box-shadow:0 1px 2px rgba(15,23,42,.05),0 20px 44px -30px rgba(15,23,42,.25)}
+.t-page .d-btn{border-radius:12px}
+.t-page .d-btn.primary{background:linear-gradient(120deg,#22d3ee,#3b82f6);color:#fff;border:0;box-shadow:0 12px 30px -14px rgba(34,211,238,.6);transition:transform .16s,filter .16s,box-shadow .16s}
+.t-page .d-btn.primary:hover{filter:brightness(1.05);transform:translateY(-1px);background:linear-gradient(120deg,#22d3ee,#3b82f6)}
+.t-page .d-btn.primary:disabled{transform:none;filter:none}
+.t-page .d-input,.t-page .d-select,.t-page .d-textarea{border-radius:12px}
+.t-page .d-eyebrow{letter-spacing:.12em}
+.t-eyebrow-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);margin-right:8px;vertical-align:middle}
+.t-title{font-size:clamp(28px,4.4vw,38px);letter-spacing:-.025em}
+.t-head .d-sub{font-size:14.5px;max-width:52ch}
+@keyframes t-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.t-rise{animation:t-rise .5s cubic-bezier(.2,.7,.2,1) both}
+.t-rise-2{animation-delay:.07s}
+.t-rise-3{animation-delay:.14s}
+@media(prefers-reduced-motion:reduce){.t-rise{animation:none}}
+.t-chip{border-radius:999px;padding:7px 12px;background:color-mix(in srgb, var(--surface) 70%, transparent);backdrop-filter:blur(8px)}
+.t-card{border-radius:20px;transition:border-color .2s,transform .25s cubic-bezier(.2,.7,.2,1),box-shadow .25s}
+.t-card:hover{transform:translateY(-3px);box-shadow:0 26px 50px -30px rgba(0,0,0,.6);border-color:var(--accent-border)}
+.t-thumb{aspect-ratio:16/11}
+.t-thumb::after{content:"";position:absolute;inset:auto 0 0 0;height:48%;background:linear-gradient(to top,rgba(5,9,18,.55),transparent);pointer-events:none}
+.t-thumb .pill{z-index:1}
+.t-thumb .ph{background:linear-gradient(135deg,var(--accent-soft),transparent 60%)}
+.t-card-body{padding:14px 16px 16px;gap:9px}
+.t-card-name{font-size:16px;letter-spacing:-.01em}
+/* Route rail: the stops read as a path (desktop and up) */
+.t-route{position:relative}
+@media(min-width:640px){
+  .t-route{padding-left:36px}
+  .t-route::before{content:"";position:absolute;left:12px;top:26px;bottom:26px;width:2px;border-radius:2px;background:linear-gradient(to bottom,var(--accent),var(--border-strong));opacity:.55}
+  .t-route-item{position:relative}
+  .t-route-item::before{content:attr(data-n);position:absolute;left:-36px;top:20px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;color:var(--accent-ink);background:var(--accent);box-shadow:0 0 0 4px var(--bg),0 6px 16px -6px rgba(34,211,238,.6);z-index:1}
+  .t-route-item.is-drop::before{content:"+";background:var(--surface-3);color:var(--muted);border:1px dashed var(--border-strong);box-shadow:0 0 0 4px var(--bg)}
+}
+.t-step{border-radius:20px;padding:16px;transition:border-color .2s,box-shadow .2s}
+.t-step-thumb{border-radius:14px}
+.t-drop{border-radius:20px;padding:34px 18px;gap:8px;background:linear-gradient(135deg,var(--accent-soft),transparent 62%),color-mix(in srgb,var(--surface) 55%,transparent)}
+.t-drop:hover,.t-drop.over{background:linear-gradient(135deg,var(--accent-soft),transparent 40%),color-mix(in srgb,var(--surface) 70%,transparent)}
+.t-drop .ico{width:48px;height:48px;border-radius:15px;display:grid;place-items:center;background:var(--accent-soft);border:1px solid var(--accent-border);color:var(--accent);margin-bottom:2px}
+.t-drop .big{font-size:16px}
+.t-bubbles{display:flex;gap:10px;justify-content:center;align-items:flex-end;margin-bottom:4px}
+.t-bubble{width:54px;height:74px;border-radius:16px;background:linear-gradient(160deg,var(--surface-3),var(--surface-2));border:1px solid var(--border);position:relative;overflow:hidden}
+.t-bubble::before{content:"";position:absolute;inset:10px 10px 22px;border-radius:9px;background:linear-gradient(135deg,var(--accent-soft),transparent 70%)}
+.t-bubble::after{content:"";position:absolute;inset:auto 10px 9px 10px;height:6px;border-radius:3px;background:var(--accent);opacity:.75}
+.t-bubble:nth-child(2){transform:translateY(-10px)}
+.t-bubble:nth-child(3){transform:translateY(-3px)}
+.t-frame{border-radius:24px;box-shadow:0 30px 60px -30px rgba(0,0,0,.6);border-color:var(--border-strong)}
+.t-empty{padding:52px 22px}
+.t-upgrade{border-radius:20px}
 `;
 
 /** Page chrome: wordmark → home, theme toggle, log out. */
@@ -81,7 +144,7 @@ export function TourShell({ children }: { children: React.ReactNode }) {
     navigate(CREATOR_START, { replace: true });
   };
   return (
-    <div className="drift-ui d-page" data-theme={theme}>
+    <div className="drift-ui d-page t-page" data-theme={theme}>
       <DriftThemeStyles />
       <style>{TOUR_STYLES}</style>
       <header className="d-topbar">

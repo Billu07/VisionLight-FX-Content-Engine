@@ -242,7 +242,8 @@ function StepCard({
 
   return (
     <div
-      className="d-card t-step"
+      className="d-card t-step t-route-item"
+      data-n={index + 1}
       style={{ borderColor: selected ? "var(--accent-border)" : undefined, cursor: "pointer" }}
       onClick={onSelect}
     >
@@ -432,7 +433,7 @@ function UploadSlot({
 
   if (progress !== null) {
     return (
-      <div className="d-card d-card-pad" style={{ display: "grid", gap: 10 }}>
+      <div className="d-card d-card-pad t-route-item is-drop" data-n={index + 1} style={{ display: "grid", gap: 10 }}>
         <div className="t-inline" style={{ justifyContent: "space-between" }}>
           <div className="d-h2">Stop {index + 1} · uploading</div>
           <span className="d-faint">{progress}%</span>
@@ -449,7 +450,8 @@ function UploadSlot({
 
   return (
     <div
-      className={`t-drop ${over ? "over" : ""}`}
+      className={`t-drop t-route-item is-drop ${over ? "over" : ""}`}
+      data-n={index + 1}
       onClick={() => inputRef.current?.click()}
       onDragOver={(e) => {
         e.preventDefault();
@@ -477,6 +479,9 @@ function UploadSlot({
           if (f) upload(f);
         }}
       />
+      <div className="ico" aria-hidden>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4" /><path d="M6 10l6-6 6 6" /><path d="M4 20h16" /></svg>
+      </div>
       <div className="d-eyebrow">Stop {index + 1}</div>
       <div className="big">{index === 0 ? "Upload your first clip" : "Add the next clip"}</div>
       <div className="d-sub" style={{ fontSize: 13 }}>
@@ -669,7 +674,7 @@ export default function TourBuilder() {
         ← Your tours
       </Link>
 
-      <div className="t-head" style={{ marginTop: 6 }}>
+      <div className="t-head t-rise" style={{ marginTop: 6 }}>
         <div style={{ flex: "1 1 320px", minWidth: 0 }}>
           <div className="d-eyebrow" style={{ marginBottom: 6 }}>
             Tour · <StatusPill status={flow.status} flow />
@@ -792,7 +797,7 @@ export default function TourBuilder() {
       )}
 
       <div className="t-builder">
-        <div className="t-steps">
+        <div className="t-steps t-route">
           {flow.steps.map((s, i) => (
             <StepCard
               key={s.id}

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
 import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "../rotation3d/driftUiTheme";
+import { TOUR_STYLES } from "./tourUi";
 import {
   ensureCreatorProfile,
   errorMessage,
@@ -224,8 +225,9 @@ export default function TourAuth() {
           : "Free to start. Turn three phone clips into an interactive tour in minutes.";
 
   return (
-    <div className="drift-ui d-page" data-theme={theme}>
+    <div className="drift-ui d-page t-page" data-theme={theme}>
       <DriftThemeStyles />
+      <style>{TOUR_STYLES}</style>
       <style>{STYLES}</style>
       <div className="ta-wrap">
         <header className="d-topbar">

@@ -111,9 +111,9 @@ export default function TourHome() {
 
   return (
     <TourShell>
-      <div className="t-head">
+      <div className="t-head t-rise">
         <div>
-          <div className="d-eyebrow">Your creator space</div>
+          <div className="d-eyebrow"><span className="t-eyebrow-dot" />Your creator space</div>
           <h1 className="t-title">{firstName ? `Hi, ${firstName}` : "Your tours"}</h1>
           <p className="d-sub" style={{ marginTop: 6 }}>
             Film short clips on your phone; we turn them into a guided, interactive tour.
@@ -182,7 +182,12 @@ export default function TourHome() {
       )}
 
       {!loading && flows.length === 0 && !creating && (
-        <div className="d-card t-empty" style={{ marginBottom: 18 }}>
+        <div className="d-card t-empty t-rise t-rise-2" style={{ marginBottom: 18 }}>
+          <div className="t-bubbles" aria-hidden>
+            <span className="t-bubble" />
+            <span className="t-bubble" />
+            <span className="t-bubble" />
+          </div>
           <div>
             <div className="d-eyebrow" style={{ marginBottom: 8 }}>Start here</div>
             <div className="d-h1" style={{ fontSize: 22 }}>Your first tour takes about five minutes</div>
@@ -215,7 +220,7 @@ export default function TourHome() {
         </div>
       )}
 
-      <div className="t-grid">
+      <div className="t-grid t-rise t-rise-3">
         {flows.map((f) => (
           <div key={f.id} className="d-card t-card" onClick={() => navigate(`/tour/${f.id}/edit`)}>
             <div className="t-thumb">
