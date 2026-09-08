@@ -29,6 +29,21 @@ import {
 type LinkOption = { label: string; url: string };
 type PreviewDraft = { placement: string; btnLabel: string; hasCustom: boolean };
 
+const DIRECTIONS = [
+  { value: "LTR", glyph: "→", short: "L→R", title: "Left to right — the camera pans right" },
+  { value: "RTL", glyph: "←", short: "R→L", title: "Right to left" },
+  { value: "TTB", glyph: "↓", short: "T→B", title: "Top to bottom" },
+  { value: "BTT", glyph: "↑", short: "B→T", title: "Bottom to top" },
+] as const;
+const PLACEMENTS = [
+  { value: "CENTER", label: "Centre · Next left" },
+  { value: "CENTER_REV", label: "Centre · Next right" },
+  { value: "LEFT", label: "Bottom left" },
+  { value: "RIGHT", label: "Bottom right" },
+  { value: "SPLIT", label: "Spread · Next right" },
+  { value: "SPLIT_REV", label: "Spread · Next left" },
+] as const;
+
 const DEFAULT_NEXT = "Next stop";
 const DEFAULT_END = "Restart tour";
 const CUSTOM = "__custom__";
@@ -255,40 +270,43 @@ function StepCard({
   const next = flow.steps[index + 1];
   const nextLabel = flow.settings.nextLabel || DEFAULT_NEXT;
 
+  const autoLink = next
+    ? `${nextLabel} → ${stepName(next, index + 1)}`
+    : flow.endCta
+      ? `${flow.endCta.label} → ${flow.endCta.url}`
+      : flow.steps.length > 1
+        ? `${DEFAULT_END} → ${stepName(flow.steps[0], 0)}`
+        : "add a second stop to link this one on";
+
   return (
     <div
-      className="d-card t-step t-route-item"
+      className={`d-card t-step t-route-item ${selected ? "is-selected" : ""}`}
       data-n={index + 1}
-      style={{ borderColor: selected ? "var(--accent-border)" : undefined, cursor: "pointer" }}
-      onClick={onSelect}
+      onClickCapture={onSelect}
     >
-      <div>
+      <div className="t-step-media">
         <div className="t-step-thumb">
           <span className="t-num">{index + 1}</span>
           {p?.thumb ? (
             <img src={p.thumb} alt="" />
           ) : status === "PROCESSING" ? (
-            <div style={{ display: "grid", gap: 8, justifyItems: "center" }}>
+            <div className="t-building">
               <Spinner />
               <span>Building your drift…</span>
             </div>
           ) : status === "FAILED" ? (
             <span>Couldn't build this clip</span>
           ) : (
-            <span>No preview</span>
+            <span>No preview yet</span>
           )}
+          {selected && isReady(status) && <span className="t-previewing">Previewing</span>}
         </div>
-        <div className="t-muted-row" style={{ marginTop: 8, justifyContent: "space-between" }}>
+        <div className="t-step-meta">
           <StatusPill status={status} />
           {p?.frameCount ? <span className="d-faint">{p.frameCount} frames</span> : null}
         </div>
-        {status === "PROCESSING" && (
-          <div className="d-faint" style={{ fontSize: 11.5, marginTop: 6, lineHeight: 1.4 }}>
-            You can keep writing — this stop updates itself when it's ready.
-          </div>
-        )}
         {(status === "FAILED" || isReady(status)) && (
-          <div style={{ marginTop: 8 }} onClick={(e) => e.stopPropagation()}>
+          <div>
             <input
               ref={fileRef}
               type="file"
@@ -311,11 +329,24 @@ function StepCard({
             )}
           </div>
         )}
+        {status === "PROCESSING" && (
+          <div className="d-faint t-tip">You can keep writing — this stop updates itself when it's ready.</div>
+        )}
       </div>
 
-      <div onClick={(e) => e.stopPropagation()}>
+      <div className="t-step-body">
         <div className="t-step-head">
-          <div className="d-eyebrow">Stop {index + 1}</div>
+          <div className="t-step-title">
+            <span className="d-eyebrow">Stop {index + 1}</span>
+            <input
+              className="t-title-input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Give this stop a title"
+              maxLength={120}
+              aria-label="Stop title"
+            />
+          </div>
           <div className="t-actions">
             <span className="t-arrows">
               <button className="d-btn sm" onClick={() => move(-1)} disabled={index === 0} title="Move up" aria-label="Move up">
@@ -336,24 +367,20 @@ function StepCard({
           </div>
         </div>
 
-        <div className="t-fields two">
-          <div>
-            <label className="d-label">Title</label>
-            <input className="d-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Living room" maxLength={120} />
-          </div>
-          <div>
+        <div className="t-fields fluid">
+          <div className="t-field">
             <label className="d-label">Headline</label>
             <input className="d-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Morning light, garden views" maxLength={120} />
           </div>
-          <div>
+          <div className="t-field">
             <label className="d-label">Button label</label>
             <input className="d-input" value={btnLabel} onChange={(e) => setBtnLabel(e.target.value)} placeholder="e.g. Book a viewing" maxLength={40} />
           </div>
-          <div>
+          <div className="t-field">
             <label className="d-label">Button link</label>
             <LinkPicker value={btnUrl} options={options.filter((o) => o.url !== p?.playerPath)} onChange={setBtnUrl} allowNone />
           </div>
-          <div>
+          <div className="t-field">
             <label className="d-label">Background</label>
             <div className="t-color">
               <input
@@ -372,39 +399,64 @@ function StepCard({
               )}
             </div>
           </div>
-          <div>
+          <div className="t-field">
             <label className="d-label">Drift direction</label>
-            <select className="d-select" value={direction} onChange={(e) => setDirection(e.target.value)}>
-              <option value="LTR">Left → right (camera pans right)</option>
-              <option value="RTL">Right → left</option>
-              <option value="TTB">Top → bottom</option>
-              <option value="BTT">Bottom → top</option>
-            </select>
-            <label className="d-label" style={{ marginTop: 10 }}>Buttons</label>
-            <select className="d-select" value={placement} onChange={(e) => setPlacement(e.target.value)}>
-              <option value="CENTER">Centre — Next left, your button right</option>
-              <option value="CENTER_REV">Centre — your button left, Next right</option>
-              <option value="LEFT">Bottom left</option>
-              <option value="RIGHT">Bottom right</option>
-              <option value="SPLIT">Spread — Next on the right</option>
-              <option value="SPLIT_REV">Spread — Next on the left</option>
-            </select>
-            <label className="t-inline" style={{ marginTop: 8, gap: 8, cursor: "pointer", fontSize: 13, color: "var(--muted)" }}>
+            <div className="t-seg" role="radiogroup" aria-label="Drift direction">
+              {DIRECTIONS.map((d) => (
+                <button
+                  key={d.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={direction === d.value}
+                  className={`t-seg-btn ${direction === d.value ? "on" : ""}`}
+                  onClick={() => setDirection(d.value)}
+                  title={d.title}
+                >
+                  {d.glyph}
+                  <small>{d.short}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="t-field">
+            <label className="d-label">Buttons</label>
+            <div className="t-chips" role="radiogroup" aria-label="Button placement">
+              {PLACEMENTS.map((pl) => (
+                <button
+                  key={pl.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={placement === pl.value}
+                  className={`t-chip-btn ${placement === pl.value ? "on" : ""}`}
+                  onClick={() => setPlacement(pl.value)}
+                >
+                  {pl.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="t-field t-field-row">
+            <label className="t-switch">
               <input type="checkbox" checked={loop} onChange={(e) => setLoop(e.target.checked)} />
-              Loop (dragging wraps end → start)
+              <i />
+              <span>
+                Loop
+                <small>dragging wraps end → start</small>
+              </span>
             </label>
           </div>
-          <div style={{ alignSelf: "end" }}>
+          <div className="t-field t-field-row">
             <div className="t-next">
               <span className="d-faint">Auto link:</span>
-              <b>{next ? `${nextLabel} → ${stepName(next, index + 1)}` : flow.endCta ? `${flow.endCta.label} → ${flow.endCta.url}` : flow.steps.length > 1 ? `${DEFAULT_END} → ${stepName(flow.steps[0], 0)}` : "— (add a second stop)"}</b>
+              <b>{autoLink}</b>
             </div>
           </div>
         </div>
 
-        <div className="t-actions" style={{ marginTop: 12 }}>
+        <div className="t-step-foot">
+          <span className={`t-unsaved ${dirty ? "on" : ""}`}>{dirty ? "Unsaved changes" : "All changes saved"}</span>
           <button className="d-btn primary" onClick={save} disabled={saving || !dirty}>
-            {saving ? "Saving…" : dirty ? "Save stop" : "Saved"}
+            {saving ? "Saving…" : "Save stop"}
           </button>
         </div>
       </div>
