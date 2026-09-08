@@ -348,16 +348,26 @@ export default function SpinViewer({
     // text/arrow. Otherwise, if the product settles on the exact frame the
     // direction flips, tick()'s idle guard stops calling draw() and the reverse
     // cue stays stranded on the frame's LEFT edge (the "end helper on the left" bug).
+    // Direction-aware: the cue sits on the edge the drift STARTS from and moves to
+    // the far edge at the end — LTR starts left, RTL starts right. Vertical drifts
+    // (TTB/BTT) keep the cue centred under the frame; only its arrow turns.
     const placeHelperX = () => {
       const el = hintRef.current;
       if (!driftMode || !el || frameRect.w <= 0) return;
       const stageW = cv.width / DPR;
-      if (helperBack) {
-        el.style.left = "auto";
-        el.style.right = Math.max(8, stageW - (frameRect.x + frameRect.w) / DPR) + "px";
-      } else {
+      const fx = frameRect.x / DPR, fw = frameRect.w / DPR;
+      if (vertical) {
+        const hintW = el.offsetWidth || 120;
         el.style.right = "auto";
-        el.style.left = Math.max(8, frameRect.x / DPR) + "px";
+        el.style.left = Math.max(8, Math.min(stageW - hintW - 8, fx + fw / 2 - hintW / 2)) + "px";
+      } else if (helperBack !== dirSign < 0) {
+        // back on LTR, or forward on RTL → the frame's RIGHT edge
+        el.style.left = "auto";
+        el.style.right = Math.max(8, stageW - (fx + fw)) + "px";
+      } else {
+        // forward on LTR, or back on RTL → the frame's LEFT edge
+        el.style.right = "auto";
+        el.style.left = Math.max(8, fx) + "px";
       }
       el.style.transform = "none";
     };
@@ -718,27 +728,7 @@ export default function SpinViewer({
         // Safety clamp: never let the helper cluster drop so low it overlaps the
         // powered badge + CTAs (tighter reserve for drift surfaces via capFit).
         const maxTop = H / DPR - ((capFit ? 130 : 140) + hintH);
-        // Vertical drifts (TTB/BTT): the helper rides beside the frame's RIGHT edge,
-        // near the top for top→bottom and near the bottom for bottom→top, whenever
-        // there's room beside the frame; otherwise (phones) it stays under the frame.
-        const stageW = W / DPR;
-        const frameRightCss = (realMode && frameRect.w > 0 ? frameRect.x + frameRect.w : cx + scale * 2.1) / DPR;
-        const sidePlaced = vertical && realMode && frameRect.w > 0 && stageW - frameRightCss >= 120;
-        let topPx: number;
-        if (sidePlaced) {
-          const hintW = hintRef.current.offsetWidth || 120;
-          const frameTopCss = frameBottomCss - frameHcss;
-          topPx = dirSign > 0 ? frameTopCss + frameHcss * 0.12 : frameBottomCss - frameHcss * 0.12 - hintH;
-          topPx = Math.max(12, Math.min(topPx, H / DPR - hintH - 12));
-          hintRef.current.classList.add("r3d-hint-side");
-          hintRef.current.style.left = Math.min(stageW - hintW - 12, frameRightCss + 14) + "px";
-          hintRef.current.style.transform = "none";
-        } else {
-          topPx = Math.max(12, Math.min(under, maxTop));
-          hintRef.current.classList.remove("r3d-hint-side");
-          hintRef.current.style.left = "";
-          hintRef.current.style.transform = "";
-        }
+        const topPx = Math.max(12, Math.min(under, maxTop));
         hintRef.current.style.top = topPx + "px";
         hintRef.current.style.bottom = "auto";
         // Reveal the helper only once its anchor has settled (top stopped moving for a
@@ -755,9 +745,7 @@ export default function SpinViewer({
         // Push the CUE down so its top lands ~16px under the frame's bottom edge
         // (the hand is now up on the frame on every device, so this always runs).
         // Keeps the text/arrow off the product without dragging the hand down.
-        if (cueRef.current && sidePlaced) {
-          cueRef.current.style.marginTop = "0px";
-        } else if (cueRef.current) {
+        if (cueRef.current) {
           const handH = handRef.current?.offsetHeight || 28;
           const naturalCueTop = topPx + handH + 7; // 7px column gap (see .r3d-drift .r3d-hint)
           const cueTop = Math.max(naturalCueTop, frameBottomCss + 16);
@@ -1857,9 +1845,7 @@ const R3D_CSS = `
 .r3d-drift.r3d-dir-rtl .r3d-hint.r3d-back{align-items:flex-start}
 .r3d-drift.r3d-dir-rtl .r3d-drift-cue{flex-direction:row-reverse}
 .r3d-drift.r3d-dir-rtl .r3d-hint.r3d-back .r3d-drift-cue{flex-direction:row}
-.r3d-drift .r3d-hint.r3d-hint-side{align-items:center;text-align:center}
-.r3d-drift .r3d-hint.r3d-hint-side .r3d-drift-cue{flex-direction:column;gap:6px;max-width:120px}
-.r3d-drift .r3d-hint.r3d-hint-side .r3d-drift-cue span:first-child{white-space:normal;line-height:1.25}
+.r3d-drift.r3d-dir-ttb .r3d-hint,.r3d-drift.r3d-dir-btt .r3d-hint,.r3d-drift.r3d-dir-ttb .r3d-hint.r3d-back,.r3d-drift.r3d-dir-btt .r3d-hint.r3d-back{align-items:center}
 .r3d-drift .r3d-hint span{font-size:clamp(12px,3.8vmin,15px);font-weight:650}
 /* the drift helper hides between its start/end appearances (hand sequence) */
 .r3d-drift .r3d-hint.r3d-gone{opacity:0}
