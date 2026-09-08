@@ -7,6 +7,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../services/database";
 import { authenticateToken, type AuthenticatedRequest } from "../middleware/auth";
 import { probeClipInfo } from "../services/rotation3d/pipeline";
+import { uploadManagedBuffer } from "../utils/managedStorage";
 import { parseCtaPlacement, parseDirection, processClip, uniqueSlug } from "./drift";
 import { sendFlowCreatedNoticeEmail, sendFlowPublishedEmails, sendUpgradeNudgeEmail } from "../services/mail";
 import {
@@ -51,6 +52,16 @@ const videoUpload = multer({
   }),
   limits: { fileSize: 500 * 1024 * 1024 },
 });
+
+// Cover images (small; kept in memory and pushed straight to storage).
+const imageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 * 1024 * 1024 } });
+const IMAGE_EXT: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/avif": "avif",
+};
 
 const requireOrg = (req: AuthenticatedRequest, res: Response): string | null => {
   const orgId = req.user?.organizationId;
@@ -327,6 +338,37 @@ router.post("/api/drift/my/flows/:id/unpublish", authenticateToken, async (req: 
   }
   res.json({ flow: serializeFlow(await loadFlow(orgId, flow.id)) });
 });
+
+// Upload a cover image for a flow (the creator home + share previews show it
+// instead of the first stop's frame). PATCH { coverUrl } picks a stop's frame or
+// clears it back to the default.
+router.post(
+  "/api/drift/my/flows/:id/cover",
+  authenticateToken,
+  imageUpload.single("image"),
+  async (req: AuthenticatedRequest, res: Response) => {
+    const orgId = requireOrg(req, res);
+    if (!orgId) return;
+    const flow = await prisma.driftFlow.findFirst({
+      where: { id: req.params.id, organizationId: orgId },
+      select: { id: true },
+    });
+    if (!flow) return res.status(404).json({ error: "Flow not found" });
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: "An image is required" });
+    const ext = IMAGE_EXT[file.mimetype];
+    if (!ext) return res.status(400).json({ error: "Please upload a JPG, PNG or WebP image" });
+    const url = await uploadManagedBuffer({
+      buffer: file.buffer,
+      contentType: file.mimetype,
+      keyPrefix: `drift/org_${orgId}/flow_${flow.id}/cover`,
+      fallbackExtension: ext,
+    });
+    await prisma.driftFlow.update({ where: { id: flow.id }, data: { coverUrl: url } });
+    console.log(`[${NS}] flow ${flow.id} cover uploaded`);
+    res.json({ flow: serializeFlow(await loadFlow(orgId, flow.id)) });
+  },
+);
 
 // ───────────────────────────── steps ─────────────────────────────
 

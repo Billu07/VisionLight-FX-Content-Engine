@@ -382,6 +382,11 @@ export const apiEndpoints = {
   driftUpdateFlowStep: (id: string, stepId: string, data: Record<string, unknown>) =>
     api.patch(`/api/drift/my/flows/${id}/steps/${stepId}`, data),
   driftDeleteFlowStep: (id: string, stepId: string) => api.delete(`/api/drift/my/flows/${id}/steps/${stepId}`),
+  driftUploadFlowCover: (id: string, formData: FormData) =>
+    api.post(`/api/drift/my/flows/${id}/cover`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 120000,
+    }),
   driftPublicFlow: (kind: string, slug: string) => api.get(`/api/drift/public/flows/${kind}/${slug}`),
   driftShareCard: (id: string) =>
     api.get(`/api/drift/my/products/${id}/share-card`, { responseType: "blob" }),

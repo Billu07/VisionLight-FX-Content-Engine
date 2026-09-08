@@ -589,6 +589,27 @@ export default function TourBuilder() {
   const [nameSaving, setNameSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  // "Path" = compact rows you expand one at a time (default); "Cards" = every stop open.
+  const [viewMode, setViewMode] = useState<"path" | "cards">(() => {
+    try {
+      return localStorage.getItem("drift_builder_view") === "cards" ? "cards" : "path";
+    } catch {
+      return "path";
+    }
+  });
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
+  const coverRef = useRef<HTMLInputElement>(null);
+  const [coverBusy, setCoverBusy] = useState(false);
+  const switchView = (m: "path" | "cards") => {
+    setViewMode(m);
+    try {
+      localStorage.setItem("drift_builder_view", m);
+    } catch {
+      /* ignore */
+    }
+  };
   const [nextLabel, setNextLabel] = useState("");
   const [endLabel, setEndLabel] = useState("");
   const [endUrl, setEndUrl] = useState("");
@@ -714,6 +735,50 @@ export default function TourBuilder() {
     }
   };
 
+  const reorderTo = async (from: number, to: number) => {
+    if (!flow || from === to || to < 0 || to >= flow.steps.length) return;
+    const ids = flow.steps.map((s) => s.id);
+    const [moved] = ids.splice(from, 1);
+    ids.splice(to, 0, moved);
+    try {
+      const r = await apiEndpoints.driftReorderFlowSteps(flow.id, ids);
+      applyFlow(r.data.flow);
+    } catch (e) {
+      notify.error(apiError(e));
+    }
+  };
+
+  const setCover = async (url: string | null) => {
+    if (!flow) return;
+    setCoverBusy(true);
+    try {
+      const r = await apiEndpoints.driftUpdateFlow(flow.id, { coverUrl: url || "" });
+      applyFlow(r.data.flow);
+      notify.success(url ? "Cover updated" : "Cover back to the first stop");
+    } catch (e) {
+      notify.error(apiError(e));
+    } finally {
+      setCoverBusy(false);
+    }
+  };
+
+  const uploadCover = async (file: File) => {
+    if (!flow) return;
+    if (!file.type.startsWith("image/")) return notify.error("Please choose an image (JPG, PNG or WebP)");
+    const fd = new FormData();
+    fd.append("image", file);
+    setCoverBusy(true);
+    try {
+      const r = await apiEndpoints.driftUploadFlowCover(flow.id, fd);
+      applyFlow(r.data.flow);
+      notify.success("Cover uploaded");
+    } catch (e) {
+      notify.error(apiError(e));
+    } finally {
+      setCoverBusy(false);
+    }
+  };
+
   const copyLink = async () => {
     if (!flow) return;
     const ok = await copyText(publicUrl(flow.publicPath));
@@ -744,6 +809,23 @@ export default function TourBuilder() {
   const atStepQuota = flow.steps.length >= quota.maxStepsPerFlow;
   const selected = flow.steps.find((s) => s.id === selectedId) || null;
   const selectedProduct = selected?.product || null;
+  const renderCard = (s: FlowStep, i: number) => (
+    <StepCard
+      key={s.id}
+      flow={flow}
+      step={s}
+      index={i}
+      options={options}
+      selected={s.id === selectedId}
+      onSelect={() => {
+        if (s.id !== selectedId) setPreviewDraft(null);
+        setSelectedId(s.id);
+      }}
+      onChanged={applyFlow}
+      maxClip={quota.maxClipSeconds}
+      onPreview={onPreview}
+    />
+  );
   const settingsDirty =
     nextLabel !== (flow.settings.nextLabel || "") ||
     endLabel !== (flow.endCta?.label || "") ||
@@ -795,6 +877,14 @@ export default function TourBuilder() {
               Preview
             </a>
           )}
+          <div className="d-tabs" role="tablist" aria-label="Builder view">
+            <button role="tab" aria-selected={viewMode === "path"} className={`d-tab ${viewMode === "path" ? "active" : ""}`} onClick={() => switchView("path")}>
+              Path
+            </button>
+            <button role="tab" aria-selected={viewMode === "cards"} className={`d-tab ${viewMode === "cards" ? "active" : ""}`} onClick={() => switchView("cards")}>
+              Cards
+            </button>
+          </div>
           <button className="d-btn" onClick={() => setShowSettings((v) => !v)}>
             {showSettings ? "Hide settings" : "Tour settings"}
           </button>
@@ -818,6 +908,58 @@ export default function TourBuilder() {
       {showSettings && (
         <div className="d-card d-card-pad" style={{ marginBottom: 18 }}>
           <div className="d-eyebrow" style={{ marginBottom: 12 }}>Tour settings</div>
+          <div className="t-cover">
+            <div className="t-cover-current">
+              {flow.thumb ? <img src={flow.thumb} alt="" /> : <span>No cover yet</span>}
+            </div>
+            <div className="t-cover-controls">
+              <div className="d-label">Cover image</div>
+              <div className="d-sub" style={{ fontSize: 12.5 }}>
+                {flow.coverUrl ? "Custom cover." : "Using the first stop's frame."} It's the picture on your tours page
+                and in share previews.
+              </div>
+              {flow.steps.some((s) => s.product?.thumb) && (
+                <div className="t-cover-picks" aria-label="Use a stop's frame">
+                  {flow.steps.map((s, i) =>
+                    s.product?.thumb ? (
+                      <button
+                        key={s.id}
+                        type="button"
+                        className={`t-cover-pick ${flow.coverUrl === s.product.thumb ? "on" : ""}`}
+                        onClick={() => setCover(s.product!.thumb)}
+                        title={`Use stop ${i + 1}`}
+                        disabled={coverBusy}
+                      >
+                        <img src={s.product.thumb} alt="" />
+                        <span>{i + 1}</span>
+                      </button>
+                    ) : null,
+                  )}
+                </div>
+              )}
+              <div className="t-actions">
+                <input
+                  ref={coverRef}
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (f) uploadCover(f);
+                  }}
+                />
+                <button className="d-btn sm" onClick={() => coverRef.current?.click()} disabled={coverBusy}>
+                  {coverBusy ? "Working…" : "Upload image"}
+                </button>
+                {flow.coverUrl && (
+                  <button className="d-btn ghost sm" onClick={() => setCover(null)} disabled={coverBusy}>
+                    Use first stop
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
           <div className="t-fields two">
             <div>
               <label className="d-label">"Next" button label</label>
@@ -880,23 +1022,67 @@ export default function TourBuilder() {
 
       <div className="t-builder">
         <div className="t-steps t-route">
-          {flow.steps.map((s, i) => (
-            <StepCard
-              key={s.id}
-              flow={flow}
-              step={s}
-              index={i}
-              options={options}
-              selected={s.id === selectedId}
-              onSelect={() => {
-                if (s.id !== selectedId) setPreviewDraft(null);
-                setSelectedId(s.id);
-              }}
-              onChanged={applyFlow}
-              maxClip={quota.maxClipSeconds}
-              onPreview={onPreview}
-            />
-          ))}
+          {viewMode === "cards"
+            ? flow.steps.map((s, i) => renderCard(s, i))
+            : flow.steps.map((s, i) => {
+                const open = expandedId === s.id;
+                const st = s.product?.status || "DRAFT";
+                return (
+                  <div key={s.id} className={`t-path-item t-route-item ${open ? "is-open" : ""}`} data-n={i + 1}>
+                    <div
+                      className={`t-path-row ${dragIdx === i ? "dragging" : ""} ${overIdx === i && dragIdx !== null && dragIdx !== i ? "over" : ""} ${s.id === selectedId ? "is-selected" : ""}`}
+                      draggable
+                      onDragStart={() => setDragIdx(i)}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (overIdx !== i) setOverIdx(i);
+                      }}
+                      onDragLeave={() => overIdx === i && setOverIdx(null)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (dragIdx !== null && dragIdx !== i) reorderTo(dragIdx, i);
+                        setDragIdx(null);
+                        setOverIdx(null);
+                      }}
+                      onDragEnd={() => {
+                        setDragIdx(null);
+                        setOverIdx(null);
+                      }}
+                      onClick={() => {
+                        setExpandedId((cur) => (cur === s.id ? null : s.id));
+                        if (s.id !== selectedId) setPreviewDraft(null);
+                        setSelectedId(s.id);
+                      }}
+                    >
+                      <div className="t-path-thumb">
+                        {s.product?.thumb ? <img src={s.product.thumb} alt="" /> : st === "PROCESSING" ? <Spinner /> : <span>—</span>}
+                      </div>
+                      <div className="t-path-main">
+                        <div className="t-path-name">{stepName(s, i)}</div>
+                        <div className="t-muted-row">
+                          <StatusPill status={st} />
+                          {s.product?.title && <span className="d-faint">{s.product.title}</span>}
+                          {s.customCta && <span className="d-faint">· button: {s.customCta.label}</span>}
+                        </div>
+                      </div>
+                      <div className="t-path-side" onClick={(e) => e.stopPropagation()}>
+                        <span className="t-arrows">
+                          <button className="d-btn sm" onClick={() => reorderTo(i, i - 1)} disabled={i === 0} title="Move up" aria-label="Move up">
+                            ↑
+                          </button>
+                          <button className="d-btn sm" onClick={() => reorderTo(i, i + 1)} disabled={i === flow.steps.length - 1} title="Move down" aria-label="Move down">
+                            ↓
+                          </button>
+                        </span>
+                        <span className={`t-chevron ${open ? "open" : ""}`} aria-hidden>
+                          ▾
+                        </span>
+                      </div>
+                    </div>
+                    {open && <div className="t-path-expand">{renderCard(s, i)}</div>}
+                  </div>
+                );
+              })}
 
           {atStepQuota ? (
             <UpgradeCard
