@@ -188,6 +188,13 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   `orgNotificationRecipients(orgId)`. Mailbox: `web@drift.li`.
 - Wired: new drift-form lead → brand admins; new brand admin → sign-in + temp password.
 - Send from new code: `sendMail({ to, subject, html: renderEmail({...}) })`.
+- **Editable templates (2026-09-08):** every platform email is a template key in
+  `services/mailTemplates.ts` (code defaults + `{{vars}}`); a superadmin rewrites copy,
+  recipients (default audience / custom list / both, BCC) or switches it off in **Admin → Drift
+  → Emails** (`rotation3d/DriftMailSettings.tsx`, routes `routes/driftMail.ts`: list / save /
+  reset / preview / test). Overrides live in `MailTemplate` (scope GLOBAL; org scope reserved).
+  Senders call `sendTemplated(key, { vars, defaultTo, rows?, replyTo? })`; reads fail soft when
+  the table isn't pushed yet. New email = add a def to `MAIL_TEMPLATES` + a sender in mail.ts.
 - **Ops owed by user**: VPS env `SMTP_HOST/PORT/USER/PASS`, `MAIL_FROM`
   (`pm2 restart --update-env`); drift.li DNS (Namecheap): MX + SPF (via Mail Settings →
   Private Email), DKIM (`default._domainkey`, value from client), DMARC (`_dmarc`).

@@ -4,6 +4,7 @@ import { LoadingSpinner } from "../components/LoadingSpinner";
 import DriftCaptionEditor from "./DriftCaptionEditor";
 import BrandProductEditModal from "./BrandProductEditModal";
 import DriftBrandDashboard from "./DriftBrandDashboard";
+import DriftMailSettings from "./DriftMailSettings";
 
 /**
  * Team (SuperAdmin) console for Drift (drift.li) — lives inside
@@ -354,7 +355,7 @@ function SecondClipButton({
 }
 
 export default function DriftAdminPanel() {
-  const [mode, setMode] = useState<"brands" | "showcase">("brands");
+  const [mode, setMode] = useState<"brands" | "showcase" | "emails">("brands");
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loadingBrands, setLoadingBrands] = useState(true);
   const [newBrand, setNewBrand] = useState("");
@@ -634,7 +635,7 @@ export default function DriftAdminPanel() {
       )}
 
       <div className="flex gap-2">
-        {(["brands", "showcase"] as const).map((m) => (
+        {(["brands", "showcase", "emails"] as const).map((m) => (
           <button
             key={m}
             onClick={() => setMode(m)}
@@ -642,12 +643,14 @@ export default function DriftAdminPanel() {
               mode === m ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"
             }`}
           >
-            {m === "brands" ? "Brands" : "Landing showcase"}
+            {m === "brands" ? "Brands" : m === "showcase" ? "Landing showcase" : "Emails"}
           </button>
         ))}
       </div>
 
-      {mode === "showcase" ? (
+      {mode === "emails" ? (
+        <DriftMailSettings />
+      ) : mode === "showcase" ? (
         <LandingPanel />
       ) : (
         <div className="grid gap-6 lg:grid-cols-[320px_1fr]">

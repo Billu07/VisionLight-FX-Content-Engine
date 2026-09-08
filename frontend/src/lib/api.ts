@@ -396,6 +396,15 @@ export const apiEndpoints = {
     api.patch(`/api/drift/landing/${id}`, changes),
   driftLandingSetHero: (source: string, productId: string) =>
     api.post("/api/drift/landing/set-hero", { source, productId }),
+  // Drift admin "Emails" panel (superadmin): editable transactional templates
+  driftMailTemplates: () => api.get("/api/drift/mail/templates"),
+  driftMailSaveTemplate: (key: string, data: Record<string, unknown>) =>
+    api.put(`/api/drift/mail/templates/${key}`, data),
+  driftMailResetTemplate: (key: string) => api.delete(`/api/drift/mail/templates/${key}`),
+  driftMailPreview: (key: string, draft: Record<string, unknown>) =>
+    api.post(`/api/drift/mail/templates/${key}/preview`, { draft }),
+  driftMailTest: (key: string, draft: Record<string, unknown>, to?: string) =>
+    api.post(`/api/drift/mail/templates/${key}/test`, { draft, to }),
 
   // Forms + leads (#11). Brand admin (/my) and superadmin brand-view (/brands/:orgId).
   driftMyForms: () => api.get("/api/drift/my/forms"),

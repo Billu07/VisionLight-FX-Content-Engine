@@ -777,3 +777,32 @@ model DriftFlowStep {
   @@index([flowId, order])
   @@index([formId])
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Editable transactional emails. One row per template key + scope ("GLOBAL", or
+// an organizationId for a per-brand override later). Absent row = the code default
+// in services/mailTemplates.ts; a null field = keep the default for that field.
+// Edited from the Drift admin "Emails" panel (superadmin). All additive.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model MailTemplate {
+  id              String   @id @default(uuid())
+  key             String // e.g. "drift.lead.new"
+  scope           String   @default("GLOBAL")
+  enabled         Boolean  @default(true)
+  subject         String?
+  heading         String?
+  intro           String?
+  bodyHtml        String?
+  ctaLabel        String?
+  ctaUrl          String?
+  footnote        String?
+  toMode          String   @default("DEFAULT") // DEFAULT | CUSTOM | BOTH (custom list instead of / plus the default audience)
+  toList          String? // comma-separated recipients
+  bcc             String? // comma-separated
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([key, scope])
+}

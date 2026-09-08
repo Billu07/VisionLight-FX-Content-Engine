@@ -15,6 +15,7 @@ import rotation3dRouter, { recoverOrphanedRot3dJobs } from "./routes/rotation3d"
 import driftRouter, { recoverOrphanedDriftJobs } from "./routes/drift";
 import driftFlowsRouter from "./routes/driftFlows";
 import driftCreatorRouter from "./routes/driftCreator";
+import driftMailRouter from "./routes/driftMail";
 import { mailConfigured, verifyMail } from "./services/mail";
 
 console.log("Environment Check:", {
@@ -54,6 +55,7 @@ app.use(rotation3dRouter);
 app.use(driftRouter);
 app.use(driftFlowsRouter);
 app.use(driftCreatorRouter);
+app.use(driftMailRouter);
 
 app.use((req, res) => res.status(404).json({ error: "Route not found" }));
 app.use((error: any, req: Request, res: Response, next: NextFunction) => {

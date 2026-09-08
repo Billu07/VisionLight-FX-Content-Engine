@@ -1,5 +1,13 @@
 import nodemailer, { type Transporter } from "nodemailer";
 import { prisma } from "./database";
+import {
+  effectiveFields,
+  loadOverride,
+  parseEmailList,
+  renderFields,
+  templateByKey,
+  type MailTemplateOverride,
+} from "./mailTemplates";
 
 /**
  * Transactional email for the platform (drift.li notifications, follow-ups, admin
@@ -52,6 +60,7 @@ function getTransport(): Transporter | null {
 
 export type MailInput = {
   to: string | string[];
+  bcc?: string | string[];
   subject: string;
   html?: string;
   text?: string;
@@ -77,9 +86,13 @@ export async function sendMail(
     return { ok: false, skipped: true };
   }
   try {
+    const bcc = (Array.isArray(input.bcc) ? input.bcc : input.bcc ? [input.bcc] : [])
+      .map((s) => (s || "").trim())
+      .filter(Boolean);
     await t.sendMail({
       from: input.from || MAIL_FROM,
       to,
+      bcc: bcc.length ? bcc : undefined,
       subject: input.subject,
       text: input.text || (input.html ? undefined : input.subject),
       html: input.html,
@@ -192,6 +205,90 @@ function pickLeadContact(data: Record<string, unknown>): { email?: string; name?
 }
 
 // ─────────────────────────── Templated notifications ───────────────────────────
+// Every platform email is a TEMPLATE KEY (services/mailTemplates.ts) whose copy,
+// recipients and on/off switch a superadmin edits in the Drift admin "Emails"
+// panel. The senders below only gather the variables + the default audience.
+
+export const mailFromAddress = () => MAIL_FROM;
+export const adminEmails = () => [...ADMIN_EMAILS];
+export const appUrl = () => APP_URL;
+
+const EMPTY_OVERRIDE: MailTemplateOverride = {
+  enabled: true,
+  subject: null,
+  heading: null,
+  intro: null,
+  bodyHtml: null,
+  ctaLabel: null,
+  ctaUrl: null,
+  footnote: null,
+  toMode: "DEFAULT",
+  toList: null,
+  bcc: null,
+};
+
+export type TemplatedRender = {
+  vars: Record<string, string>;
+  rows?: Array<[string, string]>;
+  /** unsaved edits layered on top of the stored override (preview / test) */
+  draft?: Partial<MailTemplateOverride>;
+};
+
+/** Resolve a template (defaults + stored override + draft) into subject/html. */
+export async function renderTemplated(
+  key: string,
+  opts: TemplatedRender,
+): Promise<{ subject: string; html: string; enabled: boolean; override: MailTemplateOverride }> {
+  const def = templateByKey(key);
+  if (!def) throw new Error(`Unknown mail template: ${key}`);
+  const stored = await loadOverride(key);
+  const override: MailTemplateOverride = { ...EMPTY_OVERRIDE, ...(stored || {}), ...(opts.draft || {}) };
+  const fields = renderFields(effectiveFields(def, override), opts.vars, def.vars);
+  const html = renderEmail({
+    heading: fields.heading,
+    intro: fields.intro || undefined,
+    rows: opts.rows,
+    bodyHtml: fields.bodyHtml || undefined,
+    ctaLabel: fields.ctaLabel || undefined,
+    ctaUrl: fields.ctaUrl || undefined,
+    footnote: fields.footnote || undefined,
+  });
+  return { subject: fields.subject, html, enabled: override.enabled !== false, override };
+}
+
+export type TemplatedSend = TemplatedRender & {
+  /** the audience when recipients are left on "default" */
+  defaultTo: string[];
+  replyTo?: string;
+  /** send to exactly these addresses (test send), ignoring the recipient settings */
+  forceTo?: string[];
+};
+
+/** Send a templated email honouring the superadmin's copy, recipients and on/off. */
+export async function sendTemplated(key: string, opts: TemplatedSend): Promise<void> {
+  if (!mailConfigured()) return;
+  const r = await renderTemplated(key, opts);
+  if (!opts.forceTo && !r.enabled) {
+    console.log(`[${NS}] "${key}" is switched off in Emails settings — skipped`);
+    return;
+  }
+  const custom = parseEmailList(r.override.toList);
+  const chosen =
+    opts.forceTo ??
+    (r.override.toMode === "CUSTOM" ? custom : r.override.toMode === "BOTH" ? [...opts.defaultTo, ...custom] : opts.defaultTo);
+  const to = [...new Set(chosen.map((s) => (s || "").trim().toLowerCase()).filter(Boolean))];
+  if (!to.length) {
+    console.warn(`[${NS}] "${key}" has no recipient — skipped`);
+    return;
+  }
+  await sendMail({
+    to,
+    bcc: opts.forceTo ? undefined : parseEmailList(r.override.bcc),
+    subject: r.subject,
+    html: r.html,
+    replyTo: opts.replyTo,
+  });
+}
 
 /** Notify a brand's admins that a new lead came in from one of their drift forms. */
 export async function sendNewLeadEmail(params: {
@@ -204,23 +301,31 @@ export async function sendNewLeadEmail(params: {
 }): Promise<void> {
   if (!mailConfigured()) return;
   const to = await orgNotificationRecipients(params.organizationId);
-  if (!to.length) return;
   const contact = pickLeadContact(params.data);
   const rows: Array<[string, string]> = Object.entries(params.data || {})
     .filter(([, v]) => v !== "" && v !== null && v !== undefined && typeof v !== "object")
     .map(([k, v]) => [k, typeof v === "boolean" ? (v ? "Yes" : "No") : String(v)]);
   if (params.productName) rows.push(["Drift", params.productName]);
   if (params.source?.cta) rows.push(["Button", params.source.cta]);
-  const html = renderEmail({
-    heading: "New lead from your drift",
-    intro: `Someone just submitted "${params.formName}"${contact.name ? ` — ${contact.name}` : ""}.`,
+  let brandName = "";
+  try {
+    const org = await prisma.organization.findUnique({ where: { id: params.organizationId }, select: { name: true } });
+    brandName = org?.name || "";
+  } catch {
+    /* name is cosmetic */
+  }
+  await sendTemplated("drift.lead.new", {
+    vars: {
+      formName: params.formName,
+      contactName: contact.name || "",
+      contactEmail: contact.email || "",
+      contactLine: contact.name ? `From ${contact.name}` : "",
+      driftName: params.productName || "",
+      buttonLabel: params.source?.cta || "",
+      brandName,
+    },
+    defaultTo: to,
     rows,
-    footnote: "You're receiving this because you're an admin on this Drift Link brand.",
-  });
-  await sendMail({
-    to,
-    subject: `New lead: ${params.formName}`,
-    html,
     // Let the brand hit reply and land in the lead's inbox when we captured it.
     replyTo: contact.email,
   });
@@ -236,21 +341,13 @@ export async function sendBrandAdminInviteEmail(params: {
 }): Promise<void> {
   if (!mailConfigured()) return;
   const loginUrl = params.loginUrl || APP_URL;
-  const html = renderEmail({
-    heading: `Your Drift Link account is ready`,
-    intro: `Hi${params.name ? ` ${params.name}` : ""}, an account was created for you to manage "${params.brandName}" on Drift Link.`,
+  await sendTemplated("drift.brand.invite", {
+    vars: { name: params.name || "", brandName: params.brandName, email: params.email, loginUrl },
+    defaultTo: [params.email],
     rows: [
       ["Email", params.email],
       ["Temporary password", params.tempPassword],
     ],
-    ctaLabel: "Sign in",
-    ctaUrl: loginUrl,
-    footnote: "For your security, please change this temporary password right after you sign in.",
-  });
-  await sendMail({
-    to: params.email,
-    subject: `Your Drift Link account for ${params.brandName}`,
-    html,
   });
 }
 
@@ -258,26 +355,15 @@ export async function sendBrandAdminInviteEmail(params: {
 // Event-driven emails for self-serve creators + the client's own notifications.
 // Auth mails (confirm / reset) come from Supabase's SMTP, not from here.
 
-const CREATOR_HOME_URL = `${APP_URL}/tour`;
 const kindNoun = (kind?: string | null) => (kind || "TOUR").toLowerCase();
+const creatorLabel = (email: string, name?: string | null) => (name ? `${name} · ${email}` : email);
 
 /** Welcome a brand-new creator with the three steps to a first tour. */
 export async function sendCreatorWelcomeEmail(params: { email: string; name?: string | null }): Promise<void> {
-  if (!mailConfigured()) return;
-  const html = renderEmail({
-    heading: "Your creator space is ready",
-    intro: `Hi${params.name ? ` ${params.name}` : ""}, welcome to drift.li. You can now turn short phone clips into an interactive tour people scrub with a finger. Your first tour is free: three stops, five-second clips, one link to share.`,
-    bodyHtml:
-      `<ol style="margin:0 0 6px 18px;padding:0;color:#3a4150;font-size:14px;line-height:1.7">` +
-      `<li>Film 3 short clips — hold the phone steady and move slowly through the space.</li>` +
-      `<li>Upload them; we build every stop while you write a title, a headline and a button.</li>` +
-      `<li>Publish. The stops link themselves — even if you reorder them later.</li>` +
-      `</ol>`,
-    ctaLabel: "Create your first tour",
-    ctaUrl: CREATOR_HOME_URL,
-    footnote: "Reply to this email if you get stuck — a person reads it.",
+  await sendTemplated("creator.welcome", {
+    vars: { name: params.name || "there", creatorHomeUrl: `${APP_URL}/tour` },
+    defaultTo: [params.email],
   });
-  await sendMail({ to: params.email, subject: "Welcome to drift.li — your creator space is ready", html });
 }
 
 /** Tell the client a creator signed up (goes to ADMIN_EMAILS). */
@@ -287,19 +373,17 @@ export async function sendCreatorSignupNoticeEmail(params: {
   organizationId: string;
   converted: boolean;
 }): Promise<void> {
-  if (!mailConfigured() || !ADMIN_EMAILS.length) return;
-  const html = renderEmail({
-    heading: "New creator signup",
-    intro: "Someone just created a creator space on drift.li.",
+  const profileNote = params.converted ? "new signup (converted in place)" : "added to an existing login";
+  await sendTemplated("creator.signup.notice", {
+    vars: { email: params.email, name: params.name || "", organizationId: params.organizationId, profileNote },
+    defaultTo: ADMIN_EMAILS,
     rows: [
       ["Email", params.email],
       ["Name", params.name || "—"],
       ["Org", params.organizationId],
-      ["Profile", params.converted ? "new signup (converted in place)" : "added to an existing login"],
+      ["Profile", profileNote],
     ],
-    footnote: "Creator-suite notification for the drift.li team.",
   });
-  await sendMail({ to: ADMIN_EMAILS, subject: `New creator: ${params.email}`, html });
 }
 
 /** Tell the client a creator started a flow. */
@@ -309,18 +393,21 @@ export async function sendFlowCreatedNoticeEmail(params: {
   flowName: string;
   kind?: string | null;
 }): Promise<void> {
-  if (!mailConfigured() || !ADMIN_EMAILS.length) return;
   const noun = kindNoun(params.kind);
-  const html = renderEmail({
-    heading: `New ${noun} started`,
-    intro: `${params.creatorName || params.creatorEmail} created a ${noun} called "${params.flowName}".`,
+  await sendTemplated("flow.created.notice", {
+    vars: {
+      creatorLabel: creatorLabel(params.creatorEmail, params.creatorName),
+      creatorEmail: params.creatorEmail,
+      creatorName: params.creatorName || "",
+      flowName: params.flowName,
+      kind: noun,
+    },
+    defaultTo: ADMIN_EMAILS,
     rows: [
-      ["Creator", `${params.creatorName ? `${params.creatorName} · ` : ""}${params.creatorEmail}`],
+      ["Creator", creatorLabel(params.creatorEmail, params.creatorName)],
       ["Kind", noun],
     ],
-    footnote: "Creator-suite notification for the drift.li team.",
   });
-  await sendMail({ to: ADMIN_EMAILS, subject: `New ${noun}: ${params.flowName}`, html });
 }
 
 /** A flow went live: congratulate the creator with the link, notify the client. */
@@ -332,33 +419,28 @@ export async function sendFlowPublishedEmails(params: {
   publicPath: string;
   steps: number;
 }): Promise<void> {
-  if (!mailConfigured()) return;
   const noun = kindNoun(params.kind);
   const url = `${APP_URL}${params.publicPath}`;
-  const creatorHtml = renderEmail({
-    heading: `Your ${noun} is live`,
-    intro: `"${params.flowName}" is published with ${params.steps} ${params.steps === 1 ? "stop" : "stops"}. Share the link anywhere — it opens straight into the first stop, and every button carries people along the path.`,
-    rows: [["Link", url]],
-    ctaLabel: `Open your ${noun}`,
-    ctaUrl: url,
-    footnote: "Want more stops, more tours or longer clips? Reply to this email and we'll set you up.",
+  const common = {
+    creatorLabel: creatorLabel(params.creatorEmail, params.creatorName),
+    creatorEmail: params.creatorEmail,
+    creatorName: params.creatorName || "",
+    flowName: params.flowName,
+    kind: noun,
+    url,
+    steps: String(params.steps),
+    stepsLabel: params.steps === 1 ? "stop" : "stops",
+  };
+  await sendTemplated("flow.published.creator", { vars: common, defaultTo: [params.creatorEmail], rows: [["Link", url]] });
+  await sendTemplated("flow.published.notice", {
+    vars: common,
+    defaultTo: ADMIN_EMAILS,
+    rows: [
+      ["Creator", params.creatorEmail],
+      ["Stops", String(params.steps)],
+      ["Link", url],
+    ],
   });
-  await sendMail({ to: params.creatorEmail, subject: `Your ${noun} "${params.flowName}" is live`, html: creatorHtml });
-  if (ADMIN_EMAILS.length) {
-    const noticeHtml = renderEmail({
-      heading: `${noun[0].toUpperCase()}${noun.slice(1)} published`,
-      intro: `${params.creatorName || params.creatorEmail} published "${params.flowName}".`,
-      rows: [
-        ["Creator", params.creatorEmail],
-        ["Stops", String(params.steps)],
-        ["Link", url],
-      ],
-      ctaLabel: "Open it",
-      ctaUrl: url,
-      footnote: "Creator-suite notification for the drift.li team.",
-    });
-    await sendMail({ to: ADMIN_EMAILS, subject: `Published: ${params.flowName}`, html: noticeHtml });
-  }
 }
 
 // Nudge at most once a week per creator (in-memory; resets on restart — it's a nudge).
@@ -377,13 +459,8 @@ export async function sendUpgradeNudgeEmail(params: {
   const last = upgradeNudgeSentAt.get(key) || 0;
   if (Date.now() - last < UPGRADE_NUDGE_INTERVAL_MS) return;
   upgradeNudgeSentAt.set(key, Date.now());
-  const noun = kindNoun(params.kind);
-  const html = renderEmail({
-    heading: "Want to build more?",
-    intro: `Hi${params.name ? ` ${params.name}` : ""}, you've reached the free plan's limit (${params.limit}). Paid plans unlock more ${noun}s, more stops per ${noun} and longer clips — and early creators get first access.`,
-    ctaLabel: "Tell us what you need",
-    ctaUrl: "mailto:web@drift.li?subject=Upgrade%20my%20drift.li%20plan",
-    footnote: "You'll get this at most once a week.",
+  await sendTemplated("creator.upgrade.nudge", {
+    vars: { name: params.name || "there", kind: kindNoun(params.kind), limit: params.limit },
+    defaultTo: [params.email],
   });
-  await sendMail({ to: params.email, subject: "Ready for more than one tour?", html });
 }
