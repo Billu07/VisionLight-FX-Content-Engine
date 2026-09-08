@@ -417,6 +417,17 @@ export default function SpinViewer({
       if (helperPhase === 0) { hideHand(); helperPhase = 1; }
       else if (helperPhase === 2) { hideHand(); helperPhase = 3; }
     };
+    // A drift swapped in place (tour stop → next stop) inherits the previous drift's
+    // chrome as the DOM left it: the helper flipped to "back" (the viewer tapped
+    // Next AT the end), its reverse text, the end headline showing, the hand hidden.
+    // The `let` state above is fresh, so nothing re-syncs until the next end/start
+    // crossing — the arrow pointed the wrong way until you'd scrubbed once. Put the
+    // DOM back to the start state now (the hint is still hidden by r3d-hint-init).
+    if (driftMode) {
+      syncHelper();
+      setHeadState(false);
+      showHand();
+    }
     let dirty = true, lastYaw = NaN, lastZoom = NaN, lastPX = 0, lastPY = 0;
     let touchZoomed = false;
     let scrimHidden = false;
