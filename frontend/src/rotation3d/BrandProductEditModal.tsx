@@ -22,6 +22,7 @@ type EditProduct = {
   defaultFrame?: number;
   loopEnabled?: boolean;
   driftDirection?: string;
+  ctaPlacement?: string;
   background?: string | null;
   hideLogo?: boolean;
   hideName?: boolean;
@@ -73,6 +74,7 @@ export default function BrandProductEditModal({
   const [publish, setPublish] = useState(product.status === "PUBLISHED");
   const [loopEnabled, setLoopEnabled] = useState(product.loopEnabled ?? true);
   const [driftDirection, setDriftDirection] = useState(product.driftDirection || "LTR");
+  const [ctaPlacement, setCtaPlacement] = useState(product.ctaPlacement || "CENTER");
   const [background, setBackground] = useState(product.background || "transparent");
   const [hideLogo, setHideLogo] = useState(product.hideLogo ?? false);
   const [hideName, setHideName] = useState(product.hideName ?? false);
@@ -105,6 +107,7 @@ export default function BrandProductEditModal({
     if (showLoop) {
       data.loopEnabled = loopEnabled;
       data.driftDirection = driftDirection;
+      data.ctaPlacement = ctaPlacement;
       data.titleEnd = titleEnd.trim() || null;
       data.descriptionEnd = descriptionEnd.trim() || null;
       data.helperStart = helperStart.trim() || null;
@@ -383,6 +386,24 @@ export default function BrandProductEditModal({
                   <option value="RTL">Right → left</option>
                   <option value="TTB">Top → bottom</option>
                   <option value="BTT">Bottom → top</option>
+                </select>
+              </label>
+            )}
+            {showLoop && (
+              <label className="d-muted flex items-center gap-2 text-xs">
+                Buttons
+                <select
+                  className="d-select"
+                  style={{ width: "auto" }}
+                  value={ctaPlacement}
+                  onChange={(e) => setCtaPlacement(e.target.value)}
+                  title="Where the two buttons sit in the player"
+                >
+                  <option value="CENTER">Centre (side by side)</option>
+                  <option value="LEFT">Bottom left</option>
+                  <option value="RIGHT">Bottom right</option>
+                  <option value="SPLIT">Spread — Next on the right</option>
+                  <option value="SPLIT_REV">Spread — Next on the left</option>
                 </select>
               </label>
             )}

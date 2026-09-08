@@ -108,6 +108,14 @@ export const parseDirection = (v: unknown): string | null => {
   return DRIFT_DIRECTIONS.has(s) ? s : null;
 };
 
+// Where the CTA row sits in the player (per drift). SPLIT = one button at each
+// edge with the primary (Next) on the right; SPLIT_REV puts it on the left.
+const CTA_PLACEMENTS = new Set(["CENTER", "LEFT", "RIGHT", "SPLIT", "SPLIT_REV"]);
+export const parseCtaPlacement = (v: unknown): string | null => {
+  const s = String(v ?? "").trim().toUpperCase();
+  return CTA_PLACEMENTS.has(s) ? s : null;
+};
+
 const cta = (v: unknown) => {
   if (!v || typeof v !== "object") return undefined;
   const o = v as any;
@@ -730,6 +738,10 @@ async function applyProductPatch(
     const d = parseDirection(body.driftDirection);
     if (d) data.driftDirection = d;
   }
+  if ("ctaPlacement" in body) {
+    const p = parseCtaPlacement(body.ctaPlacement);
+    if (p) data.ctaPlacement = p;
+  }
   if (typeof body.hideLogo === "boolean") data.hideLogo = body.hideLogo;
   if (typeof body.hideName === "boolean") data.hideName = body.hideName;
   if (typeof body.hideTitle === "boolean") data.hideTitle = body.hideTitle;
@@ -954,6 +966,7 @@ const publicProductPayload = async (p: any, bc: any, orgName: string, captions: 
   defaultFrame: p.defaultFrame,
   loopEnabled: p.loopEnabled,
   driftDirection: p.driftDirection || "LTR",
+  ctaPlacement: p.ctaPlacement || "CENTER",
   hideLogo: p.hideLogo,
   hideName: p.hideName,
   hideTitle: p.hideTitle,
@@ -1901,7 +1914,7 @@ async function resolveLandingItem(item: {
       itemId: item.id, source: "ROTATION3D", id: p.id, name: p.name,
       title: p.title, titleEnd: null, description: p.description,
       brandName: p.organization?.name || "", defaultFrame: p.defaultFrame,
-      background: p.background, loopEnabled: true, driftDirection: "LTR", manifest: m, secondManifest: null,
+      background: p.background, loopEnabled: true, driftDirection: "LTR", ctaPlacement: "CENTER", manifest: m, secondManifest: null,
       rank: item.rank, isHero: item.isHero, thumb: landingThumb(m, p.defaultFrame),
     };
   }
@@ -1919,7 +1932,7 @@ async function resolveLandingItem(item: {
     title: p.title, titleEnd: p.titleEnd, description: p.description,
     descriptionEnd: p.descriptionEnd, helperStart: p.helperStart, helperEnd: p.helperEnd,
     brandName: p.organization?.name || "", defaultFrame: p.defaultFrame,
-    background: p.background, loopEnabled: p.loopEnabled, driftDirection: p.driftDirection || "LTR", manifest: m,
+    background: p.background, loopEnabled: p.loopEnabled, driftDirection: p.driftDirection || "LTR", ctaPlacement: p.ctaPlacement || "CENTER", manifest: m,
     secondManifest: p.spin.secondManifest ?? null,
     rank: item.rank, isHero: item.isHero, thumb: p.thumbnailUrl || landingThumb(m, p.defaultFrame),
   };

@@ -51,6 +51,9 @@ export type SpinViewerProps = {
   brandName?: string;
   ctaPrimary?: SpinCta;
   ctaSecondary?: SpinCta;
+  /** Where the CTA row sits: CENTER (default pair), LEFT/RIGHT corner, SPLIT (one at
+   * each edge, primary on the right), SPLIT_REV (primary on the left). */
+  ctaPlacement?: "CENTER" | "LEFT" | "RIGHT" | "SPLIT" | "SPLIT_REV";
   /** lead-forms a CTA may open (keyed by id), + the product id for lead source */
   forms?: Record<string, OverlayForm>;
   productId?: string;
@@ -181,6 +184,7 @@ export default function SpinViewer({
   brandName = "Rotation3D",
   ctaPrimary,
   ctaSecondary,
+  ctaPlacement = "CENTER",
   forms,
   productId,
   onCtaClick,
@@ -1607,7 +1611,7 @@ export default function SpinViewer({
       )}
 
       {(ctaPrimary || ctaSecondary) && (
-        <div className="r3d-ctas" ref={ctasRef}>
+        <div className={`r3d-ctas ${ctaPlacement !== "CENTER" ? `r3d-ctas-${ctaPlacement.toLowerCase()}` : ""}`} ref={ctasRef}>
           {ctaPrimary && (
             <button className="r3d-cta r3d-primary" onClick={() => fireCta("primary", ctaPrimary)}>
               {ctaPrimary.label}
@@ -1774,6 +1778,16 @@ const R3D_CSS = `
 .r3d-ghost{background:var(--r3d-glass);backdrop-filter:blur(10px)}
 .r3d-ghost:hover{background:var(--r3d-glass2)}
 .r3d-cta:active{transform:translateY(1px)}
+/* Button placement (per drift). CENTER = the centred pair; LEFT/RIGHT hug that
+   corner; SPLIT spreads the two to both edges with the primary (Next) on the
+   right (DOM order is primary, secondary → reverse the row); SPLIT_REV keeps the
+   primary on the left. Buttons hug their text instead of stretching. */
+.r3d-drift .r3d-ctas.r3d-ctas-left,.r3d-drift .r3d-ctas.r3d-ctas-right,.r3d-drift .r3d-ctas.r3d-ctas-split,.r3d-drift .r3d-ctas.r3d-ctas-split_rev{max-width:none;margin:0}
+.r3d-drift .r3d-ctas.r3d-ctas-left{justify-content:flex-start}
+.r3d-drift .r3d-ctas.r3d-ctas-right{justify-content:flex-end}
+.r3d-drift .r3d-ctas.r3d-ctas-split{justify-content:space-between;flex-direction:row-reverse}
+.r3d-drift .r3d-ctas.r3d-ctas-split_rev{justify-content:space-between}
+.r3d-drift .r3d-ctas.r3d-ctas-left .r3d-cta,.r3d-drift .r3d-ctas.r3d-ctas-right .r3d-cta,.r3d-drift .r3d-ctas.r3d-ctas-split .r3d-cta,.r3d-drift .r3d-ctas.r3d-ctas-split_rev .r3d-cta{flex:0 1 auto;min-width:132px;max-width:46%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* hint sits UNDER the product (lower third), not over it; the max() floor keeps
    it clear of the angle navigator (.r3d-rot at bottom:118px) on short viewports */
 .r3d-hint{position:absolute;left:50%;bottom:max(28%,200px);top:auto;transform:translateX(-50%);z-index:4;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;transition:opacity .5s}

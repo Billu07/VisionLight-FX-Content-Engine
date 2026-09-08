@@ -275,6 +275,7 @@ function HeroLanding({ product }: { product: any }) {
           productId={product.id}
           ctaPrimary={toCta(product.ctaPrimary)}
           ctaSecondary={toCta(product.ctaSecondary)}
+          ctaPlacement={product.ctaPlacement}
           showLogo={false}
           showName={false}
           showTitle={false}

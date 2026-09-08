@@ -315,6 +315,7 @@ export default function Rotation3DPlayer() {
       introHint={drift}
       ctaPrimary={toCta(p.ctaPrimary)}
       ctaSecondary={toCta(p.ctaSecondary)}
+      ctaPlacement={drift ? p.ctaPlacement : undefined}
       forms={drift ? p.forms : undefined}
       productId={p.id}
       instant={instant}

@@ -7,7 +7,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../services/database";
 import { authenticateToken, type AuthenticatedRequest } from "../middleware/auth";
 import { probeClipInfo } from "../services/rotation3d/pipeline";
-import { parseDirection, processClip, uniqueSlug } from "./drift";
+import { parseCtaPlacement, parseDirection, processClip, uniqueSlug } from "./drift";
 import { sendFlowCreatedNoticeEmail, sendFlowPublishedEmails, sendUpgradeNudgeEmail } from "../services/mail";
 import {
   CLIP_DURATION_TOLERANCE_S,
@@ -394,6 +394,7 @@ router.post(
         customCta: cta.cta,
         loopEnabled: String(req.body?.loopEnabled ?? "false") === "true",
         driftDirection: parseDirection(req.body?.driftDirection) || "LTR",
+        ctaPlacement: parseCtaPlacement(req.body?.ctaPlacement) || "CENTER",
         maxSteps: isSuperAdmin(req) ? null : quota.maxStepsPerFlow,
         kind,
       });
@@ -532,6 +533,11 @@ router.patch(
       const d = parseDirection(body.driftDirection);
       if (!d) return res.status(400).json({ error: "Direction must be LTR, RTL, TTB or BTT" });
       data.driftDirection = d;
+    }
+    if ("ctaPlacement" in body) {
+      const p = parseCtaPlacement(body.ctaPlacement);
+      if (!p) return res.status(400).json({ error: "Button placement must be CENTER, LEFT, RIGHT, SPLIT or SPLIT_REV" });
+      data.ctaPlacement = p;
     }
     let customCta: CreatorCta | null | undefined;
     if ("customCta" in body) {

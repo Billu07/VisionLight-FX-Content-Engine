@@ -15,6 +15,7 @@ export type StepProduct = {
   defaultFrame: number;
   loopEnabled: boolean;
   driftDirection: string;
+  ctaPlacement: string;
   frameCount: number;
   thumb: string | null;
   ctaPrimary: Cta | null;

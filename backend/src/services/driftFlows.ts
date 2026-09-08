@@ -294,6 +294,7 @@ const stepProductSelect = {
   defaultFrame: true,
   loopEnabled: true,
   driftDirection: true,
+  ctaPlacement: true,
   thumbnailUrl: true,
   ctaPrimary: true,
   ctaSecondary: true,
@@ -325,6 +326,7 @@ export function serializeStepProduct(p: any) {
     defaultFrame: (p.defaultFrame ?? 0) as number,
     loopEnabled: !!p.loopEnabled,
     driftDirection: (p.driftDirection || "LTR") as string,
+    ctaPlacement: (p.ctaPlacement || "CENTER") as string,
     frameCount: (p.spin?.frameCount ?? frames.length) as number,
     thumb: (p.thumbnailUrl || frames[p.defaultFrame] || frames[0] || null) as string | null,
     ctaPrimary: (p.ctaPrimary ?? null) as CreatorCta | null,
@@ -432,6 +434,8 @@ export async function createDriftStep(args: {
   loopEnabled: boolean;
   /** LTR | RTL | TTB | BTT — which way the clip pans */
   driftDirection: string;
+  /** CENTER | LEFT | RIGHT | SPLIT | SPLIT_REV — where the buttons sit */
+  ctaPlacement: string;
   /** plan limit (null = unlimited, e.g. superadmin) — enforced INSIDE the transaction */
   maxSteps: number | null;
   kind: FlowKind;
@@ -459,6 +463,7 @@ export async function createDriftStep(args: {
         status: "PROCESSING",
         loopEnabled: args.loopEnabled,
         driftDirection: args.driftDirection,
+        ctaPlacement: args.ctaPlacement,
         createdByUserId: args.userId,
       },
     });
