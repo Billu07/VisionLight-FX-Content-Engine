@@ -207,12 +207,13 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
 - `prisma db push` is manual on the VPS (no migrations). New Prisma fields break queries
   until pushed → run it right after `git pull`, BEFORE build/restart (see VPS operations).
 - Git pushes time out → background + verify.
-- **Legal pages are brand-aware**: `/terms` and `/privacy` render `pages/Terms.tsx` /
-  `Privacy.tsx` with `lib/legalBrand.ts` swapping the product name, contact mailbox and skin
-  (drift.li + brand custom domains → "Drift Link", web@drift.li; else PicDrift Studio). The
-  clauses are shared — edit them once. drift.li surfaces link to `/terms` `/privacy` (landing
-  footer, hero-takeover + player defaults, /tour/start fine print); a brand org can still
-  override with its own `termsUrl`/`privacyUrl`.
+- **Legal pages are per host**: on drift.li (and brand custom domains) `/terms` and `/privacy`
+  render `rotation3d/DriftLegal.tsx` — the published Drift Link agreement (Visionlight
+  Productions Inc., verbatim from picdrift.com/terms + /privacy, contact picdrift@picdrift.com);
+  everywhere else `pages/Terms.tsx` / `Privacy.tsx` keep the studio agreement. drift.li surfaces
+  link to `/terms` `/privacy` (landing footer, hero-takeover + player defaults, /tour/start fine
+  print). A brand org's `termsUrl`/`privacyUrl` override those defaults — the superadmin brand
+  "Drift Link Interactive" had them pointed at picdrift.com; set them to drift.li or clear them.
 - `cloudflare/` is gitignored (`git add -f`).
 - Sensitive files: a prior `ss1.jpeg` held Google AI Studio API keys — never echo such
   secrets; keep private. Passwords/keys live only in server env, never in code/chat.

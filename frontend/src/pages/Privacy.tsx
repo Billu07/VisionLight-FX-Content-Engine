@@ -1,10 +1,12 @@
 import { Link } from "react-router-dom";
-import { legalBrand } from "../lib/legalBrand";
+import { isDriftSite } from "../lib/branding";
+import { DriftPrivacy } from "../rotation3d/DriftLegal";
 
 export const Privacy = () => {
-  const b = legalBrand();
+  // drift.li (and brand custom domains) publish the Drift Link policy, not the studio's.
+  if (isDriftSite()) return <DriftPrivacy />;
   return (
-    <div className={`min-h-screen bg-gradient-to-br ${b.shell} font-sans`}>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 text-purple-50 font-sans">
       <div className="container mx-auto px-6 py-12 max-w-4xl">
         {/* Header */}
         <div className="mb-8">
@@ -17,7 +19,7 @@ export const Privacy = () => {
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
             Privacy Policy
           </h1>
-          <p className={b.muted}>Last Updated: Dec 7, 2025</p>
+          <p className="text-purple-300">Last Updated: Dec 7, 2025</p>
         </div>
 
         {/* Content Container */}
@@ -27,7 +29,7 @@ export const Privacy = () => {
               This Privacy Policy explains how{" "}
               <strong>Visionlight Production Inc.</strong> ("we," "us," "our")
               collects, uses, stores, and protects your information when you use
-              {b.engineLong}. By accessing or using
+              PicDrift Studio and the FX dashboard engine. By accessing or using
               our platform, you agree to the practices described in this policy.
             </p>
           </section>
@@ -43,10 +45,10 @@ export const Privacy = () => {
               <br />
               Email:{" "}
               <a
-                href={`mailto:${b.email}`}
+                href="mailto:picdrift@picdrift.com"
                 className="text-cyan-400 hover:underline"
               >
-                {b.email}
+                picdrift@picdrift.com
               </a>
             </p>
           </section>
@@ -57,10 +59,10 @@ export const Privacy = () => {
             </h2>
             <p className="mb-4">
               We collect information necessary to operate, secure, and improve
-              {b.product}.
+              PicDrift Studio.
             </p>
 
-            <h3 className={`text-xl font-semibold ${b.intro} mb-2`}>
+            <h3 className="text-xl font-semibold text-purple-200 mb-2">
               2.1 Information You Provide
             </h3>
             <ul className="list-disc pl-5 mb-4 space-y-2">
@@ -70,7 +72,7 @@ export const Privacy = () => {
               <li>Support inquiries or communication with our team</li>
             </ul>
 
-            <h3 className={`text-xl font-semibold ${b.intro} mb-2`}>
+            <h3 className="text-xl font-semibold text-purple-200 mb-2">
               2.2 Automatically Collected Information
             </h3>
             <ul className="list-disc pl-5 mb-4 space-y-2">
@@ -80,7 +82,7 @@ export const Privacy = () => {
               <li>Security-related metadata for fraud prevention</li>
             </ul>
 
-            <h3 className={`text-xl font-semibold ${b.intro} mb-2`}>
+            <h3 className="text-xl font-semibold text-purple-200 mb-2">
               2.3 AI Processing Data
             </h3>
             <p>
@@ -96,14 +98,14 @@ export const Privacy = () => {
               3. How We Use Your Information
             </h2>
             <ul className="list-disc pl-5 space-y-2">
-              <li>Operate and maintain {b.product}</li>
+              <li>Operate and maintain PicDrift Studio</li>
               <li>Process FX credit transactions</li>
               <li>Improve platform features and performance</li>
               <li>Prevent fraud, abuse, and API-related attacks</li>
               <li>Provide support and respond to inquiries</li>
               <li>Comply with legal obligations</li>
             </ul>
-            <p className={`mt-4 font-semibold ${b.intro}`}>
+            <p className="mt-4 font-semibold text-purple-200">
               We do not use your creative assets for training or improving AI
               models.
             </p>
@@ -176,7 +178,7 @@ export const Privacy = () => {
             <h2 className="text-2xl font-bold text-white mb-4">
               7. Cookies & Tracking Technologies
             </h2>
-            <p className="mb-2">{b.product} may use:</p>
+            <p className="mb-2">PicDrift Studio may use:</p>
             <ul className="list-disc pl-5 space-y-2 mb-4">
               <li>Essential cookies for login and account security</li>
               <li>Performance cookies to improve platform stability</li>
@@ -193,14 +195,14 @@ export const Privacy = () => {
               8. Children’s Privacy (COPPA Compliance)
             </h2>
             <p>
-              {b.product} is not intended for children under 13. We do not
+              PicDrift Studio is not intended for children under 13. We do not
               knowingly collect personal data from children. If a parent
               believes a child has created an account, contact us at{" "}
               <a
-                href={`mailto:${b.email}`}
+                href="mailto:picdrift@picdrift.com"
                 className="text-cyan-400 hover:underline"
               >
-                {b.email}
+                picdrift@picdrift.com
               </a>{" "}
               so we can remove the data.
             </p>
@@ -211,7 +213,7 @@ export const Privacy = () => {
               9. Your Rights
             </h2>
 
-            <h3 className={`text-xl font-semibold ${b.intro} mb-2`}>
+            <h3 className="text-xl font-semibold text-purple-200 mb-2">
               9.1 GDPR (EU Users)
             </h3>
             <ul className="list-disc pl-5 mb-4 space-y-2">
@@ -222,7 +224,7 @@ export const Privacy = () => {
               <li>File a complaint with your local data authority</li>
             </ul>
 
-            <h3 className={`text-xl font-semibold ${b.intro} mb-2`}>
+            <h3 className="text-xl font-semibold text-purple-200 mb-2">
               9.2 General Rights for All Users
             </h3>
             <ul className="list-disc pl-5 mb-4 space-y-2">
@@ -233,10 +235,10 @@ export const Privacy = () => {
             <p>
               To make a request, contact:{" "}
               <a
-                href={`mailto:${b.email}`}
+                href="mailto:picdrift@picdrift.com"
                 className="text-cyan-400 hover:underline"
               >
-                {b.email}
+                picdrift@picdrift.com
               </a>
             </p>
           </section>
@@ -280,10 +282,10 @@ export const Privacy = () => {
             <p>
               For privacy-related questions or concerns, contact:{" "}
               <a
-                href={`mailto:${b.email}`}
+                href="mailto:picdrift@picdrift.com"
                 className="text-cyan-400 hover:underline"
               >
-                {b.email}
+                picdrift@picdrift.com
               </a>
             </p>
           </section>
@@ -293,15 +295,15 @@ export const Privacy = () => {
               14. Acceptance
             </h2>
             <p>
-              By using {b.product}, you acknowledge that you have read and
+              By using PicDrift Studio, you acknowledge that you have read and
               agree to this Privacy Policy.
             </p>
           </section>
         </div>
 
         {/* Footer */}
-        <div className={`mt-8 text-center ${b.muted} text-sm`}>
-          © 2026 {b.product}. All rights reserved.
+        <div className="mt-8 text-center text-purple-400 text-sm">
+          © 2026 PicDrift Studio. All rights reserved.
         </div>
       </div>
     </div>
