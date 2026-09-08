@@ -112,7 +112,11 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
   nearest neighbor.
 - **Logging**: plain `console.log/warn/error`, namespaced `[ns]` (e.g. `[drift]`, `[mail]`).
 - **Prisma**: `import { prisma } from "../services/database"`.
-- **Drift admin UI**: reuse `driftUiTheme.tsx` + scoped `.d-*` classes (light/dark tokens).
+- **Drift admin UI**: reuse `driftUiTheme.tsx` + scoped `.d-*` classes (light/dark tokens). The whole
+  superadmin **drift.li tab** (`DriftAdminPanel`, `DriftMailSettings`, the embedded `DriftBrandDashboard`)
+  is on it since 2026-09-08 — root `drift-ui d-embed`, one `ThemeToggle` (hooks sync via a window
+  event). Design brief: studio-clean, **no gradients**, flat light mode; every button row is a wrapping
+  `d-actions`, lists use `d-split` master–detail (detail-only on phones with `d-mobile-back`).
 - **Commit attribution** (this account): end commits with
   `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>` + the `Claude-Session:` line.
   Only commit/push when asked; branch off `main` if the user hasn't said to push to it.

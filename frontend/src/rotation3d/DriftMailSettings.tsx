@@ -3,10 +3,11 @@ import { apiEndpoints } from "../lib/api";
 import { notify } from "../lib/notifications";
 
 /**
- * Superadmin "Emails" panel (Drift admin tab). Every transactional email the
+ * Superadmin "Emails" panel (drift.li tab). Every transactional email the
  * platform sends is a template: rewrite the copy, change who receives it, switch
  * it off, preview with sample data, and send yourself a test — no deploy needed.
  * Empty fields fall back to the code defaults shown as placeholders.
+ * Renders inside the drift.li console's .drift-ui root (themed light/dark).
  */
 
 type TemplateVar = { name: string; description: string; sample: string; html?: boolean };
@@ -40,14 +41,6 @@ const FIELD_META: { key: keyof Fields; label: string; hint: string; multiline?: 
   { key: "footnote", label: "Footnote", hint: "Small print at the bottom." },
 ];
 
-const card = "rounded-2xl border border-white/10 bg-gray-900/60 p-5";
-const input =
-  "w-full rounded-lg border border-gray-700 bg-gray-950/60 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-cyan-400/60 focus:outline-none";
-const label = "mb-1 block text-[10px] font-bold uppercase tracking-[0.14em] text-gray-400";
-const btn = "rounded-lg px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] transition-colors";
-const btnPrimary = `${btn} bg-cyan-400 text-gray-950 hover:bg-cyan-300 disabled:opacity-40`;
-const btnGhost = `${btn} border border-gray-700 text-gray-300 hover:text-white disabled:opacity-40`;
-
 const draftFrom = (t: Template): Draft => ({
   subject: t.override?.subject ?? "",
   heading: t.override?.heading ?? "",
@@ -75,6 +68,8 @@ export default function DriftMailSettings() {
   const [testing, setTesting] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [testTo, setTestTo] = useState("");
+  // Phones: the list and the editor take turns (pick → editor, back → list).
+  const [mobileEditing, setMobileEditing] = useState(false);
 
   const selected = useMemo(() => templates.find((t) => t.key === selectedKey) || null, [templates, selectedKey]);
 
@@ -104,6 +99,7 @@ export default function DriftMailSettings() {
     setSelectedKey(t.key);
     setDraft(draftFrom(t));
     setPreview(null);
+    setMobileEditing(true);
   };
 
   const draftPayload = (d: Draft) => ({
@@ -189,17 +185,17 @@ export default function DriftMailSettings() {
   };
 
   if (loading && templates.length === 0) {
-    return <div className="text-sm text-gray-400">Loading email settings…</div>;
+    return (
+      <div className="d-sub" style={{ padding: "24px 0" }}>
+        Loading email settings…
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="d-rise" style={{ display: "grid", gap: 14, minWidth: 0 }}>
       {meta && (
-        <div
-          className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
-            meta.configured ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-100" : "border-amber-400/20 bg-amber-500/10 text-amber-100"
-          }`}
-        >
+        <div className={`d-banner ${meta.configured ? "ok" : "warn"}`} style={{ flexWrap: "wrap" }}>
           <span>
             {meta.configured ? (
               <>
@@ -209,73 +205,84 @@ export default function DriftMailSettings() {
               "SMTP isn't configured on the server yet — templates are saved, but nothing is sent until SMTP_* env is set."
             )}
           </span>
-          <span className="text-xs opacity-80">
+          <span style={{ fontSize: 12, opacity: 0.85 }}>
             Team notices go to: {meta.adminEmails.length ? meta.adminEmails.join(", ") : "ADMIN_EMAILS (not set)"}
           </span>
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+      <div className={`d-split ${mobileEditing && selected ? "has-detail" : ""}`}>
         {/* Template list */}
-        <div className={card}>
-          <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Emails</h2>
-          <p className="mt-1 text-xs text-gray-400">Pick an email to edit its copy, recipients, or switch it off.</p>
-          <div className="mt-4 space-y-2">
-            {templates.map((t) => {
-              const off = t.override?.enabled === false;
-              const custom = !!t.override && Object.entries(t.override).some(([k, v]) => k !== "enabled" && k !== "updatedAt" && k !== "toMode" && v !== null && v !== undefined && v !== "");
-              return (
-                <button
-                  key={t.key}
-                  onClick={() => select(t)}
-                  className={`w-full rounded-xl border px-3 py-2.5 text-left transition-colors ${
-                    t.key === selectedKey ? "border-cyan-400/40 bg-cyan-400/10" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-white">{t.name}</span>
-                    <span className="flex gap-1">
-                      {off && <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-rose-200">Off</span>}
-                      {!off && (custom || t.override?.toMode !== undefined && t.override?.toMode !== "DEFAULT") && (
-                        <span className="rounded-full bg-cyan-400/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-cyan-200">Edited</span>
-                      )}
+        <aside className="d-split-side">
+          <div className="d-card d-card-pad">
+            <div className="d-h2">Emails</div>
+            <p className="d-sub" style={{ fontSize: 12.5 }}>
+              Pick an email to edit its copy, recipients, or switch it off.
+            </p>
+            <div className="d-list" style={{ marginTop: 12 }}>
+              {templates.map((t) => {
+                const off = t.override?.enabled === false;
+                const custom =
+                  !!t.override &&
+                  Object.entries(t.override).some(
+                    ([k, v]) => k !== "enabled" && k !== "updatedAt" && k !== "toMode" && v !== null && v !== undefined && v !== "",
+                  );
+                const edited = !off && (custom || (t.override?.toMode !== undefined && t.override?.toMode !== "DEFAULT"));
+                return (
+                  <button key={t.key} onClick={() => select(t)} className={`d-item ${t.key === selectedKey ? "active" : ""}`}>
+                    <span className="grow">
+                      <span className="d-name" style={{ display: "block", fontSize: 13.5 }}>
+                        {t.name}
+                      </span>
+                      <span className="sub">{t.trigger}</span>
                     </span>
-                  </div>
-                  <div className="mt-0.5 text-[11px] text-gray-400">{t.trigger}</div>
-                </button>
-              );
-            })}
+                    {off && <span className="d-pill err">Off</span>}
+                    {edited && <span className="d-pill accent">Edited</span>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        </aside>
 
         {/* Editor */}
         {selected && draft ? (
-          <div className="space-y-4">
-            <div className={card}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
+          <div style={{ display: "grid", gap: 12, minWidth: 0 }}>
+            <button className="d-btn ghost sm d-mobile-back" style={{ marginBottom: 0, justifySelf: "start" }} onClick={() => setMobileEditing(false)}>
+              ← All emails
+            </button>
+            <div className="d-card d-card-pad">
+              <div className="d-head" style={{ alignItems: "flex-start" }}>
                 <div>
-                  <h3 className="text-base font-bold text-white">{selected.name}</h3>
-                  <p className="mt-1 text-xs text-gray-400">{selected.description}</p>
-                  <p className="mt-1 text-[11px] text-gray-500">
+                  <div className="d-h1" style={{ fontSize: 17 }}>
+                    {selected.name}
+                  </div>
+                  <p className="d-sub" style={{ marginTop: 4 }}>
+                    {selected.description}
+                  </p>
+                  <p className="d-note" style={{ marginTop: 4 }}>
                     Sent when: {selected.trigger}. Default recipients: {selected.audience}.
                   </p>
                 </div>
-                <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-gray-300">
+                <label className="d-check" style={{ fontWeight: 650 }}>
                   <input type="checkbox" checked={draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} />
                   {draft.enabled ? "Sending is on" : "Switched off"}
                 </label>
               </div>
 
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="d-grid-2" style={{ marginTop: 16, gap: 14 }}>
                 {FIELD_META.map((f) => (
-                  <div key={f.key} className={f.multiline ? "md:col-span-2" : ""}>
-                    <label className={label}>
+                  <div key={f.key} className={f.multiline ? "sm:col-span-2" : ""} style={{ minWidth: 0 }}>
+                    <label className="d-label">
                       {f.label}
-                      {draft[f.key] ? <span className="ml-2 text-cyan-300/80">edited</span> : <span className="ml-2 text-gray-600">default</span>}
+                      <span style={{ marginLeft: 8, textTransform: "none", letterSpacing: 0, color: draft[f.key] ? "var(--accent)" : "var(--faint)" }}>
+                        {draft[f.key] ? "edited" : "default"}
+                      </span>
                     </label>
                     {f.multiline ? (
                       <textarea
-                        className={`${input} ${f.mono ? "font-mono text-xs" : ""}`}
+                        className="d-textarea"
+                        style={f.mono ? { fontFamily: "ui-monospace, Menlo, monospace", fontSize: 12.5 } : undefined}
                         rows={f.mono ? 6 : 3}
                         value={draft[f.key]}
                         placeholder={selected.defaults[f.key] || "(empty)"}
@@ -283,28 +290,24 @@ export default function DriftMailSettings() {
                       />
                     ) : (
                       <input
-                        className={input}
+                        className="d-input"
                         value={draft[f.key]}
                         placeholder={selected.defaults[f.key] || "(empty)"}
                         onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
                       />
                     )}
-                    <div className="mt-1 text-[11px] text-gray-500">{f.hint} Clear the field to use the default.</div>
+                    <div className="d-note" style={{ marginTop: 5 }}>
+                      {f.hint} Clear the field to use the default.
+                    </div>
                   </div>
                 ))}
               </div>
 
-              <div className="mt-4">
-                <div className={label}>Variables — click to copy</div>
-                <div className="flex flex-wrap gap-1.5">
+              <div style={{ marginTop: 16 }}>
+                <div className="d-label">Variables — click to copy</div>
+                <div className="d-actions" style={{ gap: 6 }}>
                   {selected.vars.map((v) => (
-                    <button
-                      key={v.name}
-                      type="button"
-                      onClick={() => copyVar(v.name, v.html)}
-                      title={`${v.description} · e.g. "${v.sample}"`}
-                      className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 font-mono text-[11px] text-cyan-200 hover:bg-white/[0.08]"
-                    >
+                    <button key={v.name} type="button" onClick={() => copyVar(v.name, v.html)} title={`${v.description} · e.g. "${v.sample}"`} className="d-code">
                       {v.html ? `{{{${v.name}}}}` : `{{${v.name}}}`}
                     </button>
                   ))}
@@ -312,22 +315,24 @@ export default function DriftMailSettings() {
               </div>
             </div>
 
-            <div className={card}>
-              <h4 className="text-xs font-bold uppercase tracking-[0.14em] text-white">Recipients</h4>
-              <div className="mt-3 grid gap-3 md:grid-cols-[220px_1fr]">
-                <div>
-                  <label className={label}>Send to</label>
-                  <select className={input} value={draft.toMode} onChange={(e) => setDraft({ ...draft, toMode: e.target.value as Draft["toMode"] })}>
+            <div className="d-card d-card-pad">
+              <div className="d-eyebrow">Recipients</div>
+              <div className="d-grid-2" style={{ marginTop: 12, gridTemplateColumns: undefined }}>
+                <div className="d-field">
+                  <label className="d-label">Send to</label>
+                  <select className="d-select" value={draft.toMode} onChange={(e) => setDraft({ ...draft, toMode: e.target.value as Draft["toMode"] })}>
                     <option value="DEFAULT">Default audience</option>
                     <option value="CUSTOM">Only these addresses</option>
                     <option value="BOTH">Default audience + these</option>
                   </select>
-                  <div className="mt-1 text-[11px] text-gray-500">Default: {selected.audience}.</div>
+                  <div className="d-note" style={{ marginTop: 5 }}>
+                    Default: {selected.audience}.
+                  </div>
                 </div>
-                <div>
-                  <label className={label}>Addresses</label>
+                <div className="d-field">
+                  <label className="d-label">Addresses</label>
                   <textarea
-                    className={input}
+                    className="d-textarea"
                     rows={2}
                     value={draft.toList}
                     disabled={draft.toMode === "DEFAULT"}
@@ -335,46 +340,60 @@ export default function DriftMailSettings() {
                     onChange={(e) => setDraft({ ...draft, toList: e.target.value })}
                   />
                 </div>
-                <div className="md:col-span-2">
-                  <label className={label}>BCC (always)</label>
-                  <input className={input} value={draft.bcc} placeholder="Optional — e.g. a shared inbox that keeps a copy" onChange={(e) => setDraft({ ...draft, bcc: e.target.value })} />
+                <div className="d-field sm:col-span-2">
+                  <label className="d-label">BCC (always)</label>
+                  <input
+                    className="d-input"
+                    value={draft.bcc}
+                    placeholder="Optional — e.g. a shared inbox that keeps a copy"
+                    onChange={(e) => setDraft({ ...draft, bcc: e.target.value })}
+                  />
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <button className={btnPrimary} onClick={save} disabled={saving || !dirty}>
-                {saving ? "Saving…" : "Save"}
-              </button>
-              <button className={btnGhost} onClick={doPreview} disabled={previewing}>
-                {previewing ? "Rendering…" : "Preview"}
-              </button>
-              <div className="flex items-center gap-2">
-                <input className={`${input} w-56`} value={testTo} placeholder="Test to (defaults to you)" onChange={(e) => setTestTo(e.target.value)} />
-                <button className={btnGhost} onClick={sendTest} disabled={testing || !meta?.configured} title={!meta?.configured ? "SMTP not configured" : undefined}>
+            <div className="d-card d-card-pad">
+              <div className="d-actions">
+                <button className="d-btn primary" onClick={save} disabled={saving || !dirty}>
+                  {saving ? "Saving…" : "Save"}
+                </button>
+                <button className="d-btn" onClick={doPreview} disabled={previewing}>
+                  {previewing ? "Rendering…" : "Preview"}
+                </button>
+                <input
+                  className="d-input"
+                  style={{ flex: "1 1 200px", maxWidth: 280 }}
+                  value={testTo}
+                  placeholder="Test to (defaults to you)"
+                  onChange={(e) => setTestTo(e.target.value)}
+                  inputMode="email"
+                />
+                <button className="d-btn" onClick={sendTest} disabled={testing || !meta?.configured} title={!meta?.configured ? "SMTP not configured" : undefined}>
                   {testing ? "Sending…" : "Send test"}
                 </button>
+                <span style={{ flex: "1 0 8px" }} />
+                <button className="d-btn danger sm" onClick={reset} disabled={saving || !selected.override}>
+                  Reset to defaults
+                </button>
               </div>
-              <span className="flex-1" />
-              <button className={`${btnGhost} text-rose-300`} onClick={reset} disabled={saving || !selected.override}>
-                Reset to defaults
-              </button>
             </div>
 
             {preview && (
-              <div className={card}>
-                <div className="mb-3 text-xs text-gray-400">
-                  Subject: <span className="text-white">{preview.subject}</span>
-                  <span className="ml-3 text-gray-600">rendered with sample values{dirty ? " and your unsaved edits" : ""}</span>
+              <div className="d-card d-card-pad">
+                <div className="d-sub" style={{ marginBottom: 10, fontSize: 12.5 }}>
+                  Subject: <strong style={{ color: "var(--text)" }}>{preview.subject}</strong>
+                  <span className="d-faint" style={{ marginLeft: 10 }}>
+                    rendered with sample values{dirty ? " and your unsaved edits" : ""}
+                  </span>
                 </div>
-                <div className="overflow-hidden rounded-xl border border-white/10 bg-white">
-                  <iframe title="Email preview" srcDoc={preview.html} className="h-[560px] w-full" sandbox="" />
+                <div style={{ overflow: "hidden", borderRadius: 14, border: "1px solid var(--border)", background: "#fff" }}>
+                  <iframe title="Email preview" srcDoc={preview.html} style={{ width: "100%", height: 560, border: 0, display: "block" }} sandbox="" />
                 </div>
               </div>
             )}
           </div>
         ) : (
-          <div className={`${card} text-sm text-gray-400`}>Select an email on the left.</div>
+          <div className="d-empty">Select an email to edit it.</div>
         )}
       </div>
     </div>

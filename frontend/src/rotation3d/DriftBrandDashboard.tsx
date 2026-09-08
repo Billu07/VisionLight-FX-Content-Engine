@@ -392,7 +392,6 @@ export default function DriftBrandDashboard({ adminOrgId }: { adminOrgId?: strin
                 ↻ Refresh
               </button>
             )}
-            {admin && <ThemeToggle theme={theme} onToggle={toggleTheme} />}
           </div>
         </div>
 

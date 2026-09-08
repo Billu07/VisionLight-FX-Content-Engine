@@ -5,16 +5,18 @@ import DriftCaptionEditor from "./DriftCaptionEditor";
 import BrandProductEditModal from "./BrandProductEditModal";
 import DriftBrandDashboard from "./DriftBrandDashboard";
 import DriftMailSettings from "./DriftMailSettings";
+import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "./driftUiTheme";
 
 /**
  * Team (SuperAdmin) console for Drift (drift.li) — lives inside
- * SuperAdminDashboard as the "drift" tab. A completely separate product line
+ * SuperAdminDashboard as the "drift.li" tab. A completely separate product line
  * from Rotation3D: its own DRIFT brand orgs, products, and player. Create a
  * brand, then upload the rendered clip per drift; the (shared) pipeline builds
  * it into a live interactive drift on drift.li.
  *
- * Lean v1: brands (create/delete) + clip upload/delete + landing showcase.
- * Drift extras (second clip, captions, source-image tools) come next.
+ * Built on the drift design system (driftUiTheme: .d-* classes, light/dark), the
+ * same one the brand dashboard it embeds uses — so the whole tab themes together
+ * and every row wraps cleanly on a phone.
  */
 
 type Brand = { id: string; name: string; isActive: boolean; _count?: { driftProducts: number } };
@@ -35,27 +37,8 @@ type Product = {
 
 const PLAYER_ORIGIN = "https://drift.li";
 
-const card = "rounded-xl border border-gray-700/60 bg-gray-900/60 p-5";
-const input =
-  "w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-brand-accent";
-const btn =
-  "rounded-lg border border-brand-accent/40 bg-brand-accent/15 px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-brand-accent transition-colors hover:bg-brand-accent/25 disabled:opacity-50";
-
-const statusColor = (s: string) =>
-  s === "PUBLISHED"
-    ? "text-emerald-300"
-    : s === "READY"
-      ? "text-cyan-300"
-      : s === "PROCESSING"
-        ? "text-amber-300"
-        : s === "FAILED"
-          ? "text-rose-300"
-          : "text-gray-400";
-
-const sourceBadge = (s: string) =>
-  s === "ROTATION3D"
-    ? "border-violet-400/40 bg-violet-500/15 text-violet-200"
-    : "border-brand-accent/40 bg-brand-accent/15 text-brand-accent";
+const statusPill = (s: string) =>
+  s === "PUBLISHED" ? "ok" : s === "READY" ? "accent" : s === "PROCESSING" ? "warn" : s === "FAILED" ? "err" : "";
 
 // drift.li landing curation — pick the showcase from BOTH Drift drifts and
 // Rotation3D spins (unified curation table), set the single hero.
@@ -70,10 +53,7 @@ function LandingPanel() {
   const load = async () => {
     setLoading(true);
     try {
-      const [a, b] = await Promise.all([
-        apiEndpoints.driftLandingList(),
-        apiEndpoints.driftLandingCandidates(),
-      ]);
+      const [a, b] = await Promise.all([apiEndpoints.driftLandingList(), apiEndpoints.driftLandingCandidates()]);
       setItems(a.data.items || []);
       setCands({ drift: b.data.drift || [], rotation3d: b.data.rotation3d || [] });
     } catch {
@@ -127,18 +107,19 @@ function LandingPanel() {
   );
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+    <div className="d-split reverse d-rise">
       {/* Curated landing */}
-      <div className={card}>
-        <div className="flex items-center justify-between">
+      <div className="d-card d-card-pad">
+        <div className="d-head">
           <div>
-            <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Landing showcase</h2>
-            <p className="mt-1 text-xs text-gray-400">
-              What appears on drift.li — {items.length} item(s){items.some((i) => i.isHero) ? ", 1 hero" : ""}.
+            <div className="d-h2">Landing showcase</div>
+            <p className="d-sub">
+              What appears on drift.li — {items.length} item{items.length === 1 ? "" : "s"}
+              {items.some((i) => i.isHero) ? ", 1 hero" : ""}.
             </p>
           </div>
-          <button className="text-xs text-gray-400 hover:text-white" onClick={load}>
-            ↻ refresh
+          <button className="d-btn ghost sm" onClick={load}>
+            ↻ Refresh
           </button>
         </div>
 
@@ -147,53 +128,30 @@ function LandingPanel() {
             <LoadingSpinner size="sm" />
           </div>
         ) : items.length === 0 ? (
-          <p className="py-10 text-center text-xs text-gray-500">
-            Nothing on the landing yet. Add drifts or Rotation3D spins from the right.
-          </p>
+          <div className="d-empty" style={{ marginTop: 14 }}>
+            Nothing on the landing yet. Add drifts or Rotation3D spins from the picker.
+          </div>
         ) : (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="d-grid-2" style={{ marginTop: 14 }}>
             {items.map((it) => (
-              <div
-                key={it.itemId}
-                className={`rounded-xl border p-3 ${
-                  it.isHero ? "border-amber-400/40 bg-amber-400/[0.06]" : "border-gray-700/60 bg-gray-950/50"
-                }`}
-              >
-                <div className="flex gap-3">
-                  <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/10 bg-gray-900">
-                    {it.thumb ? (
-                      <img src={it.thumb} alt="" className="h-full w-full object-contain" />
-                    ) : (
-                      <span className="text-[9px] text-gray-600">no preview</span>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-white">{it.name}</p>
-                    <p className="truncate text-[11px] text-gray-500">{it.brandName}</p>
-                    <span
-                      className={`mt-1 inline-block rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${sourceBadge(it.source)}`}
-                    >
+              <div key={it.itemId} className={`d-tile ${it.isHero ? "is-hero" : ""}`}>
+                <div className="d-tile-top">
+                  <div className="d-thumb lg">{it.thumb ? <img src={it.thumb} alt="" /> : <span>no preview</span>}</div>
+                  <div className="grow" style={{ minWidth: 0, flex: 1 }}>
+                    <div className="d-name">{it.name}</div>
+                    <div className="d-faint truncate" style={{ fontSize: 11.5 }}>
+                      {it.brandName}
+                    </div>
+                    <span className={`d-pill ${it.source === "ROTATION3D" ? "violet" : "accent"}`} style={{ marginTop: 6 }}>
                       {it.source === "ROTATION3D" ? "Rotation3D" : "Drift"}
                     </span>
                   </div>
                 </div>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => setHero(it)}
-                    disabled={busy === it.itemId}
-                    className={`rounded-lg py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${
-                      it.isHero
-                        ? "border border-amber-400/40 bg-amber-400/15 text-amber-200"
-                        : "border border-gray-700 text-gray-300 hover:bg-gray-800"
-                    }`}
-                  >
-                    {it.isHero ? "★ Hero" : "Hero"}
+                <div className="d-actions" style={{ marginTop: 10 }}>
+                  <button onClick={() => setHero(it)} disabled={busy === it.itemId} className={`d-btn sm ${it.isHero ? "warn" : ""}`}>
+                    {it.isHero ? "★ Hero" : "Make hero"}
                   </button>
-                  <button
-                    onClick={() => remove(it.itemId)}
-                    disabled={busy === it.itemId}
-                    className="rounded-lg border border-gray-700 py-1.5 text-[11px] font-bold uppercase tracking-widest text-gray-300 transition-colors hover:border-rose-500/40 hover:text-rose-300 disabled:opacity-50"
-                  >
+                  <button onClick={() => remove(it.itemId)} disabled={busy === it.itemId} className="d-btn sm ghost">
                     Remove
                   </button>
                 </div>
@@ -204,55 +162,39 @@ function LandingPanel() {
       </div>
 
       {/* Candidate picker */}
-      <div className={card}>
-        <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Add to landing</h2>
-        <p className="mt-1 text-xs text-gray-400">Pick from drifts or Rotation3D spins.</p>
-        <div className="mt-3 flex gap-2">
+      <div className="d-card d-card-pad">
+        <div className="d-h2">Add to landing</div>
+        <p className="d-sub">Pick from drifts or Rotation3D spins.</p>
+        <div className="d-tabs fill" style={{ marginTop: 12 }}>
           {(["DRIFT", "ROTATION3D"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`flex-1 rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors ${
-                tab === t ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"
-              }`}
-            >
+            <button key={t} onClick={() => setTab(t)} className={`d-tab ${tab === t ? "active" : ""}`}>
               {t === "DRIFT" ? "Drifts" : "Rotation3D"}
             </button>
           ))}
         </div>
-        <input
-          className={`${input} mt-3`}
-          placeholder="Search…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-        <div className="mt-3 max-h-[520px] space-y-2 overflow-y-auto pr-1">
+        <input className="d-input" style={{ marginTop: 10 }} placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="d-list d-scroll" style={{ marginTop: 10, maxHeight: 520 }}>
           {loading ? (
             <div className="py-6 text-center">
               <LoadingSpinner size="sm" />
             </div>
           ) : pool.length === 0 ? (
-            <p className="py-6 text-center text-[11px] text-gray-500">
+            <p className="d-faint py-6 text-center" style={{ fontSize: 12 }}>
               {ql ? "No matches." : "Nothing available to add."}
             </p>
           ) : (
             pool.map((c) => (
-              <div
-                key={`${c.source}:${c.id}`}
-                className="flex items-center gap-2 rounded-lg border border-gray-700/60 bg-gray-950/50 p-2"
-              >
-                <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-md border border-white/10 bg-gray-900">
-                  {c.thumb ? <img src={c.thumb} alt="" className="h-full w-full object-contain" /> : null}
+              <div key={`${c.source}:${c.id}`} className="d-item static">
+                <div className="d-thumb" style={{ width: 44 }}>
+                  {c.thumb ? <img src={c.thumb} alt="" /> : null}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-medium text-white">{c.name}</p>
-                  <p className="truncate text-[10px] text-gray-500">{c.brandName}</p>
-                </div>
-                <button
-                  onClick={() => add(c.source, c.id)}
-                  disabled={busy === c.source + c.id}
-                  className="shrink-0 rounded-md border border-brand-accent/40 bg-brand-accent/15 px-2.5 py-1 text-[11px] font-bold text-brand-accent hover:bg-brand-accent/25 disabled:opacity-50"
-                >
+                <span className="grow">
+                  <span className="d-name" style={{ fontSize: 13, display: "block" }}>
+                    {c.name}
+                  </span>
+                  <span className="sub">{c.brandName}</span>
+                </span>
+                <button onClick={() => add(c.source, c.id)} disabled={busy === c.source + c.id} className="d-btn soft sm">
                   + Add
                 </button>
               </div>
@@ -315,17 +257,17 @@ function SecondClipButton({
     }
   };
 
-  if (pct !== null) return <span className="text-[11px] text-amber-300">2nd {pct}%</span>;
+  if (pct !== null)
+    return (
+      <span className="d-pill warn" style={{ textTransform: "none", letterSpacing: 0 }}>
+        2nd clip {pct}%
+      </span>
+    );
   if (has) {
     return (
-      <span className="flex items-center gap-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-emerald-300">
-        2nd ✓
-        <button
-          onClick={remove}
-          disabled={removing}
-          title="Remove second clip"
-          className="leading-none text-emerald-300/70 hover:text-rose-300"
-        >
+      <span className="d-pill ok" style={{ textTransform: "none", letterSpacing: 0, paddingRight: 4 }}>
+        2nd clip ✓
+        <button onClick={remove} disabled={removing} title="Remove second clip" className="d-x" style={{ width: 20, height: 20, fontSize: 14 }}>
           ×
         </button>
       </span>
@@ -343,11 +285,7 @@ function SecondClipButton({
           if (f) void upload(f);
         }}
       />
-      <button
-        onClick={() => ref.current?.click()}
-        title="Link a second clip for a 2-clip loop"
-        className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
-      >
+      <button onClick={() => ref.current?.click()} title="Link a second clip for a 2-clip loop" className="d-btn sm">
         + 2nd clip
       </button>
     </>
@@ -355,9 +293,11 @@ function SecondClipButton({
 }
 
 export default function DriftAdminPanel() {
+  const [theme, toggleTheme] = useDriftTheme();
   const [mode, setMode] = useState<"brands" | "showcase" | "emails">("brands");
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loadingBrands, setLoadingBrands] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
   const [newBrand, setNewBrand] = useState("");
   const [newBrandEmail, setNewBrandEmail] = useState("");
   const [newBrandAdminName, setNewBrandAdminName] = useState("");
@@ -406,11 +346,12 @@ export default function DriftAdminPanel() {
     }
   };
 
+  const productLink = (p: Product) =>
+    brandSlug && p.slug ? `${PLAYER_ORIGIN}/${brandSlug}/${p.slug}` : `${PLAYER_ORIGIN}/p/${p.id}`;
+
   const copyProductLink = async (p: Product) => {
-    const link =
-      brandSlug && p.slug ? `${PLAYER_ORIGIN}/${brandSlug}/${p.slug}` : `${PLAYER_ORIGIN}/p/${p.id}`;
     try {
-      await navigator.clipboard.writeText(link);
+      await navigator.clipboard.writeText(productLink(p));
       setCopiedId(p.id);
       setTimeout(() => setCopiedId(null), 1500);
     } catch {
@@ -558,6 +499,7 @@ export default function DriftAdminPanel() {
       setNewBrand("");
       setNewBrandEmail("");
       setNewBrandAdminName("");
+      setShowCreate(false);
       await loadBrands();
       if (res.data.admin) {
         setCredential(res.data.admin);
@@ -612,457 +554,393 @@ export default function DriftAdminPanel() {
   const visibleBrands = bq ? brands.filter((b) => b.name.toLowerCase().includes(bq)) : brands;
   const pq = productQuery.trim().toLowerCase();
   const visibleProducts = products.filter(
-    (p) =>
-      (productStatus === "ALL" || p.status === productStatus) &&
-      (!pq || p.name.toLowerCase().includes(pq)),
+    (p) => (productStatus === "ALL" || p.status === productStatus) && (!pq || p.name.toLowerCase().includes(pq)),
   );
+  const isReady = (p: Product) => p.status === "READY" || p.status === "PUBLISHED";
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+    <div className="drift-ui d-embed d-rise" data-theme={theme}>
+      <DriftThemeStyles />
+
+      <div className="d-head" style={{ marginBottom: 16 }}>
+        <div className="d-tabs" role="tablist" aria-label="drift.li console">
+          {(["brands", "showcase", "emails"] as const).map((m) => (
+            <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={`d-tab ${mode === m ? "active" : ""}`}>
+              {m === "brands" ? "Brands" : m === "showcase" ? "Landing showcase" : "Emails"}
+            </button>
+          ))}
+        </div>
+        <ThemeToggle theme={theme} onToggle={toggleTheme} />
+      </div>
+
       {msg && (
-        <div
-          className={`flex items-center justify-between rounded-xl border p-4 text-sm font-semibold ${
-            msg.kind === "ok"
-              ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
-              : "border-rose-400/20 bg-rose-500/10 text-rose-200"
-          }`}
-        >
-          {msg.text}
-          <button onClick={() => setMsg(null)} className="text-lg">
+        <div className={`d-banner ${msg.kind === "ok" ? "ok" : "err"}`} style={{ marginBottom: 16 }}>
+          <span>{msg.text}</span>
+          <button onClick={() => setMsg(null)} className="d-x" aria-label="Dismiss">
             ×
           </button>
         </div>
       )}
-
-      <div className="flex gap-2">
-        {(["brands", "showcase", "emails"] as const).map((m) => (
-          <button
-            key={m}
-            onClick={() => setMode(m)}
-            className={`rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] transition-colors ${
-              mode === m ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"
-            }`}
-          >
-            {m === "brands" ? "Brands" : m === "showcase" ? "Landing showcase" : "Emails"}
-          </button>
-        ))}
-      </div>
 
       {mode === "emails" ? (
         <DriftMailSettings />
       ) : mode === "showcase" ? (
         <LandingPanel />
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+        <div className={`d-split ${selected ? "has-detail" : ""}`}>
           {/* Brands column */}
-          <div className={card}>
-            <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Brands</h2>
-            <p className="mt-1 text-xs text-gray-400">Each brand is a managed Drift org (drift.li).</p>
+          <aside className="d-split-side">
+            <div className="d-card d-card-pad">
+              <div className="d-head">
+                <div>
+                  <div className="d-h2">Brands</div>
+                  <p className="d-sub" style={{ fontSize: 12.5 }}>
+                    Each brand is a managed Drift org on drift.li.
+                  </p>
+                </div>
+                <button className={`d-btn sm ${showCreate ? "" : "soft"}`} onClick={() => setShowCreate((v) => !v)}>
+                  {showCreate ? "Close" : "+ New brand"}
+                </button>
+              </div>
 
-            <div className="mt-4 space-y-2">
-              <input
-                className={input}
-                placeholder="New brand name"
-                value={newBrand}
-                onChange={(e) => setNewBrand(e.target.value)}
-              />
-              <input
-                className={input}
-                placeholder="Brand admin email (optional — creates a login)"
-                value={newBrandEmail}
-                onChange={(e) => setNewBrandEmail(e.target.value)}
-              />
-              <input
-                className={input}
-                placeholder="Admin name (optional)"
-                value={newBrandAdminName}
-                onChange={(e) => setNewBrandAdminName(e.target.value)}
-              />
-              <button
-                className={`${btn} w-full`}
-                onClick={createBrand}
-                disabled={creatingBrand || !newBrand.trim()}
-              >
-                {creatingBrand ? "Creating…" : "Create brand"}
-              </button>
-            </div>
-
-            {credential && (
-              <div className="mt-3 rounded-lg border border-emerald-400/30 bg-emerald-500/10 p-3 text-xs">
-                <div className="flex items-center justify-between">
-                  <p className="font-bold text-emerald-200">Brand admin login</p>
-                  <button className="text-gray-400 hover:text-white" onClick={() => setCredential(null)}>
-                    ×
+              {showCreate && (
+                <div className="d-hair" style={{ marginTop: 12, padding: 12, display: "grid", gap: 8 }}>
+                  <input className="d-input" placeholder="Brand name" value={newBrand} onChange={(e) => setNewBrand(e.target.value)} autoFocus />
+                  <input
+                    className="d-input"
+                    placeholder="Brand admin email (optional — creates a login)"
+                    value={newBrandEmail}
+                    onChange={(e) => setNewBrandEmail(e.target.value)}
+                    inputMode="email"
+                  />
+                  <input className="d-input" placeholder="Admin name (optional)" value={newBrandAdminName} onChange={(e) => setNewBrandAdminName(e.target.value)} />
+                  <button className="d-btn primary" onClick={createBrand} disabled={creatingBrand || !newBrand.trim()}>
+                    {creatingBrand ? "Creating…" : "Create brand"}
                   </button>
                 </div>
-                {credential.reused ? (
-                  <p className="mt-1 text-gray-300">
-                    <span className="font-mono">{credential.email}</span> already has an account — a new
-                    Drift profile was added; they log in with their existing password and pick the Drift
-                    workspace.
-                  </p>
-                ) : (
-                  <>
-                    <div className="mt-2 space-y-1 text-gray-200">
-                      <p>
-                        Email: <span className="font-mono text-white">{credential.email}</span>
-                      </p>
-                      <p>
-                        Password: <span className="font-mono text-white">{credential.tempPassword}</span>
-                      </p>
-                    </div>
-                    <p className="mt-2 text-[11px] text-amber-300">
-                      Shown once — copy and forward to the brand now.
-                    </p>
-                    <button
-                      className="mt-2 text-[11px] text-emerald-300 underline"
-                      onClick={() =>
-                        navigator.clipboard.writeText(
-                          `Login: https://drift.li\nEmail: ${credential.email}\nPassword: ${credential.tempPassword}`,
-                        )
-                      }
-                    >
-                      Copy credentials
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
+              )}
 
-            {brands.length > 0 && (
-              <input
-                className={`${input} mt-4`}
-                placeholder="Search brands…"
-                value={brandQuery}
-                onChange={(e) => setBrandQuery(e.target.value)}
-              />
-            )}
-            <div className="mt-2 space-y-2">
-              {loadingBrands ? (
-                <div className="py-6 text-center">
-                  <LoadingSpinner size="sm" />
-                </div>
-              ) : brands.length === 0 ? (
-                <p className="py-6 text-center text-xs text-gray-500">No brands yet.</p>
-              ) : visibleBrands.length === 0 ? (
-                <p className="py-6 text-center text-xs text-gray-500">No brands match “{brandQuery}”.</p>
-              ) : (
-                visibleBrands.map((b) => (
-                  <div
-                    key={b.id}
-                    className={`flex items-center gap-1 rounded-lg border transition-colors ${
-                      selected?.id === b.id
-                        ? "border-brand-accent/50 bg-brand-accent/10"
-                        : "border-gray-700/60 bg-gray-950/50 hover:bg-gray-800/60"
-                    }`}
-                  >
-                    <button
-                      onClick={() => loadProducts(b)}
-                      className="flex flex-1 items-center justify-between px-3 py-2.5 text-left"
-                    >
-                      <span className="text-sm font-medium text-white">{b.name}</span>
-                      <span className="text-[11px] text-gray-500">{b._count?.driftProducts ?? 0} drifts</span>
-                    </button>
-                    <button
-                      onClick={() => deleteBrand(b)}
-                      title="Delete brand"
-                      className="px-2.5 py-2.5 text-lg leading-none text-gray-600 hover:text-rose-400"
-                    >
+              {credential && (
+                <div className="d-banner ok" style={{ marginTop: 12, alignItems: "flex-start", flexDirection: "column", gap: 6 }}>
+                  <div className="d-head" style={{ width: "100%" }}>
+                    <strong style={{ fontSize: 13 }}>Brand admin login</strong>
+                    <button className="d-x" onClick={() => setCredential(null)} aria-label="Dismiss">
                       ×
                     </button>
                   </div>
-                ))
+                  {credential.reused ? (
+                    <span className="d-sub" style={{ fontSize: 12.5 }}>
+                      <code className="d-code">{credential.email}</code> already has an account — a new Drift profile was added; they log in with
+                      their existing password and pick the Drift workspace.
+                    </span>
+                  ) : (
+                    <>
+                      <span className="d-sub" style={{ fontSize: 12.5, display: "grid", gap: 4 }}>
+                        <span>
+                          Email: <code className="d-code">{credential.email}</code>
+                        </span>
+                        <span>
+                          Password: <code className="d-code">{credential.tempPassword}</code>
+                        </span>
+                      </span>
+                      <span className="d-note" style={{ color: "var(--warn)" }}>
+                        Shown once — copy and forward to the brand now.
+                      </span>
+                      <button
+                        className="d-btn sm"
+                        onClick={() =>
+                          navigator.clipboard.writeText(`Login: https://drift.li\nEmail: ${credential.email}\nPassword: ${credential.tempPassword}`)
+                        }
+                      >
+                        Copy credentials
+                      </button>
+                    </>
+                  )}
+                </div>
               )}
-            </div>
-          </div>
 
-          {/* Products / upload column */}
-          <div className={card}>
-            {!selected ? (
-              <div className="grid h-full place-items-center py-16 text-center text-sm text-gray-500">
-                Select a brand to manage its drifts.
+              {brands.length > 3 && (
+                <input className="d-input" style={{ marginTop: 12 }} placeholder="Search brands…" value={brandQuery} onChange={(e) => setBrandQuery(e.target.value)} />
+              )}
+              <div className="d-list" style={{ marginTop: 12 }}>
+                {loadingBrands ? (
+                  <div className="py-6 text-center">
+                    <LoadingSpinner size="sm" />
+                  </div>
+                ) : brands.length === 0 ? (
+                  <p className="d-faint py-6 text-center" style={{ fontSize: 12.5 }}>
+                    No brands yet.
+                  </p>
+                ) : visibleBrands.length === 0 ? (
+                  <p className="d-faint py-6 text-center" style={{ fontSize: 12.5 }}>
+                    No brands match “{brandQuery}”.
+                  </p>
+                ) : (
+                  visibleBrands.map((b) => (
+                    <div key={b.id} className={`d-item ${selected?.id === b.id ? "active" : ""}`} onClick={() => loadProducts(b)} role="button" tabIndex={0}
+                      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && loadProducts(b)}>
+                      <span className="grow">
+                        <span className="d-name" style={{ display: "block", fontSize: 13.5 }}>
+                          {b.name}
+                        </span>
+                        <span className="sub">
+                          {b._count?.driftProducts ?? 0} drift{(b._count?.driftProducts ?? 0) === 1 ? "" : "s"}
+                        </span>
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteBrand(b);
+                        }}
+                        title="Delete brand"
+                        aria-label={`Delete ${b.name}`}
+                        className="d-x"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
+            </div>
+          </aside>
+
+          {/* Selected brand */}
+          <section style={{ minWidth: 0 }}>
+            {!selected ? (
+              <div className="d-empty">Select a brand to manage its drifts.</div>
             ) : (
               <>
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">
-                    {selected.name}
-                  </h2>
-                  <button className="text-xs text-gray-400 hover:text-white" onClick={() => loadProducts(selected)}>
-                    ↻ refresh
-                  </button>
-                </div>
-
-                <div className="mt-3 flex gap-2">
-                  <button
-                    onClick={() => setBrandView(false)}
-                    className={`rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors ${!brandView ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"}`}
-                  >
-                    Team tools
-                  </button>
-                  <button
-                    onClick={() => setBrandView(true)}
-                    className={`rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors ${brandView ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"}`}
-                  >
-                    Brand dashboard
-                  </button>
+                <button className="d-btn ghost sm d-mobile-back" onClick={() => setSelected(null)}>
+                  ← All brands
+                </button>
+                <div className="d-head" style={{ marginBottom: 14 }}>
+                  <div>
+                    <div className="d-eyebrow">Brand</div>
+                    <div className="d-h1">{selected.name}</div>
+                  </div>
+                  <div className="d-actions">
+                    <div className="d-tabs" role="tablist" aria-label="Brand view">
+                      <button role="tab" aria-selected={!brandView} onClick={() => setBrandView(false)} className={`d-tab ${!brandView ? "active" : ""}`}>
+                        Team tools
+                      </button>
+                      <button role="tab" aria-selected={brandView} onClick={() => setBrandView(true)} className={`d-tab ${brandView ? "active" : ""}`}>
+                        Brand dashboard
+                      </button>
+                    </div>
+                    {!brandView && (
+                      <button className="d-btn ghost sm" onClick={() => loadProducts(selected)} title="Refresh">
+                        ↻
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {brandView ? (
-                  <div className="mt-4">
-                    <DriftBrandDashboard adminOrgId={selected.id} />
-                  </div>
+                  <DriftBrandDashboard adminOrgId={selected.id} />
                 ) : (
-                <>
-
-                {/* Brand vanity link (drift.li/{slug}) */}
-                <div className="mt-4 rounded-lg border border-gray-700/60 bg-gray-950/50 p-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-300">Brand link</p>
-                  <p className="mt-1 text-[11px] text-gray-500">
-                    Public showcase &amp; the base of every drift URL.
-                  </p>
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <span className="font-mono text-xs text-gray-500">drift.li/</span>
-                    <input
-                      className={`${input} w-44`}
-                      placeholder="brand-name"
-                      value={slugDraft}
-                      onChange={(e) => setSlugDraft(e.target.value)}
-                    />
-                    <button
-                      className="rounded-md border border-gray-700 px-2.5 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800 disabled:opacity-50"
-                      onClick={saveBrandSlug}
-                      disabled={savingSlug}
-                    >
-                      {savingSlug ? "Saving…" : "Save"}
-                    </button>
-                    {brandSlug && (
-                      <a
-                        className="rounded-md border border-gray-700 px-2.5 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
-                        href={`https://drift.li/${brandSlug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Open ↗
-                      </a>
-                    )}
-                    {slugMsg && <span className="text-[11px] text-gray-400">{slugMsg}</span>}
-                  </div>
-                </div>
-
-                {/* Upload rendered clip */}
-                <div className="mt-4 rounded-lg border border-gray-700/60 bg-gray-950/50 p-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-300">
-                    Upload rendered drift clip
-                  </p>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
-                    <input
-                      className={input}
-                      placeholder="Drift name (e.g. Runner — beach)"
-                      value={productName}
-                      onChange={(e) => setProductName(e.target.value)}
-                      disabled={busy}
-                    />
-                    <input
-                      ref={fileRef}
-                      type="file"
-                      accept="video/*"
-                      onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
-                      disabled={busy}
-                      className="text-xs text-gray-400 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-800 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
-                    />
-                  </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <button
-                      className={btn}
-                      onClick={uploadVideo}
-                      disabled={busy || !videoFile || !productName.trim()}
-                    >
-                      {busy ? "Working…" : "Upload & build drift"}
-                    </button>
-                    <label className="flex items-center gap-2 text-xs text-gray-400">
-                      Smoothness
-                      <select
-                        value={frames}
-                        onChange={(e) => setFrames(Number(e.target.value))}
-                        disabled={busy}
-                        className="rounded-lg border border-gray-700 bg-gray-950 px-2 py-1.5 text-xs text-white outline-none focus:border-brand-accent"
-                      >
-                        <option value={36}>36 frames · light</option>
-                        <option value={48}>48 frames</option>
-                        <option value={60}>60 frames · smooth</option>
-                        <option value={72}>72 frames</option>
-                        <option value={90}>90 frames · very smooth</option>
-                        <option value={120}>120 frames · ultra</option>
-                        <option value={180}>180 frames · max</option>
-                      </select>
-                    </label>
-                    <label className="flex items-center gap-2 text-xs text-gray-400">
-                      Background
-                      <select
-                        value={bgMode}
-                        onChange={(e) => setBgMode(e.target.value)}
-                        disabled={busy}
-                        className="rounded-lg border border-gray-700 bg-gray-950 px-2 py-1.5 text-xs text-white outline-none focus:border-brand-accent"
-                      >
-                        <option value="keep">Keep bg (auto-match)</option>
-                        <option value="remove-white">Remove white bg · free</option>
-                        <option value="remove-black">Remove black bg · free</option>
-                        <option value="ai">AI cutout · paid</option>
-                      </select>
-                    </label>
-                    <label className="flex items-center gap-2 text-xs text-gray-400">
-                      <input
-                        type="checkbox"
-                        checked={loopDefault}
-                        onChange={(e) => setLoopDefault(e.target.checked)}
-                        disabled={busy}
-                        className="h-3.5 w-3.5 accent-brand-accent"
-                      />
-                      Loop by default
-                    </label>
-                    {uploadPct !== null && (
-                      <span className="text-xs text-gray-400">
-                        {processing ? "Extracting frames…" : `Uploading ${uploadPct}%`}
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-2 text-[11px] text-gray-500">
-                    A short clip works best — the drift plays as you drag. "Remove white/black" keys
-                    out a solid backdrop for <b>free</b>; "AI cutout" is paid but handles any
-                    background; "Keep" leaves it opaque and the player background auto-matches. Loop
-                    makes playback continuous instead of stopping at the ends.
-                  </p>
-                </div>
-
-                {/* Drifts list */}
-                {products.length > 0 && (
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    <input
-                      className={`${input} flex-1 min-w-[140px]`}
-                      placeholder="Search drifts…"
-                      value={productQuery}
-                      onChange={(e) => setProductQuery(e.target.value)}
-                    />
-                    <select
-                      value={productStatus}
-                      onChange={(e) => setProductStatus(e.target.value)}
-                      className="rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-brand-accent"
-                    >
-                      {["ALL", "PUBLISHED", "READY", "PROCESSING", "FAILED"].map((s) => (
-                        <option key={s} value={s}>
-                          {s === "ALL" ? "All statuses" : s}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <div className="mt-3 space-y-2">
-                  {loadingProducts ? (
-                    <div className="py-6 text-center">
-                      <LoadingSpinner size="sm" />
+                  <div style={{ display: "grid", gap: 12, minWidth: 0 }}>
+                    {/* Brand vanity link (drift.li/{slug}) */}
+                    <div className="d-card d-card-pad">
+                      <div className="d-eyebrow">Brand link</div>
+                      <p className="d-note" style={{ marginTop: 4 }}>
+                        The public showcase, and the base of every drift URL.
+                      </p>
+                      <div className="d-actions" style={{ marginTop: 10 }}>
+                        <span className="d-faint" style={{ fontFamily: "ui-monospace, Menlo, monospace", fontSize: 12.5 }}>
+                          drift.li/
+                        </span>
+                        <input
+                          className="d-input"
+                          style={{ flex: "1 1 160px", maxWidth: 260 }}
+                          placeholder="brand-name"
+                          value={slugDraft}
+                          onChange={(e) => setSlugDraft(e.target.value)}
+                        />
+                        <button className="d-btn sm" onClick={saveBrandSlug} disabled={savingSlug}>
+                          {savingSlug ? "Saving…" : "Save"}
+                        </button>
+                        {brandSlug && (
+                          <a className="d-btn sm" href={`https://drift.li/${brandSlug}`} target="_blank" rel="noopener noreferrer">
+                            Open ↗
+                          </a>
+                        )}
+                        {slugMsg && (
+                          <span className="d-faint" style={{ fontSize: 12 }}>
+                            {slugMsg}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  ) : products.length === 0 ? (
-                    <p className="py-6 text-center text-xs text-gray-500">No drifts yet.</p>
-                  ) : visibleProducts.length === 0 ? (
-                    <p className="py-6 text-center text-xs text-gray-500">No drifts match your filters.</p>
-                  ) : (
-                    visibleProducts.map((p) => (
-                      <div
-                        key={p.id}
-                        className="flex items-center justify-between rounded-lg border border-gray-700/60 bg-gray-950/50 px-4 py-3"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-white">{p.name}</p>
-                          <p className="text-[11px] text-gray-500">
-                            <span className={statusColor(p.status)}>{p.status}</span>
-                            {p.spin ? ` · ${p.spin.frameCount} frames` : ""}
-                            {p.spin?.secondFrameCount ? " · +2nd clip" : ""}
-                            {p.loopEnabled ? " · loop" : ""}
-                          </p>
+
+                    {/* Upload rendered clip */}
+                    <div className="d-card d-card-pad">
+                      <div className="d-eyebrow">Upload a rendered drift clip</div>
+                      <div className="d-grid-2" style={{ marginTop: 12 }}>
+                        <div className="d-field">
+                          <label className="d-label">Drift name</label>
+                          <input className="d-input" placeholder="e.g. Runner — beach" value={productName} onChange={(e) => setProductName(e.target.value)} disabled={busy} />
                         </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          {(p.status === "READY" || p.status === "PUBLISHED") && (
-                            <>
-                              <button
-                                onClick={() => setEditingProduct(p)}
-                                className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => setEditingCaptions({ id: p.id, name: p.name })}
-                                className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
-                              >
-                                Captions
-                              </button>
-                              <button
-                                onClick={() => downloadProduct(p)}
-                                disabled={exportingId === p.id}
-                                className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold text-cyan-200 hover:bg-cyan-500/20 disabled:opacity-50"
-                              >
-                                {exportingId === p.id ? "Rendering…" : "⬇ Download"}
-                              </button>
-                              <SecondClipButton
-                                orgId={selected.id}
-                                product={p}
-                                onChange={() => loadProducts(selected, true)}
-                                onMsg={setMsg}
-                              />
-                              <button
-                                onClick={() => setLandingHero(p)}
-                                disabled={heroId === p.id}
-                                title="Make this drift the drift.li landing page (full-screen player)"
-                                className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 text-[11px] font-semibold text-amber-200 hover:bg-amber-400/20 disabled:opacity-50"
-                              >
-                                {heroId === p.id ? "Setting…" : "★ Set as landing"}
-                              </button>
-                              <button
-                                onClick={() => copyProductLink(p)}
-                                className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
-                              >
-                                {copiedId === p.id ? "Copied!" : "Copy link"}
-                              </button>
-                              <a
-                                href={
-                                  brandSlug && p.slug
-                                    ? `${PLAYER_ORIGIN}/${brandSlug}/${p.slug}`
-                                    : `${PLAYER_ORIGIN}/p/${p.id}`
-                                }
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
-                              >
-                                View player ↗
-                              </a>
-                            </>
-                          )}
-                          <button
-                            onClick={() => deleteProduct(p)}
-                            title="Delete drift"
-                            className="px-1.5 text-lg leading-none text-gray-600 hover:text-rose-400"
-                          >
-                            ×
-                          </button>
+                        <div className="d-field">
+                          <label className="d-label">Clip</label>
+                          <input
+                            ref={fileRef}
+                            type="file"
+                            accept="video/*"
+                            onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
+                            disabled={busy}
+                            className="d-file"
+                          />
                         </div>
                       </div>
-                    ))
-                  )}
-                </div>
-                </>
+                      <div className="d-actions" style={{ marginTop: 12 }}>
+                        <button className="d-btn primary" onClick={uploadVideo} disabled={busy || !videoFile || !productName.trim()}>
+                          {busy ? "Working…" : "Upload & build drift"}
+                        </button>
+                        <label className="d-check">
+                          Smoothness
+                          <select value={frames} onChange={(e) => setFrames(Number(e.target.value))} disabled={busy} className="d-select sm">
+                            <option value={36}>36 frames · light</option>
+                            <option value={48}>48 frames</option>
+                            <option value={60}>60 frames · smooth</option>
+                            <option value={72}>72 frames</option>
+                            <option value={90}>90 frames · very smooth</option>
+                            <option value={120}>120 frames · ultra</option>
+                            <option value={180}>180 frames · max</option>
+                          </select>
+                        </label>
+                        <label className="d-check">
+                          Background
+                          <select value={bgMode} onChange={(e) => setBgMode(e.target.value)} disabled={busy} className="d-select sm">
+                            <option value="keep">Keep bg (auto-match)</option>
+                            <option value="remove-white">Remove white bg · free</option>
+                            <option value="remove-black">Remove black bg · free</option>
+                            <option value="ai">AI cutout · paid</option>
+                          </select>
+                        </label>
+                        <label className="d-check">
+                          <input type="checkbox" checked={loopDefault} onChange={(e) => setLoopDefault(e.target.checked)} disabled={busy} />
+                          Loop by default
+                        </label>
+                      </div>
+                      {uploadPct !== null && (
+                        <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
+                          <div className="d-progress">
+                            <i style={{ width: `${processing ? 100 : uploadPct}%` }} />
+                          </div>
+                          <span className="d-faint" style={{ fontSize: 12 }}>
+                            {processing ? "Extracting frames…" : `Uploading ${uploadPct}%`}
+                          </span>
+                        </div>
+                      )}
+                      <p className="d-note" style={{ marginTop: 10 }}>
+                        A short clip works best — the drift plays as you drag. "Remove white/black" keys out a solid backdrop for free; "AI cutout"
+                        is paid but handles any background; "Keep" leaves it opaque and the player background auto-matches. Loop makes playback
+                        continuous instead of stopping at the ends.
+                      </p>
+                    </div>
+
+                    {/* Drifts list */}
+                    <div style={{ minWidth: 0 }}>
+                      <div className="d-head" style={{ marginBottom: 10 }}>
+                        <div className="d-h2">Drifts</div>
+                        <span className="d-faint" style={{ fontSize: 12 }}>
+                          {products.length} total
+                        </span>
+                      </div>
+                      {products.length > 0 && (
+                        <div className="d-actions" style={{ marginBottom: 10 }}>
+                          <input
+                            className="d-input"
+                            style={{ flex: "1 1 160px" }}
+                            placeholder="Search drifts…"
+                            value={productQuery}
+                            onChange={(e) => setProductQuery(e.target.value)}
+                          />
+                          <select value={productStatus} onChange={(e) => setProductStatus(e.target.value)} className="d-select sm">
+                            {["ALL", "PUBLISHED", "READY", "PROCESSING", "FAILED"].map((s) => (
+                              <option key={s} value={s}>
+                                {s === "ALL" ? "All statuses" : s}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      <div className="d-list" style={{ gap: 10 }}>
+                        {loadingProducts ? (
+                          <div className="py-6 text-center">
+                            <LoadingSpinner size="sm" />
+                          </div>
+                        ) : products.length === 0 ? (
+                          <div className="d-empty" style={{ padding: "36px 20px" }}>
+                            No drifts yet. Upload the first rendered clip above.
+                          </div>
+                        ) : visibleProducts.length === 0 ? (
+                          <p className="d-faint py-6 text-center" style={{ fontSize: 12.5 }}>
+                            No drifts match your filters.
+                          </p>
+                        ) : (
+                          visibleProducts.map((p) => (
+                            <div key={p.id} className="d-row">
+                              <div className="d-row-main">
+                                <div className="d-name">{p.name}</div>
+                                <div className="d-meta">
+                                  <span className={`d-pill ${statusPill(p.status)}`}>{p.status}</span>
+                                  <span>
+                                    {p.spin ? `${p.spin.frameCount} frames` : ""}
+                                    {p.spin?.secondFrameCount ? " · +2nd clip" : ""}
+                                    {p.loopEnabled ? " · loop" : ""}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="d-actions">
+                                {isReady(p) && (
+                                  <>
+                                    <button onClick={() => setEditingProduct(p)} className="d-btn sm">
+                                      Edit
+                                    </button>
+                                    <button onClick={() => setEditingCaptions({ id: p.id, name: p.name })} className="d-btn sm">
+                                      Captions
+                                    </button>
+                                    <button onClick={() => downloadProduct(p)} disabled={exportingId === p.id} className="d-btn soft sm">
+                                      {exportingId === p.id ? "Rendering…" : "⬇ Download"}
+                                    </button>
+                                    <SecondClipButton orgId={selected.id} product={p} onChange={() => loadProducts(selected, true)} onMsg={setMsg} />
+                                    <button
+                                      onClick={() => setLandingHero(p)}
+                                      disabled={heroId === p.id}
+                                      title="Make this drift the drift.li landing page (full-screen player)"
+                                      className="d-btn warn sm"
+                                    >
+                                      {heroId === p.id ? "Setting…" : "★ Set as landing"}
+                                    </button>
+                                    <button onClick={() => copyProductLink(p)} className="d-btn sm">
+                                      {copiedId === p.id ? "Copied!" : "Copy link"}
+                                    </button>
+                                    <a href={productLink(p)} target="_blank" rel="noopener noreferrer" className="d-btn sm">
+                                      View ↗
+                                    </a>
+                                  </>
+                                )}
+                                <button onClick={() => deleteProduct(p)} title="Delete drift" aria-label={`Delete ${p.name}`} className="d-x">
+                                  ×
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 )}
               </>
             )}
-          </div>
+          </section>
         </div>
       )}
 
       {editingCaptions && (
-        <DriftCaptionEditor
-          productId={editingCaptions.id}
-          productName={editingCaptions.name}
-          onClose={() => setEditingCaptions(null)}
-        />
+        <DriftCaptionEditor productId={editingCaptions.id} productName={editingCaptions.name} onClose={() => setEditingCaptions(null)} />
       )}
 
       {editingProduct && selected && (
