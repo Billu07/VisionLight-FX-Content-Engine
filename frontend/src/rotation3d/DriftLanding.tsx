@@ -23,11 +23,10 @@ const toCta = (c: any) =>
 const DRIFT_PRIMARY = "#22d3ee";
 const DRIFT_SECONDARY = "#3b82f6";
 
-// Legal docs shown only on the drift.li landing takeover (not on the players).
-const DRIFT_TERMS_URL =
-  "https://docs.google.com/document/d/1fBXABIgmCxjwK6oMxeSGDZ6ny-PdFwe7Orhd_L02oOQ/edit?usp=sharing";
-const DRIFT_PRIVACY_URL =
-  "https://docs.google.com/document/d/1f5mEo1Fcc64gzGEyQmz81ReW_PqlhZS87tpffaVgNt0/edit?usp=sharing";
+// Legal pages: drift.li serves its own /terms and /privacy (the shared agreement,
+// branded Drift Link). A brand may override them per org (termsUrl / privacyUrl).
+const DRIFT_TERMS_URL = "/terms";
+const DRIFT_PRIVACY_URL = "/privacy";
 
 type Item = {
   itemId: string;
@@ -546,7 +545,11 @@ export default function DriftLanding() {
         <div className="dl-word dl-word-sm">
           Drift Link<span>Interactive</span>
         </div>
-        <span>Interactive drift paths · © 2026</span>
+        <span className="dl-footer-links">
+          <a href={DRIFT_TERMS_URL}>Terms</a>
+          <a href={DRIFT_PRIVACY_URL}>Privacy</a>
+          <span>Interactive drift paths · © 2026</span>
+        </span>
       </footer>
 
       {active && <PlayerModal item={active} onClose={() => setActive(null)} />}
@@ -704,6 +707,9 @@ const CSS = `
 .dl-empty{position:relative;z-index:2;text-align:center;padding:100px 20px;color:var(--dl-text3);font-size:14px}
 .dl-footer{position:relative;z-index:2;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:space-between;padding:26px clamp(18px,5vw,40px);border-top:1px solid var(--dl-border);color:var(--dl-text4);font-size:12px;letter-spacing:.04em}
 @media(min-width:640px){.dl-footer{flex-direction:row}}
+.dl-footer-links{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:center}
+.dl-footer-links a{color:var(--dl-text3);text-decoration:none;font-weight:600}
+.dl-footer-links a:hover{color:var(--dl-text)}
 
 /* Modal — stays dark (the interactive player is a dark stage) */
 .dl-modal{position:fixed;inset:0;z-index:200;display:grid;place-items:center;padding:clamp(14px,3vw,40px);background:rgba(3,6,12,.82);backdrop-filter:blur(10px);animation:dlfade .25s ease}
