@@ -14,6 +14,46 @@ import { StatusPill, TourShell, UpgradeCard, apiError, copyText, publicUrl, time
 
 const DEMO_HIDDEN_KEY = "drift_demo_hidden";
 
+// Hero art: a route with stops that pop out as the line reaches them.
+const ROUTE_D = "M 36 244 C 70 244 90 214 120 210 S 170 150 196 132 S 246 102 270 96 S 312 60 328 44";
+const ROUTE_STOPS = [
+  { x: 120, y: 210, label: "Living room", side: "right" },
+  { x: 196, y: 132, label: "Kitchen", side: "left" },
+  { x: 270, y: 96, label: "Terrace", side: "right" },
+  { x: 328, y: 44, label: "Garden", side: "left" },
+] as const;
+
+function PathArt() {
+  return (
+    <svg className="th-route" viewBox="0 0 380 280" aria-hidden>
+      <path className="th-route-under" d={ROUTE_D} />
+      <path className="th-route-line" d={ROUTE_D} pathLength={1000} />
+      <g>
+        <rect className="th-start" x={8} y={234} width={56} height={20} rx={10} />
+        <text className="th-start-text" x={36} y={248} textAnchor="middle">
+          START
+        </text>
+      </g>
+      {ROUTE_STOPS.map((s, i) => {
+        const tagW = Math.round(s.label.length * 6.6 + 22);
+        const tagX = s.side === "right" ? s.x + 16 : s.x - 16 - tagW;
+        return (
+          <g key={s.label} className={`th-stop th-stop-${i + 1}`} style={{ transformOrigin: `${s.x}px ${s.y}px` }}>
+            <circle className="halo" cx={s.x} cy={s.y} r={16} />
+            <circle className="pin" cx={s.x} cy={s.y} r={9} />
+            <circle className="dot" cx={s.x} cy={s.y} r={3.5} />
+            <rect className="tag" x={tagX} y={s.y - 11} width={tagW} height={22} rx={11} />
+            <text x={tagX + tagW / 2} y={s.y + 4} textAnchor="middle">
+              {s.label}
+            </text>
+          </g>
+        );
+      })}
+      <circle className="th-traveler" r={5.5} style={{ offsetPath: `path("${ROUTE_D}")` }} />
+    </svg>
+  );
+}
+
 export default function TourHome() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -170,15 +210,7 @@ export default function TourHome() {
           )}
         </div>
         <div className="th-art" aria-hidden>
-          <span className="th-phone th-phone-1">
-            <i />
-          </span>
-          <span className="th-phone th-phone-2">
-            <i />
-          </span>
-          <span className="th-phone th-phone-3">
-            <i />
-          </span>
+          <PathArt />
         </div>
       </section>
 

@@ -210,14 +210,31 @@ export const TOUR_STYLES = `
 .th-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
 .th-art{position:relative;height:300px;display:none}
 @media(min-width:900px){.th-art{display:block}}
-.th-phone{position:absolute;width:150px;aspect-ratio:9/16;border-radius:24px;border:1px solid var(--border-strong);background:linear-gradient(165deg,var(--surface-3),var(--surface));box-shadow:0 40px 70px -40px rgba(0,0,0,.7);overflow:hidden;animation:th-float 7s ease-in-out infinite}
-.th-phone i{position:absolute;inset:10px;border-radius:18px;background:radial-gradient(70% 60% at 30% 25%,var(--accent-soft),transparent 70%),linear-gradient(180deg,transparent,var(--surface-2))}
-.th-phone::after{content:"";position:absolute;left:50%;bottom:16px;width:44%;height:6px;border-radius:3px;background:var(--accent);opacity:.8;transform:translateX(-50%)}
-.th-phone-1{left:6%;top:40px;rotate:-8deg}
-.th-phone-2{left:36%;top:0;animation-delay:-2.3s;z-index:1}
-.th-phone-3{left:64%;top:56px;rotate:9deg;animation-delay:-4.6s}
-@keyframes th-float{0%,100%{translate:0 0}50%{translate:0 -10px}}
-@media(prefers-reduced-motion:reduce){.th-phone{animation:none}}
+/* The route: a dotted trail, the line inking itself in, a traveller riding it, and
+   stops that pop out as the line reaches them. One 8s cycle: draw → hold → fade. */
+.th-route{width:100%;height:100%;display:block;overflow:visible;font-family:inherit}
+.th-route-under{fill:none;stroke:var(--border-strong);stroke-width:2;stroke-dasharray:3 9;stroke-linecap:round;opacity:.75}
+.th-route-line{fill:none;stroke:var(--accent);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1000;stroke-dashoffset:1000;animation:th-draw 8s cubic-bezier(.4,.05,.2,1) infinite;filter:drop-shadow(0 0 6px var(--accent-soft))}
+.th-stop{transform-box:view-box;transform:scale(0);opacity:0;animation-duration:8s;animation-timing-function:cubic-bezier(.34,1.56,.64,1);animation-iteration-count:infinite;animation-fill-mode:both}
+.th-stop-1{animation-name:th-pop-1}
+.th-stop-2{animation-name:th-pop-2}
+.th-stop-3{animation-name:th-pop-3}
+.th-stop-4{animation-name:th-pop-4}
+.th-stop .halo{fill:var(--accent-soft)}
+.th-stop .pin{fill:var(--surface);stroke:var(--accent);stroke-width:2.5}
+.th-stop .dot{fill:var(--accent)}
+.th-stop .tag{fill:var(--surface);stroke:var(--border-strong);filter:drop-shadow(0 6px 14px rgba(0,0,0,.18))}
+.th-stop text{fill:var(--text);font-size:11px;font-weight:700;letter-spacing:-.01em}
+.th-traveler{fill:#fff;stroke:var(--accent);stroke-width:2.5;offset-rotate:0deg;animation:th-travel 8s cubic-bezier(.4,.05,.2,1) infinite;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
+.th-start{fill:var(--surface-2);stroke:var(--border-strong)}
+.th-start-text{fill:var(--muted);font-size:9.5px;font-weight:800;letter-spacing:.1em}
+@keyframes th-draw{0%{stroke-dashoffset:1000;opacity:1}35%{stroke-dashoffset:0;opacity:1}86%{stroke-dashoffset:0;opacity:1}92%{stroke-dashoffset:0;opacity:0}92.1%{stroke-dashoffset:1000;opacity:0}100%{stroke-dashoffset:1000;opacity:0}}
+@keyframes th-travel{0%{offset-distance:0%;opacity:1}35%{offset-distance:100%;opacity:1}40%{offset-distance:100%;opacity:0}100%{offset-distance:100%;opacity:0}}
+@keyframes th-pop-1{0%,8%{transform:scale(0);opacity:0}12%{transform:scale(1.18);opacity:1}15%{transform:scale(1);opacity:1}86%{transform:scale(1);opacity:1}92%{transform:scale(1);opacity:0}100%{transform:scale(0);opacity:0}}
+@keyframes th-pop-2{0%,17%{transform:scale(0);opacity:0}21%{transform:scale(1.18);opacity:1}24%{transform:scale(1);opacity:1}86%{transform:scale(1);opacity:1}92%{transform:scale(1);opacity:0}100%{transform:scale(0);opacity:0}}
+@keyframes th-pop-3{0%,26%{transform:scale(0);opacity:0}30%{transform:scale(1.18);opacity:1}33%{transform:scale(1);opacity:1}86%{transform:scale(1);opacity:1}92%{transform:scale(1);opacity:0}100%{transform:scale(0);opacity:0}}
+@keyframes th-pop-4{0%,35%{transform:scale(0);opacity:0}39%{transform:scale(1.18);opacity:1}42%{transform:scale(1);opacity:1}86%{transform:scale(1);opacity:1}92%{transform:scale(1);opacity:0}100%{transform:scale(0);opacity:0}}
+@media(prefers-reduced-motion:reduce){.th-route-line{animation:none;stroke-dashoffset:0;opacity:1}.th-stop{animation:none;transform:scale(1);opacity:1}.th-traveler{display:none}}
 .th-create{margin-bottom:22px;display:grid;gap:10px}
 .th-first{display:grid;gap:18px;padding:clamp(22px,4vw,34px);margin-bottom:24px}
 @media(min-width:900px){.th-first{grid-template-columns:1fr 1.2fr auto;align-items:center}}
