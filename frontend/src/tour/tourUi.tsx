@@ -179,9 +179,11 @@ export const TOUR_STYLES = `
 
 /** Page chrome: wordmark → home, theme toggle, log out. */
 export function TourShell({ children }: { children: React.ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user, profiles, logout } = useAuth();
   const [theme, toggleTheme] = useDriftTheme();
   const navigate = useNavigate();
+  const canSwitch = profiles.length > 1;
+  const isSuperAdmin = user?.role === "SUPERADMIN";
   const out = async () => {
     await logout();
     navigate(CREATOR_START, { replace: true });
@@ -198,7 +200,17 @@ export function TourShell({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-2.5">
           <span className="d-faint hidden text-xs sm:inline">{user?.email}</span>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
-          <button onClick={out} className="d-btn sm">
+          {isSuperAdmin && (
+            <Link to="/admin" className="d-btn sm" style={{ textDecoration: "none" }} title="Open the admin panel">
+              Admin
+            </Link>
+          )}
+          {canSwitch && (
+            <button onClick={() => navigate("/studios")} className="d-btn sm" title="Choose another workspace">
+              Switch studio
+            </button>
+          )}
+          <button onClick={out} className="d-btn ghost sm">
             Log out
           </button>
         </div>

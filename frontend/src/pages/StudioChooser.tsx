@@ -45,7 +45,10 @@ export default function StudioChooser() {
       !isLocalHost(currentHost)
     ) {
       try {
-        const handoff = await apiEndpoints.startWorkspaceHandoff(profile.id);
+        const handoff = await apiEndpoints.startWorkspaceHandoff(
+          profile.id,
+          profile.view === "TOUR" ? "/tour" : undefined,
+        );
         const handoffUrl = handoff.data?.handoffUrl;
         if (typeof handoffUrl === "string" && handoffUrl.trim()) {
           window.location.replace(handoffUrl);
@@ -122,6 +125,7 @@ export default function StudioChooser() {
             const isPicdrift = profile.view === "PICDRIFT";
             const isRotation3d = profile.view === "ROTATION3D";
             const isDrift = profile.view === "DRIFT";
+            const isTour = profile.view === "TOUR";
             return (
               <button
                 key={profile.id}
@@ -135,10 +139,13 @@ export default function StudioChooser() {
                     <h2 className="text-xl font-black text-white">
                       {profile.organizationName || "Personal Workspace"}
                     </h2>
-                    <p className="mt-1 text-xs text-gray-500">{profile.email}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {isTour ? "Creator studio · drift.li/tour · " : ""}
+                      {profile.email}
+                    </p>
                   </div>
-                  <span className={`rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-widest ${isRotation3d ? "border-violet-300/30 bg-violet-300/10 text-violet-200" : isDrift ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-200" : isPicdrift ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-200" : "border-amber-300/30 bg-amber-300/10 text-amber-200"}`}>
-                    {isRotation3d ? "Rotation3D" : isDrift ? "Drift" : isPicdrift ? "PicDrift" : "VisualFX"}
+                  <span className={`rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-widest ${isTour ? "border-teal-300/30 bg-teal-300/10 text-teal-200" : isRotation3d ? "border-violet-300/30 bg-violet-300/10 text-violet-200" : isDrift ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-200" : isPicdrift ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-200" : "border-amber-300/30 bg-amber-300/10 text-amber-200"}`}>
+                    {isTour ? "Tour" : isRotation3d ? "Rotation3D" : isDrift ? "Drift" : isPicdrift ? "PicDrift" : "VisualFX"}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
@@ -173,7 +180,7 @@ export default function StudioChooser() {
                     {selectingId === profile.id && (
                       <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                     )}
-                    {selectingId === profile.id ? "Opening..." : "Enter Dashboard"}
+                    {selectingId === profile.id ? "Opening..." : isTour ? "Enter creator studio" : "Enter Dashboard"}
                   </span>
                 </div>
               </button>
