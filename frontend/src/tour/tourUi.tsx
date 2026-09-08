@@ -260,6 +260,48 @@ export const TOUR_STYLES = `
 .th-new{border:1.5px dashed var(--border-strong);border-radius:22px;background:color-mix(in srgb,var(--surface) 50%,transparent);min-height:260px;display:grid;place-items:center;align-content:center;gap:8px;color:var(--muted);font:inherit;font-weight:700;cursor:pointer;transition:border-color .16s,background .16s}
 .th-new:hover{border-color:var(--accent-border);background:var(--accent-soft);color:var(--text)}
 .th-new span{display:grid;place-items:center;width:44px;height:44px;border-radius:14px;background:var(--accent-soft);border:1px solid var(--accent-border);color:var(--accent);font-size:22px}
+/* ── Inked route (builder): the rail is a drawn path, pins pop in, states glow ── */
+.t-route-svg{display:none}
+@media(min-width:640px){
+  .t-route.has-ink::before{display:none}
+  .t-route-svg{display:block;position:absolute;left:0;top:0;width:36px;height:100%;overflow:visible;pointer-events:none;z-index:0}
+  .t-route-under{fill:none;stroke:var(--border-strong);stroke-width:2;stroke-dasharray:2 7;stroke-linecap:round;opacity:.8}
+  .t-route-ink{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 5px var(--accent-soft));stroke-dasharray:1000;stroke-dashoffset:1000;animation:t-ink .9s cubic-bezier(.4,.05,.2,1) .05s forwards}
+  .t-route-rider{fill:#fff;stroke:var(--accent);stroke-width:2.5;offset-rotate:0deg;opacity:0;animation:t-ride 1s cubic-bezier(.4,.05,.2,1) .05s forwards;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
+  .t-route-item::before{animation:t-pin .55s cubic-bezier(.34,1.56,.64,1) calc(var(--n,0) * 80ms + .15s) both}
+  .t-route-item.is-processing::before{background:var(--warn);color:#1a1200;animation:t-pin .55s cubic-bezier(.34,1.56,.64,1) calc(var(--n,0) * 80ms + .15s) both,t-halo 1.6s ease-in-out .8s infinite}
+  .t-route-item.is-failed::before{background:var(--err);color:#fff;box-shadow:0 0 0 4px var(--bg),0 6px 16px -6px rgba(251,113,133,.6)}
+  .t-path-item.is-open::before,.t-step.is-selected::before{box-shadow:0 0 0 4px var(--bg),0 0 0 7px var(--accent-soft),0 6px 16px -6px rgba(34,211,238,.6)}
+}
+@keyframes t-ink{to{stroke-dashoffset:0}}
+@keyframes t-ride{0%{offset-distance:0%;opacity:0}8%{opacity:1}88%{opacity:1}100%{offset-distance:100%;opacity:0}}
+@keyframes t-pin{0%{transform:scale(0)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes t-halo{0%,100%{box-shadow:0 0 0 4px var(--bg),0 0 0 6px var(--warn-soft)}50%{box-shadow:0 0 0 4px var(--bg),0 0 0 13px transparent}}
+@media(prefers-reduced-motion:reduce){.t-route-ink{animation:none;stroke-dashoffset:0}.t-route-rider{display:none}.t-route-item::before{animation:none!important}}
+/* ── Live ring + share sheet (the publish moment) ── */
+.d-pill.t-live{position:relative;padding-left:18px}
+.d-pill.t-live::before{content:"";position:absolute;left:7px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:var(--ok);animation:t-live 2s ease-out infinite}
+@keyframes t-live{0%{box-shadow:0 0 0 0 rgba(52,211,153,.6)}70%{box-shadow:0 0 0 7px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
+.t-sheet{position:fixed;inset:0;z-index:60;display:grid;place-items:end center;background:rgba(4,8,16,.6);backdrop-filter:blur(6px);animation:t-fade .25s ease-out}
+.t-sheet-card{position:relative;width:100%;max-width:520px;background:var(--surface);border:1px solid var(--border-strong);border-radius:26px 26px 0 0;padding:22px 20px calc(22px + env(safe-area-inset-bottom));display:grid;gap:16px;box-shadow:0 40px 80px -30px rgba(0,0,0,.7);animation:t-sheet-up .45s cubic-bezier(.2,.7,.2,1)}
+@media(min-width:640px){.t-sheet{place-items:center;padding:20px}.t-sheet-card{border-radius:26px;padding:24px}}
+.t-sheet-x{position:absolute;right:12px;top:12px;width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:var(--surface-2);color:var(--muted);font-size:18px;line-height:1;cursor:pointer;font-family:inherit}
+.t-sheet-hero{display:grid;grid-template-columns:76px minmax(0,1fr);gap:16px;align-items:center;padding-right:28px}
+.t-sheet-title{font-size:20px;font-weight:800;letter-spacing:-.02em;color:var(--text);margin:2px 0 4px;overflow:hidden;text-overflow:ellipsis}
+.t-live-ring{position:relative;width:76px;aspect-ratio:4/5;border-radius:18px;background:var(--surface-3);box-shadow:0 0 0 3px var(--surface),0 0 0 5px var(--ok)}
+.t-live-ring img{width:100%;height:100%;object-fit:cover;display:block;border-radius:18px}
+.t-live-ring.pulse::after{content:"";position:absolute;inset:-5px;border-radius:22px;border:2px solid var(--ok);animation:t-ring 1.5s ease-out .25s 3;pointer-events:none}
+@keyframes t-ring{0%{transform:scale(1);opacity:.9}100%{transform:scale(1.4);opacity:0}}
+.t-sheet-link{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 14px;border-radius:14px;background:var(--surface-2);border:1px solid var(--border)}
+.t-sheet-link code{flex:1;min-width:0;font-family:ui-monospace,Menlo,monospace;font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t-sheet-grid{display:grid;gap:16px;grid-template-columns:auto minmax(0,1fr);align-items:center}
+.t-sheet-qr{padding:10px;border-radius:16px;background:#fff;color:#0b1220;border:1px solid var(--border);display:grid;place-items:center}
+.t-qr{display:block}
+.t-sheet-side{display:grid;gap:8px}
+@keyframes t-fade{from{opacity:0}to{opacity:1}}
+@keyframes t-sheet-up{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+@media(max-width:440px){.t-sheet-grid{grid-template-columns:1fr;justify-items:center;text-align:center}.t-sheet-side .t-actions{justify-content:center}}
+@media(prefers-reduced-motion:reduce){.d-pill.t-live::before,.t-live-ring.pulse::after,.t-sheet,.t-sheet-card{animation:none}}
 `;
 
 /** Page chrome: wordmark → home, theme toggle, log out. */
@@ -316,7 +358,7 @@ export function StatusPill({ status, flow }: { status?: string | null; flow?: bo
     ARCHIVED: { cls: "", label: "Archived" },
   };
   const m = map[s] || { cls: "", label: s.toLowerCase() };
-  return <span className={`d-pill ${m.cls}`}>{m.label}</span>;
+  return <span className={`d-pill ${m.cls} ${s === "PUBLISHED" ? "t-live" : ""}`}>{m.label}</span>;
 }
 
 /** Plan gate — flips to Stripe later; today it asks people to say hi. */

@@ -170,6 +170,15 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   `tourUi`/`tourSession`/`types`; the landing's creator section is `.dl-suite` in `DriftLanding.tsx`.
   Routes sit before the `/:brandSlug` catch-alls; `driftNav.RESERVED_SEG` + backend `RESERVED_SLUGS`
   reserve tour/view/memory/path.
+- **Tour context in the player** (2026-09-08): `GET /api/drift/public/products/:id` adds `flow`
+  (`flowNavPayload` in `routes/drift.ts`: the flow's viewable stops in order + this drift's `index`;
+  null for brand drifts / other routes). `Rotation3DPlayer` passes it as `flowNav` → `SpinViewer`
+  renders the stop strip under the name (`.r3d-stops`), the closing card at the end of the last stop
+  (`.r3d-finale`, gated on the drift's end frame + a 900ms beat), and slides stop→stop along the
+  OUTGOING drift's direction (`prevDirRef`). Everything is gated on `flowNav`, so brand drifts are
+  untouched. Builder: `RouteInk` (TourBuilder) draws the rail as an inked route from the items'
+  pin positions (`:scope > .t-route-item`, pin centre = offsetTop + 33); `ShareSheet.tsx` is the
+  publish moment (link + copy + QR via `qrcode-generator` + system share), also behind "Share".
 - **Rules**: creator button links = drift.li / picdrift.com / same-site paths only (server-validated,
   env `DRIFT_CREATOR_LINK_HOSTS`); a flow-step drift's `ctaPrimary` is flow-managed (the generic
   product patch drops it); product/form deletes cascade the step → the product delete route relinks.

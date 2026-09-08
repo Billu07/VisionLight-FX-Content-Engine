@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import { confirmAction, notify } from "../lib/notifications";
@@ -6,6 +6,7 @@ import { useAuth } from "../hooks/useAuth";
 import type { Flow, FlowStep, Quota } from "./types";
 import { isReady } from "./types";
 import { CREATOR_HOME } from "./tourSession";
+import { ShareSheet } from "./ShareSheet";
 import {
   Spinner,
   StatusPill,
@@ -50,6 +51,54 @@ const CUSTOM = "__custom__";
 const NONE = "";
 
 const stepName = (s: FlowStep, i: number) => s.product?.name || `Stop ${i + 1}`;
+// Pin state on the route rail (colour + halo come from CSS).
+const stateClass = (st?: string | null) =>
+  st === "PROCESSING" ? "is-processing" : st === "FAILED" ? "is-failed" : isReady(st) ? "is-ready" : "";
+
+/**
+ * The rail as an inked route: a dotted trail through every pin (the upload slot
+ * included — that's "what's next"), the accent line drawing itself in through the
+ * stops, and a rider that travels it once whenever the path changes (add, reorder,
+ * expand). The pins are the items' own numbered badges; this draws the line only.
+ */
+function RouteInk({ host, dep }: { host: RefObject<HTMLDivElement | null>; dep: string }) {
+  const [paths, setPaths] = useState<{ ink: string; under: string } | null>(null);
+  useLayoutEffect(() => {
+    const el = host.current;
+    if (!el) return;
+    const measure = () => {
+      const items = Array.from(el.querySelectorAll<HTMLElement>(":scope > .t-route-item"));
+      const pts = items.map((it) => ({ y: it.offsetTop + 33, drop: it.classList.contains("is-drop") }));
+      // A gentle S between pins so it reads as a route, not a ruler.
+      const seg = (a: number, b: number, i: number) => {
+        const k = i % 2 ? -11 : 11;
+        const d = (b - a) * 0.38;
+        return ` C ${13 + k} ${a + d}, ${13 - k} ${b - d}, 13 ${b}`;
+      };
+      const build = (list: { y: number }[]) =>
+        list.length < 2 ? "" : list.slice(1).reduce((acc, p, i) => acc + seg(list[i].y, p.y, i), `M 13 ${list[0].y}`);
+      const ink = build(pts.filter((p) => !p.drop));
+      const under = build(pts);
+      setPaths((prev) => (prev && prev.ink === ink && prev.under === under ? prev : { ink, under }));
+    };
+    measure();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    return () => ro?.disconnect();
+  }, [host, dep]);
+  if (!paths || !paths.under) return null;
+  return (
+    <svg className="t-route-svg" aria-hidden>
+      <path className="t-route-under" d={paths.under} />
+      {/* keyed on `dep` (not the geometry): a path change re-inks + rides; a plain
+          window resize just follows the pins */}
+      {paths.ink && <path key={dep} className="t-route-ink" d={paths.ink} pathLength={1000} />}
+      {paths.ink && (
+        <circle key={"r" + dep} className="t-route-rider" r={5} style={{ offsetPath: `path("${paths.ink}")` }} />
+      )}
+    </svg>
+  );
+}
 
 // ─────────────────────────── link picker ───────────────────────────
 
@@ -280,8 +329,9 @@ function StepCard({
 
   return (
     <div
-      className={`d-card t-step t-route-item ${selected ? "is-selected" : ""}`}
+      className={`d-card t-step t-route-item ${selected ? "is-selected" : ""} ${stateClass(p?.status)}`}
       data-n={index + 1}
+      style={{ ["--n" as any]: index }}
       onClickCapture={onSelect}
     >
       <div className="t-step-media">
@@ -509,7 +559,7 @@ function UploadSlot({
 
   if (progress !== null) {
     return (
-      <div className="d-card d-card-pad t-route-item is-drop" data-n={index + 1} style={{ display: "grid", gap: 10 }}>
+      <div className="d-card d-card-pad t-route-item is-drop" data-n={index + 1} style={{ display: "grid", gap: 10, ["--n" as any]: index }}>
         <div className="t-inline" style={{ justifyContent: "space-between" }}>
           <div className="d-h2">Stop {index + 1} · uploading</div>
           <span className="d-faint">{progress}%</span>
@@ -528,6 +578,7 @@ function UploadSlot({
     <div
       className={`t-drop t-route-item is-drop ${over ? "over" : ""}`}
       data-n={index + 1}
+      style={{ ["--n" as any]: index }}
       onClick={() => inputRef.current?.click()}
       onDragOver={(e) => {
         e.preventDefault();
@@ -589,6 +640,8 @@ export default function TourBuilder() {
   const [nameSaving, setNameSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  // The share sheet: "celebrate" right after publishing, "open" from the Share button.
+  const [share, setShare] = useState<"none" | "open" | "celebrate">("none");
   // "Path" = compact rows you expand one at a time (default); "Cards" = every stop open.
   const [viewMode, setViewMode] = useState<"path" | "cards">(() => {
     try {
@@ -601,6 +654,7 @@ export default function TourBuilder() {
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
   const coverRef = useRef<HTMLInputElement>(null);
+  const routeRef = useRef<HTMLDivElement>(null);
   const [coverBusy, setCoverBusy] = useState(false);
   const switchView = (m: "path" | "cards") => {
     setViewMode(m);
@@ -727,6 +781,7 @@ export default function TourBuilder() {
         const link = publicUrl(r.data.flow.publicPath);
         const copied = await copyText(link);
         notify.success(copied ? "Your tour is live — link copied" : "Your tour is live");
+        setShare("celebrate");
       } else notify.success("Tour unpublished");
     } catch (e) {
       notify.error(apiError(e));
@@ -807,6 +862,8 @@ export default function TourBuilder() {
 
   const canPublish = flow.counts.steps > 0 && flow.counts.processing === 0 && flow.counts.failed === 0;
   const atStepQuota = flow.steps.length >= quota.maxStepsPerFlow;
+  // Anything that moves a pin re-inks the route.
+  const routeDep = [viewMode, expandedId, atStepQuota, ...flow.steps.map((s) => `${s.id}:${s.product?.status || ""}`)].join("|");
   const selected = flow.steps.find((s) => s.id === selectedId) || null;
   const selectedProduct = selected?.product || null;
   const renderCard = (s: FlowStep, i: number) => (
@@ -889,9 +946,14 @@ export default function TourBuilder() {
             {showSettings ? "Hide settings" : "Tour settings"}
           </button>
           {flow.status === "PUBLISHED" ? (
-            <button className="d-btn" onClick={() => publish(false)} disabled={publishing}>
-              Unpublish
-            </button>
+            <>
+              <button className="d-btn primary" onClick={() => setShare("open")}>
+                Share
+              </button>
+              <button className="d-btn" onClick={() => publish(false)} disabled={publishing}>
+                Unpublish
+              </button>
+            </>
           ) : (
             <button
               className="d-btn primary"
@@ -1021,14 +1083,20 @@ export default function TourBuilder() {
       )}
 
       <div className="t-builder">
-        <div className="t-steps t-route">
+        <div className="t-steps t-route has-ink" ref={routeRef}>
+          <RouteInk host={routeRef} dep={routeDep} />
           {viewMode === "cards"
             ? flow.steps.map((s, i) => renderCard(s, i))
             : flow.steps.map((s, i) => {
                 const open = expandedId === s.id;
                 const st = s.product?.status || "DRAFT";
                 return (
-                  <div key={s.id} className={`t-path-item t-route-item ${open ? "is-open" : ""}`} data-n={i + 1}>
+                  <div
+                    key={s.id}
+                    className={`t-path-item t-route-item ${open ? "is-open" : ""} ${stateClass(st)}`}
+                    data-n={i + 1}
+                    style={{ ["--n" as any]: i }}
+                  >
                     <div
                       className={`t-path-row ${dragIdx === i ? "dragging" : ""} ${overIdx === i && dragIdx !== null && dragIdx !== i ? "over" : ""} ${s.id === selectedId ? "is-selected" : ""}`}
                       draggable
@@ -1153,11 +1221,15 @@ export default function TourBuilder() {
           <span>
             Live at <strong>{publicUrl(flow.publicPath).replace(/^https?:\/\//, "")}</strong> — changes you save show up right away.
           </span>
-          <button className="d-btn sm" onClick={copyLink}>
+          <button className="d-btn sm" onClick={() => setShare("open")}>
+            Share
+          </button>
+          <button className="d-btn ghost sm" onClick={copyLink}>
             Copy link
           </button>
         </div>
       )}
+      {share !== "none" && <ShareSheet flow={flow} celebrate={share === "celebrate"} onClose={() => setShare("none")} />}
       <div style={{ height: 24 }} />
       <button className="d-btn ghost sm" onClick={() => navigate(CREATOR_HOME)}>
         ← Back to your tours

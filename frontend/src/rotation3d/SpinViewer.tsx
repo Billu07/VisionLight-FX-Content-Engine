@@ -45,6 +45,21 @@ export type SpinCaption = {
   align?: "left" | "center" | "right";
 };
 
+/** A tour/flow this drift is a stop of — player-side context for the stop strip
+ * and the closing card. `stops` are the flow's viewable drifts in order. */
+export type FlowNavStop = { id: string; productId: string; name: string; title?: string | null; thumb: string | null; playerPath: string };
+export type FlowNav = {
+  id: string;
+  name: string;
+  title?: string | null;
+  publicPath: string;
+  entryPath: string | null;
+  thumb: string | null;
+  endCta?: { label: string; url: string } | null;
+  stops: FlowNavStop[];
+  index: number;
+};
+
 export type SpinViewerProps = {
   manifest: SpinManifest;
   productName?: string;
@@ -57,6 +72,8 @@ export type SpinViewerProps = {
   /** Size the frame the same whether or not it has a headline (tour stops): skips
    * the desktop "no headline → fill the width" rule brand drifts use. */
   uniformSize?: boolean;
+  /** tour context: draws the stop strip, the closing card, and slides stop→stop */
+  flowNav?: FlowNav;
   /** lead-forms a CTA may open (keyed by id), + the product id for lead source */
   forms?: Record<string, OverlayForm>;
   productId?: string;
@@ -189,6 +206,7 @@ export default function SpinViewer({
   ctaSecondary,
   ctaPlacement = "CENTER",
   uniformSize = false,
+  flowNav,
   forms,
   productId,
   onCtaClick,
@@ -262,6 +280,11 @@ export default function SpinViewer({
   const xfadeRef = useRef<HTMLImageElement>(null);
   // false only on the very first effect run; true on every re-run (a drift swap).
   const swappedRef = useRef(false);
+  // The OUTGOING drift's travel direction, for the stop→stop handoff (tour stops).
+  const prevDirRef = useRef<{ vertical: boolean; sign: number } | null>(null);
+  // Drift reached its end frame (drives the tour's closing card on the last stop).
+  const [endReached, setEndReached] = useState(false);
+  const [finaleHidden, setFinaleHidden] = useState(false);
   // Captions live in a ref so updating them doesn't re-init the render engine.
   const captionsRef = useRef<SpinCaption[] | undefined>(captions);
   useEffect(() => {
@@ -897,11 +920,13 @@ export default function SpinViewer({
         if (nav >= 0.92 && !atEnd) {
           atEnd = true;
           setHeadState(true);
+          setEndReached(true);
           helperBack = true; syncHelper(); // arrow + text flip to reverse (always visible)
           if (helperPhase === 1) { showHand(); helperPhase = 2; } // hand reappears at the end
         } else if (nav <= 0.08 && atEnd) {
           atEnd = false;
           setHeadState(false);
+          setEndReached(false);
           helperBack = false; syncHelper(); // arrow + text flip back to forward
         }
       }
@@ -1432,6 +1457,21 @@ export default function SpinViewer({
     // under the new frame, so the hand fades in at its spot rather than dropping. ---
     const isSwap = swappedRef.current;
     swappedRef.current = true;
+    setEndReached(false);
+    setFinaleHidden(false);
+    // Directional handoff (tour stops only): the OUTGOING drift slides on the way its
+    // own footage travelled while the next one settles in from the far side — LTR
+    // exits left and enters from the right, TTB exits upward and enters from below.
+    // Brand drifts (no flow) keep the plain dissolve.
+    const travel = prevDirRef.current;
+    prevDirRef.current = { vertical, sign: dirSign };
+    const reduceMotion = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const slideOn = isSwap && !!flowNav && !!travel && !reduceMotion;
+    const shift = (pct: number) =>
+      !slideOn || !travel ? "" : travel.vertical ? `translate3d(0,${pct * travel.sign}%,0)` : `translate3d(${pct * travel.sign}%,0,0)`;
+    const outT = shift(-6);
+    const inT = shift(4);
+    const EASE = "cubic-bezier(.2,.7,.2,1)";
     if (instant || isSwap) {
       loaderRef.current?.classList.add("r3d-gone");
       let crossfaded = false;
@@ -1443,30 +1483,43 @@ export default function SpinViewer({
           x.src = cv.toDataURL();
           x.style.transition = "none";
           x.style.opacity = "1";
+          x.style.transform = "none";
           x.hidden = false;
           requestAnimationFrame(() => {
             const xx = xfadeRef.current;
-            if (xx) { xx.style.transition = "opacity .34s ease"; xx.style.opacity = "0"; }
+            if (xx) {
+              xx.style.transition = `opacity .34s ease, transform .42s ${EASE}`;
+              xx.style.opacity = "0";
+              if (outT) xx.style.transform = outT;
+            }
           });
-          window.setTimeout(() => { if (xfadeRef.current) xfadeRef.current.hidden = true; }, 480);
+          window.setTimeout(() => {
+            const xx = xfadeRef.current;
+            if (xx) { xx.hidden = true; xx.style.transform = ""; }
+          }, 480);
           crossfaded = true;
         } catch {
           /* cross-origin frames taint the canvas → fall back to a plain fade-in */
         }
       }
-      if (!crossfaded) {
-        cv.style.transition = "none";
-        cv.style.opacity = "0";
-        requestAnimationFrame(() => {
-          const c = canvasRef.current;
-          if (c) { c.style.transition = "opacity .34s ease"; c.style.opacity = "1"; }
-        });
-        // Restore CSS control once faded in (so the view-selector's opacity rule works).
-        window.setTimeout(() => {
-          const c = canvasRef.current;
-          if (c) { c.style.opacity = ""; c.style.transition = ""; }
-        }, 430);
-      }
+      // The incoming drift settles in: a fade when there was no snapshot to cross
+      // from, plus the slide from the far side on a tour handoff.
+      cv.style.transition = "none";
+      cv.style.opacity = crossfaded ? "1" : "0";
+      if (inT) cv.style.transform = inT;
+      requestAnimationFrame(() => {
+        const c = canvasRef.current;
+        if (c) {
+          c.style.transition = `opacity .34s ease, transform .42s ${EASE}`;
+          c.style.opacity = "1";
+          c.style.transform = "none";
+        }
+      });
+      // Restore CSS control once settled (so the view-selector's opacity rule works).
+      window.setTimeout(() => {
+        const c = canvasRef.current;
+        if (c) { c.style.opacity = ""; c.style.transition = ""; c.style.transform = ""; }
+      }, 480);
     }
 
     fit();
@@ -1533,6 +1586,29 @@ export default function SpinViewer({
     }
   };
   const [activeForm, setActiveForm] = useState<{ form: OverlayForm; which: "primary" | "secondary" } | null>(null);
+  // Jump to another stop of the tour (in-app when the host allows it).
+  const goStop = (s: FlowNavStop, i: number) => {
+    if (flowNav && i === flowNav.index) {
+      setFinaleHidden(true);
+      return;
+    }
+    if (onInternalNavigate && onInternalNavigate(s.playerPath)) return;
+    window.location.href = s.playerPath;
+  };
+  // The closing card rises a beat after the end headline dissolves in — never under
+  // a finger that's still dragging.
+  const [finaleReady, setFinaleReady] = useState(false);
+  useEffect(() => {
+    if (!endReached) {
+      setFinaleReady(false);
+      return;
+    }
+    const t = window.setTimeout(() => setFinaleReady(true), 900);
+    return () => window.clearTimeout(t);
+  }, [endReached]);
+  const isLastStop = !!flowNav && flowNav.stops.length > 1 && flowNav.index === flowNav.stops.length - 1;
+  const showFinale = driftMode && isLastStop && finaleReady && !finaleHidden && !activeForm;
+  const endCta = flowNav?.endCta && flowNav.endCta.url && flowNav.endCta.label ? flowNav.endCta : null;
 
   return (
     <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${driftMode && driftDirection !== "LTR" ? `r3d-dir-${driftDirection.toLowerCase()}` : ""} ${landing ? "r3d-landing" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${!showLogo ? "r3d-no-logo" : ""} ${!showName ? "r3d-no-name" : ""} ${!showTitle ? "r3d-no-title" : ""} ${!showTools ? "r3d-no-tools" : ""} ${!mobileZoom ? "r3d-no-mobile-zoom" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
@@ -1558,6 +1634,24 @@ export default function SpinViewer({
           <div className="r3d-titles">
             <div className="r3d-kicker">{brandName}</div>
             <div className="r3d-name">{productName}</div>
+            {driftMode && flowNav && flowNav.stops.length > 1 && (
+              <div className="r3d-stops" role="navigation" aria-label="Tour stops">
+                {flowNav.stops.map((s, i) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    className={`r3d-stop ${i === flowNav.index ? "is-here" : i < flowNav.index ? "is-seen" : ""}`}
+                    title={s.name}
+                    aria-label={`Stop ${i + 1} of ${flowNav.stops.length}: ${s.name}`}
+                    aria-current={i === flowNav.index ? "step" : undefined}
+                    onClick={() => goStop(s, i)}
+                  />
+                ))}
+                <span className="r3d-stops-n">
+                  {flowNav.index + 1}/{flowNav.stops.length}
+                </span>
+              </div>
+            )}
           </div>
         </div>
         <div className="r3d-tools">
@@ -1649,6 +1743,49 @@ export default function SpinViewer({
               {ctaSecondary.label}
             </button>
           )}
+        </div>
+      )}
+
+      {showFinale && flowNav && (
+        <div className="r3d-finale" onClick={() => setFinaleHidden(true)}>
+          <div className="r3d-finale-card" role="dialog" aria-label="End of the tour" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="r3d-finale-x" onClick={() => setFinaleHidden(true)} aria-label="Keep exploring">
+              ×
+            </button>
+            <div className="r3d-finale-head">
+              {flowNav.thumb ? <img className="r3d-finale-cover" src={flowNav.thumb} alt="" /> : <span className="r3d-finale-cover" />}
+              <div style={{ minWidth: 0 }}>
+                <div className="r3d-finale-kicker">End of the tour</div>
+                <div className="r3d-finale-title">{flowNav.title || flowNav.name}</div>
+                <div className="r3d-finale-sub">{flowNav.stops.length} stops · tap one to see it again</div>
+              </div>
+            </div>
+            <div className="r3d-finale-stops">
+              {flowNav.stops.map((s, i) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  className={`r3d-finale-stop ${i === flowNav.index ? "is-here" : ""}`}
+                  onClick={() => goStop(s, i)}
+                  title={s.name}
+                >
+                  {s.thumb && <img src={s.thumb} alt="" />}
+                  <b>{i + 1}</b>
+                  <span>{s.name}</span>
+                </button>
+              ))}
+            </div>
+            <div className="r3d-finale-actions">
+              {endCta && (
+                <button type="button" className="r3d-cta r3d-primary" onClick={() => fireCta("primary", { label: endCta.label, url: endCta.url })}>
+                  {endCta.label}
+                </button>
+              )}
+              <button type="button" className={`r3d-cta ${endCta ? "r3d-ghost" : "r3d-primary"}`} onClick={() => goStop(flowNav.stops[0], 0)}>
+                Start over
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1910,6 +2047,39 @@ const R3D_CSS = `
 .r3d-drift .r3d-cta.r3d-primary{background:#3b82f6;border:none;box-shadow:0 10px 30px -12px rgba(59,130,246,.6)}
 .r3d-drift .r3d-cta.r3d-ghost{background:#8b5cf6;border:none;color:#fff;backdrop-filter:none;box-shadow:0 10px 30px -12px rgba(139,92,246,.6)}
 .r3d-drift .r3d-cta.r3d-ghost:hover{filter:brightness(1.08)}
+/* ── Tour context (flow stops only): a pin strip under the name, and a closing
+   card that rises at the end of the last stop. Brand drifts never render these. ── */
+.r3d-stops{display:flex;align-items:center;gap:6px;margin-top:7px;pointer-events:auto}
+.r3d-stop{width:8px;height:8px;border-radius:50%;padding:0;border:1.5px solid rgba(255,255,255,.62);background:transparent;cursor:pointer;transition:transform .22s cubic-bezier(.34,1.56,.64,1),background .2s,border-color .2s,box-shadow .2s}
+.r3d-stop.is-seen{background:rgba(255,255,255,.62);border-color:rgba(255,255,255,.62)}
+.r3d-stop.is-here{background:#22d3ee;border-color:#22d3ee;box-shadow:0 0 0 3px rgba(34,211,238,.25);transform:scale(1.25);cursor:default}
+.r3d-stop:not(.is-here):hover{transform:scale(1.35);border-color:#fff}
+.r3d-stops-n{font-size:10px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.72);margin-left:3px;font-variant-numeric:tabular-nums}
+.r3d-light .r3d-stop{border-color:rgba(0,0,0,.42)}
+.r3d-light .r3d-stop.is-seen{background:rgba(0,0,0,.42);border-color:rgba(0,0,0,.42)}
+.r3d-light .r3d-stops-n{color:rgba(0,0,0,.6)}
+.r3d-finale{position:absolute;inset:0;z-index:9;display:grid;place-items:end center;background:linear-gradient(to top,rgba(6,10,20,.9) 0%,rgba(6,10,20,.55) 45%,rgba(6,10,20,.12) 100%);animation:r3d-fin-fade .35s ease-out}
+.r3d-finale-card{position:relative;width:100%;max-width:440px;background:rgba(13,18,30,.94);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.12);border-radius:24px 24px 0 0;padding:20px 18px calc(18px + env(safe-area-inset-bottom));display:grid;gap:14px;color:#fff;box-shadow:0 40px 80px -30px rgba(0,0,0,.8);animation:r3d-fin-up .5s cubic-bezier(.2,.7,.2,1);font-family:inherit;text-align:left}
+@media(min-width:700px) and (min-height:520px){.r3d-finale{place-items:center;padding:24px}.r3d-finale-card{border-radius:24px;padding:22px}}
+.r3d-finale-x{position:absolute;right:12px;top:12px;width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff;font-size:18px;line-height:1;cursor:pointer;font-family:inherit;z-index:1}
+.r3d-finale-head{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center;padding-right:28px}
+.r3d-finale-cover{display:block;width:64px;aspect-ratio:4/5;border-radius:14px;object-fit:cover;background:rgba(255,255,255,.06);box-shadow:0 0 0 2px rgba(13,18,30,1),0 0 0 4px #22d3ee}
+.r3d-finale-kicker{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#22d3ee;font-weight:700}
+.r3d-finale-title{font-size:19px;font-weight:700;letter-spacing:-.01em;line-height:1.2;margin-top:3px;overflow:hidden;text-overflow:ellipsis}
+.r3d-finale-sub{font-size:12.5px;color:rgba(255,255,255,.62);margin-top:4px}
+.r3d-finale-stops{display:flex;gap:8px;overflow-x:auto;padding:2px;margin:0 -2px;scrollbar-width:none}
+.r3d-finale-stops::-webkit-scrollbar{display:none}
+.r3d-finale-stop{position:relative;flex:none;width:58px;aspect-ratio:3/4;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);padding:0;cursor:pointer;transition:transform .2s,border-color .2s;font-family:inherit}
+.r3d-finale-stop img{width:100%;height:100%;object-fit:cover;display:block}
+.r3d-finale-stop b{position:absolute;left:5px;top:5px;font-size:10px;font-weight:800;color:#fff;background:rgba(0,0,0,.55);border-radius:6px;padding:1px 5px}
+.r3d-finale-stop span{position:absolute;left:0;right:0;bottom:0;padding:14px 5px 5px;font-size:9.5px;font-weight:600;color:#fff;background:linear-gradient(to top,rgba(0,0,0,.75),transparent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.r3d-finale-stop:hover{transform:translateY(-2px);border-color:#22d3ee}
+.r3d-finale-stop.is-here{border-color:#22d3ee;box-shadow:0 0 0 2px rgba(34,211,238,.35)}
+.r3d-finale-actions{display:flex;gap:10px}
+.r3d-finale-actions .r3d-cta{flex:1;padding:12px 14px;font-size:14px;border-radius:13px}
+@keyframes r3d-fin-fade{from{opacity:0}to{opacity:1}}
+@keyframes r3d-fin-up{from{transform:translateY(26px);opacity:0}to{transform:none;opacity:1}}
+@media(prefers-reduced-motion:reduce){.r3d-finale,.r3d-finale-card{animation:none}}
 /* Bottom stack (drift): CTA buttons up top, then the "Powered by" badge, then
    the landing's Terms/Privacy at the very bottom — see the badge + ctas rules. */
 /* Drift mobile: hide reset + fullscreen (keep it clean). */

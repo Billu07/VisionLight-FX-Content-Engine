@@ -326,6 +326,7 @@ export default function Rotation3DPlayer() {
       ctaSecondary={toCta(p.ctaSecondary) ?? (previewSecondary ? { label: previewSecondary } : undefined)}
       ctaPlacement={drift ? placementOverride ?? p.ctaPlacement : undefined}
       uniformSize={drift ? !!p.inFlow : false}
+      flowNav={drift && p.flow ? p.flow : undefined}
       forms={drift ? p.forms : undefined}
       productId={p.id}
       instant={instant}

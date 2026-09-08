@@ -25,7 +25,7 @@ import {
   DRIFT_DOMAIN_TARGET,
 } from "../services/cloudflareDomains";
 import { sendNewLeadEmail, sendBrandAdminInviteEmail } from "../services/mail";
-import { relinkFlow, stepFlowIdForProduct, isFlowStepProduct } from "../services/driftFlows";
+import { relinkFlow, stepFlowIdForProduct, isFlowStepProduct, stepPlayerPath, flowPublicPath } from "../services/driftFlows";
 
 // Drift (drift.li) — a separate product line running the same interactive
 // spin/path player as Rotation3D, but with its own brand orgs
@@ -953,6 +953,45 @@ async function resolveCtaForms(p: any): Promise<Record<string, any>> {
 }
 
 // Shape a full player payload for a Drift product record (with brand + spin).
+// Tour/flow context for the player (stop strip + closing card): the flow's
+// viewable stops in order and where this drift sits among them. null for brand
+// drifts, or when the include didn't load the flow (other public routes).
+const flowNavPayload = (p: any) => {
+  const f = p?.flowStep?.flow;
+  if (!f) return null;
+  const viewable = (s: string) => s === "READY" || s === "PUBLISHED";
+  const stops = (f.steps || [])
+    .filter((s: any) => s.product && viewable(s.product.status))
+    .map((s: any) => {
+      const frames = s.product.spin?.manifest?.frames;
+      const list: string[] = Array.isArray(frames) ? frames : [];
+      return {
+        id: s.id,
+        productId: s.product.id,
+        name: s.product.name,
+        title: s.product.title ?? null,
+        thumb: s.product.thumbnailUrl || list[s.product.defaultFrame ?? 0] || list[0] || null,
+        playerPath: stepPlayerPath(s.product.id),
+      };
+    });
+  const index = stops.findIndex((s: any) => s.productId === p.id);
+  if (index < 0) return null;
+  const entry = stops[0];
+  return {
+    id: f.id,
+    kind: f.kind,
+    slug: f.slug,
+    name: f.name,
+    title: f.title ?? null,
+    publicPath: flowPublicPath(f.kind, f.slug),
+    entryPath: entry ? entry.playerPath : null,
+    thumb: f.coverUrl || entry?.thumb || null,
+    endCta: f.endCta ?? null,
+    stops,
+    index,
+  };
+};
+
 const publicProductPayload = async (p: any, bc: any, orgName: string, captions: any[], orgPixelId?: string | null) => ({
   id: p.id,
   name: p.name,
@@ -970,6 +1009,7 @@ const publicProductPayload = async (p: any, bc: any, orgName: string, captions: 
   // A tour/flow stop: the player sizes it uniformly (no "fill the screen when
   // there's no headline"), so every stop of a path reads the same.
   inFlow: !!p.flowStep,
+  flow: flowNavPayload(p),
   hideLogo: p.hideLogo,
   hideName: p.hideName,
   hideTitle: p.hideTitle,
@@ -1092,7 +1132,27 @@ router.get(
       where: { id: req.params.id, status: { in: ["READY", "PUBLISHED"] } },
       include: {
         spin: true,
-        flowStep: { select: { id: true } },
+        // The flow this drift is a stop of (tour context for the player): its
+        // viewable stops in order, so the stop strip + closing card can render.
+        flowStep: {
+          select: {
+            id: true,
+            flow: {
+              select: {
+                id: true, kind: true, slug: true, name: true, title: true, coverUrl: true, endCta: true,
+                steps: {
+                  orderBy: { order: "asc" },
+                  select: {
+                    id: true, order: true, productId: true,
+                    product: {
+                      select: { id: true, name: true, title: true, status: true, thumbnailUrl: true, defaultFrame: true, spin: { select: { manifest: true } } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
         organization: {
           select: {
             id: true,
