@@ -1092,6 +1092,7 @@ export default function SpinViewer({
       else if (e.key === "-") zoomTarget = clampZoom(zoomTarget * 0.83);
       else if (e.key === "r" || e.key === "R") { yaw = (DEFAULT_FRAME / FRAMES) * TWO_PI; zoomTarget = 1; panX = panY = panTX = panTY = 0; }
       else if (e.key === "f" || e.key === "F") toggleFs();
+      else if (e.key === "Escape" && pseudoFs) toggleFs();
     };
 
     // Fullscreen with an iOS fallback. Safari can't fullscreen a <div> (only
@@ -1152,6 +1153,7 @@ export default function SpinViewer({
       if (landscapeZoomTimer) clearTimeout(landscapeZoomTimer);
       landscapeZoomTimer = setTimeout(() => {
         landscapeZoomTimer = null;
+        updateLandscapeTakeover();
         updateLandscapeZoom();
       }, 160);
     };
@@ -1162,7 +1164,37 @@ export default function SpinViewer({
       syncFsIcon();
       scheduleLandscapeZoom();
     };
+    // Rotate-to-fullscreen (client spec): on a phone/tablet, turning the device
+    // sideways on a drift takes the player over the whole screen, and turning it
+    // back restores the page. Browsers refuse NATIVE fullscreen without a tap, so
+    // this uses the CSS pseudo-fullscreen (the same one the button falls back to on
+    // iPhone). Only what we auto-entered is auto-exited; if the viewer taps the
+    // exit button while sideways, we stay out until the next rotation.
+    let autoPseudo = false;
+    let userExitedLandscape = false;
+    const updateLandscapeTakeover = () => {
+      if (!isTouchDevice || hero || landing || !driftMode) return;
+      if (isLandscape()) {
+        if (!pseudoFs && !nativeFsActive() && !userExitedLandscape) {
+          autoPseudo = true;
+          setPseudo(true);
+        }
+      } else {
+        userExitedLandscape = false;
+        if (pseudoFs && autoPseudo) {
+          autoPseudo = false;
+          setPseudo(false);
+        }
+      }
+    };
     const toggleFs = () => {
+      if (pseudoFs) {
+        // Leaving pseudo-fullscreen (auto or manual) always works with one tap.
+        autoPseudo = false;
+        userExitedLandscape = isLandscape();
+        setPseudo(false);
+        return;
+      }
       const reqFs = stage.requestFullscreen || (stage as any).webkitRequestFullscreen;
       if (reqFs) {
         if (nativeFsActive()) {
@@ -1887,8 +1919,10 @@ const R3D_CSS = `
      product. Pull them into a compact bottom control bar (clear of side notches),
      lift the drag helper just above it, and tuck the attribution to the corners so
      the product owns the screen. */
-  .r3d-drift .r3d-ctas{padding:8px calc(16px + env(safe-area-inset-right)) calc(26px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));gap:10px;max-width:520px}
-  .r3d-drift .r3d-cta{padding:9px 14px;font-size:13px}
+  .r3d-drift .r3d-ctas{padding:8px calc(16px + env(safe-area-inset-right)) calc(22px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));gap:10px;max-width:none;justify-content:center}
+  .r3d-drift .r3d-cta{flex:0 1 auto;min-width:118px;max-width:44vw;padding:8px 16px;font-size:12.5px;border-radius:11px;box-shadow:0 8px 22px -12px rgba(0,0,0,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .r3d-iconbtn{width:36px;height:36px}
+  .r3d-name{font-size:13px}
   .r3d-drift .r3d-hint{bottom:88px}
   .r3d-drift .r3d-drift-hand{width:30px;height:30px}
   .r3d-drift .r3d-drift-hand svg{width:19px;height:19px}
