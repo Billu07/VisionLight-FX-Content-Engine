@@ -399,11 +399,12 @@ export default function BrandProductEditModal({
                   onChange={(e) => setCtaPlacement(e.target.value)}
                   title="Where the two buttons sit in the player"
                 >
-                  <option value="CENTER">Centre (side by side)</option>
+                  <option value="CENTER">Centre — primary left, secondary right</option>
+                  <option value="CENTER_REV">Centre — secondary left, primary right</option>
                   <option value="LEFT">Bottom left</option>
                   <option value="RIGHT">Bottom right</option>
-                  <option value="SPLIT">Spread — Next on the right</option>
-                  <option value="SPLIT_REV">Spread — Next on the left</option>
+                  <option value="SPLIT">Spread — primary on the right</option>
+                  <option value="SPLIT_REV">Spread — primary on the left</option>
                 </select>
               </label>
             )}

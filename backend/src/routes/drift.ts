@@ -110,7 +110,7 @@ export const parseDirection = (v: unknown): string | null => {
 
 // Where the CTA row sits in the player (per drift). SPLIT = one button at each
 // edge with the primary (Next) on the right; SPLIT_REV puts it on the left.
-const CTA_PLACEMENTS = new Set(["CENTER", "LEFT", "RIGHT", "SPLIT", "SPLIT_REV"]);
+const CTA_PLACEMENTS = new Set(["CENTER", "CENTER_REV", "LEFT", "RIGHT", "SPLIT", "SPLIT_REV"]);
 export const parseCtaPlacement = (v: unknown): string | null => {
   const s = String(v ?? "").trim().toUpperCase();
   return CTA_PLACEMENTS.has(s) ? s : null;

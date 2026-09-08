@@ -536,7 +536,7 @@ router.patch(
     }
     if ("ctaPlacement" in body) {
       const p = parseCtaPlacement(body.ctaPlacement);
-      if (!p) return res.status(400).json({ error: "Button placement must be CENTER, LEFT, RIGHT, SPLIT or SPLIT_REV" });
+      if (!p) return res.status(400).json({ error: "Button placement must be CENTER, CENTER_REV, LEFT, RIGHT, SPLIT or SPLIT_REV" });
       data.ctaPlacement = p;
     }
     let customCta: CreatorCta | null | undefined;

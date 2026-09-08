@@ -27,6 +27,7 @@ import {
  */
 
 type LinkOption = { label: string; url: string };
+type PreviewDraft = { placement: string; btnLabel: string; hasCustom: boolean };
 
 const DEFAULT_NEXT = "Next stop";
 const DEFAULT_END = "Restart tour";
@@ -114,6 +115,7 @@ function StepCard({
   onSelect: () => void;
   onChanged: (flow: Flow) => void;
   maxClip: number;
+  onPreview: (draft: PreviewDraft) => void;
 }) {
   const p = step.product;
   const [name, setName] = useState(p?.name || "");
@@ -125,6 +127,12 @@ function StepCard({
   const [direction, setDirection] = useState(p?.driftDirection || "LTR");
   const [placement, setPlacement] = useState(p?.ctaPlacement || "CENTER");
   const [saving, setSaving] = useState(false);
+  // Live preview: the selected card's unsaved placement + button labels.
+  useEffect(() => {
+    if (!selected) return;
+    onPreview({ placement, btnLabel: btnLabel.trim(), hasCustom: !!(btnLabel.trim() && btnUrl.trim()) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, placement, btnLabel, btnUrl]);
   const [replacing, setReplacing] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -373,7 +381,8 @@ function StepCard({
             </select>
             <label className="d-label" style={{ marginTop: 10 }}>Buttons</label>
             <select className="d-select" value={placement} onChange={(e) => setPlacement(e.target.value)}>
-              <option value="CENTER">Centre (side by side)</option>
+              <option value="CENTER">Centre — Next left, your button right</option>
+              <option value="CENTER_REV">Centre — your button left, Next right</option>
               <option value="LEFT">Bottom left</option>
               <option value="RIGHT">Bottom right</option>
               <option value="SPLIT">Spread — Next on the right</option>
@@ -517,6 +526,12 @@ export default function TourBuilder() {
   const [allOptions, setAllOptions] = useState<LinkOption[]>([]);
   const [missing, setMissing] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [previewDraft, setPreviewDraft] = useState<PreviewDraft | null>(null);
+  const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onPreview = (d: PreviewDraft) => {
+    if (previewTimer.current) clearTimeout(previewTimer.current);
+    previewTimer.current = setTimeout(() => setPreviewDraft(d), 300);
+  };
   const [name, setName] = useState("");
   const [nameSaving, setNameSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -820,9 +835,13 @@ export default function TourBuilder() {
               index={i}
               options={options}
               selected={s.id === selectedId}
-              onSelect={() => setSelectedId(s.id)}
+              onSelect={() => {
+                if (s.id !== selectedId) setPreviewDraft(null);
+                setSelectedId(s.id);
+              }}
               onChanged={applyFlow}
               maxClip={quota.maxClipSeconds}
+              onPreview={onPreview}
             />
           ))}
 
@@ -857,7 +876,7 @@ export default function TourBuilder() {
             {selectedProduct && isReady(selectedProduct.status) ? (
               <iframe
                 key={selectedProduct.id + selectedProduct.updatedAt}
-                src={`/embed/${selectedProduct.id}`}
+                src={`/embed/${selectedProduct.id}?ctaPlacement=${encodeURIComponent(previewDraft?.placement || selectedProduct.ctaPlacement || "CENTER")}&previewPrimary=${encodeURIComponent(nextLabel.trim() || DEFAULT_NEXT)}${previewDraft?.hasCustom ? `&previewSecondary=${encodeURIComponent(previewDraft.btnLabel)}` : ""}`}
                 title={`Preview of ${selectedProduct.name}`}
                 allow="fullscreen"
               />

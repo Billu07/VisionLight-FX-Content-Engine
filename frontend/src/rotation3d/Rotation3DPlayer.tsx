@@ -134,6 +134,15 @@ export default function Rotation3DPlayer() {
   const [search] = useSearchParams();
   // embed customization via URL params (?cta=0&controls=0&brand=0)
   const showCtas = search.get("cta") !== "0";
+  // Builder live preview (the /embed iframe in the tour builder): unsaved button
+  // placement + labels arrive as query params. The labels only stand in when the
+  // drift has no real button yet (a single-stop tour has no Next to show).
+  const placementParam = (search.get("ctaPlacement") || "").toUpperCase();
+  const placementOverride = (["CENTER", "CENTER_REV", "LEFT", "RIGHT", "SPLIT", "SPLIT_REV"] as const).find(
+    (v) => v === placementParam,
+  );
+  const previewPrimary = (search.get("previewPrimary") || "").slice(0, 40);
+  const previewSecondary = (search.get("previewSecondary") || "").slice(0, 40);
   const showControls = search.get("controls") !== "0";
   const showBrand = search.get("brand") !== "0";
   const showLogo = search.get("logo") !== "0";
@@ -313,9 +322,9 @@ export default function Rotation3DPlayer() {
       showTitle={showTitle && !(drift && p.hideTitle)}
       mobileZoom={drift ? !!p.mobileZoom : true}
       introHint={drift}
-      ctaPrimary={toCta(p.ctaPrimary)}
-      ctaSecondary={toCta(p.ctaSecondary)}
-      ctaPlacement={drift ? p.ctaPlacement : undefined}
+      ctaPrimary={toCta(p.ctaPrimary) ?? (previewPrimary ? { label: previewPrimary } : undefined)}
+      ctaSecondary={toCta(p.ctaSecondary) ?? (previewSecondary ? { label: previewSecondary } : undefined)}
+      ctaPlacement={drift ? placementOverride ?? p.ctaPlacement : undefined}
       uniformSize={drift ? !!p.inFlow : false}
       forms={drift ? p.forms : undefined}
       productId={p.id}

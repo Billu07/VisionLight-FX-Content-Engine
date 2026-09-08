@@ -53,7 +53,7 @@ export type SpinViewerProps = {
   ctaSecondary?: SpinCta;
   /** Where the CTA row sits: CENTER (default pair), LEFT/RIGHT corner, SPLIT (one at
    * each edge, primary on the right), SPLIT_REV (primary on the left). */
-  ctaPlacement?: "CENTER" | "LEFT" | "RIGHT" | "SPLIT" | "SPLIT_REV";
+  ctaPlacement?: "CENTER" | "CENTER_REV" | "LEFT" | "RIGHT" | "SPLIT" | "SPLIT_REV";
   /** Size the frame the same whether or not it has a headline (tour stops): skips
    * the desktop "no headline → fill the width" rule brand drifts use. */
   uniformSize?: boolean;
@@ -1788,6 +1788,7 @@ const R3D_CSS = `
    right (DOM order is primary, secondary → reverse the row); SPLIT_REV keeps the
    primary on the left. Buttons hug their text instead of stretching. */
 .r3d-drift .r3d-ctas.r3d-ctas-left,.r3d-drift .r3d-ctas.r3d-ctas-right,.r3d-drift .r3d-ctas.r3d-ctas-split,.r3d-drift .r3d-ctas.r3d-ctas-split_rev{max-width:none;margin:0}
+.r3d-drift .r3d-ctas.r3d-ctas-center_rev{flex-direction:row-reverse}
 .r3d-drift .r3d-ctas.r3d-ctas-left{justify-content:flex-start}
 .r3d-drift .r3d-ctas.r3d-ctas-right{justify-content:flex-end}
 .r3d-drift .r3d-ctas.r3d-ctas-split{justify-content:space-between;flex-direction:row-reverse}
