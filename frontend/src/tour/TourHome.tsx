@@ -14,6 +14,73 @@ import { StatusPill, TourShell, UpgradeCard, apiError, copyText, publicUrl, time
 
 const DEMO_HIDDEN_KEY = "drift_demo_hidden";
 
+// Illustrated fallbacks for the hero phones (until the creator has stops of their own).
+const SCENES = [
+  {
+    name: "Living room",
+    svg: (
+      <svg viewBox="0 0 90 160" preserveAspectRatio="xMidYMid slice" aria-hidden>
+        <defs>
+          <linearGradient id="s1a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1b2b46" /><stop offset="1" stopColor="#0c1424" /></linearGradient>
+          <linearGradient id="s1b" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ffd9a0" /><stop offset="1" stopColor="#f59e8b" /></linearGradient>
+        </defs>
+        <rect width="90" height="160" fill="url(#s1a)" />
+        <rect x="14" y="22" width="40" height="52" rx="3" fill="url(#s1b)" opacity=".9" />
+        <rect x="14" y="22" width="40" height="52" rx="3" fill="none" stroke="#ffffff" strokeOpacity=".35" />
+        <path d="M34 22v52M14 48h40" stroke="#ffffff" strokeOpacity=".3" />
+        <rect x="8" y="98" width="74" height="26" rx="8" fill="#3b4a6b" />
+        <rect x="12" y="90" width="24" height="16" rx="6" fill="#4b5d85" />
+        <rect x="54" y="90" width="24" height="16" rx="6" fill="#4b5d85" />
+        <ellipse cx="45" cy="140" rx="34" ry="6" fill="#0a1120" opacity=".7" />
+        <circle cx="70" cy="40" r="6" fill="#ffe8b8" opacity=".9" />
+      </svg>
+    ),
+  },
+  {
+    name: "Kitchen",
+    svg: (
+      <svg viewBox="0 0 90 160" preserveAspectRatio="xMidYMid slice" aria-hidden>
+        <defs>
+          <linearGradient id="s2a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#0f2a2e" /><stop offset="1" stopColor="#081418" /></linearGradient>
+        </defs>
+        <rect width="90" height="160" fill="url(#s2a)" />
+        <rect x="0" y="86" width="90" height="10" fill="#1f3c42" />
+        <rect x="6" y="96" width="78" height="40" rx="4" fill="#173137" />
+        <path d="M18 96v40M34 96v40M50 96v40M66 96v40" stroke="#0e2226" />
+        <rect x="8" y="34" width="30" height="24" rx="3" fill="#1f3c42" />
+        <rect x="52" y="34" width="30" height="24" rx="3" fill="#1f3c42" />
+        <rect x="24" y="72" width="42" height="6" rx="3" fill="#22d3ee" opacity=".75" />
+        <circle cx="45" cy="52" r="10" fill="#22d3ee" opacity=".16" />
+        <circle cx="45" cy="52" r="4" fill="#9ff3ff" opacity=".9" />
+      </svg>
+    ),
+  },
+  {
+    name: "Terrace",
+    svg: (
+      <svg viewBox="0 0 90 160" preserveAspectRatio="xMidYMid slice" aria-hidden>
+        <defs>
+          <linearGradient id="s3a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#3a2a6e" /><stop offset=".55" stopColor="#f0846a" /><stop offset="1" stopColor="#1a1030" /></linearGradient>
+        </defs>
+        <rect width="90" height="160" fill="url(#s3a)" />
+        <circle cx="30" cy="70" r="14" fill="#ffd27a" />
+        <rect x="0" y="86" width="90" height="74" fill="#1a1030" />
+        <path d="M0 86 L14 70 L26 86 L40 62 L56 86 L70 74 L90 86 Z" fill="#2a1d52" />
+        <rect x="10" y="118" width="70" height="4" rx="2" fill="#5b4a9a" />
+        <rect x="16" y="122" width="4" height="26" fill="#5b4a9a" /><rect x="70" y="122" width="4" height="26" fill="#5b4a9a" />
+        <rect x="30" y="130" width="30" height="10" rx="3" fill="#7c6bc0" />
+      </svg>
+    ),
+  },
+];
+
+const HandGlyph = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8" />
+    <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-7-4l-2.5-4a2 2 0 0 1 3.4-2L8 14" />
+  </svg>
+);
+
 export default function TourHome() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -66,6 +133,20 @@ export default function TourHome() {
   const atQuota = !!quota && quota.usedFlows >= quota.maxFlows;
   const firstName = (creator?.name || user?.name || "").trim().split(/\s+/)[0] || "";
   const showDemo = !!demo && !demoHidden;
+
+  // Hero phones: the creator's own stops first, then the demo's, then illustrations.
+  const shots: { thumb: string | null; label: string }[] = [];
+  for (const f of flows) {
+    for (const s of f.steps) {
+      if (s.product?.thumb && shots.length < 3) shots.push({ thumb: s.product.thumb, label: s.product.name });
+    }
+  }
+  if (demo) {
+    for (const s of demo.steps) {
+      if (s.thumb && shots.length < 3) shots.push({ thumb: s.thumb, label: s.name });
+    }
+  }
+  const phones = [0, 1, 2].map((i) => shots[i] ?? { thumb: null, label: SCENES[i].name });
 
   const create = async () => {
     const name = newName.trim();
@@ -170,15 +251,19 @@ export default function TourHome() {
           )}
         </div>
         <div className="th-art" aria-hidden>
-          <span className="th-phone th-phone-1">
-            <i />
-          </span>
-          <span className="th-phone th-phone-2">
-            <i />
-          </span>
-          <span className="th-phone th-phone-3">
-            <i />
-          </span>
+          {phones.map((ph, i) => (
+            <span key={i} className={`th-phone th-phone-${i + 1}`}>
+              <i className="th-shot" style={ph.thumb ? { backgroundImage: `url("${ph.thumb}")` } : undefined}>
+                {!ph.thumb && SCENES[i].svg}
+              </i>
+              <em>{ph.label}</em>
+              <b className="th-hand">
+                <HandGlyph />
+              </b>
+              <span className="th-arrow" />
+              <u>{i === 2 ? "Restart tour" : "Next stop"}</u>
+            </span>
+          ))}
         </div>
       </section>
 
