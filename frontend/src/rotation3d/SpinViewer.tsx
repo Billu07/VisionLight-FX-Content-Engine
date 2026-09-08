@@ -423,8 +423,12 @@ export default function SpinViewer({
     // The `let` state above is fresh, so nothing re-syncs until the next end/start
     // crossing — the arrow pointed the wrong way until you'd scrubbed once. Put the
     // DOM back to the start state now (the hint is still hidden by r3d-hint-init).
+    // Class + text only — NOT syncHelper(): its placeHelperX() reads frameRect,
+    // which is declared further down this effect (TDZ crash), and the anchor is
+    // re-placed every frame from draw() anyway.
     if (driftMode) {
-      syncHelper();
+      hintRef.current?.classList.remove("r3d-back");
+      if (helperTextRef.current) helperTextRef.current.textContent = fwdHelper;
       setHeadState(false);
       showHand();
     }
