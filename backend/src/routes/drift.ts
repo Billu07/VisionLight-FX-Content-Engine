@@ -967,6 +967,9 @@ const publicProductPayload = async (p: any, bc: any, orgName: string, captions: 
   loopEnabled: p.loopEnabled,
   driftDirection: p.driftDirection || "LTR",
   ctaPlacement: p.ctaPlacement || "CENTER",
+  // A tour/flow stop: the player sizes it uniformly (no "fill the screen when
+  // there's no headline"), so every stop of a path reads the same.
+  inFlow: !!p.flowStep,
   hideLogo: p.hideLogo,
   hideName: p.hideName,
   hideTitle: p.hideTitle,
@@ -1089,6 +1092,7 @@ router.get(
       where: { id: req.params.id, status: { in: ["READY", "PUBLISHED"] } },
       include: {
         spin: true,
+        flowStep: { select: { id: true } },
         organization: {
           select: {
             id: true,

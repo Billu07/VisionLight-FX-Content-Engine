@@ -54,6 +54,9 @@ export type SpinViewerProps = {
   /** Where the CTA row sits: CENTER (default pair), LEFT/RIGHT corner, SPLIT (one at
    * each edge, primary on the right), SPLIT_REV (primary on the left). */
   ctaPlacement?: "CENTER" | "LEFT" | "RIGHT" | "SPLIT" | "SPLIT_REV";
+  /** Size the frame the same whether or not it has a headline (tour stops): skips
+   * the desktop "no headline → fill the width" rule brand drifts use. */
+  uniformSize?: boolean;
   /** lead-forms a CTA may open (keyed by id), + the product id for lead source */
   forms?: Record<string, OverlayForm>;
   productId?: string;
@@ -185,6 +188,7 @@ export default function SpinViewer({
   ctaPrimary,
   ctaSecondary,
   ctaPlacement = "CENTER",
+  uniformSize = false,
   forms,
   productId,
   onCtaClick,
@@ -639,9 +643,10 @@ export default function SpinViewer({
         // box (the frame's largest side) = base * 4.2.
         const img0 = realMode ? nearestLoaded(frame) : null;
         const ar0 = img0 ? img0.naturalWidth / img0.naturalHeight : 1;
-        if (bigDesktop && !hasHeadline) {
+        if (bigDesktop && !hasHeadline && !uniformSize) {
           // Desktop, no headline → let wide content fill more WIDTH; height stays
-          // inside the band so nothing runs under the buttons.
+          // inside the band so nothing runs under the buttons. (Brand drifts only:
+          // tour stops pass uniformSize so a path never changes size stop to stop.)
           const availW = W * 0.9;
           const boxMax = ar0 >= 1 ? Math.min(availW, bandH * ar0) : Math.min(bandH, availW / ar0);
           base = boxMax / 4.2;

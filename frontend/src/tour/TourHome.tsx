@@ -7,8 +7,9 @@ import type { Creator, Flow, PublicFlow, Quota } from "./types";
 import { StatusPill, TourShell, UpgradeCard, apiError, copyText, publicUrl, timeAgo } from "./tourUi";
 
 /**
- * /tour — the creator's home. Their tours as a gallery of cards, a prominent
- * "Create a tour", the client's demo tour, and plan usage with the upgrade gate.
+ * /tour — the creator's studio. A calm hero (greeting, one clear action, the demo),
+ * plan usage, then the tours as a shelf of portrait cards, and a first-tour panel
+ * when there's nothing yet. Polls while a tour is still building.
  */
 
 const DEMO_HIDDEN_KEY = "drift_demo_hidden";
@@ -50,6 +51,7 @@ export default function TourHome() {
   };
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Keep cards fresh while any tour is still building its stops.
@@ -63,6 +65,7 @@ export default function TourHome() {
 
   const atQuota = !!quota && quota.usedFlows >= quota.maxFlows;
   const firstName = (creator?.name || user?.name || "").trim().split(/\s+/)[0] || "";
+  const showDemo = !!demo && !demoHidden;
 
   const create = async () => {
     const name = newName.trim();
@@ -109,34 +112,79 @@ export default function TourHome() {
     }
   };
 
+  const startCreate = () => {
+    setCreating(true);
+    setTimeout(() => document.getElementById("new-tour-name")?.focus(), 50);
+  };
+
   return (
     <TourShell>
-      <div className="t-head t-rise">
-        <div>
-          <div className="d-eyebrow"><span className="t-eyebrow-dot" />Your creator space</div>
-          <h1 className="t-title">{firstName ? `Hi, ${firstName}` : "Your tours"}</h1>
-          <p className="d-sub" style={{ marginTop: 6 }}>
-            Film short clips on your phone; we turn them into a guided, interactive tour.
-          </p>
-        </div>
-        {quota && (
-          <div className="t-usage">
-            <span className="t-chip">
-              Tours <b>{quota.usedFlows}/{quota.maxFlows}</b>
-            </span>
-            <span className="t-chip">
-              Stops per tour <b>{quota.maxStepsPerFlow}</b>
-            </span>
-            <span className="t-chip">
-              Clips up to <b>{quota.maxClipSeconds}s</b>
-            </span>
-            <span className="d-pill accent">Free plan</span>
+      {/* Hero */}
+      <section className="th-hero t-rise">
+        <div className="th-copy">
+          <div className="d-eyebrow">
+            <span className="t-eyebrow-dot" />
+            Creator studio
           </div>
-        )}
-      </div>
+          <h1 className="th-title">
+            {firstName ? `Hi, ${firstName}.` : "Welcome."}
+            <span>Make something people can hold.</span>
+          </h1>
+          <p className="d-sub">
+            Film a few short clips on your phone. We turn them into a guided, interactive tour with a single
+            link to share.
+          </p>
+          <div className="t-actions" style={{ marginTop: 18 }}>
+            {atQuota ? (
+              <a
+                className="d-btn primary th-cta"
+                href="mailto:web@drift.li?subject=Upgrade%20my%20drift.li%20plan"
+                style={{ textDecoration: "none" }}
+              >
+                Talk to us about more tours
+              </a>
+            ) : (
+              <button className="d-btn primary th-cta" onClick={startCreate}>
+                + Create a tour
+              </button>
+            )}
+            {demo?.entryPath && (
+              <a className="d-btn th-ghost" href={demo.entryPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+                ▶ Watch the demo
+              </a>
+            )}
+          </div>
+          {quota && (
+            <div className="th-meta">
+              <span className="t-chip">
+                Tours <b>{quota.usedFlows}/{quota.maxFlows}</b>
+              </span>
+              <span className="t-chip">
+                Stops per tour <b>{quota.maxStepsPerFlow}</b>
+              </span>
+              <span className="t-chip">
+                Clips up to <b>{quota.maxClipSeconds}s</b>
+              </span>
+              <span className="d-pill accent">Free plan</span>
+            </div>
+          )}
+        </div>
+        <div className="th-art" aria-hidden>
+          <span className="th-phone th-phone-1">
+            <i />
+          </span>
+          <span className="th-phone th-phone-2">
+            <i />
+          </span>
+          <span className="th-phone th-phone-3">
+            <i />
+          </span>
+        </div>
+      </section>
 
-      {creating ? (
-        <div className="d-card d-card-pad" style={{ marginBottom: 18, display: "grid", gap: 10 }}>
+      {/* Inline create */}
+      {creating && (
+        <div className="d-card d-card-pad th-create t-rise">
           <div className="d-eyebrow">New tour</div>
           <label className="d-label" htmlFor="new-tour-name">
             What is this tour of?
@@ -145,8 +193,7 @@ export default function TourHome() {
             <input
               id="new-tour-name"
               className="d-input"
-              style={{ flex: "1 1 240px" }}
-              autoFocus
+              style={{ flex: "1 1 260px" }}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && create()}
@@ -161,136 +208,152 @@ export default function TourHome() {
             </button>
           </div>
           <div className="d-faint" style={{ fontSize: 12 }}>
-            You'll add the clips next. The name is the tour's public link, and you can change it later.
+            You'll add the clips next. The name becomes the public link and can be changed later.
           </div>
         </div>
-      ) : atQuota ? (
-        <div style={{ marginBottom: 18 }}>
+      )}
+
+      {/* First tour */}
+      {!loading && flows.length === 0 && !creating && (
+        <section className="d-card th-first t-rise t-rise-2">
+          <div>
+            <div className="d-eyebrow">Your first tour</div>
+            <h2>About five minutes, start to finish</h2>
+          </div>
+          <ol className="th-steps">
+            <li>
+              <b>1</b>
+              <div>
+                Name your tour
+                <span>a home, a venue, a walk</span>
+              </div>
+            </li>
+            <li>
+              <b>2</b>
+              <div>
+                Upload up to {quota?.maxStepsPerFlow ?? 3} clips
+                <span>{quota?.maxClipSeconds ?? 5} seconds each, straight from your phone</span>
+              </div>
+            </li>
+            <li>
+              <b>3</b>
+              <div>
+                Add a headline and a button per stop
+                <span>publish, then share one link</span>
+              </div>
+            </li>
+          </ol>
+          {!atQuota && (
+            <button className="d-btn primary th-cta" onClick={startCreate}>
+              + Create a tour
+            </button>
+          )}
+        </section>
+      )}
+
+      {/* Shelf */}
+      {(flows.length > 0 || showDemo) && (
+        <section className="th-shelf t-rise t-rise-3">
+          <div className="th-shelf-head">
+            <h2 className="d-h2">Your tours</h2>
+            {quota && (
+              <span className="d-faint" style={{ fontSize: 12.5 }}>
+                {quota.usedFlows} of {quota.maxFlows} on the free plan
+              </span>
+            )}
+          </div>
+          <div className="th-grid">
+            {flows.map((f) => (
+              <article key={f.id} className="th-item" onClick={() => navigate(`/tour/${f.id}/edit`)}>
+                <div className="th-thumb">
+                  {f.thumb ? <img src={f.thumb} alt="" loading="lazy" /> : <div className="ph">No stops yet — add your first clip</div>}
+                  <div className="th-glass">
+                    <span className="th-name" title={f.name}>
+                      {f.name}
+                    </span>
+                    <StatusPill status={f.status} flow />
+                  </div>
+                </div>
+                <div className="th-body">
+                  <div className="t-muted-row">
+                    <span>
+                      {f.counts.ready}/{f.counts.steps} stops ready
+                    </span>
+                    {f.counts.processing > 0 && <span className="d-pill warn">building {f.counts.processing}</span>}
+                    {f.counts.failed > 0 && <span className="d-pill err">{f.counts.failed} failed</span>}
+                    <span className="d-faint">· {timeAgo(f.updatedAt)}</span>
+                  </div>
+                  <div className="t-card-actions" onClick={(e) => e.stopPropagation()}>
+                    <button className="d-btn soft sm" onClick={() => navigate(`/tour/${f.id}/edit`)}>
+                      Edit
+                    </button>
+                    {f.entryPath && (
+                      <a className="d-btn sm" href={f.entryPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+                        Play
+                      </a>
+                    )}
+                    {f.status === "PUBLISHED" && (
+                      <button className="d-btn sm" onClick={() => copy(f)}>
+                        Copy link
+                      </button>
+                    )}
+                    <button className="d-btn ghost sm" onClick={() => remove(f)} title="Delete tour">
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+
+            {showDemo && demo && (
+              <article className="th-item" onClick={() => demo.entryPath && window.open(demo.entryPath, "_blank")}>
+                <div className="th-thumb">
+                  {demo.thumb ? <img src={demo.thumb} alt="" loading="lazy" /> : <div className="ph">Demo tour</div>}
+                  <span className="th-play" aria-hidden>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                  </span>
+                  <div className="th-glass">
+                    <span className="th-name">See a finished tour</span>
+                    <span className="d-pill accent">Demo</span>
+                  </div>
+                </div>
+                <div className="th-body">
+                  <div className="t-muted-row">
+                    <span>{demo.name}</span>
+                    <span className="d-faint">· {demo.steps.length} stops</span>
+                  </div>
+                  <div className="t-card-actions" onClick={(e) => e.stopPropagation()}>
+                    {demo.entryPath && (
+                      <a className="d-btn soft sm" href={demo.entryPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+                        Play demo
+                      </a>
+                    )}
+                    <button className="d-btn ghost sm" onClick={hideDemo}>
+                      Hide
+                    </button>
+                  </div>
+                </div>
+              </article>
+            )}
+
+            {!loading && flows.length > 0 && !atQuota && !creating && (
+              <button className="th-new" onClick={startCreate}>
+                <span>+</span>
+                New tour
+              </button>
+            )}
+          </div>
+        </section>
+      )}
+
+      {atQuota && flows.length > 0 && (
+        <div style={{ marginTop: 20 }}>
           <UpgradeCard
             title="You've used your free tour"
             body={`The free plan includes ${quota?.maxFlows} tour with ${quota?.maxStepsPerFlow} stops. More tours, more stops and longer clips come with a paid plan.`}
           />
         </div>
-      ) : (
-        !loading && flows.length > 0 && (
-          <div style={{ marginBottom: 18 }}>
-            <button className="d-btn primary" style={{ padding: "12px 18px", fontSize: 14 }} onClick={() => setCreating(true)}>
-              + Create a tour
-            </button>
-          </div>
-        )
       )}
-
-      {!loading && flows.length === 0 && !creating && (
-        <div className="d-card t-empty t-rise t-rise-2" style={{ marginBottom: 18 }}>
-          <div className="t-bubbles" aria-hidden>
-            <span className="t-bubble" />
-            <span className="t-bubble" />
-            <span className="t-bubble" />
-          </div>
-          <div>
-            <div className="d-eyebrow" style={{ marginBottom: 8 }}>Start here</div>
-            <div className="d-h1" style={{ fontSize: 22 }}>Your first tour takes about five minutes</div>
-          </div>
-          <div className="steps">
-            <div className="step">
-              <b>1</b>
-              <div>
-                Name your tour <span>— a home, a venue, a walk</span>
-              </div>
-            </div>
-            <div className="step">
-              <b>2</b>
-              <div>
-                Upload up to {quota?.maxStepsPerFlow ?? 3} clips <span>— {quota?.maxClipSeconds ?? 5}s each, straight from your phone</span>
-              </div>
-            </div>
-            <div className="step">
-              <b>3</b>
-              <div>
-                Add a headline and a button per stop <span>— then publish and share one link</span>
-              </div>
-            </div>
-          </div>
-          {!atQuota && (
-            <button className="d-btn primary" style={{ padding: "12px 20px", fontSize: 14 }} onClick={() => setCreating(true)}>
-              + Create a tour
-            </button>
-          )}
-        </div>
-      )}
-
-      <div className="t-grid t-rise t-rise-3">
-        {flows.map((f) => (
-          <div key={f.id} className="d-card t-card" onClick={() => navigate(`/tour/${f.id}/edit`)}>
-            <div className="t-thumb">
-              {f.thumb ? <img src={f.thumb} alt="" loading="lazy" /> : <div className="ph">No stops yet — add your first clip</div>}
-              <span className="pill">
-                <StatusPill status={f.status} flow />
-              </span>
-            </div>
-            <div className="t-card-body">
-              <div className="t-card-name" title={f.name}>
-                {f.name}
-              </div>
-              <div className="t-muted-row">
-                <span>
-                  {f.counts.ready}/{f.counts.steps} stops ready
-                </span>
-                {f.counts.processing > 0 && <span className="d-pill warn">building {f.counts.processing}</span>}
-                {f.counts.failed > 0 && <span className="d-pill err">{f.counts.failed} failed</span>}
-                <span className="d-faint">· {timeAgo(f.updatedAt)}</span>
-              </div>
-              <div className="t-card-actions" onClick={(e) => e.stopPropagation()}>
-                <button className="d-btn soft sm" onClick={() => navigate(`/tour/${f.id}/edit`)}>
-                  Edit
-                </button>
-                {f.entryPath && (
-                  <a className="d-btn sm" href={f.entryPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
-                    Play
-                  </a>
-                )}
-                {f.status === "PUBLISHED" && (
-                  <button className="d-btn sm" onClick={() => copy(f)}>
-                    Copy link
-                  </button>
-                )}
-                <button className="d-btn ghost sm" onClick={() => remove(f)} title="Delete tour">
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-
-        {demo && !demoHidden && (
-          <div className="d-card t-card" onClick={() => demo.entryPath && window.open(demo.entryPath, "_blank")}>
-            <div className="t-thumb">
-              {demo.thumb ? <img src={demo.thumb} alt="" loading="lazy" /> : <div className="ph">Demo tour</div>}
-              <span className="pill">
-                <span className="d-pill accent">Demo</span>
-              </span>
-            </div>
-            <div className="t-card-body">
-              <div className="t-card-name">See a finished tour</div>
-              <div className="t-muted-row">
-                <span>{demo.name}</span>
-                <span className="d-faint">· {demo.steps.length} stops</span>
-              </div>
-              <div className="t-card-actions" onClick={(e) => e.stopPropagation()}>
-                {demo.entryPath && (
-                  <a className="d-btn soft sm" href={demo.entryPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
-                    Play demo
-                  </a>
-                )}
-                <button className="d-btn ghost sm" onClick={hideDemo}>
-                  Hide
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
 
       {loading && (
         <div className="d-faint" style={{ fontSize: 13, marginTop: 12 }}>
