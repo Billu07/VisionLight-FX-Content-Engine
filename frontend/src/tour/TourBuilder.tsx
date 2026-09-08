@@ -106,6 +106,7 @@ function StepCard({
   onSelect,
   onChanged,
   maxClip,
+  onPreview,
 }: {
   flow: Flow;
   step: FlowStep;
