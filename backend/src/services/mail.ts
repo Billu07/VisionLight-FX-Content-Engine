@@ -38,7 +38,9 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
-const APP_URL = process.env.FRONTEND_URL || "https://drift.li";
+// Base URL for links inside drift emails. Deliberately NOT FRONTEND_URL — that one is
+// the studio (picdrift.studio); drift emails must point at drift.li.
+const APP_URL = process.env.DRIFT_APP_URL || "https://drift.li";
 const NS = "mail";
 
 export const mailConfigured = () =>
