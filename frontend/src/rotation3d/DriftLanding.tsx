@@ -30,6 +30,7 @@ const DRIFT_PRIVACY_URL = "/privacy";
 
 type Item = {
   itemId: string;
+  driftDirection?: "LTR" | "RTL" | "TTB" | "BTT";
   source: string;
   id: string;
   name: string;
@@ -73,6 +74,7 @@ function PlayerModal({ item, onClose }: { item: Item; onClose: () => void }) {
           manifest={manifest}
           driftMode
           loopScrub={item.loopEnabled}
+          driftDirection={item.driftDirection}
           brandName="Drift Link"
           productName={item.name}
           title={item.title}
@@ -254,6 +256,7 @@ function HeroLanding({ product }: { product: any }) {
           manifest={heroManifest}
           driftMode
           loopScrub={product.loopEnabled ?? false}
+          driftDirection={product.driftDirection}
           brandName="Drift Link"
           productName={product.name}
           title={product.title}

@@ -298,6 +298,7 @@ export default function Rotation3DPlayer() {
       showViewSelector={p.showViewSelector}
       enableLoop={drift ? false : getPlayerBranding().loopByDefault}
       loopScrub={drift ? p.loopEnabled ?? false : true}
+      driftDirection={drift ? p.driftDirection : undefined}
       driftMode={drift}
       captions={view.captions}
       logoUrl={p.logoUrl}

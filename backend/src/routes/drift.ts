@@ -101,6 +101,13 @@ const orgSlug = async (organizationId: string): Promise<string | null> => {
   }
 };
 
+// Which way the footage pans (per drift): drives the player's drag axis + helper arrow.
+const DRIFT_DIRECTIONS = new Set(["LTR", "RTL", "TTB", "BTT"]);
+export const parseDirection = (v: unknown): string | null => {
+  const s = String(v ?? "").trim().toUpperCase();
+  return DRIFT_DIRECTIONS.has(s) ? s : null;
+};
+
 const cta = (v: unknown) => {
   if (!v || typeof v !== "object") return undefined;
   const o = v as any;
@@ -719,6 +726,10 @@ async function applyProductPatch(
   if ("defaultFrame" in body) data.defaultFrame = Math.max(0, Number(body.defaultFrame) || 0);
   if ("background" in body) data.background = String(body.background || "").slice(0, 40);
   if (typeof body.loopEnabled === "boolean") data.loopEnabled = body.loopEnabled;
+  if ("driftDirection" in body) {
+    const d = parseDirection(body.driftDirection);
+    if (d) data.driftDirection = d;
+  }
   if (typeof body.hideLogo === "boolean") data.hideLogo = body.hideLogo;
   if (typeof body.hideName === "boolean") data.hideName = body.hideName;
   if (typeof body.hideTitle === "boolean") data.hideTitle = body.hideTitle;
@@ -942,6 +953,7 @@ const publicProductPayload = async (p: any, bc: any, orgName: string, captions: 
   helperEnd: p.helperEnd,
   defaultFrame: p.defaultFrame,
   loopEnabled: p.loopEnabled,
+  driftDirection: p.driftDirection || "LTR",
   hideLogo: p.hideLogo,
   hideName: p.hideName,
   hideTitle: p.hideTitle,
@@ -1889,7 +1901,7 @@ async function resolveLandingItem(item: {
       itemId: item.id, source: "ROTATION3D", id: p.id, name: p.name,
       title: p.title, titleEnd: null, description: p.description,
       brandName: p.organization?.name || "", defaultFrame: p.defaultFrame,
-      background: p.background, loopEnabled: true, manifest: m, secondManifest: null,
+      background: p.background, loopEnabled: true, driftDirection: "LTR", manifest: m, secondManifest: null,
       rank: item.rank, isHero: item.isHero, thumb: landingThumb(m, p.defaultFrame),
     };
   }
@@ -1907,7 +1919,7 @@ async function resolveLandingItem(item: {
     title: p.title, titleEnd: p.titleEnd, description: p.description,
     descriptionEnd: p.descriptionEnd, helperStart: p.helperStart, helperEnd: p.helperEnd,
     brandName: p.organization?.name || "", defaultFrame: p.defaultFrame,
-    background: p.background, loopEnabled: p.loopEnabled, manifest: m,
+    background: p.background, loopEnabled: p.loopEnabled, driftDirection: p.driftDirection || "LTR", manifest: m,
     secondManifest: p.spin.secondManifest ?? null,
     rank: item.rank, isHero: item.isHero, thumb: p.thumbnailUrl || landingThumb(m, p.defaultFrame),
   };

@@ -7,7 +7,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../services/database";
 import { authenticateToken, type AuthenticatedRequest } from "../middleware/auth";
 import { probeClipInfo } from "../services/rotation3d/pipeline";
-import { processClip, uniqueSlug } from "./drift";
+import { parseDirection, processClip, uniqueSlug } from "./drift";
 import { sendFlowCreatedNoticeEmail, sendFlowPublishedEmails, sendUpgradeNudgeEmail } from "../services/mail";
 import {
   CLIP_DURATION_TOLERANCE_S,
@@ -392,6 +392,8 @@ router.post(
         description: strOrNull(req.body?.description, 600) ?? null,
         background,
         customCta: cta.cta,
+        loopEnabled: String(req.body?.loopEnabled ?? "false") === "true",
+        driftDirection: parseDirection(req.body?.driftDirection) || "LTR",
         maxSteps: isSuperAdmin(req) ? null : quota.maxStepsPerFlow,
         kind,
       });
@@ -524,6 +526,12 @@ router.patch(
         return res.status(400).json({ error: "Background must be a colour (e.g. #101418) or transparent" });
       }
       data.background = background;
+    }
+    if (typeof body.loopEnabled === "boolean") data.loopEnabled = body.loopEnabled;
+    if ("driftDirection" in body) {
+      const d = parseDirection(body.driftDirection);
+      if (!d) return res.status(400).json({ error: "Direction must be LTR, RTL, TTB or BTT" });
+      data.driftDirection = d;
     }
     let customCta: CreatorCta | null | undefined;
     if ("customCta" in body) {

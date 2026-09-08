@@ -21,6 +21,7 @@ type EditProduct = {
   status?: string;
   defaultFrame?: number;
   loopEnabled?: boolean;
+  driftDirection?: string;
   background?: string | null;
   hideLogo?: boolean;
   hideName?: boolean;
@@ -71,6 +72,7 @@ export default function BrandProductEditModal({
   const [slug, setSlug] = useState(product.slug || "");
   const [publish, setPublish] = useState(product.status === "PUBLISHED");
   const [loopEnabled, setLoopEnabled] = useState(product.loopEnabled ?? true);
+  const [driftDirection, setDriftDirection] = useState(product.driftDirection || "LTR");
   const [background, setBackground] = useState(product.background || "transparent");
   const [hideLogo, setHideLogo] = useState(product.hideLogo ?? false);
   const [hideName, setHideName] = useState(product.hideName ?? false);
@@ -102,6 +104,7 @@ export default function BrandProductEditModal({
     if (slug.trim()) data.slug = slug.trim();
     if (showLoop) {
       data.loopEnabled = loopEnabled;
+      data.driftDirection = driftDirection;
       data.titleEnd = titleEnd.trim() || null;
       data.descriptionEnd = descriptionEnd.trim() || null;
       data.helperStart = helperStart.trim() || null;
@@ -364,6 +367,23 @@ export default function BrandProductEditModal({
               <label className="d-muted flex items-center gap-2 text-xs">
                 <input type="checkbox" checked={loopEnabled} onChange={(e) => setLoopEnabled(e.target.checked)} className="h-4 w-4 accent-brand-accent" />
                 Loop (drag wraps end → start)
+              </label>
+            )}
+            {showLoop && (
+              <label className="d-muted flex items-center gap-2 text-xs">
+                Drift direction
+                <select
+                  className="d-select"
+                  style={{ width: "auto" }}
+                  value={driftDirection}
+                  onChange={(e) => setDriftDirection(e.target.value)}
+                  title="Which way the footage pans — sets the drag axis and the helper arrow"
+                >
+                  <option value="LTR">Left → right</option>
+                  <option value="RTL">Right → left</option>
+                  <option value="TTB">Top → bottom</option>
+                  <option value="BTT">Bottom → top</option>
+                </select>
               </label>
             )}
           </div>

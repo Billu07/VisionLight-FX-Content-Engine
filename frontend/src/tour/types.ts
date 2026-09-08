@@ -13,6 +13,8 @@ export type StepProduct = {
   background: string | null;
   status: "DRAFT" | "PROCESSING" | "READY" | "PUBLISHED" | "FAILED" | string;
   defaultFrame: number;
+  loopEnabled: boolean;
+  driftDirection: string;
   frameCount: number;
   thumb: string | null;
   ctaPrimary: Cta | null;

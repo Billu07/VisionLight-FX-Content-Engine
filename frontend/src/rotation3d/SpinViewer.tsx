@@ -124,6 +124,9 @@ export type SpinViewerProps = {
   /** Loop on/off (per drift): true = dragging wraps end→start seamlessly;
    * false = dragging clamps at the first/last frame. Default true (360 spins). */
   loopScrub?: boolean;
+  /** Drift: which way the footage pans. Sets the drag axis and the helper arrow:
+   * LTR (default) drag right = forward, RTL drag left, TTB drag down, BTT drag up. */
+  driftDirection?: "LTR" | "RTL" | "TTB" | "BTT";
 };
 
 const clampZoom = (z: number) => Math.max(0.7, Math.min(2.8, z));
@@ -213,6 +216,7 @@ export default function SpinViewer({
   driftMode = false,
   captions,
   loopScrub = true,
+  driftDirection = "LTR",
 }: SpinViewerProps) {
   const hero = variant === "hero";
   const playerBrand = getPlayerBranding();
@@ -295,6 +299,10 @@ export default function SpinViewer({
     // so spin=+1. Rotation3D keeps the opposite object-spin the user approved (-1).
     // Everything below (drag, idle, arrows, navigator) is expressed via `spin`.
     const spin = driftMode ? 1 : -1;
+    // Drift direction: vertical footage scrubs on dy, and RTL/BTT flip the sign so
+    // dragging the way the camera moved always goes forward.
+    const vertical = driftMode && (driftDirection === "TTB" || driftDirection === "BTT");
+    const dirSign = driftMode && (driftDirection === "RTL" || driftDirection === "BTT") ? -1 : 1;
     let yaw = (START_FRAME / FRAMES) * TWO_PI;
     let yawVel = 0;
     // Loop off: clamp the drag between the first and last frame (no wrap).
@@ -920,8 +928,10 @@ export default function SpinViewer({
       if (introHandProg >= 0 && introHandRef.current && frameRect.w > 0) {
         const fx = frameRect.x / DPR, fw = frameRect.w / DPR;
         const fy = frameRect.y / DPR, fh = frameRect.h / DPR;
-        introHandRef.current.style.left = fx + (0.3 + 0.4 * introHandProg) * fw + "px";
-        introHandRef.current.style.top = fy + fh * 0.52 + "px";
+        // The demo finger travels the way the footage pans (and in reverse for RTL/BTT).
+        const along = dirSign < 0 ? 0.7 - 0.4 * introHandProg : 0.3 + 0.4 * introHandProg;
+        introHandRef.current.style.left = (vertical ? fx + fw * 0.5 : fx + along * fw) + "px";
+        introHandRef.current.style.top = (vertical ? fy + along * fh : fy + fh * 0.52) + "px";
         introHandRef.current.style.opacity = String(Math.max(0, Math.min(1, introAlpha)));
       }
       raf = requestAnimationFrame(tick);
@@ -990,7 +1000,7 @@ export default function SpinViewer({
       if (axis === "") {
         const tdx = e.clientX - startX, tdy = e.clientY - startY;
         if (Math.abs(tdx) < 6 && Math.abs(tdy) < 6) { lastX = e.clientX; lastY = e.clientY; lastT = now; return; }
-        if (Math.abs(tdx) >= Math.abs(tdy)) {
+        if (vertical ? Math.abs(tdy) >= Math.abs(tdx) : Math.abs(tdx) >= Math.abs(tdy)) {
           axis = "rotate";
           try { stage.setPointerCapture(e.pointerId); } catch { /* ignore */ }
           stage.classList.add("r3d-grabbing");
@@ -1008,17 +1018,22 @@ export default function SpinViewer({
         // zoomed → horizontal still spins the product (so you never lose the
         // rotate), vertical pans up/down to inspect the zoomed-in region.
         const k = 0.006;
-        const d = spin * dx * k;
+        const d = spin * dirSign * (vertical ? dy : dx) * k;
         yaw += d;
         clampScrub();
         yawVel = (d / dt) * 16;
         const lim = 130 * (zoomTarget - 1);
-        panTY = Math.max(-lim, Math.min(lim, panTY + dy));
-        panY = panTY;
+        if (vertical) {
+          panTX = Math.max(-lim, Math.min(lim, panTX + dx));
+          panX = panTX;
+        } else {
+          panTY = Math.max(-lim, Math.min(lim, panTY + dy));
+          panY = panTY;
+        }
       } else {
         // at rest → horizontal scrubs the sequence: drag right = forward
         const k = 0.006;
-        const d = spin * dx * k;
+        const d = spin * dirSign * (vertical ? dy : dx) * k;
         yaw += d;
         clampScrub();
         yawVel = (d / dt) * 16;
@@ -1086,8 +1101,8 @@ export default function SpinViewer({
     };
     const onKey = (e: KeyboardEvent) => {
       const step = TWO_PI / FRAMES;
-      if (e.key === "ArrowRight") { engage(); yaw += spin * step; }
-      else if (e.key === "ArrowLeft") { engage(); yaw -= spin * step; }
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") { engage(); yaw += spin * step; }
+      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { engage(); yaw -= spin * step; }
       else if (e.key === "+" || e.key === "=") zoomTarget = clampZoom(zoomTarget * 1.2);
       else if (e.key === "-") zoomTarget = clampZoom(zoomTarget * 0.83);
       else if (e.key === "r" || e.key === "R") { yaw = (DEFAULT_FRAME / FRAMES) * TWO_PI; zoomTarget = 1; panX = panY = panTX = panTY = 0; }
@@ -1475,7 +1490,7 @@ export default function SpinViewer({
   const [activeForm, setActiveForm] = useState<{ form: OverlayForm; which: "primary" | "secondary" } | null>(null);
 
   return (
-    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${landing ? "r3d-landing" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${!showLogo ? "r3d-no-logo" : ""} ${!showName ? "r3d-no-name" : ""} ${!showTitle ? "r3d-no-title" : ""} ${!showTools ? "r3d-no-tools" : ""} ${!mobileZoom ? "r3d-no-mobile-zoom" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
+    <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${driftMode && driftDirection !== "LTR" ? `r3d-dir-${driftDirection.toLowerCase()}` : ""} ${landing ? "r3d-landing" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${!showLogo ? "r3d-no-logo" : ""} ${!showName ? "r3d-no-name" : ""} ${!showTitle ? "r3d-no-title" : ""} ${!showTools ? "r3d-no-tools" : ""} ${!mobileZoom ? "r3d-no-mobile-zoom" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
       style={stageStyle}
       tabIndex={hero ? -1 : 0}
       aria-label="Interactive 360 degree product viewer. Drag to rotate.">
@@ -1784,6 +1799,23 @@ const R3D_CSS = `
 @keyframes r3darrownudgeback{0%,100%{transform:translateX(0)}50%{transform:translateX(-5px)}}
 @media (prefers-reduced-motion:reduce){.r3d-drift-arrow{animation:none!important}}
 .r3d-hint.r3d-back .r3d-drift-arrow svg{transform:scaleX(-1)}
+/* Drift direction (per drift): which way the footage pans. LTR = drag right to go
+   forward, arrow →. RTL flips it; TTB/BTT move the whole cue to the vertical axis. */
+.r3d-dir-rtl .r3d-hint .r3d-drift-arrow svg{transform:scaleX(-1)}
+.r3d-dir-rtl .r3d-hint.r3d-back .r3d-drift-arrow svg{transform:none}
+.r3d-dir-ttb .r3d-hint .r3d-drift-arrow svg{transform:rotate(90deg)}
+.r3d-dir-ttb .r3d-hint.r3d-back .r3d-drift-arrow svg{transform:rotate(-90deg)}
+.r3d-dir-btt .r3d-hint .r3d-drift-arrow svg{transform:rotate(-90deg)}
+.r3d-dir-btt .r3d-hint.r3d-back .r3d-drift-arrow svg{transform:rotate(90deg)}
+.r3d-drift.r3d-dir-rtl .r3d-hint .r3d-drift-arrow{animation-name:r3darrownudgeback}
+.r3d-drift.r3d-dir-rtl .r3d-hint.r3d-back .r3d-drift-arrow{animation-name:r3darrownudge}
+.r3d-drift.r3d-dir-ttb .r3d-hint .r3d-drift-arrow,.r3d-drift.r3d-dir-btt .r3d-hint.r3d-back .r3d-drift-arrow{animation-name:r3darrownudgev}
+.r3d-drift.r3d-dir-btt .r3d-hint .r3d-drift-arrow,.r3d-drift.r3d-dir-ttb .r3d-hint.r3d-back .r3d-drift-arrow{animation-name:r3darrownudgevback}
+.r3d-dir-ttb .r3d-drift-hand,.r3d-dir-btt .r3d-drift-hand{animation-name:r3dswayv}
+.r3d-dir-ttb canvas,.r3d-dir-btt canvas{touch-action:pan-x}
+@keyframes r3dswayv{0%,100%{transform:translateY(-10px)}50%{transform:translateY(10px)}}
+@keyframes r3darrownudgev{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}
+@keyframes r3darrownudgevback{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
 @media (prefers-reduced-motion:reduce){.r3d-drift-hand{animation:none}}
 /* One-time first-visit drag demo — a finger (with a touch ripple) drags across
    the frame while the content scrubs. Position + opacity are driven from the RAF

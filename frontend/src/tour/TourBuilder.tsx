@@ -121,6 +121,8 @@ function StepCard({
   const [btnLabel, setBtnLabel] = useState(step.customCta?.label || "");
   const [btnUrl, setBtnUrl] = useState(step.customCta?.url || "");
   const [bg, setBg] = useState(p?.background || "");
+  const [loop, setLoop] = useState(!!p?.loopEnabled);
+  const [direction, setDirection] = useState(p?.driftDirection || "LTR");
   const [saving, setSaving] = useState(false);
   const [replacing, setReplacing] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -133,6 +135,8 @@ function StepCard({
     btnLabel: step.customCta?.label || "",
     btnUrl: step.customCta?.url || "",
     bg: p?.background || "",
+    loop: !!p?.loopEnabled,
+    direction: p?.driftDirection || "LTR",
   });
   useEffect(() => {
     const next = {
@@ -141,6 +145,8 @@ function StepCard({
       btnLabel: step.customCta?.label || "",
       btnUrl: step.customCta?.url || "",
       bg: p?.background || "",
+      loop: !!p?.loopEnabled,
+      direction: p?.driftDirection || "LTR",
     };
     const prev = serverRef.current;
     setName((v) => (v === prev.name ? next.name : v));
@@ -148,15 +154,19 @@ function StepCard({
     setBtnLabel((v) => (v === prev.btnLabel ? next.btnLabel : v));
     setBtnUrl((v) => (v === prev.btnUrl ? next.btnUrl : v));
     setBg((v) => (v === prev.bg ? next.bg : v));
+    setLoop((v) => (v === prev.loop ? next.loop : v));
+    setDirection((v) => (v === prev.direction ? next.direction : v));
     serverRef.current = next;
-  }, [p?.name, p?.title, step.customCta?.label, step.customCta?.url, p?.background]);
+  }, [p?.name, p?.title, step.customCta?.label, step.customCta?.url, p?.background, p?.loopEnabled, p?.driftDirection]);
 
   const dirty =
     name !== (p?.name || "") ||
     title !== (p?.title || "") ||
     btnLabel !== (step.customCta?.label || "") ||
     btnUrl !== (step.customCta?.url || "") ||
-    bg !== (p?.background || "");
+    bg !== (p?.background || "") ||
+    loop !== !!p?.loopEnabled ||
+    direction !== (p?.driftDirection || "LTR");
 
   const save = async () => {
     if (!name.trim()) return notify.error("Give this stop a title");
@@ -169,6 +179,8 @@ function StepCard({
         name: name.trim(),
         title: title.trim(),
         background: bg,
+        loopEnabled: loop,
+        driftDirection: direction,
         customCta: btnLabel.trim() && btnUrl.trim() ? { label: btnLabel.trim(), url: btnUrl.trim() } : null,
       });
       onChanged(r.data.flow);
@@ -343,6 +355,19 @@ function StepCard({
                 </button>
               )}
             </div>
+          </div>
+          <div>
+            <label className="d-label">Drift direction</label>
+            <select className="d-select" value={direction} onChange={(e) => setDirection(e.target.value)}>
+              <option value="LTR">Left → right (camera pans right)</option>
+              <option value="RTL">Right → left</option>
+              <option value="TTB">Top → bottom</option>
+              <option value="BTT">Bottom → top</option>
+            </select>
+            <label className="t-inline" style={{ marginTop: 8, gap: 8, cursor: "pointer", fontSize: 13, color: "var(--muted)" }}>
+              <input type="checkbox" checked={loop} onChange={(e) => setLoop(e.target.checked)} />
+              Loop (dragging wraps end → start)
+            </label>
           </div>
           <div style={{ alignSelf: "end" }}>
             <div className="t-next">
