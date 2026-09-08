@@ -621,27 +621,41 @@ export default function SpinViewer({
       const capFit = landing || (driftMode && !hero);
       const cyFactor = capFit ? 0.46 : 0.47;
       let base = Math.min(W, H) * (hero ? 0.23 : 0.25);
+      // Drift surfaces keep the top bar and the bottom control stack (helper +
+      // buttons + badge) clear of the footage: the vertical budget is the BAND
+      // between them, and the cap is aspect-aware. A portrait phone clip is
+      // height-bound, so the old 95%-of-height cap ran it under the buttons (and it
+      // read as "zoomed in" next to a landscape stop). Landscape content is still
+      // capped exactly as before, so brand drifts don't change size.
+      const bandTop = 56 * DPR;
+      const bandBottom = (W / DPR <= 560 ? 150 : 140) * DPR;
+      const bandH = Math.max(H * 0.6, H - bandTop - bandBottom);
+      const bandCy = bandTop + bandH / 2;
       if (capFit) {
-        // box (the frame's largest side) = base * 4.2. Cap it so the frame fits the
-        // viewport, leaving clean room below for the drag helper + CTAs.
+        // box (the frame's largest side) = base * 4.2.
+        const img0 = realMode ? nearestLoaded(frame) : null;
+        const ar0 = img0 ? img0.naturalWidth / img0.naturalHeight : 1;
         if (bigDesktop && !hasHeadline) {
-          // Desktop, no headline → fill the screen. Allow more WIDTH so a landscape
-          // drift isn't stranded small, but stay aspect-aware off the loaded frame's
-          // ratio: a portrait drift stays height-bound (unchanged), only wide content
-          // grows. Height budget stays 0.95 so it never crops top/bottom.
-          const img0 = realMode ? nearestLoaded(frame) : null;
-          const ar0 = img0 ? img0.naturalWidth / img0.naturalHeight : 1;
-          const availW = W * 0.9, availH = H * 0.95;
-          const boxMax = ar0 >= 1 ? Math.min(availW, availH * ar0) : Math.min(availH, availW / ar0);
+          // Desktop, no headline → let wide content fill more WIDTH; height stays
+          // inside the band so nothing runs under the buttons.
+          const availW = W * 0.9;
+          const boxMax = ar0 >= 1 ? Math.min(availW, bandH * ar0) : Math.min(bandH, availW / ar0);
           base = boxMax / 4.2;
         } else {
-          const capH = (H * 0.95) / 4.2; // don't overflow the height
-          const capW = (W * 0.94) / 4.2; // and fit the width
-          base = Math.min(capH, capW);
+          const availW = W * 0.94;
+          const legacyCap = H * 0.95; // what landscape content was always capped at
+          const boxMax =
+            ar0 >= 1
+              ? Math.min(availW, bandH * ar0, legacyCap)
+              : Math.min(bandH, availW / ar0, legacyCap);
+          base = boxMax / 4.2;
         }
       }
       const scale = base * zoom;
-      const cx = W / 2 + panX * DPR, cy = H * cyFactor + panY * DPR;
+      const cx = W / 2 + panX * DPR;
+      // Centre drift frames in the band (a hair above the old 0.46H) so a tall frame
+      // sits between the top bar and the controls instead of straddling them.
+      const cy = (capFit ? Math.min(H * cyFactor, bandCy) : H * cyFactor) + panY * DPR;
 
       // Drift has no grounding shadow (per spec); Rotation3D keeps its contact shadow.
       if (!driftMode) {
