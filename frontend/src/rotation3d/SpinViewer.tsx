@@ -718,7 +718,27 @@ export default function SpinViewer({
         // Safety clamp: never let the helper cluster drop so low it overlaps the
         // powered badge + CTAs (tighter reserve for drift surfaces via capFit).
         const maxTop = H / DPR - ((capFit ? 130 : 140) + hintH);
-        const topPx = Math.max(12, Math.min(under, maxTop));
+        // Vertical drifts (TTB/BTT): the helper rides beside the frame's RIGHT edge,
+        // near the top for top→bottom and near the bottom for bottom→top, whenever
+        // there's room beside the frame; otherwise (phones) it stays under the frame.
+        const stageW = W / DPR;
+        const frameRightCss = (realMode && frameRect.w > 0 ? frameRect.x + frameRect.w : cx + scale * 2.1) / DPR;
+        const sidePlaced = vertical && realMode && frameRect.w > 0 && stageW - frameRightCss >= 120;
+        let topPx: number;
+        if (sidePlaced) {
+          const hintW = hintRef.current.offsetWidth || 120;
+          const frameTopCss = frameBottomCss - frameHcss;
+          topPx = dirSign > 0 ? frameTopCss + frameHcss * 0.12 : frameBottomCss - frameHcss * 0.12 - hintH;
+          topPx = Math.max(12, Math.min(topPx, H / DPR - hintH - 12));
+          hintRef.current.classList.add("r3d-hint-side");
+          hintRef.current.style.left = Math.min(stageW - hintW - 12, frameRightCss + 14) + "px";
+          hintRef.current.style.transform = "none";
+        } else {
+          topPx = Math.max(12, Math.min(under, maxTop));
+          hintRef.current.classList.remove("r3d-hint-side");
+          hintRef.current.style.left = "";
+          hintRef.current.style.transform = "";
+        }
         hintRef.current.style.top = topPx + "px";
         hintRef.current.style.bottom = "auto";
         // Reveal the helper only once its anchor has settled (top stopped moving for a
@@ -735,7 +755,9 @@ export default function SpinViewer({
         // Push the CUE down so its top lands ~16px under the frame's bottom edge
         // (the hand is now up on the frame on every device, so this always runs).
         // Keeps the text/arrow off the product without dragging the hand down.
-        if (cueRef.current) {
+        if (cueRef.current && sidePlaced) {
+          cueRef.current.style.marginTop = "0px";
+        } else if (cueRef.current) {
           const handH = handRef.current?.offsetHeight || 28;
           const naturalCueTop = topPx + handH + 7; // 7px column gap (see .r3d-drift .r3d-hint)
           const cueTop = Math.max(naturalCueTop, frameBottomCss + 16);
@@ -826,28 +848,40 @@ export default function SpinViewer({
         const prog = loopScrub
           ? (((yaw % TWO_PI) + TWO_PI) % TWO_PI) / TWO_PI
           : Math.max(0, Math.min(1, endYaw > 0 ? yaw / endYaw : 0));
-        const railY = frameRect.y + frameRect.h; // the frame's bottom edge
-        const x0 = frameRect.x;
-        const headX = x0 + prog * frameRect.w;
+        // The rail runs the way the footage pans: along the bottom edge for
+        // horizontal drifts (starting left for LTR, right for RTL) and along the
+        // RIGHT edge for vertical ones (starting top for TTB, bottom for BTT).
+        const fx0 = frameRect.x, fy0 = frameRect.y, fw0 = frameRect.w, fh0 = frameRect.h;
+        let sx: number, sy: number, ex: number, ey: number;
+        if (vertical) {
+          sx = ex = fx0 + fw0;
+          sy = dirSign > 0 ? fy0 : fy0 + fh0;
+          ey = dirSign > 0 ? fy0 + fh0 : fy0;
+        } else {
+          sy = ey = fy0 + fh0;
+          sx = dirSign > 0 ? fx0 : fx0 + fw0;
+          ex = dirSign > 0 ? fx0 + fw0 : fx0;
+        }
+        const hx = sx + (ex - sx) * prog, hy = sy + (ey - sy) * prog;
         ctx.save();
         ctx.lineCap = "round";
-        // faint full-width rail
+        // faint full-length rail
         ctx.strokeStyle = "rgba(255,255,255,.12)";
         ctx.lineWidth = Math.max(1, 1.4 * DPR);
         ctx.beginPath();
-        ctx.moveTo(x0, railY);
-        ctx.lineTo(x0 + frameRect.w, railY);
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(ex, ey);
         ctx.stroke();
         // filled portion — brand accent gradient (start → head)
         if (prog > 0.002) {
-          const grad = ctx.createLinearGradient(x0, 0, headX, 0);
+          const grad = ctx.createLinearGradient(sx, sy, hx, hy);
           grad.addColorStop(0, `rgba(${accentA[0]},${accentA[1]},${accentA[2]},.7)`);
           grad.addColorStop(1, `rgba(${accentB[0]},${accentB[1]},${accentB[2]},.95)`);
           ctx.strokeStyle = grad;
           ctx.lineWidth = Math.max(1.5, 1.9 * DPR);
           ctx.beginPath();
-          ctx.moveTo(x0, railY);
-          ctx.lineTo(headX, railY);
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(hx, hy);
           ctx.stroke();
         }
         // soft head at the current position
@@ -855,7 +889,7 @@ export default function SpinViewer({
         ctx.shadowBlur = 8 * DPR;
         ctx.fillStyle = `rgba(${accentB[0]},${accentB[1]},${accentB[2]},1)`;
         ctx.beginPath();
-        ctx.arc(headX, railY, 2.6 * DPR, 0, TWO_PI);
+        ctx.arc(hx, hy, 2.6 * DPR, 0, TWO_PI);
         ctx.fill();
         ctx.restore();
       }
@@ -1816,6 +1850,16 @@ const R3D_CSS = `
 .r3d-drift .r3d-hint.r3d-back{align-items:flex-end}
 .r3d-drift-cue{display:flex;align-items:center;gap:9px}
 .r3d-drift .r3d-hint.r3d-back .r3d-drift-cue{flex-direction:row-reverse}
+/* Direction-aware helper: RTL mirrors the LTR arrangement (hand on the right, arrow
+   before the text) and swaps back at the end; a side-placed helper (vertical drifts
+   beside the frame) stacks hand → text → arrow, centred. */
+.r3d-drift.r3d-dir-rtl .r3d-hint{align-items:flex-end}
+.r3d-drift.r3d-dir-rtl .r3d-hint.r3d-back{align-items:flex-start}
+.r3d-drift.r3d-dir-rtl .r3d-drift-cue{flex-direction:row-reverse}
+.r3d-drift.r3d-dir-rtl .r3d-hint.r3d-back .r3d-drift-cue{flex-direction:row}
+.r3d-drift .r3d-hint.r3d-hint-side{align-items:center;text-align:center}
+.r3d-drift .r3d-hint.r3d-hint-side .r3d-drift-cue{flex-direction:column;gap:6px;max-width:120px}
+.r3d-drift .r3d-hint.r3d-hint-side .r3d-drift-cue span:first-child{white-space:normal;line-height:1.25}
 .r3d-drift .r3d-hint span{font-size:clamp(12px,3.8vmin,15px);font-weight:650}
 /* the drift helper hides between its start/end appearances (hand sequence) */
 .r3d-drift .r3d-hint.r3d-gone{opacity:0}
