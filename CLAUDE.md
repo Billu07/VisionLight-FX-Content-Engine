@@ -234,8 +234,11 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   (org with `managedByOrgId` + ADMIN profile for the Pro); "Invite a Pro" one-time links.
 - **Superadmin**: `X-Drift-Org` lets a superadmin act on any TOUR page ("Manage this page", `usePageAdmin`);
   back office = Admin → drift.li → Tour (`routes/driftTourAdmin.ts`, `DriftTourAdmin.tsx`).
-- **drift.li home** = `rotation3d/DriftHome.tsx` (live hero = the "Set as landing" drift; wait lists →
-  `DriftWaitlist`). Brand custom domains keep `HeroLanding`.
+- **drift.li home** = `rotation3d/DriftHome.tsx` (2026-09-14 redesign per the client's `land.png`: the hero's
+  right side is a NON-interactive "live view" — five frames of the "Set as landing" drift in perspective,
+  orbit + horizon, glow in dark theme only; "Move to explore" opens `/p/{id}`; four product cards, Tour =
+  Try It Free, the rest = Join Wait List → `DriftWaitlist`). It no longer loads the player. Brand custom
+  domains keep the full-screen `HeroLanding` (SpinViewer loaded lazily there).
 
 ## Transactional email — DONE (2026-09-06)
 

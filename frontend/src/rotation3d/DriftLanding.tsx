@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import SpinViewer from "./SpinViewer";
+import { lazyRoute } from "../lib/lazyRoute";
 import { apiEndpoints } from "../lib/api";
 import { getResolvedDriftBrandSlug } from "../lib/branding";
 import { resolveDriftTarget, prefetchDriftTargets, combinedFrameSets } from "./driftNav";
 import { LoginModal } from "../components/LoginModal";
 import { initMetaPixel, track } from "./metaPixel";
 import DriftHome from "./DriftHome";
+
+// The full-screen player is only for a brand's custom domain — drift.li's home never loads it.
+const SpinViewer = lazyRoute(() => import("./SpinViewer"));
 
 const toCta = (c: any) =>
   c && typeof c === "object" && c.label && ((c.url && c.url !== "#") || c.formId)
@@ -152,6 +155,7 @@ function HeroLanding({ product }: { product: any }) {
         </button>
       </header>
       <div className="dl-hero-stage">
+        <Suspense fallback={null}>
         <SpinViewer
           manifest={heroManifest}
           driftMode
@@ -189,6 +193,7 @@ function HeroLanding({ product }: { product: any }) {
             if (product.metaPixelId) track("CTAClick", { which, content_name: product.name }, true);
           }}
         />
+        </Suspense>
       </div>
       <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
     </div>
