@@ -848,6 +848,8 @@ router.post(
     let full: ReturnType<typeof serializeFlow>;
     try {
       await prisma.driftProduct.update({ where: { id: step.productId }, data: { status: "PROCESSING" } });
+      // While it rebuilds the drift isn't viewable, so neighbours skip it until READY.
+      await relinkFlow(prisma, step.flowId).catch((e) => console.error(`[${NS}] relink before rebuild failed:`, e));
       full = serializeFlow(await loadFlow(orgId, step.flowId));
     } catch (err) {
       await rmFile(file.path);

@@ -252,6 +252,11 @@ export const processClip = (opts: {
         await prisma.driftProduct
           .update({ where: { id: productId }, data: { status: "FAILED" } })
           .catch(() => undefined);
+        // A failed tour drift drops out of its tour's buttons (neighbours skip it).
+        const failedFlowId = await stepFlowIdForProduct(productId).catch(() => null);
+        if (failedFlowId) {
+          await relinkFlow(prisma, failedFlowId).catch((e) => console.error(`[${NS}] relink after FAILED failed:`, e));
+        }
       }
     } finally {
       await fs.rm(videoPath, { force: true }).catch(() => undefined);

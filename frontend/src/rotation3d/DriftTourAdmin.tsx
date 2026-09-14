@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiEndpoints } from "../lib/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
+import { isDriftHost } from "../lib/branding";
 
 /**
  * Superadmin → drift.li → Tour. The creator suite's back office: every tour page
@@ -76,6 +77,10 @@ const pill = (s: string) =>
 const when = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+// Tour pages live on drift.li; the admin panel usually runs on the studio domain.
+const DRIFT_ORIGIN = "https://drift.li";
+const onDrift = (path: string) =>
+  typeof window !== "undefined" && isDriftHost(window.location.hostname) ? path : `${DRIFT_ORIGIN}${path}`;
 const errText = (e: any, fallback: string) => e?.message || fallback;
 
 function Banner({ msg, onClose }: { msg: Msg; onClose: () => void }) {
@@ -132,7 +137,7 @@ function PageDetailView({ detail, onSaved }: { detail: PageDetail; onSaved: (d: 
         </div>
         <div className="d-actions">
           {p.path && (
-            <a className="d-btn soft sm" href={p.path} target="_blank" rel="noopener noreferrer" title="Opens the page — use “Manage this page” there">
+            <a className="d-btn soft sm" href={onDrift(p.path)} target="_blank" rel="noopener noreferrer" title="Opens the page — use “Manage this page” there">
               Open page ↗
             </a>
           )}
@@ -200,7 +205,7 @@ function PageDetailView({ detail, onSaved }: { detail: PageDetail; onSaved: (d: 
                   </div>
                 </div>
                 <div className="d-actions">
-                  <a className="d-btn sm" href={f.publicPath} target="_blank" rel="noopener noreferrer">
+                  <a className="d-btn sm" href={onDrift(f.publicPath)} target="_blank" rel="noopener noreferrer">
                     Open ↗
                   </a>
                 </div>
@@ -239,7 +244,7 @@ function PageDetailView({ detail, onSaved }: { detail: PageDetail; onSaved: (d: 
           <div className="d-actions">
             {detail.clientPages.map((c) =>
               c.path ? (
-                <a key={c.id} className="d-btn sm" href={c.path} target="_blank" rel="noopener noreferrer">
+                <a key={c.id} className="d-btn sm" href={onDrift(c.path)} target="_blank" rel="noopener noreferrer">
                   {c.name} ↗
                 </a>
               ) : (
@@ -462,7 +467,7 @@ function DemoTour() {
                   Use as demo
                 </button>
               )}
-              <a className="d-btn ghost sm" href={r.publicPath} target="_blank" rel="noopener noreferrer">
+              <a className="d-btn ghost sm" href={onDrift(r.publicPath)} target="_blank" rel="noopener noreferrer">
                 Open ↗
               </a>
             </div>
@@ -519,7 +524,7 @@ function Orders() {
               </div>
               <div className="d-actions">
                 {o.tourPath && (
-                  <a className="d-btn sm" href={o.tourPath} target="_blank" rel="noopener noreferrer">
+                  <a className="d-btn sm" href={onDrift(o.tourPath)} target="_blank" rel="noopener noreferrer">
                     Tour ↗
                   </a>
                 )}
