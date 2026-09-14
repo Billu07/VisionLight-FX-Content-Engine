@@ -27,7 +27,7 @@ const H_STOPS = [
   { x: 370, label: "Garden", up: false },
 ] as const;
 
-export function PathArtH() {
+export function PathArtH({ labels }: { labels?: string[] } = {}) {
   return (
     <svg className="th-route-h" viewBox="0 0 430 220" aria-hidden>
       <path className="th-route-under" d={H_LINE} />
@@ -38,7 +38,8 @@ export function PathArtH() {
           START
         </text>
       </g>
-      {H_STOPS.map((s, i) => {
+      {H_STOPS.map((stop, i) => {
+        const s = { ...stop, label: labels?.[i] || stop.label };
         const tagW = Math.round(s.label.length * 6.6 + 22);
         const tagY = s.up ? H_Y - 46 : H_Y + 24;
         return (

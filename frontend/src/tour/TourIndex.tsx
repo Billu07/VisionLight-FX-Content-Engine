@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
+import { useAuth } from "../hooks/useAuth";
 import CreatorRoute from "./CreatorRoute";
+import TourLanding from "./TourLanding";
 import { TourShell, apiError } from "./tourUi";
 
 /** /tour for a signed-in creator: straight to their page (drift.li/tour/{page}). */
@@ -40,12 +42,34 @@ function GoToMyPage() {
   );
 }
 
+/** /tour: a creator (any TOUR profile) goes to their page; everyone else — and
+ *  /tour?view=landing — sees the Drift Tour landing. */
 export function TourIndex() {
-  return (
-    <CreatorRoute>
-      <GoToMyPage />
-    </CreatorRoute>
-  );
+  const { user, profiles, isLoading, checkAuth } = useAuth();
+  const location = useLocation();
+  useEffect(() => {
+    checkAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const forceLanding = new URLSearchParams(location.search).get("view") === "landing";
+  const creator = user?.view === "TOUR" || profiles.some((p) => p.view === "TOUR");
+  if (!forceLanding && creator) {
+    return (
+      <CreatorRoute>
+        <GoToMyPage />
+      </CreatorRoute>
+    );
+  }
+  if (isLoading && !forceLanding) {
+    return (
+      <div style={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
+        <div className="d-faint" style={{ fontSize: 13 }}>
+          Loading…
+        </div>
+      </div>
+    );
+  }
+  return <TourLanding />;
 }
 
 /** Legacy /tour/:id/edit links → the tour's pathway (its admin view for the owner). */

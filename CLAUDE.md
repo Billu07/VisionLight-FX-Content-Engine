@@ -193,9 +193,28 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   Supabase stays on the default (implicit) auth flow — do NOT switch to PKCE (breaks reset/confirm
   links opened in another browser).
 - **Ops owed**: Supabase dashboard (Google provider, redirect allow-list incl. `/auth/callback`,
-  Confirm email ON, custom SMTP = web@drift.li — TOUR_PLAN.md §13); seed the demo tour from the
-  superadmin account (build in /tour, tick "Use as the public demo" in Tour settings, publish, point
-  its buttons at `/tour/start`).
+  Confirm email ON, custom SMTP = web@drift.li — TOUR_PLAN.md §13); the demo tour is now picked in
+  Admin → drift.li → Tour → Demo tour.
+
+## drift.li Tour v2 (2026-09-14) — code shipped P1–P6, deploy + ops owed (TOUR_V2_PLAN.md §5)
+
+- **URLs**: `/tour` (landing for visitors, your page for creators) · `/tour/{page}` (a TOUR org = a page,
+  admin + public view) · `/tour/{page}/{tour}` (the tour's main link = pathway menu; admins get the
+  builder) · `/tour/{page}/{tour}/{drift}` (player; drift segment derived from the name, unique per tour —
+  `stepDriftSlugs`) · `/tour/invite/{token}` · `drift.li/{page}/tour` → `/tour/{page}`.
+- **Buttons**: every tour drift has Home (→ pathway) + the next drift's name, last → #1 (`relinkFlow`,
+  only READY drifts, writes on change, `relinkAllFlows()` at boot, re-run when a drift turns READY).
+- **Pay per drift** (`services/driftBilling.ts`): free while `Organization.freeDrifts` last, then
+  `AWAITING_PAYMENT` (clip stored, not processed) → Stripe Checkout (one per tour) → webhook
+  `/api/drift/billing/webhook` (raw body, mounted BEFORE express.json) or return-page confirm → PAID,
+  `hostingExpiresAt` +1y (not enforced yet) → processed. Env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+  optional `TOUR_DRIFT_PRICE_CENTS`/`TOUR_CURRENCY`. Superadmin = COMP, no clip limit.
+- **Accounts** (`services/driftTourAccounts.ts`): `tourAccountType` GENERAL | PRO; Pro "Client Pages"
+  (org with `managedByOrgId` + ADMIN profile for the Pro); "Invite a Pro" one-time links.
+- **Superadmin**: `X-Drift-Org` lets a superadmin act on any TOUR page ("Manage this page", `usePageAdmin`);
+  back office = Admin → drift.li → Tour (`routes/driftTourAdmin.ts`, `DriftTourAdmin.tsx`).
+- **drift.li home** = `rotation3d/DriftHome.tsx` (live hero = the "Set as landing" drift; wait lists →
+  `DriftWaitlist`). Brand custom domains keep `HeroLanding`.
 
 ## Transactional email — DONE (2026-09-06)
 

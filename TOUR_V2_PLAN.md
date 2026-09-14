@@ -91,9 +91,9 @@ dashboards, set up the public demo tour. The superadmin's tour account has no cl
   bypass, receipts in the order table.
 - [x] **P4 — General / Pro.** Signup choice; Pro "Client pages" (create + manage); Invite a Pro
   (emailed link → ADMIN profile on accept).
-- [ ] **P5 — Superadmin Tour tab.** Pages, owners, tours, drifts, payments; open any page as admin;
+- [x] **P5 — Superadmin Tour tab.** Pages, owners, tours, drifts, payments; open any page as admin;
   demo tour picker (exclusive); per-page limits; wait list.
-- [ ] **P6 — Marketing.** New `/tour` landing; new drift.li home (Login/Dashboard top right, live
+- [x] **P6 — Marketing.** New `/tour` landing; new drift.li home (Login/Dashboard top right, live
   hero drift, Tour/View/Memory/Path, wait list modal); straight horizontal hero routes.
 
 ## 4. Schema (lands with P2 — ONE `prisma db push`, additive only)
@@ -109,14 +109,22 @@ dashboards, set up the public demo tour. The superadmin's tour account has no cl
 - `DriftTourInvite`: org, email, token `@unique`, invitedBy, status, timestamps.
 - `DriftWaitlist`: email, product (VIEW | MEMORY | PATH), `@@unique([email, product])`.
 
-## 5. Ops owed (as phases land)
+## 5. Ops owed (one deploy covers P1–P6)
 
-- P2: `npx prisma db push --skip-generate` (pull → push → build → restart).
-- P3: Stripe account → VPS env `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
-  (+ optional `TOUR_DRIFT_PRICE_CENTS=650`, `TOUR_CURRENCY=usd`); webhook endpoint
-  `https://<api host>/api/drift/billing/webhook` for `checkout.session.completed`; backend `npm ci`
-  (new `stripe` dependency).
-- Saved email-template overrides keep their old "Drift Link" wording — re-save them in Admin → Emails.
+1. VPS: `git pull --ff-only origin main` → `cd backend && npx prisma db push --skip-generate` (additive)
+   → `npm ci` (new `stripe` dependency) → `npm run build` → `pm2 restart my-backend --update-env` →
+   `cd ../frontend && npm ci && npm run build`.
+2. Stripe (payments stay off until this is done — uploads past the free drifts are kept, checkout says
+   "not switched on yet"): VPS env `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (+ optional
+   `TOUR_DRIFT_PRICE_CENTS=650`, `TOUR_CURRENCY=usd`, `DRIFT_APP_URL=https://drift.li`); in Stripe add a
+   webhook endpoint `https://<api host>/api/drift/billing/webhook` for `checkout.session.completed`,
+   `checkout.session.async_payment_succeeded`, `checkout.session.expired`; restart with `--update-env`.
+   Admin → drift.li → Tour shows "Checkout on · $6.50 / drift" when both keys are set.
+3. Demo tour: build + publish it on the superadmin's own tour page, then Admin → drift.li → Tour →
+   Demo tour → "Use as demo".
+4. Saved email-template overrides keep their old "Drift Link" wording — re-save them in Admin → Emails.
+5. Landing hero: the drift.li home's live hero is the "Set as landing" drift (Admin → drift.li → Brands
+   → ★ Set as landing, or the Landing showcase "Make hero"); the showcase list itself no longer shows.
 
 ## 6. Client copy (verbatim)
 
@@ -263,3 +271,13 @@ Drift.li is a division of PicDrift
   `/tour/invite/{token}` → `TourInviteAccept` → `POST /api/drift/creator/invites/:token/accept`, which
   adds an ADMIN profile and records the managing Pro). Admin note shows "Managed by …". Page slugs now
   also reserve start/invite/new/edit/login/signup. Templates `tour.pro.invite`, `tour.pro.joined`.
+- 2026-09-14 — P5 shipped: `routes/driftTourAdmin.ts` (superadmin) + `rotation3d/DriftTourAdmin.tsx` as
+  the "Tour" tab of the drift.li admin panel — Pages (search, detail with limits / tours / people /
+  client pages / orders, "Open page" → Manage this page), Demo tour (exclusive `isDemo` picker),
+  Orders, Wait list (copy emails). Status pill for Stripe + webhook config.
+- 2026-09-14 — P6 shipped: drift.li "/" = `rotation3d/DriftHome.tsx` (client copy; the landing drift is a
+  live draggable hero, fallback art otherwise; Tour card + View/Memory/Path wait list dialogs → `POST
+  /api/drift/public/waitlist`, team email `waitlist.join.notice`; Login → Dashboard when signed in).
+  Brand custom domains keep `HeroLanding` (`BrandDomainLanding` in DriftLanding.tsx); the gallery reel
+  code is gone. `/tour` = `tour/TourLanding.tsx` for visitors (creators still go to their page;
+  `/tour?view=landing` forces it). Hero routes are straight and horizontal (`PathArtH`, optional labels).
