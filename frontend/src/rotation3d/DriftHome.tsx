@@ -12,7 +12,7 @@ import { loadDriftPlayer } from "../routeChunks";
  * drift.li — the home, in the client's words (TOUR_V2_PLAN.md §6). "You Control the
  * Movement": beside the headline sits a glass "live view" of drift.li's demo tour —
  * its stops laid out in perspective, the centre stepping through the tour, with an orbit
- * and a horizon (visual only; "Drag to explore" starts the tour). Below: Tour
+ * and a horizon (visual only; "Take a Tour" starts it). Below: Tour
  * (available now) and View · Memory · Path (coming soon, each with a wait list), then
  * one closing call. On the drift design tokens — the glow is dark-theme only, light
  * stays flat. Login top right; signed in, it becomes Dashboard.
@@ -266,7 +266,7 @@ type Stop = { name: string; thumb: string };
 
 /** The hero's "live view": drift.li's demo tour — its stops laid out in perspective,
  *  the centre stepping slowly through the tour — under an orbit. A picture of the
- *  product, not the player (visual only); "Drag to explore" starts the tour. */
+ *  product, not the player (visual only); "Take a Tour" starts it. */
 function LiveView({ tour }: { tour: any }) {
   const reduceMotion = useReducedMotion();
   const stops = useMemo<Stop[]>(
@@ -324,12 +324,10 @@ function LiveView({ tour }: { tour: any }) {
         <span className="dh-chip dh-chip-live">Drift / Live View</span>
         {startPath ? (
           <Link className="dh-chip dh-chip-explore" to={startPath} onPointerEnter={warm} onTouchStart={warm} onFocus={warm}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden>
-              <circle cx="12" cy="12" r="7.5" />
-              <circle cx="12" cy="12" r="2" />
-              <path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3" />
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.2-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" />
             </svg>
-            Drag to explore
+            Take a Tour
           </Link>
         ) : null}
 
