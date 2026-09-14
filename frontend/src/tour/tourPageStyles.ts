@@ -112,4 +112,12 @@ export const TOUR_PAGE_STYLES = `
 @media(max-width:640px){.t-checkout{position:sticky;bottom:calc(10px + env(safe-area-inset-bottom));z-index:15;box-shadow:0 18px 40px -18px rgba(0,0,0,.55)}.t-checkout .d-btn{width:100%}}
 .t-drop-note{margin-top:4px;font-size:12px;font-weight:650;color:var(--accent)}
 .t-chain .loop{color:var(--accent);font-weight:700}
+/* ── Pro client pages + Invite a Pro ── */
+.tpg-clients{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+.tpg-client{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;border:1px solid var(--border);background:var(--surface);text-decoration:none;color:var(--text);box-shadow:var(--shadow-sm);transition:border-color .16s,transform .16s}
+.tpg-client:hover{border-color:var(--accent-border);transform:translateY(-1px)}
+.tpg-client b{display:block;font-size:15px;font-weight:750;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tpg-client small{font-size:12px;color:var(--muted)}
+.tpg-mark.sm{width:40px;height:40px;border-radius:12px;font-size:16px}
+.tpg-invite{margin-top:18px;padding-top:16px;border-top:1px solid var(--border)}
 `;

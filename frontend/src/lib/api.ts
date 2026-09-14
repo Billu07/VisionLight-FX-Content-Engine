@@ -346,8 +346,8 @@ export const apiEndpoints = {
   driftPublicBrandProduct: (brandSlug: string, productSlug: string) =>
     api.get(`/api/drift/public/b/${brandSlug}/${productSlug}`),
   // ── Creator suite (drift.li/tour|view|memory|path): account + flows ──
-  driftCreatorSignup: (name?: string, confirm?: boolean) =>
-    api.post("/api/drift/creator/signup", { name, confirm: confirm === true }),
+  driftCreatorSignup: (name?: string, confirm?: boolean, accountType?: string) =>
+    api.post("/api/drift/creator/signup", { name, confirm: confirm === true, accountType }),
   driftCreatorProfile: () => api.get("/api/drift/creator/profile"),
   driftMyFlows: (kind?: string) => api.get("/api/drift/my/flows", { params: kind ? { kind } : undefined }),
   driftCreateFlow: (data: Record<string, unknown>) => api.post("/api/drift/my/flows", data),
@@ -398,6 +398,13 @@ export const apiEndpoints = {
       headers: { "Content-Type": "multipart/form-data" },
       timeout: 120000,
     }),
+  driftMyClientPages: () => api.get("/api/drift/my/client-pages"),
+  driftCreateClientPage: (name: string) => api.post("/api/drift/my/client-pages", { name }),
+  driftPageInvites: () => api.get("/api/drift/my/page/invites"),
+  driftCreatePageInvite: (email: string) => api.post("/api/drift/my/page/invites", { email }),
+  driftRevokePageInvite: (id: string) => api.delete(`/api/drift/my/page/invites/${id}`),
+  driftTourInvite: (token: string) => api.get(`/api/drift/public/tour-invites/${encodeURIComponent(token)}`),
+  driftAcceptTourInvite: (token: string) => api.post(`/api/drift/creator/invites/${encodeURIComponent(token)}/accept`),
   driftMyFlowsBySlug: (slug: string, kind = "TOUR") => api.get("/api/drift/my/flows", { params: { kind, slug } }),
   driftPublicPage: (page: string) => api.get(`/api/drift/public/pages/${encodeURIComponent(page)}`),
   driftPublicPageFlow: (page: string, slug: string) =>

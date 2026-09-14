@@ -76,12 +76,18 @@ export async function findCreatorProfile(authUserId: string, email: string) {
 export async function provisionCreator(
   identity: CreatorIdentity,
   displayName?: string | null,
-  opts?: { allowSecondProfile?: boolean },
+  opts?: { allowSecondProfile?: boolean; accountType?: "GENERAL" | "PRO" | null },
 ): Promise<CreatorProvisionResult> {
   const email = identity.email.trim().toLowerCase();
   const profiles: any[] = await dbService.findUsersForAuthIdentity(identity.authUserId, email);
   const existing = profiles.find(isCreatorProfile);
   if (existing) {
+    // A page created before account types existed takes the one chosen now.
+    if (opts?.accountType && existing.organizationId && !existing.organization?.tourAccountType) {
+      await prisma.organization
+        .update({ where: { id: existing.organizationId }, data: { tourAccountType: opts.accountType } })
+        .catch(() => undefined);
+    }
     return {
       profileId: existing.id,
       organizationId: existing.organizationId,
@@ -120,6 +126,7 @@ export async function provisionCreator(
       routingDomain: DOMAIN,
       slug,
       tenantPlan: "PAID", // not DEMO: demo semantics (expiry/locks) are studio-only
+      tourAccountType: opts?.accountType || "GENERAL", // Tour v2: GENERAL | PRO
     },
     select: { id: true },
   });

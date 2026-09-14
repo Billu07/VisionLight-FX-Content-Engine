@@ -46,6 +46,7 @@ import AuthCallback from "./tour/AuthCallback";
 import { TourIndex, TourEditRedirect } from "./tour/TourIndex";
 import TourPage from "./tour/TourPage";
 import TourPathway from "./tour/TourPathway";
+import TourInviteAccept from "./tour/TourInviteAccept";
 import {
   isRotation3dSite,
   isDriftHost,
@@ -376,6 +377,7 @@ function App() {
             {/* drift.li creator suite — auth. Google/email-confirm links land on /auth/callback. */}
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/tour/start" element={<TourAuth />} />
+            <Route path="/tour/invite/:token" element={<TourInviteAccept />} />
             {/* drift.li/tour — a signed-in creator lands on their page. Pages and pathways
                 are public (their admins see the tools in place); a drift's readable link
                 plays in the player. /tour/:id/edit and /tour/{old-slug} still resolve. */}

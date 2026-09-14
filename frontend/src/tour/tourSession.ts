@@ -9,6 +9,30 @@ import { useAuth } from "../hooks/useAuth";
  */
 
 const NEXT_KEY = "drift_creator_next";
+const ACCOUNT_KEY = "drift_creator_account";
+
+/** Tour v2: General (realtors, brands, venues) or Pro (photographers, videographers). */
+export type AccountType = "GENERAL" | "PRO";
+
+/** Keep the chosen account type across an auth round-trip (email confirmation / Google). */
+export function rememberAccountType(t: AccountType | null) {
+  try {
+    if (t) localStorage.setItem(ACCOUNT_KEY, t);
+    else localStorage.removeItem(ACCOUNT_KEY);
+  } catch {
+    /* storage unavailable — the page defaults to General */
+  }
+}
+
+export function takeAccountType(): AccountType | undefined {
+  try {
+    const v = localStorage.getItem(ACCOUNT_KEY);
+    localStorage.removeItem(ACCOUNT_KEY);
+    return v === "PRO" || v === "GENERAL" ? v : undefined;
+  } catch {
+    return undefined;
+  }
+}
 export const CREATOR_HOME = "/tour";
 export const CREATOR_START = "/tour/start";
 export const CREATOR_DEMO = "/tour/demo";
@@ -64,7 +88,7 @@ export const isConfirmRequired = (e: unknown): e is CreatorConfirmRequired =>
  * email may also own a studio/brand workspace) and refresh the auth store.
  * Pass { confirm: true } only from an explicit "create my creator space" action.
  */
-export async function ensureCreatorProfile(name?: string, opts?: { confirm?: boolean }): Promise<void> {
+export async function ensureCreatorProfile(name?: string, opts?: { confirm?: boolean; accountType?: AccountType }): Promise<void> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -72,7 +96,7 @@ export async function ensureCreatorProfile(name?: string, opts?: { confirm?: boo
   setAuthToken(session.access_token);
   let r;
   try {
-    r = await apiEndpoints.driftCreatorSignup(name, opts?.confirm === true);
+    r = await apiEndpoints.driftCreatorSignup(name, opts?.confirm === true, opts?.accountType);
   } catch (e: any) {
     if (e?.code === "CREATOR_CONFIRM") throw new CreatorConfirmRequired(String(e?.details?.email || ""));
     throw e;

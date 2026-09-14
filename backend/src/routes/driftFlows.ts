@@ -12,6 +12,15 @@ import { parseCtaPlacement, parseDirection, processClip, uniqueSlug } from "./dr
 import { sendFlowCreatedNoticeEmail, sendFlowPublishedEmails, sendUpgradeNudgeEmail } from "../services/mail";
 import { billingSummary, confirmCheckoutSession, createFlowCheckout, storePendingClip } from "../services/driftBilling";
 import {
+  createClientPage,
+  createProInvite,
+  listClientPages,
+  listProInvites,
+  pageManager,
+  parseAccountType,
+  revokeProInvite,
+} from "../services/driftTourAccounts";
+import {
   CLIP_DURATION_TOLERANCE_S,
   FlowError,
   STEP_MIN_FRAMES,
@@ -258,6 +267,7 @@ router.get("/api/drift/my/flows", authenticateToken, async (req: AuthenticatedRe
     billing: await billingSummary(orgId, isSuperAdmin(req)),
     creator: { name: org?.name ?? null, handle: org?.slug ?? null },
     page: org && org.productLine === "TOUR" ? serializePage(org) : null,
+    manager: org && org.productLine === "TOUR" ? await pageManager(org.managedByOrgId) : null,
   });
 });
 
@@ -516,7 +526,12 @@ router.get("/api/drift/my/page", authenticateToken, async (req: AuthenticatedReq
   if (!orgId) return;
   const org = await prisma.organization.findUnique({ where: { id: orgId }, select: PAGE_SELECT });
   if (!org || org.productLine !== "TOUR") return res.status(404).json({ error: "This account has no tour page" });
-  res.json({ page: serializePage(org), demo: await resolveDemo(org, "TOUR"), quota: await flowQuota(orgId) });
+  res.json({
+    page: serializePage(org),
+    manager: await pageManager(org.managedByOrgId),
+    demo: await resolveDemo(org, "TOUR"),
+    quota: await flowQuota(orgId),
+  });
 });
 
 // Edit the page: { name?, contactLabel?, contactUrl?, demoFlowId?, logoUrl?: null }.
@@ -549,6 +564,11 @@ router.patch("/api/drift/my/page", authenticateToken, async (req: AuthenticatedR
       if (!own) return res.status(400).json({ error: "Pick one of this page's tours" });
     }
     settings.demoFlowId = id;
+  }
+  if ("accountType" in body) {
+    const t = parseAccountType(body.accountType);
+    if (!t) return res.status(400).json({ error: "Account type must be General or Pro" });
+    data.tourAccountType = t;
   }
   if ("logoUrl" in body && !body.logoUrl) settings.logoUrl = null;
   data.tourSettings = settings;
@@ -586,6 +606,62 @@ router.post(
     res.json({ page: serializePage(updated) });
   },
 );
+
+// ── Pro pages: the client pages they create and manage ──
+router.get("/api/drift/my/client-pages", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requireOrg(req, res);
+  if (!orgId) return;
+  res.json({ pages: await listClientPages(orgId) });
+});
+
+router.post("/api/drift/my/client-pages", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requireOrg(req, res);
+  if (!orgId) return;
+  const u = req.user || {};
+  try {
+    const result = await createClientPage({
+      proOrgId: orgId,
+      name: String(req.body?.name || ""),
+      identity: { authUserId: u.authUserId || null, email: String(u.email || ""), name: u.name || null },
+    });
+    res.status(201).json(result);
+  } catch (err) {
+    return handle(res, err);
+  }
+});
+
+// ── General pages: Invite a Pro ──
+router.get("/api/drift/my/page/invites", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requireOrg(req, res);
+  if (!orgId) return;
+  res.json({ invites: await listProInvites(orgId) });
+});
+
+router.post("/api/drift/my/page/invites", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requireOrg(req, res);
+  if (!orgId) return;
+  try {
+    const invite = await createProInvite({
+      orgId,
+      email: String(req.body?.email || ""),
+      inviter: { id: req.user?.id || null, email: req.user?.email || null, name: req.user?.name || null },
+    });
+    res.status(201).json({ invite });
+  } catch (err) {
+    return handle(res, err);
+  }
+});
+
+router.delete("/api/drift/my/page/invites/:inviteId", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requireOrg(req, res);
+  if (!orgId) return;
+  try {
+    await revokeProInvite(orgId, req.params.inviteId);
+    res.json({ ok: true });
+  } catch (err) {
+    return handle(res, err);
+  }
+});
 
 // A page, publicly: its name/logo/contact, the demo, and its Featured tours
 // (published, not hidden). ?kind=TOUR (default).

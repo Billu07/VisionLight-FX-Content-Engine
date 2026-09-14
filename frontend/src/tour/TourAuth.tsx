@@ -9,8 +9,10 @@ import {
   errorMessage,
   isConfirmRequired,
   nextFromLocation,
+  rememberAccountType,
   rememberNext,
   signInWithGoogle,
+  type AccountType,
 } from "./tourSession";
 
 /**
@@ -21,6 +23,21 @@ import {
  */
 
 type Mode = "signup" | "login" | "forgot" | "sent";
+
+const ACCOUNT_TYPES: { value: AccountType; label: string; who: string; note: string }[] = [
+  {
+    value: "GENERAL",
+    label: "General",
+    who: "Realtors · Brands · Venues",
+    note: "Build tours of your own spaces — and invite your photographer or videographer any time.",
+  },
+  {
+    value: "PRO",
+    label: "Pro",
+    who: "Photographers · Videographers",
+    note: "Create tour pages for your clients and manage them all from one place.",
+  },
+];
 
 // Google sign-in needs the Supabase Google provider (a Google Cloud OAuth client).
 // Off until that's configured: set VITE_TOUR_GOOGLE_AUTH=1 at build time to show it.
@@ -64,6 +81,13 @@ const STYLES = `
 .ta-fine a{color:var(--muted);text-decoration:underline}
 .ta-sent{display:grid;gap:10px;text-align:center;padding:8px 0}
 .ta-sent .ico{width:56px;height:56px;border-radius:18px;margin:0 auto 4px;display:grid;place-items:center;background:var(--accent-soft);border:1px solid var(--accent-border);color:var(--accent);font-size:24px}
+.ta-types{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ta-type{appearance:none;cursor:pointer;display:grid;gap:3px;text-align:left;padding:12px;border-radius:14px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font:inherit;transition:border-color .16s,background .16s,box-shadow .16s}
+.ta-type b{font-size:15px;font-weight:750}
+.ta-type span{font-size:11.5px;color:var(--muted);line-height:1.35}
+.ta-type:hover{border-color:var(--border-strong)}
+.ta-type.on{border-color:var(--accent-border);background:var(--accent-soft);box-shadow:0 0 0 3px var(--accent-soft)}
+.ta-type-note{font-size:12px;color:var(--muted);line-height:1.45}
 `;
 
 export default function TourAuth() {
@@ -76,6 +100,12 @@ export default function TourAuth() {
   const next = nextFromLocation(location.search);
   const [mode, setMode] = useState<Mode>(params.get("mode") === "login" ? "login" : "signup");
   const [name, setName] = useState("");
+  // ?type=pro (the landing's "Are you a Photographer?") and invite links start on Pro.
+  const [accountType, setAccountType] = useState<AccountType>(() => {
+    const t = (params.get("type") || "").toUpperCase();
+    if (t === "PRO" || t === "GENERAL") return t;
+    return next.startsWith("/tour/invite/") ? "PRO" : "GENERAL";
+  });
   const [email, setEmail] = useState(params.get("email") || "");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -102,7 +132,7 @@ export default function TourAuth() {
     setError("");
     try {
       rememberNext(next);
-      await ensureCreatorProfile(undefined, { confirm: true });
+      await ensureCreatorProfile(undefined, { confirm: true, accountType });
       navigate(next, { replace: true });
     } catch (e) {
       setError(errorMessage(e));
@@ -115,7 +145,7 @@ export default function TourAuth() {
   // never converted silently — surface the confirmation instead.
   const provisionOrAsk = async (displayName?: string) => {
     try {
-      await ensureCreatorProfile(displayName);
+      await ensureCreatorProfile(displayName, { accountType });
     } catch (e) {
       if (!isConfirmRequired(e)) throw e;
       await checkAuth();
@@ -136,6 +166,7 @@ export default function TourAuth() {
     setBusy(true);
     setError("");
     try {
+      rememberAccountType(accountType);
       await signInWithGoogle(next);
     } catch (e) {
       setError(errorMessage(e));
@@ -161,6 +192,7 @@ export default function TourAuth() {
       }
       if (mode === "signup" && password.length < 8) throw new Error("Use at least 8 characters for your password.");
       rememberNext(next);
+      if (mode === "signup") rememberAccountType(accountType);
       if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
           email: em,
@@ -327,6 +359,26 @@ export default function TourAuth() {
                   )}
 
                   <form className="ta-form" onSubmit={submit}>
+                    {mode === "signup" && (
+                      <div style={{ display: "grid", gap: 8 }}>
+                        <div className="ta-types" role="radiogroup" aria-label="Account type">
+                          {ACCOUNT_TYPES.map((t) => (
+                            <button
+                              key={t.value}
+                              type="button"
+                              role="radio"
+                              aria-checked={accountType === t.value}
+                              className={`ta-type ${accountType === t.value ? "on" : ""}`}
+                              onClick={() => setAccountType(t.value)}
+                            >
+                              <b>{t.label}</b>
+                              <span>{t.who}</span>
+                            </button>
+                          ))}
+                        </div>
+                        <div className="ta-type-note">{ACCOUNT_TYPES.find((t) => t.value === accountType)?.note}</div>
+                      </div>
+                    )}
                     {mode === "signup" && (
                       <div>
                         <label className="d-label" htmlFor="ta-name">

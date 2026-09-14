@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { apiEndpoints } from "../lib/api";
+import { apiEndpoints, setActiveProfile } from "../lib/api";
+import { useAuth } from "../hooks/useAuth";
 import { confirmAction, notify } from "../lib/notifications";
-import type { Demo, Flow, Page, PublicFlow } from "./types";
+import type { ClientPage, Demo, Flow, Page, PageRef, PublicFlow, TourInvite } from "./types";
 import { isReady } from "./types";
 import { StatusPill, TourShell, apiError, copyText, publicUrl } from "./tourUi";
 import { TOUR_PAGE_STYLES } from "./tourPageStyles";
@@ -180,6 +181,7 @@ function PageSettings({
   const [contactLabel, setContactLabel] = useState(page.contactLabel || "");
   const [contactUrl, setContactUrl] = useState(page.contactUrl || "");
   const [demoFlowId, setDemoFlowId] = useState(page.demoFlowId || "");
+  const [accountType, setAccountType] = useState(page.accountType === "PRO" ? "PRO" : "GENERAL");
   const [saving, setSaving] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
   const logoRef = useRef<HTMLInputElement>(null);
@@ -188,7 +190,8 @@ function PageSettings({
     name.trim() !== page.name ||
     contactLabel.trim() !== (page.contactLabel || "") ||
     contactUrl.trim() !== (page.contactUrl || "") ||
-    demoFlowId !== (page.demoFlowId || "");
+    demoFlowId !== (page.demoFlowId || "") ||
+    accountType !== (page.accountType === "PRO" ? "PRO" : "GENERAL");
 
   const save = async () => {
     if (!name.trim()) return notify.error("Give your page a name");
@@ -199,6 +202,7 @@ function PageSettings({
         contactLabel: contactLabel.trim() || null,
         contactUrl: contactUrl.trim() || null,
         demoFlowId: demoFlowId || null,
+        accountType,
       });
       onSaved(r.data.page, r.data.demo ?? null);
       notify.success("Page saved");
@@ -312,6 +316,28 @@ function PageSettings({
           />
         </div>
       </div>
+      <div style={{ marginTop: 14 }}>
+        <label className="d-label">Account type</label>
+        <div className="t-seg" role="radiogroup" aria-label="Account type">
+          {(["GENERAL", "PRO"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="radio"
+              aria-checked={accountType === t}
+              className={`t-seg-btn ${accountType === t ? "on" : ""}`}
+              onClick={() => setAccountType(t)}
+              style={{ minWidth: 150, fontSize: 13.5, fontWeight: 750, padding: "8px 12px" }}
+            >
+              {t === "GENERAL" ? "General" : "Pro"}
+              <small>{t === "GENERAL" ? "Realtors · brands · venues" : "Photographers · videographers"}</small>
+            </button>
+          ))}
+        </div>
+        <div className="d-faint" style={{ fontSize: 11.5, marginTop: 5 }}>
+          Pro pages can create and manage tour pages for their clients.
+        </div>
+      </div>
       <div className="t-actions" style={{ marginTop: 14 }}>
         <button className="d-btn primary" onClick={save} disabled={saving || !dirty}>
           {saving ? "Saving…" : "Save page"}
@@ -320,7 +346,189 @@ function PageSettings({
           Leave the contact fields empty to use "Contact PicDrift".
         </span>
       </div>
+      <InvitePro />
     </div>
+  );
+}
+
+// "Invite a Pro": the page's photographer / videographer gets a one-time link to manage it.
+function InvitePro() {
+  const [invites, setInvites] = useState<TourInvite[]>([]);
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = () =>
+    apiEndpoints
+      .driftPageInvites()
+      .then((r) => setInvites(r.data.invites || []))
+      .catch(() => undefined);
+  useEffect(() => {
+    load();
+  }, []);
+  const send = async () => {
+    const to = email.trim();
+    if (!to) return;
+    setBusy(true);
+    try {
+      await apiEndpoints.driftCreatePageInvite(to);
+      notify.success(`Invite sent to ${to}`);
+      setEmail("");
+      load();
+    } catch (e) {
+      notify.error(apiError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const revoke = async (i: TourInvite) => {
+    try {
+      await apiEndpoints.driftRevokePageInvite(i.id);
+      load();
+    } catch (e) {
+      notify.error(apiError(e));
+    }
+  };
+  const statusLabel = (i: TourInvite) =>
+    i.status === "ACCEPTED" ? "Accepted — manages this page" : i.status === "EXPIRED" ? "Expired" : "Invite sent";
+  return (
+    <div className="tpg-invite">
+      <div className="d-label">Invite a Pro</div>
+      <p className="d-sub" style={{ fontSize: 12.5, margin: "0 0 10px" }}>
+        Your photographer or videographer can build and manage tours on this page with their own login.
+      </p>
+      <div className="t-inline">
+        <input
+          className="d-input"
+          type="email"
+          inputMode="email"
+          placeholder="pro@studio.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && send()}
+          style={{ flex: "1 1 220px" }}
+        />
+        <button className="d-btn primary" onClick={send} disabled={busy || !email.trim()}>
+          {busy ? "Sending…" : "Send invite"}
+        </button>
+      </div>
+      {invites.length > 0 && (
+        <div className="d-list" style={{ marginTop: 10 }}>
+          {invites.map((i) => (
+            <div key={i.id} className="d-item static">
+              <span className="grow">
+                <span className="d-name" style={{ display: "block", fontSize: 13 }}>
+                  {i.email}
+                </span>
+                <span className="sub">{statusLabel(i)}</span>
+              </span>
+              {i.status === "PENDING" && (
+                <button className="d-btn ghost sm" onClick={() => revoke(i)}>
+                  Revoke
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// A Pro's client pages: one page per client, managed from here.
+function ClientPages() {
+  const navigate = useNavigate();
+  const { checkAuth } = useAuth();
+  const [pages, setPages] = useState<ClientPage[] | null>(null);
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    apiEndpoints
+      .driftMyClientPages()
+      .then((r) => setPages(r.data.pages || []))
+      .catch(() => setPages([]));
+  }, []);
+  const create = async () => {
+    const n = name.trim();
+    if (!n) return;
+    setBusy(true);
+    try {
+      const r = await apiEndpoints.driftCreateClientPage(n);
+      setActiveProfile(r.data.profileId, r.data.page?.name);
+      await checkAuth();
+      notify.success(`${r.data.page?.name || "The page"} is ready`);
+      navigate(r.data.page?.path || "/tour");
+    } catch (e) {
+      notify.error(apiError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="tpg-section">
+      <div className="tpg-bar">
+        <h2>Client Pages</h2>
+        <button className="d-btn sm" onClick={() => setOpen((v) => !v)}>
+          {open ? "Cancel" : "+ New client page"}
+        </button>
+      </div>
+      {open && (
+        <div className="d-card d-card-pad t-rise" style={{ marginBottom: 14, display: "grid", gap: 10 }}>
+          <label className="d-label" htmlFor="client-page-name">
+            Client's page name
+          </label>
+          <div className="t-inline">
+            <input
+              id="client-page-name"
+              className="d-input"
+              style={{ flex: "1 1 240px" }}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && create()}
+              placeholder="e.g. Harbour Homes"
+              maxLength={80}
+              autoFocus
+            />
+            <button className="d-btn primary" onClick={create} disabled={busy || !name.trim()}>
+              {busy ? "Creating…" : "Create page"}
+            </button>
+          </div>
+          <div className="d-faint" style={{ fontSize: 12 }}>
+            The client's page gets its own link. You manage it — and can invite the client in later.
+          </div>
+        </div>
+      )}
+      {pages === null ? (
+        <div className="d-faint" style={{ fontSize: 13 }}>
+          Loading…
+        </div>
+      ) : pages.length === 0 ? (
+        !open && (
+          <div className="tpg-empty">
+            <h3>Build tours for your clients</h3>
+            <p className="d-sub" style={{ margin: 0, maxWidth: "46ch" }}>
+              Create a page for each client. Each one has its own link, and you manage them all from here.
+            </p>
+          </div>
+        )
+      ) : (
+        <div className="tpg-clients">
+          {pages.map((p) => (
+            <Link key={p.id} to={p.path || "/tour"} className="tpg-client">
+              <span className="tpg-mark sm">{(p.name || "?").trim().charAt(0)}</span>
+              <span style={{ minWidth: 0 }}>
+                <b>{p.name}</b>
+                <small>
+                  {p.tours} tour{p.tours === 1 ? "" : "s"}
+                </small>
+              </span>
+              <span className="tpw-go" aria-hidden>
+                ›
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -348,6 +556,7 @@ export default function TourPage() {
     }
   };
   const [flows, setFlows] = useState<Flow[]>([]);
+  const [manager, setManager] = useState<PageRef | null>(null);
   const [adminLoaded, setAdminLoaded] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -400,6 +609,7 @@ export default function TourPage() {
       const r = await apiEndpoints.driftMyFlows("TOUR");
       setFlows(r.data.flows || []);
       if (r.data.page) setPub((d) => (d ? { ...d, page: r.data.page } : d));
+      setManager(r.data.manager || null);
     } catch (e) {
       notify.error(apiError(e));
     } finally {
@@ -537,7 +747,19 @@ export default function TourPage() {
       )}
       {admin.isAdmin && (
         <div className="tpg-note">
-          <span>{preview ? "This is what visitors see." : "You're editing your page. Visitors never see the admin tools."}</span>
+          <span>
+            {preview ? "This is what visitors see." : "You're editing your page. Visitors never see the admin tools."}
+            {manager && manager.path && (
+              <>
+                {" "}
+                Managed by{" "}
+                <Link to={manager.path} style={{ color: "var(--accent)", fontWeight: 700 }}>
+                  {manager.name}
+                </Link>
+                .
+              </>
+            )}
+          </span>
           <button className="d-btn sm" onClick={() => setPreview((v) => !v)}>
             {preview ? "Back to editing" : "View as visitor"}
           </button>
@@ -659,6 +881,8 @@ export default function TourPage() {
           <TourCards items={featured} renderActions={editing ? adminActions : undefined} />
         )}
       </section>
+
+      {editing && page.accountType === "PRO" && <ClientPages />}
 
       {editing && hiddenTours.length > 0 && (
         <section className="tpg-section">

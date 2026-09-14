@@ -101,6 +101,21 @@ export type Page = {
   demoFlowId: string | null;
 };
 
+/** A page reference (a client page, the Pro page managing one, an invite's page). */
+export type PageRef = { id: string; name: string; slug: string | null; path: string | null };
+
+/** A Pro's client page. */
+export type ClientPage = PageRef & { tours: number; createdAt: string };
+
+/** An "Invite a Pro" link. */
+export type TourInvite = {
+  id: string;
+  email: string;
+  status: "PENDING" | "ACCEPTED" | "EXPIRED" | string;
+  createdAt: string;
+  acceptedAt: string | null;
+};
+
 /** "View Demo": the page's own demo tour, or drift.li's. */
 export type Demo = { name: string; path: string; own: boolean } | null;
 

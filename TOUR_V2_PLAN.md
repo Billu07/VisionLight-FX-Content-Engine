@@ -86,10 +86,10 @@ dashboards, set up the public demo tour. The superadmin's tour account has no cl
   endpoints; Home/next-drift relink; player routes + in-app swaps; public pathway page; admin
   pathway = simplified builder (ref4/ref5); page at `/tour/{page}` with Featured/Hidden, Card/Path,
   View Demo, editable Contact; legacy redirects.
-- [ ] **P3 — Stripe.** Batch upload → pending clips → Checkout ($6.50 × drifts) → webhook +
+- [x] **P3 — Stripe.** Batch upload → pending clips → Checkout ($6.50 × drifts) → webhook +
   return-page confirm → processing. + Add to Tour, + Create New Tour. Free allowance, superadmin
   bypass, receipts in the order table.
-- [ ] **P4 — General / Pro.** Signup choice; Pro "Client pages" (create + manage); Invite a Pro
+- [x] **P4 — General / Pro.** Signup choice; Pro "Client pages" (create + manage); Invite a Pro
   (emailed link → ADMIN profile on accept).
 - [ ] **P5 — Superadmin Tour tab.** Pages, owners, tours, drifts, payments; open any page as admin;
   demo tour picker (exclusive); per-page limits; wait list.
@@ -245,3 +245,21 @@ Drift.li is a division of PicDrift
   TOUR page ("Manage this page"). Builder per ref4/ref5 (no headline/buttons/placement/loop; Save
   Drift; pencil rename; straight rail; cover = start/middle/end of drift 1 or upload). Legacy
   `/tour/:id/edit`, `/tour/{old-slug}`, `/tour/demo` resolve; `drift.li/{page}/tour` redirects.
+- 2026-09-14 — P3 shipped (backend `npm ci` — new `stripe` dep): `services/driftBilling.ts`. Billing is
+  decided in `createDriftStep` under the org lock: COMP (superadmin) / FREE (while
+  `Organization.freeDrifts` last, counted over flow drifts billed FREE) / AWAITING_PAYMENT (clip stored
+  via `storePendingClip`, product status `AWAITING_PAYMENT`, not processed). `POST
+  /api/drift/my/flows/:id/checkout` (one open session per tour — older ones expired), `POST
+  /api/drift/my/checkout/confirm` (return page) and `POST /api/drift/billing/webhook` (raw body, mounted
+  before express.json) share an idempotent, row-locked `fulfillSession` → PAID + hostingExpiresAt +1y →
+  fetch the stored clip → `processClip`. Tours are unlimited (maxFlows no longer gates; 60-drift cap).
+  relink only links READY drifts and re-runs when a drift turns READY. Builder: multi-file upload, free /
+  price note, checkout bar, Stripe return confirm. Templates `tour.order.paid.creator` / `.notice`.
+- 2026-09-14 — P4 shipped: `services/driftTourAccounts.ts`. Signup chooses General / Pro
+  (`?type=pro`; invite links default to Pro; remembered across email confirm / Google) →
+  `Organization.tourAccountType`. Pro pages: "Client Pages" on their page (`GET/POST
+  /api/drift/my/client-pages` → a GENERAL org with `managedByOrgId` + an ADMIN profile for the Pro).
+  General pages: "Invite a Pro" in page settings (`/api/drift/my/page/invites` → one-time 14-day link
+  `/tour/invite/{token}` → `TourInviteAccept` → `POST /api/drift/creator/invites/:token/accept`, which
+  adds an ADMIN profile and records the managing Pro). Admin note shows "Managed by …". Page slugs now
+  also reserve start/invite/new/edit/login/signup. Templates `tour.pro.invite`, `tour.pro.joined`.

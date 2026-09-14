@@ -288,6 +288,47 @@ export const MAIL_TEMPLATES: MailTemplateDef[] = [
       footnote: "Creator-suite notification for the drift.li team.",
     }),
   },
+  {
+    key: "tour.pro.invite",
+    name: "Invite a Pro (to the Pro)",
+    description: "The one-time link a page sends its photographer or videographer so they can manage the page.",
+    trigger: "A page admin invites a Pro",
+    audience: "The invited email",
+    vars: [
+      { name: "pageName", description: "The page they're invited to", sample: "Harbour Homes" },
+      { name: "inviterLabel", description: "Who invited them", sample: "Sam (sam@harbourhomes.com)" },
+      { name: "url", description: "The one-time invite link", sample: "https://drift.li/tour/invite/abc123" },
+    ],
+    defaults: f({
+      subject: "{{inviterLabel}} invited you to manage {{pageName}} on drift.li",
+      heading: "You're invited to create Drift Tours",
+      intro:
+        '{{inviterLabel}} would like you to build and manage Drift Tours for "{{pageName}}". Use the camera and skills you already have — a short pan or tilt of each space becomes an interactive tour.',
+      ctaLabel: "Accept the invite",
+      ctaUrl: "{{url}}",
+      footnote: "The link works once and expires in 14 days. If you weren't expecting this, you can ignore it.",
+    }),
+  },
+  {
+    key: "tour.pro.joined",
+    name: "A Pro joined your page",
+    description: "Tells a page's admins that the Pro they invited accepted.",
+    trigger: "An invited Pro accepts",
+    audience: "The page's admins",
+    vars: [
+      { name: "proLabel", description: "The Pro — name (email)", sample: "Jordan (jordan@studio.com)" },
+      { name: "pageName", description: "The page", sample: "Harbour Homes" },
+      { name: "url", description: "The page's link", sample: "https://drift.li/tour/harbour-homes" },
+    ],
+    defaults: f({
+      subject: "{{proLabel}} can now manage {{pageName}}",
+      heading: "Your Pro is on board",
+      intro: '{{proLabel}} accepted your invite and can now build tours for "{{pageName}}".',
+      ctaLabel: "Open your page",
+      ctaUrl: "{{url}}",
+      footnote: "Sent by drift.li on behalf of your page.",
+    }),
+  },
 ];
 
 export const templateByKey = (key: string): MailTemplateDef | null =>

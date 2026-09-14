@@ -89,6 +89,7 @@ const RESERVED_SLUGS = new Set([
   "reset-password", "support-handoff", "auth", "billing", "demo", "rotation3d",
   "drift", "api", "www", "b", "assets", "favicon",
   "tour", "view", "memory", "path", // drift.li creator suite (/{kind}/{slug})
+  "start", "invite", "new", "edit", "login", "signup", // /tour/{static} app routes (page slugs)
 ]);
 
 // Globally-unique vanity slug for an organization.

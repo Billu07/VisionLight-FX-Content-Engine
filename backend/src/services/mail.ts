@@ -498,3 +498,20 @@ export async function sendTourOrderPaidEmails(params: {
   }
   await sendTemplated("tour.order.paid.notice", { vars, defaultTo: ADMIN_EMAILS, rows });
 }
+
+/** "Invite a Pro": the one-time link to the invited photographer / videographer. */
+export async function sendTourProInviteEmail(params: { to: string; pageName: string; inviterLabel: string; url: string }): Promise<void> {
+  await sendTemplated("tour.pro.invite", {
+    vars: { pageName: params.pageName, inviterLabel: params.inviterLabel, url: params.url },
+    defaultTo: [params.to],
+  });
+}
+
+/** The invited Pro accepted: tell the page's admins. */
+export async function sendTourProJoinedEmail(params: { to: string[]; proLabel: string; pageName: string; url: string }): Promise<void> {
+  if (!params.to.length) return;
+  await sendTemplated("tour.pro.joined", {
+    vars: { proLabel: params.proLabel, pageName: params.pageName, url: params.url },
+    defaultTo: params.to,
+  });
+}

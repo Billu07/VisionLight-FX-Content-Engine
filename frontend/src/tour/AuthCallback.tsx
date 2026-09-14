@@ -2,7 +2,15 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { DriftThemeStyles, useDriftTheme } from "../rotation3d/driftUiTheme";
-import { CREATOR_START, ensureCreatorProfile, errorMessage, isConfirmRequired, takeNext } from "./tourSession";
+import {
+  CREATOR_START,
+  ensureCreatorProfile,
+  errorMessage,
+  isConfirmRequired,
+  takeAccountType,
+  takeNext,
+  type AccountType,
+} from "./tourSession";
 
 /**
  * /auth/callback — where Google sign-in and the email-confirmation link land.
@@ -46,7 +54,7 @@ export default function AuthCallback() {
   const navigate = useNavigate();
   const [theme] = useDriftTheme();
   const [error, setError] = useState("");
-  const [confirm, setConfirm] = useState<{ email: string; name: string } | null>(null);
+  const [confirm, setConfirm] = useState<{ email: string; name: string; accountType?: AccountType } | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -58,13 +66,14 @@ export default function AuthCallback() {
       if (!session) throw new Error("We couldn't finish signing you in. Please try again.");
       const meta = (session.user?.user_metadata || {}) as Record<string, unknown>;
       const name = String(meta.full_name || meta.name || "").trim();
+      const accountType = takeAccountType();
       try {
-        await ensureCreatorProfile(name || undefined);
+        await ensureCreatorProfile(name || undefined, { accountType });
       } catch (e) {
         if (!isConfirmRequired(e)) throw e;
         // An existing studio/brand account signed in with Google: ask, never assume.
         window.history.replaceState(null, "", "/auth/callback");
-        if (alive) setConfirm({ email: e.email || session.user?.email || "", name });
+        if (alive) setConfirm({ email: e.email || session.user?.email || "", name, accountType });
         return;
       }
       window.history.replaceState(null, "", "/auth/callback");
@@ -98,7 +107,7 @@ export default function AuthCallback() {
                 setBusy(true);
                 setError("");
                 try {
-                  await ensureCreatorProfile(confirm.name || undefined, { confirm: true });
+                  await ensureCreatorProfile(confirm.name || undefined, { confirm: true, accountType: confirm.accountType });
                   navigate(takeNext(), { replace: true });
                 } catch (e) {
                   setError(errorMessage(e));
