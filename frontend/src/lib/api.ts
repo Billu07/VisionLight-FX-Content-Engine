@@ -427,6 +427,17 @@ export const apiEndpoints = {
   driftLandingSetHero: (source: string, productId: string) =>
     api.post("/api/drift/landing/set-hero", { source, productId }),
   // Drift admin "Emails" panel (superadmin): editable transactional templates
+  // Tour back office (superadmin) + the public wait list
+  driftTourAdminStatus: () => api.get("/api/drift/admin/tour/status"),
+  driftTourAdminPages: (q?: string) => api.get("/api/drift/admin/tour/pages", { params: q ? { q } : undefined }),
+  driftTourAdminPage: (id: string) => api.get(`/api/drift/admin/tour/pages/${id}`),
+  driftTourAdminUpdatePage: (id: string, data: Record<string, unknown>) => api.patch(`/api/drift/admin/tour/pages/${id}`, data),
+  driftTourAdminDemo: () => api.get("/api/drift/admin/tour/demo"),
+  driftTourAdminSetDemo: (flowId: string | null) => api.put("/api/drift/admin/tour/demo", { flowId }),
+  driftTourAdminOrders: () => api.get("/api/drift/admin/tour/orders"),
+  driftAdminWaitlist: () => api.get("/api/drift/admin/waitlist"),
+  driftJoinWaitlist: (email: string, product: string, source?: string) =>
+    api.post("/api/drift/public/waitlist", { email, product, source }),
   driftMailTemplates: () => api.get("/api/drift/mail/templates"),
   driftMailSaveTemplate: (key: string, data: Record<string, unknown>) =>
     api.put(`/api/drift/mail/templates/${key}`, data),

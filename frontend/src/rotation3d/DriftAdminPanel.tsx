@@ -5,6 +5,7 @@ import DriftCaptionEditor from "./DriftCaptionEditor";
 import BrandProductEditModal from "./BrandProductEditModal";
 import DriftBrandDashboard from "./DriftBrandDashboard";
 import DriftMailSettings from "./DriftMailSettings";
+import DriftTourAdmin from "./DriftTourAdmin";
 import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "./driftUiTheme";
 
 /**
@@ -294,7 +295,7 @@ function SecondClipButton({
 
 export default function DriftAdminPanel() {
   const [theme, toggleTheme] = useDriftTheme();
-  const [mode, setMode] = useState<"brands" | "showcase" | "emails">("brands");
+  const [mode, setMode] = useState<"brands" | "tour" | "showcase" | "emails">("brands");
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loadingBrands, setLoadingBrands] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -564,9 +565,9 @@ export default function DriftAdminPanel() {
 
       <div className="d-head" style={{ marginBottom: 16 }}>
         <div className="d-tabs" role="tablist" aria-label="drift.li console">
-          {(["brands", "showcase", "emails"] as const).map((m) => (
+          {(["brands", "tour", "showcase", "emails"] as const).map((m) => (
             <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={`d-tab ${mode === m ? "active" : ""}`}>
-              {m === "brands" ? "Brands" : m === "showcase" ? "Landing showcase" : "Emails"}
+              {m === "brands" ? "Brands" : m === "tour" ? "Tour" : m === "showcase" ? "Landing showcase" : "Emails"}
             </button>
           ))}
         </div>
@@ -584,6 +585,8 @@ export default function DriftAdminPanel() {
 
       {mode === "emails" ? (
         <DriftMailSettings />
+      ) : mode === "tour" ? (
+        <DriftTourAdmin />
       ) : mode === "showcase" ? (
         <LandingPanel />
       ) : (

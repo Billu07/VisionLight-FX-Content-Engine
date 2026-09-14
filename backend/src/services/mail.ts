@@ -515,3 +515,9 @@ export async function sendTourProJoinedEmail(params: { to: string[]; proLabel: s
     defaultTo: params.to,
   });
 }
+
+/** Someone joined the View / Memory / Path wait list: tell the team. */
+export async function sendWaitlistNoticeEmail(params: { email: string; product: string }): Promise<void> {
+  const product = params.product.charAt(0).toUpperCase() + params.product.slice(1).toLowerCase();
+  await sendTemplated("waitlist.join.notice", { vars: { email: params.email, product }, defaultTo: ADMIN_EMAILS });
+}

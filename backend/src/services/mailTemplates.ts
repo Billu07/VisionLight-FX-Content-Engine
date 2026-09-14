@@ -329,6 +329,23 @@ export const MAIL_TEMPLATES: MailTemplateDef[] = [
       footnote: "Sent by drift.li on behalf of your page.",
     }),
   },
+  {
+    key: "waitlist.join.notice",
+    name: "Wait list sign-up (team notice)",
+    description: "Tells your team someone joined the View, Memory or Path wait list on the drift.li home.",
+    trigger: "Someone joins a wait list",
+    audience: "Platform admins (ADMIN_EMAILS)",
+    vars: [
+      { name: "email", description: "Their email", sample: "alex@example.com" },
+      { name: "product", description: "View, Memory or Path", sample: "Memory" },
+    ],
+    defaults: f({
+      subject: "Wait list: {{product}} · {{email}}",
+      heading: "New wait list sign-up",
+      intro: "{{email}} wants to hear when {{product}} launches.",
+      footnote: "drift.li notification for the team.",
+    }),
+  },
 ];
 
 export const templateByKey = (key: string): MailTemplateDef | null =>
