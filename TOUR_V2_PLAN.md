@@ -317,6 +317,7 @@ Drift.li is a division of PicDrift
   `/assets/*`; existing R2 frames need a Cloudflare cache rule (they were uploaded without Cache-Control).
 - 2026-09-14 — drift.li home redesign from the client's `land.png`: the draggable hero drift is replaced by a
   visual "live view" (five frames of the landing drift in perspective with an orbit, horizon and grid; glow
-  in dark theme only, flat in light), "Move to explore" opens the live drift, four even product cards (Tour:
-  Try It Free · View/Memory/Path: Join Wait List — no Learn More), closing "Try Drift Tour" kept. The home
+  in dark theme only, flat in light), "Drag to explore" opens the live drift, four even product cards, closing
+  "Try Drift Tour" kept. All copy and CTAs unchanged (Tour: Try it Free + Learn More; View/Memory/Path: Join
+  Wait List) — the client wants the original content kept on the new design. The home
   no longer downloads the player.

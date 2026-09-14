@@ -11,7 +11,7 @@ import { combinedFrameSets } from "./driftNav";
  * drift.li — the home, in the client's words (TOUR_V2_PLAN.md §6). "You Control the
  * Movement": beside the headline sits a glass "live view" of the superadmin's landing
  * drift — a few of its frames laid out in perspective, drifting slowly, with an orbit
- * and a horizon (visual only; "Move to explore" opens the live drift). Below: Tour
+ * and a horizon (visual only; "Drag to explore" opens the live drift). Below: Tour
  * (available now) and View · Memory · Path (coming soon, each with a wait list), then
  * one closing call. On the drift design tokens — the glow is dark-theme only, light
  * stays flat. Login top right; signed in, it becomes Dashboard.
@@ -175,7 +175,7 @@ a.dh-chip-explore:hover{background:var(--accent-soft)}
   font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);border:1px solid var(--accent-border)}
 .dh-status::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .dh-status.on{color:var(--ok);background:var(--ok-soft);border-color:var(--ok-border)}
-.dh-card-cta{margin-top:auto;padding-top:14px}
+.dh-card-cta{margin-top:auto;padding-top:14px;display:flex;flex-wrap:wrap;gap:8px}
 .dh-pill{display:inline-flex;align-items:center;gap:10px;padding:12px 20px;border-radius:999px;font-size:14.5px;font-weight:700;text-decoration:none}
 .dh-pill.outline{background:transparent;border:1px solid var(--accent-border);color:var(--accent)}
 .dh-pill.outline:hover{background:var(--accent-soft);border-color:var(--accent-border)}
@@ -305,7 +305,7 @@ function LiveView({ hero }: { hero: any }) {
               <circle cx="12" cy="12" r="2" />
               <path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3" />
             </svg>
-            Move to explore
+            Drag to explore
           </Link>
         ) : null}
 
@@ -507,10 +507,15 @@ export default function DriftHome() {
                 {p.note && <p className="dh-meta">{p.note}</p>}
                 <div className="dh-card-cta">
                   {p.live ? (
-                    <Link className="d-btn primary dh-pill" to="/tour/start">
-                      Try It Free
-                      <Arrow size={16} />
-                    </Link>
+                    <>
+                      <Link className="d-btn primary dh-pill" to="/tour/start">
+                        Try it Free
+                        <Arrow size={16} />
+                      </Link>
+                      <Link className="d-btn dh-pill outline" to="/tour">
+                        Learn More
+                      </Link>
+                    </>
                   ) : (
                     <button type="button" className="d-btn dh-pill outline" onClick={() => setWaitFor(p)}>
                       Join Wait List
