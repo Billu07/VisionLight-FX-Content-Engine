@@ -232,6 +232,11 @@ export const processClip = (opts: {
             background: existing?.background || (manifest.detectedBg ?? null),
           },
         });
+        // A tour drift that just became viewable joins its tour's buttons.
+        const readyFlowId = await stepFlowIdForProduct(productId).catch(() => null);
+        if (readyFlowId) {
+          await relinkFlow(prisma, readyFlowId).catch((e) => console.error(`[${NS}] relink after READY failed:`, e));
+        }
       } else {
         // Second clip attaches to an existing spin (the product already has clip A).
         await prisma.driftSpin.update({

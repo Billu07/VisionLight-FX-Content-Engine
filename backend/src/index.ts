@@ -18,6 +18,7 @@ import driftCreatorRouter from "./routes/driftCreator";
 import driftMailRouter from "./routes/driftMail";
 import { mailConfigured, verifyMail } from "./services/mail";
 import { relinkAllFlows } from "./services/driftFlows";
+import { handleStripeWebhook } from "./services/driftBilling";
 
 console.log("Environment Check:", {
   airtableKey: process.env.AIRTABLE_API_KEY ? "Loaded" : "Missing",
@@ -41,6 +42,9 @@ app.use(
     exposedHeaders: ["Content-Disposition", "Content-Length", "Content-Type"],
   }),
 );
+
+// Stripe signs the RAW body — this route must be registered before express.json().
+app.post("/api/drift/billing/webhook", express.raw({ type: "application/json", limit: "1mb" }), handleStripeWebhook);
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));

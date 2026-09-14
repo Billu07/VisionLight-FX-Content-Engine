@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import { confirmAction, notify } from "../lib/notifications";
 import { useAuth } from "../hooks/useAuth";
-import type { Flow, FlowStep, Page, Quota } from "./types";
+import type { Billing, Flow, FlowStep, Page, Quota } from "./types";
 import { isReady } from "./types";
 import { ShareSheet } from "./ShareSheet";
 import { Spinner, StatusPill, TourShell, apiError, copyText, publicUrl, readClipDuration } from "./tourUi";
@@ -25,6 +25,13 @@ const DIRECTIONS = [
   { value: "BTT", glyph: "↑", short: "B→T", title: "Bottom to top" },
 ] as const;
 const COVER_LABELS = ["Start", "Middle", "End"];
+const money = (cents: number, currency = "usd") => {
+  try {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: currency.toUpperCase() }).format(cents / 100);
+  } catch {
+    return `${(cents / 100).toFixed(2)}`;
+  }
+};
 
 const driftName = (s: FlowStep, i: number) => s.product?.name || `Drift ${i + 1}`;
 // Pin state on the rail (colour + halo come from CSS).
@@ -197,6 +204,8 @@ function StepCard({
               <Spinner />
               <span>Building your drift…</span>
             </div>
+          ) : status === "AWAITING_PAYMENT" ? (
+            <span>Clip saved · converts after checkout</span>
           ) : status === "FAILED" ? (
             <span>Couldn't build this clip</span>
           ) : (
@@ -208,7 +217,10 @@ function StepCard({
           <StatusPill status={status} />
           {p?.frameCount ? <span className="d-faint">{p.frameCount} frames</span> : null}
         </div>
-        {(status === "FAILED" || isReady(status)) && (
+        {p?.hostingExpiresAt && (
+          <div className="d-faint t-tip">Hosted until {new Date(p.hostingExpiresAt).toLocaleDateString()}</div>
+        )}
+        {(status === "FAILED" || status === "AWAITING_PAYMENT" || isReady(status)) && (
           <div>
             <input
               ref={fileRef}
@@ -342,55 +354,81 @@ function UploadSlot({
   flow,
   index,
   maxClip,
+  billing,
   onAdded,
 }: {
   flow: Flow;
   index: number;
   maxClip: number | null;
-  onAdded: (flow: Flow, stepId: string | null) => void;
+  billing: Billing | null;
+  onAdded: (flow: Flow, stepId: string | null, billing?: Billing) => void;
 }) {
-  const [progress, setProgress] = useState<number | null>(null);
+  const [progress, setProgress] = useState<{ n: number; total: number; pct: number } | null>(null);
   const [over, setOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const upload = async (file: File) => {
-    if (!file.type.startsWith("video/") && !/\.(mp4|mov|m4v|webm)$/i.test(file.name)) {
-      return notify.error("Please choose a video clip (MP4 or MOV)");
+  // Clips upload one after another (phones stay responsive); each becomes a drift —
+  // building right away while free drifts last, otherwise saved for checkout.
+  const uploadAll = async (list: File[]) => {
+    const files = list.filter((f) => f.type.startsWith("video/") || /\.(mp4|mov|m4v|webm)$/i.test(f.name));
+    if (!files.length) return notify.error("Please choose video clips (MP4 or MOV)");
+    let added = 0;
+    let waiting = 0;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const d = await readClipDuration(file);
+      if (maxClip && d && d > maxClip + 0.5) {
+        notify.error(`"${file.name}" is ${d.toFixed(1)}s — clips must be ${maxClip}s or shorter.`);
+        continue;
+      }
+      const fd = new FormData();
+      fd.append("video", file);
+      fd.append("name", `Drift ${index + added + 1}`);
+      setProgress({ n: i + 1, total: files.length, pct: 0 });
+      try {
+        const r = await apiEndpoints.driftAddFlowStep(flow.id, fd, (e) => {
+          if (e.total) setProgress({ n: i + 1, total: files.length, pct: Math.round((e.loaded / e.total) * 100) });
+        });
+        added++;
+        if (r.data.step?.product?.status === "AWAITING_PAYMENT") waiting++;
+        onAdded(r.data.flow, r.data.step?.id || null, r.data.billing);
+      } catch (e) {
+        notify.error(`${file.name}: ${apiError(e)}`);
+      }
     }
-    const d = await readClipDuration(file);
-    if (maxClip && d && d > maxClip + 0.5) {
-      return notify.error(`Clips must be ${maxClip} seconds or shorter — this one is ${d.toFixed(1)}s. Trim it and try again.`);
-    }
-    const fd = new FormData();
-    fd.append("video", file);
-    fd.append("name", `Drift ${index + 1}`);
-    setProgress(0);
-    try {
-      const r = await apiEndpoints.driftAddFlowStep(flow.id, fd, (e) => {
-        if (e.total) setProgress(Math.round((e.loaded / e.total) * 100));
-      });
-      onAdded(r.data.flow, r.data.step?.id || null);
-      notify.success("Clip uploaded — building your drift");
-    } catch (e: any) {
-      notify.error(apiError(e));
-      if (e?.code === "PLAN_LIMIT" || e?.details?.upgrade) onAdded(flow, null);
-    } finally {
-      setProgress(null);
+    setProgress(null);
+    if (!added) return;
+    const building = added - waiting;
+    if (waiting) {
+      notify.success(
+        `${added} clip${added === 1 ? "" : "s"} saved${building ? ` — ${building} building now` : ""}. ${waiting} ${waiting === 1 ? "is" : "are"} waiting for checkout.`,
+      );
+    } else {
+      notify.success(`${added} clip${added === 1 ? "" : "s"} uploaded — building your drift${added === 1 ? "" : "s"}`);
     }
   };
 
-  if (progress !== null) {
+  const note =
+    !billing || billing.unlimited
+      ? ""
+      : billing.freeLeft && billing.freeLeft > 0
+        ? `${billing.freeLeft} free drift${billing.freeLeft === 1 ? "" : "s"} left, then ${billing.price} each`
+        : `${billing.price} per drift — you check out before they're built`;
+
+  if (progress) {
     return (
       <div className="d-card d-card-pad t-route-item is-drop" data-n={index + 1} style={{ display: "grid", gap: 10, ["--n" as any]: index }}>
         <div className="t-inline" style={{ justifyContent: "space-between" }}>
-          <div className="d-h2">Drift {index + 1} · uploading</div>
-          <span className="d-faint">{progress}%</span>
+          <div className="d-h2">
+            Uploading {progress.total > 1 ? `clip ${progress.n} of ${progress.total}` : "your clip"}
+          </div>
+          <span className="d-faint">{progress.pct}%</span>
         </div>
         <div className="t-progress">
-          <i style={{ width: `${progress}%` }} />
+          <i style={{ width: `${progress.pct}%` }} />
         </div>
         <div className="d-faint" style={{ fontSize: 12 }}>
-          {progress >= 100 ? "Checking the clip…" : "Keep this page open until the upload finishes."}
+          {progress.pct >= 100 ? "Checking the clip…" : "Keep this page open until the uploads finish."}
         </div>
       </div>
     );
@@ -410,8 +448,8 @@ function UploadSlot({
       onDrop={(e) => {
         e.preventDefault();
         setOver(false);
-        const f = e.dataTransfer.files?.[0];
-        if (f) upload(f);
+        const list = Array.from(e.dataTransfer.files || []);
+        if (list.length) uploadAll(list);
       }}
       role="button"
       tabIndex={0}
@@ -421,21 +459,23 @@ function UploadSlot({
         ref={inputRef}
         type="file"
         accept="video/*"
+        multiple
         hidden
         onChange={(e) => {
-          const f = e.target.files?.[0];
+          const list = Array.from(e.target.files || []);
           e.target.value = "";
-          if (f) upload(f);
+          if (list.length) uploadAll(list);
         }}
       />
       <div className="ico" aria-hidden>
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4" /><path d="M6 10l6-6 6 6" /><path d="M4 20h16" /></svg>
       </div>
       <div className="d-eyebrow">Drift {index + 1}</div>
-      <div className="big">{index === 0 ? "Upload your first clip" : "+ Add to Tour"}</div>
+      <div className="big">{index === 0 ? "Upload your clips" : "+ Add to Tour"}</div>
       <div className="d-sub" style={{ fontSize: 13 }}>
-        {maxClip ? `Up to ${maxClip} seconds · ` : ""}a slow pan or tilt of the space · tap to choose or drop it here
+        One clip or several · {maxClip ? `up to ${maxClip}s each · ` : ""}a slow pan or tilt of each space
       </div>
+      {note && <div className="t-drop-note">{note}</div>}
     </div>
   );
 }
@@ -458,6 +498,9 @@ export default function TourBuilder({
   const superAdmin = user?.role === "SUPERADMIN";
   const [flow, setFlow] = useState<Flow | null>(null);
   const [quota, setQuota] = useState<Quota | null>(null);
+  const [billing, setBilling] = useState<Billing | null>(null);
+  const [checkingOut, setCheckingOut] = useState(false);
+  const [search, setSearch] = useSearchParams();
   const [missing, setMissing] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -513,6 +556,7 @@ export default function TourBuilder({
       const r = await apiEndpoints.driftFlow(flowId);
       applyFlow(r.data.flow);
       setQuota(r.data.quota);
+      setBilling(r.data.billing || null);
     } catch (e: any) {
       if (e?.status === 404) setMissing(true);
       else notify.error(apiError(e));
@@ -531,6 +575,50 @@ export default function TourBuilder({
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [processing, flowId]);
+
+  // Back from Stripe Checkout: confirm the session right away (the webhook may still
+  // be on its way), then refresh; a cancel just says the clips are kept.
+  useEffect(() => {
+    const state = search.get("checkout");
+    if (!state) return;
+    const sessionId = search.get("session_id") || "";
+    const next = new URLSearchParams(search);
+    next.delete("checkout");
+    next.delete("session_id");
+    setSearch(next, { replace: true });
+    if (state === "success" && sessionId) {
+      apiEndpoints
+        .driftConfirmCheckout(sessionId)
+        .then((r) => {
+          notify.success(
+            r.data?.status === "paid"
+              ? "Payment received — your drifts are building now"
+              : "We're still confirming your payment — this page updates itself",
+          );
+          load();
+        })
+        .catch((e) => notify.error(apiError(e)));
+    } else if (state === "cancel") {
+      notify.info("Checkout canceled — your clips are saved for later");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const checkout = async () => {
+    if (!flow) return;
+    setCheckingOut(true);
+    try {
+      const r = await apiEndpoints.driftCheckoutFlow(flow.id);
+      if (r.data?.url) {
+        window.location.assign(r.data.url);
+        return;
+      }
+      notify.error("We couldn't open checkout. Please try again.");
+    } catch (e) {
+      notify.error(apiError(e));
+    }
+    setCheckingOut(false);
+  };
 
   const saveName = async () => {
     if (!flow || !name.trim() || name.trim() === flow.name) return;
@@ -653,13 +741,12 @@ export default function TourBuilder({
     );
   }
 
-  const canPublish = flow.counts.steps > 0 && flow.counts.processing === 0 && flow.counts.failed === 0;
+  const canPublish = flow.counts.steps > 0 && flow.counts.processing === 0 && flow.counts.failed === 0 && !flow.counts.awaiting;
   const maxClip = superAdmin ? null : quota.maxClipSeconds;
-  const atStepQuota = !superAdmin && flow.steps.length >= quota.maxStepsPerFlow;
   const selected = flow.steps.find((s) => s.id === selectedId) || null;
   const selectedProduct = selected?.product || null;
   // Anything that moves a pin re-inks the rail.
-  const routeDep = [viewMode, expandedId, atStepQuota, ...flow.steps.map((s) => `${s.id}:${s.product?.status || ""}`)].join("|");
+  const routeDep = [viewMode, expandedId, flow.counts.awaiting, ...flow.steps.map((s) => `${s.id}:${s.product?.status || ""}`)].join("|");
   const renderCard = (s: FlowStep, i: number) => (
     <StepCard
       key={s.id}
@@ -746,7 +833,7 @@ export default function TourBuilder({
               className="d-btn primary"
               onClick={() => publish(true)}
               disabled={publishing || !canPublish}
-              title={!canPublish ? "Every drift needs to finish building first" : undefined}
+              title={!canPublish ? (flow.counts.awaiting ? "Check out the new drifts first" : "Every drift needs to finish building first") : undefined}
             >
               {publishing ? "Publishing…" : "Publish"}
             </button>
@@ -853,6 +940,27 @@ export default function TourBuilder({
         </div>
       )}
 
+      {flow.counts.awaiting > 0 && billing && (
+        <div className="t-checkout t-rise">
+          <div style={{ minWidth: 0 }}>
+            <div className="d-h2">
+              {flow.counts.awaiting} new drift{flow.counts.awaiting === 1 ? "" : "s"} ready for checkout
+            </div>
+            <p className="d-sub" style={{ fontSize: 13 }}>
+              {billing.price} per drift · conversion + 1 year of hosting included. Nothing is built until checkout.
+            </p>
+            {!billing.paymentsEnabled && (
+              <p className="d-sub" style={{ fontSize: 12.5, color: "var(--warn)" }}>
+                Checkout isn't switched on yet — contact us to activate paid drifts.
+              </p>
+            )}
+          </div>
+          <button className="d-btn primary" onClick={checkout} disabled={checkingOut || !billing.paymentsEnabled}>
+            {checkingOut ? "Opening checkout…" : `Checkout · ${money(billing.priceCents * flow.counts.awaiting, billing.currency)}`}
+          </button>
+        </div>
+      )}
+
       <div className="t-builder">
         <div className="t-steps t-route has-ink" ref={routeRef}>
           <RouteInk host={routeRef} dep={routeDep} />
@@ -921,24 +1029,17 @@ export default function TourBuilder({
                 );
               })}
 
-          {atStepQuota ? (
-            <div className="d-card d-card-pad t-route-item is-drop" data-n="+" style={{ display: "grid", gap: 6 }}>
-              <div className="d-h2">This tour has used its free drifts</div>
-              <p className="d-sub" style={{ margin: 0 }}>
-                More drifts are $6.50 each — checkout is on its way to this page.
-              </p>
-            </div>
-          ) : (
-            <UploadSlot
-              flow={flow}
-              index={flow.steps.length}
-              maxClip={maxClip}
-              onAdded={(f, stepId) => {
-                applyFlow(f);
-                if (stepId) setSelectedId(stepId);
-              }}
-            />
-          )}
+          <UploadSlot
+            flow={flow}
+            index={flow.steps.length}
+            maxClip={maxClip}
+            billing={billing}
+            onAdded={(f, stepId, b) => {
+              applyFlow(f);
+              if (b) setBilling(b);
+              if (stepId) setSelectedId(stepId);
+            }}
+          />
 
           <div className="tpw-admin-foot">
             <button className="d-btn" onClick={() => navigate(`${homePath}?new=1`)}>
@@ -959,6 +1060,8 @@ export default function TourBuilder({
           <div className="t-frame">
             {selectedProduct && isReady(selectedProduct.status) ? (
               <iframe key={selectedProduct.id + selectedProduct.updatedAt} src={`/embed/${selectedProduct.id}`} title={`Preview of ${selectedProduct.name}`} allow="fullscreen" />
+            ) : selectedProduct?.status === "AWAITING_PAYMENT" ? (
+              <span style={{ padding: 20 }}>{selectedProduct.name} converts after checkout</span>
             ) : selectedProduct?.status === "PROCESSING" ? (
               <div style={{ display: "grid", gap: 10, justifyItems: "center", padding: 20 }}>
                 <Spinner />

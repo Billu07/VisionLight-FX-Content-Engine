@@ -200,7 +200,7 @@ export async function relinkFlow(db: Db, flowId: string): Promise<void> {
           order: true,
           stepType: true,
           productId: true,
-          product: { select: { name: true, ctaPrimary: true, ctaSecondary: true, ctaPlacement: true } },
+          product: { select: { name: true, status: true, ctaPrimary: true, ctaSecondary: true, ctaPlacement: true } },
         },
       },
     },
@@ -217,7 +217,9 @@ export async function relinkFlow(db: Db, flowId: string): Promise<void> {
   const pageSlug = flow.organization?.slug || null;
   const slugs = stepDriftSlugs(flow.steps, stepNoun(kind));
   const home: CreatorCta = { label: HOME_LABEL, url: flowPublicPath(kind, pageSlug, flow.slug) };
-  const drifts = flow.steps.filter((s) => s.stepType === "DRIFT" && s.productId);
+  // Only viewable drifts are linked: one still building, failed or waiting for checkout
+  // is skipped (its neighbours point past it) and joins once it's READY.
+  const drifts = flow.steps.filter((s) => s.stepType === "DRIFT" && s.productId && isReady(s.product?.status));
   for (let i = 0; i < drifts.length; i++) {
     const nextIndex = (i + 1) % drifts.length;
     const next = drifts.length > 1 ? drifts[nextIndex] : null;
@@ -356,6 +358,9 @@ const stepProductSelect = {
   ctaPrimary: true,
   ctaSecondary: true,
   updatedAt: true,
+  billingStatus: true,
+  paidAt: true,
+  hostingExpiresAt: true,
   spin: { select: { frameCount: true, manifest: true } },
 };
 
@@ -390,6 +395,9 @@ export function serializeStepProduct(p: any) {
     ctaPrimary: (p.ctaPrimary ?? null) as CreatorCta | null,
     ctaSecondary: (p.ctaSecondary ?? null) as CreatorCta | null,
     playerPath: stepPlayerPath(p.id),
+    billingStatus: (p.billingStatus || "FREE") as string,
+    paidAt: (p.paidAt ?? null) as Date | null,
+    hostingExpiresAt: (p.hostingExpiresAt ?? null) as Date | null,
     updatedAt: p.updatedAt as Date,
   };
 }
@@ -424,6 +432,7 @@ export function serializeFlow(f: any) {
     ready: products.filter((p: any) => isReady(p.status)).length,
     processing: products.filter((p: any) => p.status === "PROCESSING").length,
     failed: products.filter((p: any) => p.status === "FAILED").length,
+    awaiting: products.filter((p: any) => p.status === "AWAITING_PAYMENT").length,
   };
   const entry = products[0] || null;
   // Cover choices: the first drift's start, middle and end frames.
@@ -500,8 +509,11 @@ export function serializePublicFlow(f: any) {
 
 // ───────────────────────────── writes ─────────────────────────────
 
-/** Create a DRIFT step + its (PROCESSING) drift, append it, relink — one transaction.
- *  The caller queues the clip processing AFTER this resolves. */
+/** Create a DRIFT step + its drift, append it, relink — one transaction under the org
+ *  lock. Billing is decided here too, so two uploads can't both take the last free
+ *  drift: COMP for a superadmin; FREE while the page has free drifts left; otherwise
+ *  AWAITING_PAYMENT (the caller stores the clip — nothing converts before checkout).
+ *  The caller queues processing for FREE/COMP AFTER this resolves. */
 export async function createDriftStep(args: {
   flowId: string;
   orgId: string;
@@ -513,21 +525,31 @@ export async function createDriftStep(args: {
   description: string | null;
   background: string | null;
   customCta: CreatorCta | null;
-  /** drag wraps end → start (off by default for tours: the path continues via "Next") */
+  /** drag wraps end → start (off for tours: the path continues via the buttons) */
   loopEnabled: boolean;
   /** LTR | RTL | TTB | BTT — which way the clip pans */
   driftDirection: string;
-  /** CENTER | LEFT | RIGHT | SPLIT | SPLIT_REV — where the buttons sit */
+  /** where the buttons sit (tours: CENTER) */
   ctaPlacement: string;
-  /** plan limit (null = unlimited, e.g. superadmin) — enforced INSIDE the transaction */
+  /** step limit (null = unlimited, e.g. superadmin) — enforced INSIDE the transaction */
   maxSteps: number | null;
   kind: FlowKind;
+  /** AUTO = free allowance, then paid; COMP = superadmin */
+  billing: "AUTO" | "COMP";
 }) {
   return prisma.$transaction(async (tx) => {
     await lockOrg(tx, args.orgId);
     if (args.maxSteps !== null) {
       const used = await tx.driftFlowStep.count({ where: { flowId: args.flowId } });
       if (used >= args.maxSteps) throw stepLimitError(args.kind, args.maxSteps, used);
+    }
+    let billingStatus: "FREE" | "COMP" | "AWAITING_PAYMENT" = "COMP";
+    if (args.billing === "AUTO") {
+      const org = await tx.organization.findUnique({ where: { id: args.orgId }, select: { freeDrifts: true } });
+      const usedFree = await tx.driftProduct.count({
+        where: { organizationId: args.orgId, billingStatus: "FREE", flowStep: { isNot: null } },
+      });
+      billingStatus = usedFree < (org?.freeDrifts ?? 3) ? "FREE" : "AWAITING_PAYMENT";
     }
     const last = await tx.driftFlowStep.findFirst({
       where: { flowId: args.flowId },
@@ -543,7 +565,8 @@ export async function createDriftStep(args: {
         titleEnd: args.titleEnd,
         description: args.description,
         background: args.background,
-        status: "PROCESSING",
+        status: billingStatus === "AWAITING_PAYMENT" ? "AWAITING_PAYMENT" : "PROCESSING",
+        billingStatus,
         loopEnabled: args.loopEnabled,
         driftDirection: args.driftDirection,
         ctaPlacement: args.ctaPlacement,
@@ -561,9 +584,9 @@ export async function createDriftStep(args: {
     });
     await relinkFlow(tx, args.flowId);
     console.log(
-      `[${NS}] flow ${args.flowId} step ${step.id} created (product ${product.id}, order ${step.order})`,
+      `[${NS}] flow ${args.flowId} step ${step.id} created (product ${product.id}, order ${step.order}, ${billingStatus})`,
     );
-    return { product, step };
+    return { product, step, billingStatus };
   });
 }
 
@@ -664,9 +687,16 @@ export async function setFlowPublished(flowId: string, publish: boolean): Promis
     const ids = flow.steps.map((s) => s.productId).filter((id): id is string => !!id);
     if (publish) {
       if (ids.length === 0) throw new FlowError(409, "Add at least one step before publishing");
+      const awaiting = flow.steps.filter((s) => s.product?.status === "AWAITING_PAYMENT");
+      if (awaiting.length) {
+        throw new FlowError(409, "Check out the new drifts (or remove them) before publishing", {
+          code: "CHECKOUT_REQUIRED",
+          pending: awaiting.length,
+        });
+      }
       const pending = flow.steps.filter((s) => s.product && !isReady(s.product.status));
       if (pending.length) {
-        throw new FlowError(409, "Every step must finish processing before you publish", {
+        throw new FlowError(409, "Every drift must finish building before you publish", {
           pending: pending.length,
         });
       }

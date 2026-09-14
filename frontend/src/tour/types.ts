@@ -24,6 +24,10 @@ export type StepProduct = {
   /** readable player link: /tour/{page}/{tour}/{drift} */
   playerPath: string;
   updatedAt: string;
+  /** FREE | AWAITING_PAYMENT (saved, converts after checkout) | PAID | COMP */
+  billingStatus: string;
+  paidAt: string | null;
+  hostingExpiresAt: string | null;
 };
 
 export type FlowStep = {
@@ -68,7 +72,7 @@ export type Flow = {
   thumb: string | null;
   /** cover choices: the first drift's start, middle and end frames */
   coverFrames: string[];
-  counts: { steps: number; ready: number; processing: number; failed: number };
+  counts: { steps: number; ready: number; processing: number; failed: number; awaiting: number };
   steps: FlowStep[];
 };
 
@@ -129,6 +133,19 @@ export type PublicFlow = {
   entryPath: string | null;
   thumb: string | null;
   steps: PublicFlowStep[];
+};
+
+/** Pay per drift: the page's free drifts, the price, whether checkout is switched on. */
+export type Billing = {
+  unlimited: boolean;
+  freeDrifts: number;
+  usedFreeDrifts: number;
+  freeLeft: number | null;
+  priceCents: number;
+  currency: string;
+  price: string;
+  hostingDays: number;
+  paymentsEnabled: boolean;
 };
 
 export const isReady = (s?: string | null) => s === "READY" || s === "PUBLISHED";

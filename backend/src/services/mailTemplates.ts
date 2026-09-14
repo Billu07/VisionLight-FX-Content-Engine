@@ -241,6 +241,53 @@ export const MAIL_TEMPLATES: MailTemplateDef[] = [
       footnote: "You'll get this at most once a week.",
     }),
   },
+  {
+    key: "tour.order.paid.creator",
+    name: "Drifts paid (to the buyer)",
+    description: "Confirms a tour checkout and says the drifts are converting. Stripe sends its own receipt when receipts are on.",
+    trigger: "A tour checkout is paid",
+    audience: "The person who checked out",
+    vars: [
+      { name: "name", description: "Buyer's name (may be empty)", sample: "Alex" },
+      { name: "flowName", description: "The tour", sample: "45 Birch" },
+      { name: "quantity", description: "Drifts paid for", sample: "4" },
+      { name: "driftsLabel", description: '"drift" or "drifts"', sample: "drifts" },
+      { name: "amount", description: "Total paid", sample: "$26.00" },
+      { name: "hostedUntil", description: "When the hosting year ends", sample: "September 14, 2027" },
+      { name: "url", description: "The tour's link", sample: "https://drift.li/tour/picdrift/45-birch" },
+    ],
+    defaults: f({
+      subject: "Payment received — {{quantity}} {{driftsLabel}} for {{flowName}}",
+      heading: "Your drifts are on their way",
+      intro:
+        'Thanks for your order. We received {{amount}} for {{quantity}} {{driftsLabel}} in "{{flowName}}". They\'re converting now, and each one is hosted until {{hostedUntil}}.',
+      ctaLabel: "Open your tour",
+      ctaUrl: "{{url}}",
+      footnote: "Conversion and one year of hosting are included with every drift.",
+    }),
+  },
+  {
+    key: "tour.order.paid.notice",
+    name: "Drifts paid (team notice)",
+    description: "Tells your team a tour checkout was paid.",
+    trigger: "A tour checkout is paid",
+    audience: "Platform admins (ADMIN_EMAILS)",
+    vars: [
+      { name: "buyerLabel", description: "Name · email, or just the email", sample: "Alex · alex@example.com" },
+      { name: "flowName", description: "The tour", sample: "45 Birch" },
+      { name: "quantity", description: "Drifts paid for", sample: "4" },
+      { name: "amount", description: "Total paid", sample: "$26.00" },
+      { name: "url", description: "The tour's link", sample: "https://drift.li/tour/picdrift/45-birch" },
+    ],
+    defaults: f({
+      subject: "Paid: {{quantity}} drifts · {{amount}} · {{flowName}}",
+      heading: "Tour checkout paid",
+      intro: '{{buyerLabel}} paid {{amount}} for {{quantity}} drifts in "{{flowName}}".',
+      ctaLabel: "Open the tour",
+      ctaUrl: "{{url}}",
+      footnote: "Creator-suite notification for the drift.li team.",
+    }),
+  },
 ];
 
 export const templateByKey = (key: string): MailTemplateDef | null =>

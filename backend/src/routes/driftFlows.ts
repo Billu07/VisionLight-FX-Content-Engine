@@ -10,6 +10,7 @@ import { probeClipInfo } from "../services/rotation3d/pipeline";
 import { uploadManagedBuffer } from "../utils/managedStorage";
 import { parseCtaPlacement, parseDirection, processClip, uniqueSlug } from "./drift";
 import { sendFlowCreatedNoticeEmail, sendFlowPublishedEmails, sendUpgradeNudgeEmail } from "../services/mail";
+import { billingSummary, confirmCheckoutSession, createFlowCheckout, storePendingClip } from "../services/driftBilling";
 import {
   CLIP_DURATION_TOLERANCE_S,
   FlowError,
@@ -48,6 +49,8 @@ import {
 
 const router = Router();
 const NS = "drift-flow";
+// Pay per drift: tours are unlimited; this only stops runaway uploads.
+const MAX_DRIFTS_PER_FLOW = Math.max(1, Math.round(Number(process.env.TOUR_MAX_DRIFTS_PER_TOUR) || 60));
 
 const videoUpload = multer({
   storage: multer.diskStorage({
@@ -252,6 +255,7 @@ router.get("/api/drift/my/flows", authenticateToken, async (req: AuthenticatedRe
   res.json({
     flows: flows.map(serializeFlow),
     quota,
+    billing: await billingSummary(orgId, isSuperAdmin(req)),
     creator: { name: org?.name ?? null, handle: org?.slug ?? null },
     page: org && org.productLine === "TOUR" ? serializePage(org) : null,
   });
@@ -284,7 +288,7 @@ router.post("/api/drift/my/flows", authenticateToken, async (req: AuthenticatedR
       endCta: endCta.cta,
       nextLabel,
       createdByUserId: req.user?.id || null,
-      maxFlows: isSuperAdmin(req) ? null : quota.maxFlows,
+      maxFlows: null, // tours are unlimited — drifts are paid per drift (TOUR_V2_PLAN P3)
     });
   } catch (err) {
     if (err instanceof FlowError && err.status === 403 && req.user?.email) {
@@ -316,7 +320,7 @@ router.get("/api/drift/my/flows/:id", authenticateToken, async (req: Authenticat
   if (!orgId) return;
   const flow = await loadFlow(orgId, req.params.id);
   if (!flow) return res.status(404).json({ error: "Flow not found" });
-  res.json({ flow: serializeFlow(flow), quota: await flowQuota(orgId) });
+  res.json({ flow: serializeFlow(flow), quota: await flowQuota(orgId), billing: await billingSummary(orgId, isSuperAdmin(req)) });
 });
 
 // Edit a flow's own fields. endCta / nextLabel changes re-derive the step links.
@@ -443,6 +447,36 @@ router.post("/api/drift/my/flows/:id/unpublish", authenticateToken, async (req: 
     return handle(res, err);
   }
   res.json({ flow: serializeFlow(await loadFlow(orgId, flow.id)) });
+});
+
+// Checkout: one Stripe Checkout for every drift in this flow that's waiting for payment.
+router.post("/api/drift/my/flows/:id/checkout", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requireOrg(req, res);
+  if (!orgId) return;
+  try {
+    const result = await createFlowCheckout({
+      orgId,
+      flowId: req.params.id,
+      userId: req.user?.id || null,
+      email: req.user?.email || null,
+      origin: req.headers.origin,
+    });
+    res.json(result);
+  } catch (err) {
+    return handle(res, err);
+  }
+});
+
+// The checkout return page confirms the session (idempotent with the webhook).
+router.post("/api/drift/my/checkout/confirm", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requireOrg(req, res);
+  if (!orgId) return;
+  try {
+    const result = await confirmCheckoutSession(String(req.body?.sessionId || "").trim(), orgId);
+    res.json(result);
+  } catch (err) {
+    return handle(res, err);
+  }
 });
 
 // Upload a cover image for a flow (the creator home + share previews show it
@@ -585,10 +619,11 @@ router.get("/api/drift/public/pages/:page/flows/:slug", async (req: Authenticate
 
 // ───────────────────────────── steps ─────────────────────────────
 
-// Add a DRIFT step: multipart { video, name?, title?, titleEnd?, description?,
-// background?, customCta? (JSON) }. Validates the clip against the plan, creates
-// the (PROCESSING) drift + step, relinks, responds 201, then queues extraction.
-// The builder polls GET /my/flows/:id until the step's product is READY.
+// Add a DRIFT step: multipart { video, name?, background?, driftDirection? }. The clip is
+// validated; the drift is free while the page has free drifts left (COMP for a
+// superadmin), otherwise it waits for checkout — the clip is stored and nothing is
+// converted until Stripe confirms payment. Responds 201 with the flow (+ billing); the
+// builder polls GET /my/flows/:id until the drift is READY.
 router.post(
   "/api/drift/my/flows/:id/steps",
   authenticateToken,
@@ -612,56 +647,78 @@ router.post(
     }
     if (!file) return res.status(400).json({ error: "A clip is required" });
 
-    const quota = await flowQuota(orgId);
-    if (!isSuperAdmin(req) && flow.steps.length >= quota.maxStepsPerFlow) {
+    const superAdmin = isSuperAdmin(req);
+    if (!superAdmin && flow.steps.length >= MAX_DRIFTS_PER_FLOW) {
       await rmFile(file.path);
-      return handle(res, stepLimitError(kind, quota.maxStepsPerFlow, flow.steps.length));
-    }
-    const cta = parseCreatorCta(req.body?.customCta);
-    if (!cta.ok) {
-      await rmFile(file.path);
-      return res.status(400).json({ error: cta.error });
+      return handle(res, stepLimitError(kind, MAX_DRIFTS_PER_FLOW, flow.steps.length));
     }
     const background = parseBackground(req.body?.background);
     if (background === false) {
       await rmFile(file.path);
       return res.status(400).json({ error: "Background must be a colour (e.g. #101418) or transparent" });
     }
-    const clip = await validateClip(orgId, file, res, isSuperAdmin(req));
+    const clip = await validateClip(orgId, file, res, superAdmin);
     if (!clip) return;
 
     const name = str(req.body?.name, 120) || `${stepNoun(kind)} ${flow.steps.length + 1}`;
-    let product: { id: string };
-    let step: { id: string };
-    let full: ReturnType<typeof serializeFlow>;
+    let created: Awaited<ReturnType<typeof createDriftStep>>;
     try {
       const slug = await uniqueSlug(orgId, name);
-      const created = await createDriftStep({
+      created = await createDriftStep({
         flowId: flow.id,
         orgId,
         userId: req.user?.id || null,
         slug,
         name,
-        title: strOrNull(req.body?.title, 120) ?? null,
-        titleEnd: strOrNull(req.body?.titleEnd, 120) ?? null,
-        description: strOrNull(req.body?.description, 600) ?? null,
+        title: null,
+        titleEnd: null,
+        description: null,
         background,
-        customCta: cta.cta,
-        loopEnabled: String(req.body?.loopEnabled ?? "false") === "true",
+        customCta: null,
+        loopEnabled: false,
         driftDirection: parseDirection(req.body?.driftDirection) || "LTR",
-        ctaPlacement: parseCtaPlacement(req.body?.ctaPlacement) || "CENTER",
-        maxSteps: isSuperAdmin(req) ? null : quota.maxStepsPerFlow,
+        ctaPlacement: "CENTER",
+        maxSteps: superAdmin ? null : MAX_DRIFTS_PER_FLOW,
         kind,
+        billing: superAdmin ? "COMP" : "AUTO",
       });
-      product = created.product;
-      step = created.step;
-      full = serializeFlow(await loadFlow(orgId, flow.id));
     } catch (err) {
       // Nothing is queued yet — don't leave the (up to 500 MB) upload in the temp dir.
       await rmFile(file.path);
       return handle(res, err);
     }
-    res.status(201).json({ step: full.steps.find((s: any) => s.id === step.id) ?? null, flow: full });
+    const { product, step, billingStatus } = created;
+
+    if (billingStatus === "AWAITING_PAYMENT") {
+      try {
+        await storePendingClip({ productId: product.id, orgId, file, frameCount: clip.frameCount });
+      } catch (err) {
+        console.error(`[${NS}] couldn't store the clip for ${product.id}:`, err);
+        await deleteStep(flow.id, step.id).catch(() => undefined);
+        await rmFile(file.path);
+        return res.status(500).json({ error: "We couldn't save that clip. Please try again." });
+      }
+      await rmFile(file.path);
+      const full = serializeFlow(await loadFlow(orgId, flow.id));
+      return res.status(201).json({
+        step: full.steps.find((s: any) => s.id === step.id) ?? null,
+        flow: full,
+        billing: await billingSummary(orgId, superAdmin),
+      });
+    }
+
+    let full: ReturnType<typeof serializeFlow>;
+    try {
+      full = serializeFlow(await loadFlow(orgId, flow.id));
+    } catch (err) {
+      await rmFile(file.path);
+      throw err;
+    }
+    res.status(201).json({
+      step: full.steps.find((s: any) => s.id === step.id) ?? null,
+      flow: full,
+      billing: await billingSummary(orgId, superAdmin),
+    });
 
     processClip({
       clip: "A",
@@ -676,8 +733,8 @@ router.post(
   },
 );
 
-// Replace a step's clip (also the "try again" for a FAILED step). Same checks as
-// adding; the drift goes back to PROCESSING and its frames are rebuilt in place.
+// Replace a step's clip (also the "try again" for a FAILED step). A drift waiting for
+// checkout just swaps its stored clip; a free/paid one rebuilds in place at no charge.
 router.post(
   "/api/drift/my/flows/:id/steps/:stepId/clip",
   authenticateToken,
@@ -688,7 +745,7 @@ router.post(
     if (!orgId) return rmFile(file?.path);
     const step = await prisma.driftFlowStep.findFirst({
       where: { id: req.params.stepId, flowId: req.params.id, flow: { organizationId: orgId } },
-      select: { id: true, flowId: true, productId: true, product: { select: { status: true } } },
+      select: { id: true, flowId: true, productId: true, product: { select: { status: true, billingStatus: true } } },
     });
     if (!step || !step.productId) {
       await rmFile(file?.path);
@@ -697,10 +754,20 @@ router.post(
     if (!file) return res.status(400).json({ error: "A clip is required" });
     if (step.product?.status === "PROCESSING") {
       await rmFile(file.path);
-      return res.status(409).json({ error: "This step is still processing — give it a moment" });
+      return res.status(409).json({ error: "This drift is still building — give it a moment" });
     }
     const clip = await validateClip(orgId, file, res, isSuperAdmin(req));
     if (!clip) return;
+
+    if (step.product?.billingStatus === "AWAITING_PAYMENT") {
+      try {
+        await storePendingClip({ productId: step.productId, orgId, file, frameCount: clip.frameCount });
+      } finally {
+        await rmFile(file.path);
+      }
+      const full = serializeFlow(await loadFlow(orgId, step.flowId));
+      return res.json({ step: full.steps.find((s: any) => s.id === step.id) ?? null, flow: full });
+    }
 
     let full: ReturnType<typeof serializeFlow>;
     try {

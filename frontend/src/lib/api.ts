@@ -356,6 +356,8 @@ export const apiEndpoints = {
   driftDeleteFlow: (id: string) => api.delete(`/api/drift/my/flows/${id}`),
   driftPublishFlow: (id: string) => api.post(`/api/drift/my/flows/${id}/publish`),
   driftUnpublishFlow: (id: string) => api.post(`/api/drift/my/flows/${id}/unpublish`),
+  driftCheckoutFlow: (id: string) => api.post(`/api/drift/my/flows/${id}/checkout`),
+  driftConfirmCheckout: (sessionId: string) => api.post("/api/drift/my/checkout/confirm", { sessionId }),
   driftAddFlowStep: (
     id: string,
     formData: FormData,

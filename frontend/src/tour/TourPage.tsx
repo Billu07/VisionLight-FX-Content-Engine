@@ -27,6 +27,7 @@ type TourItem = {
   status?: string;
   building?: number;
   failed?: number;
+  awaiting?: number;
   flow?: Flow;
 };
 
@@ -55,6 +56,7 @@ const fromAdmin = (f: Flow): TourItem => ({
   status: f.status,
   building: f.counts.processing,
   failed: f.counts.failed,
+  awaiting: f.counts.awaiting,
   flow: f,
 });
 
@@ -93,6 +95,7 @@ function TourCards({ items, renderActions }: { items: TourItem[]; renderActions?
               <span>{plural(it.total, "drift")}</span>
               {!!it.building && <span className="d-pill warn">building {it.building}</span>}
               {!!it.failed && <span className="d-pill err">{it.failed} failed</span>}
+              {!!it.awaiting && <span className="d-pill warn">{it.awaiting} to check out</span>}
             </div>
             <div className="t-card-actions" onClick={(e) => e.stopPropagation()}>
               {renderActions

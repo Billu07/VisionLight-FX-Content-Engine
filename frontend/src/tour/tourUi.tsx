@@ -391,6 +391,7 @@ export function StatusPill({ status, flow }: { status?: string | null; flow?: bo
     READY: { cls: "accent", label: flow ? "Ready" : "Ready" },
     PROCESSING: { cls: "warn", label: "Building" },
     FAILED: { cls: "err", label: "Failed" },
+    AWAITING_PAYMENT: { cls: "warn", label: "Checkout" },
     DRAFT: { cls: "", label: "Draft" },
     ARCHIVED: { cls: "", label: "Archived" },
   };

@@ -466,3 +466,35 @@ export async function sendUpgradeNudgeEmail(params: {
     defaultTo: [params.email],
   });
 }
+
+/** A tour checkout was paid: a note to the buyer + a team notice. */
+export async function sendTourOrderPaidEmails(params: {
+  buyerEmail: string | null;
+  buyerName: string | null;
+  flowName: string;
+  quantity: number;
+  amount: string;
+  url: string;
+  hostedUntil: string;
+}): Promise<void> {
+  const vars = {
+    name: params.buyerName || "",
+    buyerLabel: params.buyerEmail ? creatorLabel(params.buyerEmail, params.buyerName) : params.buyerName || "A creator",
+    flowName: params.flowName,
+    quantity: String(params.quantity),
+    driftsLabel: params.quantity === 1 ? "drift" : "drifts",
+    amount: params.amount,
+    hostedUntil: params.hostedUntil,
+    url: params.url,
+  };
+  const rows: Array<[string, string]> = [
+    ["Tour", params.flowName],
+    ["Drifts", String(params.quantity)],
+    ["Total", params.amount],
+    ["Hosted until", params.hostedUntil],
+  ];
+  if (params.buyerEmail) {
+    await sendTemplated("tour.order.paid.creator", { vars, defaultTo: [params.buyerEmail], rows });
+  }
+  await sendTemplated("tour.order.paid.notice", { vars, defaultTo: ADMIN_EMAILS, rows });
+}

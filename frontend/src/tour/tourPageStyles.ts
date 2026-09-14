@@ -104,5 +104,12 @@ export const TOUR_PAGE_STYLES = `
 .t-cover-pick span.lbl{position:absolute;left:0;right:0;bottom:0;top:auto;border-radius:0;font-size:9px;letter-spacing:.04em;text-transform:uppercase;text-align:center;padding:2px 0;background:rgba(0,0,0,.6)}
 .t-cover-pick{width:58px}
 .tpw-admin-foot{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
+/* Pay per drift: the checkout bar (sticky on phones) and the upload note */
+.t-checkout{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 16px;padding:14px 16px;margin-bottom:16px;border-radius:18px;border:1px solid var(--warn-border);background:var(--surface);box-shadow:var(--shadow-sm)}
+.t-checkout .d-h2{font-size:16px}
+.t-checkout .d-sub{margin:4px 0 0}
+.t-checkout .d-btn{padding:12px 18px;font-size:14px}
+@media(max-width:640px){.t-checkout{position:sticky;bottom:calc(10px + env(safe-area-inset-bottom));z-index:15;box-shadow:0 18px 40px -18px rgba(0,0,0,.55)}.t-checkout .d-btn{width:100%}}
+.t-drop-note{margin-top:4px;font-size:12px;font-weight:650;color:var(--accent)}
 .t-chain .loop{color:var(--accent);font-weight:700}
 `;
