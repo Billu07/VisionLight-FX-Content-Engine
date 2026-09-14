@@ -614,8 +614,18 @@ export default function TourBuilder({
         return;
       }
       notify.error("We couldn't open checkout. Please try again.");
-    } catch (e) {
-      notify.error(apiError(e));
+    } catch (e: any) {
+      // An earlier checkout already paid (or is still clearing): say so and refresh.
+      const code = e?.response?.data?.code;
+      if (code === "ALREADY_PAID") {
+        notify.success(apiError(e));
+        load();
+      } else if (code === "CHECKOUT_IN_PROGRESS") {
+        notify.info(apiError(e));
+        load();
+      } else {
+        notify.error(apiError(e));
+      }
     }
     setCheckingOut(false);
   };

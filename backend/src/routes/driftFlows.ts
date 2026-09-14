@@ -738,13 +738,12 @@ router.post(
 
     const name = str(req.body?.name, 120) || `${stepNoun(kind)} ${flow.steps.length + 1}`;
     let created: Awaited<ReturnType<typeof createDriftStep>>;
-    try {
-      const slug = await uniqueSlug(orgId, name);
-      created = await createDriftStep({
+    const createStep = async () =>
+      createDriftStep({
         flowId: flow.id,
         orgId,
         userId: req.user?.id || null,
-        slug,
+        slug: await uniqueSlug(orgId, name),
         name,
         title: null,
         titleEnd: null,
@@ -758,6 +757,14 @@ router.post(
         kind,
         billing: superAdmin ? "COMP" : "AUTO",
       });
+    try {
+      try {
+        created = await createStep();
+      } catch (err: any) {
+        // Two uploads at once (two tabs) can pick the same free link — pick again, once.
+        if (err?.code !== "P2002") throw err;
+        created = await createStep();
+      }
     } catch (err) {
       // Nothing is queued yet — don't leave the (up to 500 MB) upload in the temp dir.
       await rmFile(file.path);
@@ -836,10 +843,14 @@ router.post(
     if (!clip) return;
 
     if (step.product?.billingStatus === "AWAITING_PAYMENT") {
+      let stored = false;
       try {
-        await storePendingClip({ productId: step.productId, orgId, file, frameCount: clip.frameCount });
+        stored = await storePendingClip({ productId: step.productId, orgId, file, frameCount: clip.frameCount });
       } finally {
         await rmFile(file.path);
+      }
+      if (!stored) {
+        return res.status(409).json({ error: "This drift was just paid for and is converting — replace its clip once it's ready." });
       }
       const full = serializeFlow(await loadFlow(orgId, step.flowId));
       return res.json({ step: full.steps.find((s: any) => s.id === step.id) ?? null, flow: full });

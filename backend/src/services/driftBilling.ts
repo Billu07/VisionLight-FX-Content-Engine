@@ -71,7 +71,8 @@ export async function billingSummary(orgId: string, unlimited: boolean) {
   };
 }
 
-/** Keep an unpaid drift's clip until checkout (nothing is converted before payment). */
+/** Keep an unpaid drift's clip until checkout (nothing is converted before payment).
+ *  false → the drift was paid meanwhile; it keeps (and builds) the clip it was paid with. */
 export async function storePendingClip(args: {
   productId: string;
   orgId: string;
@@ -85,11 +86,16 @@ export async function storePendingClip(args: {
     keyPrefix: `drift/org_${args.orgId}/pending/product_${args.productId}`,
     fallbackExtension: "mp4",
   });
-  await prisma.driftProduct.update({
-    where: { id: args.productId },
+  const { count } = await prisma.driftProduct.updateMany({
+    where: { id: args.productId, billingStatus: "AWAITING_PAYMENT" },
     data: { pendingVideoUrl: url, pendingFrameCount: args.frameCount },
   });
+  if (!count) {
+    console.warn(`[${NS}] product ${args.productId} was paid while a new clip uploaded — kept the paid clip`);
+    return false;
+  }
   console.log(`[${NS}] product ${args.productId} clip stored, waiting for checkout`);
+  return true;
 }
 
 // Checkout returns to the site it was opened from when that's drift.li (or a local
@@ -100,19 +106,73 @@ const returnOrigin = (origin: unknown): string => {
   return APP_URL;
 };
 
-/** Open a Stripe Checkout for every drift of a flow that's waiting for payment. */
-export async function createFlowCheckout(args: {
+type CheckoutArgs = {
   orgId: string;
   flowId: string;
   userId: string | null;
   email: string | null;
   origin?: unknown;
-}) {
+};
+
+// One checkout at a time per tour in this process, so a double-click can't open two
+// sessions for the same drifts (the paid-session check below covers the rest).
+const checkoutQueues = new Map<string, Promise<unknown>>();
+
+/** Open a Stripe Checkout for every drift of a flow that's waiting for payment. */
+export async function createFlowCheckout(args: CheckoutArgs) {
+  const prev = checkoutQueues.get(args.flowId) ?? Promise.resolve();
+  const run = prev.catch(() => undefined).then(() => openFlowCheckout(args));
+  const tail = run.catch(() => undefined);
+  checkoutQueues.set(args.flowId, tail);
+  try {
+    return await run;
+  } finally {
+    if (checkoutQueues.get(args.flowId) === tail) checkoutQueues.delete(args.flowId);
+  }
+}
+
+async function openFlowCheckout(args: CheckoutArgs) {
   if (!stripeConfigured()) {
     throw new FlowError(503, "Checkout isn't switched on yet — contact us and we'll activate paid drifts for you.", {
       code: "PAYMENTS_OFF",
     });
   }
+  const owned = await prisma.driftFlow.findFirst({
+    where: { id: args.flowId, organizationId: args.orgId },
+    select: { id: true },
+  });
+  if (!owned) throw new FlowError(404, "Tour not found");
+
+  // One open checkout per tour, so nobody pays twice for the same drifts. A session that
+  // can't be expired is looked up: paid → settle it now (its drifts stop being due);
+  // still clearing → stop here instead of opening a second one.
+  let settled = false;
+  const open = await prisma.driftTourOrder.findMany({
+    where: { flowId: owned.id, organizationId: args.orgId, status: "PENDING", stripeSessionId: { not: null } },
+    select: { id: true, stripeSessionId: true },
+  });
+  for (const o of open) {
+    const sessionId = o.stripeSessionId as string;
+    try {
+      await stripe().checkout.sessions.expire(sessionId);
+      await prisma.driftTourOrder.update({ where: { id: o.id }, data: { status: "EXPIRED" } });
+    } catch {
+      const s = await stripe().checkout.sessions.retrieve(sessionId).catch(() => null);
+      if (s?.status === "expired") {
+        await prisma.driftTourOrder.updateMany({ where: { id: o.id, status: "PENDING" }, data: { status: "EXPIRED" } });
+      } else if (s?.status === "complete" && s.payment_status === "paid") {
+        await fulfillSession(s);
+        settled = true;
+      } else if (s?.status === "complete") {
+        throw new FlowError(409, "A payment for this tour is still going through — give it a minute, then refresh.", {
+          code: "CHECKOUT_IN_PROGRESS",
+        });
+      } else {
+        throw new FlowError(502, "We couldn't open checkout just now. Please try again in a moment.");
+      }
+    }
+  }
+
   const flow = await prisma.driftFlow.findFirst({
     where: { id: args.flowId, organizationId: args.orgId },
     select: {
@@ -131,20 +191,10 @@ export async function createFlowCheckout(args: {
   const due = flow.steps
     .map((s) => s.product)
     .filter((p): p is NonNullable<typeof p> => !!p && p.billingStatus === "AWAITING_PAYMENT" && !!p.pendingVideoUrl);
-  if (!due.length) throw new FlowError(409, "Nothing to check out — every drift in this tour is already paid for.");
-
-  // One open checkout per tour, so nobody pays twice for the same drifts.
-  const open = await prisma.driftTourOrder.findMany({
-    where: { flowId: flow.id, status: "PENDING", stripeSessionId: { not: null } },
-    select: { id: true, stripeSessionId: true },
-  });
-  for (const o of open) {
-    try {
-      await stripe().checkout.sessions.expire(o.stripeSessionId as string);
-      await prisma.driftTourOrder.update({ where: { id: o.id }, data: { status: "EXPIRED" } });
-    } catch {
-      // Already completed or expired on Stripe's side — the webhook / confirm settles it.
-    }
+  if (!due.length) {
+    throw settled
+      ? new FlowError(409, "Your earlier payment went through — those drifts are converting now.", { code: "ALREADY_PAID" })
+      : new FlowError(409, "Nothing to check out — every drift in this tour is already paid for.");
   }
 
   const quantity = due.length;
@@ -204,6 +254,22 @@ export async function createFlowCheckout(args: {
   };
 }
 
+// A paid clip is fetched back from storage — a network blip shouldn't fail a paid drift.
+async function downloadClip(url: string, attempts = 3): Promise<Buffer> {
+  let last: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`clip download ${res.status}`);
+      return Buffer.from(await res.arrayBuffer());
+    } catch (err) {
+      last = err;
+      if (i < attempts - 1) await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
+    }
+  }
+  throw last;
+}
+
 /** Convert a paid drift from its stored clip (fetch → temp file → the normal pipeline). */
 async function startPaidProcessing(p: {
   id: string;
@@ -214,10 +280,9 @@ async function startPaidProcessing(p: {
 }) {
   try {
     if (!p.pendingVideoUrl) throw new Error("no stored clip");
-    const res = await fetch(p.pendingVideoUrl);
-    if (!res.ok) throw new Error(`clip download ${res.status}`);
+    const buffer = await downloadClip(p.pendingVideoUrl);
     const tmp = path.join(os.tmpdir(), `drift-paid-${crypto.randomUUID()}.mp4`);
-    await fs.writeFile(tmp, Buffer.from(await res.arrayBuffer()));
+    await fs.writeFile(tmp, buffer);
     processClip({
       clip: "A",
       productId: p.id,
@@ -232,6 +297,18 @@ async function startPaidProcessing(p: {
     console.error(`[${NS}] product ${p.id} is paid but couldn't start converting:`, err);
     await prisma.driftProduct.update({ where: { id: p.id }, data: { status: "FAILED" } }).catch(() => undefined);
   }
+}
+
+/** Boot: a paid drift whose conversion was cut off (deploy / restart) goes back through
+ *  the pipeline from its stored clip instead of being left FAILED. Matches the drifts
+ *  recoverOrphanedDriftJobs (routes/drift.ts) leaves alone. */
+export async function resumePaidDrifts() {
+  const stuck = await prisma.driftProduct.findMany({
+    where: { status: "PROCESSING", billingStatus: "PAID", pendingVideoUrl: { not: null }, spin: { is: null } },
+    select: { id: true, organizationId: true, pendingVideoUrl: true, pendingFrameCount: true, createdByUserId: true },
+  });
+  for (const p of stuck) void startPaidProcessing(p);
+  if (stuck.length) console.log(`[${NS}] boot: resumed converting ${stuck.length} paid drift(s)`);
 }
 
 /** Mark a paid session's order + drifts paid (once) and start converting them. */
@@ -265,7 +342,10 @@ async function fulfillSession(session: Stripe.Checkout.Session) {
       });
     }
     if (ids.length && products.length < ids.length) {
-      console.warn(`[${NS}] order ${orderId}: ${ids.length - products.length} drift(s) were removed or already paid before payment`);
+      // Paid for drifts that were deleted (or already paid) in the meantime — money to hand back.
+      console.error(
+        `[${NS}] order ${orderId}: ${ids.length - products.length} of ${ids.length} drift(s) were removed or already paid before payment — review for a refund`,
+      );
     }
     return { order, products };
   });

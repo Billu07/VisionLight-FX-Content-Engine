@@ -453,8 +453,11 @@ function ClientPages() {
     setBusy(true);
     try {
       const r = await apiEndpoints.driftCreateClientPage(n);
-      setActiveProfile(r.data.profileId, r.data.page?.name);
-      await checkAuth();
+      // No profile back when a superadmin made it for the Pro — they keep "Manage this page".
+      if (r.data.profileId) {
+        setActiveProfile(r.data.profileId, r.data.page?.name);
+        await checkAuth();
+      }
       notify.success(`${r.data.page?.name || "The page"} is ready`);
       navigate(r.data.page?.path || "/tour");
     } catch (e) {

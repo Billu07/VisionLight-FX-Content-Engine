@@ -45,7 +45,9 @@ export async function pageManager(managedByOrgId: string | null | undefined) {
 }
 
 /** A Pro creates a General page for a client: a new TOUR org managed by the Pro's page,
- *  plus an ADMIN profile in it for the Pro's own identity. */
+ *  plus an ADMIN profile in it for the Pro's own identity. (A superadmin doing it from
+ *  "Manage this page" isn't that Pro — the page goes to the Pro page's admins, and
+ *  profileId is null.) */
 export async function createClientPage(args: { proOrgId: string; identity: Identity; name: string }) {
   const name = args.name.trim().slice(0, 80);
   if (!name) throw new FlowError(400, "Give the client's page a name");
@@ -57,6 +59,27 @@ export async function createClientPage(args: { proOrgId: string; identity: Ident
   if (pro.tourAccountType !== "PRO") {
     throw new FlowError(403, "Client pages are for Pro accounts (photographers and videographers).", { code: "PRO_ONLY" });
   }
+  const actorIsMember = !!(await prisma.user.findFirst({
+    where: { organizationId: pro.id, email: { equals: args.identity.email, mode: "insensitive" } },
+    select: { id: true },
+  }));
+  const grantees: Identity[] = [];
+  if (actorIsMember) grantees.push(args.identity);
+  else {
+    const admins = await prisma.user.findMany({
+      where: { organizationId: pro.id, role: "ADMIN" },
+      select: { authUserId: true, email: true, name: true },
+    });
+    const seen = new Set<string>();
+    for (const a of admins) {
+      const key = String(a.email || "").toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      grantees.push({ authUserId: a.authUserId, email: a.email, name: a.name });
+    }
+  }
+  if (!grantees.length) throw new FlowError(409, "This Pro page has no admin to hand the client page to.");
+
   const slug = await uniqueOrgSlug(name);
   const org = await prisma.organization.create({
     data: {
@@ -71,17 +94,23 @@ export async function createClientPage(args: { proOrgId: string; identity: Ident
     },
     select: { id: true, name: true, slug: true },
   });
-  const profile = await dbService.createUser({
-    authUserId: args.identity.authUserId || undefined,
-    email: args.identity.email,
-    name: args.identity.name || undefined,
-    view: "TOUR",
-    maxProjects: 3,
-    organizationId: org.id,
-    role: "ADMIN",
-  });
-  console.log(`[${NS}] pro page ${pro.id} created client page ${org.id} (${slug}) — profile ${profile.id}`);
-  return { profileId: profile.id, page: pageRef(org) };
+  let profileId: string | null = null;
+  for (const g of grantees) {
+    const profile = await dbService.createUser({
+      authUserId: g.authUserId || undefined,
+      email: g.email,
+      name: g.name || undefined,
+      view: "TOUR",
+      maxProjects: 3,
+      organizationId: org.id,
+      role: "ADMIN",
+    });
+    if (actorIsMember) profileId = profile.id as string;
+  }
+  console.log(
+    `[${NS}] pro page ${pro.id} created client page ${org.id} (${slug}) — ${grantees.length} admin profile(s)${actorIsMember ? "" : ", by a superadmin"}`,
+  );
+  return { profileId, page: pageRef(org) };
 }
 
 /** The client pages a Pro page manages. */
@@ -190,28 +219,57 @@ export async function acceptProInvite(token: string, identity: Identity) {
 
   const profiles: any[] = await dbService.findUsersForAuthIdentity(identity.authUserId || "", identity.email);
   let profile = profiles.find((p) => p.organizationId === org.id);
-  if (!profile) {
+  const usable = invite.status === "PENDING" && !inviteExpired(invite.createdAt);
+  if (!profile && !usable) {
     if (invite.status === "ACCEPTED") throw new FlowError(409, "This invite has already been used.");
-    if (inviteExpired(invite.createdAt)) throw new FlowError(410, "This invite has expired — ask for a new one.");
-    profile = await dbService.createUser({
-      authUserId: identity.authUserId || undefined,
-      email: identity.email,
-      name: identity.name || undefined,
-      view: "TOUR",
-      maxProjects: 3,
-      organizationId: org.id,
-      role: "ADMIN",
-    });
+    throw new FlowError(410, "This invite has expired — ask for a new one.");
   }
 
-  if (invite.status === "PENDING") {
+  // Claim the link atomically first, so a forwarded link or a double-submit can't be used
+  // twice. Someone who already manages the page just goes there (an expired or used link
+  // changes nothing for them).
+  let claimed = false;
+  if (usable) {
+    const r = await prisma.driftTourInvite.updateMany({
+      where: { id: invite.id, status: "PENDING" },
+      data: { status: "ACCEPTED", acceptedAt: new Date() },
+    });
+    claimed = r.count === 1;
+  }
+  if (!profile && !claimed) {
+    // Lost the claim — fine if it was this same person's other request that won.
+    const again: any[] = await dbService.findUsersForAuthIdentity(identity.authUserId || "", identity.email);
+    profile = again.find((p) => p.organizationId === org.id);
+    if (!profile) throw new FlowError(409, "This invite has already been used.");
+  }
+  if (!profile) {
+    try {
+      profile = await dbService.createUser({
+        authUserId: identity.authUserId || undefined,
+        email: identity.email,
+        name: identity.name || undefined,
+        view: "TOUR",
+        maxProjects: 3,
+        organizationId: org.id,
+        role: "ADMIN",
+      });
+    } catch (err) {
+      // Give the link back so it still works once whatever failed is fixed.
+      await prisma.driftTourInvite
+        .updateMany({
+          where: { id: invite.id, status: "ACCEPTED", acceptedByUserId: null },
+          data: { status: "PENDING", acceptedAt: null },
+        })
+        .catch(() => undefined);
+      throw err;
+    }
+  }
+
+  if (claimed) {
     const proPage = profiles.find(
       (p) => p.view === "TOUR" && p.organizationId !== org.id && p.organization?.tourAccountType === "PRO",
     );
-    await prisma.driftTourInvite.update({
-      where: { id: invite.id },
-      data: { status: "ACCEPTED", acceptedAt: new Date(), acceptedByUserId: profile.id },
-    });
+    await prisma.driftTourInvite.update({ where: { id: invite.id }, data: { acceptedByUserId: profile.id } });
     if (proPage && !org.managedByOrgId) {
       await prisma.organization.update({ where: { id: org.id }, data: { managedByOrgId: proPage.organizationId } });
     }

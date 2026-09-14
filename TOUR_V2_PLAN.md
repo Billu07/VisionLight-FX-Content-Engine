@@ -75,6 +75,11 @@ dashboards, set up the public demo tour. The superadmin's tour account has no cl
    custom domains keep their full-screen takeover.
 8. **Pro ↔ client pages** reuse multi-profile: a Pro gets an ADMIN profile inside each client page
    (the workspace switcher already handles several profiles). Invites are emailed links.
+9. **Invite links belong to whoever holds them** (one use, 14 days): the accepting account's email
+   isn't required to match the invited email, so a Pro can join with a different login than the one
+   they were invited at. Tighten to "email must match" if the client prefers.
+10. **Free drifts count live drifts**: deleting a free drift frees its slot again, so a page never
+    has more than `freeDrifts` free drifts at once (rather than "the first 3 ever").
 
 ## 3. Phases
 
@@ -281,3 +286,15 @@ Drift.li is a division of PicDrift
   Brand custom domains keep `HeroLanding` (`BrandDomainLanding` in DriftLanding.tsx); the gallery reel
   code is gone. `/tour` = `tour/TourLanding.tsx` for visitors (creators still go to their page;
   `/tour?view=landing` forces it). Hero routes are straight and horizontal (`PathArtH`, optional labels).
+- 2026-09-14 — Post-P6 fixes. Relink when a tour drift FAILS or starts rebuilding (neighbours skip it
+  instead of linking a 404); admin Tour tab links open on drift.li. From an independent review of
+  billing/auth/invites (no unpaid-processing path found; webhook/confirm and free-count races clean):
+  checkout is serialized per tour and, when an older session can't be expired, looks it up — paid →
+  fulfilled on the spot (`ALREADY_PAID`), still clearing → 409 `CHECKOUT_IN_PROGRESS` — so nobody pays
+  twice; paid drifts cut off by a restart are resumed from their stored clip at boot
+  (`resumePaidDrifts`, excluded from `recoverOrphanedDriftJobs`), and the clip download retries;
+  invites are claimed atomically (one use; expired links change nothing for existing members); a clip
+  replaced while its checkout completes keeps the paid clip (409); the generic product PATCH ignores
+  `publish` on flow drifts; a superadmin creating a client page from "Manage this page" gives the
+  ADMIN profiles to the Pro page's admins; wait-list double-submits and two-tab uploads no longer 500.
+  An order paid for drifts deleted meanwhile logs "review for a refund" (`pm2 logs | grep refund`).

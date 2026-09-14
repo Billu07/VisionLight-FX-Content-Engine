@@ -286,7 +286,13 @@ router.post("/api/drift/public/waitlist", async (req: AuthenticatedRequest, res:
   const source = String(req.body?.source || "").trim().slice(0, 60) || null;
   const existing = await prisma.driftWaitlist.findUnique({ where: { email_product: { email, product } }, select: { id: true } });
   if (!existing) {
-    await prisma.driftWaitlist.create({ data: { email, product, source } });
+    try {
+      await prisma.driftWaitlist.create({ data: { email, product, source } });
+    } catch (err: any) {
+      // A double-submit beat us to the (email, product) row — they're on the list.
+      if (err?.code === "P2002") return res.json({ ok: true, already: true });
+      throw err;
+    }
     void sendWaitlistNoticeEmail({ email, product }).catch((err) => console.error(`[${NS}] wait list notice failed:`, err));
   }
   res.json({ ok: true, already: !!existing });

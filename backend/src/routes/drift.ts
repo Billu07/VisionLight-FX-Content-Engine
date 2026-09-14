@@ -748,11 +748,14 @@ async function applyProductPatch(
 ) {
   // A drift that is a step of a creator flow has flow-managed CTAs (the flow
   // regenerates ctaPrimary = Next and mirrors the step's own button into
-  // ctaSecondary), so direct edits would only be overwritten — drop them.
-  if (("ctaPrimary" in body || "ctaSecondary" in body) && (await isFlowStepProduct(productId))) {
+  // ctaSecondary), so direct edits would only be overwritten — drop them. Its status
+  // follows the flow too (publish the tour; unpaid drifts wait for checkout), so a
+  // direct `publish` is ignored.
+  if (("ctaPrimary" in body || "ctaSecondary" in body || "publish" in body) && (await isFlowStepProduct(productId))) {
     body = { ...body };
     delete body.ctaPrimary;
     delete body.ctaSecondary;
+    delete body.publish;
   }
   const data: Record<string, unknown> = {};
   if ("ctaPrimary" in body) data.ctaPrimary = cta(body.ctaPrimary) ?? null;
@@ -2287,7 +2290,12 @@ router.get("/api/drift/public/landing-hero", async (req: AuthenticatedRequest, r
 export async function recoverOrphanedDriftJobs() {
   try {
     const { count } = await prisma.driftProduct.updateMany({
-      where: { status: "PROCESSING" },
+      where: {
+        status: "PROCESSING",
+        // Paid tour drifts that never finished keep their stored clip and are resumed
+        // instead (driftBilling.resumePaidDrifts).
+        NOT: { billingStatus: "PAID", pendingVideoUrl: { not: null }, spin: { is: null } },
+      },
       data: { status: "FAILED" },
     });
     if (count > 0) {

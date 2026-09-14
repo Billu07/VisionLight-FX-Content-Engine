@@ -19,7 +19,7 @@ import driftMailRouter from "./routes/driftMail";
 import driftTourAdminRouter from "./routes/driftTourAdmin";
 import { mailConfigured, verifyMail } from "./services/mail";
 import { relinkAllFlows } from "./services/driftFlows";
-import { handleStripeWebhook } from "./services/driftBilling";
+import { handleStripeWebhook, resumePaidDrifts } from "./services/driftBilling";
 
 console.log("Environment Check:", {
   airtableKey: process.env.AIRTABLE_API_KEY ? "Loaded" : "Missing",
@@ -77,6 +77,7 @@ if (process.env.NODE_ENV !== "production" || process.env.VERCEL !== "1") {
     console.log(`SuperAdmin DELETE Org Route: ACTIVE`);
     void recoverOrphanedRot3dJobs();
     void recoverOrphanedDriftJobs();
+    void resumePaidDrifts().catch((err) => console.error("[drift-billing] boot resume failed:", err));
     void verifyMail();
     void relinkAllFlows().catch((err) => console.error("[drift-flow] boot relink failed:", err));
   });
