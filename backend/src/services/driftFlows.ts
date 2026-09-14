@@ -376,6 +376,9 @@ export function serializeStepProduct(p: any) {
   if (!p) return null;
   const m = p.spin?.manifest || {};
   const frames: string[] = Array.isArray(m.frames) ? m.frames : [];
+  // Thumbnails (cards, strips, builder) use the lighter mobile frame when there is one.
+  const small: string[] =
+    Array.isArray(m.framesMobile) && m.framesMobile.length === frames.length ? m.framesMobile : frames;
   return {
     id: p.id as string,
     name: p.name as string,
@@ -391,7 +394,7 @@ export function serializeStepProduct(p: any) {
     driftDirection: (p.driftDirection || "LTR") as string,
     ctaPlacement: (p.ctaPlacement || "CENTER") as string,
     frameCount: (p.spin?.frameCount ?? frames.length) as number,
-    thumb: (p.thumbnailUrl || frames[p.defaultFrame] || frames[0] || null) as string | null,
+    thumb: (p.thumbnailUrl || small[p.defaultFrame] || small[0] || null) as string | null,
     ctaPrimary: (p.ctaPrimary ?? null) as CreatorCta | null,
     ctaSecondary: (p.ctaSecondary ?? null) as CreatorCta | null,
     playerPath: stepPlayerPath(p.id),

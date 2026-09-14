@@ -28,11 +28,16 @@ export const buildManagedStorageKey = (
   return `${safePrefix}/${crypto.randomUUID()}.${extension}`;
 };
 
+/** For objects under a unique (random) key that never change: cache for a year. */
+export const IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable";
+
 export const uploadManagedBuffer = async (params: {
   buffer: Buffer;
   contentType: string;
   keyPrefix: string;
   fallbackExtension: string;
+  /** e.g. IMMUTABLE_CACHE_CONTROL — omitted → no Cache-Control header (unchanged default). */
+  cacheControl?: string;
 }) => {
   const contentType = params.contentType.split(";")[0].trim().toLowerCase();
   const key = buildManagedStorageKey(
@@ -40,7 +45,7 @@ export const uploadManagedBuffer = async (params: {
     contentType,
     params.fallbackExtension,
   );
-  return uploadFileToR2(params.buffer, key, contentType);
+  return uploadFileToR2(params.buffer, key, contentType, params.cacheControl);
 };
 
 export const isManagedStorageUrl = (rawUrl: string) => {

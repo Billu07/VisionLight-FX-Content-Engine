@@ -282,7 +282,8 @@ export default function SpinViewer({
   // Crossfade overlay: on a drift SWAP we snapshot the outgoing frame into this img
   // and fade it out as the new drift paints underneath — so the change is a smooth
   // dissolve, not a hard cut. false until the first swap so it never blocks anything.
-  const xfadeRef = useRef<HTMLImageElement>(null);
+  const xfadeRef = useRef<HTMLCanvasElement>(null);
+  const xfadeGenRef = useRef(0);
   // false only on the very first effect run; true on every re-run (a drift swap).
   const swappedRef = useRef(false);
   // The OUTGOING drift's travel direction, for the stop→stop handoff (tour stops).
@@ -1489,7 +1490,15 @@ export default function SpinViewer({
         // clears it) and fade it out over the incoming drift.
         try {
           const x = xfadeRef.current;
-          x.src = cv.toDataURL();
+          const gen = ++xfadeGenRef.current;
+          // Copy the outgoing frame canvas-to-canvas: GPU-fast and no PNG encode on the
+          // main thread (toDataURL stalled every drift swap on phones), and it works
+          // with cross-origin frames too.
+          x.width = cv.width;
+          x.height = cv.height;
+          const xctx = x.getContext("2d");
+          if (!xctx) throw new Error("no 2d context");
+          xctx.drawImage(cv, 0, 0);
           x.style.transition = "none";
           x.style.opacity = "1";
           x.style.transform = "none";
@@ -1504,11 +1513,12 @@ export default function SpinViewer({
           });
           window.setTimeout(() => {
             const xx = xfadeRef.current;
-            if (xx) { xx.hidden = true; xx.style.transform = ""; }
+            // Release the snapshot's backing store — unless a newer swap reused it.
+            if (xx && gen === xfadeGenRef.current) { xx.hidden = true; xx.style.transform = ""; xx.width = 0; xx.height = 0; }
           }, 480);
           crossfaded = true;
         } catch {
-          /* cross-origin frames taint the canvas → fall back to a plain fade-in */
+          /* no 2d context → fall back to a plain fade-in */
         }
       }
       // The incoming drift settles in: a fade when there was no snapshot to cross
@@ -1613,7 +1623,7 @@ export default function SpinViewer({
       <style>{R3D_CSS}</style>
       <canvas ref={canvasRef} />
       {/* crossfade snapshot of the previous drift, faded out on a swap (see effect) */}
-      <img className="r3d-xfade" ref={xfadeRef} alt="" aria-hidden hidden />
+      <canvas className="r3d-xfade" ref={xfadeRef} aria-hidden hidden />
       <div className="r3d-scrim-top" />
       <div className="r3d-scrim-bot" />
 
@@ -1853,7 +1863,10 @@ const R3D_CSS = `
 }
 .r3d-stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab}
 /* crossfade snapshot overlay: sits just above the canvas, below the chrome */
-.r3d-xfade{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none;z-index:1}
+.r3d-xfade{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
+.r3d-stage canvas.r3d-xfade{cursor:default}
+/* the stage's canvas rule sets display:block — keep the idle snapshot out of the compositor */
+.r3d-stage canvas.r3d-xfade[hidden]{display:none}
 /* drag helper starts gated (hidden) on a drift until it's placed under the frame,
    then fades in at its spot — instead of dropping from the CSS default position */
 .r3d-drift .r3d-hint.r3d-hint-init{opacity:0}

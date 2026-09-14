@@ -307,3 +307,11 @@ Drift.li is a division of PicDrift
   lands on `/tour`. Pro can no longer be switched on from page settings (PATCH `/api/drift/my/page`
   refuses a type change unless superadmin; settings show it read-only) and client pages are created with
   `freeDrifts = 0` — decision §2.11.
+- 2026-09-14 — Tour performance pass. Root cause of the lag on phones: the player dropped
+  `manifest.framesMobile`, so every drift downloaded and decoded 180 full 2048px frames. Now: mobile frame
+  set on phones (player + drift.li home heroes), polite neighbour warming (idle, bounded, low priority,
+  device set, data-saver aware), pathway prefetch of Start Tour / strips, canvas-to-canvas crossfade (no
+  `toDataURL`), route-level code splitting (first load 634 KB → ~196 KB gzipped JS for a drift; the
+  builder is admin-only), vendor chunks, `font-display: swap`, mobile-frame thumbnails, immutable
+  Cache-Control on new frame/cover/logo/thumbnail uploads. Ops: nginx gzip/brotli + long cache for
+  `/assets/*`; existing R2 frames need a Cloudflare cache rule (they were uploaded without Cache-Control).

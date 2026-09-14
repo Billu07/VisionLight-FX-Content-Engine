@@ -6,11 +6,17 @@ import { apiEndpoints } from "../lib/api";
  * HeroLanding) so a CTA that points to another drift on this host is fetched (and
  * a spread of its frames warmed) ahead of the click — the next drift then swaps in
  * INSTANTLY, with no loader, and (because we navigate in-app) fullscreen survives.
+ *
+ * Warming is deliberately polite: it starts a moment after the current drift has had
+ * the network to itself, runs a few low-priority requests at a time, fetches the frame
+ * set THIS device will actually play (the lighter mobile set on phones), and on
+ * data-saver / 2G links only warms what an instant first paint needs.
  */
 
 // Session caches: drift product payloads by key, and frame URLs we've warmed.
 const driftCache = new Map<string, any>();
 const warmedFrames = new Set<string>();
+const inflight = new Set<string>();
 
 // First-path-segments that are app routes, never a brand vanity — a CTA to one of
 // these is not an internal drift to prefetch / SPA-navigate.
@@ -70,57 +76,147 @@ export const cacheDrift = (key: string, product: any) => {
   if (key && product) driftCache.set(key, product);
 };
 
-// Preload a drift's frames ahead of time so it swaps in fully-formed — the default
-// frame first (painted immediately), then a coarse spread (a usable spin right
-// away), then EVERY remaining frame in the background so there's no progressive
-// sharpen when it appears. The browser caps requests per host, so this just queues;
-// `warmedFrames` dedupes so re-calling is cheap.
-export function warmFrames(product: any) {
+// ───────────────────────────── frame sets ─────────────────────────────
+
+/** Phones and touch tablets play the lighter mobile frame set — the same rule
+ *  SpinViewer applies when it picks `manifest.framesMobile`. */
+export const prefersMobileFrames = () =>
+  typeof window !== "undefined" &&
+  (Math.min(window.innerWidth, window.innerHeight) <= 820 ||
+    !!window.matchMedia?.("(pointer: coarse)").matches);
+
+/** The frame lists the player shows for a payload: clip A, plus clip B when
+ *  `withSecond` (a 2-clip drift is one circular timeline). The mobile list is only
+ *  offered when every clip has one of the same length, so frame indexes line up. */
+export function combinedFrameSets(product: any, withSecond = true): { frames: string[]; framesMobile?: string[] } {
   const m = product?.manifest || {};
+  const s = withSecond ? product?.secondManifest : null;
   const a: string[] = Array.isArray(m.frames) ? m.frames : [];
-  const secondM = product?.secondManifest;
-  const b: string[] = secondM && Array.isArray(secondM.frames) ? secondM.frames : [];
-  const all = [...a, ...b];
-  if (!all.length) return;
-  const warm = (url?: string) => {
-    if (!url || warmedFrames.has(url)) return;
-    warmedFrames.add(url);
-    const img = new Image();
-    img.decoding = "async";
-    img.src = url;
+  const b: string[] = s && Array.isArray(s.frames) ? s.frames : [];
+  const am: string[] = Array.isArray(m.framesMobile) ? m.framesMobile : [];
+  const bm: string[] = s && Array.isArray(s.framesMobile) ? s.framesMobile : [];
+  const mobileOk = a.length > 0 && am.length === a.length && (b.length === 0 || bm.length === b.length);
+  return {
+    frames: b.length ? [...a, ...b] : a,
+    framesMobile: mobileOk ? (b.length ? [...am, ...bm] : am) : undefined,
   };
-  warm(a[product?.defaultFrame ?? 0] || a[0]); // the frame shown first
-  const step = Math.max(1, Math.floor(all.length / 16)); // a coarse ring first
-  for (let i = 0; i < all.length; i += step) warm(all[i]);
-  for (const url of all) warm(url); // then the full set (deduped)
 }
 
+/** Exactly the URLs this device's player will load for a payload. */
+const deviceFrames = (product: any): string[] => {
+  const { frames, framesMobile } = combinedFrameSets(product);
+  return framesMobile && prefersMobileFrames() ? framesMobile : frames;
+};
+
+// ───────────────────────────── background warm queue ─────────────────────────────
+
+const WARM_CONCURRENCY = 3;
+const WARM_DELAY_MS = 900;
+const warmQueue: string[] = [];
+let warmActive = 0;
+let warmTimer: number | null = null;
+
+/** Data saver or a 2G link: warm only what an instant first paint needs. */
+const constrainedNetwork = () => {
+  const c = typeof navigator !== "undefined" ? (navigator as any).connection : undefined;
+  return !!c && (!!c.saveData || /(^|-)2g$/.test(String(c.effectiveType || "")));
+};
+
+const pumpWarm = () => {
+  while (warmActive < WARM_CONCURRENCY && warmQueue.length) {
+    const url = warmQueue.shift()!;
+    warmActive++;
+    const img = new Image();
+    img.decoding = "async";
+    (img as any).fetchPriority = "low";
+    img.onload = img.onerror = () => {
+      warmActive--;
+      pumpWarm();
+    };
+    img.src = url;
+  }
+};
+
+const scheduleWarm = () => {
+  if (warmTimer !== null || typeof window === "undefined") return;
+  warmTimer = window.setTimeout(() => {
+    warmTimer = null;
+    const ric = (window as any).requestIdleCallback;
+    if (typeof ric === "function") ric(pumpWarm, { timeout: 2000 });
+    else pumpWarm();
+  }, WARM_DELAY_MS);
+};
+
+const enqueueWarm = (url?: string) => {
+  if (!url || warmedFrames.has(url)) return;
+  warmedFrames.add(url);
+  warmQueue.push(url);
+};
+
+/** Drop warms that haven't started (the visitor moved on) so they can re-queue later. */
+const clearPendingWarms = () => {
+  for (const url of warmQueue) warmedFrames.delete(url);
+  warmQueue.length = 0;
+};
+
+// Preload a drift's frames ahead of time so it swaps in fully-formed — the default
+// frame first (painted immediately), then a coarse spread (a usable drift right away),
+// then (full, on a decent connection) every remaining frame. `warmedFrames` dedupes,
+// so re-calling is cheap.
+export function warmFrames(product: any, opts: { full?: boolean } = {}) {
+  const all = deviceFrames(product);
+  if (!all.length) return;
+  const first = Math.min(Math.max(0, Number(product?.defaultFrame) || 0), all.length - 1);
+  enqueueWarm(all[first]);
+  const step = Math.max(1, Math.floor(all.length / 16));
+  for (let i = 0; i < all.length; i += step) enqueueWarm(all[i]);
+  if (opts.full !== false && !constrainedNetwork()) for (const url of all) enqueueWarm(url);
+  scheduleWarm();
+}
+
+const fetchTarget = (t: DriftTarget) =>
+  ("byFlow" in t
+    ? apiEndpoints.driftPublicPageDrift(t.page, t.flow, t.drift)
+    : "bySlug" in t
+      ? apiEndpoints.driftPublicBrandProduct(t.brandSlug, t.productSlug)
+      : apiEndpoints.driftPublicProduct(t.productId)
+  ).then((r) => r.data.product);
+
+const prefetchTarget = (t: DriftTarget, opts: { full?: boolean }) => {
+  const k = targetKey(t);
+  const cached = driftCache.get(k);
+  if (cached) {
+    warmFrames(cached, opts);
+    return;
+  }
+  if (inflight.has(k)) return;
+  inflight.add(k);
+  fetchTarget(t)
+    .then((d) => {
+      if (d) {
+        driftCache.set(k, d);
+        warmFrames(d, opts);
+      }
+    })
+    .catch(() => undefined)
+    .finally(() => inflight.delete(k));
+};
+
 // Prefetch every drift a CTA on `product` points at (same host), so its click is an
-// instant swap. Safe to call repeatedly — cached targets just get re-warmed.
+// instant swap. Called when a drift comes on screen: warms queued for the drift the
+// visitor just left are dropped first. Safe to call repeatedly.
 export function prefetchDriftTargets(product: any) {
+  clearPendingWarms();
   for (const cta of [product?.ctaPrimary, product?.ctaSecondary]) {
     const url = cta && typeof cta === "object" ? cta.url : undefined;
     const t = resolveDriftTarget(url);
-    if (!t) continue;
-    const k = targetKey(t);
-    if (driftCache.has(k)) {
-      warmFrames(driftCache.get(k));
-      continue;
-    }
-    const req =
-      "byFlow" in t
-        ? apiEndpoints.driftPublicPageDrift(t.page, t.flow, t.drift)
-        : "bySlug" in t
-          ? apiEndpoints.driftPublicBrandProduct(t.brandSlug, t.productSlug)
-          : apiEndpoints.driftPublicProduct(t.productId);
-    req
-      .then((r) => {
-        const d = r.data.product;
-        if (d) {
-          driftCache.set(k, d);
-          warmFrames(d);
-        }
-      })
-      .catch(() => undefined);
+    if (t) prefetchTarget(t, { full: true });
   }
+}
+
+/** Prefetch a drift link from a page (a pathway's Start Tour, a strip on touch/hover):
+ *  its payload plus the first frame and a coarse spread — the rest warms once it plays. */
+export function prefetchDriftPath(path: string | null | undefined, opts: { full?: boolean } = { full: false }) {
+  const t = resolveDriftTarget(path);
+  if (t) prefetchTarget(t, opts);
 }

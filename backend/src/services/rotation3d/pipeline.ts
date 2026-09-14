@@ -21,6 +21,8 @@ const WEBP_QUALITY = 92;
 // indistinguishable on a handset but roughly a quarter of the bytes, so a
 // 180-frame ring buffers fast on cellular. The player picks this set on mobile.
 const MOBILE_FRAME_WIDTH = 1080;
+// Frame keys are random per upload and never rewritten → safe to cache for a year.
+const FRAME_CACHE_CONTROL = "public, max-age=31536000, immutable";
 const MOBILE_WEBP_QUALITY = 80;
 
 export type SpinManifest = {
@@ -254,8 +256,8 @@ export const buildSpinFromVideo = async (params: {
         sharp(input).resize({ width: MOBILE_FRAME_WIDTH, withoutEnlargement: true }).webp({ quality: MOBILE_WEBP_QUALITY }).toBuffer(),
       ]);
       const [full, mobile] = await Promise.all([
-        uploadManagedBuffer({ buffer: fullWebp, contentType: "image/webp", keyPrefix, fallbackExtension: "webp" }),
-        uploadManagedBuffer({ buffer: mobileWebp, contentType: "image/webp", keyPrefix: `${keyPrefix}/m`, fallbackExtension: "webp" }),
+        uploadManagedBuffer({ buffer: fullWebp, contentType: "image/webp", keyPrefix, fallbackExtension: "webp", cacheControl: FRAME_CACHE_CONTROL }),
+        uploadManagedBuffer({ buffer: mobileWebp, contentType: "image/webp", keyPrefix: `${keyPrefix}/m`, fallbackExtension: "webp", cacheControl: FRAME_CACHE_CONTROL }),
       ]);
       return { full, mobile };
     });

@@ -7,7 +7,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../services/database";
 import { authenticateToken, type AuthenticatedRequest } from "../middleware/auth";
 import { probeClipInfo } from "../services/rotation3d/pipeline";
-import { uploadManagedBuffer } from "../utils/managedStorage";
+import { IMMUTABLE_CACHE_CONTROL, uploadManagedBuffer } from "../utils/managedStorage";
 import { parseCtaPlacement, parseDirection, processClip, uniqueSlug } from "./drift";
 import { sendFlowCreatedNoticeEmail, sendFlowPublishedEmails, sendUpgradeNudgeEmail } from "../services/mail";
 import { billingSummary, confirmCheckoutSession, createFlowCheckout, storePendingClip } from "../services/driftBilling";
@@ -513,6 +513,7 @@ router.post(
       contentType: file.mimetype,
       keyPrefix: `drift/org_${orgId}/flow_${flow.id}/cover`,
       fallbackExtension: ext,
+      cacheControl: IMMUTABLE_CACHE_CONTROL,
     });
     await prisma.driftFlow.update({ where: { id: flow.id }, data: { coverUrl: url } });
     console.log(`[${NS}] flow ${flow.id} cover uploaded`);
@@ -602,6 +603,7 @@ router.post(
       contentType: file.mimetype,
       keyPrefix: `drift/org_${orgId}/page/logo`,
       fallbackExtension: ext,
+      cacheControl: IMMUTABLE_CACHE_CONTROL,
     });
     const updated = await prisma.organization.update({
       where: { id: orgId },

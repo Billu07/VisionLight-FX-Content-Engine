@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import type { Page, PublicFlow } from "./types";
@@ -6,7 +6,11 @@ import { TourShell } from "./tourUi";
 import { TOUR_PAGE_STYLES } from "./tourPageStyles";
 import { ContactButton } from "./tourPageParts";
 import { usePageAdmin } from "./usePageAdmin";
-import TourBuilder from "./TourBuilder";
+import { prefetchDriftPath } from "../rotation3d/driftNav";
+import { lazyRoute } from "../lib/lazyRoute";
+
+// The builder is for page admins only — visitors never download it.
+const TourBuilder = lazyRoute(() => import("./TourBuilder"));
 
 /**
  * drift.li/tour/{page}/{tour} — a tour's main link: its pathway menu. Visitors see the
@@ -28,6 +32,12 @@ function Loading({ label = "Loading…" }: { label?: string }) {
 function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
   const first = flow.steps[0];
   const home = page.path || "/tour";
+  // The likeliest next tap is Start Tour: fetch drift #1 and warm its first frames
+  // now (strips warm on touch / hover), so opening it is instant.
+  useEffect(() => {
+    if (first) prefetchDriftPath(first.playerPath);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [first?.playerPath]);
   return (
     <div className="tpw t-rise">
       <div className="tpw-top">
@@ -60,8 +70,13 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
             <span className="tpw-pin" aria-hidden>
               {i + 1}
             </span>
-            <Link className="tpw-strip" to={s.playerPath}>
-              <span className="tpw-thumb">{s.thumb ? <img src={s.thumb} alt="" loading="lazy" /> : null}</span>
+            <Link
+              className="tpw-strip"
+              to={s.playerPath}
+              onPointerEnter={() => prefetchDriftPath(s.playerPath)}
+              onTouchStart={() => prefetchDriftPath(s.playerPath)}
+            >
+              <span className="tpw-thumb">{s.thumb ? <img src={s.thumb} alt="" loading="lazy" decoding="async" /> : null}</span>
               <span className="tpw-name">{s.name}</span>
               <span className="tpw-go" aria-hidden>
                 ›
@@ -173,6 +188,7 @@ export default function TourPathway() {
   if (admin.isAdmin && mode === "edit") {
     if (adminFlowId) {
       return (
+        <Suspense fallback={shell(<Loading label="Opening the tour…" />)}>
         <TourBuilder
           key={adminFlowId}
           flowId={adminFlowId}
@@ -183,6 +199,7 @@ export default function TourPathway() {
           }}
           onSlugChange={(slug) => navigate(`${page.path || `/tour/${pageSlug}`}/${slug}`, { replace: true })}
         />
+        </Suspense>
       );
     }
     if (lookup !== "none") return shell(<Loading label="Opening the tour…" />);

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
 import { getResolvedDriftBrandSlug } from "../lib/branding";
-import { resolveDriftTarget, prefetchDriftTargets } from "./driftNav";
+import { resolveDriftTarget, prefetchDriftTargets, combinedFrameSets } from "./driftNav";
 import { LoginModal } from "../components/LoginModal";
 import { initMetaPixel, track } from "./metaPixel";
 import DriftHome from "./DriftHome";
@@ -69,11 +69,8 @@ function HeroLanding({ product }: { product: any }) {
   // Memoize the frame list + manifest so an incidental re-render (a resize event,
   // a state change) never hands SpinViewer a fresh manifest object — that would
   // re-run its preload effect and flash the full loader mid-session.
-  const combined = useMemo<string[]>(() => {
-    const framesA: string[] = Array.isArray(product.manifest?.frames) ? product.manifest.frames : [];
-    const framesB: string[] = product.secondManifest && Array.isArray(product.secondManifest.frames) ? product.secondManifest.frames : [];
-    return framesB.length ? [...framesA, ...framesB] : framesA;
-  }, [product]);
+  // Full + mobile frame sets (phones play the lighter one), clip B appended when present.
+  const frameSets = useMemo(() => combinedFrameSets(product), [product]);
   const captions = useMemo(() => {
     const framesALen = Array.isArray(product.manifest?.frames) ? product.manifest.frames.length : 0;
     const hasB = product.secondManifest && Array.isArray(product.secondManifest.frames) && product.secondManifest.frames.length;
@@ -87,8 +84,13 @@ function HeroLanding({ product }: { product: any }) {
     return product.captions;
   }, [product]);
   const heroManifest = useMemo(
-    () => ({ frameCount: combined.length || product.manifest?.frameCount || 0, frames: combined, defaultFrame: product.defaultFrame ?? 0 }),
-    [combined, product],
+    () => ({
+      frameCount: frameSets.frames.length || product.manifest?.frameCount || 0,
+      frames: frameSets.frames,
+      ...(frameSets.framesMobile ? { framesMobile: frameSets.framesMobile } : {}),
+      defaultFrame: product.defaultFrame ?? 0,
+    }),
+    [frameSets, product],
   );
 
   // Full-screen takeover: lock the document so the in-app browser can't

@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { loadDriftPlayer, preloadWhenIdle } from "../routeChunks";
 import { useAuth } from "../hooks/useAuth";
 import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "../rotation3d/driftUiTheme";
 import { CREATOR_HOME, CREATOR_START } from "./tourSession";
@@ -321,6 +323,8 @@ export function TourShell({ children }: { children: React.ReactNode }) {
   const isSuperAdmin = user?.role === "SUPERADMIN";
   const isCreator = user?.view === "TOUR";
   const here = encodeURIComponent(location.pathname + location.search);
+  // Every tour page leads into the player — fetch its code while the visitor browses.
+  useEffect(() => preloadWhenIdle(loadDriftPlayer), []);
   const out = async () => {
     await logout();
     // Signed out → the Drift Tour landing, not the sign-in screen.

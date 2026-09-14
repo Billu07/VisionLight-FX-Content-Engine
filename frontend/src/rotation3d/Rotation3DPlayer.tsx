@@ -4,7 +4,7 @@ import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
 import { isSpinPlayerSite, isDriftSite, getPlayerBranding } from "../lib/branding";
 import { initMetaPixel, track } from "./metaPixel";
-import { resolveDriftTarget, prefetchDriftTargets, getCachedDrift, cacheDrift, driftKey, flowDriftKey, targetKey } from "./driftNav";
+import { resolveDriftTarget, prefetchDriftTargets, getCachedDrift, cacheDrift, driftKey, flowDriftKey, targetKey, combinedFrameSets } from "./driftNav";
 
 /**
  * Public Rotation3D player (rotation3d.com/p/:id and /embed/:id). Fetches the
@@ -282,10 +282,10 @@ export default function Rotation3DPlayer() {
     const p = data;
     const m = p.manifest || {};
     const framesA: string[] = Array.isArray(m.frames) ? m.frames : [];
-    // 2-clip drift: clip A + clip B form one seamless circular timeline.
+    // 2-clip drift: clip A + clip B form one seamless circular timeline (full + mobile sets).
+    const sets = combinedFrameSets(p, drift);
     const secondM = drift ? p.secondManifest : null;
     const framesB: string[] = secondM && Array.isArray(secondM.frames) ? secondM.frames : [];
-    const combinedFrames = framesB.length ? [...framesA, ...framesB] : framesA;
     let captions = drift ? p.captions : undefined;
     if (captions && framesB.length) {
       captions = captions.map((c: any) =>
@@ -295,8 +295,11 @@ export default function Rotation3DPlayer() {
       );
     }
     const manifest = {
-      frameCount: combinedFrames.length || m.frameCount || 0,
-      frames: combinedFrames,
+      frameCount: sets.frames.length || m.frameCount || 0,
+      frames: sets.frames,
+      // Phones play the lighter 1080px set (SpinViewer picks it) — a full 2048px set per
+      // drift was far more than a phone can hold decoded, so drags stuttered.
+      ...(sets.framesMobile ? { framesMobile: sets.framesMobile } : {}),
       defaultFrame: p.defaultFrame ?? m.defaultFrame ?? 0,
     };
     return { p, manifest, captions };

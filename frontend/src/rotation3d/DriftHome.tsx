@@ -8,6 +8,7 @@ import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "./driftUiTheme";
 import { TOUR_STYLES } from "../tour/tourUi";
 import { TOUR_PAGE_STYLES } from "../tour/tourPageStyles";
 import { PathArtH } from "../tour/tourPageParts";
+import { combinedFrameSets } from "./driftNav";
 
 /**
  * drift.li — the home, in the client's words (TOUR_V2_PLAN.md §6). "You Control the
@@ -235,10 +236,11 @@ export default function DriftHome() {
 
   const heroManifest = useMemo(() => {
     if (!hero) return null;
-    const a: string[] = Array.isArray(hero.manifest?.frames) ? hero.manifest.frames : [];
-    const b: string[] = Array.isArray(hero.secondManifest?.frames) ? hero.secondManifest.frames : [];
-    const frames = b.length ? [...a, ...b] : a;
-    return frames.length ? { frameCount: frames.length, frames, defaultFrame: hero.defaultFrame ?? 0 } : null;
+    // Full + mobile sets (phones play the lighter one), clip B appended when present.
+    const { frames, framesMobile } = combinedFrameSets(hero);
+    return frames.length
+      ? { frameCount: frames.length, frames, ...(framesMobile ? { framesMobile } : {}), defaultFrame: hero.defaultFrame ?? 0 }
+      : null;
   }, [hero]);
 
   const signedIn = !!user || profileSelectionRequired;

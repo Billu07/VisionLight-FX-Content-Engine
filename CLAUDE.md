@@ -140,6 +140,21 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
   in-app SPA navigation.
 - `DriftLanding.tsx` — the drift.li landing (gallery / hero takeover `HeroLanding`).
 - Drifts connect via **CTA button links** to other drift URLs (same-origin → SPA swap).
+- **Performance rules (2026-09-14)** — keep these when touching the player or routes:
+  - Routes are lazy chunks (`App.tsx` via `lib/lazyRoute.ts`, which reloads once if a chunk vanished after
+    a deploy); shared loaders live in `routeChunks.ts` and `TourShell` preloads the player chunk on idle.
+    Vendor chunks (`vendor-react`, `vendor-supabase`) are set in `vite.config.ts`. Don't add static
+    imports of route pages elsewhere — it pulls them back into the entry.
+  - Phones play `manifest.framesMobile` (1080px). Build every player manifest with
+    `driftNav.combinedFrameSets()` so the mobile set is never dropped (it was: phones downloaded and
+    decoded 180 × 2048px frames per drift → stutter).
+  - `driftNav` warms neighbours politely: ~900ms after a drift shows, 3 low-priority requests, the
+    device's frame set, coarse-only on data-saver/2G; pages prefetch a drift link with
+    `prefetchDriftPath` (pathway Start Tour + strips). The drift→drift crossfade copies the canvas to a
+    second canvas — never `toDataURL()` (a main-thread PNG encode per swap).
+  - Tour thumbnails use the mobile frame. New R2 frame / cover / logo / thumbnail uploads send
+    `Cache-Control: public, max-age=31536000, immutable` (keys are random UUIDs) via the optional
+    `cacheControl` of `uploadManagedBuffer` — the studio's uploads are unchanged.
 
 ## Data model (drift) — high level
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -9,19 +9,7 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 
-// --- EXISTING IMPORTS ---
-import { MarketingSite } from "./pages/MarketingSite";
-import { Pricing } from "./pages/Pricing";
-import Dashboard from "./pages/Dashboard";
-import SuperAdminDashboard from "./pages/SuperAdminDashboard";
-import TenantDashboard from "./pages/TenantDashboard";
-import Projects from "./pages/Projects";
-import DemoDashboard from "./pages/DemoDashboard";
-import StudioChooser from "./pages/StudioChooser";
-import { SupportHandoff } from "./pages/SupportHandoff";
-import ResetPassword from "./pages/ResetPassword";
-import BillingReturn from "./pages/BillingReturn";
-import AuthHandoff from "./pages/AuthHandoff";
+// --- App shell (eager: needed before any route renders) ---
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { BrandProvider } from "./contexts/BrandContext";
 import { useAuth } from "./hooks/useAuth";
@@ -30,23 +18,8 @@ import { installAlertBridge } from "./lib/notifications";
 import { getCanonicalDomainRedirectUrl } from "./lib/domain-routing";
 import { DashboardEntryLoader } from "./components/DashboardEntryLoader";
 import { useAutoAppRefresh } from "./hooks/useAutoAppRefresh";
-
-// --- NEW IMPORTS (Add these) ---
-import { Terms } from "./pages/Terms";
-import { Privacy } from "./pages/Privacy";
-import Rotation3DDemo from "./rotation3d/Rotation3DDemo";
-import Rotation3DLanding from "./rotation3d/Rotation3DLanding";
-import DriftLanding from "./rotation3d/DriftLanding";
-import Rotation3DPlayer from "./rotation3d/Rotation3DPlayer";
-import BrandShowcasePage from "./rotation3d/BrandShowcasePage";
-import Rotation3DBrandDashboard from "./rotation3d/Rotation3DBrandDashboard";
-import DriftBrandDashboard from "./rotation3d/DriftBrandDashboard";
-import TourAuth from "./tour/TourAuth";
-import AuthCallback from "./tour/AuthCallback";
-import { TourIndex, TourEditRedirect } from "./tour/TourIndex";
-import TourPage from "./tour/TourPage";
-import TourPathway from "./tour/TourPathway";
-import TourInviteAccept from "./tour/TourInviteAccept";
+import { lazyRoute } from "./lib/lazyRoute";
+import { loadDriftPlayer, loadTourPage, loadTourPathway } from "./routeChunks";
 import {
   isRotation3dSite,
   isDriftHost,
@@ -56,6 +29,52 @@ import {
   setResolvedDriftHost,
 } from "./lib/branding";
 import { apiEndpoints } from "./lib/api";
+
+// --- Routes: each is its own chunk, so a drift.li visitor never downloads the studio
+// (and a studio user never downloads the tour player) until they go there. ---
+const MarketingSite = lazyRoute(() => import("./pages/MarketingSite").then((m) => ({ default: m.MarketingSite })));
+const Pricing = lazyRoute(() => import("./pages/Pricing").then((m) => ({ default: m.Pricing })));
+const Dashboard = lazyRoute(() => import("./pages/Dashboard"));
+const SuperAdminDashboard = lazyRoute(() => import("./pages/SuperAdminDashboard"));
+const TenantDashboard = lazyRoute(() => import("./pages/TenantDashboard"));
+const Projects = lazyRoute(() => import("./pages/Projects"));
+const DemoDashboard = lazyRoute(() => import("./pages/DemoDashboard"));
+const StudioChooser = lazyRoute(() => import("./pages/StudioChooser"));
+const SupportHandoff = lazyRoute(() => import("./pages/SupportHandoff").then((m) => ({ default: m.SupportHandoff })));
+const ResetPassword = lazyRoute(() => import("./pages/ResetPassword"));
+const BillingReturn = lazyRoute(() => import("./pages/BillingReturn"));
+const AuthHandoff = lazyRoute(() => import("./pages/AuthHandoff"));
+const Terms = lazyRoute(() => import("./pages/Terms").then((m) => ({ default: m.Terms })));
+const Privacy = lazyRoute(() => import("./pages/Privacy").then((m) => ({ default: m.Privacy })));
+const Rotation3DDemo = lazyRoute(() => import("./rotation3d/Rotation3DDemo"));
+const Rotation3DLanding = lazyRoute(() => import("./rotation3d/Rotation3DLanding"));
+const DriftLanding = lazyRoute(() => import("./rotation3d/DriftLanding"));
+const Rotation3DPlayer = lazyRoute(loadDriftPlayer);
+const BrandShowcasePage = lazyRoute(() => import("./rotation3d/BrandShowcasePage"));
+const Rotation3DBrandDashboard = lazyRoute(() => import("./rotation3d/Rotation3DBrandDashboard"));
+const DriftBrandDashboard = lazyRoute(() => import("./rotation3d/DriftBrandDashboard"));
+const TourAuth = lazyRoute(() => import("./tour/TourAuth"));
+const AuthCallback = lazyRoute(() => import("./tour/AuthCallback"));
+const TourIndex = lazyRoute(() => import("./tour/TourIndex").then((m) => ({ default: m.TourIndex })));
+const TourEditRedirect = lazyRoute(() => import("./tour/TourIndex").then((m) => ({ default: m.TourEditRedirect })));
+const TourPage = lazyRoute(loadTourPage);
+const TourPathway = lazyRoute(loadTourPathway);
+const TourInviteAccept = lazyRoute(() => import("./tour/TourInviteAccept"));
+
+// Shown only while a route's code loads on a first visit — in-app navigations keep the
+// current screen up meanwhile (router transitions). Blank for a beat, then a spinner.
+const RouteFallback = () => {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setShow(true), 350);
+    return () => window.clearTimeout(t);
+  }, []);
+  return (
+    <div className="flex min-h-screen items-center justify-center" aria-busy="true">
+      {show && <LoadingSpinner size="lg" variant="neon" />}
+    </div>
+  );
+};
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -355,6 +374,8 @@ function App() {
         />
         <AppBootGate>
         <Router>
+          <ErrorBoundary>
+          <Suspense fallback={<RouteFallback />}>
           <Routes>
             {/* Public Routes. On the Rotation3D host, "/" is the Rotation3D
                 landing; every other domain keeps the studio marketing site.
@@ -434,6 +455,8 @@ function App() {
             <Route path="/:brandSlug" element={<BrandShowcasePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
+          </ErrorBoundary>
         </Router>
         </AppBootGate>
       </BrandProvider>

@@ -12,7 +12,7 @@ import {
   type AuthenticatedRequest,
 } from "../middleware/auth";
 import { AuthService } from "../services/auth";
-import { uploadManagedBuffer } from "../utils/managedStorage";
+import { IMMUTABLE_CACHE_CONTROL, uploadManagedBuffer } from "../utils/managedStorage";
 import { buildSpinFromVideo } from "../services/rotation3d/pipeline";
 import { enqueueProcessing, processingQueueDepth } from "../services/rotation3d/processingQueue";
 import { buildShareCard } from "../services/rotation3d/shareCard";
@@ -996,8 +996,11 @@ const flowNavPayload = (p: any) => {
   const stops = allSteps
     .filter((s: any) => s.product && viewable(s.product.status))
     .map((s: any) => {
-      const frames = s.product.spin?.manifest?.frames;
-      const list: string[] = Array.isArray(frames) ? frames : [];
+      const man = s.product.spin?.manifest;
+      const full: string[] = Array.isArray(man?.frames) ? man.frames : [];
+      // Stop thumbnails use the lighter mobile frame when there is one.
+      const list: string[] =
+        Array.isArray(man?.framesMobile) && man.framesMobile.length === full.length ? man.framesMobile : full;
       const slug = slugs.get(s.id) || null;
       return {
         id: s.id,
@@ -1315,6 +1318,7 @@ router.post(
         contentType: "image/png",
         keyPrefix: `${NS}/org_${product.organizationId}/thumb`,
         fallbackExtension: "png",
+        cacheControl: IMMUTABLE_CACHE_CONTROL,
       });
       const updated = await prisma.driftProduct.update({
         where: { id: product.id },

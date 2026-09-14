@@ -197,7 +197,8 @@ STRICT RULES:
 export const uploadFileToR2 = async (
   buffer: Buffer,
   fileKey: string,
-  contentType: string
+  contentType: string,
+  cacheControl?: string
 ): Promise<string> => {
   try {
     const bucketName = process.env.R2_BUCKET_NAME || "";
@@ -208,6 +209,7 @@ export const uploadFileToR2 = async (
       Key: fileKey,
       Body: buffer,
       ContentType: contentType,
+      ...(cacheControl ? { CacheControl: cacheControl } : {}),
     });
 
     await r2Client.send(command);
