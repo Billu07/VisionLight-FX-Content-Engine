@@ -240,7 +240,10 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   tour — never label the visual as draggable; no demo set → empty panels); headline on two lines on desktop; four product cards). The
   client's copy and CTAs stay exactly as written (Tour: Try it Free + Learn More; the rest: Join Wait List →
   `DriftWaitlist`) — restyle freely, don't reword. It no longer loads the player. Brand custom
-  domains keep the full-screen `HeroLanding` (SpinViewer loaded lazily there).
+  domains keep the full-screen `HeroLanding` (SpinViewer loaded lazily there). The **/tour landing**
+  (`tour/TourLanding.tsx`, 2026-09-15) shares the look: its route animation (`PathArtH`) rides the same
+  `rotation3d/PerspectiveGrid` floor under a horizon glow, spaced kickers, pill CTAs, glass sections in dark
+  (flat in light) — copy verbatim. The shared TourShell header/background is not restyled yet.
 
 ## Transactional email — DONE (2026-09-06)
 

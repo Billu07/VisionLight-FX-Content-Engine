@@ -323,5 +323,9 @@ Drift.li is a division of PicDrift
 - 2026-09-14 — Home live view shows the demo tour instead of the landing drift (stops in perspective, the
   centre stepping through the first three stops, tour + stop name chip, "Take a Tour" starts the tour
   with drift #1 + player prefetched on intent — renamed from "Drag to explore", misleading on a visual you
-  can't drag); headline on exactly two lines on desktop. The home
+  can't drag); headline on exactly two lines on desktop.
+- 2026-09-15 — /tour landing restyled to match the home: the route animation now rides the home's perspective
+  grid (shared `rotation3d/PerspectiveGrid`) under a horizon glow; spaced kickers with a dot, pill CTAs (arrow on
+  Try it Free), the capture steps as glowing nodes on a horizon line, glass cards / price / Pro / closing in
+  dark (flat in light). Copy and CTAs unchanged. TourShell header/background left for a later pass. The home
   no longer downloads the player.

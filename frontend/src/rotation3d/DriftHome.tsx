@@ -7,6 +7,7 @@ import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "./driftUiTheme";
 import { TOUR_STYLES } from "../tour/tourUi";
 import { prefetchDriftPath } from "./driftNav";
 import { loadDriftPlayer } from "../routeChunks";
+import PerspectiveGrid from "./PerspectiveGrid";
 
 /**
  * drift.li — the home, in the client's words (TOUR_V2_PLAN.md §6). "You Control the
@@ -253,10 +254,6 @@ const useReducedMotion = () => {
   return reduce;
 };
 
-// A perspective floor under the frame: rungs get closer toward the horizon.
-const GRID_ROWS = [16, 42, 78, 128, 196];
-const GRID_COLS = Array.from({ length: 17 }, (_, i) => -400 + i * 100);
-
 // The centre panel steps through the tour's first few stops (images the side panels
 // already load, so the cycle costs no extra downloads).
 const CYCLE_STOPS = 3;
@@ -310,14 +307,7 @@ function LiveView({ tour }: { tour: any }) {
     <div className="dh-visual">
       <div className="dh-horizon" aria-hidden />
       <div className="dh-grid" aria-hidden>
-        <svg viewBox="0 0 800 200" preserveAspectRatio="none">
-          {GRID_ROWS.map((y) => (
-            <line key={`r${y}`} x1="0" y1={y} x2="800" y2={y} />
-          ))}
-          {GRID_COLS.map((x) => (
-            <line key={`c${x}`} x1="400" y1="-170" x2={x} y2="200" />
-          ))}
-        </svg>
+        <PerspectiveGrid />
       </div>
 
       <figure className="dh-frame" aria-label={tour ? String(tour.title || tour.name || "") : undefined}>
