@@ -3,6 +3,7 @@ import { apiEndpoints } from "../lib/api";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import BrandProductEditModal from "./BrandProductEditModal";
 import Rotation3DBrandDashboard from "./Rotation3DBrandDashboard";
+import { DriftThemeStyles, useDriftTheme } from "./driftUiTheme";
 
 /**
  * Team (SuperAdmin) console for Rotation3D — lives inside SuperAdminDashboard as
@@ -28,22 +29,57 @@ type Product = {
 
 const PLAYER_ORIGIN = "https://rotation3d.com";
 
-const card = "rounded-xl border border-gray-700/60 bg-gray-900/60 p-5";
-const input =
-  "w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-brand-accent";
-const btn =
-  "rounded-lg border border-brand-accent/40 bg-brand-accent/15 px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-brand-accent transition-colors hover:bg-brand-accent/25 disabled:opacity-50";
-
-const statusColor = (s: string) =>
+const statusPill = (s: string) =>
   s === "PUBLISHED"
-    ? "text-emerald-300"
+    ? "ok"
     : s === "READY"
-      ? "text-cyan-300"
+      ? "accent"
       : s === "PROCESSING"
-        ? "text-amber-300"
+        ? "warn"
         : s === "FAILED"
-          ? "text-rose-300"
-          : "text-gray-400";
+          ? "err"
+          : "";
+
+// Scoped extras on top of the shared .d-* design system (driftUiTheme).
+const R3_STYLES = `
+.r3-form{display:grid;gap:8px;margin-top:14px}
+.r3-block{width:100%}
+.r3-center{display:grid;place-items:center;padding:24px 8px}
+.r3-small{font-size:11.5px}
+.r3-grid{display:grid;gap:10px;margin-top:14px;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr))}
+.d-tile.r3-featured{border-color:var(--accent-border);background:var(--accent-soft)}
+.r3-two{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.r3-cred{display:grid;gap:6px;margin-top:12px;padding:12px 14px;border-radius:var(--radius-sm);border:1px solid var(--ok-border);background:var(--ok-soft);font-size:12.5px;color:var(--text)}
+.r3-cred b{color:var(--ok)}
+.r3-cred p{margin:0}
+.r3-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;overflow-wrap:anywhere}
+.r3-warn{color:var(--warn);font-size:11.5px}
+.r3-brands{margin-top:10px}
+.r3-brand{display:flex;align-items:center;gap:4px;min-width:0;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);transition:border-color .16s,background .16s}
+.r3-brand:hover{border-color:var(--border-strong);background:var(--surface-3)}
+.r3-brand.active{border-color:var(--accent-border);background:var(--accent-soft)}
+.r3-brand-main{appearance:none;flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 4px 10px 12px;background:transparent;border:0;color:var(--text);cursor:pointer;font-family:inherit;text-align:left}
+.r3-box{padding:14px 16px;margin-top:14px}
+.r3-box .d-note{margin:2px 0 0}
+.r3-slug{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px}
+.r3-slug .d-input{width:180px;padding:7px 10px;font-size:13px}
+.r3-src{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.r3-src a{display:block;width:64px;height:64px;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:var(--surface-3);transition:transform .16s}
+.r3-src a:hover{transform:scale(1.04)}
+.r3-src img{width:100%;height:100%;object-fit:cover;display:block}
+.r3-upload{display:grid;gap:10px;margin-top:10px}
+@media(min-width:640px){.r3-upload{grid-template-columns:minmax(0,1fr) minmax(0,auto);align-items:center}}
+.r3-inline{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.r3-progress{display:grid;gap:6px;margin-top:12px}
+.r3-filters{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.r3-filters .d-input{flex:1 1 180px;width:auto}
+.r3-switch{appearance:none;position:relative;flex:none;width:44px;height:26px;border-radius:999px;border:1px solid var(--border-strong);background:var(--surface-3);cursor:pointer;transition:background .16s,border-color .16s}
+.r3-switch::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .18s}
+.r3-switch[aria-pressed="true"]{background:var(--accent);border-color:transparent}
+.r3-switch[aria-pressed="true"]::after{transform:translateX(18px)}
+.r3-switch:disabled{opacity:.5;cursor:not-allowed}
+@media(prefers-reduced-motion:reduce){.r3-switch::after,.r3-src a{transition:none}}
+`;
 
 function ShowcasePanel() {
   const [products, setProducts] = useState<any[]>([]);
@@ -86,74 +122,57 @@ function ShowcasePanel() {
   const showcaseCount = products.filter((p) => p.featured).length;
 
   return (
-    <div className={card}>
-      <div className="flex items-center justify-between">
+    <div className="d-card d-card-pad">
+      <div className="d-head">
         <div>
-          <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Homepage showcase</h2>
-          <p className="mt-1 text-xs text-gray-400">
+          <div className="d-h2">Homepage showcase</div>
+          <p className="d-sub">
             Pick the homepage spins — {heroCount} hero, {showcaseCount} in showcase.
           </p>
         </div>
-        <button className="text-xs text-gray-400 hover:text-white" onClick={load}>
-          ↻ refresh
+        <button type="button" className="d-btn ghost sm" onClick={load}>
+          ↻ Refresh
         </button>
       </div>
 
       {loading ? (
-        <div className="py-10 text-center">
+        <div className="r3-center">
           <LoadingSpinner size="sm" />
         </div>
       ) : products.length === 0 ? (
-        <p className="py-10 text-center text-xs text-gray-500">
+        <div className="d-empty" style={{ marginTop: 14 }}>
           No ready products yet. Featured picks come from READY/PUBLISHED spins.
-        </p>
+        </div>
       ) : (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="r3-grid">
           {products.map((p) => (
-            <div
-              key={p.id}
-              className={`rounded-xl border p-3 transition-colors ${
-                p.featured
-                  ? "border-brand-accent/50 bg-brand-accent/[0.06]"
-                  : "border-gray-700/60 bg-gray-950/50"
-              }`}
-            >
-              <div className="flex gap-3">
-                <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/10 bg-gray-900">
-                  {p.thumb ? (
-                    <img src={p.thumb} alt="" className="h-full w-full object-contain" />
-                  ) : (
-                    <span className="text-[9px] text-gray-600">no preview</span>
-                  )}
+            <div key={p.id} className={`d-tile ${p.heroFeatured ? "is-hero" : p.featured ? "r3-featured" : ""}`}>
+              <div className="d-tile-top">
+                <div className="d-thumb lg">
+                  {p.thumb ? <img src={p.thumb} alt="" /> : <span>no preview</span>}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-white">{p.name}</p>
-                  <p className="truncate text-[11px] text-gray-500">{p.brandName}</p>
-                  <p className="text-[11px]">
-                    <span className={statusColor(p.status)}>{p.status}</span>
-                  </p>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div className="d-name">{p.name}</div>
+                  <div className="d-meta">
+                    {p.brandName && <span>{p.brandName}</span>}
+                    <span className={`d-pill ${statusPill(p.status)}`}>{p.status}</span>
+                  </div>
                 </div>
               </div>
-              <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="r3-two">
                 <button
+                  type="button"
                   onClick={() => toggle(p, "heroFeatured")}
                   disabled={busyId === p.id}
-                  className={`rounded-lg py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${
-                    p.heroFeatured
-                      ? "border border-amber-400/40 bg-amber-400/15 text-amber-200"
-                      : "border border-gray-700 text-gray-300 hover:bg-gray-800"
-                  }`}
+                  className={`d-btn sm ${p.heroFeatured ? "warn" : ""}`}
                 >
                   {p.heroFeatured ? "★ Hero" : "Hero"}
                 </button>
                 <button
+                  type="button"
                   onClick={() => toggle(p, "featured")}
                   disabled={busyId === p.id}
-                  className={`rounded-lg py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors disabled:opacity-50 ${
-                    p.featured
-                      ? "border border-brand-accent/40 bg-brand-accent/15 text-brand-accent"
-                      : "border border-gray-700 text-gray-300 hover:bg-gray-800"
-                  }`}
+                  className={`d-btn sm ${p.featured ? "soft" : ""}`}
                 >
                   {p.featured ? "✓ Showcase" : "Showcase"}
                 </button>
@@ -192,15 +211,15 @@ function LabPanel() {
   };
 
   return (
-    <div className={card}>
-      <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Lab — experimental</h2>
-      <p className="mt-1 text-xs text-gray-400">
+    <div className="d-card d-card-pad">
+      <div className="d-h2">Lab — experimental</div>
+      <p className="d-sub">
         Experimental player features, off by default. Changes apply to all published players.
       </p>
-      <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-gray-700/60 bg-gray-950/50 p-4">
-        <div>
-          <p className="text-sm font-medium text-white">Player view selector (stills)</p>
-          <p className="mt-1 text-[11px] text-gray-500">
+      <div className="d-row" style={{ marginTop: 14 }}>
+        <div className="d-row-main">
+          <div className="d-name">Player view selector (stills)</div>
+          <p className="d-note" style={{ marginTop: 4 }}>
             Thumbnail boxes under the product — interactive 360° + 4 stills from different angles.
           </p>
         </div>
@@ -209,22 +228,17 @@ function LabPanel() {
           onClick={toggle}
           disabled={stills === null || saving}
           aria-pressed={!!stills}
-          className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
-            stills ? "bg-brand-accent" : "bg-gray-700"
-          }`}
-        >
-          <span
-            className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${
-              stills ? "left-6" : "left-1"
-            }`}
-          />
-        </button>
+          aria-label="Player view selector (stills)"
+          className="r3-switch"
+        />
       </div>
     </div>
   );
 }
 
 export default function Rotation3DAdminPanel() {
+  // The theme toggle lives in the superadmin panel's top bar (shared theme state).
+  const [theme] = useDriftTheme();
   const [mode, setMode] = useState<"brands" | "showcase" | "lab">("brands");
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loadingBrands, setLoadingBrands] = useState(true);
@@ -478,450 +492,439 @@ export default function Rotation3DAdminPanel() {
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+    <div className="drift-ui d-embed d-rise" data-theme={theme}>
+      <DriftThemeStyles />
+      <style>{R3_STYLES}</style>
+
+      <div className="d-head" style={{ marginBottom: 16 }}>
+        <div className="d-tabs" role="tablist" aria-label="Rotation3D console">
+          {(["brands", "showcase", "lab"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="tab"
+              aria-selected={mode === m}
+              onClick={() => setMode(m)}
+              className={`d-tab ${mode === m ? "active" : ""}`}
+            >
+              {m === "brands" ? "Brands" : m === "showcase" ? "Homepage showcase" : "Lab"}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {msg && (
-        <div
-          className={`flex items-center justify-between rounded-xl border p-4 text-sm font-semibold ${
-            msg.kind === "ok"
-              ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
-              : "border-rose-400/20 bg-rose-500/10 text-rose-200"
-          }`}
-        >
-          {msg.text}
-          <button onClick={() => setMsg(null)} className="text-lg">
+        <div className={`d-banner ${msg.kind === "ok" ? "ok" : "err"}`} style={{ marginBottom: 16 }}>
+          <span>{msg.text}</span>
+          <button type="button" className="d-x" onClick={() => setMsg(null)} aria-label="Dismiss">
             ×
           </button>
         </div>
       )}
-
-      <div className="flex gap-2">
-        {(["brands", "showcase", "lab"] as const).map((m) => (
-          <button
-            key={m}
-            onClick={() => setMode(m)}
-            className={`rounded-lg px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] transition-colors ${
-              mode === m ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"
-            }`}
-          >
-            {m === "brands" ? "Brands" : m === "showcase" ? "Homepage showcase" : "Lab"}
-          </button>
-        ))}
-      </div>
 
       {mode === "lab" ? (
         <LabPanel />
       ) : mode === "showcase" ? (
         <ShowcasePanel />
       ) : (
-      <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-        {/* Brands column */}
-        <div className={card}>
-          <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">Brands</h2>
-          <p className="mt-1 text-xs text-gray-400">Each brand is a managed Rotation3D org.</p>
+        <div className={`d-split ${selected ? "has-detail" : ""}`}>
+          {/* Brands column */}
+          <div className="d-split-side d-card d-card-pad">
+            <div className="d-h2">Brands</div>
+            <p className="d-sub">Each brand is a managed Rotation3D org.</p>
 
-          <div className="mt-4 space-y-2">
-            <input
-              className={input}
-              placeholder="New brand name"
-              value={newBrand}
-              onChange={(e) => setNewBrand(e.target.value)}
-            />
-            <input
-              className={input}
-              placeholder="Brand admin email (optional — creates a login)"
-              value={newBrandEmail}
-              onChange={(e) => setNewBrandEmail(e.target.value)}
-            />
-            <input
-              className={input}
-              placeholder="Admin name (optional)"
-              value={newBrandAdminName}
-              onChange={(e) => setNewBrandAdminName(e.target.value)}
-            />
-            <button
-              className={`${btn} w-full`}
-              onClick={createBrand}
-              disabled={creatingBrand || !newBrand.trim()}
-            >
-              {creatingBrand ? "Creating…" : "Create brand"}
-            </button>
-          </div>
-
-          {credential && (
-            <div className="mt-3 rounded-lg border border-emerald-400/30 bg-emerald-500/10 p-3 text-xs">
-              <div className="flex items-center justify-between">
-                <p className="font-bold text-emerald-200">Brand admin login</p>
-                <button className="text-gray-400 hover:text-white" onClick={() => setCredential(null)}>
-                  ×
-                </button>
-              </div>
-              {credential.reused ? (
-                <p className="mt-1 text-gray-300">
-                  <span className="font-mono">{credential.email}</span> already has an account — they
-                  log in with their existing password.
-                </p>
-              ) : (
-                <>
-                  <div className="mt-2 space-y-1 text-gray-200">
-                    <p>
-                      Email: <span className="font-mono text-white">{credential.email}</span>
-                    </p>
-                    <p>
-                      Password: <span className="font-mono text-white">{credential.tempPassword}</span>
-                    </p>
-                  </div>
-                  <p className="mt-2 text-[11px] text-amber-300">
-                    Shown once — copy and forward to the brand now.
-                  </p>
-                  <button
-                    className="mt-2 text-[11px] text-emerald-300 underline"
-                    onClick={() =>
-                      navigator.clipboard.writeText(
-                        `Login: https://rotation3d.com\nEmail: ${credential.email}\nPassword: ${credential.tempPassword}`,
-                      )
-                    }
-                  >
-                    Copy credentials
-                  </button>
-                </>
-              )}
+            <div className="r3-form">
+              <input
+                className="d-input"
+                placeholder="New brand name"
+                value={newBrand}
+                onChange={(e) => setNewBrand(e.target.value)}
+              />
+              <input
+                className="d-input"
+                placeholder="Brand admin email (optional — creates a login)"
+                value={newBrandEmail}
+                onChange={(e) => setNewBrandEmail(e.target.value)}
+              />
+              <input
+                className="d-input"
+                placeholder="Admin name (optional)"
+                value={newBrandAdminName}
+                onChange={(e) => setNewBrandAdminName(e.target.value)}
+              />
+              <button
+                type="button"
+                className="d-btn primary r3-block"
+                onClick={createBrand}
+                disabled={creatingBrand || !newBrand.trim()}
+              >
+                {creatingBrand ? "Creating…" : "Create brand"}
+              </button>
             </div>
-          )}
 
-          {brands.length > 0 && (
-            <button
-              onClick={backfillSlugs}
-              disabled={backfilling}
-              className="mt-4 w-full rounded-lg border border-gray-700/60 px-3 py-2 text-[11px] font-semibold text-gray-300 hover:bg-gray-800/60 disabled:opacity-50"
-              title="Assign vanity links to brands that don't have one yet"
-            >
-              {backfilling ? "Generating…" : "Generate missing brand links"}
-            </button>
-          )}
-
-          {brands.length > 0 && (
-            <input
-              className={`${input} mt-4`}
-              placeholder="Search brands…"
-              value={brandQuery}
-              onChange={(e) => setBrandQuery(e.target.value)}
-            />
-          )}
-          <div className="mt-2 space-y-2">
-            {loadingBrands ? (
-              <div className="py-6 text-center">
-                <LoadingSpinner size="sm" />
-              </div>
-            ) : brands.length === 0 ? (
-              <p className="py-6 text-center text-xs text-gray-500">No brands yet.</p>
-            ) : visibleBrands.length === 0 ? (
-              <p className="py-6 text-center text-xs text-gray-500">No brands match “{brandQuery}”.</p>
-            ) : (
-              visibleBrands.map((b) => (
-                <div
-                  key={b.id}
-                  className={`flex items-center gap-1 rounded-lg border transition-colors ${
-                    selected?.id === b.id
-                      ? "border-brand-accent/50 bg-brand-accent/10"
-                      : "border-gray-700/60 bg-gray-950/50 hover:bg-gray-800/60"
-                  }`}
-                >
-                  <button
-                    onClick={() => loadProducts(b)}
-                    className="flex flex-1 items-center justify-between px-3 py-2.5 text-left"
-                  >
-                    <span className="text-sm font-medium text-white">{b.name}</span>
-                    <span className="text-[11px] text-gray-500">{b._count?.rot3dProducts ?? 0} products</span>
-                  </button>
-                  <button
-                    onClick={() => deleteBrand(b)}
-                    title="Delete brand"
-                    className="px-2.5 py-2.5 text-lg leading-none text-gray-600 hover:text-rose-400"
-                  >
+            {credential && (
+              <div className="r3-cred">
+                <div className="d-head">
+                  <b>Brand admin login</b>
+                  <button type="button" className="d-x" onClick={() => setCredential(null)} aria-label="Dismiss">
                     ×
                   </button>
                 </div>
-              ))
+                {credential.reused ? (
+                  <p>
+                    <span className="r3-mono">{credential.email}</span> already has an account — they
+                    log in with their existing password.
+                  </p>
+                ) : (
+                  <>
+                    <div>
+                      Email: <span className="r3-mono">{credential.email}</span>
+                    </div>
+                    <div>
+                      Password: <span className="r3-mono">{credential.tempPassword}</span>
+                    </div>
+                    <div className="r3-warn">Shown once — copy and forward to the brand now.</div>
+                    <div className="d-actions">
+                      <button
+                        type="button"
+                        className="d-btn sm"
+                        onClick={() =>
+                          navigator.clipboard.writeText(
+                            `Login: https://rotation3d.com\nEmail: ${credential.email}\nPassword: ${credential.tempPassword}`,
+                          )
+                        }
+                      >
+                        Copy credentials
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {brands.length > 0 && (
+              <button
+                type="button"
+                onClick={backfillSlugs}
+                disabled={backfilling}
+                className="d-btn sm r3-block"
+                style={{ marginTop: 12 }}
+                title="Assign vanity links to brands that don't have one yet"
+              >
+                {backfilling ? "Generating…" : "Generate missing brand links"}
+              </button>
+            )}
+
+            {brands.length > 0 && (
+              <input
+                className="d-input"
+                style={{ marginTop: 12 }}
+                placeholder="Search brands…"
+                value={brandQuery}
+                onChange={(e) => setBrandQuery(e.target.value)}
+              />
+            )}
+            <div className="d-list r3-brands">
+              {loadingBrands ? (
+                <div className="r3-center">
+                  <LoadingSpinner size="sm" />
+                </div>
+              ) : brands.length === 0 ? (
+                <div className="r3-center d-faint r3-small">No brands yet.</div>
+              ) : visibleBrands.length === 0 ? (
+                <div className="r3-center d-faint r3-small">No brands match “{brandQuery}”.</div>
+              ) : (
+                visibleBrands.map((b) => (
+                  <div key={b.id} className={`r3-brand ${selected?.id === b.id ? "active" : ""}`}>
+                    <button type="button" onClick={() => loadProducts(b)} className="r3-brand-main">
+                      <span className="d-name">{b.name}</span>
+                      <span className="d-faint r3-small">{b._count?.rot3dProducts ?? 0} products</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteBrand(b)}
+                      title="Delete brand"
+                      aria-label={`Delete ${b.name}`}
+                      className="d-x"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Products / upload column */}
+          <div className="d-card d-card-pad">
+            {!selected ? (
+              <div className="d-empty">Select a brand to manage its products.</div>
+            ) : (
+              <>
+                <button type="button" className="d-btn ghost sm d-mobile-back" onClick={() => setSelected(null)}>
+                  ← All brands
+                </button>
+                <div className="d-head">
+                  <div style={{ minWidth: 0 }}>
+                    <div className="d-eyebrow">Brand</div>
+                    <div className="d-h1">{selected.name}</div>
+                  </div>
+                  <div className="d-actions">
+                    <div className="d-tabs" role="tablist" aria-label="Brand view">
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={!brandView}
+                        onClick={() => setBrandView(false)}
+                        className={`d-tab ${!brandView ? "active" : ""}`}
+                      >
+                        Team tools
+                      </button>
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={brandView}
+                        onClick={() => setBrandView(true)}
+                        className={`d-tab ${brandView ? "active" : ""}`}
+                      >
+                        Brand dashboard
+                      </button>
+                    </div>
+                    <button type="button" className="d-btn ghost sm" onClick={() => loadProducts(selected)}>
+                      ↻ Refresh
+                    </button>
+                  </div>
+                </div>
+
+                {brandView ? (
+                  // The brand's own (rotation3d.com) dashboard keeps its dark look.
+                  <div className="sa-legacy" style={{ marginTop: 16 }}>
+                    <Rotation3DBrandDashboard adminOrgId={selected.id} />
+                  </div>
+                ) : (
+                  <>
+                    {/* Brand vanity link (rotation3d.com/{slug}) */}
+                    <div className="d-hair r3-box">
+                      <div className="d-label">Brand link</div>
+                      <p className="d-note">Public showcase &amp; the base of every product URL.</p>
+                      <div className="r3-slug">
+                        <span className="d-code">rotation3d.com/</span>
+                        <input
+                          className="d-input"
+                          placeholder="brand-name"
+                          value={slugDraft}
+                          onChange={(e) => setSlugDraft(e.target.value)}
+                        />
+                        <button type="button" className="d-btn sm" onClick={saveBrandSlug} disabled={savingSlug}>
+                          {savingSlug ? "Saving…" : "Save"}
+                        </button>
+                        {brandSlug && (
+                          <a
+                            className="d-btn sm ghost"
+                            href={`https://rotation3d.com/${brandSlug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Open ↗
+                          </a>
+                        )}
+                        {slugMsg && <span className="d-faint r3-small">{slugMsg}</span>}
+                      </div>
+                    </div>
+
+                    {/* Images the brand sent in */}
+                    {sourceImages.length > 0 && (
+                      <div className="d-hair r3-box">
+                        <div className="d-head">
+                          <div className="d-label" style={{ margin: 0 }}>
+                            Images sent by the brand ({sourceImages.length})
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => downloadSourceZip(selected)}
+                            disabled={downloadingZip}
+                            className="d-btn sm soft"
+                          >
+                            {downloadingZip ? "Zipping…" : "⬇ Download all (ZIP)"}
+                          </button>
+                        </div>
+                        <p className="d-note">
+                          Raw product photos to build spins from. Click a thumb to open one, or grab
+                          them all as a ZIP.
+                        </p>
+                        <div className="r3-src">
+                          {sourceImages.map((img) => (
+                            <a key={img.id} href={img.url} target="_blank" rel="noopener noreferrer" title="Open / download">
+                              <img src={img.url} alt="" />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Upload rendered video */}
+                    <div className="d-hair r3-box">
+                      <div className="d-label">Upload rendered rotation video</div>
+                      <div className="r3-upload">
+                        <input
+                          className="d-input"
+                          placeholder="Product name (e.g. Air Max 90)"
+                          value={productName}
+                          onChange={(e) => setProductName(e.target.value)}
+                          disabled={busy}
+                        />
+                        <input
+                          ref={fileRef}
+                          type="file"
+                          accept="video/*"
+                          onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
+                          disabled={busy}
+                          className="d-file"
+                        />
+                      </div>
+                      <div className="d-actions" style={{ marginTop: 12 }}>
+                        <button
+                          type="button"
+                          className="d-btn primary"
+                          onClick={uploadVideo}
+                          disabled={busy || !videoFile || !productName.trim()}
+                        >
+                          {busy ? "Working…" : "Upload & build spin"}
+                        </button>
+                        <label className="r3-inline">
+                          Smoothness
+                          <select
+                            value={frames}
+                            onChange={(e) => setFrames(Number(e.target.value))}
+                            disabled={busy}
+                            className="d-select sm"
+                          >
+                            <option value={36}>36 frames · light</option>
+                            <option value={48}>48 frames</option>
+                            <option value={60}>60 frames · smooth</option>
+                            <option value={72}>72 frames</option>
+                            <option value={90}>90 frames · very smooth</option>
+                            <option value={120}>120 frames · ultra</option>
+                            <option value={180}>180 frames · max</option>
+                          </select>
+                        </label>
+                        <label className="r3-inline">
+                          Background
+                          <select
+                            value={bgMode}
+                            onChange={(e) => setBgMode(e.target.value)}
+                            disabled={busy}
+                            className="d-select sm"
+                          >
+                            <option value="keep">Keep bg (auto-match)</option>
+                            <option value="remove-white">Remove white bg · free</option>
+                            <option value="remove-black">Remove black bg · free</option>
+                            <option value="ai">AI cutout · paid</option>
+                          </select>
+                        </label>
+                      </div>
+                      {uploadPct !== null && (
+                        <div className="r3-progress">
+                          <div className="d-progress">
+                            <i style={{ width: `${processing ? 100 : uploadPct}%` }} />
+                          </div>
+                          <span className="d-faint r3-small">
+                            {processing ? "Extracting frames…" : `Uploading ${uploadPct}%`}
+                          </span>
+                        </div>
+                      )}
+                      <p className="d-note" style={{ marginTop: 10 }}>
+                        A short single-rotation clip works best. "Remove white/black" keys out a
+                        solid backdrop for <b>free</b> so the product floats; "AI cutout" is paid but
+                        handles any background; "Keep" leaves it opaque and the player background
+                        auto-matches the video's backdrop. More frames = smoother spin.
+                      </p>
+                    </div>
+
+                    {/* Products list */}
+                    {products.length > 0 && (
+                      <div className="r3-filters">
+                        <input
+                          className="d-input"
+                          placeholder="Search products…"
+                          value={productQuery}
+                          onChange={(e) => setProductQuery(e.target.value)}
+                        />
+                        <select
+                          value={productStatus}
+                          onChange={(e) => setProductStatus(e.target.value)}
+                          className="d-select sm"
+                        >
+                          {["ALL", "PUBLISHED", "READY", "PROCESSING", "FAILED"].map((s) => (
+                            <option key={s} value={s}>
+                              {s === "ALL" ? "All statuses" : s}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <div className="d-list" style={{ marginTop: 12 }}>
+                      {loadingProducts ? (
+                        <div className="r3-center">
+                          <LoadingSpinner size="sm" />
+                        </div>
+                      ) : products.length === 0 ? (
+                        <div className="d-empty">No products yet.</div>
+                      ) : visibleProducts.length === 0 ? (
+                        <div className="d-empty">No products match your filters.</div>
+                      ) : (
+                        visibleProducts.map((p) => (
+                          <div key={p.id} className="d-row">
+                            <div className="d-row-main">
+                              <div className="d-name">{p.name}</div>
+                              <div className="d-meta">
+                                <span className={`d-pill ${statusPill(p.status)}`}>{p.status}</span>
+                                {p.spin ? <span>{p.spin.frameCount} frames</span> : null}
+                              </div>
+                            </div>
+                            <div className="d-actions">
+                              <button type="button" onClick={() => setEditingProduct(p)} className="d-btn sm">
+                                Edit
+                              </button>
+                              {(p.status === "READY" || p.status === "PUBLISHED") && (
+                                <>
+                                  <button type="button" onClick={() => copyProductLink(p)} className="d-btn sm">
+                                    {copiedId === p.id ? "Copied!" : "Copy link"}
+                                  </button>
+                                  <a
+                                    href={
+                                      brandSlug && p.slug
+                                        ? `${PLAYER_ORIGIN}/${brandSlug}/${p.slug}`
+                                        : `${PLAYER_ORIGIN}/p/${p.id}`
+                                    }
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="d-btn sm ghost"
+                                  >
+                                    View player ↗
+                                  </a>
+                                </>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => deleteProduct(p)}
+                                title="Delete product"
+                                aria-label="Delete product"
+                                className="d-x"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </>
+                )}
+              </>
             )}
           </div>
         </div>
-
-        {/* Products / upload column */}
-        <div className={card}>
-          {!selected ? (
-            <div className="grid h-full place-items-center py-16 text-center text-sm text-gray-500">
-              Select a brand to manage its products.
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold uppercase tracking-[0.14em] text-white">
-                  {selected.name}
-                </h2>
-                <button className="text-xs text-gray-400 hover:text-white" onClick={() => loadProducts(selected)}>
-                  ↻ refresh
-                </button>
-              </div>
-
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={() => setBrandView(false)}
-                  className={`rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors ${!brandView ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"}`}
-                >
-                  Team tools
-                </button>
-                <button
-                  onClick={() => setBrandView(true)}
-                  className={`rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest transition-colors ${brandView ? "bg-white/10 text-white" : "border border-gray-700 text-gray-400 hover:text-white"}`}
-                >
-                  Brand dashboard
-                </button>
-              </div>
-
-              {brandView ? (
-                <div className="mt-4">
-                  <Rotation3DBrandDashboard adminOrgId={selected.id} />
-                </div>
-              ) : (
-              <>
-
-              {/* Brand vanity link (rotation3d.com/{slug}) */}
-              <div className="mt-4 rounded-lg border border-gray-700/60 bg-gray-950/50 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-300">Brand link</p>
-                <p className="mt-1 text-[11px] text-gray-500">
-                  Public showcase &amp; the base of every product URL.
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  <span className="font-mono text-xs text-gray-500">rotation3d.com/</span>
-                  <input
-                    className={`${input} w-44`}
-                    placeholder="brand-name"
-                    value={slugDraft}
-                    onChange={(e) => setSlugDraft(e.target.value)}
-                  />
-                  <button
-                    className="rounded-md border border-gray-700 px-2.5 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800 disabled:opacity-50"
-                    onClick={saveBrandSlug}
-                    disabled={savingSlug}
-                  >
-                    {savingSlug ? "Saving…" : "Save"}
-                  </button>
-                  {brandSlug && (
-                    <a
-                      className="rounded-md border border-gray-700 px-2.5 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
-                      href={`https://rotation3d.com/${brandSlug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Open ↗
-                    </a>
-                  )}
-                  {slugMsg && <span className="text-[11px] text-gray-400">{slugMsg}</span>}
-                </div>
-              </div>
-
-              {/* Images the brand sent in */}
-              {sourceImages.length > 0 && (
-                <div className="mt-4 rounded-lg border border-gray-700/60 bg-gray-950/50 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-300">
-                      Images sent by the brand ({sourceImages.length})
-                    </p>
-                    <button
-                      onClick={() => downloadSourceZip(selected)}
-                      disabled={downloadingZip}
-                      className="rounded-lg border border-brand-accent/40 bg-brand-accent/15 px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-brand-accent transition-colors hover:bg-brand-accent/25 disabled:opacity-50"
-                    >
-                      {downloadingZip ? "Zipping…" : "⬇ Download all (ZIP)"}
-                    </button>
-                  </div>
-                  <p className="mt-1 text-[11px] text-gray-500">
-                    Raw product photos to build spins from. Click a thumb to open one, or grab
-                    them all as a ZIP.
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {sourceImages.map((img) => (
-                      <a
-                        key={img.id}
-                        href={img.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Open / download"
-                        className="block h-16 w-16 overflow-hidden rounded-lg border border-white/10 bg-gray-900 transition-transform hover:scale-105"
-                      >
-                        <img src={img.url} alt="" className="h-full w-full object-cover" />
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Upload rendered video */}
-              <div className="mt-4 rounded-lg border border-gray-700/60 bg-gray-950/50 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-gray-300">
-                  Upload rendered rotation video
-                </p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
-                  <input
-                    className={input}
-                    placeholder="Product name (e.g. Air Max 90)"
-                    value={productName}
-                    onChange={(e) => setProductName(e.target.value)}
-                    disabled={busy}
-                  />
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="video/*"
-                    onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
-                    disabled={busy}
-                    className="text-xs text-gray-400 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-800 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white"
-                  />
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <button
-                    className={btn}
-                    onClick={uploadVideo}
-                    disabled={busy || !videoFile || !productName.trim()}
-                  >
-                    {busy ? "Working…" : "Upload & build spin"}
-                  </button>
-                  <label className="flex items-center gap-2 text-xs text-gray-400">
-                    Smoothness
-                    <select
-                      value={frames}
-                      onChange={(e) => setFrames(Number(e.target.value))}
-                      disabled={busy}
-                      className="rounded-lg border border-gray-700 bg-gray-950 px-2 py-1.5 text-xs text-white outline-none focus:border-brand-accent"
-                    >
-                      <option value={36}>36 frames · light</option>
-                      <option value={48}>48 frames</option>
-                      <option value={60}>60 frames · smooth</option>
-                      <option value={72}>72 frames</option>
-                      <option value={90}>90 frames · very smooth</option>
-                      <option value={120}>120 frames · ultra</option>
-                      <option value={180}>180 frames · max</option>
-                    </select>
-                  </label>
-                  <label className="flex items-center gap-2 text-xs text-gray-400">
-                    Background
-                    <select
-                      value={bgMode}
-                      onChange={(e) => setBgMode(e.target.value)}
-                      disabled={busy}
-                      className="rounded-lg border border-gray-700 bg-gray-950 px-2 py-1.5 text-xs text-white outline-none focus:border-brand-accent"
-                    >
-                      <option value="keep">Keep bg (auto-match)</option>
-                      <option value="remove-white">Remove white bg · free</option>
-                      <option value="remove-black">Remove black bg · free</option>
-                      <option value="ai">AI cutout · paid</option>
-                    </select>
-                  </label>
-                  {uploadPct !== null && (
-                    <span className="text-xs text-gray-400">
-                      {processing ? "Extracting frames…" : `Uploading ${uploadPct}%`}
-                    </span>
-                  )}
-                </div>
-                <p className="mt-2 text-[11px] text-gray-500">
-                  A short single-rotation clip works best. "Remove white/black" keys out a
-                  solid backdrop for <b>free</b> so the product floats; "AI cutout" is paid but
-                  handles any background; "Keep" leaves it opaque and the player background
-                  auto-matches the video's backdrop. More frames = smoother spin.
-                </p>
-              </div>
-
-              {/* Products list */}
-              {products.length > 0 && (
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <input
-                    className={`${input} flex-1 min-w-[140px]`}
-                    placeholder="Search products…"
-                    value={productQuery}
-                    onChange={(e) => setProductQuery(e.target.value)}
-                  />
-                  <select
-                    value={productStatus}
-                    onChange={(e) => setProductStatus(e.target.value)}
-                    className="rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-brand-accent"
-                  >
-                    {["ALL", "PUBLISHED", "READY", "PROCESSING", "FAILED"].map((s) => (
-                      <option key={s} value={s}>
-                        {s === "ALL" ? "All statuses" : s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div className="mt-3 space-y-2">
-                {loadingProducts ? (
-                  <div className="py-6 text-center">
-                    <LoadingSpinner size="sm" />
-                  </div>
-                ) : products.length === 0 ? (
-                  <p className="py-6 text-center text-xs text-gray-500">No products yet.</p>
-                ) : visibleProducts.length === 0 ? (
-                  <p className="py-6 text-center text-xs text-gray-500">No products match your filters.</p>
-                ) : (
-                  visibleProducts.map((p) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center justify-between rounded-lg border border-gray-700/60 bg-gray-950/50 px-4 py-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-white">{p.name}</p>
-                        <p className="text-[11px] text-gray-500">
-                          <span className={statusColor(p.status)}>{p.status}</span>
-                          {p.spin ? ` · ${p.spin.frameCount} frames` : ""}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <button
-                          onClick={() => setEditingProduct(p)}
-                          className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
-                        >
-                          Edit
-                        </button>
-                        {(p.status === "READY" || p.status === "PUBLISHED") && (
-                          <>
-                            <button
-                              onClick={() => copyProductLink(p)}
-                              className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
-                            >
-                              {copiedId === p.id ? "Copied!" : "Copy link"}
-                            </button>
-                            <a
-                              href={
-                                brandSlug && p.slug
-                                  ? `${PLAYER_ORIGIN}/${brandSlug}/${p.slug}`
-                                  : `${PLAYER_ORIGIN}/p/${p.id}`
-                              }
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="rounded-lg border border-gray-600 px-3 py-1.5 text-[11px] font-semibold text-gray-200 hover:bg-gray-800"
-                            >
-                              View player ↗
-                            </a>
-                          </>
-                        )}
-                        <button
-                          onClick={() => deleteProduct(p)}
-                          title="Delete product"
-                          className="px-1.5 text-lg leading-none text-gray-600 hover:text-rose-400"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-              </>
-              )}
-            </>
-          )}
-        </div>
-      </div>
       )}
 
       {editingProduct && selected && (

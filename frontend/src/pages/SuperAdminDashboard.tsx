@@ -70,11 +70,7 @@ function DemoPickTile({
     <button
       type="button"
       onClick={onClick}
-      className={`group relative aspect-square overflow-hidden rounded-lg border-2 transition-all ${
-        selected
-          ? "border-emerald-400 ring-2 ring-emerald-400/40"
-          : "border-white/10 hover:border-white/30"
-      }`}
+      className={`group sa-pick ${selected ? "on" : ""}`}
     >
       {thumb ? (
         <img
@@ -93,7 +89,7 @@ function DemoPickTile({
           }}
         />
       ) : (
-        <div className="flex h-full w-full items-center justify-center bg-gray-800 text-2xl text-gray-500">
+        <div className="sa-pick-ph">
           ▶
         </div>
       )}
@@ -1595,305 +1591,233 @@ export default function SuperAdminDashboard() {
 
         {/* TAB CONTENT: DEMO PREVIEW */}
         {activeTab === "demo" && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            <div className={adminUi.panel}>
-              <div
-                className={`${adminUi.panelHeader} flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}
-              >
-                <div>
-                  <h2 className={adminUi.sectionTitle}>Demo Preview Content</h2>
-                  <p className={adminUi.sectionCopy}>
-                    Choose which of your renders &amp; assets appear in the public
-                    read-only demo for each view. Visitors can only look.{" "}
-                    <a
-                      className="text-brand-accent hover:underline"
-                      href={`/demo?view=${demoView}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Open preview ↗
-                    </a>
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex rounded-lg border border-white/10 bg-white/5 p-1">
-                    {(["VISIONLIGHT", "PICDRIFT"] as DemoView[]).map((v) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => setDemoView(v)}
-                        className={`rounded-md px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
-                          demoView === v
-                            ? "bg-white text-gray-900"
-                            : "text-gray-300 hover:text-white"
-                        }`}
-                      >
-                        {v === "PICDRIFT" ? "PicDrift" : "Visionlight"}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void saveDemoConfig()}
-                    disabled={demoSaving || demoLoading}
-                    className={adminUi.primaryButton}
-                  >
-                    {demoSaving ? "Saving…" : "Save Selection"}
-                  </button>
-                </div>
+          <div className="sa-stack d-rise">
+            <div className="d-head">
+              <div>
+                <div className="d-eyebrow">Studio</div>
+                <h2 className="d-h1">Demo preview</h2>
+                <p className="d-sub">
+                  Choose which of your renders &amp; assets appear in the public read-only demo for
+                  each view. Visitors can only look.
+                </p>
               </div>
-
-              <div className="space-y-6 p-5 sm:p-6">
-                {demoLoading ? (
-                  <div className="flex justify-center py-16">
-                    <LoadingSpinner size="lg" variant="neon" />
-                  </div>
-                ) : (
-                  <>
-                    <div className="text-xs text-gray-400">
-                      Showing in{" "}
-                      <span className="font-bold text-white">
-                        {demoView === "PICDRIFT" ? "PicDrift" : "Visionlight"}
-                      </span>{" "}
-                      view:{" "}
-                      <span className="font-semibold text-emerald-300">
-                        {demoSelection[demoView].postIds.length}
-                      </span>{" "}
-                      renders,{" "}
-                      <span className="font-semibold text-emerald-300">
-                        {demoSelection[demoView].assetIds.length}
-                      </span>{" "}
-                      assets. Click any tile to add or remove it, then Save.
-                    </div>
-
-                    <div>
-                      <h3 className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-gray-300">
-                        Renders
-                      </h3>
-                      {demoPosts.length === 0 ? (
-                        <p className="text-xs text-gray-500">
-                          No completed renders on your account yet.
-                        </p>
-                      ) : (
-                        <>
-                          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-8">
-                            {demoPosts.slice(0, demoPostsVisible).map((p) => (
-                              <DemoPickTile
-                                key={p.id}
-                                url={p.mediaUrl}
-                                type={p.mediaType}
-                                poster={p.imageReference}
-                                selected={demoSelection[demoView].postIds.includes(p.id)}
-                                onClick={() => toggleDemoItem("post", p.id)}
-                              />
-                            ))}
-                          </div>
-                          {demoPosts.length > demoPostsVisible && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setDemoPostsVisible((n) => n + DEMO_PICKER_PAGE)
-                              }
-                              className={`${adminUi.softButton} mt-3`}
-                            >
-                              Load more ({demoPosts.length - demoPostsVisible} left)
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
-
-                    <div>
-                      <h3 className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-gray-300">
-                        Assets
-                      </h3>
-                      {demoAssets.length === 0 ? (
-                        <p className="text-xs text-gray-500">
-                          No assets on your account yet.
-                        </p>
-                      ) : (
-                        <>
-                          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-8">
-                            {demoAssets.slice(0, demoAssetsVisible).map((a) => (
-                              <DemoPickTile
-                                key={a.id}
-                                url={a.url}
-                                type={a.type}
-                                selected={demoSelection[demoView].assetIds.includes(a.id)}
-                                onClick={() => toggleDemoItem("asset", a.id)}
-                              />
-                            ))}
-                          </div>
-                          {demoAssets.length > demoAssetsVisible && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setDemoAssetsVisible((n) => n + DEMO_PICKER_PAGE)
-                              }
-                              className={`${adminUi.softButton} mt-3`}
-                            >
-                              Load more ({demoAssets.length - demoAssetsVisible} left)
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </>
-                )}
+              <div className="d-actions">
+                <div className="d-tabs" role="tablist" aria-label="Demo view">
+                  {(["VISIONLIGHT", "PICDRIFT"] as DemoView[]).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      role="tab"
+                      aria-selected={demoView === v}
+                      onClick={() => setDemoView(v)}
+                      className={`d-tab ${demoView === v ? "active" : ""}`}
+                    >
+                      {v === "PICDRIFT" ? "PicDrift" : "Visionlight"}
+                    </button>
+                  ))}
+                </div>
+                <a className="d-btn ghost" href={`/demo?view=${demoView}`} target="_blank" rel="noreferrer">
+                  Open preview ↗
+                </a>
+                <button
+                  type="button"
+                  onClick={() => void saveDemoConfig()}
+                  disabled={demoSaving || demoLoading}
+                  className="d-btn primary"
+                >
+                  {demoSaving ? "Saving…" : "Save selection"}
+                </button>
               </div>
             </div>
+
+            {demoLoading ? (
+              <div className="d-card sa-center">
+                <LoadingSpinner size="lg" variant="neon" />
+              </div>
+            ) : (
+              <>
+                <div className="d-banner">
+                  <span>
+                    Showing in <b>{demoView === "PICDRIFT" ? "PicDrift" : "Visionlight"}</b> view:{" "}
+                    <b className="sa-count">{demoSelection[demoView].postIds.length}</b> renders,{" "}
+                    <b className="sa-count">{demoSelection[demoView].assetIds.length}</b> assets. Click any
+                    tile to add or remove it, then Save.
+                  </span>
+                </div>
+
+                <section className="d-card d-card-pad">
+                  <h3 className="d-h2 sa-sec-title">Renders</h3>
+                  {demoPosts.length === 0 ? (
+                    <p className="d-note">No completed renders on your account yet.</p>
+                  ) : (
+                    <>
+                      <div className="sa-pick-grid">
+                        {demoPosts.slice(0, demoPostsVisible).map((p) => (
+                          <DemoPickTile
+                            key={p.id}
+                            url={p.mediaUrl}
+                            type={p.mediaType}
+                            poster={p.imageReference}
+                            selected={demoSelection[demoView].postIds.includes(p.id)}
+                            onClick={() => toggleDemoItem("post", p.id)}
+                          />
+                        ))}
+                      </div>
+                      {demoPosts.length > demoPostsVisible && (
+                        <button
+                          type="button"
+                          onClick={() => setDemoPostsVisible((n) => n + DEMO_PICKER_PAGE)}
+                          className="d-btn sm sa-more"
+                        >
+                          Load more ({demoPosts.length - demoPostsVisible} left)
+                        </button>
+                      )}
+                    </>
+                  )}
+                </section>
+
+                <section className="d-card d-card-pad">
+                  <h3 className="d-h2 sa-sec-title">Assets</h3>
+                  {demoAssets.length === 0 ? (
+                    <p className="d-note">No assets on your account yet.</p>
+                  ) : (
+                    <>
+                      <div className="sa-pick-grid">
+                        {demoAssets.slice(0, demoAssetsVisible).map((a) => (
+                          <DemoPickTile
+                            key={a.id}
+                            url={a.url}
+                            type={a.type}
+                            selected={demoSelection[demoView].assetIds.includes(a.id)}
+                            onClick={() => toggleDemoItem("asset", a.id)}
+                          />
+                        ))}
+                      </div>
+                      {demoAssets.length > demoAssetsVisible && (
+                        <button
+                          type="button"
+                          onClick={() => setDemoAssetsVisible((n) => n + DEMO_PICKER_PAGE)}
+                          className="d-btn sm sa-more"
+                        >
+                          Load more ({demoAssets.length - demoAssetsVisible} left)
+                        </button>
+                      )}
+                    </>
+                  )}
+                </section>
+              </>
+            )}
           </div>
         )}
 
         {/* TAB CONTENT: GLOBAL PRESETS */}
         {activeTab === "global-presets" && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="sa-stack d-rise">
+            <div className="d-head">
               <div>
-                <h2 className={adminUi.sectionTitle}>Global Prompt Presets</h2>
-                <p className={adminUi.sectionCopy}>These presets automatically appear in every user's PromptFX menu.</p>
+                <div className="d-eyebrow">Settings</div>
+                <h2 className="d-h1">Global prompt presets</h2>
+                <p className="d-sub">These presets automatically appear in every user's PromptFX menu.</p>
               </div>
               <button
+                type="button"
                 onClick={() => {
                   setEditingPreset(null);
                   setPresetForm({ name: "", prompt: "", isActive: true });
                   setShowPresetModal(true);
                 }}
-                className={adminUi.primaryButton}
+                className="d-btn primary"
               >
-                Add New Preset
+                Add new preset
               </button>
             </div>
 
-            <div className={`${adminUi.tablePanel} ${adminUi.tableScroll}`}>
-              <table className="w-full min-w-[640px] text-left">
-                <thead className={adminUi.tableHead}>
-                  <tr>
-                    <th className="p-6">Preset Name</th>
-                    <th className="p-6">Prompt Content</th>
-                    <th className="p-6 text-center">Status</th>
-                    <th className="p-6 text-right">Operations</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {presets.length === 0 ? (
-                    <tr><td colSpan={4} className="p-10 text-center text-gray-500 italic">No global presets created yet.</td></tr>
-                  ) : presets.map(p => (
-                    <tr key={p.id} className={adminUi.tableRow}>
-                      <td className="p-6">
-                        <div className="font-bold text-white">{p.name}</div>
-                      </td>
-                      <td className="p-6">
-                        <div className="text-xs text-gray-400 line-clamp-2 max-w-md">{p.prompt}</div>
-                      </td>
-                      <td className="p-6 text-center">
-                        <span
-                          className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${p.isActive
-                              ? "bg-green-500/10 text-green-400 border-green-500/20"
-                              : "bg-red-500/10 text-red-400 border-red-500/20"
-                            }`}
-                        >
+            {presets.length === 0 ? (
+              <div className="d-empty">No global presets created yet.</div>
+            ) : (
+              <div className="d-list">
+                {presets.map((p) => (
+                  <div key={p.id} className="d-row">
+                    <div className="d-row-main">
+                      <div className="sa-title-row">
+                        <span className="d-name">{p.name}</span>
+                        <span className={`d-pill ${p.isActive ? "ok" : "err"}`}>
                           {p.isActive ? "Active" : "Inactive"}
                         </span>
-                      </td>
-                      <td className="p-6 text-right">
-                        <div className="flex gap-2 justify-end">
-                          <button
-                            className={adminUi.softButton}
-                            onClick={() => openEditPreset(p)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className={adminUi.dangerButton}
-                            onClick={() => handleDeletePreset(p.id)}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
+                      </div>
+                      <p className="sa-clamp">{p.prompt}</p>
+                    </div>
+                    <div className="d-actions">
+                      <button type="button" className="d-btn sm" onClick={() => openEditPreset(p)}>
+                        Edit
+                      </button>
+                      <button type="button" className="d-btn sm danger" onClick={() => handleDeletePreset(p.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {/* TAB CONTENT: EDITOR PRESETS (PicFX + Convert) */}
         {activeTab === "editor-presets" && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="sa-stack d-rise">
+            <div className="d-head">
               <div>
-                <h2 className={adminUi.sectionTitle}>Editor Prompt Presets</h2>
-                <p className={adminUi.sectionCopy}>These presets appear only in the asset-library editor — the PicFX and Convert tabs. They are isolated from the global presets above.</p>
+                <div className="d-eyebrow">Settings</div>
+                <h2 className="d-h1">Editor prompt presets</h2>
+                <p className="d-sub">
+                  These presets appear only in the asset-library editor — the PicFX and Convert tabs.
+                  They are isolated from the global presets.
+                </p>
               </div>
               <button
+                type="button"
                 onClick={() => {
                   setEditingEditorPreset(null);
                   setEditorPresetForm({ name: "", prompt: "", isActive: true });
                   setShowEditorPresetModal(true);
                 }}
-                className={adminUi.primaryButton}
+                className="d-btn primary"
               >
-                Add New Preset
+                Add new preset
               </button>
             </div>
 
-            <div className={`${adminUi.tablePanel} ${adminUi.tableScroll}`}>
-              <table className="w-full min-w-[640px] text-left">
-                <thead className={adminUi.tableHead}>
-                  <tr>
-                    <th className="p-6">Preset Name</th>
-                    <th className="p-6">Prompt Content</th>
-                    <th className="p-6 text-center">Status</th>
-                    <th className="p-6 text-right">Operations</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {editorPresets.length === 0 ? (
-                    <tr><td colSpan={4} className="p-10 text-center text-gray-500 italic">No editor presets created yet.</td></tr>
-                  ) : editorPresets.map(p => (
-                    <tr key={p.id} className={adminUi.tableRow}>
-                      <td className="p-6">
-                        <div className="font-bold text-white">{p.name}</div>
-                      </td>
-                      <td className="p-6">
-                        <div className="text-xs text-gray-400 line-clamp-2 max-w-md">{p.prompt}</div>
-                      </td>
-                      <td className="p-6 text-center">
-                        <span
-                          className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${p.isActive
-                              ? "bg-green-500/10 text-green-400 border-green-500/20"
-                              : "bg-red-500/10 text-red-400 border-red-500/20"
-                            }`}
-                        >
+            {editorPresets.length === 0 ? (
+              <div className="d-empty">No editor presets created yet.</div>
+            ) : (
+              <div className="d-list">
+                {editorPresets.map((p) => (
+                  <div key={p.id} className="d-row">
+                    <div className="d-row-main">
+                      <div className="sa-title-row">
+                        <span className="d-name">{p.name}</span>
+                        <span className={`d-pill ${p.isActive ? "ok" : "err"}`}>
                           {p.isActive ? "Active" : "Inactive"}
                         </span>
-                      </td>
-                      <td className="p-6 text-right">
-                        <div className="flex gap-2 justify-end">
-                          <button
-                            className={adminUi.softButton}
-                            onClick={() => openEditEditorPreset(p)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className={adminUi.dangerButton}
-                            onClick={() => handleDeleteEditorPreset(p.id)}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
+                      </div>
+                      <p className="sa-clamp">{p.prompt}</p>
+                    </div>
+                    <div className="d-actions">
+                      <button type="button" className="d-btn sm" onClick={() => openEditEditorPreset(p)}>
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="d-btn sm danger"
+                        onClick={() => handleDeleteEditorPreset(p.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -2660,141 +2584,114 @@ export default function SuperAdminDashboard() {
 
         {/* TAB CONTENT: LAB */}
         {activeTab === "lab" && globalSettings && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            <div className="rounded-2xl border border-cyan-400/15 bg-gradient-to-r from-cyan-500/10 via-sky-500/5 to-transparent p-6 shadow-[0_18px_42px_rgba(2,8,23,0.24)] backdrop-blur-xl">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h3 className="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-cyan-200">
-                    Experimental Lab
-                  </h3>
-                  <p className="text-xs text-gray-300">
-                    Controlled feature switches and system media, organized for low-noise operations.
-                  </p>
-                </div>
-                <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-200">
-                  SuperAdmin
-                </span>
+          <div className="sa-stack d-rise">
+            <div className="d-head">
+              <div>
+                <div className="d-eyebrow">Settings</div>
+                <h2 className="d-h1">Experimental lab</h2>
+                <p className="d-sub">
+                  Controlled feature switches and system media, organized for low-noise operations.
+                </p>
               </div>
+              <span className="d-pill accent">SuperAdmin</span>
             </div>
 
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-              <div className="space-y-6 xl:col-span-7">
-                <div className={`${adminUi.panel} p-6`}>
-                  <h4 className={`${adminUi.sectionTitle} mb-4`}>Feature Controls</h4>
-                  <div className="space-y-3">
-                    <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4">
-                      <div className="mb-3 flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-white">Video Editor Rollout</p>
-                          <p className="mt-1 text-xs text-gray-500">
-                            Keep editor access restricted while testing, then expand globally.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const nextValue = !Boolean(globalSettings.featureVideoEditorForAll);
-                            try {
-                              const res = await apiEndpoints.superadminUpdateGlobalSettings({
-                                featureVideoEditorForAll: nextValue,
-                              });
-                              if (res.data?.success) {
-                                setGlobalSettings(res.data.settings);
-                                setMsg(
-                                  nextValue
-                                    ? "Video Editor rollout enabled for all users."
-                                    : "Video Editor restricted to SuperAdmin.",
-                                );
-                              }
-                            } catch (err: any) {
-                              setMsg("Error: " + err.message);
-                            }
-                          }}
-                          className={`rounded-lg border px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
-                            globalSettings.featureVideoEditorForAll
-                              ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
-                              : "border-white/10 bg-white/[0.055] text-gray-300 hover:bg-white/10"
-                          }`}
-                        >
-                          {globalSettings.featureVideoEditorForAll
-                            ? "Enabled For All"
-                            : "SuperAdmin Only"}
-                        </button>
+            <div className="sa-lab">
+              <div className="sa-stack">
+                <section className="d-card d-card-pad">
+                  <h3 className="d-h2 sa-sec-title">Feature controls</h3>
+                  <div className="d-list">
+                    <div className="d-row">
+                      <div className="d-row-main">
+                        <div className="d-name">Video Editor rollout</div>
+                        <p className="d-note sa-tight">
+                          Keep editor access restricted while testing, then expand globally.
+                        </p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const nextValue = !Boolean(globalSettings.featureVideoEditorForAll);
+                          try {
+                            const res = await apiEndpoints.superadminUpdateGlobalSettings({
+                              featureVideoEditorForAll: nextValue,
+                            });
+                            if (res.data?.success) {
+                              setGlobalSettings(res.data.settings);
+                              setMsg(
+                                nextValue
+                                  ? "Video Editor rollout enabled for all users."
+                                  : "Video Editor restricted to SuperAdmin.",
+                              );
+                            }
+                          } catch (err: any) {
+                            setMsg("Error: " + err.message);
+                          }
+                        }}
+                        className={`d-btn sm ${globalSettings.featureVideoEditorForAll ? "soft" : ""}`}
+                      >
+                        {globalSettings.featureVideoEditorForAll ? "Enabled for all" : "SuperAdmin only"}
+                      </button>
                     </div>
 
-                    <div className="rounded-xl border border-white/10 bg-white/[0.035] p-4">
-                      <div className="mb-3 flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-white">Carousel Rollout</p>
-                          <p className="mt-1 text-xs leading-relaxed text-gray-500">
-                            Enable Carousel for all users when needed, or keep it restricted to
-                            SuperAdmin-only lab access.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const enabled =
-                              Number(globalSettings.pricePicFX_Carousel || 0) > 0;
-                            const nextEnabled = !enabled;
-                            const nextCarouselPrice = nextEnabled
-                              ? Math.max(1, Number(globalSettings.pricePicFX_Carousel || 3))
-                              : 0;
-                            try {
-                              const res = await apiEndpoints.superadminUpdateGlobalSettings({
-                                pricePicFX_Carousel: nextCarouselPrice,
-                              });
-                              if (res.data?.success) {
-                                setGlobalSettings(res.data.settings);
-                                setMsg(
-                                  nextEnabled
-                                    ? "Carousel rollout enabled for all users."
-                                    : "Carousel restricted to SuperAdmin lab access.",
-                                );
-                              }
-                            } catch (err: any) {
-                              setMsg("Error: " + err.message);
-                            }
-                          }}
-                          className={`rounded-lg border px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
-                            Number(globalSettings.pricePicFX_Carousel || 0) > 0
-                              ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
-                              : "border-white/10 bg-white/[0.055] text-gray-300 hover:bg-white/10"
-                          }`}
-                        >
-                          {Number(globalSettings.pricePicFX_Carousel || 0) > 0
-                            ? "Enabled For All"
-                            : "SuperAdmin Only"}
-                        </button>
+                    <div className="d-row">
+                      <div className="d-row-main">
+                        <div className="d-name">Carousel rollout</div>
+                        <p className="d-note sa-tight">
+                          Enable Carousel for all users when needed, or keep it restricted to
+                          SuperAdmin-only lab access.
+                        </p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const enabled =
+                            Number(globalSettings.pricePicFX_Carousel || 0) > 0;
+                          const nextEnabled = !enabled;
+                          const nextCarouselPrice = nextEnabled
+                            ? Math.max(1, Number(globalSettings.pricePicFX_Carousel || 3))
+                            : 0;
+                          try {
+                            const res = await apiEndpoints.superadminUpdateGlobalSettings({
+                              pricePicFX_Carousel: nextCarouselPrice,
+                            });
+                            if (res.data?.success) {
+                              setGlobalSettings(res.data.settings);
+                              setMsg(
+                                nextEnabled
+                                  ? "Carousel rollout enabled for all users."
+                                  : "Carousel restricted to SuperAdmin lab access.",
+                              );
+                            }
+                          } catch (err: any) {
+                            setMsg("Error: " + err.message);
+                          }
+                        }}
+                        className={`d-btn sm ${Number(globalSettings.pricePicFX_Carousel || 0) > 0 ? "soft" : ""}`}
+                      >
+                        {Number(globalSettings.pricePicFX_Carousel || 0) > 0
+                          ? "Enabled for all"
+                          : "SuperAdmin only"}
+                      </button>
                     </div>
                   </div>
-                </div>
+                </section>
 
-                <div className={`${adminUi.panel} p-6`}>
-                  <div className="mb-4">
-                    <h4 className={`${adminUi.sectionTitle} mb-1`}>Default Welcome Video</h4>
-                    <p className="text-xs text-gray-500">
-                      This appears as a read-only system item in user timelines.
-                    </p>
-                  </div>
+                <section className="d-card d-card-pad">
+                  <h3 className="d-h2">Default welcome video</h3>
+                  <p className="d-note sa-tight">This appears as a read-only system item in user timelines.</p>
 
-                  <label className="group flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 transition-colors hover:bg-cyan-400/10">
+                  <label className="sa-upload">
                     <div>
-                      <p className="text-sm font-semibold text-cyan-200">
+                      <div className="d-name">
                         {welcomeVideoUploading ? "Uploading welcome video..." : "Replace welcome video"}
-                      </p>
-                      <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-cyan-300/80">
-                        Storage-managed upload
-                      </p>
+                      </div>
+                      <div className="d-faint sa-small">Storage-managed upload</div>
                     </div>
                     {welcomeVideoUploading ? (
                       <LoadingSpinner size="sm" variant="light" />
                     ) : (
-                      <span className="rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-200">
-                        Choose File
-                      </span>
+                      <span className="d-btn sm soft">Choose file</span>
                     )}
                     <input
                       type="file"
@@ -2828,75 +2725,61 @@ export default function SuperAdminDashboard() {
                     />
                   </label>
 
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <div className="d-actions sa-gap">
                     {globalSettings.welcomeVideoUrl ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            try {
-                              const res = await apiEndpoints.superadminUpdateGlobalSettings({
-                                welcomeVideoUrl: "",
-                              });
-                              if (res.data?.success) {
-                                setGlobalSettings(res.data.settings);
-                                setWelcomePreviewReady(false);
-                                setMsg("Welcome video cleared.");
-                              }
-                            } catch (err: any) {
-                              setMsg("Error: " + err.message);
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const res = await apiEndpoints.superadminUpdateGlobalSettings({
+                              welcomeVideoUrl: "",
+                            });
+                            if (res.data?.success) {
+                              setGlobalSettings(res.data.settings);
+                              setWelcomePreviewReady(false);
+                              setMsg("Welcome video cleared.");
                             }
-                          }}
-                          className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-red-300 transition-colors hover:bg-red-500/20"
-                        >
-                          Clear Video
-                        </button>
-                      </>
+                          } catch (err: any) {
+                            setMsg("Error: " + err.message);
+                          }
+                        }}
+                        className="d-btn sm danger"
+                      >
+                        Clear video
+                      </button>
                     ) : (
-                      <span className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500">
-                        No welcome video configured
-                      </span>
+                      <span className="d-pill">No welcome video configured</span>
                     )}
                   </div>
-                </div>
+                </section>
               </div>
 
-              <div className="xl:col-span-5">
-                <div className={`${adminUi.panel} h-full p-5`}>
-                  <div className="mb-3 flex items-center justify-between">
-                    <h4 className={`${adminUi.sectionTitle}`}>Preview Monitor</h4>
-                    <span className="text-[10px] uppercase tracking-[0.14em] text-gray-500">
-                      Auto preview
-                    </span>
+              <section className="d-card d-card-pad">
+                <div className="d-head">
+                  <h3 className="d-h2">Preview monitor</h3>
+                  <span className="d-eyebrow">Auto preview</span>
+                </div>
+                {!globalSettings.welcomeVideoUrl ? (
+                  <div className="sa-video sa-video-empty">Upload a video to enable preview.</div>
+                ) : (
+                  <div className="sa-video">
+                    {!welcomePreviewReady && (
+                      <div className="sa-video-wait">
+                        <LoadingSpinner size="sm" variant="light" />
+                        Loading preview
+                      </div>
+                    )}
+                    <video
+                      key={globalSettings.welcomeVideoUrl}
+                      src={globalSettings.welcomeVideoUrl}
+                      controls
+                      preload="metadata"
+                      onLoadedData={() => setWelcomePreviewReady(true)}
+                      onWaiting={() => setWelcomePreviewReady(false)}
+                    />
                   </div>
-
-                  {!globalSettings.welcomeVideoUrl ? (
-                    <div className="flex aspect-video items-center justify-center rounded-xl border border-white/10 bg-white/[0.025] text-xs text-gray-500">
-                      Upload a video to enable preview.
-                    </div>
-                  ) : (
-                    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-black/35">
-                      {!welcomePreviewReady && (
-                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-gray-950/70">
-                          <div className="flex items-center gap-2 text-xs text-cyan-200">
-                            <LoadingSpinner size="sm" variant="light" />
-                            Loading preview
-                          </div>
-                        </div>
-                      )}
-                      <video
-                        key={globalSettings.welcomeVideoUrl}
-                        src={globalSettings.welcomeVideoUrl}
-                        controls
-                        preload="metadata"
-                        onLoadedData={() => setWelcomePreviewReady(true)}
-                        onWaiting={() => setWelcomePreviewReady(false)}
-                        className="aspect-video w-full"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
+                )}
+              </section>
             </div>
           </div>
         )}
@@ -3711,22 +3594,25 @@ export default function SuperAdminDashboard() {
 
       {/* MODAL: GLOBAL PRESET */}
       {showPresetModal && (
-        <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg shadow-2xl max-h-[92vh] overflow-y-auto">
-            <div className="p-8 border-b border-gray-800 flex justify-between items-center">
+        <div className="sa-overlay">
+          <div className="sa-dialog" role="dialog" aria-modal="true" aria-labelledby="preset-dialog-title">
+            <div className="sa-dialog-head">
               <div>
-                <h3 className="text-xl font-bold text-white uppercase tracking-tight">
-                  {editingPreset ? "Edit Global Preset" : "New Global Preset"}
+                <h3 id="preset-dialog-title" className="d-h1">
+                  {editingPreset ? "Edit global preset" : "New global preset"}
                 </h3>
-                <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Appears for every user</p>
+                <p className="d-note sa-tight">Appears for every user</p>
               </div>
-              <button onClick={() => setShowPresetModal(false)} className="text-gray-500 hover:text-white font-bold text-xl">x</button>
+              <button type="button" onClick={() => setShowPresetModal(false)} className="d-x" aria-label="Close">
+                ×
+              </button>
             </div>
-            <form onSubmit={handleSavePreset} className="p-8 space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Preset Name</label>
+            <form onSubmit={handleSavePreset} className="sa-dialog-body">
+              <div className="d-field">
+                <label className="d-label" htmlFor="preset-name">Preset name</label>
                 <input
-                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                  id="preset-name"
+                  className="d-input"
                   placeholder="e.g. Cinematic 8K"
                   required
                   value={presetForm.name}
@@ -3734,10 +3620,11 @@ export default function SuperAdminDashboard() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Prompt Content</label>
+              <div className="d-field">
+                <label className="d-label" htmlFor="preset-prompt">Prompt content</label>
                 <textarea
-                  className="w-full h-32 p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent resize-none"
+                  id="preset-prompt"
+                  className="d-textarea sa-prompt"
                   placeholder="The base prompt to apply..."
                   required
                   value={presetForm.prompt}
@@ -3745,23 +3632,22 @@ export default function SuperAdminDashboard() {
                 />
               </div>
 
-              <div className="flex items-center gap-3">
+              <label className="d-check" htmlFor="preset-active">
                 <input
                   type="checkbox"
                   id="preset-active"
-                  className="w-4 h-4 rounded bg-gray-950 border-gray-800 text-brand-accent focus:ring-brand-accent"
                   checked={presetForm.isActive}
                   onChange={e => setPresetForm({ ...presetForm, isActive: e.target.checked })}
                 />
-                <label htmlFor="preset-active" className="text-xs font-bold text-gray-400 uppercase tracking-widest cursor-pointer">
-                  Preset is Active
-                </label>
-              </div>
+                Preset is active
+              </label>
 
-              <div className="flex gap-4 pt-4">
-                <button type="button" onClick={() => setShowPresetModal(false)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
-                <button type="submit" disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
-                  {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : (editingPreset ? "Update Preset" : "Save Preset")}
+              <div className="sa-dialog-foot">
+                <button type="button" onClick={() => setShowPresetModal(false)} className="d-btn ghost">
+                  Cancel
+                </button>
+                <button type="submit" disabled={actionLoading} className="d-btn primary">
+                  {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : (editingPreset ? "Update preset" : "Save preset")}
                 </button>
               </div>
             </form>
@@ -3771,22 +3657,25 @@ export default function SuperAdminDashboard() {
 
       {/* MODAL: EDITOR PRESET (PicFX + Convert) */}
       {showEditorPresetModal && (
-        <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg shadow-2xl max-h-[92vh] overflow-y-auto">
-            <div className="p-8 border-b border-gray-800 flex justify-between items-center">
+        <div className="sa-overlay">
+          <div className="sa-dialog" role="dialog" aria-modal="true" aria-labelledby="editor-preset-dialog-title">
+            <div className="sa-dialog-head">
               <div>
-                <h3 className="text-xl font-bold text-white uppercase tracking-tight">
-                  {editingEditorPreset ? "Edit Editor Preset" : "New Editor Preset"}
+                <h3 id="editor-preset-dialog-title" className="d-h1">
+                  {editingEditorPreset ? "Edit editor preset" : "New editor preset"}
                 </h3>
-                <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">PicFX + Convert tabs only</p>
+                <p className="d-note sa-tight">PicFX + Convert tabs only</p>
               </div>
-              <button onClick={() => setShowEditorPresetModal(false)} className="text-gray-500 hover:text-white font-bold text-xl">x</button>
+              <button type="button" onClick={() => setShowEditorPresetModal(false)} className="d-x" aria-label="Close">
+                ×
+              </button>
             </div>
-            <form onSubmit={handleSaveEditorPreset} className="p-8 space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Preset Name</label>
+            <form onSubmit={handleSaveEditorPreset} className="sa-dialog-body">
+              <div className="d-field">
+                <label className="d-label" htmlFor="editor-preset-name">Preset name</label>
                 <input
-                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                  id="editor-preset-name"
+                  className="d-input"
                   placeholder="e.g. Cinematic Relight"
                   required
                   value={editorPresetForm.name}
@@ -3794,10 +3683,11 @@ export default function SuperAdminDashboard() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Prompt Content</label>
+              <div className="d-field">
+                <label className="d-label" htmlFor="editor-preset-prompt">Prompt content</label>
                 <textarea
-                  className="w-full h-32 p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent resize-none"
+                  id="editor-preset-prompt"
+                  className="d-textarea sa-prompt"
                   placeholder="The base prompt to apply..."
                   required
                   value={editorPresetForm.prompt}
@@ -3805,23 +3695,22 @@ export default function SuperAdminDashboard() {
                 />
               </div>
 
-              <div className="flex items-center gap-3">
+              <label className="d-check" htmlFor="editor-preset-active">
                 <input
                   type="checkbox"
                   id="editor-preset-active"
-                  className="w-4 h-4 rounded bg-gray-950 border-gray-800 text-brand-accent focus:ring-brand-accent"
                   checked={editorPresetForm.isActive}
                   onChange={e => setEditorPresetForm({ ...editorPresetForm, isActive: e.target.checked })}
                 />
-                <label htmlFor="editor-preset-active" className="text-xs font-bold text-gray-400 uppercase tracking-widest cursor-pointer">
-                  Preset is Active
-                </label>
-              </div>
+                Preset is active
+              </label>
 
-              <div className="flex gap-4 pt-4">
-                <button type="button" onClick={() => setShowEditorPresetModal(false)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
-                <button type="submit" disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
-                  {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : (editingEditorPreset ? "Update Preset" : "Save Preset")}
+              <div className="sa-dialog-foot">
+                <button type="button" onClick={() => setShowEditorPresetModal(false)} className="d-btn ghost">
+                  Cancel
+                </button>
+                <button type="submit" disabled={actionLoading} className="d-btn primary">
+                  {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : (editingEditorPreset ? "Update preset" : "Save preset")}
                 </button>
               </div>
             </form>
