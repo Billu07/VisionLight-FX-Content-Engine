@@ -5,7 +5,6 @@ import {
   startReadOnlyImpersonation,
   API_BASE_URL,
 } from "../lib/api";
-import { adminUi } from "../lib/adminUi";
 import { confirmAction } from "../lib/notifications";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { useAuth } from "../hooks/useAuth";
@@ -1823,490 +1822,376 @@ export default function SuperAdminDashboard() {
 
         {/* TAB CONTENT: PLATFORM (TENANTS) */}
         {activeTab === "platform" && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            <div className={adminUi.tablePanel}>
-              <div className={`${adminUi.panelHeader} flex items-center justify-between`}>
-                <h2 className={adminUi.sectionTitle}>Pending Render Requests</h2>
-                <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-accent">
-                  {creditRequests.length} Pending
+          <div className="sa-stack d-rise">
+            <section className="d-card">
+              <div className="sa-card-head">
+                <div className="d-h2">Pending render requests</div>
+                <span className={`d-pill ${creditRequests.length ? "accent" : ""}`}>
+                  {creditRequests.length} pending
                 </span>
               </div>
-              {creditRequests.length === 0 ? (
-                <div className="p-6 text-xs text-gray-500 italic">No pending render requests across all tenants.</div>
-              ) : (
-                <div className={adminUi.tableScroll}>
-                  <table className="w-full text-left min-w-[900px]">
-                    <thead className={adminUi.tableHead}>
-                      <tr>
-                        <th className="p-6">Requester</th>
-                        <th className="p-6">Email</th>
-                        <th className="p-6">Organization</th>
-                        <th className="p-6">Submitted</th>
-                        <th className="p-6 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {creditRequests.map((r) => (
-                        <tr key={r.id} className={adminUi.tableRow}>
-                          <td className="p-6 text-sm text-white">{r.user?.name || r.name || "Unknown User"}</td>
-                          <td className="p-6 text-xs text-gray-400 font-mono">{r.user?.email || r.email}</td>
-                          <td className="p-6 text-xs text-gray-300">{r.organization?.name || "Unassigned"}</td>
-                          <td className="p-6 text-xs text-gray-500">{new Date(r.createdAt).toLocaleString()}</td>
-                          <td className="p-6 text-right">
-                            <button
-                              onClick={() => handleResolveCreditRequest(r.id)}
-                              className={adminUi.primaryButton}
-                            >
-                              Mark Resolved
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+              <div className="sa-card-body">
+                {creditRequests.length === 0 ? (
+                  <p className="d-note">No pending render requests across all tenants.</p>
+                ) : (
+                  <div className="d-list">
+                    {creditRequests.map((r) => (
+                      <div key={r.id} className="sa-grid-row sa-request">
+                        <div>
+                          <div className="d-name">{r.user?.name || r.name || "Unknown User"}</div>
+                          <div className="sa-mono">{r.user?.email || r.email}</div>
+                        </div>
+                        <div className="sa-small d-muted">
+                          <span className="sa-cell-label">Organization · submitted</span>
+                          {r.organization?.name || "Unassigned"} · {new Date(r.createdAt).toLocaleString()}
+                        </div>
+                        <div className="d-actions">
+                          <button
+                            type="button"
+                            onClick={() => handleResolveCreditRequest(r.id)}
+                            className="d-btn sm primary"
+                          >
+                            Mark resolved
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className={adminUi.sectionTitle}>Subscription Management</h2>
-              <button
-                onClick={() => setShowTenantModal(true)}
-                className={adminUi.primaryButton}
-              >
-                Create New Tenant
+            <div className="d-head">
+              <div>
+                <div className="d-eyebrow">Studio</div>
+                <h2 className="d-h1">Subscription management</h2>
+              </div>
+              <button type="button" onClick={() => setShowTenantModal(true)} className="d-btn primary">
+                Create new tenant
               </button>
             </div>
 
-            <div className={`${adminUi.tablePanel} ${adminUi.tableScroll}`}>
-              <table className="block w-full text-left md:table md:min-w-[900px]">
-                <thead className={`hidden md:table-header-group ${adminUi.tableHead}`}>
-                  <tr>
-                    <th className="p-6">Organization</th>
-                    <th className="p-6 text-center">Status</th>
-                    <th className="p-6 text-center">Users / Projects / Storage</th>
-                    <th className="p-6 text-right">Operations</th>
-                  </tr>
-                </thead>
-                <tbody className="block md:table-row-group">
-                  {tenants.length === 0 ? (
-                    <tr className="block md:table-row">
-                      <td colSpan={4} className="block p-10 text-center text-sm text-gray-300/80 md:table-cell">
-                        No organizations created yet.
-                      </td>
-                    </tr>
-                  ) : sortedTenants.map((t) => {
-                    const adminCandidates = users.filter(
-                      (u) =>
-                        u.organizationId === t.id &&
-                        (u.role === "ADMIN" || u.role === "SUPERADMIN"),
-                    );
-                    const organizationAdmin = t.isDefault
-                      ? adminCandidates.find((u) => u.role === "SUPERADMIN") ||
-                        adminCandidates.find((u) => u.role === "ADMIN")
-                      : adminCandidates.find((u) => u.role === "ADMIN") ||
-                        adminCandidates.find((u) => u.role === "SUPERADMIN");
-                    const isEnteringOrganizationAdminDashboard =
-                      !!organizationAdmin &&
-                      enteringDashboardUserId === organizationAdmin.id;
-                    return (
-                      <tr key={t.id} className={`block py-3 md:table-row ${adminUi.tableRow}`}>
-                        <td className="block px-5 py-2 md:table-cell md:p-6">
-                          <div className="font-bold text-white">{t.name}</div>
-                          <div className="mt-1 text-xs text-cyan-200/80 font-mono">
-                            {organizationAdmin?.email || "No admin email"}
-                          </div>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {(() => {
-                              const demoExpired =
-                                t.tenantPlan === "DEMO" &&
-                                !!t.trialEndsAt &&
-                                new Date(t.trialEndsAt).getTime() <= Date.now();
-                              const badge = t.isDefault
-                                ? { label: "Default Org", cls: "border-emerald-400/25 bg-emerald-400/10 text-emerald-300" }
-                                : t.tenantPlan === "DEMO"
-                                  ? demoExpired
-                                    ? { label: "Demo · Expired", cls: "border-red-500/40 bg-red-500/10 text-red-400" }
-                                    : { label: "Demo", cls: "border-amber-500/45 bg-amber-500/10 text-amber-400" }
-                                  : t.tenantPlan === "PAID"
-                                    ? {
-                                        label: `Premium${(t as any).entitlementCode ? ` · ${(t as any).entitlementCode}` : ""}`,
-                                        cls: "border-emerald-500/45 bg-emerald-500/10 text-emerald-400",
-                                      }
-                                    : { label: "Standard", cls: "border-gray-700 bg-gray-900 text-gray-400" };
-                              return (
-                                <span
-                                  className={`rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${badge.cls}`}
-                                >
-                                  {badge.label}
-                                </span>
-                              );
-                            })()}
-                            {t.trialEndsAt && t.tenantPlan === "DEMO" && (
-                              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-amber-300">
-                                Ends {new Date(t.trialEndsAt).toLocaleDateString()}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="block px-5 py-2 md:table-cell md:p-6 md:text-center">
-                          {t.isDefault ? (
-                            <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-emerald-300">
-                              System
-                            </span>
-                          ) : (
-                            <span
-                              className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest border ${t.isActive
-                                  ? "bg-green-500/10 text-green-400 border-green-500/20"
-                                  : "bg-red-500/10 text-red-400 border-red-500/20"
-                                }`}
-                            >
-                              {t.isActive ? "Active" : "Deactivated"}
-                            </span>
+            {tenants.length === 0 ? (
+              <div className="d-empty">No organizations created yet.</div>
+            ) : (
+              <div className="d-list">
+                {sortedTenants.map((t) => {
+                  const adminCandidates = users.filter(
+                    (u) =>
+                      u.organizationId === t.id &&
+                      (u.role === "ADMIN" || u.role === "SUPERADMIN"),
+                  );
+                  const organizationAdmin = t.isDefault
+                    ? adminCandidates.find((u) => u.role === "SUPERADMIN") ||
+                      adminCandidates.find((u) => u.role === "ADMIN")
+                    : adminCandidates.find((u) => u.role === "ADMIN") ||
+                      adminCandidates.find((u) => u.role === "SUPERADMIN");
+                  const isEnteringOrganizationAdminDashboard =
+                    !!organizationAdmin &&
+                    enteringDashboardUserId === organizationAdmin.id;
+                  const usagePercent = Number(t.storageSummary?.usagePercent || 0);
+                  return (
+                    <div key={t.id} className="sa-grid-row sa-tenant">
+                      <div>
+                        <div className="d-name">{t.name}</div>
+                        <div className="sa-mono">{organizationAdmin?.email || "No admin email"}</div>
+                        <div className="sa-pills">
+                          {(() => {
+                            const demoExpired =
+                              t.tenantPlan === "DEMO" &&
+                              !!t.trialEndsAt &&
+                              new Date(t.trialEndsAt).getTime() <= Date.now();
+                            const badge = t.isDefault
+                              ? { label: "Default Org", cls: "ok" }
+                              : t.tenantPlan === "DEMO"
+                                ? demoExpired
+                                  ? { label: "Demo · Expired", cls: "err" }
+                                  : { label: "Demo", cls: "warn" }
+                                : t.tenantPlan === "PAID"
+                                  ? {
+                                      label: `Premium${(t as any).entitlementCode ? ` · ${(t as any).entitlementCode}` : ""}`,
+                                      cls: "ok",
+                                    }
+                                  : { label: "Standard", cls: "" };
+                            return <span className={`d-pill ${badge.cls}`}>{badge.label}</span>;
+                          })()}
+                          {t.trialEndsAt && t.tenantPlan === "DEMO" && (
+                            <span className="d-pill warn">Ends {new Date(t.trialEndsAt).toLocaleDateString()}</span>
                           )}
-                        </td>
-                        <td className="block px-5 py-2 md:table-cell md:p-6 md:text-center">
-                          <div className="text-sm font-semibold text-gray-200">{t.maxUsers} users</div>
-                          <div className="mt-1 text-xs text-gray-500">{t.maxProjectsTotal} projects</div>
-                          <div className="mt-2 text-xs text-gray-400">
-                            {mbToGb(Number(t.storageSummary?.usedMb || 0)).toFixed(2)}GB / {mbToGb(Number(t.maxStorageMb || 0)).toFixed(2)}GB
-                          </div>
-                          <div className="mt-2 h-1.5 w-36 overflow-hidden rounded-full bg-gray-900/90 md:mx-auto">
-                            <div
-                              className={`h-full rounded-full ${
-                                Number(t.storageSummary?.usagePercent || 0) >= 90
-                                  ? "bg-rose-400"
-                                  : Number(t.storageSummary?.usagePercent || 0) >= 75
-                                    ? "bg-amber-400"
-                                    : "bg-cyan-400"
-                              }`}
-                              style={{
-                                width: `${Math.max(
-                                  0,
-                                  Math.min(
-                                    100,
-                                    Number(t.storageSummary?.usagePercent || 0),
-                                  ),
-                                )}%`,
-                              }}
-                            />
-                          </div>
-                        </td>
-                        <td className="block px-5 py-2 md:table-cell md:p-6 md:text-right">
-                          <div className="flex flex-wrap gap-2 md:justify-end">
-                            {canEnterDashboard(organizationAdmin?.id) ? (
-                              <button
-                                className={`${adminUi.amberButton} disabled:cursor-wait disabled:opacity-70`}
-                                onClick={() =>
-                                  organizationAdmin &&
-                                  handleEnterReadOnlyDashboard(organizationAdmin)
-                                }
-                                disabled={!organizationAdmin || !!enteringDashboardUserId}
-                              >
-                                <span className="inline-flex items-center gap-2">
-                                  {isEnteringOrganizationAdminDashboard && (
-                                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                  )}
-                                  {isEnteringOrganizationAdminDashboard
-                                    ? "Opening..."
-                                    : "Enter Dashboard"}
-                                </span>
-                              </button>
-                            ) : (
-                              <span className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500">
-                                Own Profile
-                              </span>
-                            )}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="sa-cell-label">Status</span>
+                        {t.isDefault ? (
+                          <span className="d-pill ok">System</span>
+                        ) : (
+                          <span className={`d-pill ${t.isActive ? "ok" : "err"}`}>
+                            {t.isActive ? "Active" : "Deactivated"}
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <span className="sa-cell-label">Users · projects · storage</span>
+                        <div className="sa-strong">
+                          {t.maxUsers} users · {t.maxProjectsTotal} projects
+                        </div>
+                        <div className="d-faint sa-small">
+                          {mbToGb(Number(t.storageSummary?.usedMb || 0)).toFixed(2)}GB / {mbToGb(Number(t.maxStorageMb || 0)).toFixed(2)}GB
+                        </div>
+                        <div className={`sa-bar ${usagePercent >= 90 ? "err" : usagePercent >= 75 ? "warn" : ""}`}>
+                          <i style={{ width: `${Math.max(0, Math.min(100, usagePercent))}%` }} />
+                        </div>
+                      </div>
+                      <div className="d-actions">
+                        {canEnterDashboard(organizationAdmin?.id) ? (
+                          <button
+                            type="button"
+                            className="d-btn sm warn"
+                            onClick={() =>
+                              organizationAdmin &&
+                              handleEnterReadOnlyDashboard(organizationAdmin)
+                            }
+                            disabled={!organizationAdmin || !!enteringDashboardUserId}
+                          >
+                            {isEnteringOrganizationAdminDashboard && <span className="sa-spin" />}
+                            {isEnteringOrganizationAdminDashboard ? "Opening..." : "Enter dashboard"}
+                          </button>
+                        ) : (
+                          <span className="d-pill">Own profile</span>
+                        )}
+                        <button type="button" className="d-btn sm" onClick={() => openEditTenant(t)}>
+                          Configure
+                        </button>
+                        {t.isDefault ? (
+                          <span className="d-pill ok">Protected</span>
+                        ) : (
+                          <button type="button" className="d-btn sm danger" onClick={() => handleDeleteTenant(t.id)}>
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <section className="d-card">
+              <div className="sa-card-head">
+                <div>
+                  <div className="d-h2">All platform users</div>
+                  <p className="d-note sa-tight">
+                    Use read-only entry for support/debugging. Passwords can be reset from Manage.
+                  </p>
+                </div>
+                <select
+                  value={userView}
+                  onChange={(e) => setUserView(e.target.value as any)}
+                  className="d-select sm"
+                  aria-label="Sort users"
+                >
+                  <option value="recent">Recently Added</option>
+                  <option value="oldest">Oldest</option>
+                  <option value="alpha">Alphabetical</option>
+                  <option value="demo">Demo Users</option>
+                  <option value="active">Active</option>
+                </select>
+              </div>
+              <div className="sa-card-body">
+                <div className="d-list">
+                  {visibleUsers.map((u) => {
+                    const org = tenants.find((t) => t.id === u.organizationId);
+                    return (
+                      <div key={u.id} className="sa-grid-row sa-user">
+                        <div>
+                          <div className="d-name">{u.name || "Unnamed User"}</div>
+                          <div className="sa-mono">{u.email}</div>
+                        </div>
+                        <div className="sa-small d-muted">
+                          <span className="sa-cell-label">Org</span>
+                          {org?.name || "Default / Unassigned"}
+                        </div>
+                        <div>
+                          <span className="sa-cell-label">Role</span>
+                          <span className="d-pill">{u.role}</span>
+                        </div>
+                        <div>
+                          <span className="sa-cell-label">View</span>
+                          <span className="d-pill accent">{u.view}</span>
+                        </div>
+                        <div className="d-actions">
+                          {canEnterDashboard(u.id) ? (
                             <button
-                              className={adminUi.softButton}
-                              onClick={() => openEditTenant(t)}
+                              type="button"
+                              onClick={() => handleEnterReadOnlyDashboard(u)}
+                              disabled={!!enteringDashboardUserId}
+                              className="d-btn sm warn"
                             >
-                              Configure
+                              {enteringDashboardUserId === u.id && <span className="sa-spin" />}
+                              {enteringDashboardUserId === u.id ? "Opening..." : "Enter dashboard"}
                             </button>
-                            {t.isDefault ? (
-                              <span className="rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-300">
-                                Protected
-                              </span>
-                            ) : (
-                              <button
-                                className={adminUi.dangerButton}
-                                onClick={() => handleDeleteTenant(t.id)}
-                              >
-                                Delete
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+                          ) : (
+                            <span className="d-pill">Own profile</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingUser(u);
+                              setUserUpdates({ view: u.view, role: u.role, maxProjects: u.maxProjects ?? 3 });
+                            }}
+                            className="d-btn sm soft"
+                          >
+                            Manage
+                          </button>
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className={adminUi.tablePanel}>
-              <div className={adminUi.panelHeader}>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h2 className={adminUi.sectionTitle}>All Platform Users</h2>
-                    <p className={adminUi.sectionCopy}>
-                      Use read-only entry for support/debugging. Passwords can be reset from Manage.
-                    </p>
-                  </div>
-                  <select
-                    value={userView}
-                    onChange={(e) => setUserView(e.target.value as any)}
-                    className="rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-xs font-semibold text-gray-200 outline-none focus:border-brand-accent"
-                  >
-                    <option value="recent">Recently Added</option>
-                    <option value="oldest">Oldest</option>
-                    <option value="alpha">Alphabetical</option>
-                    <option value="demo">Demo Users</option>
-                    <option value="active">Active</option>
-                  </select>
                 </div>
               </div>
-              <div className={adminUi.tableScroll}>
-                <table className="block w-full text-left md:table md:min-w-[900px]">
-                  <thead className={`hidden md:table-header-group ${adminUi.tableHead}`}>
-                    <tr>
-                      <th className="p-5">User</th>
-                      <th className="p-5">Organization</th>
-                      <th className="p-5 text-center">Role</th>
-                      <th className="p-5 text-center">View</th>
-                      <th className="p-5 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="block md:table-row-group">
-                    {visibleUsers.map((u) => {
-                      const org = tenants.find((t) => t.id === u.organizationId);
-                      return (
-                        <tr key={u.id} className={`block py-3 md:table-row ${adminUi.tableRow}`}>
-                          <td className="block px-5 py-1.5 md:table-cell md:p-5">
-                            <div className="font-bold text-white text-sm">{u.name || "Unnamed User"}</div>
-                            <div className="text-[10px] text-gray-500 font-mono">{u.email}</div>
-                          </td>
-                          <td className="block px-5 py-1.5 text-xs text-gray-400 md:table-cell md:p-5"><span className="mr-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500 md:hidden">Org</span>{org?.name || "Default / Unassigned"}</td>
-                          <td className="block px-5 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-300 md:table-cell md:p-5 md:text-center"><span className="mr-2 text-gray-500 md:hidden">Role</span>{u.role}</td>
-                          <td className="block px-5 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-400 md:table-cell md:p-5 md:text-center"><span className="mr-2 text-gray-500 md:hidden">View</span>{u.view}</td>
-                          <td className="block px-5 py-1.5 md:table-cell md:p-5 md:text-right">
-                            <div className="flex flex-wrap gap-2 md:justify-end">
-                              {canEnterDashboard(u.id) ? (
-                                <button
-                                  onClick={() => handleEnterReadOnlyDashboard(u)}
-                                  disabled={!!enteringDashboardUserId}
-                                  className={`${adminUi.amberButton} disabled:cursor-wait disabled:opacity-70`}
-                                >
-                                  <span className="inline-flex items-center gap-2">
-                                    {enteringDashboardUserId === u.id && (
-                                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                    )}
-                                    {enteringDashboardUserId === u.id
-                                      ? "Opening..."
-                                      : "Enter Dashboard"}
-                                  </span>
-                                </button>
-                              ) : (
-                                <span className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500">
-                                  Own Profile
-                                </span>
-                              )}
-                              <button
-                                onClick={() => {
-                                  setEditingUser(u);
-                                  setUserUpdates({ view: u.view, role: u.role, maxProjects: u.maxProjects ?? 3 });
-                                }}
-                                className={adminUi.cyanButton}
-                              >
-                                Manage
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            </section>
           </div>
         )}
 
         {activeTab === "byok" && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            <div className={adminUi.tablePanel}>
-              <div className={`${adminUi.panelHeader} flex flex-wrap items-center justify-between gap-3`}>
+          <div className="sa-stack d-rise">
+            <section className="d-card">
+              <div className="sa-card-head">
                 <div>
-                  <h2 className={adminUi.sectionTitle}>BYOK Ops Health</h2>
-                  <p className={adminUi.sectionCopy}>
+                  <div className="d-h2">BYOK ops health</div>
+                  <p className="d-note sa-tight">
                     Webhook reliability, stale activations, routing drift, and entitlement drift.
                   </p>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className={adminUi.cyanButton}
-                    onClick={() => void fetchByokOpsData()}
-                    disabled={byokEventsLoading}
-                  >
-                    Refresh Ops
-                  </button>
+                <button
+                  type="button"
+                  className="d-btn sm soft"
+                  onClick={() => void fetchByokOpsData()}
+                  disabled={byokEventsLoading}
+                >
+                  Refresh ops
+                </button>
+              </div>
+              <div className="sa-card-body sa-stats">
+                <div className="d-stat">
+                  <div className="d-eyebrow">Errors (1h)</div>
+                  <div className="n err">{byokOpsHealth?.windows?.lastHour?.errorCount ?? 0}</div>
+                  <div className="d-note">Rate: {byokOpsHealth?.windows?.lastHour?.errorRate ?? 0}%</div>
+                </div>
+                <div className="d-stat">
+                  <div className="d-eyebrow">Stale pending</div>
+                  <div className="n warn">{byokOpsHealth?.stalePendingActivations?.count ?? 0}</div>
+                  <div className="d-note">&gt; {byokOpsHealth?.stalePendingMinutes ?? 0} minutes</div>
+                </div>
+                <div className="d-stat">
+                  <div className="d-eyebrow">Routing drift</div>
+                  <div className="n accent">{byokOpsHealth?.routingDrift?.count ?? 0}</div>
+                  <div className="d-note">Expected vs org routing domain</div>
+                </div>
+                <div className="d-stat">
+                  <div className="d-eyebrow">Entitlement drift</div>
+                  <div className="n violet">{byokOpsHealth?.entitlementDrift?.count ?? 0}</div>
+                  <div className="d-note">Org + entitlement mismatch</div>
                 </div>
               </div>
+            </section>
 
-              <div className="grid grid-cols-1 gap-3 p-5 md:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-gray-400">Errors (1h)</div>
-                  <div className="mt-1 text-2xl font-black text-rose-300">
-                    {byokOpsHealth?.windows?.lastHour?.errorCount ?? 0}
-                  </div>
-                  <div className="mt-1 text-[11px] text-gray-500">
-                    Rate: {byokOpsHealth?.windows?.lastHour?.errorRate ?? 0}%
-                  </div>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-gray-400">Stale Pending</div>
-                  <div className="mt-1 text-2xl font-black text-amber-300">
-                    {byokOpsHealth?.stalePendingActivations?.count ?? 0}
-                  </div>
-                  <div className="mt-1 text-[11px] text-gray-500">
-                    &gt; {byokOpsHealth?.stalePendingMinutes ?? 0} minutes
-                  </div>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-gray-400">Routing Drift</div>
-                  <div className="mt-1 text-2xl font-black text-cyan-200">
-                    {byokOpsHealth?.routingDrift?.count ?? 0}
-                  </div>
-                  <div className="mt-1 text-[11px] text-gray-500">Expected vs org routing domain</div>
-                </div>
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                  <div className="text-[10px] uppercase tracking-[0.16em] text-gray-400">Entitlement Drift</div>
-                  <div className="mt-1 text-2xl font-black text-fuchsia-200">
-                    {byokOpsHealth?.entitlementDrift?.count ?? 0}
-                  </div>
-                  <div className="mt-1 text-[11px] text-gray-500">Org + entitlement mismatch</div>
-                </div>
-              </div>
-            </div>
-
-            <div className={adminUi.tablePanel}>
-              <div className={adminUi.panelHeader}>
-                <h2 className={adminUi.sectionTitle}>BYOK Organizations</h2>
-                <p className={adminUi.sectionCopy}>
-                  Isolated self-serve tenants from byok.link and package activations.
-                </p>
-              </div>
-              {byokOrganizations.length === 0 ? (
-                <div className="p-6 text-xs text-gray-500 italic">
-                  No BYOK organizations yet.
-                </div>
-              ) : (
-                <div className={adminUi.tableScroll}>
-                  <table className="w-full min-w-[1100px] text-left">
-                    <thead className={adminUi.tableHead}>
-                      <tr>
-                        <th className="p-5">Organization</th>
-                        <th className="p-5">Package</th>
-                        <th className="p-5">Limits</th>
-                        <th className="p-5">Trial</th>
-                        <th className="p-5">Admin</th>
-                        <th className="p-5 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {byokOrganizations.map((org) => {
-                        const primaryUser = Array.isArray(org.users) ? org.users[0] : null;
-                        return (
-                          <tr key={org.id} className={adminUi.tableRow}>
-                            <td className="p-5">
-                              <div className="font-bold text-white">{org.name}</div>
-                              <div className="mt-1 text-[10px] font-mono text-cyan-200/80">
-                                {primaryUser?.email || "No primary email"}
-                              </div>
-                              <div className="mt-1 text-[10px] text-gray-500">
-                                Domain: {org.routingDomain || "n/a"}
-                              </div>
-                            </td>
-                            <td className="p-5">
-                              <div className="text-xs font-bold text-gray-200">
-                                {org.entitlement?.packageCode || org.entitlementCode || "BYOK_TRIAL"}
-                              </div>
-                              <div className="mt-1 text-[10px] text-gray-500">
-                                {org.entitlement?.status || "ACTIVE"}
-                              </div>
-                            </td>
-                            <td className="p-5 text-xs text-gray-300">
-                              <div>{org.maxUsers} users</div>
-                              <div>{org.maxProjectsTotal} projects</div>
-                              <div>{(Number(org.maxStorageMb || 0) / 1024).toFixed(1)} GB</div>
-                            </td>
-                            <td className="p-5 text-xs text-gray-300">
-                              {org.trialEndsAt
-                                ? new Date(org.trialEndsAt).toLocaleDateString()
-                                : "n/a"}
-                            </td>
-                            <td className="p-5 text-xs">
-                              <span
-                                className={`rounded-full border px-2 py-1 text-[9px] font-bold uppercase tracking-widest ${
-                                  org.adminPanelLocked
-                                    ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
-                                    : "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                                }`}
-                              >
-                                {org.adminPanelLocked ? "Locked" : "Enabled"}
-                              </span>
-                            </td>
-                            <td className="p-5 text-right">
-                              <div className="flex justify-end gap-2">
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    const packageCode = window.prompt(
-                                      "Enter package code: PD_APP, VFX_APP, PD_STUDIO, VFX_STUDIO, VFX_STUDIO_AGENCY",
-                                    );
-                                    if (!packageCode) return;
-                                    await handleManualByokActivation(org.id, packageCode.trim());
-                                  }}
-                                  className={adminUi.cyanButton}
-                                  disabled={actionLoading}
-                                >
-                                  Activate Package
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => void handleResetByokTrial(org.id)}
-                                  className={adminUi.amberButton}
-                                  disabled={actionLoading}
-                                >
-                                  Reset Trial
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            <div className={adminUi.tablePanel}>
-              <div className={`${adminUi.panelHeader} flex flex-wrap items-center justify-between gap-3`}>
+            <section className="d-card">
+              <div className="sa-card-head">
                 <div>
-                  <h2 className={adminUi.sectionTitle}>BYOK Webhook Events</h2>
-                  <p className={adminUi.sectionCopy}>
+                  <div className="d-h2">BYOK organizations</div>
+                  <p className="d-note sa-tight">
+                    Isolated self-serve tenants from byok.link and package activations.
+                  </p>
+                </div>
+              </div>
+              <div className="sa-card-body">
+                {byokOrganizations.length === 0 ? (
+                  <p className="d-note">No BYOK organizations yet.</p>
+                ) : (
+                  <div className="d-list">
+                    {byokOrganizations.map((org) => {
+                      const primaryUser = Array.isArray(org.users) ? org.users[0] : null;
+                      return (
+                        <div key={org.id} className="sa-grid-row sa-byok">
+                          <div>
+                            <div className="d-name">{org.name}</div>
+                            <div className="sa-mono">{primaryUser?.email || "No primary email"}</div>
+                            <div className="d-faint sa-small">Domain: {org.routingDomain || "n/a"}</div>
+                          </div>
+                          <div>
+                            <span className="sa-cell-label">Package</span>
+                            <div className="sa-strong">
+                              {org.entitlement?.packageCode || org.entitlementCode || "BYOK_TRIAL"}
+                            </div>
+                            <div className="d-faint sa-small">{org.entitlement?.status || "ACTIVE"}</div>
+                          </div>
+                          <div className="sa-small d-muted">
+                            <span className="sa-cell-label">Limits</span>
+                            <div>{org.maxUsers} users</div>
+                            <div>{org.maxProjectsTotal} projects</div>
+                            <div>{(Number(org.maxStorageMb || 0) / 1024).toFixed(1)} GB</div>
+                          </div>
+                          <div className="sa-small d-muted">
+                            <span className="sa-cell-label">Trial</span>
+                            {org.trialEndsAt
+                              ? new Date(org.trialEndsAt).toLocaleDateString()
+                              : "n/a"}
+                          </div>
+                          <div>
+                            <span className="sa-cell-label">Admin</span>
+                            <span className={`d-pill ${org.adminPanelLocked ? "warn" : "ok"}`}>
+                              {org.adminPanelLocked ? "Locked" : "Enabled"}
+                            </span>
+                          </div>
+                          <div className="d-actions">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const packageCode = window.prompt(
+                                  "Enter package code: PD_APP, VFX_APP, PD_STUDIO, VFX_STUDIO, VFX_STUDIO_AGENCY",
+                                );
+                                if (!packageCode) return;
+                                await handleManualByokActivation(org.id, packageCode.trim());
+                              }}
+                              className="d-btn sm soft"
+                              disabled={actionLoading}
+                            >
+                              Activate package
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleResetByokTrial(org.id)}
+                              className="d-btn sm warn"
+                              disabled={actionLoading}
+                            >
+                              Reset trial
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className="d-card">
+              <div className="sa-card-head">
+                <div>
+                  <div className="d-h2">BYOK webhook events</div>
+                  <p className="d-note sa-tight">
                     Filter by status/package and inspect activation lifecycle.
                   </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="d-actions">
                   <select
                     value={byokEventFilters.status}
                     onChange={(e) =>
                       setByokEventFilters((prev) => ({ ...prev, status: e.target.value }))
                     }
-                    className={adminUi.select}
+                    className="d-select sm"
+                    aria-label="Status"
                   >
                     <option value="">All Statuses</option>
                     <option value="PENDING">PENDING</option>
@@ -2321,7 +2206,8 @@ export default function SuperAdminDashboard() {
                     onChange={(e) =>
                       setByokEventFilters((prev) => ({ ...prev, packageCode: e.target.value }))
                     }
-                    className={adminUi.select}
+                    className="d-select sm"
+                    aria-label="Package"
                   >
                     <option value="">All Packages</option>
                     <option value="PD_APP">PD_APP</option>
@@ -2338,7 +2224,8 @@ export default function SuperAdminDashboard() {
                         limit: Number.parseInt(e.target.value, 10) || 80,
                       }))
                     }
-                    className={adminUi.select}
+                    className="d-select sm"
+                    aria-label="Limit"
                   >
                     <option value="50">50</option>
                     <option value="80">80</option>
@@ -2347,7 +2234,7 @@ export default function SuperAdminDashboard() {
                   </select>
                   <button
                     type="button"
-                    className={adminUi.cyanButton}
+                    className="d-btn sm soft"
                     onClick={() => void fetchByokOpsData()}
                     disabled={byokEventsLoading}
                   >
@@ -2357,159 +2244,150 @@ export default function SuperAdminDashboard() {
               </div>
 
               {byokWebhookEvents.length === 0 ? (
-                <div className="p-6 text-xs text-gray-500 italic">No webhook events for current filter.</div>
+                <div className="sa-card-body">
+                  <p className="d-note">No webhook events for current filter.</p>
+                </div>
               ) : (
-                <div className={adminUi.tableScroll}>
-                  <table className="w-full min-w-[1250px] text-left">
-                    <thead className={adminUi.tableHead}>
+                <div className="sa-table-wrap">
+                  <table className="d-table wide">
+                    <thead>
                       <tr>
-                        <th className="p-4">Time</th>
-                        <th className="p-4">Provider</th>
-                        <th className="p-4">Status</th>
-                        <th className="p-4">Package</th>
-                        <th className="p-4">Email</th>
-                        <th className="p-4">Checkout Session</th>
-                        <th className="p-4">Order</th>
-                        <th className="p-4">Error</th>
+                        <th>Time</th>
+                        <th>Provider</th>
+                        <th>Status</th>
+                        <th>Package</th>
+                        <th>Email</th>
+                        <th>Checkout session</th>
+                        <th>Order</th>
+                        <th>Error</th>
                       </tr>
                     </thead>
                     <tbody>
                       {byokWebhookEvents.map((event) => (
-                        <tr key={event.id} className={adminUi.tableRow}>
-                          <td className="p-4 text-xs text-gray-300">
+                        <tr key={event.id}>
+                          <td className="sa-small">
                             {event.createdAt ? new Date(event.createdAt).toLocaleString() : "n/a"}
                           </td>
-                          <td className="p-4 text-[11px] font-semibold text-cyan-200">
-                            {event.provider}
+                          <td className="sa-small sa-accent">{event.provider}</td>
+                          <td>
+                            <span className="d-pill">{event.status}</span>
                           </td>
-                          <td className="p-4">
-                            <span className="rounded border border-white/15 bg-white/[0.04] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-gray-200">
-                              {event.status}
-                            </span>
-                          </td>
-                          <td className="p-4 text-[11px] text-gray-200">{event.packageCode || "n/a"}</td>
-                          <td className="p-4 text-[11px] text-gray-300">{event.customerEmail || "n/a"}</td>
-                          <td className="p-4 font-mono text-[10px] text-gray-400">
-                            {event.checkoutSessionId || "n/a"}
-                          </td>
-                          <td className="p-4 text-[11px] text-gray-300">{event.orderId || "n/a"}</td>
-                          <td className="p-4 text-[11px] text-rose-300">{event.error || "-"}</td>
+                          <td className="sa-small">{event.packageCode || "n/a"}</td>
+                          <td className="sa-small">{event.customerEmail || "n/a"}</td>
+                          <td className="sa-mono-cell">{event.checkoutSessionId || "n/a"}</td>
+                          <td className="sa-small">{event.orderId || "n/a"}</td>
+                          <td className="sa-small sa-err-text">{event.error || "-"}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               )}
-            </div>
+            </section>
           </div>
         )}
 
         {/* TAB CONTENT: MY AGENCY */}
         {activeTab === "my-agency" && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className={adminUi.sectionTitle}>Default Agency Team</h2>
-              <button
-                onClick={() => setShowAddTeamModal(true)}
-                className={adminUi.primaryButton}
-              >
-                Add Team Member
+          <div className="sa-stack d-rise">
+            <div className="d-head">
+              <div>
+                <div className="d-eyebrow">Studio</div>
+                <h2 className="d-h1">Default agency team</h2>
+                <p className="d-sub">Credit fields save when you leave them.</p>
+              </div>
+              <button type="button" onClick={() => setShowAddTeamModal(true)} className="d-btn primary">
+                Add team member
               </button>
             </div>
-            <div className={`${adminUi.tablePanel} ${adminUi.tableScroll}`}>
-              <table className="w-full text-left min-w-[1000px]">
-                <thead className={adminUi.tableHead}>
-                  <tr>
-                    <th className="p-6">User</th>
-                    <th className="p-6 text-center">View</th>
-                    <th className="p-6 text-center">PicDrift</th>
-                    <th className="p-6 text-center">PicFX</th>
-                    <th className="p-6 text-center">Video Engines (Kling / Topaz / Seedance / H3 Max)</th>
-                    <th className="p-6 text-right">Coverage (USD)</th>
-                    <th className="p-6 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {myAgencyUsers.map(u => (
-                    <tr key={u.id} className={adminUi.tableRow}>
-                      <td className="p-6">
-                        <div className="font-bold text-white text-sm">{u.name}</div>
-                        <div className="text-[10px] text-gray-500 font-mono">{u.email}</div>
-                      </td>
-                      <td className="p-6 text-center">
-                        <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${u.view === 'PICDRIFT' ? 'bg-pink-500/10 text-pink-400 border-pink-500/20' : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'}`}>
-                          {u.view}
-                        </span>
-                      </td>
-                      <td className="p-6 text-center">
-                        <input type="number" step="1" min="0" className="w-12 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsPicDrift} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsPicDrift) - u.creditsPicDrift, creditType: "creditsPicDrift" })} />
-                      </td>
-                      <td className="p-6 text-center">
-                        <input type="number" step="1" min="0" className="w-16 bg-gray-950 border border-gray-800 rounded p-1 text-center text-xs text-white" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsImageFX} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsImageFX) - u.creditsImageFX, creditType: "creditsImageFX" })} />
-                      </td>
-                      <td className="p-6 text-center">
-                        <div className="flex gap-2 justify-center">
-                          <input type="number" step="1" min="0" title="Kling 3.0" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsPicDriftPlus) - u.creditsPicDriftPlus, creditType: "creditsPicDriftPlus" })} />
-                          <input type="number" step="1" min="0" title="Topaz Upscale" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1, creditType: "creditsVideoFX1" })} />
-                          <input type="number" step="1" min="0" title="Seedance 2.0" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2, creditType: "creditsVideoFX2" })} />
-                          <input type="number" step="1" min="0" title="H3 Max" className="w-10 bg-gray-950 border border-gray-800 rounded text-[10px] text-center" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3, creditType: "creditsVideoFX3" })} />
-                        </div>
-                      </td>
-                      <td className="p-6 text-right text-sm font-semibold text-brand-accent">
-                        {formatUsd(getUserCoverageUsd(u))}
-                      </td>
-                      <td className="p-6 text-right">
-                        <div className="flex gap-2 justify-end">
-                          {canEnterDashboard(u.id) ? (
-                            <button
-                              onClick={() => handleEnterReadOnlyDashboard(u)}
-                              disabled={!!enteringDashboardUserId}
-                              className={`${adminUi.amberButton} disabled:cursor-wait disabled:opacity-70`}
-                            >
-                              <span className="inline-flex items-center gap-2">
-                                {enteringDashboardUserId === u.id && (
-                                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                )}
-                                {enteringDashboardUserId === u.id
-                                  ? "Opening..."
-                                  : "Enter Dashboard"}
-                              </span>
-                            </button>
-                          ) : (
-                            <span className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500">
-                              Own Profile
-                            </span>
-                          )}
-                          <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role, maxProjects: u.maxProjects ?? 3 }); }} className={adminUi.cyanButton}>Manage</button>
-                          {isProtectedUser(u) ? (
-                            <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-amber-300">
-                              {getProtectionLabel(u)}
-                            </span>
-                          ) : (
-                            <button
-                              className={adminUi.dangerButton}
-                              onClick={async () => {
-                                if (
-                                  await confirmAction(`Remove "${u.email}" from platform?`, {
-                                    confirmLabel: "Remove",
-                                    critical: true,
-                                    confirmationText: `REMOVE ${u.email}`,
-                                  })
-                                ) {
-                                  apiEndpoints.tenantDeleteUser(u.id).then(fetchInitialData);
-                                }
-                              }}
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      </td>
+            <section className="d-card">
+              <div className="sa-table-wrap">
+                <table className="d-table wide">
+                  <thead>
+                    <tr>
+                      <th>User</th>
+                      <th className="mid">View</th>
+                      <th className="mid">PicDrift</th>
+                      <th className="mid">PicFX</th>
+                      <th className="mid">Video engines (Kling / Topaz / Seedance / H3 Max)</th>
+                      <th className="num">Coverage (USD)</th>
+                      <th className="num">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {myAgencyUsers.map(u => (
+                      <tr key={u.id}>
+                        <td>
+                          <div className="d-name">{u.name}</div>
+                          <div className="sa-mono">{u.email}</div>
+                        </td>
+                        <td className="mid">
+                          <span className={`d-pill ${u.view === 'PICDRIFT' ? 'violet' : 'accent'}`}>
+                            {u.view}
+                          </span>
+                        </td>
+                        <td className="mid">
+                          <input type="number" step="1" min="0" className="d-input sa-num" aria-label="PicDrift credits" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsPicDrift} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsPicDrift) - u.creditsPicDrift, creditType: "creditsPicDrift" })} />
+                        </td>
+                        <td className="mid">
+                          <input type="number" step="1" min="0" className="d-input sa-num" aria-label="PicFX credits" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsImageFX} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsImageFX) - u.creditsImageFX, creditType: "creditsImageFX" })} />
+                        </td>
+                        <td className="mid">
+                          <div className="sa-num-row">
+                            <input type="number" step="1" min="0" title="Kling 3.0" aria-label="Kling 3.0 credits" className="d-input sa-num" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsPicDriftPlus} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsPicDriftPlus) - u.creditsPicDriftPlus, creditType: "creditsPicDriftPlus" })} />
+                            <input type="number" step="1" min="0" title="Topaz Upscale" aria-label="Topaz Upscale credits" className="d-input sa-num" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsVideoFX1} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX1) - u.creditsVideoFX1, creditType: "creditsVideoFX1" })} />
+                            <input type="number" step="1" min="0" title="Seedance 2.0" aria-label="Seedance 2.0 credits" className="d-input sa-num" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsVideoFX2} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX2) - u.creditsVideoFX2, creditType: "creditsVideoFX2" })} />
+                            <input type="number" step="1" min="0" title="H3 Max" aria-label="H3 Max credits" className="d-input sa-num" disabled={!isUserCreditLimited(u)} defaultValue={u.creditsVideoFX3} onBlur={(e) => handleUpdateAgencyUser(u.id, { addCredits: toInt(e.target.value, u.creditsVideoFX3) - u.creditsVideoFX3, creditType: "creditsVideoFX3" })} />
+                          </div>
+                        </td>
+                        <td className="num sa-accent">
+                          {formatUsd(getUserCoverageUsd(u))}
+                        </td>
+                        <td className="num">
+                          <div className="d-actions sa-end">
+                            {canEnterDashboard(u.id) ? (
+                              <button
+                                type="button"
+                                onClick={() => handleEnterReadOnlyDashboard(u)}
+                                disabled={!!enteringDashboardUserId}
+                                className="d-btn sm warn"
+                              >
+                                {enteringDashboardUserId === u.id && <span className="sa-spin" />}
+                                {enteringDashboardUserId === u.id ? "Opening..." : "Enter dashboard"}
+                              </button>
+                            ) : (
+                              <span className="d-pill">Own profile</span>
+                            )}
+                            <button type="button" onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role, maxProjects: u.maxProjects ?? 3 }); }} className="d-btn sm soft">Manage</button>
+                            {isProtectedUser(u) ? (
+                              <span className="d-pill warn">{getProtectionLabel(u)}</span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="d-btn sm danger"
+                                onClick={async () => {
+                                  if (
+                                    await confirmAction(`Remove "${u.email}" from platform?`, {
+                                      confirmLabel: "Remove",
+                                      critical: true,
+                                      confirmationText: `REMOVE ${u.email}`,
+                                    })
+                                  ) {
+                                    apiEndpoints.tenantDeleteUser(u.id).then(fetchInitialData);
+                                  }
+                                }}
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </div>
         )}
 
@@ -2786,63 +2664,58 @@ export default function SuperAdminDashboard() {
 
         {/* TAB CONTENT: GLOBAL SETTINGS */}
         {activeTab === "global-settings" && globalSettings && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-            <div className="rounded-2xl border border-brand-accent/20 bg-brand-accent/10 p-6 shadow-[0_18px_42px_rgba(2,8,23,0.24)] backdrop-blur-xl">
-              <h3 className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-brand-accent">Global Pricing Template</h3>
-              <p className="text-xs text-gray-400 italic">These prices are used as defaults for all new organizations unless overridden.</p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className={adminUi.metricCard}>
-                <p className="text-[10px] uppercase tracking-[0.14em] text-gray-500 font-bold">
-                  Fal Coverage Needed
-                </p>
-                <p className="text-xl font-bold text-pink-400 mt-2">
-                  {formatUsd(coverageTotals.fal)}
-                </p>
-              </div>
-              <div className={adminUi.metricCard}>
-                <p className="text-[10px] uppercase tracking-[0.14em] text-gray-500 font-bold">
-                  Total Coverage Needed
-                </p>
-                <p className="text-xl font-bold text-white mt-2">
-                  {formatUsd(coverageTotals.total)}
+          <div className="sa-stack d-rise">
+            <div className="d-head">
+              <div>
+                <div className="d-eyebrow">Settings</div>
+                <h2 className="d-h1">Global pricing template</h2>
+                <p className="d-sub">
+                  These prices are used as defaults for all new organizations unless overridden.
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-8 xl:grid-cols-12">
-              <div className={`${adminUi.panel} p-6 sm:p-8 xl:col-span-8`}>
-                <div className="mb-6">
-                  <h4 className={adminUi.sectionTitle}>
-                    Actual Provider Cost
-                  </h4>
-                  <p className="text-xs text-gray-500 mt-2">
-                    USD per render. Implied USD/credit is auto-calculated from configured platform deductions.
-                  </p>
+            <div className="sa-stats">
+              <div className="d-stat">
+                <div className="d-eyebrow">Fal coverage needed</div>
+                <div className="n violet">{formatUsd(coverageTotals.fal)}</div>
+              </div>
+              <div className="d-stat">
+                <div className="d-eyebrow">Total coverage needed</div>
+                <div className="n">{formatUsd(coverageTotals.total)}</div>
+              </div>
+            </div>
+
+            <div className="sa-pricing">
+              <section className="d-card">
+                <div className="sa-card-head">
+                  <div>
+                    <div className="d-h2">Actual provider cost</div>
+                    <p className="d-note sa-tight">
+                      USD per render. Implied USD/credit is auto-calculated from configured platform deductions.
+                    </p>
+                  </div>
                 </div>
-                <div className={adminUi.tableScroll}>
-                  <table className="w-full min-w-[600px]">
+                <div className="sa-table-wrap">
+                  <table className="d-table">
                     <thead>
-                      <tr className="border-b border-white/10 text-[10px] uppercase tracking-[0.14em] text-gray-500">
-                        <th className="py-3 text-left">Generation Variant</th>
-                        <th className="py-3 text-left">Provider</th>
-                        <th className="py-3 text-right">Credit / Render</th>
-                        <th className="py-3 text-right">Cost / Render ($)</th>
-                        <th className="py-3 text-right">Implied / Credit ($)</th>
+                      <tr>
+                        <th>Generation variant</th>
+                        <th>Provider</th>
+                        <th className="num">Credit / render</th>
+                        <th className="num">Cost / render ($)</th>
+                        <th className="num">Implied / credit ($)</th>
                       </tr>
                     </thead>
                     <tbody>
                       {variantRows.map((row) => (
-                        <tr key={row.id} className="border-b border-white/10">
-                          <td className="py-3 text-sm text-gray-200">{row.label}</td>
-                          <td className="py-3 text-xs uppercase tracking-widest text-gray-400">
-                            {row.provider}
+                        <tr key={row.id}>
+                          <td>{row.label}</td>
+                          <td>
+                            <span className="d-eyebrow">{row.provider}</span>
                           </td>
-                          <td className="py-3 text-sm text-right text-gray-200">
-                            {row.deductionCredits.toFixed(0)}
-                          </td>
-                          <td className="py-3 text-right">
+                          <td className="num">{row.deductionCredits.toFixed(0)}</td>
+                          <td className="num">
                             <input
                               type="number"
                               step="0.01"
@@ -2850,157 +2723,141 @@ export default function SuperAdminDashboard() {
                               value={row.providerCostPerRender}
                               onChange={(e) => handleVariantCostChange(row.id, e.target.value)}
                               onBlur={() => void handleVariantCostCommit(row.id)}
-                              className={`${adminUi.input} w-24 p-2 text-right text-xs`}
+                              aria-label={`${row.label} cost per render`}
+                              className="d-input sa-num wide"
                             />
                           </td>
-                          <td className="py-3 text-sm text-right font-semibold text-brand-accent">
-                            {formatUsd(row.impliedUsdPerCredit)}
-                          </td>
+                          <td className="num sa-accent">{formatUsd(row.impliedUsdPerCredit)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-                <p className="mt-4 text-[10px] uppercase tracking-[0.14em] text-gray-500">
+                <p className="d-note sa-card-note">
                   Wallet USD/credit uses the highest implied variant rate per wallet (conservative mode).
                 </p>
-                <div className={`${adminUi.tableScroll} mt-3`}>
-                  <table className="w-full min-w-[600px]">
+                <div className="sa-table-wrap">
+                  <table className="d-table">
                     <thead>
-                      <tr className="border-b border-white/10 text-[10px] uppercase tracking-[0.14em] text-gray-500">
-                        <th className="py-3 text-left">Wallet</th>
-                        <th className="py-3 text-left">Provider</th>
-                        <th className="py-3 text-right">Allocated Credits</th>
-                        <th className="py-3 text-right">Derived / Credit ($)</th>
-                        <th className="py-3 text-right">Coverage ($)</th>
+                      <tr>
+                        <th>Wallet</th>
+                        <th>Provider</th>
+                        <th className="num">Allocated credits</th>
+                        <th className="num">Derived / credit ($)</th>
+                        <th className="num">Coverage ($)</th>
                       </tr>
                     </thead>
                     <tbody>
                       {walletCoverageRows.map((row) => (
-                        <tr key={row.key} className="border-b border-white/10">
-                          <td className="py-3 text-sm text-gray-200">{row.label}</td>
-                          <td className="py-3 text-xs uppercase tracking-widest text-gray-400">
-                            {row.provider}
+                        <tr key={row.key}>
+                          <td>{row.label}</td>
+                          <td>
+                            <span className="d-eyebrow">{row.provider}</span>
                           </td>
-                          <td className="py-3 text-sm text-right text-gray-200">
-                            {row.allocatedCredits.toFixed(0)}
-                          </td>
-                          <td className="py-3 text-sm text-right text-gray-200">
-                            {formatUsd(row.usdPerCredit)}
-                          </td>
-                          <td className="py-3 text-sm text-right font-semibold text-brand-accent">
-                            {formatUsd(row.requiredUsd)}
-                          </td>
+                          <td className="num">{row.allocatedCredits.toFixed(0)}</td>
+                          <td className="num">{formatUsd(row.usdPerCredit)}</td>
+                          <td className="num sa-accent">{formatUsd(row.requiredUsd)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </div>
+              </section>
 
-              <div className={`${adminUi.panel} p-6 sm:p-7 xl:col-span-4`}>
-                <h4 className={`${adminUi.sectionTitle} mb-6 border-b border-white/10 pb-2`}>
-                  Platform Render Credit Cost
-                </h4>
-                <div className="grid grid-cols-1 gap-4">
-                  <div className={`${adminUi.mutedCard} p-5`}>
-                    <h5 className={`${adminUi.sectionTitle} mb-4`}>PicDrift Engine</h5>
-                    <div className="space-y-4">
-                      {[
-                        { key: "pricePicDrift_5s", label: "Standard 5s" },
-                        { key: "pricePicDrift_10s", label: "Standard 10s" },
-                        { key: "priceAsset_DriftPath", label: "3DX Drift Path" },
-                      ].map(({ key, label }) => (
-                        <div key={key} className="flex justify-between items-center">
-                          <span className="text-[10px] text-gray-400 uppercase font-bold">
-                            {label}
-                          </span>
-                          <input
-                            type="number"
-                            step="1"
-                            min="0"
-                            className={`${adminUi.input} w-16 p-1 text-center text-xs`}
-                            defaultValue={toInt(String(globalSettings[key]), 0)}
-                            onBlur={(e) =>
-                              apiEndpoints.superadminUpdateGlobalSettings({
-                                [key]: toInt(
-                                  e.target.value,
-                                  toInt(String(globalSettings[key]), 0),
-                                ),
-                              })
-                            }
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+              <section className="d-card d-card-pad">
+                <div className="d-h2">Platform render credit cost</div>
+                <p className="d-note sa-tight">Credits per render. Each field saves when you leave it.</p>
 
-                  <div className={`${adminUi.mutedCard} p-5`}>
-                    <h5 className={`${adminUi.sectionTitle} mb-4`}>Studio & Editor</h5>
-                    <div className="space-y-4">
-                      {["pricePicFX_Standard", "pricePicFX_Carousel", "pricePicFX_Batch", "priceEditor_Pro", "priceEditor_Enhance", "priceEditor_Convert"].map(key => (
-                        <div key={key} className="flex justify-between items-center">
-                          <span className="text-[10px] text-gray-400 uppercase font-bold truncate max-w-[120px]" title={key}>{key.replace('price', '').replace(/_/g, ' ')}</span>
-                          <input
-                            type="number"
-                            step="1"
-                            min="0"
-                            className={`${adminUi.input} w-16 p-1 text-center text-xs`}
-                            defaultValue={toInt(String(globalSettings[key]), 0)}
-                            onBlur={(e) =>
-                              apiEndpoints.superadminUpdateGlobalSettings({
-                                [key]: toInt(
-                                  e.target.value,
-                                  toInt(String(globalSettings[key]), 0),
-                                ),
-                              })
-                            }
-                          />
-                        </div>
-                      ))}
+                <div className="d-hair sa-price-group">
+                  <div className="d-label">PicDrift engine</div>
+                  {[
+                    { key: "pricePicDrift_5s", label: "Standard 5s" },
+                    { key: "pricePicDrift_10s", label: "Standard 10s" },
+                    { key: "priceAsset_DriftPath", label: "3DX Drift Path" },
+                  ].map(({ key, label }) => (
+                    <div key={key} className="sa-price-row">
+                      <span>{label}</span>
+                      <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        aria-label={label}
+                        className="d-input sa-num"
+                        defaultValue={toInt(String(globalSettings[key]), 0)}
+                        onBlur={(e) =>
+                          apiEndpoints.superadminUpdateGlobalSettings({
+                            [key]: toInt(
+                              e.target.value,
+                              toInt(String(globalSettings[key]), 0),
+                            ),
+                          })
+                        }
+                      />
                     </div>
-                  </div>
-
-                  <div className={`${adminUi.mutedCard} p-5`}>
-                    <h5 className={`${adminUi.sectionTitle} mb-4`}>Video Engines</h5>
-                    <div className="space-y-4">
-                      {[
-                        { key: "pricePicDrift_Plus_5s", label: "Kling 3.0 · 5s" },
-                        { key: "pricePicDrift_Plus_10s", label: "Kling 3.0 · 10s" },
-                        { key: "priceVideoFX1_10s", label: "Topaz Upscale 2x" },
-                        { key: "priceVideoFX1_15s", label: "Topaz Upscale 4x" },
-                        { key: "priceVideoFX2_4s", label: "Seedance 2.0 · 4s" },
-                        { key: "priceVideoFX2_8s", label: "Seedance 2.0 · 8s" },
-                        { key: "priceVideoFX2_12s", label: "Seedance 2.0 · 12s" },
-                        { key: "priceVideoFX3_4s", label: "H3 Max · 5–6s" },
-                        { key: "priceVideoFX3_6s", label: "H3 Max · 7–10s" },
-                        { key: "priceVideoFX3_8s", label: "H3 Max · 11–15s" },
-                      ].map(({ key, label }) => (
-                        <div key={key} className="flex justify-between items-center">
-                          <span className="text-[10px] text-gray-400 uppercase font-bold">
-                            {label}
-                          </span>
-                          <input
-                            type="number"
-                            step="1"
-                            min="0"
-                            className={`${adminUi.input} w-16 p-1 text-center text-xs`}
-                            defaultValue={toInt(String(globalSettings[key]), 0)}
-                            onBlur={(e) =>
-                              apiEndpoints.superadminUpdateGlobalSettings({
-                                [key]: toInt(
-                                  e.target.value,
-                                  toInt(String(globalSettings[key]), 0),
-                                ),
-                              })
-                            }
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              </div>
+
+                <div className="d-hair sa-price-group">
+                  <div className="d-label">Studio &amp; editor</div>
+                  {["pricePicFX_Standard", "pricePicFX_Carousel", "pricePicFX_Batch", "priceEditor_Pro", "priceEditor_Enhance", "priceEditor_Convert"].map(key => (
+                    <div key={key} className="sa-price-row">
+                      <span title={key}>{key.replace('price', '').replace(/_/g, ' ')}</span>
+                      <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        aria-label={key}
+                        className="d-input sa-num"
+                        defaultValue={toInt(String(globalSettings[key]), 0)}
+                        onBlur={(e) =>
+                          apiEndpoints.superadminUpdateGlobalSettings({
+                            [key]: toInt(
+                              e.target.value,
+                              toInt(String(globalSettings[key]), 0),
+                            ),
+                          })
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="d-hair sa-price-group">
+                  <div className="d-label">Video engines</div>
+                  {[
+                    { key: "pricePicDrift_Plus_5s", label: "Kling 3.0 · 5s" },
+                    { key: "pricePicDrift_Plus_10s", label: "Kling 3.0 · 10s" },
+                    { key: "priceVideoFX1_10s", label: "Topaz Upscale 2x" },
+                    { key: "priceVideoFX1_15s", label: "Topaz Upscale 4x" },
+                    { key: "priceVideoFX2_4s", label: "Seedance 2.0 · 4s" },
+                    { key: "priceVideoFX2_8s", label: "Seedance 2.0 · 8s" },
+                    { key: "priceVideoFX2_12s", label: "Seedance 2.0 · 12s" },
+                    { key: "priceVideoFX3_4s", label: "H3 Max · 5–6s" },
+                    { key: "priceVideoFX3_6s", label: "H3 Max · 7–10s" },
+                    { key: "priceVideoFX3_8s", label: "H3 Max · 11–15s" },
+                  ].map(({ key, label }) => (
+                    <div key={key} className="sa-price-row">
+                      <span>{label}</span>
+                      <input
+                        type="number"
+                        step="1"
+                        min="0"
+                        aria-label={label}
+                        className="d-input sa-num"
+                        defaultValue={toInt(String(globalSettings[key]), 0)}
+                        onBlur={(e) =>
+                          apiEndpoints.superadminUpdateGlobalSettings({
+                            [key]: toInt(
+                              e.target.value,
+                              toInt(String(globalSettings[key]), 0),
+                            ),
+                          })
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+              </section>
             </div>
           </div>
         )}
@@ -3010,162 +2867,160 @@ export default function SuperAdminDashboard() {
       <div className="sa-ink">
       {/* MODAL: NEW TENANT */}
       {showTenantModal && (
-        <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg shadow-2xl max-h-[92vh] overflow-y-auto">
-            <div className="p-8 border-b border-gray-800">
-              <h3 className="text-xl font-bold text-white uppercase tracking-tight">Provision New Tenant</h3>
-              <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Create Organization & Admin Account</p>
+        <div className="sa-overlay">
+          <div className="sa-dialog" role="dialog" aria-modal="true" aria-labelledby="new-tenant-title">
+            <div className="sa-dialog-head">
+              <div>
+                <h3 id="new-tenant-title" className="d-h1">Provision new tenant</h3>
+                <p className="d-note sa-tight">Create organization &amp; admin account</p>
+              </div>
             </div>
-            <form onSubmit={handleCreateTenant} className="p-8 space-y-6">
-              <div className="grid grid-cols-1 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Organization Name</label>
-                  <input
-                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm outline-none focus:border-brand-accent text-white"
-                    placeholder="e.g. Paramount Visuals"
-                    required
-                    onChange={e => setNewTenant({ ...newTenant, orgName: e.target.value })}
-                  />
+            <form onSubmit={handleCreateTenant} className="sa-dialog-body">
+              <div className="d-field">
+                <label className="d-label" htmlFor="new-tenant-name">Organization name</label>
+                <input
+                  id="new-tenant-name"
+                  className="d-input"
+                  placeholder="e.g. Paramount Visuals"
+                  required
+                  onChange={e => setNewTenant({ ...newTenant, orgName: e.target.value })}
+                />
+              </div>
+              <div className="sa-grid-2">
+                <div className="d-field">
+                  <label className="d-label" htmlFor="new-tenant-users">User limit</label>
+                  <input id="new-tenant-users" type="number" className="d-input" defaultValue={5} onChange={e => setNewTenant({ ...newTenant, maxUsers: parseInt(e.target.value) })} />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">User Limit</label>
-                    <input type="number" className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white" defaultValue={5} onChange={e => setNewTenant({ ...newTenant, maxUsers: parseInt(e.target.value) })} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Project Limit</label>
-                    <input type="number" className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white" defaultValue={20} onChange={e => setNewTenant({ ...newTenant, maxProjectsTotal: parseInt(e.target.value) })} />
-                  </div>
+                <div className="d-field">
+                  <label className="d-label" htmlFor="new-tenant-projects">Project limit</label>
+                  <input id="new-tenant-projects" type="number" className="d-input" defaultValue={20} onChange={e => setNewTenant({ ...newTenant, maxProjectsTotal: parseInt(e.target.value) })} />
                 </div>
-                <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform Storage Limit (GB)</label>
+              </div>
+              <div className="d-field">
+                <label className="d-label" htmlFor="new-tenant-storage">Platform storage limit (GB)</label>
+                <input
+                  id="new-tenant-storage"
+                  type="number"
+                  step="0.25"
+                  min="0"
+                  className="d-input"
+                  value={mbToGb(newTenant.maxStorageMb).toString()}
+                  onChange={e =>
+                    setNewTenant({
+                      ...newTenant,
+                      maxStorageMb: gbToMb(e.target.value, newTenant.maxStorageMb),
+                    })
+                  }
+                />
+                <p className="d-note sa-tight">Default 10GB</p>
+              </div>
+              <div className="d-field">
+                <label className="d-label" htmlFor="new-tenant-view">Platform view</label>
+                <select
+                  id="new-tenant-view"
+                  className="d-select"
+                  value={newTenant.view}
+                  onChange={e => setNewTenant({ ...newTenant, view: e.target.value })}
+                >
+                  <option value="VISIONLIGHT">VisionLight View (Full)</option>
+                  <option value="PICDRIFT">PicDrift View (Limited)</option>
+                </select>
+              </div>
+              <div className="d-hair sa-plan">
+                <div className="d-label sa-flat">Tenant type</div>
+                <div className="d-tabs fill" role="radiogroup" aria-label="Tenant type">
+                  {["PAID", "DEMO"].map((plan) => (
+                    <button
+                      key={plan}
+                      type="button"
+                      role="radio"
+                      aria-checked={newTenant.tenantPlan === plan}
+                      onClick={() => setNewTenant({ ...newTenant, tenantPlan: plan })}
+                      className={`d-tab ${newTenant.tenantPlan === plan ? "active" : ""}`}
+                    >
+                      {plan === "PAID" ? "Paid" : "Demo"}
+                    </button>
+                  ))}
+                </div>
+                {newTenant.tenantPlan === "DEMO" && (
+                  <div className="d-field">
+                    <label className="d-label" htmlFor="new-tenant-days">Deactivate after days</label>
                     <input
+                      id="new-tenant-days"
                       type="number"
-                      step="0.25"
-                      min="0"
-                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
-                      value={mbToGb(newTenant.maxStorageMb).toString()}
-                      onChange={e =>
+                      min="1"
+                      step="1"
+                      className="d-input"
+                      value={newTenant.trialDays}
+                      onChange={(e) =>
                         setNewTenant({
                           ...newTenant,
-                          maxStorageMb: gbToMb(e.target.value, newTenant.maxStorageMb),
+                          trialDays: Math.max(1, toInt(e.target.value, 14)),
                         })
                       }
                     />
-                    <p className="text-[10px] text-gray-500">Default 10GB</p>
-                </div>
-                <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform View</label>
-                    <select
-                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
-                      value={newTenant.view}
-                      onChange={e => setNewTenant({ ...newTenant, view: e.target.value })}
-                    >
-                      <option value="VISIONLIGHT">VisionLight View (Full)</option>
-                      <option value="PICDRIFT">PicDrift View (Limited)</option>
-                    </select>
-                </div>
-                <div className="space-y-3 rounded-xl border border-gray-800 bg-gray-950/70 p-4">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Tenant Type</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {["PAID", "DEMO"].map((plan) => (
-                      <button
-                        key={plan}
-                        type="button"
-                        onClick={() => setNewTenant({ ...newTenant, tenantPlan: plan })}
-                        className={`rounded-lg border py-3 text-[10px] font-bold uppercase tracking-widest transition-colors ${
-                          newTenant.tenantPlan === plan
-                            ? "border-brand-accent bg-brand-accent/15 text-brand-accent"
-                            : "border-gray-800 bg-gray-900 text-gray-500 hover:text-white"
-                        }`}
-                      >
-                        {plan === "PAID" ? "Paid" : "Demo"}
-                      </button>
-                    ))}
                   </div>
-                  {newTenant.tenantPlan === "DEMO" && (
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Deactivate After Days</label>
-                      <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        className="w-full p-3 bg-gray-900 border border-gray-800 rounded-lg text-sm text-white"
-                        value={newTenant.trialDays}
-                        onChange={(e) =>
-                          setNewTenant({
-                            ...newTenant,
-                            trialDays: Math.max(1, toInt(e.target.value, 14)),
-                          })
-                        }
-                      />
-                    </div>
-                  )}
-                </div>
-                <div className="border-t border-gray-800 pt-6 space-y-4">
-                  <h4 className="text-[10px] font-bold text-brand-accent uppercase tracking-widest">Tenant Admin Account</h4>
-                  <input
-                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
-                    placeholder="Admin Email"
-                    type="email"
-                    value={newTenant.adminEmail}
-                    required
-                    onChange={(e) => {
-                      setNewTenant({ ...newTenant, adminEmail: e.target.value });
-                      setTenantAdminEmailStatus(null);
-                    }}
-                  />
-                  {isTenantAdminEmailChecked && (
-                    <div
-                      className={`rounded-xl border p-3 text-[10px] font-bold uppercase tracking-widest ${
-                        tenantAdminEmailStatus?.authExists
-                          ? "border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
-                          : "border-amber-400/25 bg-amber-400/10 text-amber-200"
-                      }`}
-                    >
+                )}
+              </div>
+              <div className="sa-divide sa-stack-sm">
+                <div className="d-label sa-flat">Tenant admin account</div>
+                <input
+                  className="d-input"
+                  placeholder="Admin Email"
+                  type="email"
+                  value={newTenant.adminEmail}
+                  required
+                  onChange={(e) => {
+                    setNewTenant({ ...newTenant, adminEmail: e.target.value });
+                    setTenantAdminEmailStatus(null);
+                  }}
+                />
+                {isTenantAdminEmailChecked && (
+                  <div className={`d-banner ${tenantAdminEmailStatus?.authExists ? "sa-info" : "warn"}`}>
+                    <span>
                       {tenantAdminEmailStatus?.authExists
                         ? "Existing login found. Tenant admin will use their current password."
                         : "New login. Set an initial password for this tenant admin."}
-                    </div>
-                  )}
-                  {canContinueTenantAdmin && (
-                    <>
+                    </span>
+                  </div>
+                )}
+                {canContinueTenantAdmin && (
+                  <>
+                    <input
+                      className="d-input"
+                      placeholder="Admin Name (optional)"
+                      value={newTenant.adminName}
+                      onChange={e => setNewTenant({ ...newTenant, adminName: e.target.value })}
+                    />
+                    {tenantAdminNeedsPassword && (
                       <input
-                        className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
-                        placeholder="Admin Name (optional)"
-                        value={newTenant.adminName}
-                        onChange={e => setNewTenant({ ...newTenant, adminName: e.target.value })}
+                        className="d-input"
+                        placeholder="Initial Password"
+                        type="password"
+                        value={newTenant.adminPassword}
+                        required
+                        minLength={6}
+                        onChange={e => setNewTenant({ ...newTenant, adminPassword: e.target.value })}
                       />
-                      {tenantAdminNeedsPassword && (
-                        <input
-                          className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
-                          placeholder="Initial Password"
-                          type="password"
-                          value={newTenant.adminPassword}
-                          required
-                          minLength={6}
-                          onChange={e => setNewTenant({ ...newTenant, adminPassword: e.target.value })}
-                        />
-                      )}
-                    </>
-                  )}
-                </div>
+                    )}
+                  </>
+                )}
               </div>
-              <div className="flex gap-4 pt-4">
+              <div className="sa-dialog-foot">
                 <button
                   type="button"
                   onClick={() => {
                     setShowTenantModal(false);
                     resetNewTenantForm();
                   }}
-                  className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors"
+                  className="d-btn ghost"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading || checkingTenantAdminEmail}
-                  className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all disabled:opacity-50"
+                  className="d-btn primary"
                 >
                   {actionLoading ? (
                     <LoadingSpinner size="sm" color="text-gray-950" />
@@ -3185,55 +3040,61 @@ export default function SuperAdminDashboard() {
 
       {/* MODAL: EDIT TENANT */}
       {editingTenant && (
-        <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg shadow-2xl max-h-[92vh] overflow-y-auto">
-            <div className="p-8 border-b border-gray-800 flex justify-between items-center">
+        <div className="sa-overlay">
+          <div className="sa-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-tenant-title">
+            <div className="sa-dialog-head">
               <div>
-                <h3 className="text-xl font-bold text-white uppercase tracking-tight">
-                  {editingTenant.isDefault ? "Configure Default Org" : "Configure Tenant"}
+                <h3 id="edit-tenant-title" className="d-h1">
+                  {editingTenant.isDefault ? "Configure default org" : "Configure tenant"}
                 </h3>
-                <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">{editingTenant.name}</p>
+                <p className="d-note sa-tight">{editingTenant.name}</p>
               </div>
-              <button onClick={() => setEditingTenant(null)} className="text-gray-500 hover:text-white font-bold text-xl">x</button>
+              <button type="button" onClick={() => setEditingTenant(null)} className="d-x" aria-label="Close">
+                ×
+              </button>
             </div>
-            <div className="p-8 space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Organization Name</label>
+            <div className="sa-dialog-body">
+              <div className="d-field">
+                <label className="d-label" htmlFor="edit-tenant-name">Organization name</label>
                 <input
-                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                  id="edit-tenant-name"
+                  className="d-input"
                   value={tenantUpdates.name}
                   onChange={e => setTenantUpdates({ ...tenantUpdates, name: e.target.value })}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Max Users</label>
+              <div className="sa-grid-2">
+                <div className="d-field">
+                  <label className="d-label" htmlFor="edit-tenant-users">Max users</label>
                   <input
+                    id="edit-tenant-users"
                     type="number"
-                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                    className="d-input"
                     value={tenantUpdates.maxUsers}
                     onChange={e => setTenantUpdates({ ...tenantUpdates, maxUsers: parseInt(e.target.value) })}
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Max Projects</label>
+                <div className="d-field">
+                  <label className="d-label" htmlFor="edit-tenant-projects">Max projects</label>
                   <input
+                    id="edit-tenant-projects"
                     type="number"
-                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                    className="d-input"
                     value={tenantUpdates.maxProjectsTotal}
                     onChange={e => setTenantUpdates({ ...tenantUpdates, maxProjectsTotal: parseInt(e.target.value) })}
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform Storage Limit (GB)</label>
+              <div className="d-field">
+                <label className="d-label" htmlFor="edit-tenant-storage">Platform storage limit (GB)</label>
                 <input
+                  id="edit-tenant-storage"
                   type="number"
                   step="0.25"
                   min="0"
-                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                  className="d-input"
                   value={mbToGb(tenantUpdates.maxStorageMb).toString()}
                   onChange={e =>
                     setTenantUpdates({
@@ -3244,30 +3105,31 @@ export default function SuperAdminDashboard() {
                 />
               </div>
               {editingTenant.storageSummary && (
-                <div className="rounded-xl border border-gray-800 bg-gray-950/60 p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                    Current Storage Usage
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-white">
+                <div className="d-hair sa-plan sa-tight-gap">
+                  <div className="d-label sa-flat">Current storage usage</div>
+                  <div className="sa-strong">
                     {mbToGb(Number(editingTenant.storageSummary.usedMb || 0)).toFixed(2)}GB used
-                  </p>
-                  <p className="mt-1 text-[10px] uppercase tracking-widest text-gray-500">
+                  </div>
+                  <div className="d-faint sa-small">
                     Remaining {mbToGb(Number(editingTenant.storageSummary.remainingMb || 0)).toFixed(2)}GB
-                  </p>
+                  </div>
                 </div>
               )}
 
               {editingTenant.isDefault ? (
-                <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-4 text-xs leading-relaxed text-emerald-100">
-                  Default org is platform-owned and protected. You can rename it and adjust limits, but deletion,
-                  deactivation, and bulk platform-view switching are disabled.
+                <div className="d-banner ok">
+                  <span>
+                    Default org is platform-owned and protected. You can rename it and adjust limits, but deletion,
+                    deactivation, and bulk platform-view switching are disabled.
+                  </span>
                 </div>
               ) : (
                 <>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform View (Applies to all users)</label>
+                  <div className="d-field">
+                    <label className="d-label" htmlFor="edit-tenant-view">Platform view (applies to all users)</label>
                     <select
-                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                      id="edit-tenant-view"
+                      className="d-select"
                       value={tenantUpdates.view}
                       onChange={e => setTenantUpdates({ ...tenantUpdates, view: e.target.value })}
                     >
@@ -3276,42 +3138,36 @@ export default function SuperAdminDashboard() {
                     </select>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Subscription Status</label>
-                    <div className="flex gap-4">
+                  <div className="d-field">
+                    <div className="d-label">Subscription status</div>
+                    <div className="sa-grid-2">
                       <button
+                        type="button"
                         onClick={() => setTenantUpdates({ ...tenantUpdates, isActive: true })}
-                        className={`flex-1 py-3 rounded-lg border text-xs font-bold uppercase tracking-widest transition-colors ${tenantUpdates.isActive
-                            ? "bg-green-500/10 border-green-500/50 text-green-400"
-                            : "bg-gray-950 border-gray-800 text-gray-500 hover:text-white"
-                          }`}
+                        className={`d-btn ${tenantUpdates.isActive ? "sa-on-ok" : ""}`}
                       >
                         Active
                       </button>
                       <button
+                        type="button"
                         onClick={() => setTenantUpdates({ ...tenantUpdates, isActive: false })}
-                        className={`flex-1 py-3 rounded-lg border text-xs font-bold uppercase tracking-widest transition-colors ${!tenantUpdates.isActive
-                            ? "bg-red-500/10 border-red-500/50 text-red-400"
-                            : "bg-gray-950 border-gray-800 text-gray-500 hover:text-white"
-                          }`}
+                        className={`d-btn ${!tenantUpdates.isActive ? "sa-on-err" : ""}`}
                       >
                         Deactivated
                       </button>
                     </div>
                   </div>
 
-                  <div className="space-y-3 rounded-lg border border-gray-800 bg-gray-950/60 p-4">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                        Plan &amp; Billing
-                      </label>
+                  <div className="d-hair sa-plan">
+                    <div className="d-head">
+                      <div className="d-label sa-flat">Plan &amp; billing</div>
                       <span
-                        className={`rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest border ${
+                        className={`d-pill ${
                           (editingTenant as any).tenantPlan === "DEMO"
-                            ? "border-amber-500/50 bg-amber-500/10 text-amber-400"
+                            ? "warn"
                             : (editingTenant as any).tenantPlan === "PAID"
-                              ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
-                              : "border-gray-700 bg-gray-900 text-gray-400"
+                              ? "ok"
+                              : ""
                         }`}
                       >
                         {(editingTenant as any).tenantPlan === "DEMO"
@@ -3324,8 +3180,8 @@ export default function SuperAdminDashboard() {
 
                     {/* Plan flip — keeps the tenant on their own view-based
                         domain (no BYOK, no domain change). */}
-                    <div className="flex gap-2">
-                      <div className="flex items-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/10 pl-2">
+                    <div className="sa-inline">
+                      <div className="sa-days">
                         <input
                           type="number"
                           min="1"
@@ -3334,8 +3190,8 @@ export default function SuperAdminDashboard() {
                           onChange={(e) =>
                             setPlanDemoDays(Math.max(1, toInt(e.target.value, 14)))
                           }
-                          className="w-12 bg-transparent py-2.5 text-center text-xs font-bold text-amber-200 outline-none"
                           title="Demo length in days"
+                          aria-label="Demo length in days"
                         />
                         <button
                           type="button"
@@ -3347,9 +3203,9 @@ export default function SuperAdminDashboard() {
                             )
                           }
                           disabled={actionLoading}
-                          className="rounded-r-lg px-3 py-2.5 text-xs font-bold uppercase tracking-widest text-amber-300 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
+                          className="d-btn sm warn"
                         >
-                          Start Demo
+                          Start demo
                         </button>
                       </div>
                       <button
@@ -3358,12 +3214,12 @@ export default function SuperAdminDashboard() {
                           void handleSetManualPlan(editingTenant.id, "PAID")
                         }
                         disabled={actionLoading}
-                        className="flex-1 py-2.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 text-xs font-bold uppercase tracking-widest transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
+                        className="d-btn sm sa-on-ok sa-grow"
                       >
-                        Mark as Paid
+                        Mark as paid
                       </button>
                     </div>
-                    <p className="text-[10px] text-gray-500 leading-relaxed">
+                    <p className="d-note sa-flat">
                       Keeps their view &amp; {tenantUpdates.view === "PICDRIFT" ? "picdrift.studio" : "visualfx.studio"} domain.
                       Demo runs for the days you set; after it ends they keep their
                       dashboard &amp; content but can&rsquo;t render until upgraded.
@@ -3371,15 +3227,16 @@ export default function SuperAdminDashboard() {
 
                     {/* Explicit package activation — intentionally applies the
                         package's domain routing (moves them onto a BYOK domain). */}
-                    <div className="border-t border-gray-800 pt-3">
-                      <label className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">
+                    <div className="sa-divide sa-stack-sm">
+                      <label className="d-label sa-flat" htmlFor="edit-tenant-package">
                         Activate a package (advanced)
                       </label>
-                      <div className="mt-2 flex gap-2">
+                      <div className="sa-inline">
                         <select
+                          id="edit-tenant-package"
                           value={planPackageCode}
                           onChange={(e) => setPlanPackageCode(e.target.value)}
-                          className="flex-1 rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-xs font-semibold text-gray-200 outline-none focus:border-brand-accent"
+                          className="d-select sm sa-grow"
                         >
                           <option value="BYOK_TRIAL">BYOK Trial (14-day · byok.link)</option>
                           <option value="PD_APP">PicDrift App</option>
@@ -3394,12 +3251,12 @@ export default function SuperAdminDashboard() {
                             void handleActivatePackage(editingTenant.id, planPackageCode)
                           }
                           disabled={actionLoading}
-                          className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 text-xs font-bold uppercase tracking-widest text-cyan-300 transition-colors hover:bg-cyan-500/20 disabled:opacity-50"
+                          className="d-btn sm soft"
                         >
                           Activate
                         </button>
                       </div>
-                      <p className="mt-2 text-[10px] text-amber-300/70 leading-relaxed">
+                      <p className="d-note sa-flat sa-warn-note">
                         Moves the tenant onto the package&rsquo;s domain &amp; limits (BYOK lifecycle). Use only when you want package-specific routing.
                       </p>
                     </div>
@@ -3407,9 +3264,9 @@ export default function SuperAdminDashboard() {
                 </>
               )}
 
-              <div className="flex gap-4 pt-4">
-                <button type="button" onClick={() => setEditingTenant(null)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
-                <button onClick={handleUpdateTenant} disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
+              <div className="sa-dialog-foot">
+                <button type="button" onClick={() => setEditingTenant(null)} className="d-btn ghost">Cancel</button>
+                <button type="button" onClick={handleUpdateTenant} disabled={actionLoading} className="d-btn primary">
                   {actionLoading ? <LoadingSpinner size="sm" color="text-gray-950" /> : "Save Changes"}
                 </button>
               </div>
@@ -3420,17 +3277,20 @@ export default function SuperAdminDashboard() {
 
       {/* MODAL: EDIT USER (Manage View/Role) */}
       {editingUser && (
-        <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl max-h-[92vh] overflow-y-auto">
-            <div className="p-8 border-b border-gray-800">
-              <h3 className="text-xl font-bold text-white uppercase tracking-tight">Manage User</h3>
-              <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">{editingUser.email}</p>
+        <div className="sa-overlay">
+          <div className="sa-dialog sm" role="dialog" aria-modal="true" aria-labelledby="edit-user-title">
+            <div className="sa-dialog-head">
+              <div>
+                <h3 id="edit-user-title" className="d-h1">Manage user</h3>
+                <p className="d-note sa-tight">{editingUser.email}</p>
+              </div>
             </div>
-            <div className="p-8 space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform View</label>
+            <div className="sa-dialog-body">
+              <div className="d-field">
+                <label className="d-label" htmlFor="edit-user-view">Platform view</label>
                 <select
-                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                  id="edit-user-view"
+                  className="d-select"
                   value={userUpdates.view}
                   onChange={e => setUserUpdates({ ...userUpdates, view: e.target.value })}
                 >
@@ -3439,10 +3299,11 @@ export default function SuperAdminDashboard() {
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Role</label>
+              <div className="d-field">
+                <label className="d-label" htmlFor="edit-user-role">Account role</label>
                 <select
-                  className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                  id="edit-user-role"
+                  className="d-select"
                   value={userUpdates.role}
                   disabled={isProtectedUser(editingUser)}
                   onChange={e => setUserUpdates({ ...userUpdates, role: e.target.value })}
@@ -3453,42 +3314,43 @@ export default function SuperAdminDashboard() {
                   <option value="SUPERADMIN">System SuperAdmin</option>
                 </select>
                 {isProtectedUser(editingUser) && (
-                  <p className="text-[10px] text-amber-300">
+                  <p className="d-note sa-tight sa-warn-note">
                     {getProtectionLabel(editingUser)} role cannot be downgraded.
                   </p>
                 )}
               </div>
 
               {editingUser.organizationId === adminUser?.organizationId && (
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Project Limit</label>
+                <div className="d-field">
+                  <label className="d-label" htmlFor="edit-user-projects">Project limit</label>
                   {userUpdates.role === "SUPERADMIN" ? (
-                    <div className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-emerald-300 font-bold">
-                      Unlimited (SuperAdmin)
+                    <div className="d-banner ok">
+                      <span>Unlimited (SuperAdmin)</span>
                     </div>
                   ) : (
                     <input
+                      id="edit-user-projects"
                       type="number"
                       min={1}
-                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                      className="d-input"
                       value={userUpdates.maxProjects}
                       onChange={e => setUserUpdates({ ...userUpdates, maxProjects: Math.max(1, toInt(e.target.value, 3)) })}
                     />
                   )}
-                  <p className="text-[10px] text-gray-500">Drawn from the agency's project pool.</p>
+                  <p className="d-note sa-tight">Drawn from the agency's project pool.</p>
                 </div>
               )}
 
-              <div className="space-y-2 rounded-xl border border-gray-800 bg-gray-950/60 p-4">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Password Reset</label>
-                <p className="text-[10px] leading-relaxed text-gray-500">
+              <div className="d-hair sa-plan sa-tight-gap">
+                <div className="d-label sa-flat">Password reset</div>
+                <p className="d-note sa-flat">
                   Passwords are account-level and may be shared across multiple studios. Users reset their own password from the login page.
                 </p>
               </div>
 
-              <div className="flex gap-4 pt-4">
-                <button type="button" onClick={() => setEditingUser(null)} className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors">Cancel</button>
-                <button onClick={handleUpdateUserBasic} disabled={actionLoading} className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all">
+              <div className="sa-dialog-foot">
+                <button type="button" onClick={() => setEditingUser(null)} className="d-btn ghost">Cancel</button>
+                <button type="button" onClick={handleUpdateUserBasic} disabled={actionLoading} className="d-btn primary">
                   Update User
                 </button>
               </div>
@@ -3499,15 +3361,17 @@ export default function SuperAdminDashboard() {
 
       {/* MODAL: NEW DEMO */}
       {showDemoModal && (
-        <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl max-h-[92vh] overflow-y-auto">
-            <div className="p-8 border-b border-gray-800">
-              <h3 className="text-xl font-bold text-white uppercase tracking-tight">New Demo Account</h3>
-              <p className="text-xs text-gray-500 mt-1 uppercase tracking-widest">Locked to PicDrift View</p>
+        <div className="sa-overlay">
+          <div className="sa-dialog sm" role="dialog" aria-modal="true" aria-labelledby="new-demo-title">
+            <div className="sa-dialog-head">
+              <div>
+                <h3 id="new-demo-title" className="d-h1">New demo account</h3>
+                <p className="d-note sa-tight">Locked to PicDrift view</p>
+              </div>
             </div>
-            <form onSubmit={handleCreateDemo} className="p-8 space-y-6">
+            <form onSubmit={handleCreateDemo} className="sa-dialog-body">
               <input
-                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                className="d-input"
                 placeholder="Demo Lead Email"
                 type="email"
                 value={newDemo.email}
@@ -3519,25 +3383,27 @@ export default function SuperAdminDashboard() {
               />
               {isDemoEmailChecked && (
                 <div
-                  className={`rounded-xl border p-3 text-[10px] font-bold uppercase tracking-widest ${
+                  className={`d-banner ${
                     demoEmailStatus?.existingProfileInOrganization
-                      ? "border-red-500/30 bg-red-500/10 text-red-300"
+                      ? "err"
                       : demoEmailStatus?.authExists
-                        ? "border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
-                        : "border-amber-400/25 bg-amber-400/10 text-amber-200"
+                        ? "sa-info"
+                        : "warn"
                   }`}
                 >
-                  {demoEmailStatus?.existingProfileInOrganization
-                    ? "This email already has a demo/default workspace profile."
-                    : demoEmailStatus?.authExists
-                      ? "Existing login found. Demo profile will use the current password."
-                      : "New login. Set an initial password for this demo profile."}
+                  <span>
+                    {demoEmailStatus?.existingProfileInOrganization
+                      ? "This email already has a demo/default workspace profile."
+                      : demoEmailStatus?.authExists
+                        ? "Existing login found. Demo profile will use the current password."
+                        : "New login. Set an initial password for this demo profile."}
+                  </span>
                 </div>
               )}
               {canContinueDemo && (
                 <>
                   <input
-                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                    className="d-input"
                     placeholder="Demo Lead Name"
                     value={newDemo.name}
                     required
@@ -3545,7 +3411,7 @@ export default function SuperAdminDashboard() {
                   />
                   {demoNeedsPassword && (
                     <input
-                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                      className="d-input"
                       placeholder="Initial Password"
                       type="password"
                       value={newDemo.password}
@@ -3556,14 +3422,14 @@ export default function SuperAdminDashboard() {
                   )}
                 </>
               )}
-              <div className="flex gap-4 pt-4">
+              <div className="sa-dialog-foot">
                 <button
                   type="button"
                   onClick={() => {
                     setShowDemoModal(false);
                     resetNewDemoForm();
                   }}
-                  className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors"
+                  className="d-btn ghost"
                 >
                   Cancel
                 </button>
@@ -3574,7 +3440,7 @@ export default function SuperAdminDashboard() {
                     checkingDemoEmail ||
                     demoEmailStatus?.existingProfileInOrganization === true
                   }
-                  className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all disabled:opacity-50"
+                  className="d-btn primary"
                 >
                   {actionLoading ? (
                     <LoadingSpinner size="sm" color="text-gray-950" />
@@ -3720,14 +3586,16 @@ export default function SuperAdminDashboard() {
 
       {/* MODAL: ADD TEAM MEMBER */}
       {showAddTeamModal && (
-        <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md shadow-2xl max-h-[92vh] overflow-y-auto">
-            <div className="p-8 border-b border-gray-800">
-              <h3 className="text-xl font-bold text-white uppercase tracking-tight">New Agency Member</h3>
+        <div className="sa-overlay">
+          <div className="sa-dialog sm" role="dialog" aria-modal="true" aria-labelledby="add-member-title">
+            <div className="sa-dialog-head">
+              <div>
+                <h3 id="add-member-title" className="d-h1">New agency member</h3>
+              </div>
             </div>
-            <form onSubmit={handleAddTeamMember} className="p-8 space-y-6">
+            <form onSubmit={handleAddTeamMember} className="sa-dialog-body">
               <input
-                className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
+                className="d-input"
                 placeholder="Email Address"
                 type="email"
                 value={newTeamMember.email}
@@ -3739,25 +3607,27 @@ export default function SuperAdminDashboard() {
               />
               {isTeamMemberEmailChecked && (
                 <div
-                  className={`rounded-xl border p-3 text-[10px] font-bold uppercase tracking-widest ${
+                  className={`d-banner ${
                     teamMemberEmailStatus?.existingProfileInOrganization
-                      ? "border-red-500/30 bg-red-500/10 text-red-300"
+                      ? "err"
                       : teamMemberEmailStatus?.authExists
-                        ? "border-cyan-400/25 bg-cyan-400/10 text-cyan-200"
-                        : "border-amber-400/25 bg-amber-400/10 text-amber-200"
+                        ? "sa-info"
+                        : "warn"
                   }`}
                 >
-                  {teamMemberEmailStatus?.existingProfileInOrganization
-                    ? "This email is already a member of this organization."
-                    : teamMemberEmailStatus?.authExists
-                      ? "Existing login found. This member will use their current password."
-                      : "New login. Set a temporary password for this member."}
+                  <span>
+                    {teamMemberEmailStatus?.existingProfileInOrganization
+                      ? "This email is already a member of this organization."
+                      : teamMemberEmailStatus?.authExists
+                        ? "Existing login found. This member will use their current password."
+                        : "New login. Set a temporary password for this member."}
+                  </span>
                 </div>
               )}
               {canContinueTeamMember && (
                 <>
                   <input
-                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
+                    className="d-input"
                     placeholder="Full Name"
                     value={newTeamMember.name}
                     required
@@ -3765,7 +3635,7 @@ export default function SuperAdminDashboard() {
                   />
                   {teamMemberNeedsPassword && (
                     <input
-                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white"
+                      className="d-input"
                       placeholder="Temporary Password"
                       type="password"
                       value={newTeamMember.password}
@@ -3775,7 +3645,8 @@ export default function SuperAdminDashboard() {
                     />
                   )}
                   <select
-                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-gray-300"
+                    className="d-select"
+                    aria-label="Role"
                     value={newTeamMember.role}
                     onChange={e => setNewTeamMember({ ...newTeamMember, role: e.target.value })}
                   >
@@ -3783,21 +3654,23 @@ export default function SuperAdminDashboard() {
                     <option value="MANAGER">Team Manager</option>
                   </select>
                   <select
-                    className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-gray-300"
+                    className="d-select"
+                    aria-label="Platform view"
                     value={newTeamMember.view}
                     onChange={e => setNewTeamMember({ ...newTeamMember, view: e.target.value })}
                   >
                     <option value="VISIONLIGHT">VisionLight View (Full)</option>
                     <option value="PICDRIFT">PicDrift View (Limited)</option>
                   </select>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                      Project Limit
+                  <div className="d-field">
+                    <label className="d-label" htmlFor="new-member-projects">
+                      Project limit
                     </label>
                     <input
+                      id="new-member-projects"
                       type="number"
                       min={1}
-                      className="w-full p-3 bg-gray-950 border border-gray-800 rounded-lg text-sm text-white outline-none focus:border-brand-accent"
+                      className="d-input"
                       value={newTeamMember.maxProjects}
                       onChange={e =>
                         setNewTeamMember({
@@ -3806,20 +3679,20 @@ export default function SuperAdminDashboard() {
                         })
                       }
                     />
-                    <p className="text-[10px] text-gray-500">
+                    <p className="d-note sa-tight">
                       Max projects this member can create. Drawn from the agency's project pool.
                     </p>
                   </div>
                 </>
               )}
-              <div className="flex gap-4 pt-4">
+              <div className="sa-dialog-foot">
                 <button
                   type="button"
                   onClick={() => {
                     setShowAddTeamModal(false);
                     resetNewTeamMemberForm();
                   }}
-                  className="flex-1 py-3 text-xs font-bold uppercase text-gray-500 hover:text-white transition-colors"
+                  className="d-btn ghost"
                 >
                   Cancel
                 </button>
@@ -3830,7 +3703,7 @@ export default function SuperAdminDashboard() {
                     checkingTeamMemberEmail ||
                     teamMemberEmailStatus?.existingProfileInOrganization === true
                   }
-                  className="flex-1 py-3 bg-brand-accent hover:bg-cyan-300 text-gray-950 rounded-lg font-bold uppercase text-xs tracking-widest transition-all disabled:opacity-50"
+                  className="d-btn primary"
                 >
                   {actionLoading ? (
                     <LoadingSpinner size="sm" color="text-gray-950" />

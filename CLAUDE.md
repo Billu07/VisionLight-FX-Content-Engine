@@ -119,9 +119,9 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
   `d-actions`, lists use `d-split` master–detail (detail-only on phones with `d-mobile-back`).
 - **Superadmin panel shell** (2026-09-14): `SuperAdminDashboard` is a `drift-ui d-page` shell from
   `pages/superAdminShell.ts` (sticky top bar, grouped tabs Studio / Settings / Products, the ONE theme
-  toggle). Tabs move onto `.d-*` one at a time — add the id to `MIGRATED`; unmigrated tabs keep their dark
-  Tailwind inside `.sa-legacy`, modals inside `.sa-ink`. Studio tabs: **visual-only** changes (handlers,
-  API calls and permissions untouched), money tabs (global settings, platform credits, BYOK) last.
+  toggle). Every tab + dialog is on `.d-*` / `.sa-*` (all migrated 2026-09-14, visual-only — handlers, API
+  calls and permissions untouched; dialogs use `.sa-overlay` + `.sa-dialog`). A NEW tab not yet restyled:
+  leave its id out of `MIGRATED` and it renders inside `.sa-legacy` (readable in light mode).
   `lib/adminUi.ts` is shared with the studio `TenantDashboard` — don't restyle it for this.
 - **Commit attribution** (this account): end commits with the `Co-Authored-By:` line for the
   model doing the work (e.g. `Claude Opus 5 <noreply@anthropic.com>`) + the `Claude-Session:` line.
