@@ -55,17 +55,7 @@ const GoogleMark = () => (
 const STYLES = `
 .ta-wrap{min-height:100dvh;display:grid;grid-template-rows:auto 1fr}
 .ta-body{display:grid;place-items:center;padding:24px 16px 48px}
-.ta-grid{width:100%;max-width:960px;display:grid;gap:28px;align-items:center}
-@media(min-width:880px){.ta-grid{grid-template-columns:1.05fr .95fr;gap:56px}}
-.ta-pitch{display:none}
-@media(min-width:880px){.ta-pitch{display:block}}
-.ta-pitch h1{font-size:clamp(30px,4vw,44px);line-height:1.05;letter-spacing:-.025em;font-weight:800;margin:14px 0 14px}
-.ta-pitch h1 i{font-style:normal;color:var(--accent)}
-.ta-pitch p{font-size:15.5px;line-height:1.6;color:var(--muted);max-width:44ch}
-.ta-steps{display:grid;gap:10px;margin-top:22px}
-.ta-step{display:flex;gap:12px;align-items:flex-start;font-size:14px;color:var(--text)}
-.ta-step b{display:grid;place-items:center;width:26px;height:26px;border-radius:8px;background:var(--accent-soft);color:var(--accent);font-size:12px;flex:none;border:1px solid var(--accent-border)}
-.ta-step span{color:var(--muted)}
+.ta-grid{width:100%;max-width:440px;display:grid;justify-items:center}
 .ta-card{width:100%;max-width:440px;justify-self:center;display:grid;gap:14px;padding:clamp(20px,4vw,28px)}
 .ta-title{font-size:24px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
 .ta-google{width:100%;padding:12px 14px;font-size:14px;gap:10px}
@@ -270,39 +260,6 @@ export default function TourAuth() {
         </header>
         <div className="ta-body">
           <div className="ta-grid">
-            <section className="ta-pitch">
-              <div className="d-eyebrow">Tour · creator suite</div>
-              <h1>
-                Film it on your phone.
-                <br />
-                Make it a <i>tour</i>.
-              </h1>
-              <p>
-                Short clips become drift paths people scrub with a finger — connected into a guided
-                walkthrough with headlines and buttons. No app, no editing.
-              </p>
-              <div className="ta-steps">
-                <div className="ta-step">
-                  <b>1</b>
-                  <div>
-                    Upload three clips <span>— up to 5 seconds each</span>
-                  </div>
-                </div>
-                <div className="ta-step">
-                  <b>2</b>
-                  <div>
-                    Add a title, a headline, a button <span>— we build every step</span>
-                  </div>
-                </div>
-                <div className="ta-step">
-                  <b>3</b>
-                  <div>
-                    Share one link <span>— the path links itself, even after reordering</span>
-                  </div>
-                </div>
-              </div>
-            </section>
-
             <div className="d-card ta-card">
               {mode === "sent" ? (
                 <div className="ta-sent">
