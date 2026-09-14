@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useSearchParams, Navigate, useNavigate } from "react-router-dom";
+import { useParams, useSearchParams, Navigate, useNavigate, useLocation } from "react-router-dom";
 import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
 import { isSpinPlayerSite, isDriftSite, getPlayerBranding } from "../lib/branding";
 import { initMetaPixel, track } from "./metaPixel";
-import { resolveDriftTarget, prefetchDriftTargets, getCachedDrift, cacheDrift, driftKey } from "./driftNav";
+import { resolveDriftTarget, prefetchDriftTargets, getCachedDrift, cacheDrift, driftKey, flowDriftKey, targetKey } from "./driftNav";
 
 /**
  * Public Rotation3D player (rotation3d.com/p/:id and /embed/:id). Fetches the
@@ -130,7 +130,10 @@ function Placeholder({ title, sub, showHome }: { title: string; sub: string; sho
 
 export default function Rotation3DPlayer() {
   // /p/:productId (id) OR /:brandSlug/:productSlug (vanity)
-  const { productId, brandSlug, productSlug } = useParams();
+  // /p/:productId (id) OR /:brandSlug/:productSlug (vanity) OR a tour drift's
+  // readable link /tour/:tourPage/:tourFlow/:tourDrift.
+  const { productId, brandSlug, productSlug, tourPage, tourFlow, tourDrift } = useParams();
+  const byFlow = !!(tourPage && tourFlow && tourDrift);
   const [search] = useSearchParams();
   // embed customization via URL params (?cta=0&controls=0&brand=0)
   const showCtas = search.get("cta") !== "0";
@@ -149,7 +152,7 @@ export default function Rotation3DPlayer() {
   const showName = search.get("name") !== "0";
   const showTitle = search.get("title") !== "0";
   const bySlug = !!(brandSlug && productSlug);
-  const isDemo = !bySlug && (!productId || productId === "demo");
+  const isDemo = !bySlug && !byFlow && (!productId || productId === "demo");
   // drift.li serves the same player against its own data (/api/drift/*).
   const drift = isDriftSite();
   const pubProduct = drift ? apiEndpoints.driftPublicProduct : apiEndpoints.r3dPublicProduct;
@@ -158,10 +161,15 @@ export default function Rotation3DPlayer() {
     : apiEndpoints.r3dPublicBrandProduct;
   const trackEvent = drift ? apiEndpoints.driftTrackEvent : apiEndpoints.r3dTrackEvent;
   const navigate = useNavigate();
+  const location = useLocation();
   // The drift currently being shown. Keeping this (and the SpinViewer below) MOUNTED
   // across route changes is what lets a drift→drift jump be instant and stay
   // fullscreen: we never unmount the player element, we just swap its data.
-  const cacheKey = driftKey(bySlug, brandSlug, productSlug, productId);
+  // drift.li/{page}/tour is an alias of a creator's page (drift.li/tour/{page}).
+  const tourAlias = drift && bySlug && productSlug === "tour";
+  const cacheKey = byFlow
+    ? flowDriftKey("tour", tourPage!, tourFlow!, tourDrift!)
+    : driftKey(bySlug, brandSlug, productSlug, productId);
   const [data, setData] = useState<any>(() => (isDemo ? null : getCachedDrift(cacheKey) || null));
   const [error, setError] = useState<"not_found" | "error" | undefined>(undefined);
   // True when the FIRST drift shown was already prefetched (from the landing or a
@@ -173,8 +181,19 @@ export default function Rotation3DPlayer() {
     if (drift) prefetchDriftTargets(product);
   };
 
+  // A tour drift opened by its id (/p/{id}, older links) shows its readable address
+  // (/tour/{page}/{tour}/{drift}) — same drift, cached under the new key, no reload.
+  const adoptReadableUrl = (product: any) => {
+    if (!drift || byFlow || !location.pathname.startsWith("/p/")) return;
+    const readable = product?.flow?.stops?.[product.flow.index]?.playerPath;
+    const t = resolveDriftTarget(readable);
+    if (!t || !("byFlow" in t)) return;
+    cacheDrift(targetKey(t), product);
+    navigate(t.path + location.search, { replace: true });
+  };
+
   useEffect(() => {
-    if (isDemo) return;
+    if (isDemo || tourAlias) return;
     let alive = true;
     // Captured at effect start: is a drift already on screen? If so this is a
     // TRANSITION (keep it up on failure); if not, it's the first load (may error).
@@ -187,6 +206,7 @@ export default function Rotation3DPlayer() {
       setError(undefined);
       if (cached?.id) trackEvent(cached.id, "VIEW").catch(() => undefined);
       prefetchNeighbors(cached);
+      adoptReadableUrl(cached);
       return () => {
         alive = false;
       };
@@ -195,7 +215,11 @@ export default function Rotation3DPlayer() {
     // drift stays on screen (and fullscreen) until the new one is ready, so a
     // transition never flashes the loader. The loader shows only on the very first
     // load, when there's nothing to keep showing.
-    const req = bySlug ? pubBrandProduct(brandSlug!, productSlug!) : pubProduct(productId!);
+    const req = byFlow
+      ? apiEndpoints.driftPublicPageDrift(tourPage!, tourFlow!, tourDrift!)
+      : bySlug
+        ? pubBrandProduct(brandSlug!, productSlug!)
+        : pubProduct(productId!);
     req
       .then((res) => {
         if (!alive) return;
@@ -205,6 +229,7 @@ export default function Rotation3DPlayer() {
         setError(undefined);
         if (d?.id) trackEvent(d.id, "VIEW").catch(() => undefined);
         prefetchNeighbors(d);
+        adoptReadableUrl(d);
       })
       .catch((err) => {
         if (!alive) return;
@@ -216,7 +241,7 @@ export default function Rotation3DPlayer() {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cacheKey, isDemo, bySlug]);
+  }, [cacheKey, isDemo, bySlug, byFlow]);
 
   // Drift ad tracking: load the brand's Meta Pixel and log a ViewContent once
   // the product resolves (per-drift id, or the brand default, from the payload).
@@ -232,9 +257,21 @@ export default function Rotation3DPlayer() {
   // Returns true when handled; SpinViewer falls back to a normal navigation on false.
   const onInternalNavigate = (url: string): boolean => {
     const t = resolveDriftTarget(url);
-    if (!t) return false;
-    navigate(t.path);
-    return true;
+    if (t) {
+      navigate(t.path);
+      return true;
+    }
+    // A tour's Home (its pathway) and other creator-suite pages open in-app too.
+    try {
+      const u = new URL(url, window.location.origin);
+      if (u.origin === window.location.origin && /^\/(tour|view|memory|path)\//.test(u.pathname)) {
+        navigate(u.pathname + u.search);
+        return true;
+      }
+    } catch {
+      /* not a URL */
+    }
+    return false;
   };
 
   // Memoize the manifest/captions so an incidental re-render never hands SpinViewer a
@@ -264,6 +301,8 @@ export default function Rotation3DPlayer() {
     };
     return { p, manifest, captions };
   }, [data, drift]);
+
+  if (tourAlias) return <Navigate to={`/tour/${brandSlug}`} replace />;
 
   // vanity URLs are Rotation3D-host only — on other domains fall through to "/"
   if (bySlug && !isSpinPlayerSite()) return <Navigate to="/" replace />;

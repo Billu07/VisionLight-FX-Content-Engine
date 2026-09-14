@@ -388,6 +388,22 @@ export const apiEndpoints = {
       timeout: 120000,
     }),
   driftPublicFlow: (kind: string, slug: string) => api.get(`/api/drift/public/flows/${kind}/${slug}`),
+  // Tour v2 pages: drift.li/tour/{page} (+ /{tour} pathway, + /{drift} player)
+  driftMyPage: () => api.get("/api/drift/my/page"),
+  driftUpdateMyPage: (data: Record<string, unknown>) => api.patch("/api/drift/my/page", data),
+  driftUploadPageLogo: (formData: FormData) =>
+    api.post("/api/drift/my/page/logo", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 120000,
+    }),
+  driftMyFlowsBySlug: (slug: string, kind = "TOUR") => api.get("/api/drift/my/flows", { params: { kind, slug } }),
+  driftPublicPage: (page: string) => api.get(`/api/drift/public/pages/${encodeURIComponent(page)}`),
+  driftPublicPageFlow: (page: string, slug: string) =>
+    api.get(`/api/drift/public/pages/${encodeURIComponent(page)}/flows/${encodeURIComponent(slug)}`),
+  driftPublicPageDrift: (page: string, flow: string, drift: string) =>
+    api.get(
+      `/api/drift/public/pages/${encodeURIComponent(page)}/flows/${encodeURIComponent(flow)}/drifts/${encodeURIComponent(drift)}`,
+    ),
   driftShareCard: (id: string) =>
     api.get(`/api/drift/my/products/${id}/share-card`, { responseType: "blob" }),
   driftTrackEvent: (productId: string, type: string, meta?: Record<string, unknown>) =>
@@ -749,6 +765,14 @@ export const stopReadOnlyImpersonation = () => {
 export const getReadOnlyImpersonationLabel = () =>
   localStorage.getItem(IMPERSONATE_USER_LABEL_KEY) || "";
 
+// A superadmin managing somebody's tour page: creator API calls (/api/drift/my/*)
+// act on that page (the backend honours X-Drift-Org for superadmins only). In
+// memory on purpose — it never outlives the page that set it.
+let driftOrgOverride: string | null = null;
+export const setDriftOrgOverride = (orgId: string | null) => {
+  driftOrgOverride = orgId;
+};
+
 export const setActiveProfile = (profileId: string, label?: string) => {
   localStorage.setItem(ACTIVE_PROFILE_ID_KEY, profileId);
   if (label) localStorage.setItem(ACTIVE_PROFILE_LABEL_KEY, label);
@@ -798,6 +822,11 @@ api.interceptors.request.use((config) => {
   if (activeProfileId) {
     config.headers = config.headers || {};
     config.headers["X-Active-User-Id"] = activeProfileId;
+  }
+
+  if (driftOrgOverride && String(config.url || "").startsWith("/api/drift/my/")) {
+    config.headers = config.headers || {};
+    config.headers["X-Drift-Org"] = driftOrgOverride;
   }
 
   const impersonateUserId = localStorage.getItem(IMPERSONATE_USER_ID_KEY);

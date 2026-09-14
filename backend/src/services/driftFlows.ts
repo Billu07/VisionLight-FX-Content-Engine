@@ -25,26 +25,23 @@ export const STEP_MIN_FRAMES = 12;
 /** Slack over Organization.maxClipSeconds so a "5.2s" phone clip isn't rejected. */
 export const CLIP_DURATION_TOLERANCE_S = 0.5;
 
-const DEFAULT_NEXT_LABEL: Record<FlowKind, string> = {
-  TOUR: "Next stop",
-  VIEW: "Next view",
-  MEMORY: "Next memory",
-  PATH: "Continue",
-};
-const DEFAULT_END_LABEL: Record<FlowKind, string> = {
-  TOUR: "Restart tour",
-  VIEW: "Back to start",
-  MEMORY: "Back to start",
-  PATH: "Back to start",
-};
 export const stepNoun = (kind: FlowKind) =>
   kind === "TOUR" ? "Drift" : kind === "VIEW" ? "View" : kind === "MEMORY" ? "Memory" : "Step";
 
-/** Player path of a step's drift. Relative on purpose: it works on drift.li AND any
- *  custom host, and it's exactly what the player intercepts for an instant in-app
- *  swap (frontend driftNav.resolveDriftTarget). */
+/** Fallback player path of a step's drift (by id) — only when the page has no slug.
+ *  Relative on purpose: it works on drift.li AND any custom host, and the player
+ *  intercepts it for an instant in-app swap (frontend driftNav.resolveDriftTarget). */
 export const stepPlayerPath = (productId: string) => `/p/${productId}`;
-export const flowPublicPath = (kind: string, slug: string) => `/${kind.toLowerCase()}/${slug}`;
+const kindSeg = (kind: string) => String(kind || "TOUR").toLowerCase();
+/** A page (the creator's profile — admin + public view): /tour/{page}. */
+export const pagePublicPath = (pageSlug: string, kind: string = "TOUR") => `/${kindSeg(kind)}/${pageSlug}`;
+/** A flow's main link, its pathway menu: /tour/{page}/{tour} (legacy /tour/{tour}
+ *  only when the page has no slug). */
+export const flowPublicPath = (kind: string, pageSlug: string | null | undefined, slug: string) =>
+  pageSlug ? `/${kindSeg(kind)}/${pageSlug}/${slug}` : `/${kindSeg(kind)}/${slug}`;
+/** One drift of a flow: /tour/{page}/{tour}/{drift}. */
+export const driftPublicPath = (kind: string, pageSlug: string, flowSlug: string, driftSlug: string) =>
+  `/${kindSeg(kind)}/${pageSlug}/${flowSlug}/${driftSlug}`;
 
 // Hosts a creator's own buttons may link to (drift + picdrift only — never external).
 const CREATOR_LINK_HOSTS = (process.env.DRIFT_CREATOR_LINK_HOSTS || "drift.li,picdrift.com")
@@ -155,12 +152,38 @@ const isReady = (status: string | null | undefined) => status === "READY" || sta
 
 // ───────────────────────────── links (the core) ─────────────────────────────
 
+const HOME_LABEL = "Home";
+const sameJson = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/** URL segment of each step's drift, unique within its flow and derived from the
+ *  drift's name ("Porch" → porch, a second "Porch" → porch-2, unnamed → drift-3).
+ *  Computed over ALL steps in order, so the relink, the serializers and the public
+ *  resolver always agree. */
+export function stepDriftSlugs(
+  steps: Array<{ id: string; product?: { name?: string | null } | null }>,
+  noun: string = "Drift",
+): Map<string, string> {
+  const used = new Set<string>();
+  const out = new Map<string, string>();
+  const nounSlug = slugifyFlow(noun) || "drift";
+  steps.forEach((s, i) => {
+    const base = slugifyFlow(String(s.product?.name || "")) || `${nounSlug}-${i + 1}`;
+    let slug = base;
+    for (let n = 2; used.has(slug); n++) slug = `${base}-${n}`;
+    used.add(slug);
+    out.set(s.id, slug);
+  });
+  return out;
+}
+
 /**
- * Single source of truth for a path's links. Re-derives every DRIFT step's
- * primary CTA from step order (Next → the following drift; the last step gets the
- * flow's own endCta, else "back to start"), mirrors each step's own button into
- * ctaSecondary, and normalizes `order` to 0..n-1 (gaps appear after a cascade
- * delete). Run it inside the same transaction as any step create/reorder/delete.
+ * Single source of truth for a flow's buttons. Every drift gets exactly two:
+ * **Home** (left) back to the flow's pathway menu, and the **next drift's name**
+ * (right). The last drift points at drift #1 — a tour loops, it never ends — and a
+ * one-drift flow shows Home only. Derived from step order + names, so reordering or
+ * renaming can never break the path. Also normalizes `order` to 0..n-1 (gaps appear
+ * after a cascade delete). Run it inside the same transaction as any step create /
+ * reorder / delete / rename, and after a flow's slug changes.
  */
 export async function relinkFlow(db: Db, flowId: string): Promise<void> {
   const flow = await db.driftFlow.findUnique({
@@ -168,18 +191,22 @@ export async function relinkFlow(db: Db, flowId: string): Promise<void> {
     select: {
       id: true,
       kind: true,
-      endCta: true,
-      settings: true,
+      slug: true,
+      organization: { select: { slug: true } },
       steps: {
         orderBy: { order: "asc" },
-        select: { id: true, order: true, stepType: true, productId: true, customCta: true },
+        select: {
+          id: true,
+          order: true,
+          stepType: true,
+          productId: true,
+          product: { select: { name: true, ctaPrimary: true, ctaSecondary: true, ctaPlacement: true } },
+        },
       },
     },
   });
   if (!flow) return;
   const kind = parseFlowKind(flow.kind) ?? "TOUR";
-  const nextLabel =
-    String(settingsOf(flow).nextLabel || "").trim().slice(0, 40) || DEFAULT_NEXT_LABEL[kind];
 
   for (let i = 0; i < flow.steps.length; i++) {
     if (flow.steps[i].order !== i) {
@@ -187,27 +214,57 @@ export async function relinkFlow(db: Db, flowId: string): Promise<void> {
     }
   }
 
+  const pageSlug = flow.organization?.slug || null;
+  const slugs = stepDriftSlugs(flow.steps, stepNoun(kind));
+  const home: CreatorCta = { label: HOME_LABEL, url: flowPublicPath(kind, pageSlug, flow.slug) };
   const drifts = flow.steps.filter((s) => s.stepType === "DRIFT" && s.productId);
-  const entry = drifts[0];
   for (let i = 0; i < drifts.length; i++) {
-    const step = drifts[i];
-    const next = drifts[i + 1];
-    let primary: CreatorCta | null = null;
-    if (next?.productId) primary = { label: nextLabel, url: stepPlayerPath(next.productId) };
-    else if (flow.endCta && typeof flow.endCta === "object") primary = flow.endCta as CreatorCta;
-    else if (drifts.length > 1 && entry?.productId) {
-      primary = { label: DEFAULT_END_LABEL[kind], url: stepPlayerPath(entry.productId) };
+    const nextIndex = (i + 1) % drifts.length;
+    const next = drifts.length > 1 ? drifts[nextIndex] : null;
+    const nextSlug = next ? slugs.get(next.id) : undefined;
+    const nextCta: CreatorCta | null = next
+      ? {
+          label: String(next.product?.name || `${stepNoun(kind)} ${nextIndex + 1}`).slice(0, 80),
+          url:
+            pageSlug && nextSlug
+              ? driftPublicPath(kind, pageSlug, flow.slug, nextSlug)
+              : stepPlayerPath(next.productId as string),
+        }
+      : null;
+    const current = drifts[i].product;
+    if (
+      current &&
+      sameJson(current.ctaPrimary, home) &&
+      sameJson(current.ctaSecondary, nextCta) &&
+      current.ctaPlacement === "CENTER"
+    ) {
+      continue; // already right — no write, no updatedAt churn
     }
-    const secondary =
-      step.customCta && typeof step.customCta === "object" ? (step.customCta as CreatorCta) : null;
     await db.driftProduct.update({
-      where: { id: step.productId as string },
+      where: { id: drifts[i].productId as string },
       data: {
-        ctaPrimary: primary ? (primary as any) : Prisma.DbNull,
-        ctaSecondary: secondary ? (secondary as any) : Prisma.DbNull,
+        ctaPrimary: home as any,
+        ctaSecondary: nextCta ? (nextCta as any) : Prisma.DbNull,
+        ctaPlacement: "CENTER",
       },
     });
   }
+}
+
+/** Re-derive every flow's buttons (writes only where something changed). Run at boot
+ *  so drifts built under older link rules pick up the current ones. */
+export async function relinkAllFlows(): Promise<void> {
+  const flows = await prisma.driftFlow.findMany({ select: { id: true } });
+  let ok = 0;
+  for (const f of flows) {
+    try {
+      await relinkFlow(prisma, f.id);
+      ok++;
+    } catch (err) {
+      console.error(`[${NS}] relink ${f.id} failed:`, err);
+    }
+  }
+  if (flows.length) console.log(`[${NS}] boot relink checked ${ok}/${flows.length} flows`);
 }
 
 /** The flow a product is a step of (null when it isn't one). Capture it BEFORE
@@ -303,6 +360,7 @@ const stepProductSelect = {
 };
 
 export const flowInclude = {
+  organization: { select: { slug: true, name: true } },
   steps: {
     orderBy: { order: "asc" as const },
     include: { product: { select: stepProductSelect } },
@@ -350,7 +408,16 @@ export function serializeStep(s: any) {
 }
 
 export function serializeFlow(f: any) {
-  const steps = (f.steps || []).map(serializeStep);
+  const kind = parseFlowKind(f.kind) ?? "TOUR";
+  const pageSlug: string | null = f.organization?.slug ?? null;
+  const rawSteps: any[] = f.steps || [];
+  const slugs = stepDriftSlugs(rawSteps, stepNoun(kind));
+  const steps = rawSteps.map((s: any) => {
+    const out = serializeStep(s);
+    const slug = slugs.get(s.id) ?? null;
+    if (out.product && pageSlug && slug) out.product.playerPath = driftPublicPath(kind, pageSlug, f.slug, slug);
+    return { ...out, slug };
+  });
   const products = steps.map((s: any) => s.product).filter(Boolean);
   const counts = {
     steps: steps.length,
@@ -359,6 +426,13 @@ export function serializeFlow(f: any) {
     failed: products.filter((p: any) => p.status === "FAILED").length,
   };
   const entry = products[0] || null;
+  // Cover choices: the first drift's start, middle and end frames.
+  const firstFrames: string[] = Array.isArray(rawSteps[0]?.product?.spin?.manifest?.frames)
+    ? rawSteps[0].product.spin.manifest.frames
+    : [];
+  const coverFrames = firstFrames.length
+    ? [firstFrames[0], firstFrames[Math.floor((firstFrames.length - 1) / 2)], firstFrames[firstFrames.length - 1]]
+    : [];
   return {
     id: f.id as string,
     kind: f.kind as string,
@@ -368,6 +442,7 @@ export function serializeFlow(f: any) {
     description: (f.description ?? null) as string | null,
     status: f.status as string,
     isDemo: !!f.isDemo,
+    hidden: !!f.hidden,
     coverUrl: (f.coverUrl ?? null) as string | null,
     endCta: (f.endCta ?? null) as CreatorCta | null,
     settings: { nextLabel: (settingsOf(f).nextLabel ?? null) as string | null },
@@ -375,16 +450,20 @@ export function serializeFlow(f: any) {
     publishedAt: (f.publishedAt ?? null) as Date | null,
     createdAt: f.createdAt as Date,
     updatedAt: f.updatedAt as Date,
-    publicPath: flowPublicPath(f.kind, f.slug),
+    pageSlug,
+    pageName: (f.organization?.name ?? null) as string | null,
+    pagePath: pageSlug ? pagePublicPath(pageSlug, kind) : null,
+    publicPath: flowPublicPath(kind, pageSlug, f.slug),
     entryProductId: (entry?.id ?? null) as string | null,
-    entryPath: entry ? stepPlayerPath(entry.id) : null,
+    entryPath: entry ? (entry.playerPath as string) : null,
     thumb: (f.coverUrl || entry?.thumb || null) as string | null,
+    coverFrames,
     counts,
     steps,
   };
 }
 
-/** The public shape (/{kind}/{slug}): only steps whose drift is viewable. */
+/** The public shape (a pathway menu): only steps whose drift is viewable. */
 export function serializePublicFlow(f: any) {
   const full = serializeFlow(f);
   const steps = full.steps.filter((s: any) => s.product && isReady(s.product.status));
@@ -397,15 +476,19 @@ export function serializePublicFlow(f: any) {
     title: full.title,
     description: full.description,
     coverUrl: full.coverUrl,
-    endCta: full.endCta,
     settings: full.settings,
+    hidden: full.hidden,
+    pageSlug: full.pageSlug,
+    pageName: full.pageName,
+    pagePath: full.pagePath,
     publicPath: full.publicPath,
     entryProductId: entry?.id ?? null,
-    entryPath: entry ? stepPlayerPath(entry.id) : null,
+    entryPath: entry ? entry.playerPath : null,
     thumb: full.coverUrl || entry?.thumb || null,
     steps: steps.map((s: any) => ({
       id: s.id,
       order: s.order,
+      slug: s.slug,
       productId: s.product.id,
       name: s.product.name,
       title: s.product.title,

@@ -82,7 +82,7 @@ dashboards, set up the public demo tour. The superadmin's tour account has no cl
   every drift; "Tour Powered by"; remove reset; hand at the frame's bottom corner (fix the height
   feedback loop); tour icon cue; remove the end-of-tour popup; dots top-middle; tour title lines;
   "Drift" instead of "Stop"; signup copy.
-- [ ] **P2 — Pages & pathways (schema push #1, all v2 columns at once).** Slug URLs + public
+- [x] **P2 — Pages & pathways (schema push #1, all v2 columns at once).** Slug URLs + public
   endpoints; Home/next-drift relink; player routes + in-app swaps; public pathway page; admin
   pathway = simplified builder (ref4/ref5); page at `/tour/{page}` with Featured/Hidden, Card/Path,
   View Demo, editable Contact; legacy redirects.
@@ -232,3 +232,16 @@ Drift.li is a division of PicDrift
   to the frame top) and parked on the frame's bottom corner; tour drifts get a hand-icon + arrow cue;
   end-of-tour card removed; progress dots top-middle (top-right on phones); title block page · tour
   · drift; default step names "Drift N"; signup copy.
+- 2026-09-14 — P2 shipped (needs the one `db push`): all v2 columns/models in schema.prisma.
+  URLs: `/tour/{page}` (TourPage — Featured/Hidden Tours, Cards/Path, View Demo, Contact, page
+  settings incl. logo), `/tour/{page}/{tour}` (TourPathway — public strips + Start Tour; admins get
+  TourBuilder there, with "Public view"), `/tour/{page}/{tour}/{drift}` (Rotation3DPlayer; `/p/{id}`
+  for a tour drift swaps its address to the readable one). Drift segments come from names
+  (`stepDriftSlugs`, unique per flow). `relinkFlow` = Home (→ pathway) + next drift's name, last →
+  #1, placement CENTER; writes only on change and `relinkAllFlows()` runs at boot. An unpublished
+  tour's slug follows its name. Page endpoints: `GET/PATCH /api/drift/my/page`, `POST
+  /api/drift/my/page/logo`, `GET /api/drift/public/pages/:page`, `…/flows/:slug`,
+  `…/flows/:flow/drifts/:drift`. Superadmins: no clip limit; `X-Drift-Org` lets them act on any
+  TOUR page ("Manage this page"). Builder per ref4/ref5 (no headline/buttons/placement/loop; Save
+  Drift; pencil rename; straight rail; cover = start/middle/end of drift 1 or upload). Legacy
+  `/tour/:id/edit`, `/tour/{old-slug}`, `/tour/demo` resolve; `drift.li/{page}/tour` redirects.

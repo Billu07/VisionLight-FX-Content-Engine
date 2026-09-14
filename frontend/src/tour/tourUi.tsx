@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "../rotation3d/driftUiTheme";
 import { CREATOR_HOME, CREATOR_START } from "./tourSession";
@@ -302,15 +302,25 @@ export const TOUR_STYLES = `
 @keyframes t-sheet-up{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
 @media(max-width:440px){.t-sheet-grid{grid-template-columns:1fr;justify-items:center;text-align:center}.t-sheet-side .t-actions{justify-content:center}}
 @media(prefers-reduced-motion:reduce){.d-pill.t-live::before,.t-live-ring.pulse::after,.t-sheet,.t-sheet-card{animation:none}}
+/* ── Shell: wrapping account actions + the Tour · Powered by footer ── */
+.t-topactions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px;min-width:0}
+.t-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 16px;margin-top:8px;padding:22px 16px calc(24px + env(safe-area-inset-bottom));border-top:1px solid var(--border);font-size:12px;color:var(--faint)}
+.t-foot b{color:var(--muted);font-weight:700}
+.t-foot a{color:var(--muted);text-decoration:none}
+.t-foot a:hover{color:var(--accent)}
 `;
 
-/** Page chrome: wordmark → home, theme toggle, log out. */
+/** Page chrome: the wordmark, the theme toggle and the account actions (visitors get
+ *  Log in + Try It Free), plus the "Tour · Powered by" footer with Terms · Privacy. */
 export function TourShell({ children }: { children: React.ReactNode }) {
   const { user, profiles, logout } = useAuth();
   const [theme, toggleTheme] = useDriftTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const canSwitch = profiles.length > 1;
   const isSuperAdmin = user?.role === "SUPERADMIN";
+  const isCreator = user?.view === "TOUR";
+  const here = encodeURIComponent(location.pathname + location.search);
   const out = async () => {
     await logout();
     navigate(CREATOR_START, { replace: true });
@@ -324,25 +334,52 @@ export function TourShell({ children }: { children: React.ReactNode }) {
           drift<i>.li</i>
           <span className="t-kind">tour</span>
         </Link>
-        <div className="flex items-center gap-2.5">
-          <span className="d-faint hidden text-xs sm:inline">{user?.email}</span>
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
-          {isSuperAdmin && (
-            <Link to="/admin" className="d-btn sm" style={{ textDecoration: "none" }} title="Open the admin panel">
-              Admin
-            </Link>
+        <div className="t-topactions">
+          {user ? (
+            <>
+              <span className="d-faint hidden text-xs sm:inline">{user.email}</span>
+              <ThemeToggle theme={theme} onToggle={toggleTheme} />
+              {isCreator && (
+                <Link to={CREATOR_HOME} className="d-btn sm" style={{ textDecoration: "none" }} title="Your page">
+                  My page
+                </Link>
+              )}
+              {isSuperAdmin && (
+                <Link to="/admin" className="d-btn sm" style={{ textDecoration: "none" }} title="Open the admin panel">
+                  Admin
+                </Link>
+              )}
+              {canSwitch && (
+                <button onClick={() => navigate("/studios")} className="d-btn sm" title="Choose another workspace">
+                  Switch studio
+                </button>
+              )}
+              <button onClick={out} className="d-btn ghost sm">
+                Log out
+              </button>
+            </>
+          ) : (
+            <>
+              <ThemeToggle theme={theme} onToggle={toggleTheme} />
+              <Link to={`${CREATOR_START}?mode=login&next=${here}`} className="d-btn ghost sm" style={{ textDecoration: "none" }}>
+                Log in
+              </Link>
+              <Link to={CREATOR_START} className="d-btn primary sm" style={{ textDecoration: "none" }}>
+                Try It Free
+              </Link>
+            </>
           )}
-          {canSwitch && (
-            <button onClick={() => navigate("/studios")} className="d-btn sm" title="Choose another workspace">
-              Switch studio
-            </button>
-          )}
-          <button onClick={out} className="d-btn ghost sm">
-            Log out
-          </button>
         </div>
       </header>
       <main className="d-main">{children}</main>
+      <footer className="t-foot">
+        <span>
+          <b>Tour</b> · Powered by <b>Drift Live Interactive</b>
+        </span>
+        <span>
+          <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>
+        </span>
+      </footer>
     </div>
   );
 }

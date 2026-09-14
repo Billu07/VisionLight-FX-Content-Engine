@@ -25,7 +25,18 @@ import {
   DRIFT_DOMAIN_TARGET,
 } from "../services/cloudflareDomains";
 import { sendNewLeadEmail, sendBrandAdminInviteEmail } from "../services/mail";
-import { relinkFlow, stepFlowIdForProduct, isFlowStepProduct, stepPlayerPath, flowPublicPath } from "../services/driftFlows";
+import {
+  driftPublicPath,
+  flowPublicPath,
+  isFlowStepProduct,
+  pagePublicPath,
+  parseFlowKind,
+  relinkFlow,
+  stepDriftSlugs,
+  stepFlowIdForProduct,
+  stepNoun,
+  stepPlayerPath,
+} from "../services/driftFlows";
 
 // Drift (drift.li) — a separate product line running the same interactive
 // spin/path player as Rotation3D, but with its own brand orgs
@@ -55,10 +66,14 @@ export const slugify = (s: string) =>
   "product";
 
 // Generate a slug unique within the org (append a short suffix on collision).
+// A drift's slug is never a creator-suite word: drift.li/{page}/tour is a page alias.
+const RESERVED_PRODUCT_SLUGS = new Set(["tour", "view", "memory", "path"]);
+
 export const uniqueSlug = async (organizationId: string, name: string) => {
   const base = slugify(name);
   for (let i = 0; i < 5; i++) {
     const slug = i === 0 ? base : `${base}-${crypto.randomBytes(2).toString("hex")}`;
+    if (RESERVED_PRODUCT_SLUGS.has(slug)) continue;
     const clash = await prisma.driftProduct.findFirst({
       where: { organizationId, slug },
       select: { id: true },
@@ -959,37 +974,50 @@ async function resolveCtaForms(p: any): Promise<Record<string, any>> {
 const flowNavPayload = (p: any) => {
   const f = p?.flowStep?.flow;
   if (!f) return null;
+  const kind = String(f.kind || "TOUR");
+  const pageSlug: string | null = f.organization?.slug || null;
   const viewable = (s: string) => s === "READY" || s === "PUBLISHED";
-  const stops = (f.steps || [])
+  const allSteps: any[] = f.steps || [];
+  const slugs = stepDriftSlugs(allSteps, stepNoun(parseFlowKind(kind) ?? "TOUR"));
+  const stops = allSteps
     .filter((s: any) => s.product && viewable(s.product.status))
     .map((s: any) => {
       const frames = s.product.spin?.manifest?.frames;
       const list: string[] = Array.isArray(frames) ? frames : [];
+      const slug = slugs.get(s.id) || null;
       return {
         id: s.id,
         productId: s.product.id,
         name: s.product.name,
         title: s.product.title ?? null,
+        slug,
         thumb: s.product.thumbnailUrl || list[s.product.defaultFrame ?? 0] || list[0] || null,
-        playerPath: stepPlayerPath(s.product.id),
+        playerPath: pageSlug && slug ? driftPublicPath(kind, pageSlug, f.slug, slug) : stepPlayerPath(s.product.id),
       };
     });
   const index = stops.findIndex((s: any) => s.productId === p.id);
   if (index < 0) return null;
-  const entry = stops[0];
   return {
     id: f.id,
-    kind: f.kind,
+    kind,
     slug: f.slug,
     name: f.name,
     title: f.title ?? null,
-    publicPath: flowPublicPath(f.kind, f.slug),
-    entryPath: entry ? entry.playerPath : null,
-    thumb: f.coverUrl || entry?.thumb || null,
-    endCta: f.endCta ?? null,
+    pageSlug,
+    pageName: f.organization?.name ?? null,
+    pagePath: pageSlug ? pagePublicPath(pageSlug, kind) : null,
+    publicPath: flowPublicPath(kind, pageSlug, f.slug),
+    entryPath: stops[0]?.playerPath ?? null,
+    thumb: f.coverUrl || stops[0]?.thumb || null,
     stops,
     index,
   };
+};
+
+// A tour page's own logo (Organization.tourSettings.logoUrl) for its drifts.
+const tourPageLogo = (p: any): string | null => {
+  const s = p?.flowStep?.flow?.organization?.tourSettings;
+  return s && typeof s === "object" && typeof s.logoUrl === "string" && s.logoUrl ? s.logoUrl : null;
 };
 
 const publicProductPayload = async (p: any, bc: any, orgName: string, captions: any[], orgPixelId?: string | null) => ({
@@ -1021,7 +1049,7 @@ const publicProductPayload = async (p: any, bc: any, orgName: string, captions: 
   ctaSecondary: p.ctaSecondary,
   forms: await resolveCtaForms(p),
   brandName: bc?.companyName || orgName || "",
-  logoUrl: bc?.logoUrl || null,
+  logoUrl: bc?.logoUrl || tourPageLogo(p) || null,
   primaryColor: bc?.primaryColor || null,
   secondaryColor: bc?.secondaryColor || null,
   manifest: p.spin?.manifest,
@@ -1125,56 +1153,96 @@ router.get(
 );
 
 // Manifest + presentation for the player. Only READY/PUBLISHED products.
-router.get(
-  "/api/drift/public/products/:id",
-  async (req: AuthenticatedRequest, res: Response) => {
-    const product = await prisma.driftProduct.findFirst({
-      where: { id: req.params.id, status: { in: ["READY", "PUBLISHED"] } },
-      include: {
-        spin: true,
-        // The flow this drift is a stop of (tour context for the player): its
-        // viewable stops in order, so the stop strip + closing card can render.
-        flowStep: {
-          select: {
-            id: true,
-            flow: {
-              select: {
-                id: true, kind: true, slug: true, name: true, title: true, coverUrl: true, endCta: true,
-                steps: {
-                  orderBy: { order: "asc" },
-                  select: {
-                    id: true, order: true, productId: true,
-                    product: {
-                      select: { id: true, name: true, title: true, status: true, thumbnailUrl: true, defaultFrame: true, spin: { select: { manifest: true } } },
-                    },
+// Everything the public player needs for one viewable drift — with its flow context
+// (steps, page) when it's a step of a tour/view/memory/path. null → not found.
+async function loadPublicDrift(productId: string) {
+  const product = await prisma.driftProduct.findFirst({
+    where: { id: productId, status: { in: ["READY", "PUBLISHED"] } },
+    include: {
+      spin: true,
+      flowStep: {
+        select: {
+          id: true,
+          flow: {
+            select: {
+              id: true,
+              kind: true,
+              slug: true,
+              name: true,
+              title: true,
+              coverUrl: true,
+              organization: { select: { slug: true, name: true, tourSettings: true } },
+              steps: {
+                orderBy: { order: "asc" },
+                select: {
+                  id: true,
+                  order: true,
+                  productId: true,
+                  product: {
+                    select: { id: true, name: true, title: true, status: true, thumbnailUrl: true, defaultFrame: true, spin: { select: { manifest: true } } },
                   },
                 },
               },
             },
           },
         },
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            metaPixelId: true,
-            brandConfigs: {
-              select: { logoUrl: true, companyName: true, primaryColor: true, secondaryColor: true },
-              take: 1,
-            },
+      },
+      organization: {
+        select: {
+          id: true,
+          name: true,
+          metaPixelId: true,
+          brandConfigs: {
+            select: { logoUrl: true, companyName: true, primaryColor: true, secondaryColor: true },
+            take: 1,
           },
         },
       },
+    },
+  });
+  if (!product || !product.spin) return null;
+  const captions = await prisma.driftCaption.findMany({
+    where: { productId: product.id },
+    orderBy: [{ clip: "asc" }, { startFrame: "asc" }, { order: "asc" }],
+  });
+  const bc = product.organization?.brandConfigs?.[0];
+  return publicProductPayload(product, bc, product.organization?.name || "", captions, product.organization?.metaPixelId);
+}
+
+router.get("/api/drift/public/products/:id", async (req: AuthenticatedRequest, res: Response) => {
+  const payload = await loadPublicDrift(req.params.id);
+  if (!payload) return res.status(404).json({ error: "Not found" });
+  res.json({ product: payload });
+});
+
+// One drift of a flow by its readable link: /{kind}/{page}/{flow}/{drift}. The drift
+// segment is derived from the drift's name, unique within the flow (stepDriftSlugs).
+router.get(
+  "/api/drift/public/pages/:page/flows/:flow/drifts/:drift",
+  async (req: AuthenticatedRequest, res: Response) => {
+    const pageSlug = String(req.params.page || "").trim().toLowerCase();
+    const flowSlug = String(req.params.flow || "").trim().toLowerCase();
+    const driftSlug = String(req.params.drift || "").trim().toLowerCase();
+    const org = await prisma.organization.findFirst({
+      where: { slug: pageSlug, productLine: "TOUR" },
+      select: { id: true },
     });
-    if (!product || !product.spin) return res.status(404).json({ error: "Not found" });
-    const captions = await prisma.driftCaption.findMany({
-      where: { productId: product.id },
-      orderBy: [{ clip: "asc" }, { startFrame: "asc" }, { order: "asc" }],
+    if (!org) return res.status(404).json({ error: "Not found" });
+    const flow = await prisma.driftFlow.findFirst({
+      where: { organizationId: org.id, slug: flowSlug },
+      select: {
+        id: true,
+        kind: true,
+        steps: { orderBy: { order: "asc" }, select: { id: true, productId: true, product: { select: { name: true } } } },
+      },
     });
-    const bc = product.organization?.brandConfigs?.[0];
-    res.json({
-      product: await publicProductPayload(product, bc, product.organization?.name || "", captions, product.organization?.metaPixelId),
-    });
+    if (!flow) return res.status(404).json({ error: "Not found" });
+    const slugs = stepDriftSlugs(flow.steps, stepNoun(parseFlowKind(flow.kind) ?? "TOUR"));
+    const step = flow.steps.find((s) => slugs.get(s.id) === driftSlug);
+    if (!step?.productId) return res.status(404).json({ error: "Not found" });
+    const payload = await loadPublicDrift(step.productId);
+    if (!payload) return res.status(404).json({ error: "Not found" });
+    res.json({ product: payload });
   },
 );
 

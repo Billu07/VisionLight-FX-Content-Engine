@@ -17,6 +17,7 @@ import driftFlowsRouter from "./routes/driftFlows";
 import driftCreatorRouter from "./routes/driftCreator";
 import driftMailRouter from "./routes/driftMail";
 import { mailConfigured, verifyMail } from "./services/mail";
+import { relinkAllFlows } from "./services/driftFlows";
 
 console.log("Environment Check:", {
   airtableKey: process.env.AIRTABLE_API_KEY ? "Loaded" : "Missing",
@@ -71,6 +72,7 @@ if (process.env.NODE_ENV !== "production" || process.env.VERCEL !== "1") {
     void recoverOrphanedRot3dJobs();
     void recoverOrphanedDriftJobs();
     void verifyMail();
+    void relinkAllFlows().catch((err) => console.error("[drift-flow] boot relink failed:", err));
   });
 }
 

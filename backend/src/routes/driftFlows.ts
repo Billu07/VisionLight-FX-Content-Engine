@@ -24,6 +24,8 @@ import {
   isReservedFlowSlug,
   parseBackground,
   parseCreatorCta,
+  pagePublicPath,
+  flowPublicPath,
   parseFlowKind,
   relinkFlow,
   reorderSteps,
@@ -33,7 +35,9 @@ import {
   slugifyFlow,
   stepLimitError,
   stepNoun,
+  uniqueFlowSlug,
   type CreatorCta,
+  type FlowKind,
 } from "../services/driftFlows";
 
 // Creator API for drift flows (drift.li/tour | view | memory | path).
@@ -63,7 +67,23 @@ const IMAGE_EXT: Record<string, string> = {
   "image/avif": "avif",
 };
 
-const requireOrg = (req: AuthenticatedRequest, res: Response): string | null => {
+const isSuperAdmin = (req: AuthenticatedRequest) => req.user?.role === "SUPERADMIN";
+// The org a creator request acts on: the active profile's org — or, for a superadmin
+// managing somebody's page (drift.li admin → Tour, or "Manage" on a page), the tour
+// page named in X-Drift-Org.
+const requireOrg = async (req: AuthenticatedRequest, res: Response): Promise<string | null> => {
+  const override = String(req.headers["x-drift-org"] || "").trim();
+  if (override && isSuperAdmin(req)) {
+    const org = await prisma.organization.findFirst({
+      where: { id: override, productLine: "TOUR" },
+      select: { id: true },
+    });
+    if (!org) {
+      res.status(404).json({ error: "That page doesn't exist" });
+      return null;
+    }
+    return org.id;
+  }
   const orgId = req.user?.organizationId;
   if (!orgId) {
     res.status(403).json({ error: "No organization on this account" });
@@ -71,7 +91,6 @@ const requireOrg = (req: AuthenticatedRequest, res: Response): string | null => 
   }
   return orgId;
 };
-const isSuperAdmin = (req: AuthenticatedRequest) => req.user?.role === "SUPERADMIN";
 const rmFile = async (p?: string) => {
   if (p) await fs.rm(p, { force: true }).catch(() => undefined);
 };
@@ -104,12 +123,89 @@ const handle = (res: Response, err: unknown) => {
   throw err;
 };
 
+// ───────────────────────────── pages ─────────────────────────────
+// A page = a TOUR org (the creator's profile). Its settings live in
+// Organization.tourSettings: { contactLabel, contactUrl, demoFlowId, logoUrl }.
+
+const PAGE_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  productLine: true,
+  tourAccountType: true,
+  managedByOrgId: true,
+  tourSettings: true,
+} as const;
+
+const DEFAULT_CONTACT = {
+  label: process.env.DRIFT_TOUR_CONTACT_LABEL || "Contact PicDrift",
+  url: process.env.DRIFT_TOUR_CONTACT_URL || "mailto:picdrift@picdrift.com",
+};
+
+const pageSettingsOf = (org: { tourSettings?: unknown }): Record<string, any> =>
+  org.tourSettings && typeof org.tourSettings === "object" ? (org.tourSettings as Record<string, any>) : {};
+
+const serializePage = (org: any) => {
+  const s = pageSettingsOf(org);
+  const label = typeof s.contactLabel === "string" ? s.contactLabel.trim() : "";
+  const url = typeof s.contactUrl === "string" ? s.contactUrl.trim() : "";
+  return {
+    id: org.id as string,
+    name: org.name as string,
+    slug: (org.slug ?? null) as string | null,
+    path: org.slug ? pagePublicPath(org.slug) : null,
+    accountType: (org.tourAccountType ?? null) as string | null,
+    logoUrl: typeof s.logoUrl === "string" && s.logoUrl ? (s.logoUrl as string) : null,
+    contact: { label: label || DEFAULT_CONTACT.label, url: url || DEFAULT_CONTACT.url },
+    contactLabel: label || null,
+    contactUrl: url || null,
+    demoFlowId: typeof s.demoFlowId === "string" && s.demoFlowId ? (s.demoFlowId as string) : null,
+  };
+};
+
+/** A page's own contact link: the web, email or phone (never javascript: etc.). */
+const isContactUrl = (u: string) => {
+  if (/[\s\\]/.test(u)) return false;
+  try {
+    return ["https:", "http:", "mailto:", "tel:"].includes(new URL(u).protocol);
+  } catch {
+    return false;
+  }
+};
+
+/** "View Demo": the page's own demo tour when it set one, else the site's demo. */
+async function resolveDemo(org: { id: string; tourSettings?: unknown }, kind: FlowKind) {
+  const s = pageSettingsOf(org);
+  const pick = { kind: true, slug: true, name: true, organization: { select: { slug: true } } } as const;
+  if (typeof s.demoFlowId === "string" && s.demoFlowId) {
+    const own = await prisma.driftFlow.findFirst({
+      where: { id: s.demoFlowId, organizationId: org.id, status: "PUBLISHED" },
+      select: pick,
+    });
+    if (own) return { name: own.name, path: flowPublicPath(own.kind, own.organization?.slug, own.slug), own: true };
+  }
+  const site = await prisma.driftFlow.findFirst({
+    where: { kind, status: "PUBLISHED", isDemo: true },
+    orderBy: { updatedAt: "desc" },
+    select: pick,
+  });
+  return site ? { name: site.name, path: flowPublicPath(site.kind, site.organization?.slug, site.slug), own: false } : null;
+}
+
+const findPublicPage = (slug: string) =>
+  prisma.organization.findFirst({
+    where: { slug: String(slug || "").trim().toLowerCase(), productLine: "TOUR" },
+    select: PAGE_SELECT,
+  });
+
 // Probe + validate an uploaded clip against the org's plan. Deletes the temp
 // file and writes the error response on failure (returns null).
 async function validateClip(
   orgId: string,
   file: Express.Multer.File,
   res: Response,
+  /** superadmin: no clip-length limit (frames stay capped) */
+  unlimited = false,
 ): Promise<{ frameCount: number; duration: number } | null> {
   const quota = await flowQuota(orgId);
   const info = await probeClipInfo(file.path);
@@ -118,7 +214,7 @@ async function validateClip(
     res.status(400).json({ error: "We couldn't read that clip. Please upload an MP4 or MOV video." });
     return null;
   }
-  if (info.duration > quota.maxClipSeconds + CLIP_DURATION_TOLERANCE_S) {
+  if (!unlimited && info.duration > quota.maxClipSeconds + CLIP_DURATION_TOLERANCE_S) {
     await rmFile(file.path);
     res.status(400).json({
       error: `Clips must be ${quota.maxClipSeconds} seconds or shorter — this one is ${info.duration.toFixed(1)}s.`,
@@ -138,30 +234,32 @@ async function validateClip(
 
 // The creator's flows (+ plan usage). ?kind=TOUR filters one kind.
 router.get("/api/drift/my/flows", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = requireOrg(req, res);
+  const orgId = await requireOrg(req, res);
   if (!orgId) return;
   const kindRaw = req.query.kind;
   const kind = kindRaw !== undefined ? parseFlowKind(kindRaw) : null;
   if (kindRaw !== undefined && !kind) return res.status(400).json({ error: "Unknown flow kind" });
+  const slugFilter = typeof req.query.slug === "string" ? req.query.slug.trim().toLowerCase() : "";
   const [flows, quota, org] = await Promise.all([
     prisma.driftFlow.findMany({
-      where: { organizationId: orgId, ...(kind ? { kind } : {}) },
+      where: { organizationId: orgId, ...(kind ? { kind } : {}), ...(slugFilter ? { slug: slugFilter } : {}) },
       orderBy: [{ order: "asc" }, { createdAt: "desc" }],
       include: flowInclude,
     }),
     flowQuota(orgId),
-    prisma.organization.findUnique({ where: { id: orgId }, select: { name: true, slug: true } }),
+    prisma.organization.findUnique({ where: { id: orgId }, select: PAGE_SELECT }),
   ]);
   res.json({
     flows: flows.map(serializeFlow),
     quota,
     creator: { name: org?.name ?? null, handle: org?.slug ?? null },
+    page: org && org.productLine === "TOUR" ? serializePage(org) : null,
   });
 });
 
 // Create a flow. Plan gate: maxFlows (all kinds count) → 403 { upgrade: true }.
 router.post("/api/drift/my/flows", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = requireOrg(req, res);
+  const orgId = await requireOrg(req, res);
   if (!orgId) return;
   const kind = parseFlowKind(req.body?.kind ?? "TOUR");
   if (!kind) return res.status(400).json({ error: "Unknown flow kind" });
@@ -214,7 +312,7 @@ router.post("/api/drift/my/flows", authenticateToken, async (req: AuthenticatedR
 });
 
 router.get("/api/drift/my/flows/:id", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = requireOrg(req, res);
+  const orgId = await requireOrg(req, res);
   if (!orgId) return;
   const flow = await loadFlow(orgId, req.params.id);
   if (!flow) return res.status(404).json({ error: "Flow not found" });
@@ -223,11 +321,11 @@ router.get("/api/drift/my/flows/:id", authenticateToken, async (req: Authenticat
 
 // Edit a flow's own fields. endCta / nextLabel changes re-derive the step links.
 router.patch("/api/drift/my/flows/:id", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = requireOrg(req, res);
+  const orgId = await requireOrg(req, res);
   if (!orgId) return;
   const flow = await prisma.driftFlow.findFirst({
     where: { id: req.params.id, organizationId: orgId },
-    select: { id: true, kind: true, settings: true, isDemo: true },
+    select: { id: true, kind: true, name: true, settings: true, isDemo: true, publishedAt: true },
   });
   if (!flow) return res.status(404).json({ error: "Flow not found" });
   const body = req.body || {};
@@ -239,7 +337,14 @@ router.patch("/api/drift/my/flows/:id", authenticateToken, async (req: Authentic
     const name = str(body.name, 80);
     if (!name) return res.status(400).json({ error: "Name can't be empty" });
     data.name = name;
+    // Until a flow has ever been published its link follows its name, so
+    // "45 Birch" reads /tour/{page}/45-birch. Once shared, the link stays put.
+    if (!flow.publishedAt && typeof body.slug !== "string" && name !== flow.name) {
+      data.slug = await uniqueFlowSlug(kind, name, { excludeId: flow.id });
+      relink = true;
+    }
   }
+  if (typeof body.hidden === "boolean") data.hidden = body.hidden;
   if ("title" in body) data.title = strOrNull(body.title, 120) ?? null;
   if ("description" in body) data.description = strOrNull(body.description, 600) ?? null;
   if ("coverUrl" in body) {
@@ -271,6 +376,7 @@ router.patch("/api/drift/my/flows/:id", authenticateToken, async (req: Authentic
     });
     if (clash) return res.status(409).json({ error: "That link is already taken" });
     data.slug = s;
+    relink = true;
   }
   if ("order" in body) data.order = Math.max(0, Math.floor(Number(body.order)) || 0);
   if (typeof body.isDemo === "boolean" && isSuperAdmin(req)) data.isDemo = body.isDemo;
@@ -284,7 +390,7 @@ router.patch("/api/drift/my/flows/:id", authenticateToken, async (req: Authentic
 
 // Delete a flow and the drifts it created.
 router.delete("/api/drift/my/flows/:id", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = requireOrg(req, res);
+  const orgId = await requireOrg(req, res);
   if (!orgId) return;
   const flow = await prisma.driftFlow.findFirst({
     where: { id: req.params.id, organizationId: orgId },
@@ -297,7 +403,7 @@ router.delete("/api/drift/my/flows/:id", authenticateToken, async (req: Authenti
 });
 
 router.post("/api/drift/my/flows/:id/publish", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = requireOrg(req, res);
+  const orgId = await requireOrg(req, res);
   if (!orgId) return;
   const flow = await prisma.driftFlow.findFirst({
     where: { id: req.params.id, organizationId: orgId },
@@ -324,7 +430,7 @@ router.post("/api/drift/my/flows/:id/publish", authenticateToken, async (req: Au
 });
 
 router.post("/api/drift/my/flows/:id/unpublish", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = requireOrg(req, res);
+  const orgId = await requireOrg(req, res);
   if (!orgId) return;
   const flow = await prisma.driftFlow.findFirst({
     where: { id: req.params.id, organizationId: orgId },
@@ -347,7 +453,7 @@ router.post(
   authenticateToken,
   imageUpload.single("image"),
   async (req: AuthenticatedRequest, res: Response) => {
-    const orgId = requireOrg(req, res);
+    const orgId = await requireOrg(req, res);
     if (!orgId) return;
     const flow = await prisma.driftFlow.findFirst({
       where: { id: req.params.id, organizationId: orgId },
@@ -370,6 +476,113 @@ router.post(
   },
 );
 
+// The caller's page: name, link, logo, contact button, demo.
+router.get("/api/drift/my/page", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requireOrg(req, res);
+  if (!orgId) return;
+  const org = await prisma.organization.findUnique({ where: { id: orgId }, select: PAGE_SELECT });
+  if (!org || org.productLine !== "TOUR") return res.status(404).json({ error: "This account has no tour page" });
+  res.json({ page: serializePage(org), demo: await resolveDemo(org, "TOUR"), quota: await flowQuota(orgId) });
+});
+
+// Edit the page: { name?, contactLabel?, contactUrl?, demoFlowId?, logoUrl?: null }.
+router.patch("/api/drift/my/page", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requireOrg(req, res);
+  if (!orgId) return;
+  const org = await prisma.organization.findUnique({ where: { id: orgId }, select: PAGE_SELECT });
+  if (!org || org.productLine !== "TOUR") return res.status(404).json({ error: "This account has no tour page" });
+  const body = req.body || {};
+  const data: Record<string, unknown> = {};
+  const settings = { ...pageSettingsOf(org) };
+
+  if ("name" in body) {
+    const name = str(body.name, 80);
+    if (!name) return res.status(400).json({ error: "Page name can't be empty" });
+    data.name = name;
+  }
+  if ("contactLabel" in body) settings.contactLabel = strOrNull(body.contactLabel, 40) ?? null;
+  if ("contactUrl" in body) {
+    const url = strOrNull(body.contactUrl, 500) ?? null;
+    if (url && !isContactUrl(url)) {
+      return res.status(400).json({ error: "The contact link must be a web address, an email (mailto:) or a phone (tel:)" });
+    }
+    settings.contactUrl = url;
+  }
+  if ("demoFlowId" in body) {
+    const id = strOrNull(body.demoFlowId, 60) ?? null;
+    if (id) {
+      const own = await prisma.driftFlow.findFirst({ where: { id, organizationId: orgId }, select: { id: true } });
+      if (!own) return res.status(400).json({ error: "Pick one of this page's tours" });
+    }
+    settings.demoFlowId = id;
+  }
+  if ("logoUrl" in body && !body.logoUrl) settings.logoUrl = null;
+  data.tourSettings = settings;
+
+  const updated = await prisma.organization.update({ where: { id: orgId }, data: data as any, select: PAGE_SELECT });
+  res.json({ page: serializePage(updated), demo: await resolveDemo(updated, "TOUR") });
+});
+
+// Upload the page logo (shown on the page, the pathway and every drift's title block).
+router.post(
+  "/api/drift/my/page/logo",
+  authenticateToken,
+  imageUpload.single("image"),
+  async (req: AuthenticatedRequest, res: Response) => {
+    const orgId = await requireOrg(req, res);
+    if (!orgId) return;
+    const org = await prisma.organization.findUnique({ where: { id: orgId }, select: PAGE_SELECT });
+    if (!org || org.productLine !== "TOUR") return res.status(404).json({ error: "This account has no tour page" });
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: "An image is required" });
+    const ext = IMAGE_EXT[file.mimetype];
+    if (!ext) return res.status(400).json({ error: "Please upload a JPG, PNG or WebP image" });
+    const url = await uploadManagedBuffer({
+      buffer: file.buffer,
+      contentType: file.mimetype,
+      keyPrefix: `drift/org_${orgId}/page/logo`,
+      fallbackExtension: ext,
+    });
+    const updated = await prisma.organization.update({
+      where: { id: orgId },
+      data: { tourSettings: { ...pageSettingsOf(org), logoUrl: url } },
+      select: PAGE_SELECT,
+    });
+    console.log(`[${NS}] page ${orgId} logo uploaded`);
+    res.json({ page: serializePage(updated) });
+  },
+);
+
+// A page, publicly: its name/logo/contact, the demo, and its Featured tours
+// (published, not hidden). ?kind=TOUR (default).
+router.get("/api/drift/public/pages/:page", async (req: AuthenticatedRequest, res: Response) => {
+  const kind = parseFlowKind(req.query.kind ?? "TOUR") ?? "TOUR";
+  const org = await findPublicPage(req.params.page);
+  if (!org) return res.status(404).json({ error: "Not found" });
+  const flows = await prisma.driftFlow.findMany({
+    where: { organizationId: org.id, kind, status: "PUBLISHED", hidden: false },
+    orderBy: [{ order: "asc" }, { createdAt: "desc" }],
+    include: flowInclude,
+  });
+  res.json({
+    page: serializePage(org),
+    demo: await resolveDemo(org, kind),
+    flows: flows.map(serializePublicFlow).filter((f) => f.steps.length > 0),
+  });
+});
+
+// One published flow's pathway menu: /{kind}/{page}/{slug}.
+router.get("/api/drift/public/pages/:page/flows/:slug", async (req: AuthenticatedRequest, res: Response) => {
+  const org = await findPublicPage(req.params.page);
+  if (!org) return res.status(404).json({ error: "Not found" });
+  const flow = await prisma.driftFlow.findFirst({
+    where: { organizationId: org.id, slug: String(req.params.slug || "").trim().toLowerCase(), status: "PUBLISHED" },
+    include: flowInclude,
+  });
+  if (!flow) return res.status(404).json({ error: "Not found", page: serializePage(org) });
+  res.json({ page: serializePage(org), flow: serializePublicFlow(flow) });
+});
+
 // ───────────────────────────── steps ─────────────────────────────
 
 // Add a DRIFT step: multipart { video, name?, title?, titleEnd?, description?,
@@ -382,7 +595,7 @@ router.post(
   videoUpload.single("video"),
   async (req: AuthenticatedRequest, res: Response) => {
     const file = req.file;
-    const orgId = requireOrg(req, res);
+    const orgId = await requireOrg(req, res);
     if (!orgId) return rmFile(file?.path);
     const flow = await prisma.driftFlow.findFirst({
       where: { id: req.params.id, organizationId: orgId },
@@ -414,7 +627,7 @@ router.post(
       await rmFile(file.path);
       return res.status(400).json({ error: "Background must be a colour (e.g. #101418) or transparent" });
     }
-    const clip = await validateClip(orgId, file, res);
+    const clip = await validateClip(orgId, file, res, isSuperAdmin(req));
     if (!clip) return;
 
     const name = str(req.body?.name, 120) || `${stepNoun(kind)} ${flow.steps.length + 1}`;
@@ -471,7 +684,7 @@ router.post(
   videoUpload.single("video"),
   async (req: AuthenticatedRequest, res: Response) => {
     const file = req.file;
-    const orgId = requireOrg(req, res);
+    const orgId = await requireOrg(req, res);
     if (!orgId) return rmFile(file?.path);
     const step = await prisma.driftFlowStep.findFirst({
       where: { id: req.params.stepId, flowId: req.params.id, flow: { organizationId: orgId } },
@@ -486,7 +699,7 @@ router.post(
       await rmFile(file.path);
       return res.status(409).json({ error: "This step is still processing — give it a moment" });
     }
-    const clip = await validateClip(orgId, file, res);
+    const clip = await validateClip(orgId, file, res, isSuperAdmin(req));
     if (!clip) return;
 
     let full: ReturnType<typeof serializeFlow>;
@@ -518,7 +731,7 @@ router.patch(
   "/api/drift/my/flows/:id/steps/reorder",
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
-    const orgId = requireOrg(req, res);
+    const orgId = await requireOrg(req, res);
     if (!orgId) return;
     const flow = await prisma.driftFlow.findFirst({
       where: { id: req.params.id, organizationId: orgId },
@@ -544,7 +757,7 @@ router.patch(
   "/api/drift/my/flows/:id/steps/:stepId",
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
-    const orgId = requireOrg(req, res);
+    const orgId = await requireOrg(req, res);
     if (!orgId) return;
     const step = await prisma.driftFlowStep.findFirst({
       where: { id: req.params.stepId, flowId: req.params.id, flow: { organizationId: orgId } },
@@ -597,8 +810,9 @@ router.patch(
           where: { id: step.id },
           data: { customCta: customCta ? (customCta as any) : Prisma.DbNull },
         });
-        await relinkFlow(tx, step.flowId);
       }
+      // A rename changes the next-drift button (label + URL) on its neighbour.
+      if (customCta !== undefined || "name" in data) await relinkFlow(tx, step.flowId);
     });
     const full = serializeFlow(await loadFlow(orgId, step.flowId));
     res.json({ step: full.steps.find((s: any) => s.id === step.id) ?? null, flow: full });
@@ -610,7 +824,7 @@ router.delete(
   "/api/drift/my/flows/:id/steps/:stepId",
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
-    const orgId = requireOrg(req, res);
+    const orgId = await requireOrg(req, res);
     if (!orgId) return;
     const flow = await prisma.driftFlow.findFirst({
       where: { id: req.params.id, organizationId: orgId },

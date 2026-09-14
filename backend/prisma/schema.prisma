@@ -88,6 +88,12 @@ model Organization {
   maxStepsPerFlow   Int     @default(3) // steps (clips) per flow
   maxClipSeconds    Int     @default(5) // longest source clip accepted per step
 
+  // drift.li Tour v2 (TOUR_V2_PLAN.md) — a TOUR org is a "page": its admin and public view.
+  tourAccountType   String? // GENERAL (realtors, brands, venues) | PRO (photographers / videographers)
+  managedByOrgId    String? // the Pro page that created / manages this client page
+  tourSettings      Json? // { contactLabel, contactUrl, demoFlowId, logoUrl }
+  freeDrifts        Int     @default(3) // drifts the page may build before checkout (per-drift pricing)
+
   driftProducts     DriftProduct[]
   driftSourceImages DriftSourceImage[]
   driftEvents       DriftEvent[]
@@ -95,6 +101,8 @@ model Organization {
   driftLeads        DriftLead[]
   driftDomains      DriftDomain[]
   driftFlows        DriftFlow[]
+  driftTourOrders   DriftTourOrder[]
+  driftTourInvites  DriftTourInvite[]
 }
 
 model User {
@@ -531,6 +539,14 @@ model DriftProduct {
   order           Int      @default(0)
   featured        Boolean  @default(false) // curated into the drift.li landing showcase
   heroFeatured    Boolean  @default(false) // the single hero clip on the landing
+  // Tour v2 billing: FREE (brand drifts / a page's free allowance) | AWAITING_PAYMENT
+  // (clip stored, waiting for checkout — not processed) | PAID | COMP (superadmin).
+  billingStatus     String    @default("FREE")
+  pendingVideoUrl   String? // the uploaded clip while AWAITING_PAYMENT
+  pendingFrameCount Int?
+  orderId           String? // the DriftTourOrder that paid for it
+  paidAt            DateTime?
+  hostingExpiresAt  DateTime? // paidAt + 1 year (expiry enforcement: a later phase)
   featuredRank    Int      @default(0)
   createdByUserId String?
   createdAt       DateTime @default(now())
@@ -740,6 +756,7 @@ model DriftFlow {
   description     String?
   status          String    @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
   isDemo          Boolean   @default(false) // client-seeded demo flow (read-only for creators)
+  hidden          Boolean   @default(false) // page admin hid it from Featured Tours (link still works)
   coverUrl        String? // cover image; falls back to the entry step's poster
   endCta          Json? // last step's CTA { label, url } — creator-set, drift/picdrift targets only
   settings        Json? // small presentation knobs { nextLabel?, theme?, … } so knobs need no migration
@@ -778,6 +795,59 @@ model DriftFlowStep {
 
   @@index([flowId, order])
   @@index([formId])
+}
+
+// Tour v2 — a Stripe Checkout for drifts (price per drift; TOUR_V2_PLAN.md P3).
+model DriftTourOrder {
+  id                    String    @id @default(uuid())
+  organizationId        String
+  userId                String?
+  flowId                String?
+  quantity              Int
+  unitAmountCents       Int
+  amountCents           Int
+  currency              String    @default("usd")
+  status                String    @default("PENDING") // PENDING | PAID | CANCELED | EXPIRED
+  stripeSessionId       String?   @unique
+  stripePaymentIntentId String?
+  productIds            Json? // the drifts this order pays for
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  paidAt                DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([flowId])
+}
+
+// Tour v2 — a General page invites a Pro (photographer / videographer) to manage it.
+model DriftTourInvite {
+  id               String    @id @default(uuid())
+  organizationId   String
+  email            String
+  token            String    @unique
+  invitedByUserId  String?
+  status           String    @default("PENDING") // PENDING | ACCEPTED | REVOKED
+  acceptedByUserId String?
+  createdAt        DateTime  @default(now())
+  acceptedAt       DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+}
+
+// Tour v2 — "Join Wait List" for View / Memory / Path on the drift.li home.
+model DriftWaitlist {
+  id        String   @id @default(uuid())
+  email     String
+  product   String // VIEW | MEMORY | PATH
+  source    String?
+  createdAt DateTime @default(now())
+
+  @@unique([email, product])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

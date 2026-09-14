@@ -1,34 +1,22 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import { confirmAction, notify } from "../lib/notifications";
 import { useAuth } from "../hooks/useAuth";
-import type { Flow, FlowStep, Quota } from "./types";
+import type { Flow, FlowStep, Page, Quota } from "./types";
 import { isReady } from "./types";
-import { CREATOR_HOME } from "./tourSession";
 import { ShareSheet } from "./ShareSheet";
-import {
-  Spinner,
-  StatusPill,
-  TourShell,
-  UpgradeCard,
-  apiError,
-  copyText,
-  publicUrl,
-  readClipDuration,
-} from "./tourUi";
+import { Spinner, StatusPill, TourShell, apiError, copyText, publicUrl, readClipDuration } from "./tourUi";
+import { TOUR_PAGE_STYLES } from "./tourPageStyles";
 
 /**
- * /tour/:id/edit — the builder. A vertical "map" of numbered stops (each a
- * drift): upload a clip → it builds in the background while you write the
- * title, headline and button → reorder with arrows → publish. The path links
- * itself: every stop's Next button is derived from the order, so reordering
- * never breaks it. Desktop shows a live preview of the selected stop (the real
- * player in an iframe) plus the link chain.
+ * The admin view of a tour's pathway (drift.li/tour/{page}/{tour} for page admins):
+ * the drifts on a straight, numbered path. Upload a clip — it builds in the background
+ * — name it, set its background and drift direction, reorder, publish. Every drift's
+ * buttons are fixed and derived from the order (Home + the next drift's name; the last
+ * one loops back to #1), so nothing here can break the path. Desktop shows a live
+ * preview of the selected drift.
  */
-
-type LinkOption = { label: string; url: string };
-type PreviewDraft = { placement: string; btnLabel: string; hasCustom: boolean };
 
 const DIRECTIONS = [
   { value: "LTR", glyph: "→", short: "L→R", title: "Left to right — the camera pans right" },
@@ -36,30 +24,24 @@ const DIRECTIONS = [
   { value: "TTB", glyph: "↓", short: "T→B", title: "Top to bottom" },
   { value: "BTT", glyph: "↑", short: "B→T", title: "Bottom to top" },
 ] as const;
-const PLACEMENTS = [
-  { value: "CENTER", label: "Centre · Next left" },
-  { value: "CENTER_REV", label: "Centre · Next right" },
-  { value: "LEFT", label: "Bottom left" },
-  { value: "RIGHT", label: "Bottom right" },
-  { value: "SPLIT", label: "Spread · Next right" },
-  { value: "SPLIT_REV", label: "Spread · Next left" },
-] as const;
+const COVER_LABELS = ["Start", "Middle", "End"];
 
-const DEFAULT_NEXT = "Next stop";
-const DEFAULT_END = "Restart tour";
-const CUSTOM = "__custom__";
-const NONE = "";
-
-const stepName = (s: FlowStep, i: number) => s.product?.name || `Stop ${i + 1}`;
-// Pin state on the route rail (colour + halo come from CSS).
+const driftName = (s: FlowStep, i: number) => s.product?.name || `Drift ${i + 1}`;
+// Pin state on the rail (colour + halo come from CSS).
 const stateClass = (st?: string | null) =>
   st === "PROCESSING" ? "is-processing" : st === "FAILED" ? "is-failed" : isReady(st) ? "is-ready" : "";
 
+const PencilIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+);
+
 /**
- * The rail as an inked route: a dotted trail through every pin (the upload slot
+ * The rail as a straight inked line: a dotted trail through every pin (the upload slot
  * included — that's "what's next"), the accent line drawing itself in through the
- * stops, and a rider that travels it once whenever the path changes (add, reorder,
- * expand). The pins are the items' own numbered badges; this draws the line only.
+ * drifts, and a rider that travels it once whenever the path changes.
  */
 function RouteInk({ host, dep }: { host: RefObject<HTMLDivElement | null>; dep: string }) {
   const [paths, setPaths] = useState<{ ink: string; under: string } | null>(null);
@@ -69,14 +51,8 @@ function RouteInk({ host, dep }: { host: RefObject<HTMLDivElement | null>; dep: 
     const measure = () => {
       const items = Array.from(el.querySelectorAll<HTMLElement>(":scope > .t-route-item"));
       const pts = items.map((it) => ({ y: it.offsetTop + 33, drop: it.classList.contains("is-drop") }));
-      // A gentle S between pins so it reads as a route, not a ruler.
-      const seg = (a: number, b: number, i: number) => {
-        const k = i % 2 ? -11 : 11;
-        const d = (b - a) * 0.38;
-        return ` C ${13 + k} ${a + d}, ${13 - k} ${b - d}, 13 ${b}`;
-      };
       const build = (list: { y: number }[]) =>
-        list.length < 2 ? "" : list.slice(1).reduce((acc, p, i) => acc + seg(list[i].y, p.y, i), `M 13 ${list[0].y}`);
+        list.length < 2 ? "" : list.slice(1).reduce((acc, p) => `${acc} L 13 ${p.y}`, `M 13 ${list[0].y}`);
       const ink = build(pts.filter((p) => !p.drop));
       const under = build(pts);
       setPaths((prev) => (prev && prev.ink === ink && prev.under === under ? prev : { ink, under }));
@@ -90,8 +66,6 @@ function RouteInk({ host, dep }: { host: RefObject<HTMLDivElement | null>; dep: 
   return (
     <svg className="t-route-svg" aria-hidden>
       <path className="t-route-under" d={paths.under} />
-      {/* keyed on `dep` (not the geometry): a path change re-inks + rides; a plain
-          window resize just follows the pins */}
       {paths.ink && <path key={dep} className="t-route-ink" d={paths.ink} pathLength={1000} />}
       {paths.ink && (
         <circle key={"r" + dep} className="t-route-rider" r={5} style={{ offsetPath: `path("${paths.ink}")` }} />
@@ -100,170 +74,59 @@ function RouteInk({ host, dep }: { host: RefObject<HTMLDivElement | null>; dep: 
   );
 }
 
-// ─────────────────────────── link picker ───────────────────────────
-
-function LinkPicker({
-  value,
-  options,
-  onChange,
-  allowNone,
-  placeholder,
-}: {
-  value: string;
-  options: LinkOption[];
-  onChange: (url: string) => void;
-  allowNone?: boolean;
-  placeholder?: string;
-}) {
-  const known = options.some((o) => o.url === value);
-  const [mode, setMode] = useState<string>(!value ? (allowNone ? NONE : CUSTOM) : known ? value : CUSTOM);
-  useEffect(() => {
-    if (value && options.some((o) => o.url === value)) setMode(value);
-    else if (value) setMode(CUSTOM);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value]);
-  return (
-    <div style={{ display: "grid", gap: 8 }}>
-      <select
-        className="d-select"
-        value={mode}
-        onChange={(e) => {
-          const v = e.target.value;
-          setMode(v);
-          if (v === CUSTOM) onChange(value && !known ? value : "");
-          else onChange(v);
-        }}
-      >
-        {allowNone && <option value={NONE}>No button</option>}
-        {options.length > 0 && (
-          <optgroup label="Your stops">
-            {options.map((o) => (
-              <option key={o.url} value={o.url}>
-                {o.label}
-              </option>
-            ))}
-          </optgroup>
-        )}
-        <option value={CUSTOM}>A drift.li or picdrift.com link…</option>
-      </select>
-      {mode === CUSTOM && (
-        <input
-          className="d-input"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder || "https://drift.li/… or https://picdrift.com/…"}
-          inputMode="url"
-        />
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────── one stop ───────────────────────────
+// ─────────────────────────── one drift ───────────────────────────
 
 function StepCard({
   flow,
   step,
   index,
-  options,
   selected,
   onSelect,
   onChanged,
   maxClip,
-  onPreview,
 }: {
   flow: Flow;
   step: FlowStep;
   index: number;
-  options: LinkOption[];
   selected: boolean;
   onSelect: () => void;
   onChanged: (flow: Flow) => void;
-  maxClip: number;
-  onPreview: (draft: PreviewDraft) => void;
+  maxClip: number | null;
 }) {
   const p = step.product;
   const [name, setName] = useState(p?.name || "");
-  const [title, setTitle] = useState(p?.title || "");
-  const [btnLabel, setBtnLabel] = useState(step.customCta?.label || "");
-  const [btnUrl, setBtnUrl] = useState(step.customCta?.url || "");
   const [bg, setBg] = useState(p?.background || "");
-  const [loop, setLoop] = useState(!!p?.loopEnabled);
   const [direction, setDirection] = useState(p?.driftDirection || "LTR");
-  const [placement, setPlacement] = useState(p?.ctaPlacement || "CENTER");
   const [saving, setSaving] = useState(false);
-  // Live preview: the selected card's unsaved placement + button labels.
-  useEffect(() => {
-    if (!selected) return;
-    onPreview({ placement, btnLabel: btnLabel.trim(), hasCustom: !!(btnLabel.trim() && btnUrl.trim()) });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, placement, btnLabel, btnUrl]);
   const [replacing, setReplacing] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
 
-  // Re-sync a field from the server ONLY while it isn't being edited locally. The 3s
-  // poll and every relink refresh the server copy; typing must never be thrown away.
-  const serverRef = useRef({
-    name: p?.name || "",
-    title: p?.title || "",
-    btnLabel: step.customCta?.label || "",
-    btnUrl: step.customCta?.url || "",
-    bg: p?.background || "",
-    loop: !!p?.loopEnabled,
-    direction: p?.driftDirection || "LTR",
-    placement: p?.ctaPlacement || "CENTER",
-  });
+  // Re-sync a field from the server ONLY while it isn't being edited locally (the poll
+  // and every relink refresh the server copy; typing must never be thrown away).
+  const serverRef = useRef({ name: p?.name || "", bg: p?.background || "", direction: p?.driftDirection || "LTR" });
   useEffect(() => {
-    const next = {
-      name: p?.name || "",
-      title: p?.title || "",
-      btnLabel: step.customCta?.label || "",
-      btnUrl: step.customCta?.url || "",
-      bg: p?.background || "",
-      loop: !!p?.loopEnabled,
-      direction: p?.driftDirection || "LTR",
-      placement: p?.ctaPlacement || "CENTER",
-    };
+    const next = { name: p?.name || "", bg: p?.background || "", direction: p?.driftDirection || "LTR" };
     const prev = serverRef.current;
     setName((v) => (v === prev.name ? next.name : v));
-    setTitle((v) => (v === prev.title ? next.title : v));
-    setBtnLabel((v) => (v === prev.btnLabel ? next.btnLabel : v));
-    setBtnUrl((v) => (v === prev.btnUrl ? next.btnUrl : v));
     setBg((v) => (v === prev.bg ? next.bg : v));
-    setLoop((v) => (v === prev.loop ? next.loop : v));
     setDirection((v) => (v === prev.direction ? next.direction : v));
-    setPlacement((v) => (v === prev.placement ? next.placement : v));
     serverRef.current = next;
-  }, [p?.name, p?.title, step.customCta?.label, step.customCta?.url, p?.background, p?.loopEnabled, p?.driftDirection, p?.ctaPlacement]);
+  }, [p?.name, p?.background, p?.driftDirection]);
 
-  const dirty =
-    name !== (p?.name || "") ||
-    title !== (p?.title || "") ||
-    btnLabel !== (step.customCta?.label || "") ||
-    btnUrl !== (step.customCta?.url || "") ||
-    bg !== (p?.background || "") ||
-    loop !== !!p?.loopEnabled ||
-    direction !== (p?.driftDirection || "LTR") ||
-    placement !== (p?.ctaPlacement || "CENTER");
+  const dirty = name !== (p?.name || "") || bg !== (p?.background || "") || direction !== (p?.driftDirection || "LTR");
 
   const save = async () => {
-    if (!name.trim()) return notify.error("Give this stop a title");
-    if ((btnLabel.trim() && !btnUrl.trim()) || (!btnLabel.trim() && btnUrl.trim())) {
-      return notify.error("A button needs both a label and a link");
-    }
+    if (!name.trim()) return notify.error("Give this drift a name");
     setSaving(true);
     try {
       const r = await apiEndpoints.driftUpdateFlowStep(flow.id, step.id, {
         name: name.trim(),
-        title: title.trim(),
         background: bg,
-        loopEnabled: loop,
         driftDirection: direction,
-        ctaPlacement: placement,
-        customCta: btnLabel.trim() && btnUrl.trim() ? { label: btnLabel.trim(), url: btnUrl.trim() } : null,
       });
       onChanged(r.data.flow);
-      notify.success("Stop saved");
+      notify.success("Drift saved");
     } catch (e) {
       notify.error(apiError(e));
     } finally {
@@ -285,12 +148,12 @@ function StepCard({
   };
 
   const remove = async () => {
-    const ok = await confirmAction(`Remove "${stepName(step, index)}" from the tour?`);
+    const ok = await confirmAction(`Remove "${driftName(step, index)}" from the tour?`);
     if (!ok) return;
     try {
       const r = await apiEndpoints.driftDeleteFlowStep(flow.id, step.id);
       onChanged(r.data.flow);
-      notify.success("Stop removed");
+      notify.success("Drift removed");
     } catch (e) {
       notify.error(apiError(e));
     }
@@ -298,7 +161,7 @@ function StepCard({
 
   const replaceClip = async (file: File) => {
     const d = await readClipDuration(file);
-    if (d && d > maxClip + 0.5) return notify.error(`Clips must be ${maxClip}s or shorter — this one is ${d.toFixed(1)}s.`);
+    if (maxClip && d && d > maxClip + 0.5) return notify.error(`Clips must be ${maxClip}s or shorter — this one is ${d.toFixed(1)}s.`);
     const fd = new FormData();
     fd.append("video", file);
     setReplacing(0);
@@ -316,16 +179,6 @@ function StepCard({
   };
 
   const status = p?.status || "DRAFT";
-  const next = flow.steps[index + 1];
-  const nextLabel = flow.settings.nextLabel || DEFAULT_NEXT;
-
-  const autoLink = next
-    ? `${nextLabel} → ${stepName(next, index + 1)}`
-    : flow.endCta
-      ? `${flow.endCta.label} → ${flow.endCta.url}`
-      : flow.steps.length > 1
-        ? `${DEFAULT_END} → ${stepName(flow.steps[0], 0)}`
-        : "add a second stop to link this one on";
 
   return (
     <div
@@ -379,23 +232,37 @@ function StepCard({
             )}
           </div>
         )}
-        {status === "PROCESSING" && (
-          <div className="d-faint t-tip">You can keep writing — this stop updates itself when it's ready.</div>
-        )}
+        {status === "PROCESSING" && <div className="d-faint t-tip">You can keep going — this drift updates itself when it's ready.</div>}
       </div>
 
       <div className="t-step-body">
         <div className="t-step-head">
           <div className="t-step-title">
-            <span className="d-eyebrow">Stop {index + 1}</span>
-            <input
-              className="t-title-input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Give this stop a title"
-              maxLength={120}
-              aria-label="Stop title"
-            />
+            <span className="d-eyebrow">Drift {index + 1}</span>
+            <div className="t-name-row">
+              <input
+                ref={nameRef}
+                className="t-title-input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && dirty && save()}
+                placeholder={`Drift ${index + 1}`}
+                maxLength={120}
+                aria-label="Drift name"
+              />
+              <button
+                type="button"
+                className="t-pencil"
+                title="Rename this drift"
+                aria-label="Rename this drift"
+                onClick={() => {
+                  nameRef.current?.focus();
+                  nameRef.current?.select();
+                }}
+              >
+                <PencilIcon />
+              </button>
+            </div>
           </div>
           <div className="t-actions">
             <span className="t-arrows">
@@ -418,18 +285,6 @@ function StepCard({
         </div>
 
         <div className="t-fields fluid">
-          <div className="t-field">
-            <label className="d-label">Headline</label>
-            <input className="d-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Morning light, garden views" maxLength={120} />
-          </div>
-          <div className="t-field">
-            <label className="d-label">Button label</label>
-            <input className="d-input" value={btnLabel} onChange={(e) => setBtnLabel(e.target.value)} placeholder="e.g. Book a viewing" maxLength={40} />
-          </div>
-          <div className="t-field">
-            <label className="d-label">Button link</label>
-            <LinkPicker value={btnUrl} options={options.filter((o) => o.url !== p?.playerPath)} onChange={setBtnUrl} allowNone />
-          </div>
           <div className="t-field">
             <label className="d-label">Background</label>
             <div className="t-color">
@@ -468,45 +323,12 @@ function StepCard({
               ))}
             </div>
           </div>
-          <div className="t-field">
-            <label className="d-label">Buttons</label>
-            <div className="t-chips" role="radiogroup" aria-label="Button placement">
-              {PLACEMENTS.map((pl) => (
-                <button
-                  key={pl.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={placement === pl.value}
-                  className={`t-chip-btn ${placement === pl.value ? "on" : ""}`}
-                  onClick={() => setPlacement(pl.value)}
-                >
-                  {pl.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="t-field t-field-row">
-            <label className="t-switch">
-              <input type="checkbox" checked={loop} onChange={(e) => setLoop(e.target.checked)} />
-              <i />
-              <span>
-                Loop
-                <small>dragging wraps end → start</small>
-              </span>
-            </label>
-          </div>
-          <div className="t-field t-field-row">
-            <div className="t-next">
-              <span className="d-faint">Auto link:</span>
-              <b>{autoLink}</b>
-            </div>
-          </div>
         </div>
 
         <div className="t-step-foot">
           <span className={`t-unsaved ${dirty ? "on" : ""}`}>{dirty ? "Unsaved changes" : "All changes saved"}</span>
           <button className="d-btn primary" onClick={save} disabled={saving || !dirty}>
-            {saving ? "Saving…" : "Save stop"}
+            {saving ? "Saving…" : "Save Drift"}
           </button>
         </div>
       </div>
@@ -514,7 +336,7 @@ function StepCard({
   );
 }
 
-// ─────────────────────────── upload slot ───────────────────────────
+// ─────────────────────────── + Add to Tour ───────────────────────────
 
 function UploadSlot({
   flow,
@@ -524,7 +346,7 @@ function UploadSlot({
 }: {
   flow: Flow;
   index: number;
-  maxClip: number;
+  maxClip: number | null;
   onAdded: (flow: Flow, stepId: string | null) => void;
 }) {
   const [progress, setProgress] = useState<number | null>(null);
@@ -536,12 +358,12 @@ function UploadSlot({
       return notify.error("Please choose a video clip (MP4 or MOV)");
     }
     const d = await readClipDuration(file);
-    if (d && d > maxClip + 0.5) {
+    if (maxClip && d && d > maxClip + 0.5) {
       return notify.error(`Clips must be ${maxClip} seconds or shorter — this one is ${d.toFixed(1)}s. Trim it and try again.`);
     }
     const fd = new FormData();
     fd.append("video", file);
-    fd.append("name", `Stop ${index + 1}`);
+    fd.append("name", `Drift ${index + 1}`);
     setProgress(0);
     try {
       const r = await apiEndpoints.driftAddFlowStep(flow.id, fd, (e) => {
@@ -561,7 +383,7 @@ function UploadSlot({
     return (
       <div className="d-card d-card-pad t-route-item is-drop" data-n={index + 1} style={{ display: "grid", gap: 10, ["--n" as any]: index }}>
         <div className="t-inline" style={{ justifyContent: "space-between" }}>
-          <div className="d-h2">Stop {index + 1} · uploading</div>
+          <div className="d-h2">Drift {index + 1} · uploading</div>
           <span className="d-faint">{progress}%</span>
         </div>
         <div className="t-progress">
@@ -609,40 +431,42 @@ function UploadSlot({
       <div className="ico" aria-hidden>
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4" /><path d="M6 10l6-6 6 6" /><path d="M4 20h16" /></svg>
       </div>
-      <div className="d-eyebrow">Stop {index + 1}</div>
-      <div className="big">{index === 0 ? "Upload your first clip" : "Add the next clip"}</div>
+      <div className="d-eyebrow">Drift {index + 1}</div>
+      <div className="big">{index === 0 ? "Upload your first clip" : "+ Add to Tour"}</div>
       <div className="d-sub" style={{ fontSize: 13 }}>
-        Up to {maxClip} seconds · shot on your phone is perfect · tap to choose or drop it here
+        {maxClip ? `Up to ${maxClip} seconds · ` : ""}a slow pan or tilt of the space · tap to choose or drop it here
       </div>
     </div>
   );
 }
 
-// ─────────────────────────── the page ───────────────────────────
+// ─────────────────────────── the pathway (admin) ───────────────────────────
 
-export default function TourBuilder() {
-  const { id = "" } = useParams();
+export default function TourBuilder({
+  flowId,
+  page,
+  onPublicView,
+  onSlugChange,
+}: {
+  flowId: string;
+  page: Page;
+  onPublicView: () => void;
+  onSlugChange: (slug: string) => void;
+}) {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const superAdmin = user?.role === "SUPERADMIN";
   const [flow, setFlow] = useState<Flow | null>(null);
-  const [demoSaving, setDemoSaving] = useState(false);
   const [quota, setQuota] = useState<Quota | null>(null);
-  const [allOptions, setAllOptions] = useState<LinkOption[]>([]);
   const [missing, setMissing] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [previewDraft, setPreviewDraft] = useState<PreviewDraft | null>(null);
-  const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const onPreview = (d: PreviewDraft) => {
-    if (previewTimer.current) clearTimeout(previewTimer.current);
-    previewTimer.current = setTimeout(() => setPreviewDraft(d), 300);
-  };
   const [name, setName] = useState("");
   const [nameSaving, setNameSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   // The share sheet: "celebrate" right after publishing, "open" from the Share button.
   const [share, setShare] = useState<"none" | "open" | "celebrate">("none");
-  // "Path" = compact rows you expand one at a time (default); "Cards" = every stop open.
+  // "Path" = compact rows you expand one at a time (default); "Cards" = every drift open.
   const [viewMode, setViewMode] = useState<"path" | "cards">(() => {
     try {
       return localStorage.getItem("drift_builder_view") === "cards" ? "cards" : "path";
@@ -653,9 +477,13 @@ export default function TourBuilder() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
+  const [description, setDescription] = useState("");
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [coverBusy, setCoverBusy] = useState(false);
+  const [demoSaving, setDemoSaving] = useState(false);
   const coverRef = useRef<HTMLInputElement>(null);
   const routeRef = useRef<HTMLDivElement>(null);
-  const [coverBusy, setCoverBusy] = useState(false);
+  const slugRef = useRef<string | null>(null);
   const switchView = (m: "path" | "cards") => {
     setViewMode(m);
     try {
@@ -664,36 +492,25 @@ export default function TourBuilder() {
       /* ignore */
     }
   };
-  const [nextLabel, setNextLabel] = useState("");
-  const [endLabel, setEndLabel] = useState("");
-  const [endUrl, setEndUrl] = useState("");
-  const [description, setDescription] = useState("");
-  const [settingsSaving, setSettingsSaving] = useState(false);
 
   // Tour-level fields follow the server copy only while they're not being edited.
-  const flowServerRef = useRef<{ name: string; nextLabel: string; endLabel: string; endUrl: string; description: string } | null>(null);
+  const flowServerRef = useRef<{ name: string; description: string } | null>(null);
   const applyFlow = (f: Flow) => {
     setFlow(f);
-    const next = {
-      name: f.name,
-      nextLabel: f.settings.nextLabel || "",
-      endLabel: f.endCta?.label || "",
-      endUrl: f.endCta?.url || "",
-      description: f.description || "",
-    };
+    const next = { name: f.name, description: f.description || "" };
     const prev = flowServerRef.current;
     setName((v) => (!prev || v === prev.name ? next.name : v));
-    setNextLabel((v) => (!prev || v === prev.nextLabel ? next.nextLabel : v));
-    setEndLabel((v) => (!prev || v === prev.endLabel ? next.endLabel : v));
-    setEndUrl((v) => (!prev || v === prev.endUrl ? next.endUrl : v));
     setDescription((v) => (!prev || v === prev.description ? next.description : v));
     flowServerRef.current = next;
     setSelectedId((cur) => (cur && f.steps.some((s) => s.id === cur) ? cur : f.steps[0]?.id || null));
+    // An unpublished tour's link follows its name: keep the address bar in step.
+    if (slugRef.current && slugRef.current !== f.slug) onSlugChange(f.slug);
+    slugRef.current = f.slug;
   };
 
   const load = async () => {
     try {
-      const r = await apiEndpoints.driftFlow(id);
+      const r = await apiEndpoints.driftFlow(flowId);
       applyFlow(r.data.flow);
       setQuota(r.data.quota);
     } catch (e: any) {
@@ -703,39 +520,17 @@ export default function TourBuilder() {
   };
   useEffect(() => {
     load();
-    apiEndpoints
-      .driftMyFlows()
-      .then((r) => {
-        const opts: LinkOption[] = [];
-        for (const f of (r.data.flows || []) as Flow[]) {
-          for (const s of f.steps) {
-            if (s.product && isReady(s.product.status)) opts.push({ label: `${f.name} · ${s.product.name}`, url: s.product.playerPath });
-          }
-        }
-        setAllOptions(opts);
-      })
-      .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [flowId]);
 
-  // Poll while any stop is building.
+  // Poll while any drift is building.
   const processing = flow?.counts.processing || 0;
   useEffect(() => {
     if (!processing) return;
     const t = setInterval(load, 3000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [processing, id]);
-
-  // Options for pickers: this tour's stops first (fresh), then everything else.
-  const options = useMemo(() => {
-    if (!flow) return allOptions;
-    const mine: LinkOption[] = flow.steps
-      .filter((s) => s.product && isReady(s.product.status))
-      .map((s, i) => ({ label: `Stop ${i + 1} · ${s.product!.name}`, url: s.product!.playerPath }));
-    const seen = new Set(mine.map((o) => o.url));
-    return [...mine, ...allOptions.filter((o) => !seen.has(o.url))];
-  }, [flow, allOptions]);
+  }, [processing, flowId]);
 
   const saveName = async () => {
     if (!flow || !name.trim() || name.trim() === flow.name) return;
@@ -752,16 +547,9 @@ export default function TourBuilder() {
 
   const saveSettings = async () => {
     if (!flow) return;
-    if ((endLabel.trim() && !endUrl.trim()) || (!endLabel.trim() && endUrl.trim())) {
-      return notify.error("The last-stop button needs both a label and a link");
-    }
     setSettingsSaving(true);
     try {
-      const r = await apiEndpoints.driftUpdateFlow(flow.id, {
-        nextLabel: nextLabel.trim() || null,
-        endCta: endLabel.trim() && endUrl.trim() ? { label: endLabel.trim(), url: endUrl.trim() } : null,
-        description: description.trim() || null,
-      });
+      const r = await apiEndpoints.driftUpdateFlow(flow.id, { description: description.trim() || null });
       applyFlow(r.data.flow);
       notify.success("Tour settings saved");
     } catch (e) {
@@ -778,8 +566,7 @@ export default function TourBuilder() {
       const r = on ? await apiEndpoints.driftPublishFlow(flow.id) : await apiEndpoints.driftUnpublishFlow(flow.id);
       applyFlow(r.data.flow);
       if (on) {
-        const link = publicUrl(r.data.flow.publicPath);
-        const copied = await copyText(link);
+        const copied = await copyText(publicUrl(r.data.flow.publicPath));
         notify.success(copied ? "Your tour is live — link copied" : "Your tour is live");
         setShare("celebrate");
       } else notify.success("Tour unpublished");
@@ -809,7 +596,7 @@ export default function TourBuilder() {
     try {
       const r = await apiEndpoints.driftUpdateFlow(flow.id, { coverUrl: url || "" });
       applyFlow(r.data.flow);
-      notify.success(url ? "Cover updated" : "Cover back to the first stop");
+      notify.success(url ? "Cover updated" : "Cover back to the first drift");
     } catch (e) {
       notify.error(apiError(e));
     } finally {
@@ -840,65 +627,63 @@ export default function TourBuilder() {
     notify[ok ? "success" : "error"](ok ? "Link copied" : "Couldn't copy the link");
   };
 
+  const shell = (body: React.ReactNode) => (
+    <TourShell>
+      <style>{TOUR_PAGE_STYLES}</style>
+      {body}
+    </TourShell>
+  );
+  const homePath = page.path || "/tour";
+
   if (missing) {
-    return (
-      <TourShell>
-        <div className="d-empty">
-          This tour doesn't exist (or isn't yours).{" "}
-          <Link to={CREATOR_HOME} style={{ color: "var(--accent)" }}>
-            Back to your tours
-          </Link>
-        </div>
-      </TourShell>
+    return shell(
+      <div className="d-empty">
+        This tour doesn't exist (or isn't on this page).{" "}
+        <Link to={homePath} style={{ color: "var(--accent)" }}>
+          Back to {page.name}
+        </Link>
+      </div>,
     );
   }
   if (!flow || !quota) {
-    return (
-      <TourShell>
-        <div className="d-faint" style={{ fontSize: 13 }}>Loading…</div>
-      </TourShell>
+    return shell(
+      <div style={{ display: "grid", placeItems: "center", minHeight: "40vh", gap: 10 }}>
+        <Spinner />
+      </div>,
     );
   }
 
   const canPublish = flow.counts.steps > 0 && flow.counts.processing === 0 && flow.counts.failed === 0;
-  const atStepQuota = flow.steps.length >= quota.maxStepsPerFlow;
-  // Anything that moves a pin re-inks the route.
-  const routeDep = [viewMode, expandedId, atStepQuota, ...flow.steps.map((s) => `${s.id}:${s.product?.status || ""}`)].join("|");
+  const maxClip = superAdmin ? null : quota.maxClipSeconds;
+  const atStepQuota = !superAdmin && flow.steps.length >= quota.maxStepsPerFlow;
   const selected = flow.steps.find((s) => s.id === selectedId) || null;
   const selectedProduct = selected?.product || null;
+  // Anything that moves a pin re-inks the rail.
+  const routeDep = [viewMode, expandedId, atStepQuota, ...flow.steps.map((s) => `${s.id}:${s.product?.status || ""}`)].join("|");
   const renderCard = (s: FlowStep, i: number) => (
     <StepCard
       key={s.id}
       flow={flow}
       step={s}
       index={i}
-      options={options}
       selected={s.id === selectedId}
-      onSelect={() => {
-        if (s.id !== selectedId) setPreviewDraft(null);
-        setSelectedId(s.id);
-      }}
+      onSelect={() => setSelectedId(s.id)}
       onChanged={applyFlow}
-      maxClip={quota.maxClipSeconds}
-      onPreview={onPreview}
+      maxClip={maxClip}
     />
   );
-  const settingsDirty =
-    nextLabel !== (flow.settings.nextLabel || "") ||
-    endLabel !== (flow.endCta?.label || "") ||
-    endUrl !== (flow.endCta?.url || "") ||
-    description !== (flow.description || "");
 
-  return (
-    <TourShell>
-      <Link to={CREATOR_HOME} className="t-back" style={{ marginBottom: 12 }}>
-        ← Your tours
+  return shell(
+    <>
+      <Link to={homePath} className="t-back" style={{ marginBottom: 12 }}>
+        ← {page.name} Tours
       </Link>
 
       <div className="t-head t-rise" style={{ marginTop: 6 }}>
         <div style={{ flex: "1 1 320px", minWidth: 0 }}>
           <div className="d-eyebrow" style={{ marginBottom: 6 }}>
             Tour · <StatusPill status={flow.status} flow />
+            {flow.hidden && <span className="d-pill" style={{ marginLeft: 6 }}>Hidden</span>}
           </div>
           <div className="t-inline">
             <input
@@ -915,25 +700,27 @@ export default function TourBuilder() {
           </div>
           <div className="t-muted-row" style={{ marginTop: 8 }}>
             <span>
-              {flow.counts.ready}/{flow.counts.steps} stops ready
+              {flow.counts.ready}/{flow.counts.steps} drifts ready
             </span>
-            <span className="d-faint">· up to {quota.maxStepsPerFlow} stops</span>
-            {flow.status === "PUBLISHED" && (
-              <span className="t-link" style={{ padding: "4px 8px" }}>
-                <code>{publicUrl(flow.publicPath).replace(/^https?:\/\//, "")}</code>
+            <span className="t-link" style={{ padding: "4px 8px" }}>
+              <code>{publicUrl(flow.publicPath).replace(/^https?:\/\//, "")}</code>
+              {flow.status === "PUBLISHED" && (
                 <button className="d-btn ghost sm" onClick={copyLink}>
                   Copy
                 </button>
-              </span>
-            )}
+              )}
+            </span>
           </div>
         </div>
         <div className="t-actions">
           {flow.entryPath && (
             <a className="d-btn" href={flow.entryPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
-              Preview
+              ▶ Start Tour
             </a>
           )}
+          <button className="d-btn" onClick={onPublicView} title="See this pathway the way visitors do">
+            Public view
+          </button>
           <div className="d-tabs" role="tablist" aria-label="Builder view">
             <button role="tab" aria-selected={viewMode === "path"} className={`d-tab ${viewMode === "path" ? "active" : ""}`} onClick={() => switchView("path")}>
               Path
@@ -959,7 +746,7 @@ export default function TourBuilder() {
               className="d-btn primary"
               onClick={() => publish(true)}
               disabled={publishing || !canPublish}
-              title={!canPublish ? "Every stop needs to finish building first" : undefined}
+              title={!canPublish ? "Every drift needs to finish building first" : undefined}
             >
               {publishing ? "Publishing…" : "Publish"}
             </button>
@@ -971,32 +758,28 @@ export default function TourBuilder() {
         <div className="d-card d-card-pad" style={{ marginBottom: 18 }}>
           <div className="d-eyebrow" style={{ marginBottom: 12 }}>Tour settings</div>
           <div className="t-cover">
-            <div className="t-cover-current">
-              {flow.thumb ? <img src={flow.thumb} alt="" /> : <span>No cover yet</span>}
-            </div>
+            <div className="t-cover-current">{flow.thumb ? <img src={flow.thumb} alt="" /> : <span>No cover yet</span>}</div>
             <div className="t-cover-controls">
               <div className="d-label">Cover image</div>
               <div className="d-sub" style={{ fontSize: 12.5 }}>
-                {flow.coverUrl ? "Custom cover." : "Using the first stop's frame."} It's the picture on your tours page
-                and in share previews.
+                The picture on your page and in share previews. Pick a frame from the first drift — its start, middle or
+                end — or upload your own.
               </div>
-              {flow.steps.some((s) => s.product?.thumb) && (
-                <div className="t-cover-picks" aria-label="Use a stop's frame">
-                  {flow.steps.map((s, i) =>
-                    s.product?.thumb ? (
-                      <button
-                        key={s.id}
-                        type="button"
-                        className={`t-cover-pick ${flow.coverUrl === s.product.thumb ? "on" : ""}`}
-                        onClick={() => setCover(s.product!.thumb)}
-                        title={`Use stop ${i + 1}`}
-                        disabled={coverBusy}
-                      >
-                        <img src={s.product.thumb} alt="" />
-                        <span>{i + 1}</span>
-                      </button>
-                    ) : null,
-                  )}
+              {flow.coverFrames.length > 0 && (
+                <div className="t-cover-picks" aria-label="Use a frame from the first drift">
+                  {flow.coverFrames.map((url, i) => (
+                    <button
+                      key={url + i}
+                      type="button"
+                      className={`t-cover-pick ${flow.coverUrl === url ? "on" : ""}`}
+                      onClick={() => setCover(url)}
+                      title={`Use the ${COVER_LABELS[i]?.toLowerCase() || "frame"} of the first drift`}
+                      disabled={coverBusy}
+                    >
+                      <img src={url} alt="" />
+                      <span className="lbl">{COVER_LABELS[i] || i + 1}</span>
+                    </button>
+                  ))}
                 </div>
               )}
               <div className="t-actions">
@@ -1016,42 +799,33 @@ export default function TourBuilder() {
                 </button>
                 {flow.coverUrl && (
                   <button className="d-btn ghost sm" onClick={() => setCover(null)} disabled={coverBusy}>
-                    Use first stop
+                    Use first drift
                   </button>
                 )}
               </div>
             </div>
           </div>
-          <div className="t-fields two">
-            <div>
-              <label className="d-label">"Next" button label</label>
-              <input className="d-input" value={nextLabel} onChange={(e) => setNextLabel(e.target.value)} placeholder={DEFAULT_NEXT} maxLength={40} />
-              <div className="d-faint" style={{ fontSize: 11.5, marginTop: 5 }}>
-                Shown on every stop except the last; it always points at the following stop.
-              </div>
-            </div>
+          <div className="t-fields">
             <div>
               <label className="d-label">Description</label>
-              <input className="d-input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional — for the share preview" maxLength={600} />
-            </div>
-            <div>
-              <label className="d-label">Last stop button — label</label>
-              <input className="d-input" value={endLabel} onChange={(e) => setEndLabel(e.target.value)} placeholder={DEFAULT_END} maxLength={40} />
-            </div>
-            <div>
-              <label className="d-label">Last stop button — link</label>
-              <LinkPicker value={endUrl} options={options} onChange={setEndUrl} allowNone placeholder="Leave empty to restart the tour" />
+              <input
+                className="d-input"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Optional — shown under the tour title and in share previews"
+                maxLength={600}
+              />
             </div>
           </div>
           <div className="t-actions" style={{ marginTop: 12 }}>
-            <button className="d-btn primary" onClick={saveSettings} disabled={settingsSaving || !settingsDirty}>
+            <button className="d-btn primary" onClick={saveSettings} disabled={settingsSaving || description === (flow.description || "")}>
               {settingsSaving ? "Saving…" : "Save settings"}
             </button>
             <span className="d-faint" style={{ fontSize: 12 }}>
-              Empty = "{DEFAULT_END}" back to stop 1.
+              Buttons are automatic: Home, and the next drift's name. The last drift loops back to #1.
             </span>
           </div>
-          {user?.role === "SUPERADMIN" && (
+          {superAdmin && (
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
               <label className="t-inline" style={{ gap: 8, cursor: "pointer" }}>
                 <input
@@ -1064,7 +838,7 @@ export default function TourBuilder() {
                     try {
                       const r = await apiEndpoints.driftUpdateFlow(flow.id, { isDemo: on });
                       applyFlow(r.data.flow);
-                      notify.success(on ? "This tour is now the public demo (/tour/demo)" : "No longer the demo tour");
+                      notify.success(on ? "This tour is now drift.li's demo tour" : "No longer the demo tour");
                     } catch (err) {
                       notify.error(apiError(err));
                     } finally {
@@ -1072,10 +846,7 @@ export default function TourBuilder() {
                     }
                   }}
                 />
-                <span className="d-sub">
-                  Use as the public demo tour (<code className="d-code">/tour/demo</code>) — superadmin only. Publish it
-                  and point its buttons at <code className="d-code">/tour/start</code>.
-                </span>
+                <span className="d-sub">Use as drift.li's demo tour (every page's "View Demo" by default) — superadmin only.</span>
               </label>
             </div>
           )}
@@ -1118,7 +889,6 @@ export default function TourBuilder() {
                       }}
                       onClick={() => {
                         setExpandedId((cur) => (cur === s.id ? null : s.id));
-                        if (s.id !== selectedId) setPreviewDraft(null);
                         setSelectedId(s.id);
                       }}
                     >
@@ -1126,11 +896,10 @@ export default function TourBuilder() {
                         {s.product?.thumb ? <img src={s.product.thumb} alt="" /> : st === "PROCESSING" ? <Spinner /> : <span>—</span>}
                       </div>
                       <div className="t-path-main">
-                        <div className="t-path-name">{stepName(s, i)}</div>
+                        <div className="t-path-name">{driftName(s, i)}</div>
                         <div className="t-muted-row">
                           <StatusPill status={st} />
-                          {s.product?.title && <span className="d-faint">{s.product.title}</span>}
-                          {s.customCta && <span className="d-faint">· button: {s.customCta.label}</span>}
+                          <span className="d-faint">Drift {i + 1}</span>
                         </div>
                       </div>
                       <div className="t-path-side" onClick={(e) => e.stopPropagation()}>
@@ -1153,15 +922,17 @@ export default function TourBuilder() {
               })}
 
           {atStepQuota ? (
-            <UpgradeCard
-              title={`This tour is at ${quota.maxStepsPerFlow} stops`}
-              body="Longer tours with more stops (and longer clips) come with a paid plan."
-            />
+            <div className="d-card d-card-pad t-route-item is-drop" data-n="+" style={{ display: "grid", gap: 6 }}>
+              <div className="d-h2">This tour has used its free drifts</div>
+              <p className="d-sub" style={{ margin: 0 }}>
+                More drifts are $6.50 each — checkout is on its way to this page.
+              </p>
+            </div>
           ) : (
             <UploadSlot
               flow={flow}
               index={flow.steps.length}
-              maxClip={quota.maxClipSeconds}
+              maxClip={maxClip}
               onAdded={(f, stepId) => {
                 applyFlow(f);
                 if (stepId) setSelectedId(stepId);
@@ -1169,10 +940,16 @@ export default function TourBuilder() {
             />
           )}
 
+          <div className="tpw-admin-foot">
+            <button className="d-btn" onClick={() => navigate(`${homePath}?new=1`)}>
+              + Create New Tour
+            </button>
+          </div>
+
           {flow.steps.length === 0 && (
             <div className="d-faint" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
-              Tip: hold your phone steady and move slowly through the space for 3–5 seconds. Every clip becomes a
-              stop people can scrub with a finger; we link the stops in order automatically.
+              Tip: hold your phone steady and pan or tilt slowly across the space for about three seconds. Every clip
+              becomes a drift people explore with a finger; the buttons link the drifts in order automatically.
             </div>
           )}
         </div>
@@ -1181,12 +958,7 @@ export default function TourBuilder() {
           <div className="d-eyebrow">Preview</div>
           <div className="t-frame">
             {selectedProduct && isReady(selectedProduct.status) ? (
-              <iframe
-                key={selectedProduct.id + selectedProduct.updatedAt}
-                src={`/embed/${selectedProduct.id}?ctaPlacement=${encodeURIComponent(previewDraft?.placement || selectedProduct.ctaPlacement || "CENTER")}&previewPrimary=${encodeURIComponent(nextLabel.trim() || DEFAULT_NEXT)}${previewDraft?.hasCustom ? `&previewSecondary=${encodeURIComponent(previewDraft.btnLabel)}` : ""}`}
-                title={`Preview of ${selectedProduct.name}`}
-                allow="fullscreen"
-              />
+              <iframe key={selectedProduct.id + selectedProduct.updatedAt} src={`/embed/${selectedProduct.id}`} title={`Preview of ${selectedProduct.name}`} allow="fullscreen" />
             ) : selectedProduct?.status === "PROCESSING" ? (
               <div style={{ display: "grid", gap: 10, justifyItems: "center", padding: 20 }}>
                 <Spinner />
@@ -1202,14 +974,14 @@ export default function TourBuilder() {
               <div className="t-chain">
                 {flow.steps.map((s, i) => (
                   <span key={s.id} className="t-chain">
-                    <b>{stepName(s, i)}</b>
+                    <b>{driftName(s, i)}</b>
                     <span className="arr">→</span>
                   </span>
                 ))}
-                <span>{flow.endCta ? flow.endCta.label : flow.steps.length > 1 ? DEFAULT_END : "end"}</span>
+                <span className="loop">↺ {driftName(flow.steps[0], 0)}</span>
               </div>
               <div className="d-faint" style={{ fontSize: 11.5, lineHeight: 1.45 }}>
-                Reorder with the arrows — the buttons re-link themselves.
+                Every drift has Home and the next drift's name. Reorder freely — the buttons re-link themselves.
               </div>
             </div>
           )}
@@ -1230,10 +1002,6 @@ export default function TourBuilder() {
         </div>
       )}
       {share !== "none" && <ShareSheet flow={flow} celebrate={share === "celebrate"} onClose={() => setShare("none")} />}
-      <div style={{ height: 24 }} />
-      <button className="d-btn ghost sm" onClick={() => navigate(CREATOR_HOME)}>
-        ← Back to your tours
-      </button>
-    </TourShell>
+    </>,
   );
 }

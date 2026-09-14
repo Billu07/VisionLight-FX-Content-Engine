@@ -23,7 +23,11 @@ const RESERVED_SEG = new Set([
 
 export type DriftTarget =
   | { productId: string; path: string }
-  | { bySlug: true; brandSlug: string; productSlug: string; path: string };
+  | { bySlug: true; brandSlug: string; productSlug: string; path: string }
+  | { byFlow: true; kind: string; page: string; flow: string; drift: string; path: string };
+
+// Creator-suite kinds: /{kind}/{page}/{flow}/{drift} is one drift of a flow.
+const FLOW_KINDS = new Set(["tour", "view", "memory", "path"]);
 
 // Parse a CTA url into an internal drift target (same-origin only), or null when
 // it's external / not a drift — then the browser navigates it normally.
@@ -35,6 +39,9 @@ export function resolveDriftTarget(raw: string | undefined | null): DriftTarget 
     const segs = u.pathname.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
     const path = u.pathname + u.search;
     if ((segs[0] === "p" || segs[0] === "embed") && segs[1]) return { productId: segs[1], path };
+    if (FLOW_KINDS.has(segs[0]) && segs.length === 4) {
+      return { byFlow: true, kind: segs[0], page: segs[1], flow: segs[2], drift: segs[3], path };
+    }
     if (segs.length === 2 && !RESERVED_SEG.has(segs[0])) {
       return { bySlug: true, brandSlug: segs[0], productSlug: segs[1], path };
     }
@@ -44,8 +51,16 @@ export function resolveDriftTarget(raw: string | undefined | null): DriftTarget 
   }
 }
 
+/** Cache key of a flow drift's readable link (the player uses the same key). */
+export const flowDriftKey = (kind: string, page: string, flow: string, drift: string) =>
+  `${kind}:${page}/${flow}/${drift}`;
+
 export const targetKey = (t: DriftTarget) =>
-  "bySlug" in t ? `${t.brandSlug}/${t.productSlug}` : t.productId;
+  "byFlow" in t
+    ? flowDriftKey(t.kind, t.page, t.flow, t.drift)
+    : "bySlug" in t
+      ? `${t.brandSlug}/${t.productSlug}`
+      : t.productId;
 
 export const driftKey = (bySlug: boolean, brandSlug?: string, productSlug?: string, productId?: string) =>
   bySlug ? `${brandSlug}/${productSlug}` : productId || "";
@@ -92,9 +107,12 @@ export function prefetchDriftTargets(product: any) {
       warmFrames(driftCache.get(k));
       continue;
     }
-    const req = "bySlug" in t
-      ? apiEndpoints.driftPublicBrandProduct(t.brandSlug, t.productSlug)
-      : apiEndpoints.driftPublicProduct(t.productId);
+    const req =
+      "byFlow" in t
+        ? apiEndpoints.driftPublicPageDrift(t.page, t.flow, t.drift)
+        : "bySlug" in t
+          ? apiEndpoints.driftPublicBrandProduct(t.brandSlug, t.productSlug)
+          : apiEndpoints.driftPublicProduct(t.productId);
     req
       .then((r) => {
         const d = r.data.product;

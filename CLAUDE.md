@@ -117,8 +117,8 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
   is on it since 2026-09-08 — root `drift-ui d-embed`, one `ThemeToggle` (hooks sync via a window
   event). Design brief: studio-clean, **no gradients**, flat light mode; every button row is a wrapping
   `d-actions`, lists use `d-split` master–detail (detail-only on phones with `d-mobile-back`).
-- **Commit attribution** (this account): end commits with
-  `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>` + the `Claude-Session:` line.
+- **Commit attribution** (this account): end commits with the `Co-Authored-By:` line for the
+  model doing the work (e.g. `Claude Opus 5 <noreply@anthropic.com>`) + the `Claude-Session:` line.
   Only commit/push when asked; branch off `main` if the user hasn't said to push to it.
 
 ## The drift player (frontend)
@@ -170,16 +170,20 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   `/api/drift/creator/*` before workspace selection), `pipeline.probeClipInfo` (duration + fps),
   creator email templates at the end of `services/mail.ts`.
 - **Frontend** `src/tour/`: `TourAuth` (/tour/start), `AuthCallback` (/auth/callback), `CreatorRoute`
-  (guard), `TourHome` (/tour), `TourBuilder` (/tour/:id/edit), `TourPlay` (/tour/:slug),
-  `tourUi`/`tourSession`/`types`; the landing's creator section is `.dl-suite` in `DriftLanding.tsx`.
+  (guard), `TourIndex` (/tour → your page; legacy /tour/:id/edit → pathway), `TourPage` (/tour/:page —
+  admin + public view), `TourPathway` (/tour/:page/:tour — public strips; admins get `TourBuilder`),
+  readable drift links /tour/:page/:tour/:drift in `Rotation3DPlayer`; `usePageAdmin` (who's admin;
+  superadmin "Manage" via `X-Drift-Org`), `tourUi`/`tourPageStyles`/`tourPageParts`/`tourSession`/`types`;
+  the landing's creator section is `.dl-suite` in `DriftLanding.tsx`. **Tour v2 (2026-09-14): plan, decisions
+  and log in TOUR_V2_PLAN.md** — read it before touching tours.
   Routes sit before the `/:brandSlug` catch-alls; `driftNav.RESERVED_SEG` + backend `RESERVED_SLUGS`
   reserve tour/view/memory/path.
 - **Tour context in the player** (2026-09-08): `GET /api/drift/public/products/:id` adds `flow`
   (`flowNavPayload` in `routes/drift.ts`: the flow's viewable stops in order + this drift's `index`;
   null for brand drifts / other routes). `Rotation3DPlayer` passes it as `flowNav` → `SpinViewer`
-  renders the stop strip under the name (`.r3d-stops`), the closing card at the end of the last stop
-  (`.r3d-finale`, gated on the drift's end frame + a 900ms beat), and slides stop→stop along the
-  OUTGOING drift's direction (`prevDirRef`). Everything is gated on `flowNav`, so brand drifts are
+  renders the progress dots top-middle (`.r3d-stops`), the page · tour · drift title lines, the
+  hand-icon helper cue and "Tour Powered by", and slides drift→drift along the OUTGOING drift's
+  direction (`prevDirRef`). (The end-of-tour card was removed in Tour v2 — tours loop.) Everything is gated on `flowNav`, so brand drifts are
   untouched. Builder: `RouteInk` (TourBuilder) draws the rail as an inked route from the items'
   pin positions (`:scope > .t-route-item`, pin centre = offsetTop + 33); `ShareSheet.tsx` is the
   publish moment (link + copy + QR via `qrcode-generator` + system share), also behind "Share".
