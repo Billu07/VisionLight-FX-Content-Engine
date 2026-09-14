@@ -327,5 +327,8 @@ Drift.li is a division of PicDrift
 - 2026-09-15 — /tour landing restyled to match the home: the route animation now rides the home's perspective
   grid (shared `rotation3d/PerspectiveGrid`) under a horizon glow; spaced kickers with a dot, pill CTAs (arrow on
   Try it Free), the capture steps as glowing nodes on a horizon line, glass cards / price / Pro / closing in
-  dark (flat in light). Copy and CTAs unchanged. TourShell header/background left for a later pass. The home
+  dark (flat in light). Copy and CTAs unchanged. TourShell header/background left for a later pass.
+- 2026-09-15 — Home live view loses its boxed frame: the demo tour's cards stand on the grid floor — the back
+  row angled and receding to the horizon, the centre card forward (out of the screen) floating over its
+  shadow with a faint reflection, an orbit ring around its base. Labels float over the scene. Copy unchanged. The home
   no longer downloads the player.
