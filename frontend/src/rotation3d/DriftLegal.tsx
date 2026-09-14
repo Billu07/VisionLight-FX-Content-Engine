@@ -68,7 +68,7 @@ function Shell({
       <style>{CSS}</style>
       <header className="dlg-header">
         <Link to="/" className="dlg-word">
-          Drift Link<span>Interactive</span>
+          Drift Live<span>Interactive</span>
         </Link>
         <nav className="dlg-nav" aria-label="Legal">
           <Link to="/terms" className={current === "terms" ? "on" : ""}>
@@ -87,7 +87,7 @@ function Shell({
         <div className="dlg-card">{children}</div>
       </main>
       <footer className="dlg-footer">
-        <span>© 2026 Drift Link · Visionlight Productions Inc.</span>
+        <span>© 2026 Drift Live Interactive · Visionlight Productions Inc.</span>
         <span>
           <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
         </span>

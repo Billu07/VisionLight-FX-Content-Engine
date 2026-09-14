@@ -24,7 +24,7 @@ const DRIFT_PRIMARY = "#22d3ee";
 const DRIFT_SECONDARY = "#3b82f6";
 
 // Legal pages: drift.li serves its own /terms and /privacy (the shared agreement,
-// branded Drift Link). A brand may override them per org (termsUrl / privacyUrl).
+// branded Drift Live Interactive). A brand may override them per org (termsUrl / privacyUrl).
 const DRIFT_TERMS_URL = "/terms";
 const DRIFT_PRIVACY_URL = "/privacy";
 
@@ -75,7 +75,7 @@ function PlayerModal({ item, onClose }: { item: Item; onClose: () => void }) {
           driftMode
           loopScrub={item.loopEnabled}
           driftDirection={item.driftDirection}
-          brandName="Drift Link"
+          brandName="Drift Live Interactive"
           productName={item.name}
           title={item.title}
           titleEnd={item.titleEnd}
@@ -161,7 +161,7 @@ function HeroLanding({ product }: { product: any }) {
     navigate(t.path);
     return true;
   };
-  // A brand can set its own Terms/Privacy for its landing; fall back to Drift Link's.
+  // A brand can set its own Terms/Privacy for its landing; fall back to Drift Live Interactive's.
   const termsUrl = product.termsUrl || DRIFT_TERMS_URL;
   const privacyUrl = product.privacyUrl || DRIFT_PRIVACY_URL;
   // On a brand's custom domain the header shows the brand's own logo/name.
@@ -244,7 +244,7 @@ function HeroLanding({ product }: { product: any }) {
           </div>
         ) : (
           <div className="dl-word">
-            Drift Link<span>Interactive</span>
+            Drift Live<span>Interactive</span>
           </div>
         )}
         <button className="dl-hero-login" onClick={() => setShowLogin(true)}>
@@ -257,7 +257,7 @@ function HeroLanding({ product }: { product: any }) {
           driftMode
           loopScrub={product.loopEnabled ?? false}
           driftDirection={product.driftDirection}
-          brandName="Drift Link"
+          brandName="Drift Live Interactive"
           productName={product.name}
           title={product.title}
           titleEnd={product.titleEnd}
@@ -372,7 +372,7 @@ export default function DriftLanding() {
       {/* Header */}
       <header className="dl-header">
         <div className="dl-word">
-          Drift Link<span>Interactive</span>
+          Drift Live<span>Interactive</span>
         </div>
         <div className="dl-nav">
           <span className="dl-nav-tag">Interactive drift paths</span>
@@ -389,7 +389,7 @@ export default function DriftLanding() {
             )}
           </button>
           <a className="dl-start" href="/tour/start">
-            Start free
+            Try It Free
           </a>
           <button className="dl-login" onClick={() => setShowLogin(true)}>
             Log in
@@ -455,7 +455,7 @@ export default function DriftLanding() {
               Your phone. Your path. <em>One link.</em>
             </h2>
             <p className="dl-suite-sub">
-              Drift Link now builds itself around your clips. Film a few seconds, and we turn them into
+              Drift Live Interactive now builds itself around your clips. Film a few seconds, and we turn them into
               interactive paths you connect with buttons — a home tour, a view worth keeping, a memory lane,
               or a full path with forms in between.
             </p>
@@ -547,7 +547,7 @@ export default function DriftLanding() {
 
       <footer className="dl-footer">
         <div className="dl-word dl-word-sm">
-          Drift Link<span>Interactive</span>
+          Drift Live<span>Interactive</span>
         </div>
         <span className="dl-footer-links">
           <a href={DRIFT_TERMS_URL}>Terms</a>
@@ -657,7 +657,7 @@ const CSS = `
 .dl-reel-card:hover .dl-reel-name{opacity:1;transform:none}
 @media(prefers-reduced-motion:reduce){.dl-reel-track{animation:none}}
 
-/* Header "Start free" */
+/* Header "Try It Free" */
 .dl-start{display:none;padding:9px 18px;border-radius:999px;border:1px solid transparent;background:var(--dl-accent-grad);color:#fff;font-family:inherit;font-weight:800;font-size:13px;text-decoration:none;box-shadow:0 10px 30px -14px rgba(34,211,238,.6);transition:transform .2s}
 .dl-start:hover{transform:translateY(-1px)}
 @media(min-width:520px){.dl-start{display:inline-flex}}

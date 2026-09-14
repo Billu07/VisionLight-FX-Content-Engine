@@ -23,7 +23,7 @@ import {
  *   SMTP_PORT=465
  *   SMTP_USER=web@drift.li
  *   SMTP_PASS=<mailbox password>          ← secret, server env only
- *   MAIL_FROM="Drift Link <web@drift.li>" ← optional; defaults to SMTP_USER
+ *   MAIL_FROM="Drift Live Interactive <web@drift.li>" ← optional; defaults to SMTP_USER
  *   MAIL_REPLY_TO=                         ← optional default Reply-To
  */
 
@@ -31,7 +31,7 @@ const SMTP_HOST = process.env.SMTP_HOST || "mail.privateemail.com";
 const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
 const SMTP_USER = process.env.SMTP_USER || "";
 const SMTP_PASS = process.env.SMTP_PASS || "";
-const MAIL_FROM = process.env.MAIL_FROM || (SMTP_USER ? `Drift Link <${SMTP_USER}>` : "");
+const MAIL_FROM = process.env.MAIL_FROM || (SMTP_USER ? `Drift Live Interactive <${SMTP_USER}>` : "");
 const MAIL_REPLY_TO = process.env.MAIL_REPLY_TO || "";
 // Platform-admin fallback recipients (already used elsewhere for admin lists).
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
@@ -157,7 +157,7 @@ export function renderEmail(opts: {
     <tr><td align="center">
       <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e6e9ef">
         <tr><td style="background:linear-gradient(135deg,#0d1324,#0a0e19);padding:20px 28px">
-          <span style="color:#fff;font-size:18px;font-weight:800;letter-spacing:-.01em">Drift Link</span>
+          <span style="color:#fff;font-size:18px;font-weight:800;letter-spacing:-.01em">Drift Live</span>
           <span style="color:#22d3ee;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;margin-left:8px">Interactive</span>
         </td></tr>
         <tr><td style="padding:26px 28px 30px">
@@ -169,7 +169,7 @@ export function renderEmail(opts: {
           ${opts.footnote ? `<p style="margin:22px 0 0;font-size:12px;line-height:1.5;color:#8a93a3">${esc(opts.footnote)}</p>` : ""}
         </td></tr>
       </table>
-      <p style="margin:16px 0 0;font-size:11px;color:#98a1b0">Sent by Drift Link · drift.li</p>
+      <p style="margin:16px 0 0;font-size:11px;color:#98a1b0">Sent by Drift Live Interactive · drift.li</p>
     </td></tr>
   </table></body></html>`;
 }

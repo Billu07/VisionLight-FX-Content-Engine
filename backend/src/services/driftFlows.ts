@@ -38,7 +38,7 @@ const DEFAULT_END_LABEL: Record<FlowKind, string> = {
   PATH: "Back to start",
 };
 export const stepNoun = (kind: FlowKind) =>
-  kind === "TOUR" ? "Stop" : kind === "VIEW" ? "View" : kind === "MEMORY" ? "Memory" : "Step";
+  kind === "TOUR" ? "Drift" : kind === "VIEW" ? "View" : kind === "MEMORY" ? "Memory" : "Step";
 
 /** Player path of a step's drift. Relative on purpose: it works on drift.li AND any
  *  custom host, and it's exactly what the player intercepts for an instant in-app

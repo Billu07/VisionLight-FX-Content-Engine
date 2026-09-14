@@ -84,7 +84,7 @@ export const MAIL_TEMPLATES: MailTemplateDef[] = [
       subject: "New lead: {{formName}}",
       heading: "New lead from your drift",
       intro: 'Someone just submitted "{{formName}}". {{contactLine}}',
-      footnote: "You're receiving this because you're an admin on this Drift Link brand.",
+      footnote: "You're receiving this because you're an admin on this Drift Live Interactive brand.",
     }),
   },
   {
@@ -100,9 +100,9 @@ export const MAIL_TEMPLATES: MailTemplateDef[] = [
       { name: "loginUrl", description: "Where to sign in", sample: "https://drift.li" },
     ],
     defaults: f({
-      subject: "Your Drift Link account for {{brandName}}",
-      heading: "Your Drift Link account is ready",
-      intro: 'Hi {{name}}, an account was created for you to manage "{{brandName}}" on Drift Link.',
+      subject: "Your Drift Live Interactive account for {{brandName}}",
+      heading: "Your Drift Live Interactive account is ready",
+      intro: 'Hi {{name}}, an account was created for you to manage "{{brandName}}" on Drift Live Interactive.',
       ctaLabel: "Sign in",
       ctaUrl: "{{loginUrl}}",
       footnote: "For your security, please change this temporary password right after you sign in.",

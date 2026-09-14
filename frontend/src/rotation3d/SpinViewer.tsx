@@ -50,6 +50,8 @@ export type SpinCaption = {
 export type FlowNavStop = { id: string; productId: string; name: string; title?: string | null; thumb: string | null; playerPath: string };
 export type FlowNav = {
   id: string;
+  /** TOUR | VIEW | MEMORY | PATH — "Tour Powered by …" */
+  kind?: string;
   name: string;
   title?: string | null;
   publicPath: string;
@@ -245,6 +247,9 @@ export default function SpinViewer({
   driftDirection = "LTR",
 }: SpinViewerProps) {
   const hero = variant === "hero";
+  // Tour drifts: the helper is a hand icon + arrow (no "Drag to drift" text) unless
+  // the drift carries its own helper copy.
+  const iconCue = driftMode && !!flowNav && !helperStart && !helperEnd;
   const playerBrand = getPlayerBranding();
   const lightBg = isLightColor(background);
   const stageStyle: CSSProperties = {
@@ -282,9 +287,6 @@ export default function SpinViewer({
   const swappedRef = useRef(false);
   // The OUTGOING drift's travel direction, for the stop→stop handoff (tour stops).
   const prevDirRef = useRef<{ vertical: boolean; sign: number } | null>(null);
-  // Drift reached its end frame (drives the tour's closing card on the last stop).
-  const [endReached, setEndReached] = useState(false);
-  const [finaleHidden, setFinaleHidden] = useState(false);
   // Captions live in a ref so updating them doesn't re-init the render engine.
   const captionsRef = useRef<SpinCaption[] | undefined>(captions);
   useEffect(() => {
@@ -363,8 +365,8 @@ export default function SpinViewer({
     // Drift drag-helper: direction-aware text + arrow. Flips to "reverse" at the
     // end frame and back to "forward" at the start.
     let helperBack = false;
-    const fwdHelper = helperStart || "Drag to drift";
-    const backHelper = helperEnd || "Drag to start";
+    const fwdHelper = helperStart || (iconCue ? "" : "Drag to drift");
+    const backHelper = helperEnd || (iconCue ? "" : "Drag to start");
     // Anchor the helper cue to the frame's LEFT edge going forward, RIGHT edge
     // going backward (the arrow leads the swipe). Called every frame from draw()
     // AND from syncHelper, so the left/right anchor flips in the SAME frame as the
@@ -761,12 +763,16 @@ export default function SpinViewer({
         // cue moves under the product. isNarrow gates the mobile-only bottom stack
         // below (buttons + badge), not the hand lift.
         const isNarrow = typeof window !== "undefined" && window.innerWidth <= 560;
-        const under = frameBottomCss - frameHcss * 0.16;
-        const hintH = hintRef.current.offsetHeight || 110;
-        // Safety clamp: never let the helper cluster drop so low it overlaps the
-        // powered badge + CTAs (tighter reserve for drift surfaces via capFit).
-        const maxTop = H / DPR - ((capFit ? 130 : 140) + hintH);
-        const topPx = Math.max(12, Math.min(under, maxTop));
+        // The HAND sits on the frame's bottom corner (just inside the edge); the CUE
+        // is pushed under the frame below. Clamp with the column's NATURAL height
+        // (hand + gap + cue): offsetHeight includes the cue's JS margin, which fed
+        // back into this clamp every frame and walked the hand up to the top of a
+        // tall frame (brand drifts on desktop).
+        const handH = handRef.current?.offsetHeight || 28;
+        const cueH = cueRef.current?.offsetHeight || 26;
+        const under = frameBottomCss - Math.min(frameHcss * 0.16, handH + 14);
+        const hintH = handH + 7 + cueH;
+        const topPx = Math.max(12, Math.min(under, H / DPR - hintH - 12));
         hintRef.current.style.top = topPx + "px";
         hintRef.current.style.bottom = "auto";
         // Reveal the helper only once its anchor has settled (top stopped moving for a
@@ -784,17 +790,14 @@ export default function SpinViewer({
         // (the hand is now up on the frame on every device, so this always runs).
         // Keeps the text/arrow off the product without dragging the hand down.
         if (cueRef.current) {
-          const handH = handRef.current?.offsetHeight || 28;
           const naturalCueTop = topPx + handH + 7; // 7px column gap (see .r3d-drift .r3d-hint)
           const cueTop = Math.max(naturalCueTop, frameBottomCss + 16);
           cueRef.current.style.marginTop = cueTop - naturalCueTop + "px";
-          // Mobile bottom stack (phones only): the CTA row + powered badge are
-          // bottom-anchored, so a fixed CSS offset can't track the frame/cue (they
-          // scale with the viewport + product aspect). Drive them from JS — buttons a
-          // comfortable gap under the cue, and the "Powered by" badge tucked just
-          // under the buttons rather than pinned to the very bottom. Terms/Privacy
-          // (.r3d-legal) deliberately stay bottom-aligned via CSS. Desktop clears the
-          // overrides and keeps the CSS values.
+          // Mobile bottom stack (phones only): the CTA row is bottom-anchored, so a
+          // fixed CSS offset can't track the frame/cue (they scale with the viewport +
+          // product aspect). Drive it from JS — buttons a comfortable gap under the
+          // cue. The "Powered by" line and Terms · Privacy under it stay
+          // bottom-aligned via CSS on every device. Desktop clears the override.
           const firstBtn = ctasRef.current?.firstElementChild as HTMLElement | null;
           if (isNarrow && ctasRef.current && firstBtn) {
             const stageH = H / DPR;
@@ -805,12 +808,7 @@ export default function SpinViewer({
             );
             ctasRef.current.style.paddingBottom =
               "calc(" + Math.round(pb) + "px + env(safe-area-inset-bottom))";
-            if (poweredRef.current) {
-              const badgeH = poweredRef.current.offsetHeight || 16;
-              const badgeBottom = Math.max(10, pb - 12 - badgeH); // sit 12px under the buttons
-              poweredRef.current.style.bottom =
-                "calc(" + Math.round(badgeBottom) + "px + env(safe-area-inset-bottom))";
-            }
+            if (poweredRef.current) poweredRef.current.style.bottom = "";
           } else {
             if (ctasRef.current) ctasRef.current.style.paddingBottom = "";
             if (poweredRef.current) poweredRef.current.style.bottom = "";
@@ -935,13 +933,11 @@ export default function SpinViewer({
         if (nav >= 0.92 && !atEnd) {
           atEnd = true;
           setHeadState(true);
-          setEndReached(true);
           helperBack = true; syncHelper(); // arrow + text flip to reverse (always visible)
           if (helperPhase === 1) { showHand(); helperPhase = 2; } // hand reappears at the end
         } else if (nav <= 0.08 && atEnd) {
           atEnd = false;
           setHeadState(false);
-          setEndReached(false);
           helperBack = false; syncHelper(); // arrow + text flip back to forward
         }
       }
@@ -1472,8 +1468,6 @@ export default function SpinViewer({
     // under the new frame, so the hand fades in at its spot rather than dropping. ---
     const isSwap = swappedRef.current;
     swappedRef.current = true;
-    setEndReached(false);
-    setFinaleHidden(false);
     // Directional handoff (tour stops only): the OUTGOING drift slides on the way its
     // own footage travelled while the next one settles in from the far side — LTR
     // exits left and enters from the right, TTB exits upward and enters from below.
@@ -1570,7 +1564,7 @@ export default function SpinViewer({
       // persist across it. Real unmount teardown lives in the effect below.
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manifest, FRAMES, DEFAULT_FRAME, hero, driftMode, loopScrub, helperStart, helperEnd]);
+  }, [manifest, FRAMES, DEFAULT_FRAME, hero, driftMode, loopScrub, helperStart, helperEnd, iconCue]);
 
   // Unmount-only: drop pseudo-fullscreen if the player leaves the page while it's
   // active (a dep-change re-run of the effect above must NOT do this).
@@ -1601,29 +1595,15 @@ export default function SpinViewer({
     }
   };
   const [activeForm, setActiveForm] = useState<{ form: OverlayForm; which: "primary" | "secondary" } | null>(null);
-  // Jump to another stop of the tour (in-app when the host allows it).
+  // Jump to another drift of the tour (in-app when the host allows it).
   const goStop = (s: FlowNavStop, i: number) => {
-    if (flowNav && i === flowNav.index) {
-      setFinaleHidden(true);
-      return;
-    }
+    if (flowNav && i === flowNav.index) return;
     if (onInternalNavigate && onInternalNavigate(s.playerPath)) return;
     window.location.href = s.playerPath;
   };
-  // The closing card rises a beat after the end headline dissolves in — never under
-  // a finger that's still dragging.
-  const [finaleReady, setFinaleReady] = useState(false);
-  useEffect(() => {
-    if (!endReached) {
-      setFinaleReady(false);
-      return;
-    }
-    const t = window.setTimeout(() => setFinaleReady(true), 900);
-    return () => window.clearTimeout(t);
-  }, [endReached]);
-  const isLastStop = !!flowNav && flowNav.stops.length > 1 && flowNav.index === flowNav.stops.length - 1;
-  const showFinale = driftMode && isLastStop && finaleReady && !finaleHidden && !activeForm;
-  const endCta = flowNav?.endCta && flowNav.endCta.url && flowNav.endCta.label ? flowNav.endCta : null;
+  // "Tour Powered by …" / "View Powered by …" on flow drifts.
+  const poweredKind =
+    driftMode && flowNav?.kind ? flowNav.kind.charAt(0).toUpperCase() + flowNav.kind.slice(1).toLowerCase() + " " : "";
 
   return (
     <div ref={stageRef} className={`r3d-stage ${hero ? "r3d-hero" : ""} ${driftMode ? "r3d-drift" : ""} ${driftMode && driftDirection !== "LTR" ? `r3d-dir-${driftDirection.toLowerCase()}` : ""} ${landing ? "r3d-landing" : ""} ${lightBg ? "r3d-light" : ""} ${!showControls ? "r3d-no-controls" : ""} ${!showCtas ? "r3d-no-ctas" : ""} ${!showBrand ? "r3d-no-brand" : ""} ${!showLogo ? "r3d-no-logo" : ""} ${!showName ? "r3d-no-name" : ""} ${!showTitle ? "r3d-no-title" : ""} ${!showTools ? "r3d-no-tools" : ""} ${!mobileZoom ? "r3d-no-mobile-zoom" : ""} ${view !== 0 ? "r3d-media-mode" : ""} ${className || ""}`}
@@ -1648,25 +1628,8 @@ export default function SpinViewer({
           )}
           <div className="r3d-titles">
             <div className="r3d-kicker">{brandName}</div>
+            {driftMode && flowNav && <div className="r3d-tourline">{flowNav.title || flowNav.name}</div>}
             <div className="r3d-name">{productName}</div>
-            {driftMode && flowNav && flowNav.stops.length > 1 && (
-              <div className="r3d-stops" role="navigation" aria-label="Tour stops">
-                {flowNav.stops.map((s, i) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    className={`r3d-stop ${i === flowNav.index ? "is-here" : i < flowNav.index ? "is-seen" : ""}`}
-                    title={s.name}
-                    aria-label={`Stop ${i + 1} of ${flowNav.stops.length}: ${s.name}`}
-                    aria-current={i === flowNav.index ? "step" : undefined}
-                    onClick={() => goStop(s, i)}
-                  />
-                ))}
-                <span className="r3d-stops-n">
-                  {flowNav.index + 1}/{flowNav.stops.length}
-                </span>
-              </div>
-            )}
           </div>
         </div>
         <div className="r3d-tools">
@@ -1675,14 +1638,35 @@ export default function SpinViewer({
               <svg ref={loopIconRef} viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 5h4v14H6zM14 5h4v14h-4z" /></svg>
             </button>
           )}
-          <button className="r3d-iconbtn" data-reset title="Reset view" aria-label="Reset view">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.7 9.7 0 0 0-6.7 2.7L3 8" /><path d="M3 3v5h5" /></svg>
-          </button>
+          {!driftMode && (
+            <button className="r3d-iconbtn" data-reset title="Reset view" aria-label="Reset view">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.7 9.7 0 0 0-6.7 2.7L3 8" /><path d="M3 3v5h5" /></svg>
+            </button>
+          )}
           <button className="r3d-iconbtn" data-fs title="Fullscreen" aria-label="Toggle fullscreen">
             <svg ref={fsIconRef} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" /></svg>
           </button>
         </div>
       </div>
+
+      {driftMode && flowNav && flowNav.stops.length > 1 && (
+        <div className="r3d-stops" role="navigation" aria-label="Tour drifts">
+          {flowNav.stops.map((s, i) => (
+            <button
+              key={s.id}
+              type="button"
+              className={`r3d-stop ${i === flowNav.index ? "is-here" : i < flowNav.index ? "is-seen" : ""}`}
+              title={s.name}
+              aria-label={`Drift ${i + 1} of ${flowNav.stops.length}: ${s.name}`}
+              aria-current={i === flowNav.index ? "step" : undefined}
+              onClick={() => goStop(s, i)}
+            />
+          ))}
+          <span className="r3d-stops-n">
+            {flowNav.index + 1}/{flowNav.stops.length}
+          </span>
+        </div>
+      )}
 
       {!hero && driftMode && (title || description || titleEnd || descriptionEnd) ? (
         <div className="r3d-heads" aria-hidden ref={headsRef}>
@@ -1723,7 +1707,12 @@ export default function SpinViewer({
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-7-4l-2.5-4a2 2 0 0 1 3.4-2L8 14" /></svg>
             </div>
             <div className="r3d-drift-cue" ref={cueRef}>
-              <span ref={helperTextRef}>{helperStart || "Drag to drift"}</span>
+              {iconCue && (
+                <span className="r3d-cue-hand" aria-hidden>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-7-4l-2.5-4a2 2 0 0 1 3.4-2L8 14" /></svg>
+                </span>
+              )}
+              <span ref={helperTextRef}>{helperStart || (iconCue ? "" : "Drag to drift")}</span>
               <span className="r3d-drift-arrow" aria-hidden>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></svg>
               </span>
@@ -1758,49 +1747,6 @@ export default function SpinViewer({
               {ctaSecondary.label}
             </button>
           )}
-        </div>
-      )}
-
-      {showFinale && flowNav && (
-        <div className="r3d-finale" onClick={() => setFinaleHidden(true)}>
-          <div className="r3d-finale-card" role="dialog" aria-label="End of the tour" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="r3d-finale-x" onClick={() => setFinaleHidden(true)} aria-label="Keep exploring">
-              ×
-            </button>
-            <div className="r3d-finale-head">
-              {flowNav.thumb ? <img className="r3d-finale-cover" src={flowNav.thumb} alt="" /> : <span className="r3d-finale-cover" />}
-              <div style={{ minWidth: 0 }}>
-                <div className="r3d-finale-kicker">End of the tour</div>
-                <div className="r3d-finale-title">{flowNav.title || flowNav.name}</div>
-                <div className="r3d-finale-sub">{flowNav.stops.length} stops · tap one to see it again</div>
-              </div>
-            </div>
-            <div className="r3d-finale-stops">
-              {flowNav.stops.map((s, i) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  className={`r3d-finale-stop ${i === flowNav.index ? "is-here" : ""}`}
-                  onClick={() => goStop(s, i)}
-                  title={s.name}
-                >
-                  {s.thumb && <img src={s.thumb} alt="" />}
-                  <b>{i + 1}</b>
-                  <span>{s.name}</span>
-                </button>
-              ))}
-            </div>
-            <div className="r3d-finale-actions">
-              {endCta && (
-                <button type="button" className="r3d-cta r3d-primary" onClick={() => fireCta("primary", { label: endCta.label, url: endCta.url })}>
-                  {endCta.label}
-                </button>
-              )}
-              <button type="button" className={`r3d-cta ${endCta ? "r3d-ghost" : "r3d-primary"}`} onClick={() => goStop(flowNav.stops[0], 0)}>
-                Start over
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
@@ -1856,7 +1802,7 @@ export default function SpinViewer({
         aria-label={`Powered by ${playerBrand.name}`}
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v5h-5" /></svg>
-        <span>{driftMode ? <>Powered by <b>Drift Link Interactive</b></> : <>Powered by <b>{playerBrand.name}</b></>}</span>
+        <span>{driftMode ? <>{poweredKind}Powered by <b>Drift Live Interactive</b></> : <>Powered by <b>{playerBrand.name}</b></>}</span>
       </a>
 
       {driftMode && termsUrl ? (
@@ -1881,7 +1827,7 @@ export default function SpinViewer({
           </svg>
           <div className="r3d-pct" ref={pctRef}>0%</div>
           <div className="r3d-lbl">{driftMode ? "Loading…" : loaderLabel || "Optimizing frames…"}</div>
-          <div className="r3d-powered">{driftMode ? <b>Drift Link Interactive</b> : <>Powered by <b>{playerBrand.name}</b></>}</div>
+          <div className="r3d-powered">{driftMode ? <b>Drift Live Interactive</b> : <>Powered by <b>{playerBrand.name}</b></>}</div>
         </div>
       </div>
     </div>
@@ -2044,7 +1990,7 @@ const R3D_CSS = `
 /* during the demo, hide the resting hint so there's just the one moving finger */
 .r3d-introing .r3d-hint{opacity:0!important}
 @media (prefers-reduced-motion:reduce){.r3d-intro-ring{animation:none}}
-/* Drift: "Powered By Drift Link" sits UNDER the player, above the CTA, a bit bigger. */
+/* Drift: "Powered By Drift Live Interactive" sits UNDER the player, above the CTA, a bit bigger. */
 .r3d-drift .r3d-powered-badge{top:auto;bottom:calc(36px + env(safe-area-inset-bottom));font-size:clamp(10px,3vmin,12px)}
 .r3d-drift .r3d-powered-badge svg{width:clamp(12px,3.4vmin,14px);height:clamp(12px,3.4vmin,14px)}
 /* Drift landing legal (Terms · Privacy): sits just UNDER the powered badge; on
@@ -2062,39 +2008,27 @@ const R3D_CSS = `
 .r3d-drift .r3d-cta.r3d-primary{background:#3b82f6;border:none;box-shadow:0 10px 30px -12px rgba(59,130,246,.6)}
 .r3d-drift .r3d-cta.r3d-ghost{background:#8b5cf6;border:none;color:#fff;backdrop-filter:none;box-shadow:0 10px 30px -12px rgba(139,92,246,.6)}
 .r3d-drift .r3d-cta.r3d-ghost:hover{filter:brightness(1.08)}
-/* ── Tour context (flow stops only): a pin strip under the name, and a closing
-   card that rises at the end of the last stop. Brand drifts never render these. ── */
-.r3d-stops{display:flex;align-items:center;gap:6px;margin-top:7px;pointer-events:auto}
+/* ── Tour context (flow drifts only): progress dots top-middle (top-right on
+   phones, where the title block needs the room); the title block reads
+   page · tour · drift; the helper cue is a hand icon + arrow. Brand drifts never
+   render these. ── */
+.r3d-stops{position:absolute;left:50%;top:max(20px,calc(env(safe-area-inset-top) + 10px));transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:7px;padding:7px 11px;border-radius:999px;background:rgba(11,15,25,.38);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(10px);pointer-events:auto}
 .r3d-stop{width:8px;height:8px;border-radius:50%;padding:0;border:1.5px solid rgba(255,255,255,.62);background:transparent;cursor:pointer;transition:transform .22s cubic-bezier(.34,1.56,.64,1),background .2s,border-color .2s,box-shadow .2s}
 .r3d-stop.is-seen{background:rgba(255,255,255,.62);border-color:rgba(255,255,255,.62)}
 .r3d-stop.is-here{background:#22d3ee;border-color:#22d3ee;box-shadow:0 0 0 3px rgba(34,211,238,.25);transform:scale(1.25);cursor:default}
 .r3d-stop:not(.is-here):hover{transform:scale(1.35);border-color:#fff}
-.r3d-stops-n{font-size:10px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.72);margin-left:3px;font-variant-numeric:tabular-nums}
+.r3d-stops-n{font-size:10px;font-weight:700;letter-spacing:.08em;color:rgba(255,255,255,.78);margin-left:3px;font-variant-numeric:tabular-nums}
+.r3d-light .r3d-stops{background:rgba(255,255,255,.62);border-color:rgba(0,0,0,.08)}
 .r3d-light .r3d-stop{border-color:rgba(0,0,0,.42)}
 .r3d-light .r3d-stop.is-seen{background:rgba(0,0,0,.42);border-color:rgba(0,0,0,.42)}
 .r3d-light .r3d-stops-n{color:rgba(0,0,0,.6)}
-.r3d-finale{position:absolute;inset:0;z-index:9;display:grid;place-items:end center;background:linear-gradient(to top,rgba(6,10,20,.9) 0%,rgba(6,10,20,.55) 45%,rgba(6,10,20,.12) 100%);animation:r3d-fin-fade .35s ease-out}
-.r3d-finale-card{position:relative;width:100%;max-width:440px;background:rgba(13,18,30,.94);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.12);border-radius:24px 24px 0 0;padding:20px 18px calc(18px + env(safe-area-inset-bottom));display:grid;gap:14px;color:#fff;box-shadow:0 40px 80px -30px rgba(0,0,0,.8);animation:r3d-fin-up .5s cubic-bezier(.2,.7,.2,1);font-family:inherit;text-align:left}
-@media(min-width:700px) and (min-height:520px){.r3d-finale{place-items:center;padding:24px}.r3d-finale-card{border-radius:24px;padding:22px}}
-.r3d-finale-x{position:absolute;right:12px;top:12px;width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff;font-size:18px;line-height:1;cursor:pointer;font-family:inherit;z-index:1}
-.r3d-finale-head{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center;padding-right:28px}
-.r3d-finale-cover{display:block;width:64px;aspect-ratio:4/5;border-radius:14px;object-fit:cover;background:rgba(255,255,255,.06);box-shadow:0 0 0 2px rgba(13,18,30,1),0 0 0 4px #22d3ee}
-.r3d-finale-kicker{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#22d3ee;font-weight:700}
-.r3d-finale-title{font-size:19px;font-weight:700;letter-spacing:-.01em;line-height:1.2;margin-top:3px;overflow:hidden;text-overflow:ellipsis}
-.r3d-finale-sub{font-size:12.5px;color:rgba(255,255,255,.62);margin-top:4px}
-.r3d-finale-stops{display:flex;gap:8px;overflow-x:auto;padding:2px;margin:0 -2px;scrollbar-width:none}
-.r3d-finale-stops::-webkit-scrollbar{display:none}
-.r3d-finale-stop{position:relative;flex:none;width:58px;aspect-ratio:3/4;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);padding:0;cursor:pointer;transition:transform .2s,border-color .2s;font-family:inherit}
-.r3d-finale-stop img{width:100%;height:100%;object-fit:cover;display:block}
-.r3d-finale-stop b{position:absolute;left:5px;top:5px;font-size:10px;font-weight:800;color:#fff;background:rgba(0,0,0,.55);border-radius:6px;padding:1px 5px}
-.r3d-finale-stop span{position:absolute;left:0;right:0;bottom:0;padding:14px 5px 5px;font-size:9.5px;font-weight:600;color:#fff;background:linear-gradient(to top,rgba(0,0,0,.75),transparent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
-.r3d-finale-stop:hover{transform:translateY(-2px);border-color:#22d3ee}
-.r3d-finale-stop.is-here{border-color:#22d3ee;box-shadow:0 0 0 2px rgba(34,211,238,.35)}
-.r3d-finale-actions{display:flex;gap:10px}
-.r3d-finale-actions .r3d-cta{flex:1;padding:12px 14px;font-size:14px;border-radius:13px}
-@keyframes r3d-fin-fade{from{opacity:0}to{opacity:1}}
-@keyframes r3d-fin-up{from{transform:translateY(26px);opacity:0}to{transform:none;opacity:1}}
-@media(prefers-reduced-motion:reduce){.r3d-finale,.r3d-finale-card{animation:none}}
+@media(max-width:560px){.r3d-stops{left:auto;right:14px;transform:none;padding:6px 9px;gap:6px}}
+.r3d-tourline{font-size:clamp(11px,3.2vmin,13px);font-weight:600;line-height:1.25;color:rgba(238,241,246,.82);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r3d-light .r3d-tourline{color:rgba(11,15,25,.72)}
+@media(max-width:560px){.r3d-tourline{max-width:52vw}}
+.r3d-cue-hand{display:inline-grid;place-items:center;color:#fff}
+.r3d-cue-hand svg{width:clamp(18px,5.2vmin,24px);height:clamp(18px,5.2vmin,24px);filter:drop-shadow(0 1px 3px rgba(0,0,0,.9))}
+.r3d-drift-cue > span:empty{display:none}
 /* Bottom stack (drift): CTA buttons up top, then the "Powered by" badge, then
    the landing's Terms/Privacy at the very bottom — see the badge + ctas rules. */
 /* Drift mobile: hide reset + fullscreen (keep it clean). */
@@ -2175,7 +2109,7 @@ const R3D_CSS = `
 .r3d-powered-badge:hover{opacity:1}
 .r3d-powered-badge svg{width:12px;height:12px;color:var(--r3d-secondary)}
 .r3d-powered-badge b{font-weight:700}
-/* Drift: match the "Drift Link Interactive" wordmark accent (cyan) used in the landing header. */
+/* Drift: match the "Drift Live Interactive" wordmark accent (cyan) used in the landing header. */
 .r3d-drift .r3d-powered-badge b{color:#22d3ee}
 .r3d-hero .r3d-powered-badge{display:none!important}
 .r3d-light .r3d-powered-badge{color:#5b6472;text-shadow:none}
@@ -2200,7 +2134,7 @@ const R3D_CSS = `
      product. Pull them into a compact bottom control bar (clear of side notches),
      lift the drag helper just above it, and tuck the attribution to the corners so
      the product owns the screen. */
-  .r3d-drift .r3d-ctas{padding:8px calc(16px + env(safe-area-inset-right)) calc(22px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));gap:10px;max-width:none;justify-content:center}
+  .r3d-drift .r3d-ctas{padding:8px calc(16px + env(safe-area-inset-right)) calc(44px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));gap:10px;max-width:none;justify-content:center}
   .r3d-drift .r3d-cta{flex:0 1 auto;min-width:118px;max-width:44vw;padding:8px 16px;font-size:12.5px;border-radius:11px;box-shadow:0 8px 22px -12px rgba(0,0,0,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .r3d-iconbtn{width:36px;height:36px}
   .r3d-name{font-size:13px}
@@ -2209,8 +2143,8 @@ const R3D_CSS = `
   .r3d-drift .r3d-drift-hand svg{width:19px;height:19px}
   .r3d-drift .r3d-hint span{font-size:13px}
   .r3d-drift .r3d-drift-arrow svg{width:22px;height:22px}
-  .r3d-drift .r3d-powered-badge{top:calc(8px + env(safe-area-inset-top));bottom:auto}
-  .r3d-drift .r3d-legal{bottom:calc(8px + env(safe-area-inset-bottom))}
+  .r3d-drift .r3d-powered-badge{top:auto;bottom:calc(24px + env(safe-area-inset-bottom))}
+  .r3d-drift .r3d-legal{bottom:calc(6px + env(safe-area-inset-bottom))}
 }
 /* thumbnail-box view selector (e-commerce style): interactive 360° + 4 stills.
    Selecting a still shows it large (.r3d-media) with the canvas hidden. */

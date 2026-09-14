@@ -5,7 +5,7 @@
 // Open Graph tags WITHOUT running JavaScript. So the JS tab-title script in
 // index.html can't help them, and drift.li link previews fell back to the baked-in
 // "PicDrift Studio - AI Content Generation Studio". This rewrites those tags to the
-// Drift Link values at the edge for drift domains; every other host/response passes
+// Drift Live Interactive values at the edge for drift domains; every other host/response passes
 // through untouched.
 //
 // DEPLOY (Cloudflare dashboard → the drift.li zone):
@@ -18,13 +18,13 @@
 //
 // VERIFY: after deploy, use the Facebook Sharing Debugger / X Card Validator, or
 // just paste a drift.li link into iMessage — the preview title should read
-// "Drift Link — Interactive Drift Paths".
+// "Drift Live Interactive — Interactive Drift Paths".
 
 const DRIFT = {
-  title: "Drift Link — Interactive Drift Paths",
+  title: "Drift Live Interactive — Interactive Drift Paths",
   description:
     "Drag anything to life — interactive before/after drifts you scrub with a finger. Built for ad campaigns.",
-  siteName: "Drift Link",
+  siteName: "Drift Live Interactive",
   // 1200x630 share card, served as a static asset by the app (frontend/public).
   image: "https://drift.li/og-drift.png",
 };
@@ -59,14 +59,14 @@ export default {
       .on('meta[property="og:description"]', setContent(DRIFT.description))
       .on('meta[name="twitter:description"]', setContent(DRIFT.description))
       // index.html carries no og:image (so picdrift/visualfx aren't mislabeled) —
-      // inject the Drift Link share card into <head> for drift domains only.
+      // inject the Drift Live Interactive share card into <head> for drift domains only.
       .on("head", {
         element(el) {
           el.append(
             `<meta property="og:image" content="${DRIFT.image}"/>` +
               `<meta property="og:image:width" content="1200"/>` +
               `<meta property="og:image:height" content="630"/>` +
-              `<meta property="og:image:alt" content="Drift Link — interactive before/after product drifts"/>` +
+              `<meta property="og:image:alt" content="Drift Live Interactive — interactive before/after product drifts"/>` +
               `<meta name="twitter:image" content="${DRIFT.image}"/>`,
             { html: true },
           );

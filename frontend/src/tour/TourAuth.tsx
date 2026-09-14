@@ -295,7 +295,7 @@ export default function TourAuth() {
                 <>
                   <div>
                     <div className="d-eyebrow" style={{ marginBottom: 8 }}>
-                      {mode === "login" ? "Creator login" : "Start free"}
+                      {mode === "login" ? "Creator login" : "Try It Free"}
                     </div>
                     <div className="ta-title">{title}</div>
                     {sub && (
@@ -330,15 +330,15 @@ export default function TourAuth() {
                     {mode === "signup" && (
                       <div>
                         <label className="d-label" htmlFor="ta-name">
-                          Your name
+                          Your Page Name
                         </label>
                         <input
                           id="ta-name"
                           className="d-input"
                           value={name}
                           onChange={(e) => setName(e.target.value)}
-                          placeholder="How should we call you?"
-                          autoComplete="name"
+                          placeholder="Your name or business name"
+                          autoComplete="organization"
                         />
                       </div>
                     )}
@@ -382,7 +382,7 @@ export default function TourAuth() {
                       {busy
                         ? "One moment…"
                         : mode === "signup"
-                          ? "Create my free account"
+                          ? "Create My Free Account"
                           : mode === "login"
                             ? "Log in"
                             : "Send reset link"}
@@ -405,7 +405,7 @@ export default function TourAuth() {
                         <span>
                           New here?{" "}
                           <button type="button" onClick={() => switchMode("signup")}>
-                            Start free
+                            Try It Free
                           </button>
                         </span>
                         <button type="button" onClick={() => switchMode("forgot")}>

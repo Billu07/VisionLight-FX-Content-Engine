@@ -58,7 +58,7 @@ function FullscreenLoader({ drift }: { drift: boolean }) {
         <div style={{ fontSize: 12, color: "#9aa3b6", letterSpacing: ".14em", textTransform: "uppercase" }}>Loading…</div>
         <div style={{ marginTop: 4, fontSize: 10, letterSpacing: ".16em", textTransform: "uppercase", color: "#9aa3b6", opacity: 0.65 }}>
           {drift ? (
-            <b style={{ fontWeight: 700, color: "#22d3ee" }}>Drift Link Interactive</b>
+            <b style={{ fontWeight: 700, color: "#22d3ee" }}>Drift Live Interactive</b>
           ) : (
             <>
               Powered by <b style={{ fontWeight: 700 }}>{getPlayerBranding().name}</b>
@@ -327,6 +327,8 @@ export default function Rotation3DPlayer() {
       ctaPlacement={drift ? placementOverride ?? p.ctaPlacement : undefined}
       uniformSize={drift ? !!p.inFlow : false}
       flowNav={drift && p.flow ? p.flow : undefined}
+      termsUrl={drift ? p.termsUrl || "/terms" : undefined}
+      privacyUrl={drift ? p.privacyUrl || "/privacy" : undefined}
       forms={drift ? p.forms : undefined}
       productId={p.id}
       instant={instant}
