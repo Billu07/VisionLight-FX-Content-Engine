@@ -80,6 +80,11 @@ dashboards, set up the public demo tour. The superadmin's tour account has no cl
    they were invited at. Tighten to "email must match" if the client prefers.
 10. **Free drifts count live drifts**: deleting a free drift frees its slot again, so a page never
     has more than `freeDrifts` free drifts at once (rather than "the first 3 ever").
+11. **Pro is self-serve but not a loophole** (2026-09-14): anyone may pick Pro at signup (the client's
+    two-layer signup), but the type is then fixed — only a superadmin changes it (Admin → drift.li →
+    Tour); page settings show it read-only. Client pages start with `freeDrifts = 0` (the trial is the
+    Pro's own page; client work is paid per drift). Optional later: superadmin approval before a Pro
+    can create client pages.
 
 ## 3. Phases
 
@@ -298,3 +303,7 @@ Drift.li is a division of PicDrift
   `publish` on flow drifts; a superadmin creating a client page from "Manage this page" gives the
   ADMIN profiles to the Pro page's admins; wait-list double-submits and two-tab uploads no longer 500.
   An order paid for drifts deleted meanwhile logs "review for a refund" (`pm2 logs | grep refund`).
+- 2026-09-14 — Signup screen is just the wizard (left pitch panel removed); logging out of a tour page
+  lands on `/tour`. Pro can no longer be switched on from page settings (PATCH `/api/drift/my/page`
+  refuses a type change unless superadmin; settings show it read-only) and client pages are created with
+  `freeDrifts = 0` — decision §2.11.

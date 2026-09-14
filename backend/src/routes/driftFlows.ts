@@ -568,7 +568,13 @@ router.patch("/api/drift/my/page", authenticateToken, async (req: AuthenticatedR
   if ("accountType" in body) {
     const t = parseAccountType(body.accountType);
     if (!t) return res.status(400).json({ error: "Account type must be General or Pro" });
-    data.tourAccountType = t;
+    // Chosen at signup; changing it afterwards is a drift.li team action (Admin → drift.li → Tour).
+    if (t !== (org.tourAccountType || "GENERAL")) {
+      if (!isSuperAdmin(req)) {
+        return res.status(403).json({ error: "Your account type is set at signup — contact us to change it." });
+      }
+      data.tourAccountType = t;
+    }
   }
   if ("logoUrl" in body && !body.logoUrl) settings.logoUrl = null;
   data.tourSettings = settings;

@@ -323,7 +323,8 @@ export function TourShell({ children }: { children: React.ReactNode }) {
   const here = encodeURIComponent(location.pathname + location.search);
   const out = async () => {
     await logout();
-    navigate(CREATOR_START, { replace: true });
+    // Signed out → the Drift Tour landing, not the sign-in screen.
+    navigate(CREATOR_HOME, { replace: true });
   };
   return (
     <div className="drift-ui d-page t-page" data-theme={theme}>

@@ -91,6 +91,9 @@ export async function createClientPage(args: { proOrgId: string; identity: Ident
       tenantPlan: "PAID",
       tourAccountType: "GENERAL",
       managedByOrgId: pro.id,
+      // The free trial is the Pro's own page; client work is paid per drift (a superadmin
+      // can still grant free drifts per page in Admin → drift.li → Tour).
+      freeDrifts: 0,
     },
     select: { id: true, name: true, slug: true },
   });

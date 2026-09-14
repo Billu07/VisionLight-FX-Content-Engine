@@ -181,7 +181,6 @@ function PageSettings({
   const [contactLabel, setContactLabel] = useState(page.contactLabel || "");
   const [contactUrl, setContactUrl] = useState(page.contactUrl || "");
   const [demoFlowId, setDemoFlowId] = useState(page.demoFlowId || "");
-  const [accountType, setAccountType] = useState(page.accountType === "PRO" ? "PRO" : "GENERAL");
   const [saving, setSaving] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
   const logoRef = useRef<HTMLInputElement>(null);
@@ -190,8 +189,7 @@ function PageSettings({
     name.trim() !== page.name ||
     contactLabel.trim() !== (page.contactLabel || "") ||
     contactUrl.trim() !== (page.contactUrl || "") ||
-    demoFlowId !== (page.demoFlowId || "") ||
-    accountType !== (page.accountType === "PRO" ? "PRO" : "GENERAL");
+    demoFlowId !== (page.demoFlowId || "");
 
   const save = async () => {
     if (!name.trim()) return notify.error("Give your page a name");
@@ -202,7 +200,6 @@ function PageSettings({
         contactLabel: contactLabel.trim() || null,
         contactUrl: contactUrl.trim() || null,
         demoFlowId: demoFlowId || null,
-        accountType,
       });
       onSaved(r.data.page, r.data.demo ?? null);
       notify.success("Page saved");
@@ -317,25 +314,17 @@ function PageSettings({
         </div>
       </div>
       <div style={{ marginTop: 14 }}>
-        <label className="d-label">Account type</label>
-        <div className="t-seg" role="radiogroup" aria-label="Account type">
-          {(["GENERAL", "PRO"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              role="radio"
-              aria-checked={accountType === t}
-              className={`t-seg-btn ${accountType === t ? "on" : ""}`}
-              onClick={() => setAccountType(t)}
-              style={{ minWidth: 150, fontSize: 13.5, fontWeight: 750, padding: "8px 12px" }}
-            >
-              {t === "GENERAL" ? "General" : "Pro"}
-              <small>{t === "GENERAL" ? "Realtors · brands · venues" : "Photographers · videographers"}</small>
-            </button>
-          ))}
+        <div className="d-label">Account type</div>
+        <div className="d-actions">
+          <span className={`d-pill ${page.accountType === "PRO" ? "violet" : "accent"}`}>
+            {page.accountType === "PRO" ? "Pro" : "General"}
+          </span>
+          <span className="d-faint" style={{ fontSize: 12 }}>
+            {page.accountType === "PRO" ? "Photographers · videographers" : "Realtors · brands · venues"}
+          </span>
         </div>
-        <div className="d-faint" style={{ fontSize: 11.5, marginTop: 5 }}>
-          Pro pages can create and manage tour pages for their clients.
+        <div className="d-faint" style={{ fontSize: 11.5, marginTop: 6 }}>
+          Chosen at signup — contact us if it needs to change.
         </div>
       </div>
       <div className="t-actions" style={{ marginTop: 14 }}>
@@ -497,6 +486,7 @@ function ClientPages() {
           </div>
           <div className="d-faint" style={{ fontSize: 12 }}>
             The client's page gets its own link. You manage it — and can invite the client in later.
+            Drifts on client pages are paid at checkout; your free drifts are for your own page.
           </div>
         </div>
       )}
