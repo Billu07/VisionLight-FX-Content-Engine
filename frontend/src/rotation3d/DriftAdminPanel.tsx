@@ -6,7 +6,7 @@ import BrandProductEditModal from "./BrandProductEditModal";
 import DriftBrandDashboard from "./DriftBrandDashboard";
 import DriftMailSettings from "./DriftMailSettings";
 import DriftTourAdmin from "./DriftTourAdmin";
-import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "./driftUiTheme";
+import { DriftThemeStyles, useDriftTheme } from "./driftUiTheme";
 
 /**
  * Team (SuperAdmin) console for Drift (drift.li) — lives inside
@@ -294,7 +294,8 @@ function SecondClipButton({
 }
 
 export default function DriftAdminPanel() {
-  const [theme, toggleTheme] = useDriftTheme();
+  // The theme toggle lives in the superadmin panel's top bar (shared theme state).
+  const [theme] = useDriftTheme();
   const [mode, setMode] = useState<"brands" | "tour" | "showcase" | "emails">("brands");
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loadingBrands, setLoadingBrands] = useState(true);
@@ -571,7 +572,6 @@ export default function DriftAdminPanel() {
             </button>
           ))}
         </div>
-        <ThemeToggle theme={theme} onToggle={toggleTheme} />
       </div>
 
       {msg && (

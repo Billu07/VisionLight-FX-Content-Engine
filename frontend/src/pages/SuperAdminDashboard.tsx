@@ -12,6 +12,8 @@ import { useAuth } from "../hooks/useAuth";
 import { isUserCreditLimited } from "../lib/adminCredits";
 import Rotation3DAdminPanel from "../rotation3d/Rotation3DAdminPanel";
 import DriftAdminPanel from "../rotation3d/DriftAdminPanel";
+import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "../rotation3d/driftUiTheme";
+import { SA_GROUPS, SA_STYLES, isLegacyTab, type SuperAdminTab } from "./superAdminShell";
 
 type DemoView = "VISIONLIGHT" | "PICDRIFT";
 
@@ -423,19 +425,9 @@ export default function SuperAdminDashboard() {
   };
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<
-    | "platform"
-    | "byok"
-    | "my-agency"
-    | "demo-leads"
-    | "demo"
-    | "global-settings"
-    | "global-presets"
-    | "editor-presets"
-    | "lab"
-    | "rotation3d"
-    | "drift"
-  >("platform");
+  const [activeTab, setActiveTab] = useState<SuperAdminTab>("platform");
+  // One light/dark theme for the whole panel (shared with the drift.li tab).
+  const [theme, toggleTheme] = useDriftTheme();
 
   // Demo Preview curation state
   const [demoLoading, setDemoLoading] = useState(false);
@@ -1469,136 +1461,134 @@ export default function SuperAdminDashboard() {
   };
 
   if (loading) return (
-    <div className={adminUi.loading}>
+    <div className="drift-ui d-page sa-loading" data-theme={theme}>
+      <DriftThemeStyles />
+      <style>{SA_STYLES}</style>
       <LoadingSpinner size="lg" variant="neon" />
     </div>
   );
 
   return (
-    <div className={`${adminUi.page} font-sans`}>
-      <div className={adminUi.backdrop} />
-      <div className={adminUi.container}>
-        {/* HEADER */}
-        <div className={adminUi.header}>
-          <div>
-            <h1 className={`${adminUi.title} mb-2 uppercase`}>
-              Platform <span className="text-brand-accent">Control</span>
-            </h1>
-            <p className={adminUi.eyebrow}>
-              Super Admin Interface - {adminUser?.email}
-            </p>
-          </div>
+    <div className="drift-ui d-page sa-page" data-theme={theme}>
+      <DriftThemeStyles />
+      <style>{SA_STYLES}</style>
 
-          <div className="flex w-full flex-col gap-3 xl:min-w-0 xl:flex-1 xl:items-end">
-            <div className={`${adminUi.tabBar} ${adminUi.tabBarScroll} xl:!w-full`}>
-              <button
-                onClick={() => navigate("/app")}
-                className={`${adminUi.tab} border border-brand-accent/20 text-brand-accent hover:bg-brand-accent/10`}
-              >
-                Back to App
-              </button>
-              {[
-                { id: "platform", label: "platform" },
-                { id: "byok", label: "byok" },
-                { id: "my-agency", label: "my agency" },
-                { id: "demo-leads", label: "demo leads" },
-                { id: "demo", label: "demo preview" },
-                { id: "global-settings", label: "global settings" },
-                { id: "global-presets", label: "global presets" },
-                { id: "editor-presets", label: "editor presets" },
-                { id: "lab", label: "lab" },
-                { id: "rotation3d", label: "rotation3d" },
-                { id: "drift", label: "drift.li" },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`${adminUi.tab} ${activeTab === tab.id ? adminUi.tabActive : adminUi.tabInactive
-                    }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex w-full flex-wrap items-center gap-2 xl:justify-end">
-            <a
-              href="https://fal.ai/dashboard/usage-billing/credits"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center whitespace-nowrap rounded-lg border border-pink-400/40 bg-pink-600 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-white transition-colors hover:bg-pink-500"
-            >
-              Check Your Credits
-            </a>
-            <button
-              type="button"
-              disabled={creditLimitsBusy}
-              onClick={async () => {
-                setCreditLimitsBusy(true);
-                try {
-                  await apiEndpoints.setAdminCreditLimits(!adminCreditLimitsEnabled);
-                  await checkAuth();
-                  setMsg(
-                    !adminCreditLimitsEnabled
-                      ? "Credit limits enabled for your account. Your credits now count toward coverage."
-                      : "Credit limits disabled. Your account is unlimited again.",
-                  );
-                } catch (err: any) {
-                  setMsg("Error: " + (err?.message || "Failed to update credit limits."));
-                } finally {
-                  setCreditLimitsBusy(false);
-                }
-              }}
-              title="When enabled, your account uses credit limits and your allocated credits count toward Needed Coverage."
-              className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-4 py-2 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
-                adminCreditLimitsEnabled
-                  ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25"
-                  : "border-gray-600/50 bg-gray-800/70 text-gray-300 hover:bg-gray-700/70"
-              }`}
-            >
-              {creditLimitsBusy ? (
-                <LoadingSpinner size="sm" />
-              ) : (
-                <>My Credit Limits: {adminCreditLimitsEnabled ? "On" : "Off"}</>
-              )}
-            </button>
-            </div>
+      {/* TOP BAR */}
+      <header className="sa-top">
+        <div className="sa-brand">
+          <div className="d-wordmark">
+            Platform <i>Control</i>
           </div>
+          <div className="sa-who">Super Admin · {adminUser?.email}</div>
         </div>
+        <div className="d-actions sa-top-actions">
+          <a
+            href="https://fal.ai/dashboard/usage-billing/credits"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="d-btn sm"
+          >
+            Check fal credits ↗
+          </a>
+          <button
+            type="button"
+            disabled={creditLimitsBusy}
+            onClick={async () => {
+              setCreditLimitsBusy(true);
+              try {
+                await apiEndpoints.setAdminCreditLimits(!adminCreditLimitsEnabled);
+                await checkAuth();
+                setMsg(
+                  !adminCreditLimitsEnabled
+                    ? "Credit limits enabled for your account. Your credits now count toward coverage."
+                    : "Credit limits disabled. Your account is unlimited again.",
+                );
+              } catch (err: any) {
+                setMsg("Error: " + (err?.message || "Failed to update credit limits."));
+              } finally {
+                setCreditLimitsBusy(false);
+              }
+            }}
+            title="When enabled, your account uses credit limits and your allocated credits count toward Needed Coverage."
+            className={`d-btn sm ${adminCreditLimitsEnabled ? "soft" : ""}`}
+          >
+            {creditLimitsBusy ? (
+              <LoadingSpinner size="sm" />
+            ) : (
+              <>
+                My credit limits: <b>{adminCreditLimitsEnabled ? "On" : "Off"}</b>
+              </>
+            )}
+          </button>
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+          <button type="button" onClick={() => navigate("/app")} className="d-btn sm primary">
+            Back to App
+          </button>
+        </div>
+      </header>
+
+      <main className="sa-main">
+        {/* SECTION TABS */}
+        <nav className="sa-nav" aria-label="Admin sections">
+          {SA_GROUPS.map((group) => (
+            <div key={group.label} className="sa-group">
+              <div className="sa-group-label">{group.label}</div>
+              <div className="d-tabs" role="tablist" aria-label={group.label}>
+                {group.tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`d-tab ${activeTab === tab.id ? "active" : ""}`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
 
         {msg && (
-          <div className="mb-8 flex items-center justify-between rounded-xl border border-brand-accent/20 bg-brand-accent/10 p-4 text-sm font-semibold text-brand-accent">
-            {msg}
-            <button onClick={() => setMsg("")} className="text-lg">x</button>
+          <div className={`d-banner ${msg.startsWith("Error") ? "err" : "ok"}`} style={{ marginBottom: 16 }}>
+            <span>{msg}</span>
+            <button type="button" className="d-x" onClick={() => setMsg("")} aria-label="Dismiss">
+              ×
+            </button>
           </div>
         )}
 
-        <div className="mb-8 rounded-xl border border-amber-300/20 bg-amber-500/[0.06] p-4">
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-amber-200">
-            Release Email
-          </p>
-          <p className="mt-1 text-xs text-gray-400">
-            Free up a deleted or stuck email so it can sign up again from scratch.
-            Removes leftover profiles/orgs and the auth identity. No past data is restored.
-          </p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+        {/* RELEASE EMAIL */}
+        <section className="d-card sa-release">
+          <div className="sa-release-copy">
+            <div className="d-h2">Release email</div>
+            <p className="d-note">
+              Free up a deleted or stuck email so it can sign up again from scratch.
+              Removes leftover profiles/orgs and the auth identity. No past data is restored.
+            </p>
+          </div>
+          <div className="sa-release-form">
             <input
               type="email"
               value={releaseEmailInput}
               onChange={(e) => setReleaseEmailInput(e.target.value)}
               placeholder="user@email.com"
-              className="flex-1 rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-white outline-none focus:border-brand-accent"
+              className="d-input"
             />
             <button
               type="button"
               onClick={() => void handleReleaseEmail()}
               disabled={releaseEmailBusy}
-              className="rounded-lg border border-amber-400/40 bg-amber-500/15 px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-amber-100 transition-colors hover:bg-amber-500/25 disabled:opacity-60"
+              className="d-btn warn"
             >
-              {releaseEmailBusy ? "Releasing…" : "Release Email"}
+              {releaseEmailBusy ? "Releasing…" : "Release"}
             </button>
           </div>
-        </div>
+        </section>
 
+        <div className={isLegacyTab(activeTab) ? "sa-legacy" : undefined}>
         {/* TAB CONTENT: ROTATION3D */}
         {activeTab === "rotation3d" && <Rotation3DAdminPanel />}
         {activeTab === "drift" && <DriftAdminPanel />}
@@ -2601,61 +2591,70 @@ export default function SuperAdminDashboard() {
 
         {/* TAB CONTENT: DEMO LEADS */}
         {activeTab === "demo-leads" && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className={adminUi.sectionTitle}>Picdrift Demo Users</h2>
-              <button
-                onClick={() => setShowDemoModal(true)}
-                className={adminUi.primaryButton}
-              >
-                New Demo User
+          <div className="sa-stack d-rise">
+            <div className="d-head">
+              <div>
+                <div className="d-eyebrow">Studio</div>
+                <h2 className="d-h1">Demo users</h2>
+                <p className="d-sub">PicDrift demo accounts — open one read-only or change its view.</p>
+              </div>
+              <button type="button" onClick={() => setShowDemoModal(true)} className="d-btn primary">
+                New demo user
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {demoUsers.map(u => (
-                <div key={u.id} className={`${adminUi.panel} relative p-6 group`}>
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <div className="font-bold text-white">{u.name}</div>
-                      <div className="text-xs text-gray-500 font-mono">{u.email}</div>
+            {demoUsers.length === 0 ? (
+              <div className="d-empty">No demo users yet.</div>
+            ) : (
+              <div className="sa-cards">
+                {demoUsers.map((u) => (
+                  <div key={u.id} className="d-card sa-lead">
+                    <div className="sa-lead-top">
+                      <div>
+                        <div className="d-name">{u.name}</div>
+                        <div className="sa-mono">{u.email}</div>
+                      </div>
+                      <span className="d-pill accent">{u.view}</span>
                     </div>
-                    <div className="flex flex-col gap-1 items-end">
-                      <span className="bg-cyan-500/10 text-cyan-400 text-[9px] font-bold px-2 py-1 rounded uppercase tracking-widest border border-cyan-500/20">
-                        {u.view}
-                      </span>
+                    <div className="sa-lead-stats">
+                      <div>
+                        <span className="d-eyebrow">PicDrift</span>
+                        <b>{u.creditsPicDrift}</b>
+                      </div>
+                      <div>
+                        <span className="d-eyebrow">PicFX</span>
+                        <b>{u.creditsImageFX}</b>
+                      </div>
+                    </div>
+                    <div className="d-actions">
                       {canEnterDashboard(u.id) ? (
                         <button
+                          type="button"
                           onClick={() => handleEnterReadOnlyDashboard(u)}
                           disabled={!!enteringDashboardUserId}
-                          className="inline-flex items-center gap-1 text-[8px] text-amber-300 hover:text-amber-100 uppercase font-bold tracking-tighter disabled:cursor-wait disabled:opacity-70"
+                          className="d-btn sm soft"
                         >
-                          {enteringDashboardUserId === u.id && (
-                            <span className="h-2.5 w-2.5 animate-spin rounded-full border border-current border-t-transparent" />
-                          )}
-                          {enteringDashboardUserId === u.id
-                            ? "Opening..."
-                            : "Enter Dashboard"}
+                          {enteringDashboardUserId === u.id && <span className="sa-spin" />}
+                          {enteringDashboardUserId === u.id ? "Opening…" : "Enter dashboard"}
                         </button>
                       ) : (
-                        <span className="text-[8px] text-gray-500 uppercase font-bold tracking-tighter">Own Profile</span>
+                        <span className="d-pill">Own profile</span>
                       )}
-                      <button onClick={() => { setEditingUser(u); setUserUpdates({ view: u.view, role: u.role, maxProjects: u.maxProjects ?? 3 }); }} className="text-[8px] text-gray-500 hover:text-white uppercase font-bold tracking-tighter">Edit View</button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingUser(u);
+                          setUserUpdates({ view: u.view, role: u.role, maxProjects: u.maxProjects ?? 3 });
+                        }}
+                        className="d-btn sm ghost"
+                      >
+                        Edit view
+                      </button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-4 mt-4">
-                    <div>
-                      <div className="text-[9px] uppercase text-gray-500 font-bold mb-1">PicDrift</div>
-                      <div className="text-sm font-bold text-white">{u.creditsPicDrift}</div>
-                    </div>
-                    <div className="border-l border-white/10 pl-4">
-                      <div className="text-[9px] uppercase text-gray-500 font-bold mb-1">PicFX</div>
-                      <div className="text-sm font-bold text-white">{u.creditsImageFX}</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -3122,8 +3121,10 @@ export default function SuperAdminDashboard() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </main>
 
+      <div className="sa-ink">
       {/* MODAL: NEW TENANT */}
       {showTenantModal && (
         <div className="fixed inset-0 bg-gray-950/90 flex items-center justify-center z-[100] backdrop-blur-sm p-4">
@@ -3957,6 +3958,7 @@ export default function SuperAdminDashboard() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
