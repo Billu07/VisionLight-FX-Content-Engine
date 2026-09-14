@@ -5,13 +5,14 @@ import { useAuth } from "../hooks/useAuth";
 import { LoginModal } from "../components/LoginModal";
 import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "./driftUiTheme";
 import { TOUR_STYLES } from "../tour/tourUi";
-import { combinedFrameSets } from "./driftNav";
+import { prefetchDriftPath } from "./driftNav";
+import { loadDriftPlayer } from "../routeChunks";
 
 /**
  * drift.li — the home, in the client's words (TOUR_V2_PLAN.md §6). "You Control the
- * Movement": beside the headline sits a glass "live view" of the superadmin's landing
- * drift — a few of its frames laid out in perspective, drifting slowly, with an orbit
- * and a horizon (visual only; "Drag to explore" opens the live drift). Below: Tour
+ * Movement": beside the headline sits a glass "live view" of drift.li's demo tour —
+ * its stops laid out in perspective, the centre stepping through the tour, with an orbit
+ * and a horizon (visual only; "Drag to explore" starts the tour). Below: Tour
  * (available now) and View · Memory · Path (coming soon, each with a wait list), then
  * one closing call. On the drift design tokens — the glow is dark-theme only, light
  * stays flat. Login top right; signed in, it becomes Dashboard.
@@ -91,10 +92,13 @@ const STYLES = `
 
 /* ── Hero ── */
 .dh-hero{display:grid;gap:clamp(34px,6vw,56px);align-items:center;padding:clamp(34px,6vw,80px) 0 clamp(28px,4vw,52px)}
-@media(min-width:1024px){.dh-hero{grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr);gap:44px}}
+@media(min-width:1024px){.dh-hero{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:44px}}
 .dh-kicker{display:inline-flex;align-items:center;gap:14px;font-size:12.5px;font-weight:700;letter-spacing:.3em;text-transform:uppercase;color:var(--accent)}
 .dh-kicker::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
-.dh-h1{margin:22px 0 0;font-size:clamp(50px,7.4vw,106px);line-height:.94;letter-spacing:-.045em;font-weight:800;color:var(--text)}
+.dh-h1{margin:22px 0 0;font-size:clamp(44px,7.4vw,106px);line-height:.94;letter-spacing:-.045em;font-weight:800;color:var(--text)}
+.dh-h1 .ln{display:block}
+/* Desktop: exactly two lines — the size follows the column so neither line wraps. */
+@media(min-width:1024px){.dh-h1{font-size:clamp(52px,5.1vw,80px)}.dh-h1 .ln{white-space:nowrap}}
 .dh-h1 em{font-style:normal;color:var(--accent)}
 .drift-ui[data-theme="dark"] .dh-h1 em{background:linear-gradient(90deg,#22d3ee 0%,#38bdf8 48%,#a78bfa 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
 .dh-lead{margin:24px 0 0;font-size:clamp(18px,2.1vw,24px);line-height:1.45;color:var(--muted);max-width:30ch}
@@ -128,7 +132,9 @@ const STYLES = `
 .dh-chip-explore{top:18px;right:18px;border-radius:999px;color:var(--accent);border-color:var(--accent-border);text-decoration:none;transition:background .16s}
 a.dh-chip-explore:hover{background:var(--accent-soft)}
 .dh-chip-meta{left:18px;bottom:18px;display:grid;gap:4px;border-radius:10px;padding:9px 12px;
-  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;font-weight:600;letter-spacing:.03em;text-transform:none;color:var(--muted)}
+  font-size:11.5px;font-weight:600;letter-spacing:.02em;text-transform:none;color:var(--muted);max-width:60%}
+.dh-chip-meta b{color:var(--text);font-weight:750;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dh-chip-meta span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 .dh-strip{position:absolute;inset:0;z-index:1;perspective:1100px;perspective-origin:50% 46%}
 .dh-panel{position:absolute;top:52%;overflow:hidden;border-radius:6px;background:var(--surface-3);
@@ -139,7 +145,8 @@ a.dh-chip-explore:hover{background:var(--accent-soft)}
 .dh-panel.c{left:24%;width:52%;height:74%;z-index:2;transform:translateY(-50%) rotateY(-9deg)}
 .dh-panel.r1{left:74%;width:15%;height:66%;transform:translateY(-50%) rotateY(-46deg);opacity:.8}
 .dh-panel.r2{left:84%;width:13%;height:56%;transform:translateY(-50%) rotateY(-56deg);opacity:.5}
-.dh-panel.c img{animation:dh-drift 18s ease-in-out infinite alternate;will-change:transform}
+.dh-panel.c img{position:absolute;inset:0;opacity:0;transition:opacity 1.1s ease;animation:dh-drift 18s ease-in-out infinite alternate;will-change:transform,opacity}
+.dh-panel.c img.on{opacity:1}
 @keyframes dh-drift{from{transform:scale(1.04) translate3d(-2%,0,0)}to{transform:scale(1.14) translate3d(2.5%,-1%,0)}}
 .dh-panel.empty{background:var(--surface-2)}
 
@@ -246,41 +253,58 @@ const useReducedMotion = () => {
   return reduce;
 };
 
-const DIRECTION_LABEL: Record<string, string> = {
-  LTR: "Left → right",
-  RTL: "Right → left",
-  TTB: "Top → bottom",
-  BTT: "Bottom → top",
-};
-
-// Where along the drift each panel's frame comes from: two left, centre, two right.
-const PANELS = [
-  { cls: "l2", at: 0.08 },
-  { cls: "l1", at: 0.27 },
-  { cls: "c", at: 0.5 },
-  { cls: "r1", at: 0.73 },
-  { cls: "r2", at: 0.92 },
-] as const;
-
 // A perspective floor under the frame: rungs get closer toward the horizon.
 const GRID_ROWS = [16, 42, 78, 128, 196];
 const GRID_COLS = Array.from({ length: 17 }, (_, i) => -400 + i * 100);
 
-/** The hero's "live view": five frames of the landing drift in perspective, drifting
- *  slowly under an orbit — a picture of the product, not the player (visual only). */
-function LiveView({ hero }: { hero: any }) {
+// The centre panel steps through the tour's first few stops (images the side panels
+// already load, so the cycle costs no extra downloads).
+const CYCLE_STOPS = 3;
+const CYCLE_MS = 3800;
+
+type Stop = { name: string; thumb: string };
+
+/** The hero's "live view": drift.li's demo tour — its stops laid out in perspective,
+ *  the centre stepping slowly through the tour — under an orbit. A picture of the
+ *  product, not the player (visual only); "Drag to explore" starts the tour. */
+function LiveView({ tour }: { tour: any }) {
   const reduceMotion = useReducedMotion();
-  const { panels, frameCount } = useMemo(() => {
-    if (!hero) return { panels: [] as string[], frameCount: 0 };
-    const { frames, framesMobile } = combinedFrameSets(hero);
-    // The lighter set is plenty for panels this size.
-    const list = framesMobile?.length ? framesMobile : frames;
-    if (!list.length) return { panels: [] as string[], frameCount: 0 };
-    return {
-      panels: PANELS.map((p) => list[Math.min(list.length - 1, Math.round(p.at * (list.length - 1)))]),
-      frameCount: frames.length,
-    };
-  }, [hero]);
+  const stops = useMemo<Stop[]>(
+    () =>
+      (Array.isArray(tour?.steps) ? tour.steps : [])
+        .filter((s: any) => s && s.thumb)
+        .map((s: any) => ({ name: String(s.name || ""), thumb: String(s.thumb) })),
+    [tour],
+  );
+  const n = stops.length;
+  const cycle = Math.min(n, CYCLE_STOPS);
+  const [at, setAt] = useState(0);
+
+  useEffect(() => {
+    setAt(0);
+    if (reduceMotion || cycle < 2) return;
+    const t = window.setInterval(() => {
+      if (!document.hidden) setAt((i) => (i + 1) % cycle);
+    }, CYCLE_MS);
+    return () => window.clearInterval(t);
+  }, [reduceMotion, cycle]);
+
+  // Side panels: the next stops on the right, the last stops on the left (a tour loops).
+  const sideStop = (offset: number): Stop | null => (n ? stops[((offset % n) + n) % n] : null);
+  const sides = [
+    { cls: "l2", stop: sideStop(-2) },
+    { cls: "l1", stop: sideStop(-1) },
+    { cls: "r1", stop: sideStop(1) },
+    { cls: "r2", stop: sideStop(2) },
+  ];
+  const current = n ? stops[Math.min(at, n - 1)] : null;
+  const startPath: string | null = tour?.entryPath || tour?.publicPath || null;
+  // Opening the tour should be instant: fetch drift #1 and the player's code on intent.
+  const warm = () => {
+    if (!startPath) return;
+    prefetchDriftPath(startPath);
+    loadDriftPlayer().catch(() => undefined);
+  };
 
   return (
     <div className="dh-visual">
@@ -296,10 +320,10 @@ function LiveView({ hero }: { hero: any }) {
         </svg>
       </div>
 
-      <figure className="dh-frame" aria-label="A drift, live">
+      <figure className="dh-frame" aria-label={tour ? String(tour.title || tour.name || "") : undefined}>
         <span className="dh-chip dh-chip-live">Drift / Live View</span>
-        {hero?.id ? (
-          <Link className="dh-chip dh-chip-explore" to={`/p/${hero.id}`}>
+        {startPath ? (
+          <Link className="dh-chip dh-chip-explore" to={startPath} onPointerEnter={warm} onTouchStart={warm} onFocus={warm}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden>
               <circle cx="12" cy="12" r="7.5" />
               <circle cx="12" cy="12" r="2" />
@@ -310,19 +334,23 @@ function LiveView({ hero }: { hero: any }) {
         ) : null}
 
         <div className="dh-strip" aria-hidden>
-          {PANELS.map((p, i) => (
-            <div key={p.cls} className={`dh-panel ${p.cls} ${panels[i] ? "" : "empty"}`}>
-              {panels[i] ? (
-                <img
-                  src={panels[i]}
-                  alt=""
-                  decoding="async"
-                  loading={p.cls === "c" ? "eager" : "lazy"}
-                  fetchPriority={p.cls === "c" ? "high" : "low"}
-                />
-              ) : null}
+          {sides.map((p) => (
+            <div key={p.cls} className={`dh-panel ${p.cls} ${p.stop ? "" : "empty"}`}>
+              {p.stop ? <img src={p.stop.thumb} alt="" decoding="async" loading="lazy" fetchPriority="low" /> : null}
             </div>
           ))}
+          <div className={`dh-panel c ${n ? "" : "empty"}`}>
+            {stops.slice(0, Math.max(cycle, 0)).map((s, i) => (
+              <img
+                key={`${i}-${s.thumb}`}
+                src={s.thumb}
+                alt=""
+                decoding="async"
+                fetchPriority={i === 0 ? "high" : "low"}
+                className={i === at ? "on" : ""}
+              />
+            ))}
+          </div>
         </div>
 
         <svg className="dh-orbit" viewBox="0 0 400 100" aria-hidden>
@@ -341,12 +369,12 @@ function LiveView({ hero }: { hero: any }) {
           )}
         </svg>
 
-        {frameCount > 0 && (
+        {tour && current ? (
           <span className="dh-chip dh-chip-meta" aria-hidden>
-            <span>{frameCount} frames</span>
-            <span>{DIRECTION_LABEL[String(hero?.driftDirection || "LTR")] || DIRECTION_LABEL.LTR}</span>
+            <b>{tour.title || tour.name}</b>
+            <span>{current.name}</span>
           </span>
-        )}
+        ) : null}
       </figure>
     </div>
   );
@@ -422,16 +450,16 @@ export default function DriftHome() {
   const { user, profiles, profileSelectionRequired, checkAuth } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
   const [waitFor, setWaitFor] = useState<Product | null>(null);
-  const [hero, setHero] = useState<any>(null);
+  const [tour, setTour] = useState<any>(null);
 
   useEffect(() => {
     checkAuth();
     let alive = true;
-    // The superadmin's landing drift supplies the live view's frames.
+    // drift.li's demo tour (Admin → drift.li → Tour → Demo tour) fills the live view.
     apiEndpoints
-      .driftPublicLandingHero(null)
-      .then((r) => alive && setHero(r.data?.product || null))
-      .catch(() => alive && setHero(null));
+      .driftPublicFlow("tour", "demo")
+      .then((r) => alive && setTour(r.data?.flow || null))
+      .catch(() => alive && setTour(null));
     return () => {
       alive = false;
     };
@@ -474,9 +502,10 @@ export default function DriftHome() {
           <div style={{ minWidth: 0 }}>
             <div className="dh-kicker">Drift Live Interactive</div>
             <h1 className="dh-h1">
-              You Control
-              <br />
-              the <em>Movement.</em>
+              <span className="ln">You Control</span>{" "}
+              <span className="ln">
+                the <em>Movement.</em>
+              </span>
             </h1>
             <p className="dh-lead">Turn a few seconds of video into a Live Interactive you can explore.</p>
             <Kinds />
@@ -485,7 +514,7 @@ export default function DriftHome() {
               <Arrow />
             </Link>
           </div>
-          <LiveView hero={hero} />
+          <LiveView tour={tour} />
         </section>
 
         <section className="dh-section" aria-label="Tour, View, Memory and Path">

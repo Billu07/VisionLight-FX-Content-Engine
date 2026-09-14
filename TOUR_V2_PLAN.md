@@ -319,5 +319,8 @@ Drift.li is a division of PicDrift
   visual "live view" (five frames of the landing drift in perspective with an orbit, horizon and grid; glow
   in dark theme only, flat in light), "Drag to explore" opens the live drift, four even product cards, closing
   "Try Drift Tour" kept. All copy and CTAs unchanged (Tour: Try it Free + Learn More; View/Memory/Path: Join
-  Wait List) — the client wants the original content kept on the new design. The home
+  Wait List) — the client wants the original content kept on the new design.
+- 2026-09-14 — Home live view shows the demo tour instead of the landing drift (stops in perspective, the
+  centre stepping through the first three stops, tour + stop name chip, "Drag to explore" starts the tour
+  with drift #1 + player prefetched on intent); headline on exactly two lines on desktop. The home
   no longer downloads the player.
