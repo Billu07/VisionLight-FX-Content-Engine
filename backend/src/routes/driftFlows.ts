@@ -23,6 +23,7 @@ import {
 } from "../services/driftEnquiries";
 import { enquirySettingsOf, parseEnquirySettings } from "../services/tourEnquirySettings";
 import { ensureReportLink, ownerReport, recordAttention, removeReportLink, tourInsights } from "../services/driftInsights";
+import { startTourReel, streamTourReel, tourReel } from "../services/driftReel";
 import {
   createClientPage,
   createProInvite,
@@ -925,6 +926,40 @@ router.get("/api/drift/public/reports/:code", async (req: AuthenticatedRequest, 
   res.json({ report });
 });
 
+// ── Reel: the tour as a vertical video (services/driftReel.ts) ──
+router.get("/api/drift/my/flows/:id/reel", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "VIEW");
+  if (!orgId) return;
+  try {
+    res.json({ reel: await tourReel(orgId, req.params.id) });
+  } catch (err) {
+    return handle(res, err);
+  }
+});
+
+// Make the reel (queued behind clip builds; an up-to-date reel comes straight back).
+router.post("/api/drift/my/flows/:id/reel", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "EDIT");
+  if (!orgId) return;
+  try {
+    res.status(202).json({ reel: await startTourReel(orgId, req.params.id) });
+  } catch (err) {
+    return handle(res, err);
+  }
+});
+
+// The reel as a download (Content-Disposition: attachment).
+router.get("/api/drift/my/flows/:id/reel/file", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "VIEW");
+  if (!orgId) return;
+  try {
+    await streamTourReel(orgId, req.params.id, res);
+  } catch (err) {
+    if (res.headersSent) return void res.end();
+    return handle(res, err);
+  }
+});
+
 // A visit through a personal link (public): counts the open; an unknown link is ignored.
 router.post("/api/drift/public/links/:token/open", async (req: AuthenticatedRequest, res: Response) => {
   const opened = await openShareLink(String(req.params.token || "")).catch(() => null);
@@ -1080,6 +1115,7 @@ router.post(
       uploaderId: req.user?.id || null,
       frameCount: clip.frameCount,
       removal: "none",
+      cleanup: true,
     });
   },
 );
@@ -1145,6 +1181,7 @@ router.post(
       uploaderId: req.user?.id || null,
       frameCount: clip.frameCount,
       removal: "none",
+      cleanup: true,
     });
   },
 );

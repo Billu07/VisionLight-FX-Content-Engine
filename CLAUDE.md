@@ -290,6 +290,20 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   `GET /api/drift/public/reports/:code` (counts only — no names, messages or personal links) → `/report/{code}`
   (`tour/OwnerReport.tsx`, noindex). The generic player events endpoint now drops meta over 1KB and rate-limits per IP
   (`services/driftVisitors.ts`). `report` is reserved in both slug lists.
+- **Clip clean-up** (2026-09-15, no schema change): tour clips (step upload, replace, paid conversion — `processClip`
+  `cleanup: true`; brand drifts and Rotation3D unchanged; env `TOUR_CLIP_CLEANUP=off` turns it off) extract through
+  `services/driftCleanup.ts` `extractFramesForCleanup` (the PNG frames + a 256×256 gray copy of each in ONE ffmpeg pass).
+  `planCleanup` (async, yields every 20ms) detects the pan direction, trims still ends (up to ~2% of the pan into the
+  motion, 2 still frames kept) and steadies translational shake (smoothed path → a per-frame crop, margin 1–6%); anything
+  unclear leaves the clip as uploaded (zooms, diagonals, noise, screen recordings). `buildSpinFromVideo({ cleanup })`
+  applies it (`steadyCropFor`) and stores the report in `manifest.cleanup`; `processClip` sets `driftDirection` from it;
+  the builder's step card shows "Auto clean-up: …" (`serializeStepProduct` → `cleanup`).
+- **Reel** (2026-09-15, no schema change): share sheet → "Reel" (`tour/ReelSheet.tsx`: make / watch / download / share
+  the file) → `GET|POST /api/drift/my/flows/:id/reel` (VIEW / EDIT) + `GET …/reel/file` (download stream).
+  `services/driftReel.ts` `renderReel` = one ffmpeg graph: 1080×1920 30fps — intro card → each ready drift (≤8, mobile
+  frames, ~3.4s + holds) over a blurred copy of itself with a name + progress overlay (sharp SVG; DejaVu Sans on the VPS)
+  → end card (link + QR), slideleft xfades, no audio. Runs on the processing queue, uploads to R2, and keeps its state in
+  `DriftFlow.settings.reel` via one atomic `jsonb_set` (a content hash → `stale` once the tour changes).
 - **Superadmin**: `X-Drift-Org` lets a superadmin act on any TOUR page ("Manage this page", `usePageAdmin`);
   back office = Admin → drift.li → Tour (`routes/driftTourAdmin.ts`, `DriftTourAdmin.tsx`).
 - **drift.li home** = `rotation3d/DriftHome.tsx` (2026-09-14 redesign per the client's `land.png`: the hero's

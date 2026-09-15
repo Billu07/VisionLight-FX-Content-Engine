@@ -305,6 +305,7 @@ async function startPaidProcessing(p: {
       uploaderId: p.createdByUserId,
       frameCount: p.pendingFrameCount || 180,
       removal: "none",
+      cleanup: true,
     });
   } catch (err) {
     console.error(`[${NS}] product ${p.id} is paid but couldn't start converting:`, err);

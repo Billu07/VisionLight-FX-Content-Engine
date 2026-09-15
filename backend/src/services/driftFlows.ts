@@ -373,6 +373,17 @@ export const flowInclude = {
   },
 };
 
+/** What the auto clean-up did to a tour clip (services/driftCleanup.ts), or null when nothing. */
+const cleanupSummary = (c: any) => {
+  if (!c || typeof c !== "object" || c.v !== 1) return null;
+  const out = {
+    trimmedS: Math.round(((Number(c.trimmedStartS) || 0) + (Number(c.trimmedEndS) || 0)) * 10) / 10,
+    steadied: !!c.steadied,
+    direction: typeof c.direction === "string" ? (c.direction as string) : null,
+  };
+  return out.trimmedS > 0 || out.steadied || out.direction ? out : null;
+};
+
 export function serializeStepProduct(p: any) {
   if (!p) return null;
   const m = p.spin?.manifest || {};
@@ -403,6 +414,7 @@ export function serializeStepProduct(p: any) {
     paidAt: (p.paidAt ?? null) as Date | null,
     hostingExpiresAt: (p.hostingExpiresAt ?? null) as Date | null,
     pinCount: (p._count?.pins ?? 0) as number,
+    cleanup: cleanupSummary(m.cleanup),
     updatedAt: p.updatedAt as Date,
   };
 }

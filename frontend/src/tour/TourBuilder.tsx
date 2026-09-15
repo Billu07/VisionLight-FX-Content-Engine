@@ -29,6 +29,15 @@ const DIRECTIONS = [
   { value: "BTT", glyph: "↑", short: "B→T", title: "Bottom to top" },
 ] as const;
 const COVER_LABELS = ["Start", "Middle", "End"];
+// The auto clean-up, in words (the step card's note under a ready drift).
+const cleanupText = (c: NonNullable<NonNullable<FlowStep["product"]>["cleanup"]>) =>
+  [
+    c.trimmedS > 0 ? `trimmed ${c.trimmedS}s of still footage` : "",
+    c.steadied ? "steadied the shake" : "",
+    c.direction ? `direction set from the footage (${DIRECTIONS.find((d) => d.value === c.direction)?.glyph ?? c.direction})` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 const money = (cents: number, currency = "usd") => {
   try {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: currency.toUpperCase() }).format(cents / 100);
@@ -226,6 +235,11 @@ function StepCard({
           <StatusPill status={status} />
           {p?.frameCount ? <span className="d-faint">{p.frameCount} frames</span> : null}
         </div>
+        {p?.cleanup && isReady(status) && (
+          <div className="d-faint t-tip" title="drift.li tidies every clip as it builds">
+            Auto clean-up: {cleanupText(p.cleanup)}
+          </div>
+        )}
         {p?.hostingExpiresAt && (
           <div className="d-faint t-tip">Hosted until {new Date(p.hostingExpiresAt).toLocaleDateString()}</div>
         )}

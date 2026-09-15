@@ -374,8 +374,8 @@ Drift.li is a division of PicDrift
   noise and scene cuts are refused (pins then follow the fine-tuning only). Player: pulsing dot + label, tap for the
   note, dragging closes it. Also closed: tour Editors/Viewers could still write brand captions/thumbnails directly.
 - 2026-09-15 — Feature roadmap agreed (one phase at a time, review between): 1 pins ✅ · 2 enquiries + personal links ✅
-  · 3 print kit + MLS-safe link ✅ · 4 attention heatmap + owner report ✅ · 5 auto clean-up on upload · 6 shoot mode in the
-  browser · 7 reel export · 8 Then & Now.
+  · 3 print kit + MLS-safe link ✅ · 4 attention heatmap + owner report ✅ · 5 auto clean-up on upload ✅ · 6 shoot mode in the
+  browser · 7 reel export ✅ · 8 Then & Now.
 - 2026-09-15 — Phase 2: enquiries + personal links (SCHEMA: `DriftShareLink` → db push). Page settings → "Enquiry
   button" (label presets Book a viewing / Ask a question / Request info / Get a quote, optional phone). Shown on the
   page, the pathway (top + foot) and as a chip in every tour drift; the form sends name, email, phone?, message →
@@ -408,3 +408,21 @@ Drift.li is a division of PicDrift
   meter checks (scripted 60fps drags — lingering, reach, reversals, loop wrap, fast flicks, idle, hidden tab, stalls) and
   42 roll-up / validation checks against hand-computed numbers; the view rendered light, dark, empty and at phone width
   in headless Chrome. Not yet run against the live DB: the new endpoints — test after deploy.
+- 2026-09-15 — Phase 5: auto clean-up on upload (NO schema change). Every tour clip is tidied as it builds, only where
+  the measurement is clear: the drift direction is set from the footage (which way the camera pans), still footage
+  before the pan starts and after it stops is trimmed (a couple of still frames kept), and a shaky hand is steadied (the
+  frames are re-cropped by 1–6% along a smoothed path). Zooms, diagonals, cuts, featureless and screen-recorded clips
+  stay exactly as uploaded. The builder's drift card says what was done ("Auto clean-up: trimmed 1.2s of still footage ·
+  steadied the shake · direction set from the footage (→)"). Brand drifts and Rotation3D are untouched; env
+  `TOUR_CLIP_CLEANUP=off` turns it off. Cost: one extra small output in the same ffmpeg pass plus ~1s of planning that
+  yields to the API. Verified on synthetic pans cut from a real photo (all four directions; trims within a few frames;
+  jitter 10–20× lower with a 1.5% crop for 8px of shake) and through a real encode + extract (measured shake 0.71% →
+  0.10% of the frame); the three sample phone clips (screen recordings) were left as uploaded.
+- 2026-09-15 — Phase 7: reel download (NO schema change; brought forward ahead of shoot mode at the user's request).
+  Share sheet → "Reel": a vertical 1080×1920 video of the published tour — an intro card (cover, page, title), each drift
+  (up to 8) playing through over a blurred copy of itself with its name and a progress bar, an end card with the link
+  and a QR code, slide transitions, no audio. Made on the server's processing queue (a 3-drift reel: 16.7s of video,
+  3.7 MB, ~22s to render on the dev machine), kept until the tour changes ("Make a new reel"), downloadable, or shared
+  straight to an app from a phone. Verified: rendered from landscape, wide and portrait footage — 1080×1920, 30fps,
+  yuv420p, length = timeline, no audio; stills checked. Not yet run on the VPS: making, storing and downloading a reel —
+  test after deploy.

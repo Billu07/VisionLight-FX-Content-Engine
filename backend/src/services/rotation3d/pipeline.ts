@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { uploadManagedBuffer } from "../../utils/managedStorage";
 import { matteFrame } from "./matte";
+import { ANALYSIS_FILE, extractFramesForCleanup, planCleanup, steadyCropFor, type CleanupPlan, type CleanupReport } from "../driftCleanup";
 
 if (ffmpegStatic) ffmpeg.setFfmpegPath(ffmpegStatic);
 
@@ -35,6 +36,8 @@ export type SpinManifest = {
   /** content-aware player background: the frame's corner color if opaque, else
    * null (transparent frames → default gradient). */
   detectedBg?: string | null;
+  /** tour clips: what the auto clean-up did (services/driftCleanup.ts) */
+  cleanup?: CleanupReport;
 };
 
 // Sample a frame's top-left corner (the product's backdrop) → a CSS color if
@@ -208,6 +211,8 @@ export const buildSpinFromVideo = async (params: {
   removal?: "white" | "black" | "ai" | "none";
   /** storage namespace for frame keys (default "rotation3d"; "drift" for Drift). */
   keyNamespace?: string;
+  /** tour clips: trim still ends, steady shake, detect the pan direction (opaque frames only) */
+  cleanup?: boolean;
 }): Promise<SpinManifest> => {
   const targetCount = Math.min(180, Math.max(12, params.frameCount ?? 48));
   const removal = params.removal ?? "none";
@@ -222,13 +227,30 @@ export const buildSpinFromVideo = async (params: {
     if (!duration || duration <= 0) throw new Error("Could not read video duration");
 
     const fps = Math.max(0.1, targetCount / duration);
-    await extractFrames(params.videoPath, framesDir, fps, keyColor);
+    const cleanupOn = !!params.cleanup && removal === "none";
+    if (cleanupOn) await extractFramesForCleanup(params.videoPath, framesDir, fps);
+    else await extractFrames(params.videoPath, framesDir, fps, keyColor);
 
-    const files = (await fs.readdir(framesDir))
+    const extracted = (await fs.readdir(framesDir))
       .filter((f) => f.endsWith(".png"))
       .sort(); // f_0001, f_0002, … → rotation order
-    console.log(`[r3d] extracted ${files.length} frames (fps=${fps.toFixed(3)})`);
-    if (files.length === 0) throw new Error("No frames were extracted");
+    console.log(`[r3d] extracted ${extracted.length} frames (fps=${fps.toFixed(3)})`);
+    if (extracted.length === 0) throw new Error("No frames were extracted");
+
+    // Tour clips: plan the clean-up from the analysis copy. Any problem → the frames as extracted.
+    let plan: CleanupPlan | null = null;
+    if (cleanupOn) {
+      try {
+        plan = await planCleanup(await fs.readFile(path.join(framesDir, ANALYSIS_FILE)), extracted.length, fps);
+        console.log(`[r3d] clean-up product=${params.productId}: ${plan ? JSON.stringify(plan.report) : "analysis didn't line up — frames as extracted"}`);
+      } catch (err: any) {
+        console.warn(`[r3d] clean-up skipped for product=${params.productId}: ${err?.message || err}`);
+        plan = null;
+      }
+    }
+    const files = plan ? extracted.slice(plan.start, plan.end + 1) : extracted;
+    const steady = plan?.steady ?? null;
+    const frameSize = steady ? await sharp(path.join(framesDir, files[0])).metadata() : null;
 
     // Content-aware player background from a representative frame's corner.
     let detectedBg: string | null = null;
@@ -244,16 +266,20 @@ export const buildSpinFromVideo = async (params: {
     // Each frame → a full-res WebP and a lighter mobile WebP, both on R2.
     // Resizing from the already-extracted frame is cheap next to ffmpeg, so the
     // second variant adds little processing time while making phones much faster.
-    const pairs = await mapPool(files, UPLOAD_CONCURRENCY, async (file) => {
+    const pairs = await mapPool(files, UPLOAD_CONCURRENCY, async (file, index) => {
       const raw = await fs.readFile(path.join(framesDir, file));
       let input: Buffer = raw;
       if (removal === "ai") {
         const cut = await matteFrame(raw); // paid Fal matte, on demand only
         if (cut) { input = cut; aiCut++; }
       }
+      // A steadied tour clip: every frame re-cropped by the same small margin along the smooth path.
+      const region =
+        steady && frameSize?.width && frameSize?.height ? steadyCropFor(steady, index, frameSize.width, frameSize.height) : null;
+      const source = () => (region ? sharp(input).extract(region) : sharp(input));
       const [fullWebp, mobileWebp] = await Promise.all([
-        sharp(input).resize({ width: MAX_FRAME_WIDTH, withoutEnlargement: true }).webp({ quality: WEBP_QUALITY }).toBuffer(),
-        sharp(input).resize({ width: MOBILE_FRAME_WIDTH, withoutEnlargement: true }).webp({ quality: MOBILE_WEBP_QUALITY }).toBuffer(),
+        source().resize({ width: MAX_FRAME_WIDTH, withoutEnlargement: true }).webp({ quality: WEBP_QUALITY }).toBuffer(),
+        source().resize({ width: MOBILE_FRAME_WIDTH, withoutEnlargement: true }).webp({ quality: MOBILE_WEBP_QUALITY }).toBuffer(),
       ]);
       const [full, mobile] = await Promise.all([
         uploadManagedBuffer({ buffer: fullWebp, contentType: "image/webp", keyPrefix, fallbackExtension: "webp", cacheControl: FRAME_CACHE_CONTROL }),
@@ -274,6 +300,7 @@ export const buildSpinFromVideo = async (params: {
       defaultFrame: Math.round(frames.length / 12),
       width: MAX_FRAME_WIDTH,
       detectedBg,
+      ...(plan ? { cleanup: plan.report } : {}),
     };
   } finally {
     await fs.rm(framesDir, { recursive: true, force: true }).catch(() => undefined);

@@ -5,6 +5,7 @@ import { apiEndpoints } from "../lib/api";
 import { notify } from "../lib/notifications";
 import { apiError, copyText, publicUrl } from "./tourUi";
 import { PrintKit } from "./PrintKit";
+import { ReelSheet } from "./ReelSheet";
 import { PersonalLinks } from "./PersonalLinks";
 
 /** A QR code as an inline SVG (theme-coloured via currentColor). */
@@ -53,14 +54,15 @@ export function ShareSheet({
   const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   const [printOpen, setPrintOpen] = useState(false);
+  const [reelOpen, setReelOpen] = useState(false);
   const [ubPath, setUbPath] = useState<string | null>(flow.unbrandedPath ?? null);
   const [ubBusy, setUbBusy] = useState(false);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !printOpen && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !printOpen && !reelOpen && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, printOpen]);
+  }, [onClose, printOpen, reelOpen]);
 
   // The unbranded (MLS-safe) link: made the first time it's asked for, then kept.
   const ensureUnbranded = async (): Promise<string | null> => {
@@ -161,6 +163,15 @@ export function ShareSheet({
                   Open
                 </button>
               </div>
+              <div className="t-share-row">
+                <span className="grow">
+                  <b>Reel</b>
+                  <small>A vertical video of the tour for Instagram, TikTok and Shorts.</small>
+                </span>
+                <button type="button" className="d-btn sm" onClick={() => setReelOpen(true)}>
+                  Open
+                </button>
+              </div>
             </div>
           )}
           {canManageLinks && flow.status === "PUBLISHED" && <PersonalLinks flow={flow} />}
@@ -169,6 +180,7 @@ export function ShareSheet({
       {printOpen && (
         <PrintKit flow={flow} page={page} unbrandedPath={ubPath} ensureUnbranded={ensureUnbranded} onClose={() => setPrintOpen(false)} />
       )}
+      {reelOpen && <ReelSheet flow={flow} onClose={() => setReelOpen(false)} />}
     </>
   );
 }

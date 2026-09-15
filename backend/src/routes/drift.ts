@@ -188,8 +188,11 @@ export const processClip = (opts: {
   uploaderId: string | null;
   frameCount: number;
   removal: "white" | "black" | "ai" | "none";
+  /** tour clips: trim still ends, steady shake, detect the pan direction (env TOUR_CLIP_CLEANUP=off turns it off) */
+  cleanup?: boolean;
 }) => {
   const { clip, productId, orgId, videoPath, mimetype, uploaderId, frameCount, removal } = opts;
+  const cleanup = !!opts.cleanup && clip === "A" && process.env.TOUR_CLIP_CLEANUP !== "off";
   {
     const d = processingQueueDepth();
     console.log(
@@ -216,6 +219,7 @@ export const processClip = (opts: {
         frameCount,
         removal,
         keyNamespace: NS,
+        cleanup,
       });
 
       if (clip === "A") {
@@ -236,6 +240,8 @@ export const processClip = (opts: {
             status: "READY",
             defaultFrame: manifest.defaultFrame,
             background: existing?.background || (manifest.detectedBg ?? null),
+            // The clean-up measured which way the footage pans.
+            ...(manifest.cleanup?.direction ? { driftDirection: manifest.cleanup.direction } : {}),
           },
         });
         // A tour drift that just became viewable joins its tour's buttons.

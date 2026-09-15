@@ -30,6 +30,8 @@ export type StepProduct = {
   hostingExpiresAt: string | null;
   /** tour pins on this drift */
   pinCount?: number;
+  /** what the auto clean-up did to the clip (null when nothing) */
+  cleanup?: { trimmedS: number; steadied: boolean; direction: string | null } | null;
 };
 
 export type FlowStep = {
@@ -268,6 +270,19 @@ export type OwnerReport = {
   tour: { title: string; description: string | null; thumb: string | null };
   page: { name: string; logoUrl: string | null };
   insights: TourInsights;
+};
+
+/** A tour's reel (vertical video): none yet, rendering, ready or failed. */
+export type TourReel = {
+  status: "NONE" | "RENDERING" | "READY" | "FAILED";
+  url?: string | null;
+  seconds?: number | null;
+  renderedAt?: string | null;
+  /** the tour changed since this reel was made */
+  stale?: boolean;
+  error?: string | null;
+  /** drifts that go in it */
+  drifts: number;
 };
 
 export const isReady = (s?: string | null) => s === "READY" || s === "PUBLISHED";
