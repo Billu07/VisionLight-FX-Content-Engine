@@ -148,8 +148,10 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
   - Phones play `manifest.framesMobile` (1080px). Build every player manifest with
     `driftNav.combinedFrameSets()` so the mobile set is never dropped (it was: phones downloaded and
     decoded 180 × 2048px frames per drift → stutter).
-  - `driftNav` warms neighbours politely: ~900ms after a drift shows, 3 low-priority requests, the
-    device's frame set, coarse-only on data-saver/2G; pages prefetch a drift link with
+  - `driftNav` warms the next drift's WHOLE frame set (6 at a time, the device's set, coarse-only on
+    data-saver/2G) once the drift on screen has every frame: SpinViewer holds `holdForegroundLoad()` while
+    it loads (25s safety release). Tour drifts reveal only at 100% (20s fallback); brand drifts keep the
+    36-frame coarse reveal. Pages prefetch a drift link with
     `prefetchDriftPath` (pathway Start Tour + strips). The drift→drift crossfade copies the canvas to a
     second canvas — never `toDataURL()` (a main-thread PNG encode per swap).
   - Tour thumbnails use the mobile frame. New R2 frame / cover / logo / thumbnail uploads send
