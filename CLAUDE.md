@@ -261,6 +261,14 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   Player: `.r3d-pins` buttons positioned in `draw()` (excluded from drag via `isControl`). Builder: "Pins" on a
   ready drift → `tour/PinEditor.tsx`. Brand caption/thumbnail writes also refuse tour Editors/Viewers
   (`tourRoleReadOnly` in drift.ts).
+- **Enquiries + personal links** (2026-09-15): a page's enquiry button (`tourSettings.enquiries` {enabled, label,
+  askPhone}; `services/tourEnquirySettings.ts`, pure) shows on the page, the pathway and in the player (chip under the
+  tour titles → `DriftFormOverlay` with `enquiry`). `POST /api/drift/public/pages/:page/enquiries` (honeypot + per-IP
+  limit) → a `DriftLead` (formId null, `source.kind` "TOUR_ENQUIRY", tour / drift / link) + email `tour.enquiry.new` to
+  the page's Admins + Editors (reply-to = visitor); inbox `PageEnquiries` (`GET|DELETE /api/drift/my/page/enquiries`).
+  Personal links: `DriftShareLink` per tour (`…?to={token}`, `services/driftEnquiries.ts`); `rotation3d/personalLink.ts`
+  notes the token for the visit (open counted once, param dropped from the address) and the player tags VIEW events
+  `meta.link`; the share sheet's `PersonalLinks` shows opens / drifts seen / enquiries.
 - **Superadmin**: `X-Drift-Org` lets a superadmin act on any TOUR page ("Manage this page", `usePageAdmin`);
   back office = Admin → drift.li → Tour (`routes/driftTourAdmin.ts`, `DriftTourAdmin.tsx`).
 - **drift.li home** = `rotation3d/DriftHome.tsx` (2026-09-14 redesign per the client's `land.png`: the hero's

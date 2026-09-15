@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { apiEndpoints } from "../lib/api";
 import { track } from "./metaPixel";
 import type { FormDefinition, FormField } from "./DriftFormsManager";
+import { shareLinkFor } from "./personalLink";
 
 /**
  * The in-player lead form. A CTA with an attached form opens this over the
@@ -12,6 +13,23 @@ import type { FormDefinition, FormField } from "./DriftFormsManager";
 
 export type OverlayForm = { id: string; name: string; definition: FormDefinition };
 
+/** The fixed form behind a tour page's enquiry button ("Book a viewing", "Ask a question" …). */
+export function enquiryDefinition(e: { label: string; askPhone: boolean }): FormDefinition {
+  const fields: FormField[] = [
+    { key: "name", type: "text", label: "Your name", required: true },
+    { key: "email", type: "email", label: "Email", required: true },
+  ];
+  if (e.askPhone) fields.push({ key: "phone", type: "phone", label: "Phone (optional)" });
+  fields.push({ key: "message", type: "textarea", label: "Message (optional)", placeholder: "What would you like to know — or a good time to reach you" });
+  return {
+    multiStep: false,
+    steps: [{ title: e.label, fields }],
+    consent: { enabled: false, text: "" },
+    submitLabel: "Send",
+    successMessage: "Sent — they'll get back to you by email.",
+  };
+}
+
 export default function DriftFormOverlay({
   form,
   productId,
@@ -19,6 +37,7 @@ export default function DriftFormOverlay({
   which,
   accent,
   onClose,
+  enquiry,
 }: {
   form: OverlayForm;
   productId?: string;
@@ -26,6 +45,8 @@ export default function DriftFormOverlay({
   which: "primary" | "secondary";
   accent?: string | null;
   onClose: () => void;
+  /** a tour page's enquiry form: submits to the page's enquiries instead of a brand form */
+  enquiry?: { pageSlug: string; flowId?: string | null } | null;
 }) {
   const def = form.definition;
   const steps = def.steps?.length ? def.steps : [{ fields: [] }];
@@ -82,11 +103,21 @@ export default function DriftFormOverlay({
     try {
       const data: Record<string, any> = { ...values };
       if (def.consent?.enabled) data.__consent = true;
-      const r = await apiEndpoints.driftSubmitForm(form.id, {
-        data,
-        productId,
-        source: { drift: productName, cta: which },
-      });
+      const r = enquiry
+        ? await apiEndpoints.driftSubmitEnquiry(enquiry.pageSlug, {
+            name: values.name,
+            email: values.email,
+            phone: values.phone,
+            message: values.message,
+            flowId: enquiry.flowId || undefined,
+            productId,
+            link: shareLinkFor(enquiry.flowId) || undefined,
+          })
+        : await apiEndpoints.driftSubmitForm(form.id, {
+            data,
+            productId,
+            source: { drift: productName, cta: which },
+          });
       track("Lead", { content_name: productName });
       setDone(r.data?.successMessage || def.successMessage || "Thanks — we'll be in touch.");
     } catch (e: any) {

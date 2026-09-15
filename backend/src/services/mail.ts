@@ -535,6 +535,46 @@ export async function sendTourProJoinedEmail(params: {
   });
 }
 
+/** A visitor used a tour page's enquiry button: tell the page's Admins and Editors (reply goes to the visitor). */
+export async function sendTourEnquiryEmail(params: {
+  to: string[];
+  pageName: string;
+  button: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  message: string | null;
+  tour: string | null;
+  drift: string | null;
+  via: string | null;
+  url: string;
+}): Promise<void> {
+  if (!params.to.length) return;
+  const rows: Array<[string, string]> = [
+    ["Name", params.name],
+    ["Email", params.email],
+  ];
+  if (params.phone) rows.push(["Phone", params.phone]);
+  if (params.message) rows.push(["Message", params.message]);
+  if (params.tour) rows.push(["Tour", params.tour]);
+  if (params.drift) rows.push(["Drift", params.drift]);
+  if (params.via) rows.push(["Personal link", params.via]);
+  await sendTemplated("tour.enquiry.new", {
+    vars: {
+      pageName: params.pageName,
+      button: params.button,
+      visitorName: params.name,
+      visitorEmail: params.email,
+      tourName: params.tour || "",
+      viaLine: params.via ? `They opened the link you sent to ${params.via}.` : "",
+      url: params.url,
+    },
+    defaultTo: params.to,
+    rows,
+    replyTo: params.email,
+  });
+}
+
 /** Someone joined the View / Memory / Path wait list: tell the team. */
 export async function sendWaitlistNoticeEmail(params: { email: string; product: string }): Promise<void> {
   const product = params.product.charAt(0).toUpperCase() + params.product.slice(1).toLowerCase();

@@ -13,6 +13,16 @@ import { sendFlowCreatedNoticeEmail, sendFlowPublishedEmails, sendUpgradeNudgeEm
 import { billingSummary, confirmCheckoutSession, createFlowCheckout, storePendingClip } from "../services/driftBilling";
 import { MAX_PINS, ensurePinTrack, pinFrames, sanitizePins, serializePin } from "../services/driftPins";
 import {
+  createShareLink,
+  deleteEnquiry,
+  deleteShareLink,
+  listEnquiries,
+  listShareLinks,
+  openShareLink,
+  submitEnquiry,
+} from "../services/driftEnquiries";
+import { enquirySettingsOf, parseEnquirySettings } from "../services/tourEnquirySettings";
+import {
   createClientPage,
   createProInvite,
   listClientPages,
@@ -199,6 +209,7 @@ const serializePage = (org: any) => {
     contactLabel: label || null,
     contactUrl: url || null,
     demoFlowId: typeof s.demoFlowId === "string" && s.demoFlowId ? (s.demoFlowId as string) : null,
+    enquiries: enquirySettingsOf(s),
   };
 };
 
@@ -612,6 +623,7 @@ router.patch("/api/drift/my/page", authenticateToken, async (req: AuthenticatedR
     }
   }
   if ("logoUrl" in body && !body.logoUrl) settings.logoUrl = null;
+  if ("enquiries" in body) settings.enquiries = parseEnquirySettings(body.enquiries);
   data.tourSettings = settings;
 
   const updated = await prisma.organization.update({ where: { id: orgId }, data: data as any, select: PAGE_SELECT });
@@ -751,6 +763,88 @@ router.delete("/api/drift/my/page/members/:memberId", authenticateToken, async (
   } catch (err) {
     return handle(res, err);
   }
+});
+
+// ── Enquiries: the page's "Book a viewing" / "Ask a question" button ──
+// The visitor's IP for rate limiting: Cloudflare's / nginx's header first, then the first
+// X-Forwarded-For hop, then the socket.
+const clientIp = (req: AuthenticatedRequest) => {
+  const h = (name: string) => String(req.headers[name] || "").split(",")[0].trim();
+  return h("cf-connecting-ip") || h("x-real-ip") || h("x-forwarded-for") || req.ip || "unknown";
+};
+
+// A visitor sends an enquiry (public). Rate-limited per visitor; a honeypot field drops bots.
+router.post("/api/drift/public/pages/:page/enquiries", async (req: AuthenticatedRequest, res: Response) => {
+  const org = await findPublicPage(req.params.page);
+  if (!org) return res.status(404).json({ error: "Not found" });
+  try {
+    await submitEnquiry(org, {
+      body: req.body,
+      ip: clientIp(req),
+      referrer: typeof req.headers.referer === "string" ? req.headers.referer.slice(0, 300) : null,
+      ua: typeof req.headers["user-agent"] === "string" ? String(req.headers["user-agent"]).slice(0, 300) : null,
+    });
+    res.status(201).json({ ok: true });
+  } catch (err) {
+    return handle(res, err);
+  }
+});
+
+// The page team's enquiries, newest first (Editors and Admins).
+router.get("/api/drift/my/page/enquiries", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "EDIT");
+  if (!orgId) return;
+  res.json({ enquiries: await listEnquiries(orgId) });
+});
+
+router.delete("/api/drift/my/page/enquiries/:enquiryId", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "ADMIN");
+  if (!orgId) return;
+  try {
+    await deleteEnquiry(orgId, String(req.params.enquiryId || ""));
+    res.json({ ok: true });
+  } catch (err) {
+    return handle(res, err);
+  }
+});
+
+// ── Personal links: one link per person for a tour ──
+router.get("/api/drift/my/flows/:id/links", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "EDIT");
+  if (!orgId) return;
+  try {
+    res.json({ links: await listShareLinks(orgId, req.params.id) });
+  } catch (err) {
+    return handle(res, err);
+  }
+});
+
+router.post("/api/drift/my/flows/:id/links", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "EDIT");
+  if (!orgId) return;
+  try {
+    const link = await createShareLink({ orgId, flowId: req.params.id, label: req.body?.label, userId: req.user?.id || null });
+    res.status(201).json({ link });
+  } catch (err) {
+    return handle(res, err);
+  }
+});
+
+router.delete("/api/drift/my/flows/:id/links/:linkId", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "EDIT");
+  if (!orgId) return;
+  try {
+    await deleteShareLink(orgId, req.params.id, String(req.params.linkId || ""));
+    res.json({ ok: true });
+  } catch (err) {
+    return handle(res, err);
+  }
+});
+
+// A visit through a personal link (public): counts the open; an unknown link is ignored.
+router.post("/api/drift/public/links/:token/open", async (req: AuthenticatedRequest, res: Response) => {
+  const opened = await openShareLink(String(req.params.token || "")).catch(() => null);
+  res.json(opened ? { ok: true, flowId: opened.flowId } : { ok: false });
 });
 
 // A page, publicly: its name/logo/contact, the demo, and its Featured tours

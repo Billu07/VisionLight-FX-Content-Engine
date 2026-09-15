@@ -103,6 +103,7 @@ model Organization {
   driftFlows        DriftFlow[]
   driftTourOrders   DriftTourOrder[]
   driftTourInvites  DriftTourInvite[]
+  driftShareLinks   DriftShareLink[]
 }
 
 model User {
@@ -791,9 +792,31 @@ model DriftFlow {
 
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   steps        DriftFlowStep[]
+  shareLinks   DriftShareLink[]
 
   @@unique([kind, slug])
   @@index([organizationId, kind])
+}
+
+// A personal link for one tour, sent to one person (…?to={token}): the page team sees when
+// they open it and which drifts they viewed (DriftEvent meta.link); their enquiries carry it.
+model DriftShareLink {
+  id              String    @id @default(uuid())
+  organizationId  String
+  flowId          String
+  token           String    @unique
+  label           String // who it's for, e.g. "Sam Carter"
+  createdByUserId String?
+  opens           Int       @default(0)
+  firstOpenedAt   DateTime?
+  lastOpenedAt    DateTime?
+  createdAt       DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  flow         DriftFlow    @relation(fields: [flowId], references: [id], onDelete: Cascade)
+
+  @@index([flowId])
+  @@index([organizationId])
 }
 
 // One stop on a flow. Exactly one target is set per stepType. `order` is the

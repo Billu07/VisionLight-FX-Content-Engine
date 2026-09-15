@@ -7,6 +7,8 @@ import { TOUR_PAGE_STYLES } from "./tourPageStyles";
 import { ContactButton } from "./tourPageParts";
 import { usePageAdmin } from "./usePageAdmin";
 import { prefetchDriftPath } from "../rotation3d/driftNav";
+import { captureShareLink } from "../rotation3d/personalLink";
+import { EnquiryButton } from "./EnquirySheet";
 import { lazyRoute } from "../lib/lazyRoute";
 
 // The builder is for page admins only — visitors never download it.
@@ -38,13 +40,20 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
     if (first) prefetchDriftPath(first.playerPath, { full: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [first?.playerPath]);
+  // Opened through a personal link (?to=…): note it for this visit.
+  useEffect(() => {
+    captureShareLink();
+  }, []);
   return (
     <div className="tpw t-rise">
       <div className="tpw-top">
         <Link className="t-back" to={home}>
           ← {page.name} Tours
         </Link>
-        <ContactButton page={page} className="d-btn sm" />
+        <span className="t-inline">
+          <EnquiryButton page={page} flowId={flow.id} className="d-btn primary sm" />
+          <ContactButton page={page} className="d-btn sm" />
+        </span>
       </div>
       <Link to={home} className="tpw-brand">
         {page.logoUrl ? <img src={page.logoUrl} alt="" /> : null}
@@ -87,6 +96,7 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
       </ol>
 
       <div className="tpw-foot">
+        <EnquiryButton page={page} flowId={flow.id} />
         <ContactButton page={page} />
       </div>
     </div>

@@ -1255,7 +1255,9 @@ export default function TourBuilder({
           </button>
         </div>
       )}
-      {share !== "none" && <ShareSheet flow={flow} celebrate={share === "celebrate"} onClose={() => setShare("none")} />}
+      {share !== "none" && (
+        <ShareSheet flow={flow} celebrate={share === "celebrate"} onClose={() => setShare("none")} canManageLinks={!readOnly} />
+      )}
       {pinStep && (
         <PinEditor
           key={pinStep.id}

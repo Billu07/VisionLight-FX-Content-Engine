@@ -2,7 +2,7 @@ import { holdForegroundLoad } from "./driftNav";
 import { pinPlacement, type PinTrack, type SpinPin } from "./pins";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { getPlayerBranding } from "../lib/branding";
-import DriftFormOverlay, { type OverlayForm } from "./DriftFormOverlay";
+import DriftFormOverlay, { type OverlayForm, enquiryDefinition } from "./DriftFormOverlay";
 
 /**
  * Rotation3D — reusable interactive 360° spin viewer.
@@ -60,6 +60,9 @@ export type FlowNav = {
   entryPath: string | null;
   thumb: string | null;
   endCta?: { label: string; url: string } | null;
+  /** the page's enquiry button ("Book a viewing" …); null while it's switched off */
+  enquiry?: { label: string; askPhone: boolean } | null;
+  pageSlug?: string | null;
   stops: FlowNavStop[];
   index: number;
 };
@@ -1092,6 +1095,7 @@ export default function SpinViewer({
       (t.closest(".r3d-iconbtn") ||
         t.closest(".r3d-cta") ||
         t.closest(".r3d-pin") ||
+        t.closest(".r3d-enquire") ||
         t.closest(".r3d-powered-badge") ||
         t.closest(".r3d-thumbs") ||
         t.closest(".r3d-media"));
@@ -1669,6 +1673,7 @@ export default function SpinViewer({
     }
   };
   const [activeForm, setActiveForm] = useState<{ form: OverlayForm; which: "primary" | "secondary" } | null>(null);
+  const [enquiryOpen, setEnquiryOpen] = useState(false);
   // Jump to another drift of the tour (in-app when the host allows it).
   const goStop = (s: FlowNavStop, i: number) => {
     if (flowNav && i === flowNav.index) return;
@@ -1704,6 +1709,11 @@ export default function SpinViewer({
             <div className="r3d-kicker">{brandName}</div>
             {driftMode && flowNav && <div className="r3d-tourline">{flowNav.title || flowNav.name}</div>}
             <div className="r3d-name">{productName}</div>
+            {driftMode && flowNav?.enquiry && flowNav.pageSlug && (
+              <button type="button" className="r3d-enquire" onClick={() => setEnquiryOpen(true)}>
+                {flowNav.enquiry.label}
+              </button>
+            )}
           </div>
         </div>
         <div className="r3d-tools">
@@ -1857,6 +1867,18 @@ export default function SpinViewer({
           productName={productName}
           accent={primaryColor}
           onClose={() => setActiveForm(null)}
+        />
+      )}
+
+      {enquiryOpen && flowNav?.enquiry && flowNav.pageSlug && (
+        <DriftFormOverlay
+          form={{ id: "enquiry", name: flowNav.enquiry.label, definition: enquiryDefinition(flowNav.enquiry) }}
+          which="primary"
+          productId={productId}
+          productName={productName}
+          accent={primaryColor}
+          enquiry={{ pageSlug: flowNav.pageSlug, flowId: flowNav.id }}
+          onClose={() => setEnquiryOpen(false)}
         />
       )}
 
@@ -2112,6 +2134,12 @@ const R3D_CSS = `
 .r3d-pin:focus-visible{outline:none}
 .r3d-pin:focus-visible .r3d-pin-dot::before{box-shadow:0 0 0 3px #fff,0 0 0 6px var(--r3d-primary,#22d3ee)}
 @media (prefers-reduced-motion:reduce){.r3d-pin-dot::after{animation:none}}
+/* Tour enquiry chip ("Book a viewing"): under the tour titles; opens the enquiry form. */
+.r3d-enquire{display:inline-flex;align-items:center;gap:7px;margin-top:8px;padding:6px 12px 6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.28);background:rgba(11,15,25,.45);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);color:#fff;font:inherit;font-size:clamp(11.5px,3.2vmin,13px);font-weight:700;line-height:1.2;cursor:pointer;pointer-events:auto;max-width:min(60vw,280px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .2s,border-color .2s}
+.r3d-enquire::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:var(--r3d-primary,#22d3ee);box-shadow:0 0 0 3px rgba(34,211,238,.22)}
+.r3d-enquire:hover{background:rgba(11,15,25,.65);border-color:rgba(255,255,255,.45)}
+.r3d-enquire:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.r3d-light .r3d-enquire{background:rgba(255,255,255,.72);border-color:rgba(0,0,0,.12);color:#0b0f19}
 @media (prefers-reduced-motion:reduce){.r3d-intro-ring{animation:none}}
 /* Drift: "Powered By Drift Live Interactive" sits UNDER the player, above the CTA, a bit bigger. */
 .r3d-drift .r3d-powered-badge{top:auto;bottom:calc(36px + env(safe-area-inset-bottom));font-size:clamp(10px,3vmin,12px)}

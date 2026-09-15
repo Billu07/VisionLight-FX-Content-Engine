@@ -101,6 +101,8 @@ export type Page = {
   contactLabel: string | null;
   contactUrl: string | null;
   demoFlowId: string | null;
+  /** the enquiry button ("Book a viewing" …) */
+  enquiries?: { enabled: boolean; label: string; askPhone: boolean };
 };
 
 /** A page reference (a client page, the Pro page managing one, an invite's page). */
@@ -135,6 +137,35 @@ export type TourInvite = {
   status: "PENDING" | "ACCEPTED" | "EXPIRED" | string;
   createdAt: string;
   acceptedAt: string | null;
+};
+
+/** A visitor's enquiry (the page's enquiry button). */
+export type Enquiry = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  message: string | null;
+  button: string | null;
+  tour: string | null;
+  drift: string | null;
+  /** the personal link it came through */
+  via: string | null;
+  createdAt: string;
+};
+
+/** A personal link for one tour, sent to one person — with what they did. */
+export type ShareLink = {
+  id: string;
+  label: string;
+  token: string;
+  opens: number;
+  firstOpenedAt: string | null;
+  lastOpenedAt: string | null;
+  driftsSeen: number;
+  drifts: number;
+  enquiries: number;
+  createdAt: string;
 };
 
 /** "View Demo": the page's own demo tour, or drift.li's. */

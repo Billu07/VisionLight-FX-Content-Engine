@@ -3,6 +3,7 @@ import qrcode from "qrcode-generator";
 import type { Flow } from "./types";
 import { notify } from "../lib/notifications";
 import { copyText, publicUrl } from "./tourUi";
+import { PersonalLinks } from "./PersonalLinks";
 
 /** A QR code as an inline SVG (theme-coloured via currentColor). */
 function QrSvg({ text, size }: { text: string; size: number }) {
@@ -29,7 +30,18 @@ function QrSvg({ text, size }: { text: string; size: number }) {
  * ring, the link with copy, a QR code to open the tour on a phone, and the
  * system share sheet where the browser has one.
  */
-export function ShareSheet({ flow, celebrate, onClose }: { flow: Flow; celebrate: boolean; onClose: () => void }) {
+export function ShareSheet({
+  flow,
+  celebrate,
+  onClose,
+  canManageLinks = false,
+}: {
+  flow: Flow;
+  celebrate: boolean;
+  onClose: () => void;
+  /** Editors and Admins: personal links per person */
+  canManageLinks?: boolean;
+}) {
   const link = publicUrl(flow.publicPath);
   const short = link.replace(/^https?:\/\//, "");
   const [copied, setCopied] = useState(false);
@@ -57,7 +69,7 @@ export function ShareSheet({ flow, celebrate, onClose }: { flow: Flow; celebrate
 
   return (
     <div className="t-sheet" onClick={onClose} role="dialog" aria-modal aria-label="Share this tour">
-      <div className="t-sheet-card" onClick={(e) => e.stopPropagation()}>
+      <div className="t-sheet-card t-share-card" onClick={(e) => e.stopPropagation()}>
         <button type="button" className="t-sheet-x" onClick={onClose} aria-label="Close">
           ×
         </button>
@@ -96,6 +108,7 @@ export function ShareSheet({ flow, celebrate, onClose }: { flow: Flow; celebrate
             </div>
           </div>
         </div>
+        {canManageLinks && flow.status === "PUBLISHED" && <PersonalLinks flow={flow} />}
       </div>
     </div>
   );

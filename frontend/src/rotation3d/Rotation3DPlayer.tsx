@@ -5,6 +5,7 @@ import { apiEndpoints } from "../lib/api";
 import { isSpinPlayerSite, isDriftSite, getPlayerBranding } from "../lib/branding";
 import { initMetaPixel, track } from "./metaPixel";
 import { resolveDriftTarget, prefetchDriftTargets, getCachedDrift, cacheDrift, driftKey, flowDriftKey, targetKey, combinedFrameSets } from "./driftNav";
+import { captureShareLink, shareLinkFor } from "./personalLink";
 
 /**
  * Public Rotation3D player (rotation3d.com/p/:id and /embed/:id). Fetches the
@@ -160,6 +161,16 @@ export default function Rotation3DPlayer() {
     ? apiEndpoints.driftPublicBrandProduct
     : apiEndpoints.r3dPublicBrandProduct;
   const trackEvent = drift ? apiEndpoints.driftTrackEvent : apiEndpoints.r3dTrackEvent;
+  // A visit through a tour's personal link (?to=…) tags that tour's views, so the team sees
+  // how much the person explored.
+  const viewMeta = (p: any) => {
+    const link = drift ? shareLinkFor(p?.flow?.id) : null;
+    return link ? { link } : undefined;
+  };
+  useEffect(() => {
+    if (drift) captureShareLink();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const navigate = useNavigate();
   const location = useLocation();
   // The drift currently being shown. Keeping this (and the SpinViewer below) MOUNTED
@@ -204,7 +215,7 @@ export default function Rotation3DPlayer() {
       // without a loader — the player element stays mounted, so fullscreen holds.
       setData(cached);
       setError(undefined);
-      if (cached?.id) trackEvent(cached.id, "VIEW").catch(() => undefined);
+      if (cached?.id) trackEvent(cached.id, "VIEW", viewMeta(cached)).catch(() => undefined);
       prefetchNeighbors(cached);
       adoptReadableUrl(cached);
       return () => {
@@ -227,7 +238,7 @@ export default function Rotation3DPlayer() {
         cacheDrift(cacheKey, d);
         setData(d);
         setError(undefined);
-        if (d?.id) trackEvent(d.id, "VIEW").catch(() => undefined);
+        if (d?.id) trackEvent(d.id, "VIEW", viewMeta(d)).catch(() => undefined);
         prefetchNeighbors(d);
         adoptReadableUrl(d);
       })

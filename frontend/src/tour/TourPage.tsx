@@ -12,6 +12,8 @@ import { usePageAdmin } from "./usePageAdmin";
 import { PagePeople, leavePage } from "./PagePeople";
 import { canEditPage, isPageAdmin } from "./pageRoles";
 import { invalidateMyPages } from "./myPages";
+import { EnquiryButton } from "./EnquirySheet";
+import { PageEnquiries } from "./PageEnquiries";
 
 /**
  * drift.li/tour/{page} — a page is both its admin and its public view. Visitors see the
@@ -37,6 +39,7 @@ type TourItem = {
 };
 
 const VIEW_KEY = "drift_page_view";
+const ENQUIRY_PRESETS = ["Book a viewing", "Ask a question", "Request info", "Get a quote"];
 
 const fromPublic = (f: PublicFlow): TourItem => ({
   id: f.id,
@@ -191,6 +194,9 @@ function PageSettings({
   const [contactLabel, setContactLabel] = useState(page.contactLabel || "");
   const [contactUrl, setContactUrl] = useState(page.contactUrl || "");
   const [demoFlowId, setDemoFlowId] = useState(page.demoFlowId || "");
+  const [enqOn, setEnqOn] = useState(!!page.enquiries?.enabled);
+  const [enqLabel, setEnqLabel] = useState(page.enquiries?.label || "Book a viewing");
+  const [enqPhone, setEnqPhone] = useState(!!page.enquiries?.askPhone);
   const [saving, setSaving] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
   const logoRef = useRef<HTMLInputElement>(null);
@@ -199,7 +205,10 @@ function PageSettings({
     name.trim() !== page.name ||
     contactLabel.trim() !== (page.contactLabel || "") ||
     contactUrl.trim() !== (page.contactUrl || "") ||
-    demoFlowId !== (page.demoFlowId || "");
+    demoFlowId !== (page.demoFlowId || "") ||
+    enqOn !== !!page.enquiries?.enabled ||
+    (enqLabel.trim() || "Book a viewing") !== (page.enquiries?.label || "Book a viewing") ||
+    enqPhone !== !!page.enquiries?.askPhone;
 
   const save = async () => {
     if (!name.trim()) return notify.error("Give your page a name");
@@ -210,6 +219,7 @@ function PageSettings({
         contactLabel: contactLabel.trim() || null,
         contactUrl: contactUrl.trim() || null,
         demoFlowId: demoFlowId || null,
+        enquiries: { enabled: enqOn, label: enqLabel.trim() || "Book a viewing", askPhone: enqPhone },
       });
       onSaved(r.data.page, r.data.demo ?? null);
       notify.success("Page saved");
@@ -322,6 +332,31 @@ function PageSettings({
             inputMode="url"
           />
         </div>
+      </div>
+      <div className="tpg-enq">
+        <label className="tpg-check">
+          <input type="checkbox" checked={enqOn} onChange={(e) => setEnqOn(e.target.checked)} />
+          <span>
+            <b>Enquiry button</b>
+            <small>On your page, your tours and every drift. Visitors send their name, email and a message straight to you.</small>
+          </span>
+        </label>
+        {enqOn && (
+          <div className="tpg-enq-body">
+            <div className="t-inline">
+              {ENQUIRY_PRESETS.map((l) => (
+                <button key={l} type="button" className={`d-btn sm ${(enqLabel.trim() || "Book a viewing") === l ? "soft" : ""}`} onClick={() => setEnqLabel(l)}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            <input className="d-input" value={enqLabel} onChange={(e) => setEnqLabel(e.target.value)} maxLength={28} placeholder="Button label" aria-label="Enquiry button label" />
+            <label className="tpg-check sm">
+              <input type="checkbox" checked={enqPhone} onChange={(e) => setEnqPhone(e.target.checked)} />
+              <span>Ask for a phone number</span>
+            </label>
+          </div>
+        )}
       </div>
       <div style={{ marginTop: 14 }}>
         <div className="d-label">Account type</div>
@@ -745,6 +780,7 @@ export default function TourPage() {
                 ▶ View Demo
               </Link>
             )}
+            {!editing && <EnquiryButton page={page} />}
             <ContactButton page={page} />
             {canAdmin && (
               <button className="d-btn ghost" onClick={() => setShowSettings((v) => !v)}>
@@ -844,6 +880,21 @@ export default function TourPage() {
           <TourCards items={featured} renderActions={editing ? adminActions : undefined} />
         )}
       </section>
+
+      {canEdit && (
+        <PageEnquiries
+          page={page}
+          canDelete={canAdmin}
+          onSetUp={
+            canAdmin
+              ? () => {
+                  setShowSettings(true);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }
+              : undefined
+          }
+        />
+      )}
 
       {canAdmin && page.accountType === "PRO" && <ClientPages />}
 

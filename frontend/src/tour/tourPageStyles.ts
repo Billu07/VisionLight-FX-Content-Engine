@@ -132,4 +132,36 @@ export const TOUR_PAGE_STYLES = `
 .tpg-invite-form{display:flex;flex-wrap:wrap;gap:8px}
 .tpg-invite-form .d-input{flex:1 1 200px;width:auto}
 .tpg-role-help{font-size:11.5px;margin-top:6px}
+/* Enquiry button settings + the enquiry form */
+.tpg-enq{margin-top:16px;padding:12px 14px;border-radius:14px;border:1px solid var(--border);background:var(--surface-2);display:grid;gap:10px}
+.tpg-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13.5px;color:var(--text)}
+.tpg-check input{margin-top:3px;width:16px;height:16px;flex:none;accent-color:var(--accent)}
+.tpg-check span{display:grid;gap:2px}
+.tpg-check small{font-size:12px;color:var(--muted);line-height:1.4}
+.tpg-check.sm{align-items:center;font-size:13px}
+.tpg-check.sm input{margin-top:0}
+.tpg-enq-body{display:grid;gap:8px;padding-left:26px}
+.tpg-enq-form{display:grid;gap:12px}
+.tpg-hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none}
+.tpg-enq-done{display:grid;gap:8px;justify-items:center;text-align:center;padding:10px 0}
+.tpg-enq-tick{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;font-size:24px;background:var(--ok-soft);color:var(--ok);border:1px solid var(--ok-border)}
+/* Enquiries inbox */
+.tpg-enquiries{display:grid;gap:10px}
+.tpg-enquiry{display:grid;gap:6px;padding:14px 16px;border-radius:16px;border:1px solid var(--border);background:var(--surface)}
+.tpg-enquiry-top{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px}
+.tpg-enquiry-top b{font-size:15px;color:var(--text)}
+.tpg-enquiry-contact{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px}
+.tpg-enquiry-contact a{color:var(--accent);text-decoration:none;font-weight:650;overflow-wrap:anywhere}
+.tpg-enquiry-msg{margin:0;font-size:13.5px;line-height:1.5;color:var(--text);white-space:pre-wrap;overflow-wrap:anywhere}
+.tpg-enquiry-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-size:12px;color:var(--faint)}
+/* Personal links (share sheet) */
+.t-sheet-card.t-share-card{max-height:92dvh;overflow:auto}
+.t-links{display:grid;gap:10px;padding-top:14px;border-top:1px solid var(--border)}
+.t-links-form{display:flex;flex-wrap:wrap;gap:8px}
+.t-links-form .d-input{flex:1 1 180px;width:auto}
+.t-link-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 12px;border-radius:14px;border:1px solid var(--border);background:var(--surface-2)}
+.t-link-row .grow{flex:1 1 160px;min-width:0;display:grid;gap:2px}
+.t-link-row b{font-size:13.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t-link-row small{font-size:12px;color:var(--muted)}
+.t-link-row small.on{color:var(--ok)}
 `;

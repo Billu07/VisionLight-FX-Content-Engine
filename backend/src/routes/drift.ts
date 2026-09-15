@@ -16,6 +16,7 @@ import { IMMUTABLE_CACHE_CONTROL, uploadManagedBuffer } from "../utils/managedSt
 import { buildSpinFromVideo } from "../services/rotation3d/pipeline";
 import { enqueueProcessing, processingQueueDepth } from "../services/rotation3d/processingQueue";
 import { publicPins } from "../services/driftPins";
+import { publicEnquiry } from "../services/tourEnquirySettings";
 import { buildShareCard } from "../services/rotation3d/shareCard";
 import { streamDriftExportZip, renderCaptionedFramePng } from "../services/driftExport";
 import {
@@ -1038,6 +1039,8 @@ const flowNavPayload = (p: any) => {
     pageSlug,
     pageName: f.organization?.name ?? null,
     pagePath: pageSlug ? pagePublicPath(pageSlug, kind) : null,
+    // the page's enquiry button (null while it's off)
+    enquiry: publicEnquiry(f.organization?.tourSettings),
     publicPath: flowPublicPath(kind, pageSlug, f.slug),
     entryPath: stops[0]?.playerPath ?? null,
     thumb: f.coverUrl || stops[0]?.thumb || null,

@@ -475,6 +475,16 @@ export const apiEndpoints = {
   driftPublicForm: (id: string) => api.get(`/api/drift/public/forms/${id}`),
   driftSubmitForm: (id: string, payload: Record<string, unknown>) =>
     api.post(`/api/drift/public/forms/${id}/submit`, payload),
+  // tour enquiries + personal links
+  driftSubmitEnquiry: (page: string, payload: Record<string, unknown>) =>
+    api.post(`/api/drift/public/pages/${encodeURIComponent(page)}/enquiries`, payload),
+  driftPageEnquiries: () => api.get("/api/drift/my/page/enquiries"),
+  driftDeleteEnquiry: (id: string) => api.delete(`/api/drift/my/page/enquiries/${encodeURIComponent(id)}`),
+  driftFlowLinks: (id: string) => api.get(`/api/drift/my/flows/${id}/links`),
+  driftCreateFlowLink: (id: string, label: string) => api.post(`/api/drift/my/flows/${id}/links`, { label }),
+  driftDeleteFlowLink: (id: string, linkId: string) =>
+    api.delete(`/api/drift/my/flows/${id}/links/${encodeURIComponent(linkId)}`),
+  driftOpenShareLink: (token: string) => api.post(`/api/drift/public/links/${encodeURIComponent(token)}/open`),
 
   // Brand-level drift settings (Meta Pixel default).
   driftBrandSettings: () => api.get("/api/drift/my/brand-settings"),
