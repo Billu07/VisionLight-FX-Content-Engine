@@ -236,7 +236,17 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   `hostingExpiresAt` +1y (not enforced yet) → processed. Env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
   optional `TOUR_DRIFT_PRICE_CENTS`/`TOUR_CURRENCY`. Superadmin = COMP, no clip limit.
 - **Accounts** (`services/driftTourAccounts.ts`): `tourAccountType` GENERAL | PRO; Pro "Client Pages"
-  (org with `managedByOrgId` + ADMIN profile for the Pro); "Invite a Pro" one-time links.
+  (org with `managedByOrgId` + an Admin profile for the Pro); page invites (one-time links with a role).
+- **Page roles** (2026-09-15): a member = a User profile in the page's org; `User.tourRole` ADMIN | EDITOR |
+  VIEWER (null = ADMIN for pre-roles rows; `User.role` mirrors it — ADMIN, else USER). Enforced server-side:
+  `driftFlows.requirePage(req, res, "VIEW" | "EDIT" | "ADMIN")` on every creator route (Viewers read; Editors
+  build, publish, check out; Admins also page settings, People, client pages, deleting tours) and drift.ts
+  `requireOrg` keeps the brand tools read-only for Editors/Viewers. The session user carries `tourRole`
+  (`AuthService.toSessionUser`) — a new creator route must use `requirePage`, never bare `requireOrg`. People:
+  `GET /api/drift/my/page/people`, `PATCH|DELETE /api/drift/my/page/members/:id` (last admin protected; deleting
+  yourself = Leave page; when nobody from the managing Pro page is left, `managedByOrgId` clears).
+  `GET /api/drift/creator/pages` = the login's pages (`home` = its own page) for the header `PageSwitcher` and
+  `/tour/dashboard`. UI: `PagePeople` in page settings, a view-only `TourBuilder` for Viewers.
 - **Superadmin**: `X-Drift-Org` lets a superadmin act on any TOUR page ("Manage this page", `usePageAdmin`);
   back office = Admin → drift.li → Tour (`routes/driftTourAdmin.ts`, `DriftTourAdmin.tsx`).
 - **drift.li home** = `rotation3d/DriftHome.tsx` (2026-09-14 redesign per the client's `land.png`: the hero's

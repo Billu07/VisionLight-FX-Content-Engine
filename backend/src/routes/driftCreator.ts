@@ -6,7 +6,7 @@ import {
   provisionCreator,
 } from "../services/driftCreator";
 import { FlowError } from "../services/driftFlows";
-import { acceptProInvite, describeInvite, parseAccountType } from "../services/driftTourAccounts";
+import { acceptProInvite, describeInvite, listIdentityPages, parseAccountType } from "../services/driftTourAccounts";
 
 // Creator-account routes for the drift.li creator suite. These operate on the
 // signed-in IDENTITY (not a chosen workspace), so the auth middleware lets them
@@ -62,7 +62,14 @@ router.get("/api/drift/creator/profile", authenticateToken, async (req: Authenti
   });
 });
 
-// "Invite a Pro": what the invite link shows before anyone signs in.
+// The tour pages this login can open, its own page first (the page switcher + Dashboard).
+router.get("/api/drift/creator/pages", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const id = identityOf(req);
+  if (!id.email) return res.json({ pages: [] });
+  res.json({ pages: await listIdentityPages({ authUserId: id.authUserId || null, email: id.email }) });
+});
+
+// A page invite: what the link shows before anyone signs in.
 router.get("/api/drift/public/tour-invites/:token", async (req: AuthenticatedRequest, res: Response) => {
   try {
     res.json({ invite: await describeInvite(String(req.params.token || "")) });

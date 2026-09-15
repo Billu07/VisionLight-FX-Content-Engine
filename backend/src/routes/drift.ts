@@ -735,6 +735,13 @@ const requireOrg = (req: AuthenticatedRequest, res: Response): string | null => 
     res.status(403).json({ error: "No organization on this account" });
     return null;
   }
+  // Tour page Editors and Viewers work through the creator API (driftFlows checks their
+  // role); for them these brand tools are read-only.
+  const tourRole = req.user?.tourRole;
+  if (tourRole && tourRole !== "ADMIN" && req.user?.role !== "SUPERADMIN" && !["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+    res.status(403).json({ error: "Your role on this page can't make that change.", code: "PAGE_ROLE" });
+    return null;
+  }
   return orgId;
 };
 

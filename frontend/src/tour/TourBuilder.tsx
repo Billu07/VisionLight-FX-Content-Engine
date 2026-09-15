@@ -3,7 +3,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import { confirmAction, notify } from "../lib/notifications";
 import { useAuth } from "../hooks/useAuth";
-import type { Billing, Flow, FlowStep, Page, Quota } from "./types";
+import type { Billing, Flow, FlowStep, Page, PageRole, Quota } from "./types";
+import { canEditPage } from "./pageRoles";
 import { isReady } from "./types";
 import { ShareSheet } from "./ShareSheet";
 import { CAPTURE_GUIDE_SEEN_KEY, CaptureGuideSheet } from "./CaptureGuide";
@@ -16,7 +17,7 @@ import { TOUR_PAGE_STYLES } from "./tourPageStyles";
  * — name it, set its background and drift direction, reorder, publish. Every drift's
  * buttons are fixed and derived from the order (Home + the next drift's name; the last
  * one loops back to #1), so nothing here can break the path. Desktop shows a live
- * preview of the selected drift.
+ * preview of the selected drift. A page Viewer gets the same view without the controls.
  */
 
 const DIRECTIONS = [
@@ -92,6 +93,7 @@ function StepCard({
   onSelect,
   onChanged,
   maxClip,
+  readOnly = false,
 }: {
   flow: Flow;
   step: FlowStep;
@@ -100,6 +102,7 @@ function StepCard({
   onSelect: () => void;
   onChanged: (flow: Flow) => void;
   maxClip: number | null;
+  readOnly?: boolean;
 }) {
   const p = step.product;
   const [name, setName] = useState(p?.name || "");
@@ -221,7 +224,7 @@ function StepCard({
         {p?.hostingExpiresAt && (
           <div className="d-faint t-tip">Hosted until {new Date(p.hostingExpiresAt).toLocaleDateString()}</div>
         )}
-        {(status === "FAILED" || status === "AWAITING_PAYMENT" || isReady(status)) && (
+        {!readOnly && (status === "FAILED" || status === "AWAITING_PAYMENT" || isReady(status)) && (
           <div>
             <input
               ref={fileRef}
@@ -262,38 +265,45 @@ function StepCard({
                 placeholder={`Drift ${index + 1}`}
                 maxLength={120}
                 aria-label="Drift name"
+                readOnly={readOnly}
               />
-              <button
-                type="button"
-                className="t-pencil"
-                title="Rename this drift"
-                aria-label="Rename this drift"
-                onClick={() => {
-                  nameRef.current?.focus();
-                  nameRef.current?.select();
-                }}
-              >
-                <PencilIcon />
-              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  className="t-pencil"
+                  title="Rename this drift"
+                  aria-label="Rename this drift"
+                  onClick={() => {
+                    nameRef.current?.focus();
+                    nameRef.current?.select();
+                  }}
+                >
+                  <PencilIcon />
+                </button>
+              )}
             </div>
           </div>
           <div className="t-actions">
-            <span className="t-arrows">
-              <button className="d-btn sm" onClick={() => move(-1)} disabled={index === 0} title="Move up" aria-label="Move up">
-                ↑
-              </button>
-              <button className="d-btn sm" onClick={() => move(1)} disabled={index === flow.steps.length - 1} title="Move down" aria-label="Move down">
-                ↓
-              </button>
-            </span>
+            {!readOnly && (
+              <span className="t-arrows">
+                <button className="d-btn sm" onClick={() => move(-1)} disabled={index === 0} title="Move up" aria-label="Move up">
+                  ↑
+                </button>
+                <button className="d-btn sm" onClick={() => move(1)} disabled={index === flow.steps.length - 1} title="Move down" aria-label="Move down">
+                  ↓
+                </button>
+              </span>
+            )}
             {p?.playerPath && isReady(status) && (
               <a className="d-btn ghost sm" href={p.playerPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
                 Open
               </a>
             )}
-            <button className="d-btn ghost sm" onClick={remove}>
-              Remove
-            </button>
+            {!readOnly && (
+              <button className="d-btn ghost sm" onClick={remove}>
+                Remove
+              </button>
+            )}
           </div>
         </div>
 
@@ -306,12 +316,13 @@ function StepCard({
                 value={/^#[0-9a-f]{6}$/i.test(bg) ? bg : "#101418"}
                 onChange={(e) => setBg(e.target.value)}
                 aria-label="Background colour"
+                disabled={readOnly}
               />
-              <button className={`d-btn sm ${bg === "transparent" ? "soft" : ""}`} onClick={() => setBg(bg === "transparent" ? "" : "transparent")}>
+              <button className={`d-btn sm ${bg === "transparent" ? "soft" : ""}`} onClick={() => setBg(bg === "transparent" ? "" : "transparent")} disabled={readOnly}>
                 Transparent
               </button>
               {bg && (
-                <button className="d-btn ghost sm" onClick={() => setBg("")}>
+                <button className="d-btn ghost sm" onClick={() => setBg("")} disabled={readOnly}>
                   Auto
                 </button>
               )}
@@ -329,6 +340,7 @@ function StepCard({
                   className={`t-seg-btn ${direction === d.value ? "on" : ""}`}
                   onClick={() => setDirection(d.value)}
                   title={d.title}
+                  disabled={readOnly}
                 >
                   {d.glyph}
                   <small>{d.short}</small>
@@ -338,12 +350,14 @@ function StepCard({
           </div>
         </div>
 
-        <div className="t-step-foot">
-          <span className={`t-unsaved ${dirty ? "on" : ""}`}>{dirty ? "Unsaved changes" : "All changes saved"}</span>
-          <button className="d-btn primary" onClick={save} disabled={saving || !dirty}>
-            {saving ? "Saving…" : "Save Drift"}
-          </button>
-        </div>
+        {!readOnly && (
+          <div className="t-step-foot">
+            <span className={`t-unsaved ${dirty ? "on" : ""}`}>{dirty ? "Unsaved changes" : "All changes saved"}</span>
+            <button className="d-btn primary" onClick={save} disabled={saving || !dirty}>
+              {saving ? "Saving…" : "Save Drift"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -589,6 +603,8 @@ export default function TourBuilder({
   // The share sheet: "celebrate" right after publishing, "open" from the Share button.
   const [share, setShare] = useState<"none" | "open" | "celebrate">("none");
   const [showGuide, setShowGuide] = useState(false);
+  // The caller's page role (from the API): Viewers get the builder without its controls.
+  const [role, setRole] = useState<PageRole | null>(null);
   // "Path" = compact rows you expand one at a time (default); "Cards" = every drift open.
   const [viewMode, setViewMode] = useState<"path" | "cards">(() => {
     try {
@@ -637,6 +653,7 @@ export default function TourBuilder({
       applyFlow(r.data.flow);
       setQuota(r.data.quota);
       setBilling(r.data.billing || null);
+      setRole((r.data.role as PageRole) || "ADMIN");
     } catch (e: any) {
       if (e?.status === 404) setMissing(true);
       else notify.error(apiError(e));
@@ -650,7 +667,7 @@ export default function TourBuilder({
   // A creator's first tour: open the Capture Guide once, before the first clip goes up.
   const emptyTour = !!flow && flow.steps.length === 0;
   useEffect(() => {
-    if (!emptyTour) return;
+    if (!emptyTour || !canEditPage(role)) return;
     try {
       if (localStorage.getItem(CAPTURE_GUIDE_SEEN_KEY)) return;
       localStorage.setItem(CAPTURE_GUIDE_SEEN_KEY, "1");
@@ -658,7 +675,7 @@ export default function TourBuilder({
       /* storage blocked → still show it this once */
     }
     setShowGuide(true);
-  }, [emptyTour]);
+  }, [emptyTour, role]);
 
   // Poll while any drift is building.
   const processing = flow?.counts.processing || 0;
@@ -846,6 +863,8 @@ export default function TourBuilder({
 
   const canPublish = flow.counts.steps > 0 && flow.counts.processing === 0 && flow.counts.failed === 0 && !flow.counts.awaiting;
   const maxClip = superAdmin ? null : quota.maxClipSeconds;
+  // Viewers see the whole tour but none of the controls (the API refuses their changes too).
+  const readOnly = !canEditPage(role);
   const selected = flow.steps.find((s) => s.id === selectedId) || null;
   const selectedProduct = selected?.product || null;
   // Anything that moves a pin re-inks the rail.
@@ -860,6 +879,7 @@ export default function TourBuilder({
       onSelect={() => setSelectedId(s.id)}
       onChanged={applyFlow}
       maxClip={maxClip}
+      readOnly={readOnly}
     />
   );
 
@@ -869,10 +889,18 @@ export default function TourBuilder({
         <Link to={homePath} className="t-back">
           ← {page.name} Tours
         </Link>
-        <button className="d-btn ghost sm" onClick={() => navigate(`${homePath}?new=1`)} title="Start a separate tour on this page">
-          + New Tour
-        </button>
+        {!readOnly && (
+          <button className="d-btn ghost sm" onClick={() => navigate(`${homePath}?new=1`)} title="Start a separate tour on this page">
+            + New Tour
+          </button>
+        )}
       </div>
+
+      {readOnly && (
+        <div className="tpg-note">
+          <span>View only — you can look through this tour, but not change it.</span>
+        </div>
+      )}
 
       <div className="t-head t-rise" style={{ marginTop: 6 }}>
         <div style={{ flex: "1 1 320px", minWidth: 0 }}>
@@ -890,6 +918,7 @@ export default function TourBuilder({
               onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
               maxLength={80}
               aria-label="Tour name"
+              readOnly={readOnly}
             />
             {nameSaving && <Spinner />}
           </div>
@@ -928,19 +957,23 @@ export default function TourBuilder({
               Cards
             </button>
           </div>
-          <button className="d-btn" onClick={() => setShowSettings((v) => !v)}>
-            {showSettings ? "Hide settings" : "Tour settings"}
-          </button>
+          {!readOnly && (
+            <button className="d-btn" onClick={() => setShowSettings((v) => !v)}>
+              {showSettings ? "Hide settings" : "Tour settings"}
+            </button>
+          )}
           {flow.status === "PUBLISHED" ? (
             <>
               <button className="d-btn primary" onClick={() => setShare("open")}>
                 Share
               </button>
-              <button className="d-btn" onClick={() => publish(false)} disabled={publishing}>
-                Unpublish
-              </button>
+              {!readOnly && (
+                <button className="d-btn" onClick={() => publish(false)} disabled={publishing}>
+                  Unpublish
+                </button>
+              )}
             </>
-          ) : (
+          ) : !readOnly ? (
             <button
               className="d-btn primary"
               onClick={() => publish(true)}
@@ -949,11 +982,11 @@ export default function TourBuilder({
             >
               {publishing ? "Publishing…" : "Publish"}
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
-      {showSettings && (
+      {showSettings && !readOnly && (
         <div className="d-card d-card-pad" style={{ marginBottom: 18 }}>
           <div className="d-eyebrow" style={{ marginBottom: 12 }}>Tour settings</div>
           <div className="t-cover">
@@ -1052,7 +1085,7 @@ export default function TourBuilder({
         </div>
       )}
 
-      {flow.counts.awaiting > 0 && billing && (
+      {flow.counts.awaiting > 0 && billing && !readOnly && (
         <div className="t-checkout t-rise">
           <div style={{ minWidth: 0 }}>
             <div className="d-h2">
@@ -1090,8 +1123,8 @@ export default function TourBuilder({
                   >
                     <div
                       className={`t-path-row ${dragIdx === i ? "dragging" : ""} ${overIdx === i && dragIdx !== null && dragIdx !== i ? "over" : ""} ${s.id === selectedId ? "is-selected" : ""}`}
-                      draggable
-                      onDragStart={() => setDragIdx(i)}
+                      draggable={!readOnly}
+                      onDragStart={() => !readOnly && setDragIdx(i)}
                       onDragOver={(e) => {
                         e.preventDefault();
                         if (overIdx !== i) setOverIdx(i);
@@ -1099,7 +1132,7 @@ export default function TourBuilder({
                       onDragLeave={() => overIdx === i && setOverIdx(null)}
                       onDrop={(e) => {
                         e.preventDefault();
-                        if (dragIdx !== null && dragIdx !== i) reorderTo(dragIdx, i);
+                        if (!readOnly && dragIdx !== null && dragIdx !== i) reorderTo(dragIdx, i);
                         setDragIdx(null);
                         setOverIdx(null);
                       }}
@@ -1123,14 +1156,16 @@ export default function TourBuilder({
                         </div>
                       </div>
                       <div className="t-path-side" onClick={(e) => e.stopPropagation()}>
-                        <span className="t-arrows">
-                          <button className="d-btn sm" onClick={() => reorderTo(i, i - 1)} disabled={i === 0} title="Move up" aria-label="Move up">
-                            ↑
-                          </button>
-                          <button className="d-btn sm" onClick={() => reorderTo(i, i + 1)} disabled={i === flow.steps.length - 1} title="Move down" aria-label="Move down">
-                            ↓
-                          </button>
-                        </span>
+                        {!readOnly && (
+                          <span className="t-arrows">
+                            <button className="d-btn sm" onClick={() => reorderTo(i, i - 1)} disabled={i === 0} title="Move up" aria-label="Move up">
+                              ↑
+                            </button>
+                            <button className="d-btn sm" onClick={() => reorderTo(i, i + 1)} disabled={i === flow.steps.length - 1} title="Move down" aria-label="Move down">
+                              ↓
+                            </button>
+                          </span>
+                        )}
                         <span className={`t-chevron ${open ? "open" : ""}`} aria-hidden>
                           ▾
                         </span>
@@ -1141,19 +1176,22 @@ export default function TourBuilder({
                 );
               })}
 
-          <UploadSlot
-            key={flow.id}
-            flow={flow}
-            index={flow.steps.length}
-            maxClip={maxClip}
-            billing={billing}
-            onAdded={(f, stepId, b) => {
-              applyFlow(f);
-              if (b) setBilling(b);
-              if (stepId) setSelectedId(stepId);
-            }}
-          />
-
+          {readOnly ? (
+            flow.steps.length === 0 && <div className="d-empty">No drifts in this tour yet.</div>
+          ) : (
+            <UploadSlot
+              key={flow.id}
+              flow={flow}
+              index={flow.steps.length}
+              maxClip={maxClip}
+              billing={billing}
+              onAdded={(f, stepId, b) => {
+                applyFlow(f);
+                if (b) setBilling(b);
+                if (stepId) setSelectedId(stepId);
+              }}
+            />
+          )}
         </div>
 
         <aside className="t-preview">
@@ -1169,7 +1207,7 @@ export default function TourBuilder({
                 <span>Building {selectedProduct.name}…</span>
               </div>
             ) : (
-              <span style={{ padding: 20 }}>Upload a clip to preview it here</span>
+              <span style={{ padding: 20 }}>{readOnly ? "Pick a drift to preview it here" : "Upload a clip to preview it here"}</span>
             )}
           </div>
           {flow.steps.length > 0 && (

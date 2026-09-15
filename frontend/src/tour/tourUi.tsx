@@ -4,6 +4,8 @@ import { loadDriftPlayer, preloadWhenIdle } from "../routeChunks";
 import { useAuth } from "../hooks/useAuth";
 import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "../rotation3d/driftUiTheme";
 import { CREATOR_HOME, CREATOR_LANDING, CREATOR_START } from "./tourSession";
+import { PageSwitcher } from "./PageSwitcher";
+import { invalidateMyPages } from "./myPages";
 
 /**
  * Shared chrome + small pieces for the creator suite pages. Everything sits on
@@ -310,6 +312,22 @@ export const TOUR_STYLES = `
 .t-foot b{color:var(--muted);font-weight:700}
 .t-foot a{color:var(--muted);text-decoration:none}
 .t-foot a:hover{color:var(--accent)}
+/* ── Page switcher (header) ── */
+.t-switch{position:relative;min-width:0}
+.t-switch-btn{max-width:220px}
+.t-switch-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t-switch-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:40;width:min(320px,calc(100vw - 32px));max-height:min(70vh,480px);overflow:auto;padding:6px;border-radius:16px;border:1px solid var(--border-strong);background:var(--surface);box-shadow:0 24px 60px -24px rgba(0,0,0,.45);display:grid;gap:2px;animation:t-fade .14s ease both}
+.t-switch-label{padding:8px 10px 4px;font-size:10.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+.t-switch-item{appearance:none;display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;border-radius:11px;background:transparent;color:var(--text);text-align:left;font:inherit;cursor:pointer;text-decoration:none}
+.t-switch-item:hover,.t-switch-item:focus-visible{background:var(--surface-2);outline:none}
+.t-switch-item.on{background:var(--accent-soft)}
+.t-switch-item:disabled{opacity:.5;cursor:default}
+.t-switch-mark{width:30px;height:30px;flex:none;border-radius:9px;display:grid;place-items:center;font-weight:800;font-size:13px;background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-border)}
+.t-switch-text{display:grid;min-width:0}
+.t-switch-text b{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t-switch-text small{font-size:11.5px;color:var(--muted)}
+.t-switch-foot{justify-content:center;font-size:12.5px;color:var(--muted);border-top:1px solid var(--border);border-radius:0 0 11px 11px;margin-top:4px}
+@media(max-width:560px){.t-switch-menu{position:fixed;left:16px;right:16px;top:64px;width:auto}}
 `;
 
 /** Page chrome: the wordmark, the theme toggle and the account actions (visitors get
@@ -322,11 +340,13 @@ export function TourShell({ children }: { children: React.ReactNode }) {
   const canSwitch = profiles.length > 1;
   const isSuperAdmin = user?.role === "SUPERADMIN";
   const hasTour = user?.view === "TOUR" || profiles.some((p) => p.view === "TOUR");
+  const otherWorkspaces = profiles.some((p) => p.view !== "TOUR");
   const here = encodeURIComponent(location.pathname + location.search);
   // Every tour page leads into the player — fetch its code while the visitor browses.
   useEffect(() => preloadWhenIdle(loadDriftPlayer), []);
   const out = async () => {
     await logout();
+    invalidateMyPages();
     // Signed out → the Drift Tour landing, not the sign-in screen.
     navigate(CREATOR_LANDING, { replace: true });
   };
@@ -349,10 +369,14 @@ export function TourShell({ children }: { children: React.ReactNode }) {
                   Admin
                 </Link>
               )}
-              {canSwitch && (
-                <button onClick={() => navigate("/studios")} className="d-btn sm" title="Choose another workspace">
-                  Switch studio
-                </button>
+              {hasTour ? (
+                <PageSwitcher identityKey={user.email} otherWorkspaces={canSwitch && otherWorkspaces} />
+              ) : (
+                canSwitch && (
+                  <button onClick={() => navigate("/studios")} className="d-btn sm" title="Choose another workspace">
+                    Switch studio
+                  </button>
+                )
               )}
               <button onClick={out} className="d-btn ghost sm">
                 Log out

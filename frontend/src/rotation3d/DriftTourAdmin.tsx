@@ -40,7 +40,7 @@ type PageDetail = {
     createdAt: string;
     paid: string;
   };
-  users: { id: string; email: string; name: string | null; role: string; createdAt: string }[];
+  users: { id: string; email: string; name: string | null; role: string; pageRole?: string; createdAt: string }[];
   flows: {
     id: string;
     name: string;
@@ -230,7 +230,7 @@ function PageDetailView({ detail, onSaved }: { detail: PageDetail; onSaved: (d: 
                   {u.name || "—"} · since {when(u.createdAt)}
                 </span>
               </span>
-              <span className="d-pill">{u.role}</span>
+              <span className="d-pill">{u.pageRole || u.role}</span>
             </div>
           ))}
         </div>

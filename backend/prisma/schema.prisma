@@ -123,6 +123,7 @@ model User {
   creditSystem String   @default("COMMERCIAL")
   isDemo       Boolean  @default(false)
   role         String   @default("USER") // SUPERADMIN, ADMIN, USER
+  tourRole     String?  // drift.li tour pages: ADMIN | EDITOR | VIEWER (null = ADMIN — profiles from before roles)
   view         String   @default("VISIONLIGHT")
   maxProjects  Int      @default(3)
   seatLocked   Boolean  @default(false)
@@ -829,6 +830,7 @@ model DriftTourInvite {
   token            String    @unique
   invitedByUserId  String?
   status           String    @default("PENDING") // PENDING | ACCEPTED | REVOKED
+  role             String    @default("ADMIN") // what accepting grants: ADMIN | EDITOR | VIEWER
   acceptedByUserId String?
   createdAt        DateTime  @default(now())
   acceptedAt       DateTime?

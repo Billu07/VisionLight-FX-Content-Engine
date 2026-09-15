@@ -107,10 +107,27 @@ export type PageRef = { id: string; name: string; slug: string | null; path: str
 /** A Pro's client page. */
 export type ClientPage = PageRef & { tours: number; createdAt: string };
 
-/** An "Invite a Pro" link. */
+/** What someone may do on a page: Admin (everything), Editor (build tours), Viewer (look). */
+export type PageRole = "ADMIN" | "EDITOR" | "VIEWER";
+
+/** Someone on a page (a profile in its org). */
+export type PageMember = { id: string; email: string; name: string | null; role: PageRole; you: boolean; joinedAt: string };
+
+/** A page this login can open — the header's page switcher and the Dashboard. */
+export type MyPage = PageRef & {
+  profileId: string;
+  role: PageRole;
+  accountType: string;
+  managedBy: { id: string; name: string | null } | null;
+  /** the login's own page (where Dashboard goes) */
+  home: boolean;
+};
+
+/** A page invite link, with the role accepting it grants. */
 export type TourInvite = {
   id: string;
   email: string;
+  role?: PageRole;
   status: "PENDING" | "ACCEPTED" | "EXPIRED" | string;
   createdAt: string;
   acceptedAt: string | null;

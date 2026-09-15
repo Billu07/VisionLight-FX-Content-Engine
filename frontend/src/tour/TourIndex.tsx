@@ -6,17 +6,20 @@ import CreatorRoute from "./CreatorRoute";
 import TourLanding from "./TourLanding";
 import { TourShell, apiError } from "./tourUi";
 import { CREATOR_HOME } from "./tourSession";
+import { loadMyPages } from "./myPages";
 
-/** Straight to the signed-in creator's page (drift.li/tour/{page}). */
+/** Straight to the signed-in creator's own page (drift.li/tour/{page}) — never a client page
+ *  they happened to open last; the active profile's page if the page list can't load. */
 function GoToMyPage() {
   const navigate = useNavigate();
   const [error, setError] = useState("");
   useEffect(() => {
     let alive = true;
-    apiEndpoints
-      .driftMyPage()
-      .then((r) => {
-        const path = r.data?.page?.path;
+    loadMyPages(true)
+      .then((pages) => pages.find((p) => p.home)?.path ?? null)
+      .catch(() => null)
+      .then(async (home) => home ?? ((await apiEndpoints.driftMyPage()).data?.page?.path as string | undefined) ?? null)
+      .then((path) => {
         if (!alive) return;
         if (path) navigate(path, { replace: true });
         else setError("Your page doesn't have a link yet.");

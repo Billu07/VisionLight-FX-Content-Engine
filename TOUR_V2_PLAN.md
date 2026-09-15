@@ -352,5 +352,12 @@ Drift.li is a division of PicDrift
 - 2026-09-15 — Billing fix: a delayed (bank) payment that fails left its order PENDING forever, so every later
   checkout for that tour hit CHECKOUT_IN_PROGRESS. Now `checkout.session.async_payment_failed` marks the order
   FAILED (drifts due again), and the checkout settle loop does the same when the session's PaymentIntent shows the
-  failure (covers a missed webhook). "Still clearing" copy says bank payments can take a few days. The home
+  failure (covers a missed webhook). "Still clearing" copy says bank payments can take a few days.
+- 2026-09-15 — Page roles + People + page switcher (SCHEMA: `User.tourRole`, `DriftTourInvite.role` → db push).
+  Admin / Editor / Viewer per page (existing members stay Admin), enforced on every creator route
+  (`requirePage`) and read-only brand tools for non-admins. Page settings → People: members with a role picker,
+  Remove / Leave (last admin protected), invite by email with a role (client pages default to Viewer), pending
+  invites. Tour header: page switcher (own page, other pages, client pages, other workspaces) replaces "Switch
+  studio" for creators; Dashboard always opens the login's own page. Viewers get a view-only builder and page
+  (no create / hide / delete / settings; "Leave page"). Invite page + emails name the role. The home
   no longer downloads the player.

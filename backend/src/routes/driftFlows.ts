@@ -16,9 +16,15 @@ import {
   createProInvite,
   listClientPages,
   listProInvites,
+  listPageMembers,
+  memberRole,
+  PAGE_ROLE_RANK,
   pageManager,
   parseAccountType,
+  removePageMember,
   revokeProInvite,
+  updatePageMemberRole,
+  type PageRole,
 } from "../services/driftTourAccounts";
 import {
   CLIP_DURATION_TOLERANCE_S,
@@ -51,8 +57,9 @@ import {
 } from "../services/driftFlows";
 
 // Creator API for drift flows (drift.li/tour | view | memory | path).
-// Org-scoped like the other /api/drift/my/* routes: any member of the caller's
-// org (a creator is the ADMIN of their own personal org). Superadmins skip the
+// Org-scoped like the other /api/drift/my/* routes, plus page roles: Viewers read,
+// Editors build tours, Admins also run the page (settings, people, client pages) and
+// delete tours — a creator is the Admin of their own org. Superadmins skip the
 // plan quotas so the client can seed the demo flow. Clip processing reuses the
 // drift pipeline verbatim; the flow's links are re-derived after every change.
 
@@ -99,6 +106,25 @@ const requireOrg = async (req: AuthenticatedRequest, res: Response): Promise<str
   const orgId = req.user?.organizationId;
   if (!orgId) {
     res.status(403).json({ error: "No organization on this account" });
+    return null;
+  }
+  return orgId;
+};
+type PageAccess = "VIEW" | "EDIT" | "ADMIN";
+const ACCESS_ROLE: Record<PageAccess, PageRole> = { VIEW: "VIEWER", EDIT: "EDITOR", ADMIN: "ADMIN" };
+// The caller's role on the page it acts on: a superadmin (their own page, or one they manage
+// through X-Drift-Org) is an admin; everyone else is what their profile says.
+const pageRoleOf = (req: AuthenticatedRequest): PageRole => (isSuperAdmin(req) ? "ADMIN" : memberRole(req.user));
+// requireOrg + the role check: VIEW to read, EDIT to build tours, ADMIN for the page itself
+// (settings, people, client pages) and for deleting tours.
+const requirePage = async (req: AuthenticatedRequest, res: Response, access: PageAccess): Promise<string | null> => {
+  const orgId = await requireOrg(req, res);
+  if (!orgId) return null;
+  if (PAGE_ROLE_RANK[pageRoleOf(req)] < PAGE_ROLE_RANK[ACCESS_ROLE[access]]) {
+    res.status(403).json({
+      error: access === "ADMIN" ? "Only this page's admins can do that." : "You have view-only access to this page.",
+      code: "PAGE_ROLE",
+    });
     return null;
   }
   return orgId;
@@ -246,7 +272,7 @@ async function validateClip(
 
 // The creator's flows (+ plan usage). ?kind=TOUR filters one kind.
 router.get("/api/drift/my/flows", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = await requireOrg(req, res);
+  const orgId = await requirePage(req, res, "VIEW");
   if (!orgId) return;
   const kindRaw = req.query.kind;
   const kind = kindRaw !== undefined ? parseFlowKind(kindRaw) : null;
@@ -265,6 +291,7 @@ router.get("/api/drift/my/flows", authenticateToken, async (req: AuthenticatedRe
     flows: flows.map(serializeFlow),
     quota,
     billing: await billingSummary(orgId, isSuperAdmin(req)),
+    role: pageRoleOf(req),
     creator: { name: org?.name ?? null, handle: org?.slug ?? null },
     page: org && org.productLine === "TOUR" ? serializePage(org) : null,
     manager: org && org.productLine === "TOUR" ? await pageManager(org.managedByOrgId) : null,
@@ -273,7 +300,7 @@ router.get("/api/drift/my/flows", authenticateToken, async (req: AuthenticatedRe
 
 // Create a flow. Plan gate: maxFlows (all kinds count) → 403 { upgrade: true }.
 router.post("/api/drift/my/flows", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = await requireOrg(req, res);
+  const orgId = await requirePage(req, res, "EDIT");
   if (!orgId) return;
   const kind = parseFlowKind(req.body?.kind ?? "TOUR");
   if (!kind) return res.status(400).json({ error: "Unknown flow kind" });
@@ -326,16 +353,21 @@ router.post("/api/drift/my/flows", authenticateToken, async (req: AuthenticatedR
 });
 
 router.get("/api/drift/my/flows/:id", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = await requireOrg(req, res);
+  const orgId = await requirePage(req, res, "VIEW");
   if (!orgId) return;
   const flow = await loadFlow(orgId, req.params.id);
   if (!flow) return res.status(404).json({ error: "Flow not found" });
-  res.json({ flow: serializeFlow(flow), quota: await flowQuota(orgId), billing: await billingSummary(orgId, isSuperAdmin(req)) });
+  res.json({
+    flow: serializeFlow(flow),
+    quota: await flowQuota(orgId),
+    billing: await billingSummary(orgId, isSuperAdmin(req)),
+    role: pageRoleOf(req),
+  });
 });
 
 // Edit a flow's own fields. endCta / nextLabel changes re-derive the step links.
 router.patch("/api/drift/my/flows/:id", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = await requireOrg(req, res);
+  const orgId = await requirePage(req, res, "EDIT");
   if (!orgId) return;
   const flow = await prisma.driftFlow.findFirst({
     where: { id: req.params.id, organizationId: orgId },
@@ -404,7 +436,7 @@ router.patch("/api/drift/my/flows/:id", authenticateToken, async (req: Authentic
 
 // Delete a flow and the drifts it created.
 router.delete("/api/drift/my/flows/:id", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = await requireOrg(req, res);
+  const orgId = await requirePage(req, res, "ADMIN");
   if (!orgId) return;
   const flow = await prisma.driftFlow.findFirst({
     where: { id: req.params.id, organizationId: orgId },
@@ -417,7 +449,7 @@ router.delete("/api/drift/my/flows/:id", authenticateToken, async (req: Authenti
 });
 
 router.post("/api/drift/my/flows/:id/publish", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = await requireOrg(req, res);
+  const orgId = await requirePage(req, res, "EDIT");
   if (!orgId) return;
   const flow = await prisma.driftFlow.findFirst({
     where: { id: req.params.id, organizationId: orgId },
@@ -444,7 +476,7 @@ router.post("/api/drift/my/flows/:id/publish", authenticateToken, async (req: Au
 });
 
 router.post("/api/drift/my/flows/:id/unpublish", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = await requireOrg(req, res);
+  const orgId = await requirePage(req, res, "EDIT");
   if (!orgId) return;
   const flow = await prisma.driftFlow.findFirst({
     where: { id: req.params.id, organizationId: orgId },
@@ -461,7 +493,7 @@ router.post("/api/drift/my/flows/:id/unpublish", authenticateToken, async (req: 
 
 // Checkout: one Stripe Checkout for every drift in this flow that's waiting for payment.
 router.post("/api/drift/my/flows/:id/checkout", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = await requireOrg(req, res);
+  const orgId = await requirePage(req, res, "EDIT");
   if (!orgId) return;
   try {
     const result = await createFlowCheckout({
@@ -479,7 +511,7 @@ router.post("/api/drift/my/flows/:id/checkout", authenticateToken, async (req: A
 
 // The checkout return page confirms the session (idempotent with the webhook).
 router.post("/api/drift/my/checkout/confirm", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = await requireOrg(req, res);
+  const orgId = await requirePage(req, res, "VIEW");
   if (!orgId) return;
   try {
     const result = await confirmCheckoutSession(String(req.body?.sessionId || "").trim(), orgId);
@@ -497,7 +529,7 @@ router.post(
   authenticateToken,
   imageUpload.single("image"),
   async (req: AuthenticatedRequest, res: Response) => {
-    const orgId = await requireOrg(req, res);
+    const orgId = await requirePage(req, res, "EDIT");
     if (!orgId) return;
     const flow = await prisma.driftFlow.findFirst({
       where: { id: req.params.id, organizationId: orgId },
@@ -523,7 +555,7 @@ router.post(
 
 // The caller's page: name, link, logo, contact button, demo.
 router.get("/api/drift/my/page", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = await requireOrg(req, res);
+  const orgId = await requirePage(req, res, "VIEW");
   if (!orgId) return;
   const org = await prisma.organization.findUnique({ where: { id: orgId }, select: PAGE_SELECT });
   if (!org || org.productLine !== "TOUR") return res.status(404).json({ error: "This account has no tour page" });
@@ -532,12 +564,13 @@ router.get("/api/drift/my/page", authenticateToken, async (req: AuthenticatedReq
     manager: await pageManager(org.managedByOrgId),
     demo: await resolveDemo(org, "TOUR"),
     quota: await flowQuota(orgId),
+    role: pageRoleOf(req),
   });
 });
 
 // Edit the page: { name?, contactLabel?, contactUrl?, demoFlowId?, logoUrl?: null }.
 router.patch("/api/drift/my/page", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = await requireOrg(req, res);
+  const orgId = await requirePage(req, res, "ADMIN");
   if (!orgId) return;
   const org = await prisma.organization.findUnique({ where: { id: orgId }, select: PAGE_SELECT });
   if (!org || org.productLine !== "TOUR") return res.status(404).json({ error: "This account has no tour page" });
@@ -590,7 +623,7 @@ router.post(
   authenticateToken,
   imageUpload.single("image"),
   async (req: AuthenticatedRequest, res: Response) => {
-    const orgId = await requireOrg(req, res);
+    const orgId = await requirePage(req, res, "ADMIN");
     if (!orgId) return;
     const org = await prisma.organization.findUnique({ where: { id: orgId }, select: PAGE_SELECT });
     if (!org || org.productLine !== "TOUR") return res.status(404).json({ error: "This account has no tour page" });
@@ -617,13 +650,13 @@ router.post(
 
 // ── Pro pages: the client pages they create and manage ──
 router.get("/api/drift/my/client-pages", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = await requireOrg(req, res);
+  const orgId = await requirePage(req, res, "VIEW");
   if (!orgId) return;
   res.json({ pages: await listClientPages(orgId) });
 });
 
 router.post("/api/drift/my/client-pages", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = await requireOrg(req, res);
+  const orgId = await requirePage(req, res, "ADMIN");
   if (!orgId) return;
   const u = req.user || {};
   try {
@@ -638,20 +671,21 @@ router.post("/api/drift/my/client-pages", authenticateToken, async (req: Authent
   }
 });
 
-// ── General pages: Invite a Pro ──
+// ── Page invites: any email, with the role accepting it grants ──
 router.get("/api/drift/my/page/invites", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = await requireOrg(req, res);
+  const orgId = await requirePage(req, res, "ADMIN");
   if (!orgId) return;
   res.json({ invites: await listProInvites(orgId) });
 });
 
 router.post("/api/drift/my/page/invites", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = await requireOrg(req, res);
+  const orgId = await requirePage(req, res, "ADMIN");
   if (!orgId) return;
   try {
     const invite = await createProInvite({
       orgId,
       email: String(req.body?.email || ""),
+      role: req.body?.role,
       inviter: { id: req.user?.id || null, email: req.user?.email || null, name: req.user?.name || null },
     });
     res.status(201).json({ invite });
@@ -661,11 +695,58 @@ router.post("/api/drift/my/page/invites", authenticateToken, async (req: Authent
 });
 
 router.delete("/api/drift/my/page/invites/:inviteId", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
-  const orgId = await requireOrg(req, res);
+  const orgId = await requirePage(req, res, "ADMIN");
   if (!orgId) return;
   try {
     await revokeProInvite(orgId, req.params.inviteId);
     res.json({ ok: true });
+  } catch (err) {
+    return handle(res, err);
+  }
+});
+
+// ── People: who can open this page, and as what ──
+router.get("/api/drift/my/page/people", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "VIEW");
+  if (!orgId) return;
+  const role = pageRoleOf(req);
+  const [members, invites] = await Promise.all([
+    listPageMembers(orgId, req.user?.id || null),
+    role === "ADMIN" ? listProInvites(orgId) : Promise.resolve([]),
+  ]);
+  res.json({ role, members, invites });
+});
+
+// Change someone's role: { role: ADMIN | EDITOR | VIEWER }.
+router.patch("/api/drift/my/page/members/:memberId", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "ADMIN");
+  if (!orgId) return;
+  try {
+    const result = await updatePageMemberRole({
+      orgId,
+      memberId: String(req.params.memberId || ""),
+      role: req.body?.role,
+      actorIsSuper: isSuperAdmin(req),
+    });
+    res.json(result);
+  } catch (err) {
+    return handle(res, err);
+  }
+});
+
+// Remove someone's access — or your own ("Leave page"); the service checks which.
+router.delete("/api/drift/my/page/members/:memberId", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "VIEW");
+  if (!orgId) return;
+  try {
+    const result = await removePageMember({
+      orgId,
+      memberId: String(req.params.memberId || ""),
+      actorId: req.user?.id || null,
+      actorIsAdmin: pageRoleOf(req) === "ADMIN",
+      actorIsSuper: isSuperAdmin(req),
+    });
+    res.json(result);
   } catch (err) {
     return handle(res, err);
   }
@@ -714,7 +795,7 @@ router.post(
   videoUpload.single("video"),
   async (req: AuthenticatedRequest, res: Response) => {
     const file = req.file;
-    const orgId = await requireOrg(req, res);
+    const orgId = await requirePage(req, res, "EDIT");
     if (!orgId) return rmFile(file?.path);
     const flow = await prisma.driftFlow.findFirst({
       where: { id: req.params.id, organizationId: orgId },
@@ -832,7 +913,7 @@ router.post(
   videoUpload.single("video"),
   async (req: AuthenticatedRequest, res: Response) => {
     const file = req.file;
-    const orgId = await requireOrg(req, res);
+    const orgId = await requirePage(req, res, "EDIT");
     if (!orgId) return rmFile(file?.path);
     const step = await prisma.driftFlowStep.findFirst({
       where: { id: req.params.stepId, flowId: req.params.id, flow: { organizationId: orgId } },
@@ -895,7 +976,7 @@ router.patch(
   "/api/drift/my/flows/:id/steps/reorder",
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
-    const orgId = await requireOrg(req, res);
+    const orgId = await requirePage(req, res, "EDIT");
     if (!orgId) return;
     const flow = await prisma.driftFlow.findFirst({
       where: { id: req.params.id, organizationId: orgId },
@@ -921,7 +1002,7 @@ router.patch(
   "/api/drift/my/flows/:id/steps/:stepId",
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
-    const orgId = await requireOrg(req, res);
+    const orgId = await requirePage(req, res, "EDIT");
     if (!orgId) return;
     const step = await prisma.driftFlowStep.findFirst({
       where: { id: req.params.stepId, flowId: req.params.id, flow: { organizationId: orgId } },
@@ -988,7 +1069,7 @@ router.delete(
   "/api/drift/my/flows/:id/steps/:stepId",
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
-    const orgId = await requireOrg(req, res);
+    const orgId = await requirePage(req, res, "EDIT");
     if (!orgId) return;
     const flow = await prisma.driftFlow.findFirst({
       where: { id: req.params.id, organizationId: orgId },

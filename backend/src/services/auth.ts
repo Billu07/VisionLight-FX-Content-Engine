@@ -205,6 +205,7 @@ export class AuthService {
       view: user.view || "VISIONLIGHT",
       maxProjects: user.maxProjects || 3,
       seatLocked: user.seatLocked === true,
+      tourRole: user.tourRole ?? null,
     };
   }
 
@@ -231,6 +232,7 @@ export class AuthService {
       organizationIsDefault: user.organization?.isDefault === true,
       isOrgActive: user.organization?.isActive !== false,
       seatLocked: user.seatLocked === true,
+      tourRole: user.tourRole ?? null,
       canonicalDomain:
         orgRoutingDomain ||
         (view === "PICDRIFT"

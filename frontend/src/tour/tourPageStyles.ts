@@ -126,4 +126,10 @@ export const TOUR_PAGE_STYLES = `
 .tpg-client small{font-size:12px;color:var(--muted)}
 .tpg-mark.sm{width:40px;height:40px;border-radius:12px;font-size:16px}
 .tpg-invite{margin-top:18px;padding-top:16px;border-top:1px solid var(--border)}
+.tpg-member{flex-wrap:wrap}
+.tpg-member .grow{flex:1 1 180px}
+.d-select.tpg-role{width:auto;padding:6px 30px 6px 10px;font-size:12.5px}
+.tpg-invite-form{display:flex;flex-wrap:wrap;gap:8px}
+.tpg-invite-form .d-input{flex:1 1 200px;width:auto}
+.tpg-role-help{font-size:11.5px;margin-top:6px}
 `;

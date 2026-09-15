@@ -195,6 +195,7 @@ export const dbService = {
     maxProjects?: number;
     organizationId?: string;
     role?: string;
+    tourRole?: string;
     isDemo?: boolean;
     // Allow explicit override of credits during creation
     creditsPicDrift?: number;
@@ -228,6 +229,7 @@ export const dbService = {
         creditSystem: isDemo ? "INTERNAL" : "COMMERCIAL",
         isDemo,
         role: data.role || "USER",
+        tourRole: data.tourRole,
       },
       include: { organization: true },
     });

@@ -500,18 +500,37 @@ export async function sendTourOrderPaidEmails(params: {
 }
 
 /** "Invite a Pro": the one-time link to the invited photographer / videographer. */
-export async function sendTourProInviteEmail(params: { to: string; pageName: string; inviterLabel: string; url: string }): Promise<void> {
+export async function sendTourProInviteEmail(params: {
+  to: string;
+  pageName: string;
+  inviterLabel: string;
+  url: string;
+  roleLabel?: string;
+  roleSummary?: string;
+}): Promise<void> {
   await sendTemplated("tour.pro.invite", {
-    vars: { pageName: params.pageName, inviterLabel: params.inviterLabel, url: params.url },
+    vars: {
+      pageName: params.pageName,
+      inviterLabel: params.inviterLabel,
+      url: params.url,
+      roleLabel: params.roleLabel || "an Admin",
+      roleSummary: params.roleSummary || "manage the page, its people and its tours",
+    },
     defaultTo: [params.to],
   });
 }
 
-/** The invited Pro accepted: tell the page's admins. */
-export async function sendTourProJoinedEmail(params: { to: string[]; proLabel: string; pageName: string; url: string }): Promise<void> {
+/** An invite was accepted: tell the page's admins. */
+export async function sendTourProJoinedEmail(params: {
+  to: string[];
+  proLabel: string;
+  pageName: string;
+  url: string;
+  roleLabel?: string;
+}): Promise<void> {
   if (!params.to.length) return;
   await sendTemplated("tour.pro.joined", {
-    vars: { proLabel: params.proLabel, pageName: params.pageName, url: params.url },
+    vars: { proLabel: params.proLabel, pageName: params.pageName, url: params.url, roleLabel: params.roleLabel || "an Admin" },
     defaultTo: params.to,
   });
 }

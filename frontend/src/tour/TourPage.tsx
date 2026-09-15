@@ -3,18 +3,22 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from "reac
 import { apiEndpoints, setActiveProfile } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { confirmAction, notify } from "../lib/notifications";
-import type { ClientPage, Demo, Flow, Page, PageRef, PublicFlow, TourInvite } from "./types";
+import type { ClientPage, Demo, Flow, Page, PageRef, PageRole, PublicFlow } from "./types";
 import { isReady } from "./types";
 import { StatusPill, TourShell, apiError, copyText, publicUrl } from "./tourUi";
 import { TOUR_PAGE_STYLES } from "./tourPageStyles";
 import { ContactButton, PathArtH } from "./tourPageParts";
 import { usePageAdmin } from "./usePageAdmin";
+import { PagePeople, leavePage } from "./PagePeople";
+import { canEditPage, isPageAdmin } from "./pageRoles";
+import { invalidateMyPages } from "./myPages";
 
 /**
  * drift.li/tour/{page} — a page is both its admin and its public view. Visitors see the
  * page (logo, name, View Demo, Contact) and its Featured Tours as cards or as a path.
- * Page admins also get Create New Tour, hide / unhide (Hidden Tours are theirs alone),
- * links, and the page settings (name, logo, contact button, demo tour).
+ * Its team gets the admin view by role: Viewers see every tour (Hidden and drafts too);
+ * Editors also create, hide and build tours; Admins also delete tours and run the page
+ * settings (name, logo, contact button, demo tour, People) and a Pro's client pages.
  */
 
 type TourItem = {
@@ -171,11 +175,17 @@ function PageSettings({
   flows,
   onSaved,
   onClose,
+  clientPage,
+  onSelfChange,
 }: {
   page: Page;
   flows: Flow[];
   onSaved: (page: Page, demo?: Demo) => void;
   onClose: () => void;
+  /** a Pro manages this page */
+  clientPage: boolean;
+  /** the admin changed their own role */
+  onSelfChange: () => void;
 }) {
   const [name, setName] = useState(page.name);
   const [contactLabel, setContactLabel] = useState(page.contactLabel || "");
@@ -335,89 +345,7 @@ function PageSettings({
           Leave the contact fields empty to use "Contact PicDrift".
         </span>
       </div>
-      <InvitePro />
-    </div>
-  );
-}
-
-// "Invite a Pro": the page's photographer / videographer gets a one-time link to manage it.
-function InvitePro() {
-  const [invites, setInvites] = useState<TourInvite[]>([]);
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const load = () =>
-    apiEndpoints
-      .driftPageInvites()
-      .then((r) => setInvites(r.data.invites || []))
-      .catch(() => undefined);
-  useEffect(() => {
-    load();
-  }, []);
-  const send = async () => {
-    const to = email.trim();
-    if (!to) return;
-    setBusy(true);
-    try {
-      await apiEndpoints.driftCreatePageInvite(to);
-      notify.success(`Invite sent to ${to}`);
-      setEmail("");
-      load();
-    } catch (e) {
-      notify.error(apiError(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-  const revoke = async (i: TourInvite) => {
-    try {
-      await apiEndpoints.driftRevokePageInvite(i.id);
-      load();
-    } catch (e) {
-      notify.error(apiError(e));
-    }
-  };
-  const statusLabel = (i: TourInvite) =>
-    i.status === "ACCEPTED" ? "Accepted — manages this page" : i.status === "EXPIRED" ? "Expired" : "Invite sent";
-  return (
-    <div className="tpg-invite">
-      <div className="d-label">Invite a Pro</div>
-      <p className="d-sub" style={{ fontSize: 12.5, margin: "0 0 10px" }}>
-        Your photographer or videographer can build and manage tours on this page with their own login.
-      </p>
-      <div className="t-inline">
-        <input
-          className="d-input"
-          type="email"
-          inputMode="email"
-          placeholder="pro@studio.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()}
-          style={{ flex: "1 1 220px" }}
-        />
-        <button className="d-btn primary" onClick={send} disabled={busy || !email.trim()}>
-          {busy ? "Sending…" : "Send invite"}
-        </button>
-      </div>
-      {invites.length > 0 && (
-        <div className="d-list" style={{ marginTop: 10 }}>
-          {invites.map((i) => (
-            <div key={i.id} className="d-item static">
-              <span className="grow">
-                <span className="d-name" style={{ display: "block", fontSize: 13 }}>
-                  {i.email}
-                </span>
-                <span className="sub">{statusLabel(i)}</span>
-              </span>
-              {i.status === "PENDING" && (
-                <button className="d-btn ghost sm" onClick={() => revoke(i)}>
-                  Revoke
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      <PagePeople clientPage={clientPage} onSelfChange={onSelfChange} />
     </div>
   );
 }
@@ -447,6 +375,7 @@ function ClientPages() {
         setActiveProfile(r.data.profileId, r.data.page?.name);
         await checkAuth();
       }
+      invalidateMyPages();
       notify.success(`${r.data.page?.name || "The page"} is ready`);
       navigate(r.data.page?.path || "/tour/dashboard");
     } catch (e) {
@@ -558,6 +487,11 @@ export default function TourPage() {
 
   const admin = usePageAdmin(pub?.page.id);
   const editing = admin.isAdmin && !preview;
+  const { user, checkAuth } = useAuth();
+  // The caller's role here, from the admin API (a superadmin managing the page is an Admin).
+  const [role, setRole] = useState<PageRole | null>(null);
+  const canEdit = editing && canEditPage(role);
+  const canAdmin = editing && isPageAdmin(role);
 
   const loadPublic = async () => {
     try {
@@ -603,6 +537,7 @@ export default function TourPage() {
       setFlows(r.data.flows || []);
       if (r.data.page) setPub((d) => (d ? { ...d, page: r.data.page } : d));
       setManager(r.data.manager || null);
+      setRole((r.data.role as PageRole) || "ADMIN");
     } catch (e) {
       notify.error(apiError(e));
     } finally {
@@ -614,6 +549,7 @@ export default function TourPage() {
     else {
       setFlows([]);
       setAdminLoaded(false);
+      setRole(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [admin.isAdmin, pub?.page.id]);
@@ -672,6 +608,18 @@ export default function TourPage() {
     notify[ok ? "success" : "error"](ok ? "Link copied" : "Couldn't copy the link");
   };
 
+  const leave = async () => {
+    if (!pub || !user || user.organizationId !== pub.page.id) return;
+    const ok = await confirmAction(`Leave ${pub.page.name}? You'll lose access to this page.`);
+    if (!ok) return;
+    try {
+      await leavePage(user.id, checkAuth, navigate);
+      notify.success("You left the page");
+    } catch (e) {
+      notify.error(apiError(e));
+    }
+  };
+
   const shell = (body: React.ReactNode) => (
     <TourShell>
       <style>{TOUR_PAGE_STYLES}</style>
@@ -716,12 +664,16 @@ export default function TourPage() {
             Copy link
           </button>
         )}
-        <button className="d-btn sm" onClick={() => setHidden(f, !f.hidden)}>
-          {f.hidden ? "Unhide" : "Hide"}
-        </button>
-        <button className="d-btn ghost sm" onClick={() => remove(f)}>
-          Delete
-        </button>
+        {canEdit && (
+          <button className="d-btn sm" onClick={() => setHidden(f, !f.hidden)}>
+            {f.hidden ? "Unhide" : "Hide"}
+          </button>
+        )}
+        {canAdmin && (
+          <button className="d-btn ghost sm" onClick={() => remove(f)}>
+            Delete
+          </button>
+        )}
       </>
     );
   };
@@ -741,7 +693,13 @@ export default function TourPage() {
       {admin.isAdmin && (
         <div className="tpg-note">
           <span>
-            {preview ? "This is what visitors see." : "You're editing your page. Visitors never see the admin tools."}
+            {preview
+              ? "This is what visitors see."
+              : role === "VIEWER"
+                ? "You can see every tour on this page, drafts included — ask an admin if you need to make changes."
+                : role === "EDITOR"
+                  ? "You can build and publish tours on this page. Visitors never see the admin tools."
+                  : "You're editing your page. Visitors never see the admin tools."}
             {manager && manager.path && (
               <>
                 {" "}
@@ -753,9 +711,16 @@ export default function TourPage() {
               </>
             )}
           </span>
-          <button className="d-btn sm" onClick={() => setPreview((v) => !v)}>
-            {preview ? "Back to editing" : "View as visitor"}
-          </button>
+          <div className="t-actions">
+            {!preview && role && role !== "ADMIN" && !admin.managing && (
+              <button className="d-btn ghost sm" onClick={leave}>
+                Leave page
+              </button>
+            )}
+            <button className="d-btn sm" onClick={() => setPreview((v) => !v)}>
+              {preview ? "Back to editing" : "View as visitor"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -770,7 +735,7 @@ export default function TourPage() {
           </div>
           <p className="tpg-sub">Interactive tours you explore with a finger — pick one to start.</p>
           <div className="tpg-cta">
-            {editing && (
+            {canEdit && (
               <button className="d-btn primary" onClick={startCreate}>
                 + Create New Tour
               </button>
@@ -781,7 +746,7 @@ export default function TourPage() {
               </Link>
             )}
             <ContactButton page={page} />
-            {editing && (
+            {canAdmin && (
               <button className="d-btn ghost" onClick={() => setShowSettings((v) => !v)}>
                 {showSettings ? "Close settings" : "Page settings"}
               </button>
@@ -803,17 +768,22 @@ export default function TourPage() {
         </div>
       </section>
 
-      {editing && showSettings && (
+      {canAdmin && showSettings && (
         <PageSettings
           key={page.id}
           page={page}
           flows={flows}
+          clientPage={!!manager}
+          onSelfChange={() => {
+            setShowSettings(false);
+            loadAdmin();
+          }}
           onClose={() => setShowSettings(false)}
           onSaved={(p, demo) => setPub((d) => (d ? { ...d, page: p, demo: demo === undefined ? d.demo : demo } : d))}
         />
       )}
 
-      {editing && creating && (
+      {canEdit && creating && (
         <div className="d-card d-card-pad t-rise" style={{ marginBottom: 22, display: "grid", gap: 10 }}>
           <div className="d-eyebrow">New tour</div>
           <label className="d-label" htmlFor="new-tour-name">
@@ -853,7 +823,7 @@ export default function TourPage() {
             Loading your tours…
           </div>
         ) : featured.length === 0 ? (
-          editing ? (
+          canEdit ? (
             <div className="tpg-empty">
               <h3>Build your first tour</h3>
               <p className="d-sub" style={{ margin: 0, maxWidth: "46ch" }}>
@@ -875,13 +845,13 @@ export default function TourPage() {
         )}
       </section>
 
-      {editing && page.accountType === "PRO" && <ClientPages />}
+      {canAdmin && page.accountType === "PRO" && <ClientPages />}
 
       {editing && hiddenTours.length > 0 && (
         <section className="tpg-section">
           <div className="tpg-bar">
             <h2>Hidden Tours</h2>
-            <span className="d-faint">Only page admins see these. Their links still work.</span>
+            <span className="d-faint">Only this page's team sees these. Their links still work.</span>
           </div>
           {view === "path" ? (
             <TourPathList items={hiddenTours} renderActions={adminActions} />

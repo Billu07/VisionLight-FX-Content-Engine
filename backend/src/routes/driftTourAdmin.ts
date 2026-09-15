@@ -3,7 +3,7 @@ import { prisma } from "../services/database";
 import { authenticateToken, requireSuperAdmin, type AuthenticatedRequest } from "../middleware/auth";
 import { flowInclude, flowPublicPath, pagePublicPath, serializeFlow } from "../services/driftFlows";
 import { DRIFT_PRICE_CENTS, formatMoney, stripeConfigured, stripeWebhookConfigured } from "../services/driftBilling";
-import { parseAccountType } from "../services/driftTourAccounts";
+import { memberRole, parseAccountType } from "../services/driftTourAccounts";
 import { sendWaitlistNoticeEmail } from "../services/mail";
 
 // drift.li Tour v2 back office (TOUR_V2_PLAN.md P5): the superadmin's view of every
@@ -98,7 +98,7 @@ async function pageDetail(id: string) {
       freeDrifts: true,
       maxClipSeconds: true,
       createdAt: true,
-      users: { select: { id: true, email: true, name: true, role: true, createdAt: true }, orderBy: { createdAt: "asc" } },
+      users: { select: { id: true, email: true, name: true, role: true, tourRole: true, createdAt: true }, orderBy: { createdAt: "asc" } },
     },
   });
   if (!org) return null;
@@ -129,7 +129,7 @@ async function pageDetail(id: string) {
       createdAt: org.createdAt,
       paid: formatMoney(paid._sum.amountCents || 0),
     },
-    users: org.users,
+    users: org.users.map(({ tourRole, ...u }) => ({ ...u, pageRole: memberRole({ tourRole }) })),
     flows: flows.map(serializeFlow).map((f) => ({
       id: f.id,
       name: f.name,
