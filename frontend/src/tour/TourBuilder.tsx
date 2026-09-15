@@ -6,6 +6,7 @@ import { useAuth } from "../hooks/useAuth";
 import type { Billing, Flow, FlowStep, Page, Quota } from "./types";
 import { isReady } from "./types";
 import { ShareSheet } from "./ShareSheet";
+import { CAPTURE_GUIDE_SEEN_KEY, CaptureGuide, CaptureGuideSheet } from "./CaptureGuide";
 import { Spinner, StatusPill, TourShell, apiError, copyText, publicUrl, readClipDuration } from "./tourUi";
 import { TOUR_PAGE_STYLES } from "./tourPageStyles";
 
@@ -509,6 +510,7 @@ export default function TourBuilder({
   const [showSettings, setShowSettings] = useState(false);
   // The share sheet: "celebrate" right after publishing, "open" from the Share button.
   const [share, setShare] = useState<"none" | "open" | "celebrate">("none");
+  const [showGuide, setShowGuide] = useState(false);
   // "Path" = compact rows you expand one at a time (default); "Cards" = every drift open.
   const [viewMode, setViewMode] = useState<"path" | "cards">(() => {
     try {
@@ -566,6 +568,19 @@ export default function TourBuilder({
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowId]);
+
+  // A creator's first tour: open the Capture Guide once, before the first clip goes up.
+  const emptyTour = !!flow && flow.steps.length === 0;
+  useEffect(() => {
+    if (!emptyTour) return;
+    try {
+      if (localStorage.getItem(CAPTURE_GUIDE_SEEN_KEY)) return;
+      localStorage.setItem(CAPTURE_GUIDE_SEEN_KEY, "1");
+    } catch {
+      /* storage blocked → still show it this once */
+    }
+    setShowGuide(true);
+  }, [emptyTour]);
 
   // Poll while any drift is building.
   const processing = flow?.counts.processing || 0;
@@ -731,7 +746,7 @@ export default function TourBuilder({
       {body}
     </TourShell>
   );
-  const homePath = page.path || "/tour";
+  const homePath = page.path || "/tour/dashboard";
 
   if (missing) {
     return shell(
@@ -815,6 +830,9 @@ export default function TourBuilder({
               ▶ Start Tour
             </a>
           )}
+          <button className="d-btn" onClick={() => setShowGuide(true)} title="How to film a great drift">
+            Capture Guide
+          </button>
           <button className="d-btn" onClick={onPublicView} title="See this pathway the way visitors do">
             Public view
           </button>
@@ -1058,9 +1076,8 @@ export default function TourBuilder({
           </div>
 
           {flow.steps.length === 0 && (
-            <div className="d-faint" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
-              Tip: hold your phone steady and pan or tilt slowly across the space for about three seconds. Every clip
-              becomes a drift people explore with a finger; the buttons link the drifts in order automatically.
+            <div className="d-card d-card-pad">
+              <CaptureGuide compact />
             </div>
           )}
         </div>
@@ -1115,6 +1132,7 @@ export default function TourBuilder({
         </div>
       )}
       {share !== "none" && <ShareSheet flow={flow} celebrate={share === "celebrate"} onClose={() => setShare("none")} />}
+      {showGuide && <CaptureGuideSheet onClose={() => setShowGuide(false)} />}
     </>,
   );
 }

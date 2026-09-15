@@ -334,5 +334,14 @@ Drift.li is a division of PicDrift
 - 2026-09-15 — Home cards stand upright (no tilt — depth from distance only). New coming-soon landings at
   `/view`, `/memory`, `/path` on a shared site kit (`rotation3d/driftSite.tsx`, which the home now uses for its
   header/footer/wait list): same aesthetic, each with its own accent, layout and animated scene; Join Wait List +
-  Try Drift Tour. The home's coming-soon cards still only open the wait list (not linked to the landings yet). The home
+  Try Drift Tour. The home's coming-soon cards still only open the wait list (not linked to the landings yet).
+- 2026-09-15 — Client feedback: (1) tour drifts reveal only when every frame is loaded (20s fallback) and the
+  player holds a "foreground lease" so the next drift warms its whole frame set (6 at a time) right after the
+  current one completes; the pathway's Start Tour warms all of drift #1; desktop tour drifts start one zoom step
+  (×1.25) bigger. (2) The tutorial hand hides the instant the screen is touched (inline opacity reset) and a touch
+  before the demo cancels it. (3) `/tour` is always the landing; `/tour/dashboard` opens the creator's page
+  (Dashboard button top right of the tour header, post-login target, /app + /projects for tour users, drift.li
+  home). Backend reserves `dashboard` and `capture-guide` page slugs. (4) Drift Capture Guide (client copy
+  verbatim, `tour/CaptureGuide.tsx`): inline in the builder while a tour is empty, a sheet the first time + from
+  the builder's "Capture Guide" button, and a page at `/tour/capture-guide`. The home
   no longer downloads the player.

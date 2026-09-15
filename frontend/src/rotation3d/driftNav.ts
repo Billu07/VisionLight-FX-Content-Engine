@@ -7,10 +7,10 @@ import { apiEndpoints } from "../lib/api";
  * a spread of its frames warmed) ahead of the click — the next drift then swaps in
  * INSTANTLY, with no loader, and (because we navigate in-app) fullscreen survives.
  *
- * Warming is deliberately polite: it starts a moment after the current drift has had
- * the network to itself, runs a few low-priority requests at a time, fetches the frame
- * set THIS device will actually play (the lighter mobile set on phones), and on
- * data-saver / 2G links only warms what an instant first paint needs.
+ * Warming waits until the drift on screen has loaded ALL of its own frames (the player
+ * holds a foreground lease while it loads), then fetches the next drift's whole frame
+ * set — the set THIS device will play (the lighter mobile set on phones) — so the swap
+ * is instant and smooth. On data-saver / 2G links it only warms what a first paint needs.
  */
 
 // Session caches: drift product payloads by key, and frame URLs we've warmed.
@@ -110,8 +110,10 @@ const deviceFrames = (product: any): string[] => {
 
 // ───────────────────────────── background warm queue ─────────────────────────────
 
-const WARM_CONCURRENCY = 3;
-const WARM_DELAY_MS = 900;
+const WARM_CONCURRENCY = 6;
+const WARM_DELAY_MS = 250;
+// Players still loading their own frames (see holdForegroundLoad).
+let foregroundLeases = 0;
 const warmQueue: string[] = [];
 let warmActive = 0;
 let warmTimer: number | null = null;
@@ -123,12 +125,12 @@ const constrainedNetwork = () => {
 };
 
 const pumpWarm = () => {
+  if (foregroundLeases > 0) return; // the drift on screen comes first
   while (warmActive < WARM_CONCURRENCY && warmQueue.length) {
     const url = warmQueue.shift()!;
     warmActive++;
     const img = new Image();
     img.decoding = "async";
-    (img as any).fetchPriority = "low";
     img.onload = img.onerror = () => {
       warmActive--;
       pumpWarm();
@@ -146,6 +148,19 @@ const scheduleWarm = () => {
     else pumpWarm();
   }, WARM_DELAY_MS);
 };
+
+/** A player calls this when it starts loading a drift's frames and calls the returned
+ *  release when they're all in (or it unmounts): warming waits for every lease. */
+export function holdForegroundLoad(): () => void {
+  foregroundLeases++;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    foregroundLeases = Math.max(0, foregroundLeases - 1);
+    if (foregroundLeases === 0 && warmQueue.length) scheduleWarm();
+  };
+}
 
 const enqueueWarm = (url?: string) => {
   if (!url || warmedFrames.has(url)) return;

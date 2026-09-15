@@ -183,7 +183,7 @@ export function DriftSiteShell({ children, className = "" }: { children: ReactNo
 
   const signedIn = !!user || profileSelectionRequired;
   const hasTour = user?.view === "TOUR" || profiles.some((p) => p.view === "TOUR");
-  const dashboardPath = hasTour ? "/tour" : profileSelectionRequired ? "/studios" : "/app";
+  const dashboardPath = hasTour ? "/tour/dashboard" : profileSelectionRequired ? "/studios" : "/app";
 
   return (
     <div className={`drift-ui d-page ds ${className}`} data-theme={theme}>

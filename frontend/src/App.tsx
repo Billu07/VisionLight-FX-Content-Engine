@@ -56,6 +56,8 @@ const DriftBrandDashboard = lazyRoute(() => import("./rotation3d/DriftBrandDashb
 const TourAuth = lazyRoute(() => import("./tour/TourAuth"));
 const AuthCallback = lazyRoute(() => import("./tour/AuthCallback"));
 const TourIndex = lazyRoute(() => import("./tour/TourIndex").then((m) => ({ default: m.TourIndex })));
+const TourDashboard = lazyRoute(() => import("./tour/TourIndex").then((m) => ({ default: m.TourDashboard })));
+const TourCaptureGuide = lazyRoute(() => import("./tour/CaptureGuide").then((m) => ({ default: m.CaptureGuidePage })));
 const TourEditRedirect = lazyRoute(() => import("./tour/TourIndex").then((m) => ({ default: m.TourEditRedirect })));
 const TourPage = lazyRoute(loadTourPage);
 const TourPathway = lazyRoute(loadTourPathway);
@@ -205,7 +207,7 @@ const ProjectRoute = ({ children }: { children: React.ReactNode }) => {
 const AppEntry = () => {
   const { user } = useAuth();
   // drift.li creators (view "TOUR") have their own home under /tour.
-  if (user?.view === "TOUR") return <Navigate to="/tour" replace />;
+  if (user?.view === "TOUR") return <Navigate to="/tour/dashboard" replace />;
   if (user?.view === "ROTATION3D") {
     return (
       <ErrorBoundary>
@@ -406,6 +408,8 @@ function App() {
                 are public (their admins see the tools in place); a drift's readable link
                 plays in the player. /tour/:id/edit and /tour/{old-slug} still resolve. */}
             <Route path="/tour" element={<TourIndex />} />
+            <Route path="/tour/dashboard" element={<TourDashboard />} />
+            <Route path="/tour/capture-guide" element={<TourCaptureGuide />} />
             <Route path="/tour/:id/edit" element={<TourEditRedirect />} />
             <Route path="/tour/:page" element={<TourPage />} />
             <Route path="/tour/:page/:tour" element={<TourPathway />} />

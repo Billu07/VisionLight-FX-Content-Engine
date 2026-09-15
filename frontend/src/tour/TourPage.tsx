@@ -448,7 +448,7 @@ function ClientPages() {
         await checkAuth();
       }
       notify.success(`${r.data.page?.name || "The page"} is ready`);
-      navigate(r.data.page?.path || "/tour");
+      navigate(r.data.page?.path || "/tour/dashboard");
     } catch (e) {
       notify.error(apiError(e));
     } finally {

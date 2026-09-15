@@ -33,9 +33,13 @@ export function takeAccountType(): AccountType | undefined {
     return undefined;
   }
 }
-export const CREATOR_HOME = "/tour";
+/** The Drift Tour landing — public, signed in or not. */
+export const CREATOR_LANDING = "/tour";
+/** "Dashboard": /tour/dashboard opens the signed-in creator's own page. */
+export const CREATOR_HOME = "/tour/dashboard";
 export const CREATOR_START = "/tour/start";
 export const CREATOR_DEMO = "/tour/demo";
+export const CAPTURE_GUIDE = "/tour/capture-guide";
 
 // Only same-site paths — never an absolute URL — may be used as a post-auth target.
 export const isSafeNext = (p: unknown): p is string =>

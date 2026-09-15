@@ -53,7 +53,7 @@ export default function TourInviteAccept() {
       const r = await apiEndpoints.driftAcceptTourInvite(token);
       setActiveProfile(r.data.profileId, r.data.page?.name);
       await checkAuth();
-      navigate(r.data.page?.path || "/tour", { replace: true });
+      navigate(r.data.page?.path || "/tour/dashboard", { replace: true });
     } catch (e) {
       setError(apiError(e));
     } finally {

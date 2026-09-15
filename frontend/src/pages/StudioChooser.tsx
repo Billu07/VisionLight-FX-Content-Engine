@@ -47,7 +47,7 @@ export default function StudioChooser() {
       try {
         const handoff = await apiEndpoints.startWorkspaceHandoff(
           profile.id,
-          profile.view === "TOUR" ? "/tour" : undefined,
+          profile.view === "TOUR" ? "/tour/dashboard" : undefined,
         );
         const handoffUrl = handoff.data?.handoffUrl;
         if (typeof handoffUrl === "string" && handoffUrl.trim()) {
@@ -74,7 +74,7 @@ export default function StudioChooser() {
       return;
     }
     navigate(
-      profile.view === "TOUR" ? "/tour" : profile.view === "ROTATION3D" || profile.view === "DRIFT" ? "/app" : "/projects",
+      profile.view === "TOUR" ? "/tour/dashboard" : profile.view === "ROTATION3D" || profile.view === "DRIFT" ? "/app" : "/projects",
       { replace: true },
     );
   };
@@ -94,7 +94,7 @@ export default function StudioChooser() {
   if (user && !profileSelectionRequired && profiles.length <= 1) {
     return (
       <Navigate
-        to={user?.view === "TOUR" ? "/tour" : user?.view === "ROTATION3D" || user?.view === "DRIFT" ? "/app" : "/projects"}
+        to={user?.view === "TOUR" ? "/tour/dashboard" : user?.view === "ROTATION3D" || user?.view === "DRIFT" ? "/app" : "/projects"}
         replace
       />
     );

@@ -35,7 +35,7 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
   // The likeliest next tap is Start Tour: fetch drift #1 and warm its first frames
   // now (strips warm on touch / hover), so opening it is instant.
   useEffect(() => {
-    if (first) prefetchDriftPath(first.playerPath);
+    if (first) prefetchDriftPath(first.playerPath, { full: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [first?.playerPath]);
   return (

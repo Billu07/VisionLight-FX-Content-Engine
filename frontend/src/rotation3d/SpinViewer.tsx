@@ -1,3 +1,4 @@
+import { holdForegroundLoad } from "./driftNav";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { getPlayerBranding } from "../lib/branding";
 import DriftFormOverlay, { type OverlayForm } from "./DriftFormOverlay";
@@ -155,6 +156,8 @@ export type SpinViewerProps = {
 };
 
 const clampZoom = (z: number) => Math.max(0.7, Math.min(2.8, z));
+// Tour drifts have no headline, so on desktop they start one zoom step bigger.
+const TOUR_DESKTOP_ZOOM = 1.25;
 
 // Is the player background a light color? (so we flip text/controls to dark).
 const isLightColor = (bg?: string | null): boolean => {
@@ -447,6 +450,7 @@ export default function SpinViewer({
     // scrubs in sync, then eases back — so they realise it's draggable. Runs once
     // ever (localStorage) and cancels the instant they touch it.
     let introActive = false;
+    let userTookOver = false; // touched before / during the demo
     let introStart = 0;
     let introRange = 0;
     const INTRO_IN = 380, INTRO_OUT = 820, INTRO_HOLD = 240, INTRO_BACK = 720, INTRO_FADE = 300;
@@ -456,13 +460,15 @@ export default function SpinViewer({
       if (!introActive) return;
       introActive = false;
       introHandRef.current?.classList.remove("r3d-intro-on");
+      // The demo animates the hand's opacity inline — clear it, or the hand stays on screen.
+      if (introHandRef.current) introHandRef.current.style.opacity = "";
       stage.classList.remove("r3d-introing");
       yaw = 0; // back to the start frame
       yawVel = 0;
       dirty = true;
     };
     const startIntro = () => {
-      if (introActive || !driftMode || !introHint || FRAMES < 4) return;
+      if (introActive || userTookOver || !driftMode || !introHint || FRAMES < 4) return;
       // Respect reduced-motion: skip the auto-demo (the static hint still guides).
       if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
       try {
@@ -493,6 +499,8 @@ export default function SpinViewer({
     const urls = usingMobileFrames ? manifest.framesMobile : manifest.frames;
     const realMode = Array.isArray(urls) && urls.length > 0;
     let revealTimer: ReturnType<typeof setTimeout> | null = null;
+    let releaseForeground: (() => void) | null = null;
+    let leaseTimer: ReturnType<typeof setTimeout> | null = null;
     const imgs: (HTMLImageElement | null)[] = realMode
       ? new Array(urls!.length).fill(null)
       : [];
@@ -704,10 +712,13 @@ export default function SpinViewer({
         } else {
           const availW = W * 0.94;
           const legacyCap = H * 0.95; // what landscape content was always capped at
-          const boxMax =
+          let boxMax =
             ar0 >= 1
               ? Math.min(availW, bandH * ar0, legacyCap)
               : Math.min(bandH, availW / ar0, legacyCap);
+          // Tour stops (uniformSize) on desktop: one zoom step bigger — they have no
+          // headline to make room for — still the same size stop to stop.
+          if (bigDesktop && uniformSize) boxMax = Math.min(boxMax * TOUR_DESKTOP_ZOOM, ar0 >= 1 ? availW : H * 0.98);
           base = boxMax / 4.2;
         }
       }
@@ -1132,6 +1143,7 @@ export default function SpinViewer({
     };
 
     const onDown = (e: PointerEvent) => {
+      userTookOver = true; // a touch before the demo starts cancels it too
       if (introActive) endIntro(); // the user is taking over — stop the demo
       if (isControl(e.target)) return;
       pointers.set(e.pointerId, e);
@@ -1400,11 +1412,18 @@ export default function SpinViewer({
 
     if (realMode) {
       const n = urls!.length;
+      // Hold the network for this drift; the next one warms once every frame is in.
+      releaseForeground = holdForegroundLoad();
+      // A hung frame request must not block warming forever.
+      leaseTimer = setTimeout(() => releaseForeground?.(), 25000);
       // Progressive density: load an evenly-spread coarse ring first so the
       // whole 360 is usable within ~a second, then keep filling the gaps so the
       // spin sharpens toward full frame count — no waiting for all 120/180.
       const seq = progressiveOrder(n, START_FRAME);
       const COARSE = Math.min(n, 36); // a turntable already reads well at ~36
+      // Tour drifts reveal only when EVERY frame is ready, so the first drag is already
+      // smooth; brand drifts keep the quick coarse reveal (the rest sharpen underneath).
+      const REVEAL_AT = flowNav ? n : COARSE;
       let revealed = false;
       let cursor = 0;
 
@@ -1433,10 +1452,11 @@ export default function SpinViewer({
         // Reveal as soon as a usable coarse ring is decoded — don't make the
         // user wait for all 120/180. The rest keep loading underneath and the
         // spin sharpens seamlessly (nearestLoaded picks the best frame).
-        if (!revealed && loaded >= COARSE) {
+        if (!revealed && loaded >= REVEAL_AT) {
           revealed = true;
           finishLoad();
         }
+        if (loaded >= n) releaseForeground?.(); // complete → the next drift can warm
       };
       const worker = async () => {
         while (alive && cursor < seq.length) {
@@ -1449,7 +1469,7 @@ export default function SpinViewer({
       // spin is still usable, and keeps sharpening as frames arrive).
       revealTimer = setTimeout(() => {
         if (!revealed) { revealed = true; finishLoad(); }
-      }, 1500);
+      }, flowNav ? 20000 : 1500); // tours: never hold the loader past 20s on a slow link
     } else {
       // synthetic: simulate a short preload so the UX matches real mode
       let p = 0;
@@ -1553,6 +1573,8 @@ export default function SpinViewer({
 
     return () => {
       alive = false;
+      releaseForeground?.();
+      if (leaseTimer) clearTimeout(leaseTimer);
       if (revealTimer) clearTimeout(revealTimer);
       if (landscapeZoomTimer) clearTimeout(landscapeZoomTimer);
       clearTimeout(hintRevealTimer);

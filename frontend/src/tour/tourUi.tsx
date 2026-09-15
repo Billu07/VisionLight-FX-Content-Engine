@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { loadDriftPlayer, preloadWhenIdle } from "../routeChunks";
 import { useAuth } from "../hooks/useAuth";
 import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "../rotation3d/driftUiTheme";
-import { CREATOR_HOME, CREATOR_START } from "./tourSession";
+import { CREATOR_HOME, CREATOR_LANDING, CREATOR_START } from "./tourSession";
 
 /**
  * Shared chrome + small pieces for the creator suite pages. Everything sits on
@@ -321,21 +321,21 @@ export function TourShell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const canSwitch = profiles.length > 1;
   const isSuperAdmin = user?.role === "SUPERADMIN";
-  const isCreator = user?.view === "TOUR";
+  const hasTour = user?.view === "TOUR" || profiles.some((p) => p.view === "TOUR");
   const here = encodeURIComponent(location.pathname + location.search);
   // Every tour page leads into the player — fetch its code while the visitor browses.
   useEffect(() => preloadWhenIdle(loadDriftPlayer), []);
   const out = async () => {
     await logout();
     // Signed out → the Drift Tour landing, not the sign-in screen.
-    navigate(CREATOR_HOME, { replace: true });
+    navigate(CREATOR_LANDING, { replace: true });
   };
   return (
     <div className="drift-ui d-page t-page" data-theme={theme}>
       <DriftThemeStyles />
       <style>{TOUR_STYLES}</style>
       <header className="d-topbar">
-        <Link to={CREATOR_HOME} className="d-wordmark" style={{ textDecoration: "none" }}>
+        <Link to={CREATOR_LANDING} className="d-wordmark" style={{ textDecoration: "none" }}>
           drift<i>.li</i>
           <span className="t-kind">tour</span>
         </Link>
@@ -344,11 +344,6 @@ export function TourShell({ children }: { children: React.ReactNode }) {
             <>
               <span className="d-faint hidden text-xs sm:inline">{user.email}</span>
               <ThemeToggle theme={theme} onToggle={toggleTheme} />
-              {isCreator && (
-                <Link to={CREATOR_HOME} className="d-btn sm" style={{ textDecoration: "none" }} title="Your page">
-                  My page
-                </Link>
-              )}
               {isSuperAdmin && (
                 <Link to="/admin" className="d-btn sm" style={{ textDecoration: "none" }} title="Open the admin panel">
                   Admin
@@ -362,6 +357,11 @@ export function TourShell({ children }: { children: React.ReactNode }) {
               <button onClick={out} className="d-btn ghost sm">
                 Log out
               </button>
+              {hasTour && (
+                <Link to={CREATOR_HOME} className="d-btn primary sm" style={{ textDecoration: "none" }} title="Your page">
+                  Dashboard
+                </Link>
+              )}
             </>
           ) : (
             <>

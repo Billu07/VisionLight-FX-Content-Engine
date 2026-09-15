@@ -191,7 +191,7 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   `/api/drift/creator/*` before workspace selection), `pipeline.probeClipInfo` (duration + fps),
   creator email templates at the end of `services/mail.ts`.
 - **Frontend** `src/tour/`: `TourAuth` (/tour/start), `AuthCallback` (/auth/callback), `CreatorRoute`
-  (guard), `TourIndex` (/tour → your page; legacy /tour/:id/edit → pathway), `TourPage` (/tour/:page —
+  (guard), `TourIndex` (/tour = landing always; `TourDashboard` /tour/dashboard → your page; legacy /tour/:id/edit → pathway), `CaptureGuide` (builder + /tour/capture-guide), `TourPage` (/tour/:page —
   admin + public view), `TourPathway` (/tour/:page/:tour — public strips; admins get `TourBuilder`),
   readable drift links /tour/:page/:tour/:drift in `Rotation3DPlayer`; `usePageAdmin` (who's admin;
   superadmin "Manage" via `X-Drift-Org`), `tourUi`/`tourPageStyles`/`tourPageParts`/`tourSession`/`types`;
@@ -219,7 +219,9 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
 
 ## drift.li Tour v2 (2026-09-14) — code shipped P1–P6, deploy + ops owed (TOUR_V2_PLAN.md §5)
 
-- **URLs**: `/tour` (landing for visitors, your page for creators) · `/tour/{page}` (a TOUR org = a page,
+- **URLs**: `/tour` (the landing — ALWAYS, even signed in; creators get Dashboard in the header) ·
+  `/tour/dashboard` (→ the creator's page; post-login target) · `/tour/capture-guide` (Drift Capture Guide,
+  also in the builder) · `/tour/{page}` (a TOUR org = a page,
   admin + public view) · `/tour/{page}/{tour}` (the tour's main link = pathway menu; admins get the
   builder) · `/tour/{page}/{tour}/{drift}` (player; drift segment derived from the name, unique per tour —
   `stepDriftSlugs`) · `/tour/invite/{token}` · `drift.li/{page}/tour` → `/tour/{page}`.
