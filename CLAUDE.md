@@ -307,6 +307,18 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   the mobile frames over a blurred copy. Runs on the processing queue, uploads to R2; state per layout in
   `DriftFlow.settings.reelFull` / `settings.reel` (framed kept the first key) via one atomic `jsonb_set` (a content hash
   → `stale` once the tour changes).
+- **Link previews + search** (2026-09-16, no schema change; runbook docs/DRIFT_SOCIAL_SETUP.md): drift.li pages get their
+  `<head>` from the app — nginx sends non-file requests to `/__drift/html<path>`, `/og/*` → `/__drift/og/*`,
+  `/robots.txt` + `/sitemap.xml` → `/__drift/*` (`routes/driftShare.ts`). `services/driftShare.ts` `resolveShare(path,
+  lookup)` → title / description / canonical / noindex / JSON-LD / card per page (site pages with the client's copy,
+  tour page, tour, drift, `/u/` = no page name + noindex, `/report/` = generic + noindex, brand drifts; unknown →
+  home card, noindex) and `renderSharePage` swaps the block between `<!-- share:start … -->` and `<!-- share:end -->`
+  in frontend/index.html (other domains keep that static PicDrift block — put new head tags outside the markers).
+  Cards: `driftShareCards.ts` (1200×630 JPEG ≤290 KB for WhatsApp), text drawn as paths from Bai Jamjuree in
+  backend/assets/fonts via opentype.js (`driftTypeset.ts`; own typings in src/types/opentype.d.ts — @types/opentype.js
+  pulls the DOM lib and breaks Node's Blob typing). Card URLs carry a content version (`CARD_VERSION` refreshes all).
+  drift.li icons: frontend/public/drift/* + drift.webmanifest. Any lookup failure serves the plain index.html and a
+  drift.li card; nginx falls back to the static file. The Cloudflare OG worker is no longer needed.
 - **Superadmin**: `X-Drift-Org` lets a superadmin act on any TOUR page ("Manage this page", `usePageAdmin`);
   back office = Admin → drift.li → Tour (`routes/driftTourAdmin.ts`, `DriftTourAdmin.tsx`).
 - **drift.li home** = `rotation3d/DriftHome.tsx` (2026-09-14 redesign per the client's `land.png`: the hero's

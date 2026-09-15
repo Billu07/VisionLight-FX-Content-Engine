@@ -2,21 +2,22 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="dns-prefetch" href="//picdrift.studio" />
+    <link rel="dns-prefetch" href="//visualfx.studio" />
+    <link rel="preconnect" href="https://picdrift.studio" crossorigin />
+    <link rel="preconnect" href="https://visualfx.studio" crossorigin />
+    <!-- share:start — Everything down to share:end is the page's identity for link previews and
+         search (title, icons, Open Graph + X tags). Crawlers read it without running JavaScript,
+         so on drift.li the server replaces this block with the tags for the page being opened
+         (backend services/driftShare.ts, reached through nginx). Other domains get it as it is.
+         Put any new head tags outside the markers. -->
     <link rel="icon" type="image/x-icon" href="/logo.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="manifest" href="/site.webmanifest" />
-    <link rel="dns-prefetch" href="//picdrift.studio" />
-    <link rel="dns-prefetch" href="//visualfx.studio" />
-    <link rel="preconnect" href="https://picdrift.studio" crossorigin />
-    <link rel="preconnect" href="https://visualfx.studio" crossorigin />
     <meta name="theme-color" content="#6366f1" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Social share preview (Open Graph + Twitter). Crawlers read these from the
-         STATIC HTML and DON'T run JS, so the JS tab-title script below can't fix
-         them — per-domain values (e.g. drift.li) must be swapped at the edge/server.
-         See cloudflare/drift-og-worker.js for the drift.li override. -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="PicDrift Studio" />
     <meta property="og:title" content="PicDrift Studio - AI Content Generation Studio" />
@@ -25,12 +26,16 @@
     <meta name="twitter:title" content="PicDrift Studio - AI Content Generation Studio" />
     <meta name="twitter:description" content="Create scroll-stopping content with AI — images, video, and interactive product drifts." />
     <title>PicDrift Studio - AI Content Generation Studio</title>
+    <!-- share:end -->
     <script>
-      // Domain-aware browser tab title. Runs before React so there is no flash
-      // of the wrong brand. Mirrors getSiteBrandFromHostname() in lib/branding.ts.
+      // Domain-aware browser tab title. Runs before React so there is no flash of the wrong
+      // brand. Mirrors getSiteBrandFromHostname() in lib/branding.ts. A page the server already
+      // named (drift.li pages get their own title) keeps it.
       (function () {
+        var fallback = "PicDrift Studio - AI Content Generation Studio";
+        if (document.title && document.title !== fallback) return;
         var h = (location.hostname || "").trim().toLowerCase();
-        var title = "PicDrift Studio - AI Content Generation Studio";
+        var title = fallback;
         if (h === "byok.link" || h === "www.byok.link") {
           title = "BYOK - AI Content Studio";
         } else if (h.indexOf("visualfx") !== -1) {

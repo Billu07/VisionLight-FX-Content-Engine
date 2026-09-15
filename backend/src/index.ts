@@ -17,6 +17,7 @@ import driftFlowsRouter from "./routes/driftFlows";
 import driftCreatorRouter from "./routes/driftCreator";
 import driftMailRouter from "./routes/driftMail";
 import driftTourAdminRouter from "./routes/driftTourAdmin";
+import driftShareRouter from "./routes/driftShare";
 import { mailConfigured, verifyMail } from "./services/mail";
 import { relinkAllFlows } from "./services/driftFlows";
 import { handleStripeWebhook, resumePaidDrifts } from "./services/driftBilling";
@@ -63,6 +64,8 @@ app.use(driftFlowsRouter);
 app.use(driftCreatorRouter);
 app.use(driftMailRouter);
 app.use(driftTourAdminRouter);
+// drift.li link previews: each page's head, share cards, robots.txt, sitemap (reached through nginx).
+app.use(driftShareRouter);
 
 app.use((req, res) => res.status(404).json({ error: "Route not found" }));
 app.use((error: any, req: Request, res: Response, next: NextFunction) => {
