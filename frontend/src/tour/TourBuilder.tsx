@@ -686,7 +686,7 @@ export default function TourBuilder({
           notify.success(
             r.data?.status === "paid"
               ? "Payment received — your drifts are building now"
-              : "We're still confirming your payment — this page updates itself",
+              : "Your payment is processing — your drifts start building as soon as it clears",
           );
           load();
         })

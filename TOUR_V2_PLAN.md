@@ -127,8 +127,9 @@ dashboards, set up the public demo tour. The superadmin's tour account has no cl
 2. Stripe (payments stay off until this is done — uploads past the free drifts are kept, checkout says
    "not switched on yet"): VPS env `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (+ optional
    `TOUR_DRIFT_PRICE_CENTS=650`, `TOUR_CURRENCY=usd`, `DRIFT_APP_URL=https://drift.li`); in Stripe add a
-   webhook endpoint `https://<api host>/api/drift/billing/webhook` for `checkout.session.completed`,
-   `checkout.session.async_payment_succeeded`, `checkout.session.expired`; restart with `--update-env`.
+   webhook endpoint `https://drift.li/api/drift/billing/webhook` (Snapshot payload) for `checkout.session.completed`,
+   `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`;
+   restart with `--update-env`.
    Admin → drift.li → Tour shows "Checkout on · $6.50 / drift" when both keys are set.
 3. Demo tour: build + publish it on the superadmin's own tour page, then Admin → drift.li → Tour →
    Demo tour → "Use as demo".
@@ -347,5 +348,9 @@ Drift.li is a division of PicDrift
 - 2026-09-15 — Builder UX: clips queue — pick/drop more any time (even mid-upload), they upload in order
   (a plan-limit error stops the queue with one message; leaving mid-upload asks first); "+ Create New Tour"
   moved from under the slot to the top row ("+ New Tour" beside the back link); the inline Capture Guide is
-  gone — the header button is first and Spotify green. The home
+  gone — the header button is first and Spotify green.
+- 2026-09-15 — Billing fix: a delayed (bank) payment that fails left its order PENDING forever, so every later
+  checkout for that tour hit CHECKOUT_IN_PROGRESS. Now `checkout.session.async_payment_failed` marks the order
+  FAILED (drifts due again), and the checkout settle loop does the same when the session's PaymentIntent shows the
+  failure (covers a missed webhook). "Still clearing" copy says bank payments can take a few days. The home
   no longer downloads the player.

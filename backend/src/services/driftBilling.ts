@@ -118,6 +118,13 @@ type CheckoutArgs = {
 // sessions for the same drifts (the paid-session check below covers the rest).
 const checkoutQueues = new Map<string, Promise<unknown>>();
 
+/** A delayed (bank) payment that failed: its PaymentIntent went back to needing a payment
+ *  method, or was canceled. Needs the session retrieved with `payment_intent` expanded. */
+const delayedPaymentFailed = (s: Stripe.Checkout.Session) => {
+  const pi = s.payment_intent;
+  return !!pi && typeof pi !== "string" && (pi.status === "requires_payment_method" || pi.status === "canceled");
+};
+
 /** Open a Stripe Checkout for every drift of a flow that's waiting for payment. */
 export async function createFlowCheckout(args: CheckoutArgs) {
   const prev = checkoutQueues.get(args.flowId) ?? Promise.resolve();
@@ -157,16 +164,22 @@ async function openFlowCheckout(args: CheckoutArgs) {
       await stripe().checkout.sessions.expire(sessionId);
       await prisma.driftTourOrder.update({ where: { id: o.id }, data: { status: "EXPIRED" } });
     } catch {
-      const s = await stripe().checkout.sessions.retrieve(sessionId).catch(() => null);
+      const s = await stripe().checkout.sessions.retrieve(sessionId, { expand: ["payment_intent"] }).catch(() => null);
       if (s?.status === "expired") {
         await prisma.driftTourOrder.updateMany({ where: { id: o.id, status: "PENDING" }, data: { status: "EXPIRED" } });
       } else if (s?.status === "complete" && s.payment_status === "paid") {
         await fulfillSession(s);
         settled = true;
+      } else if (s?.status === "complete" && delayedPaymentFailed(s)) {
+        // A bank payment that bounced (even if its webhook was missed): the drifts are due
+        // again, so a fresh checkout can open.
+        await prisma.driftTourOrder.updateMany({ where: { id: o.id, status: "PENDING" }, data: { status: "FAILED" } });
       } else if (s?.status === "complete") {
-        throw new FlowError(409, "A payment for this tour is still going through — give it a minute, then refresh.", {
-          code: "CHECKOUT_IN_PROGRESS",
-        });
+        throw new FlowError(
+          409,
+          "A payment for this tour is still clearing — bank payments can take a few days. Your drifts start building as soon as it does.",
+          { code: "CHECKOUT_IN_PROGRESS" },
+        );
       } else {
         throw new FlowError(502, "We couldn't open checkout just now. Please try again in a moment.");
       }
@@ -414,6 +427,11 @@ export async function handleStripeWebhook(req: Request, res: Response) {
     } else if (event.type === "checkout.session.expired") {
       const s = event.data.object as Stripe.Checkout.Session;
       await prisma.driftTourOrder.updateMany({ where: { stripeSessionId: s.id, status: "PENDING" }, data: { status: "EXPIRED" } });
+    } else if (event.type === "checkout.session.async_payment_failed") {
+      // A bank payment bounced days later: close the order so its drifts can be checked out again.
+      const s = event.data.object as Stripe.Checkout.Session;
+      const failed = await prisma.driftTourOrder.updateMany({ where: { stripeSessionId: s.id, status: "PENDING" }, data: { status: "FAILED" } });
+      if (failed.count) console.warn(`[${NS}] checkout ${s.id}: delayed payment failed — its drifts are due again`);
     }
     res.json({ received: true });
   } catch (err) {

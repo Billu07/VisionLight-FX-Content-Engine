@@ -807,7 +807,7 @@ model DriftTourOrder {
   unitAmountCents       Int
   amountCents           Int
   currency              String    @default("usd")
-  status                String    @default("PENDING") // PENDING | PAID | CANCELED | EXPIRED
+  status                String    @default("PENDING") // PENDING | PAID | CANCELED | EXPIRED | FAILED (bank payment bounced)
   stripeSessionId       String?   @unique
   stripePaymentIntentId String?
   productIds            Json? // the drifts this order pays for

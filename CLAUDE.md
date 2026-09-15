@@ -231,7 +231,8 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   only READY drifts, writes on change, `relinkAllFlows()` at boot, re-run when a drift turns READY).
 - **Pay per drift** (`services/driftBilling.ts`): free while `Organization.freeDrifts` last, then
   `AWAITING_PAYMENT` (clip stored, not processed) → Stripe Checkout (one per tour) → webhook
-  `/api/drift/billing/webhook` (raw body, mounted BEFORE express.json) or return-page confirm → PAID,
+  `/api/drift/billing/webhook` (raw body, mounted BEFORE express.json; events `checkout.session.completed` / `.async_payment_succeeded` /
+  `.async_payment_failed` → order FAILED, drifts due again / `.expired`) or return-page confirm → PAID,
   `hostingExpiresAt` +1y (not enforced yet) → processed. Env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
   optional `TOUR_DRIFT_PRICE_CENTS`/`TOUR_CURRENCY`. Superadmin = COMP, no clip limit.
 - **Accounts** (`services/driftTourAccounts.ts`): `tourAccountType` GENERAL | PRO; Pro "Client Pages"
