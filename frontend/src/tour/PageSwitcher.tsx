@@ -3,12 +3,14 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { MyPage } from "./types";
 import { MY_PAGES_EVENT, loadMyPages } from "./myPages";
 import { ROLE_INFO } from "./pageRoles";
+import { CREATOR_START } from "./tourSession";
 
 /**
  * The tour header's page switcher: every page this login can open — its own page first,
- * then its other pages and client pages — each with the role it holds there, plus the
- * way to other (studio / brand) workspaces. Opening a page activates its profile
- * (usePageAdmin). Hidden when there's only one page and nowhere else to go.
+ * then pages it joined and client pages — each with the role it holds there, plus the way
+ * to other (studio / brand) workspaces. Someone who has only joined pages also gets
+ * "Create your own page". Opening a page activates its profile (usePageAdmin). Hidden
+ * when there's nothing to switch to or create.
  */
 export function PageSwitcher({ identityKey, otherWorkspaces }: { identityKey: string; otherWorkspaces: boolean }) {
   const [pages, setPages] = useState<MyPage[]>([]);
@@ -31,7 +33,7 @@ export function PageSwitcher({ identityKey, otherWorkspaces }: { identityKey: st
     };
   }, [identityKey]);
 
-  useEffect(() => setOpen(false), [location.pathname]);
+  useEffect(() => setOpen(false), [location.pathname, location.search]);
 
   useEffect(() => {
     if (!open) return;
@@ -47,7 +49,8 @@ export function PageSwitcher({ identityKey, otherWorkspaces }: { identityKey: st
     };
   }, [open]);
 
-  if (pages.length < 2 && !otherWorkspaces) return null;
+  const canCreate = pages.length > 0 && !pages.some((p) => p.own);
+  if (pages.length < 2 && !otherWorkspaces && !canCreate) return null;
   const current = pages.find((p) => p.path && (location.pathname === p.path || location.pathname.startsWith(`${p.path}/`)));
 
   return (
@@ -81,12 +84,16 @@ export function PageSwitcher({ identityKey, otherWorkspaces }: { identityKey: st
               <span className="t-switch-text">
                 <b>{p.name}</b>
                 <small>
-                  {p.home ? "Your page" : p.managedBy ? "Client page" : p.accountType === "PRO" ? "Pro page" : "Page"} ·{" "}
-                  {ROLE_INFO[p.role].label}
+                  {p.own ? "Your page" : p.managedBy ? "Client page" : "Shared with you"} · {ROLE_INFO[p.role].label}
                 </small>
               </span>
             </button>
           ))}
+          {canCreate && (
+            <Link to={`${CREATOR_START}?create=1`} role="menuitem" className="t-switch-item t-switch-foot">
+              + Create your own page
+            </Link>
+          )}
           {otherWorkspaces && (
             <Link to="/studios" role="menuitem" className="t-switch-item t-switch-foot">
               Other workspaces →

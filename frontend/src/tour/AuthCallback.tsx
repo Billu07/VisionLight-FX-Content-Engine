@@ -7,6 +7,8 @@ import {
   ensureCreatorProfile,
   errorMessage,
   isConfirmRequired,
+  isInvitePath,
+  peekNext,
   takeAccountType,
   takeNext,
   type AccountType,
@@ -67,6 +69,12 @@ export default function AuthCallback() {
       const meta = (session.user?.user_metadata || {}) as Record<string, unknown>;
       const name = String(meta.full_name || meta.name || "").trim();
       const accountType = takeAccountType();
+      if (isInvitePath(peekNext())) {
+        // Signed up from an invite: back to accept it — no page of their own is created.
+        window.history.replaceState(null, "", "/auth/callback");
+        navigate(takeNext(), { replace: true });
+        return;
+      }
       try {
         await ensureCreatorProfile(name || undefined, { accountType });
       } catch (e) {

@@ -119,7 +119,9 @@ export type MyPage = PageRef & {
   role: PageRole;
   accountType: string;
   managedBy: { id: string; name: string | null } | null;
-  /** the login's own page (where Dashboard goes) */
+  /** a page this login made itself (not joined by invite, not a Pro's client page) */
+  own: boolean;
+  /** where Dashboard goes: the first own page (else the first page it admins) */
   home: boolean;
 };
 

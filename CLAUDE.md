@@ -247,6 +247,11 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   yourself = Leave page; when nobody from the managing Pro page is left, `managedByOrgId` clears).
   `GET /api/drift/creator/pages` = the login's pages (`home` = its own page) for the header `PageSwitcher` and
   `/tour/dashboard`. UI: `PagePeople` in page settings, a view-only `TourBuilder` for Viewers.
+- **Invite sign-up** (2026-09-15): `/tour/start?next=/tour/invite/…` is an account only — no page type, no page of
+  their own (TourAuth + AuthCallback skip `ensureCreatorProfile`); accepting converts the bare auto-created
+  profile in place (`driftCreator.untouchedProfile`). Pages are `own` unless joined by invite (accepted invite
+  `acceptedByUserId`) or a Pro's client page; Dashboard = first own page. Someone with no own page gets
+  "+ Create your own page" (PageSwitcher → `/tour/start?create=1` → signup API `ownPage: true`).
 - **Superadmin**: `X-Drift-Org` lets a superadmin act on any TOUR page ("Manage this page", `usePageAdmin`);
   back office = Admin → drift.li → Tour (`routes/driftTourAdmin.ts`, `DriftTourAdmin.tsx`).
 - **drift.li home** = `rotation3d/DriftHome.tsx` (2026-09-14 redesign per the client's `land.png`: the hero's

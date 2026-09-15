@@ -35,8 +35,10 @@ router.post("/api/drift/creator/signup", authenticateToken, async (req: Authenti
   const name = typeof req.body?.name === "string" ? req.body.name.trim().slice(0, 80) : "";
   const confirm = req.body?.confirm === true;
   const accountType = parseAccountType(req.body?.accountType);
+  // ownPage: "Create your own page" from someone who so far has only joined pages.
+  const ownPage = req.body?.ownPage === true;
   try {
-    const result = await provisionCreator(id, name || null, { allowSecondProfile: confirm, accountType });
+    const result = await provisionCreator(id, name || null, { allowSecondProfile: confirm, accountType, ownPage });
     res.status(result.created ? 201 : 200).json(result);
   } catch (err: any) {
     if (err instanceof CreatorConfirmationRequired) {

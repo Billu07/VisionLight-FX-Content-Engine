@@ -4,6 +4,7 @@ import { prisma, dbService } from "./database";
 import { uniqueOrgSlug } from "../routes/drift";
 import { FlowError, pagePublicPath } from "./driftFlows";
 import { sendTourProInviteEmail, sendTourProJoinedEmail } from "./mail";
+import { untouchedProfile } from "./driftCreator";
 
 // drift.li Tour v2 accounts (TOUR_V2_PLAN.md P4). Two layers of page:
 // - GENERAL (realtors, brands, venues) — can "Invite a Pro" to manage their page;
@@ -286,16 +287,31 @@ export async function acceptProInvite(token: string, identity: Identity) {
   }
   if (!profile) {
     try {
-      profile = await dbService.createUser({
-        authUserId: identity.authUserId || undefined,
-        email: identity.email,
-        name: identity.name || undefined,
-        view: "TOUR",
-        maxProjects: 3,
-        organizationId: org.id,
-        role: appRoleFor(inviteRole),
-        tourRole: inviteRole,
-      });
+      // A brand-new login (the bare profile validateSession just made for this sign-up)
+      // becomes its profile on this page in place — no stray empty workspace beside it.
+      const bare = await untouchedProfile(profiles);
+      profile = bare
+        ? await prisma.user.update({
+            where: { id: bare.id },
+            data: {
+              organizationId: org.id,
+              view: "TOUR",
+              role: appRoleFor(inviteRole),
+              tourRole: inviteRole,
+              name: bare.name || identity.name || undefined,
+              authUserId: identity.authUserId || bare.authUserId || undefined,
+            },
+          })
+        : await dbService.createUser({
+            authUserId: identity.authUserId || undefined,
+            email: identity.email,
+            name: identity.name || undefined,
+            view: "TOUR",
+            maxProjects: 3,
+            organizationId: org.id,
+            role: appRoleFor(inviteRole),
+            tourRole: inviteRole,
+          });
     } catch (err) {
       // Give the link back so it still works once whatever failed is fixed.
       await prisma.driftTourInvite
@@ -433,10 +449,20 @@ export async function removePageMember(args: {
   return { ok: true };
 }
 
+/** The profiles among these that joined their page by accepting an invite. */
+export async function joinedByInvite(profileIds: string[]) {
+  if (!profileIds.length) return new Set<string>();
+  const rows = await prisma.driftTourInvite.findMany({
+    where: { acceptedByUserId: { in: profileIds } },
+    select: { acceptedByUserId: true },
+  });
+  return new Set(rows.map((r) => r.acceptedByUserId).filter((v): v is string => !!v));
+}
+
 /** Every tour page this login can open (one profile each), for the header's page switcher
- *  and the Dashboard. `home` is its own page: the earliest one it admins that no Pro page
- *  manages (else the first it admins, else the first). Home first, then its other own
- *  pages, then client pages. */
+ *  and the Dashboard. `own` = a page it made itself (not joined by invite, not a Pro's
+ *  client page); `home` = its first own page (else the first page it admins, else the
+ *  first). Home first, then own pages, pages it joined, then client pages. */
 export async function listIdentityPages(identity: { authUserId: string | null; email: string }) {
   const profiles: any[] = await dbService.findUsersForAuthIdentity(identity.authUserId || "", identity.email);
   const tour = profiles.filter((p) => p.view === "TOUR" && p.organization?.productLine === "TOUR");
@@ -447,6 +473,7 @@ export async function listIdentityPages(identity: { authUserId: string | null; e
     ? await prisma.organization.findMany({ where: { id: { in: managerIds } }, select: { id: true, name: true } })
     : [];
   const managerName = new Map(managers.map((m) => [m.id, m.name]));
+  const joined = await joinedByInvite(tour.map((p) => String(p.id)));
   const pages = tour.map((p) => ({
     ...pageRef(p.organization),
     profileId: p.id as string,
@@ -455,10 +482,12 @@ export async function listIdentityPages(identity: { authUserId: string | null; e
     managedBy: p.organization.managedByOrgId
       ? { id: p.organization.managedByOrgId as string, name: managerName.get(p.organization.managedByOrgId) ?? null }
       : null,
+    own: !p.organization.managedByOrgId && !joined.has(p.id),
     home: false,
   }));
-  const home = pages.find((p) => p.role === "ADMIN" && !p.managedBy) ?? pages.find((p) => p.role === "ADMIN") ?? pages[0];
+  const home =
+    pages.find((p) => p.own) ?? pages.find((p) => p.role === "ADMIN" && !p.managedBy) ?? pages.find((p) => p.role === "ADMIN") ?? pages[0];
   if (home) home.home = true;
-  const rank = (p: (typeof pages)[number]) => (p.home ? 0 : p.managedBy ? 2 : 1);
+  const rank = (p: (typeof pages)[number]) => (p.home ? 0 : p.own ? 1 : p.managedBy ? 3 : 2);
   return pages.sort((a, b) => rank(a) - rank(b));
 }

@@ -51,9 +51,8 @@ export default function TourInviteAccept() {
   const signedInEmail = user?.email || profiles[0]?.email || "";
   const here = `/tour/invite/${token}`;
   const emailParam = info?.email ? `&email=${encodeURIComponent(info.email)}` : "";
-  // Admins and Editors are usually the photographer / videographer: start signup on Pro.
-  const typeParam = role === "VIEWER" ? "" : "type=pro&";
-  const signupUrl = `${CREATOR_START}?${typeParam}next=${encodeURIComponent(here)}${emailParam}`;
+  // Joining a page needs an account only — the sign-up skips the page type and own page.
+  const signupUrl = `${CREATOR_START}?next=${encodeURIComponent(here)}${emailParam}`;
   const loginUrl = `${CREATOR_START}?mode=login&next=${encodeURIComponent(here)}${emailParam}`;
 
   const accept = async () => {

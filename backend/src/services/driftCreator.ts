@@ -57,6 +57,35 @@ const summarize = (profiles: any[]): ExistingProfileSummary[] =>
     organizationName: p.organization?.name ?? null,
   }));
 
+/** The identity's only profile when validateSession auto-created it moments ago for this
+ *  sign-up and nothing uses it yet (no org, default role and view, no projects) — safe to
+ *  turn into a creator profile, or into the profile on a page they were invited to. */
+export async function untouchedProfile(profiles: any[]) {
+  const candidate = profiles.length === 1 ? profiles[0] : null;
+  const looksUntouched =
+    !!candidate &&
+    !candidate.organizationId &&
+    (candidate.role || "USER") === "USER" &&
+    (candidate.view || "VISIONLIGHT") === "VISIONLIGHT" &&
+    Date.now() - new Date(candidate.createdAt).getTime() < BARE_PROFILE_MAX_AGE_MS;
+  if (!looksUntouched) return null;
+  const projects = await prisma.project.count({ where: { userId: candidate.id } });
+  return projects === 0 ? candidate : null;
+}
+
+/** A creator profile on a page the identity made itself — not a page it joined by invite,
+ *  not a client page a Pro made (managedByOrgId). */
+async function ownCreatorProfile(profiles: any[]) {
+  const creators = profiles.filter((p) => isCreatorProfile(p) && !p.organization?.managedByOrgId);
+  if (!creators.length) return null;
+  const joined = await prisma.driftTourInvite.findMany({
+    where: { acceptedByUserId: { in: creators.map((p) => String(p.id)) } },
+    select: { acceptedByUserId: true },
+  });
+  const joinedIds = new Set(joined.map((j) => j.acceptedByUserId));
+  return creators.find((p) => !joinedIds.has(p.id)) || null;
+}
+
 /** The identity's creator profile, or null. */
 export async function findCreatorProfile(authUserId: string, email: string) {
   const profiles: any[] = await dbService.findUsersForAuthIdentity(authUserId, email);
@@ -72,15 +101,17 @@ export async function findCreatorProfile(authUserId: string, email: string) {
  * 3. otherwise the identity owns a real studio/brand workspace → ONLY with
  *    `allowSecondProfile` (an explicit user confirmation) a second profile is
  *    created in a new personal org; without it → CreatorConfirmationRequired.
+ * With `ownPage` only a page the identity made itself counts as existing (pages it joined
+ * by invite and a Pro's client pages don't) — the "Create your own page" action.
  */
 export async function provisionCreator(
   identity: CreatorIdentity,
   displayName?: string | null,
-  opts?: { allowSecondProfile?: boolean; accountType?: "GENERAL" | "PRO" | null },
+  opts?: { allowSecondProfile?: boolean; accountType?: "GENERAL" | "PRO" | null; ownPage?: boolean },
 ): Promise<CreatorProvisionResult> {
   const email = identity.email.trim().toLowerCase();
   const profiles: any[] = await dbService.findUsersForAuthIdentity(identity.authUserId, email);
-  const existing = profiles.find(isCreatorProfile);
+  const existing = opts?.ownPage ? await ownCreatorProfile(profiles) : profiles.find(isCreatorProfile);
   if (existing) {
     // A page created before account types existed takes the one chosen now.
     if (opts?.accountType && existing.organizationId && !existing.organization?.tourAccountType) {
@@ -103,15 +134,7 @@ export async function provisionCreator(
       .slice(0, 80) || "Creator";
 
   // Decide the path BEFORE creating anything, so a refusal leaves no orphan org.
-  const candidate = profiles.length === 1 ? profiles[0] : null;
-  const looksUntouched =
-    !!candidate &&
-    !candidate.organizationId &&
-    (candidate.role || "USER") === "USER" &&
-    (candidate.view || "VISIONLIGHT") === "VISIONLIGHT" &&
-    Date.now() - new Date(candidate.createdAt).getTime() < BARE_PROFILE_MAX_AGE_MS;
-  const projects = looksUntouched ? await prisma.project.count({ where: { userId: candidate.id } }) : 1;
-  const bare = looksUntouched && projects === 0 ? candidate : null;
+  const bare = await untouchedProfile(profiles);
 
   if (!bare && !opts?.allowSecondProfile) {
     throw new CreatorConfirmationRequired(email, summarize(profiles));

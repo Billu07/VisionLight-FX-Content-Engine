@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { apiEndpoints } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "../rotation3d/driftUiTheme";
 import { TOUR_STYLES } from "./tourUi";
+import type { PageRef, PageRole } from "./types";
+import { invalidateMyPages } from "./myPages";
 import {
+  CREATOR_HOME,
   ensureCreatorProfile,
   errorMessage,
   isConfirmRequired,
+  isInvitePath,
   nextFromLocation,
   rememberAccountType,
   rememberNext,
@@ -17,9 +22,12 @@ import {
 
 /**
  * /tour/start — sign up / log in for the drift.li creator suite. Mobile-first:
- * one calm card; on wide screens a short value prop sits beside it. Google
- * one-tap or email + password (with email confirmation), then straight into the
- * creator's space — or the demo tour when they came from "View demo".
+ * one calm card. Google one-tap or email + password (with email confirmation), then
+ * straight into the creator's space — or the demo tour when they came from "View demo".
+ * Two variants:
+ * - from an invite link (?next=/tour/invite/…): an account only — no page type and no
+ *   page of their own — then back to accept the invite;
+ * - ?create=1, signed in with only joined pages: create a page of their own.
  */
 
 type Mode = "signup" | "login" | "forgot" | "sent";
@@ -38,6 +46,8 @@ const ACCOUNT_TYPES: { value: AccountType; label: string; who: string; note: str
     note: "Create tour pages for your clients and manage them all from one place.",
   },
 ];
+
+const ROLE_AS: Record<PageRole, string> = { ADMIN: "an Admin", EDITOR: "an Editor", VIEWER: "a Viewer" };
 
 // Google sign-in needs the Supabase Google provider (a Google Cloud OAuth client).
 // Off until that's configured: set VITE_TOUR_GOOGLE_AUTH=1 at build time to show it.
@@ -88,29 +98,49 @@ export default function TourAuth() {
 
   const params = new URLSearchParams(location.search);
   const next = nextFromLocation(location.search);
+  // From an invite link: they join someone else's page — an account is all they need.
+  const joining = isInvitePath(next);
+  const inviteToken = joining ? next.slice("/tour/invite/".length).split(/[?#/]/)[0] : "";
+  const creating = params.get("create") === "1";
   const [mode, setMode] = useState<Mode>(params.get("mode") === "login" ? "login" : "signup");
   const [name, setName] = useState("");
-  // ?type=pro (the landing's "Are you a Photographer?") and invite links start on Pro.
+  // ?type=pro — the landing's "Are you a Photographer?" — starts on Pro.
   const [accountType, setAccountType] = useState<AccountType>(() => {
     const t = (params.get("type") || "").toUpperCase();
-    if (t === "PRO" || t === "GENERAL") return t;
-    return next.startsWith("/tour/invite/") ? "PRO" : "GENERAL";
+    return t === "PRO" ? "PRO" : "GENERAL";
   });
   const [email, setEmail] = useState(params.get("email") || "");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [invite, setInvite] = useState<{ page: PageRef; role?: PageRole } | null>(null);
 
-  // Already signed in on a creator profile? Straight through.
   useEffect(() => {
     checkAuth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Joining: whose page, and as what (shown in the copy).
   useEffect(() => {
-    if (!isLoading && user?.view === "TOUR") navigate(next, { replace: true });
+    if (!inviteToken) return;
+    let alive = true;
+    apiEndpoints
+      .driftTourInvite(inviteToken)
+      .then((r) => alive && setInvite(r.data?.invite || null))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [inviteToken]);
+
+  // Already signed in on a creator profile? Straight through — unless they came to create
+  // a page of their own.
+  useEffect(() => {
+    if (!isLoading && user?.view === "TOUR" && !creating) navigate(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, user?.view]);
+  const ownPageMode = creating && !isLoading && user?.view === "TOUR";
 
   // Already signed in on a studio/brand profile (or a multi-workspace login): the
   // creator space is only ever created from this explicit confirmation.
@@ -118,6 +148,10 @@ export default function TourAuth() {
   const signedInElsewhere = !isLoading && (user ? user.view !== "TOUR" : profileSelectionRequired);
   const signedInEmail = user?.email || profiles[0]?.email || email.trim();
   const continueSignedIn = async () => {
+    if (joining) {
+      navigate(next, { replace: true });
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -132,8 +166,14 @@ export default function TourAuth() {
   };
 
   // Provision a brand-new identity right away; an existing studio/brand account is
-  // never converted silently — surface the confirmation instead.
+  // never converted silently — surface the confirmation instead. Joining a page by
+  // invite provisions nothing: accepting the invite gives them their profile there.
   const provisionOrAsk = async (displayName?: string) => {
+    if (joining) {
+      await checkAuth();
+      navigate(next, { replace: true });
+      return;
+    }
     try {
       await ensureCreatorProfile(displayName, { accountType });
     } catch (e) {
@@ -146,6 +186,21 @@ export default function TourAuth() {
     navigate(next, { replace: true });
   };
 
+  // Someone who has only joined pages makes one of their own.
+  const createOwnPage = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await ensureCreatorProfile(name.trim() || undefined, { confirm: true, accountType, ownPage: true });
+      invalidateMyPages();
+      navigate(CREATOR_HOME, { replace: true });
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const switchMode = (m: Mode) => {
     setMode(m);
     setError("");
@@ -156,7 +211,7 @@ export default function TourAuth() {
     setBusy(true);
     setError("");
     try {
-      rememberAccountType(accountType);
+      rememberAccountType(joining ? null : accountType);
       await signInWithGoogle(next);
     } catch (e) {
       setError(errorMessage(e));
@@ -182,7 +237,7 @@ export default function TourAuth() {
       }
       if (mode === "signup" && password.length < 8) throw new Error("Use at least 8 characters for your password.");
       rememberNext(next);
-      if (mode === "signup") rememberAccountType(accountType);
+      if (mode === "signup") rememberAccountType(joining ? null : accountType);
       if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
           email: em,
@@ -235,16 +290,72 @@ export default function TourAuth() {
     }
   };
 
-  const title =
-    mode === "login" ? "Welcome back" : mode === "forgot" ? "Reset your password" : mode === "sent" ? "Check your inbox" : "Create your first tour";
-  const sub =
-    mode === "login"
-      ? "Log in to your creator space."
+  const inviteLine = invite ? `${invite.page.name} as ${ROLE_AS[invite.role || "ADMIN"]}` : "";
+  const eyebrow = ownPageMode ? "Your own page" : joining ? "Page invite" : mode === "login" ? "Creator login" : "Try It Free";
+  const title = ownPageMode
+    ? "Create your own page"
+    : mode === "login"
+      ? "Welcome back"
+      : mode === "forgot"
+        ? "Reset your password"
+        : mode === "sent"
+          ? "Check your inbox"
+          : joining
+            ? "Create your account"
+            : "Create your first tour";
+  const sub = ownPageMode
+    ? "A page of your own for your tours. The pages you've joined stay just as they are."
+    : mode === "login"
+      ? joining
+        ? inviteLine
+          ? `Log in to join ${inviteLine}.`
+          : "Log in to accept your invite."
+        : "Log in to your creator space."
       : mode === "forgot"
         ? "We'll email you a link to set a new password."
         : mode === "sent"
           ? ""
-          : "Free to start. Turn three phone clips into an interactive tour in minutes.";
+          : joining
+            ? inviteLine
+              ? `Then you'll join ${inviteLine}.`
+              : "Then you'll accept your invite."
+            : "Free to start. Turn three phone clips into an interactive tour in minutes.";
+
+  const typePicker = (
+    <div style={{ display: "grid", gap: 8 }}>
+      <div className="ta-types" role="radiogroup" aria-label="Account type">
+        {ACCOUNT_TYPES.map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            role="radio"
+            aria-checked={accountType === t.value}
+            className={`ta-type ${accountType === t.value ? "on" : ""}`}
+            onClick={() => setAccountType(t.value)}
+          >
+            <b>{t.label}</b>
+            <span>{t.who}</span>
+          </button>
+        ))}
+      </div>
+      <div className="ta-type-note">{ACCOUNT_TYPES.find((t) => t.value === accountType)?.note}</div>
+    </div>
+  );
+  const nameField = (
+    <div>
+      <label className="d-label" htmlFor="ta-name">
+        {joining ? "Your name" : "Your Page Name"}
+      </label>
+      <input
+        id="ta-name"
+        className="d-input"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder={joining ? "So the page's team knows it's you" : "Your name or business name"}
+        autoComplete={joining ? "name" : "organization"}
+      />
+    </div>
+  );
 
   return (
     <div className="drift-ui d-page t-page" data-theme={theme}>
@@ -267,7 +378,7 @@ export default function TourAuth() {
                   <div className="ta-title">Check your inbox</div>
                   <p className="d-sub">
                     We sent a confirmation link to <strong style={{ color: "var(--text)" }}>{email.trim()}</strong>. Open it on
-                    this device and you'll land straight in your creator space.
+                    this device and you'll land {joining ? "back on your invite" : "straight in your creator space"}.
                   </p>
                   {notice && <div className="d-banner ok">{notice}</div>}
                   {error && <div className="d-banner err">{error}</div>}
@@ -280,11 +391,34 @@ export default function TourAuth() {
                     </button>
                   </div>
                 </div>
+              ) : ownPageMode ? (
+                <>
+                  <div>
+                    <div className="d-eyebrow" style={{ marginBottom: 8 }}>
+                      {eyebrow}
+                    </div>
+                    <div className="ta-title">{title}</div>
+                    <p className="d-sub" style={{ marginTop: 6 }}>
+                      {sub}
+                    </p>
+                  </div>
+                  <div className="ta-form">
+                    {typePicker}
+                    {nameField}
+                    {error && <div className="d-banner err">{error}</div>}
+                    <button type="button" className="d-btn primary ta-submit" onClick={createOwnPage} disabled={busy}>
+                      {busy ? "Creating…" : "Create my page"}
+                    </button>
+                  </div>
+                  <div className="ta-links">
+                    <Link to={CREATOR_HOME}>← Back to my pages</Link>
+                  </div>
+                </>
               ) : (
                 <>
                   <div>
                     <div className="d-eyebrow" style={{ marginBottom: 8 }}>
-                      {mode === "login" ? "Creator login" : "Try It Free"}
+                      {eyebrow}
                     </div>
                     <div className="ta-title">{title}</div>
                     {sub && (
@@ -297,11 +431,20 @@ export default function TourAuth() {
                   {(signedInElsewhere || confirmPending) && mode !== "forgot" && (
                     <div className="d-banner" style={{ display: "grid", gap: 8 }}>
                       <span>
-                        You're signed in as <strong>{signedInEmail}</strong>, which already has a workspace. Create a
-                        separate creator space for it? Your existing workspace stays exactly as it is.
+                        {joining ? (
+                          <>
+                            You're signed in as <strong>{signedInEmail}</strong>. Continue to accept the invite with this
+                            account.
+                          </>
+                        ) : (
+                          <>
+                            You're signed in as <strong>{signedInEmail}</strong>, which already has a workspace. Create a
+                            separate creator space for it? Your existing workspace stays exactly as it is.
+                          </>
+                        )}
                       </span>
                       <button type="button" className="d-btn primary" onClick={continueSignedIn} disabled={busy}>
-                        {busy ? "One moment…" : "Continue with this account"}
+                        {busy ? "One moment…" : joining ? "Continue to the invite" : "Continue with this account"}
                       </button>
                     </div>
                   )}
@@ -316,41 +459,8 @@ export default function TourAuth() {
                   )}
 
                   <form className="ta-form" onSubmit={submit}>
-                    {mode === "signup" && (
-                      <div style={{ display: "grid", gap: 8 }}>
-                        <div className="ta-types" role="radiogroup" aria-label="Account type">
-                          {ACCOUNT_TYPES.map((t) => (
-                            <button
-                              key={t.value}
-                              type="button"
-                              role="radio"
-                              aria-checked={accountType === t.value}
-                              className={`ta-type ${accountType === t.value ? "on" : ""}`}
-                              onClick={() => setAccountType(t.value)}
-                            >
-                              <b>{t.label}</b>
-                              <span>{t.who}</span>
-                            </button>
-                          ))}
-                        </div>
-                        <div className="ta-type-note">{ACCOUNT_TYPES.find((t) => t.value === accountType)?.note}</div>
-                      </div>
-                    )}
-                    {mode === "signup" && (
-                      <div>
-                        <label className="d-label" htmlFor="ta-name">
-                          Your Page Name
-                        </label>
-                        <input
-                          id="ta-name"
-                          className="d-input"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          placeholder="Your name or business name"
-                          autoComplete="organization"
-                        />
-                      </div>
-                    )}
+                    {mode === "signup" && !joining && typePicker}
+                    {mode === "signup" && nameField}
                     <div>
                       <label className="d-label" htmlFor="ta-email">
                         Email
@@ -391,7 +501,9 @@ export default function TourAuth() {
                       {busy
                         ? "One moment…"
                         : mode === "signup"
-                          ? "Create My Free Account"
+                          ? joining
+                            ? "Create account"
+                            : "Create My Free Account"
                           : mode === "login"
                             ? "Log in"
                             : "Send reset link"}
@@ -400,21 +512,19 @@ export default function TourAuth() {
 
                   <div className="ta-links">
                     {mode === "signup" && (
-                      <>
-                        <span>
-                          Have an account?{" "}
-                          <button type="button" onClick={() => switchMode("login")}>
-                            Log in
-                          </button>
-                        </span>
-                      </>
+                      <span>
+                        Have an account?{" "}
+                        <button type="button" onClick={() => switchMode("login")}>
+                          Log in
+                        </button>
+                      </span>
                     )}
                     {mode === "login" && (
                       <>
                         <span>
                           New here?{" "}
                           <button type="button" onClick={() => switchMode("signup")}>
-                            Try It Free
+                            {joining ? "Create an account" : "Try It Free"}
                           </button>
                         </span>
                         <button type="button" onClick={() => switchMode("forgot")}>

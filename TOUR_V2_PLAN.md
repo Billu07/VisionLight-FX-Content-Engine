@@ -359,5 +359,11 @@ Drift.li is a division of PicDrift
   Remove / Leave (last admin protected), invite by email with a role (client pages default to Viewer), pending
   invites. Tour header: page switcher (own page, other pages, client pages, other workspaces) replaces "Switch
   studio" for creators; Dashboard always opens the login's own page. Viewers get a view-only builder and page
-  (no create / hide / delete / settings; "Leave page"). Invite page + emails name the role. The home
+  (no create / hide / delete / settings; "Leave page"). Invite page + emails name the role.
+- 2026-09-15 — Invite sign-up is an account only: no General/Pro choice and no page of their own (it used to
+  create an empty page first, and Dashboard opened it). "Your name" instead of "Your Page Name"; the copy names
+  the page and role; email confirmation returns to the invite. Accepting turns the brand-new login's bare profile
+  into its profile on that page (no stray "Personal Workspace"). Pages joined by invite and client pages aren't
+  "own"; Dashboard opens the first own page. People with only joined pages get "+ Create your own page" in the page
+  switcher (/tour/start?create=1). No schema change. The home
   no longer downloads the player.

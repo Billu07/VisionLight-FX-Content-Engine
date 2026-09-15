@@ -65,6 +65,20 @@ export function takeNext(fallback: string = CREATOR_HOME): string {
   }
 }
 
+/** The remembered post-auth target, left in place. */
+export function peekNext(): string | null {
+  try {
+    const v = localStorage.getItem(NEXT_KEY);
+    return isSafeNext(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Signing up from an invite joins someone else's page: an account only — no page type and
+ *  no page of their own — then straight back to /tour/invite/{token} to accept it. */
+export const isInvitePath = (p: string | null | undefined): boolean => !!p && p.startsWith("/tour/invite/");
+
 /** Resolve the post-auth target from the current URL (?next= / ?intent=demo). */
 export function nextFromLocation(search: string): string {
   const q = new URLSearchParams(search);
@@ -92,7 +106,10 @@ export const isConfirmRequired = (e: unknown): e is CreatorConfirmRequired =>
  * email may also own a studio/brand workspace) and refresh the auth store.
  * Pass { confirm: true } only from an explicit "create my creator space" action.
  */
-export async function ensureCreatorProfile(name?: string, opts?: { confirm?: boolean; accountType?: AccountType }): Promise<void> {
+export async function ensureCreatorProfile(
+  name?: string,
+  opts?: { confirm?: boolean; accountType?: AccountType; ownPage?: boolean },
+): Promise<void> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -100,7 +117,7 @@ export async function ensureCreatorProfile(name?: string, opts?: { confirm?: boo
   setAuthToken(session.access_token);
   let r;
   try {
-    r = await apiEndpoints.driftCreatorSignup(name, opts?.confirm === true, opts?.accountType);
+    r = await apiEndpoints.driftCreatorSignup(name, opts?.confirm === true, opts?.accountType, opts?.ownPage === true);
   } catch (e: any) {
     if (e?.code === "CREATOR_CONFIRM") throw new CreatorConfirmRequired(String(e?.details?.email || ""));
     throw e;
