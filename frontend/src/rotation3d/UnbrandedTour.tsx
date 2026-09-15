@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
 import { combinedFrameSets, warmFrames } from "./driftNav";
+import { newViewKey, type AttentionTarget } from "./attention";
 
 /**
  * An unbranded (MLS-safe) tour: drift.li/u/{code}. The tour's menu and drifts with no page
@@ -131,6 +132,12 @@ export default function UnbrandedTour() {
     return { p, manifest, captions: framesB.length ? undefined : p.captions, pins, pinTrack: pins ? p.pinTrack ?? null : null };
   }, [product]);
 
+  // Tour Insights: unbranded visits count too (marked as such).
+  const attention = useMemo<AttentionTarget | null>(
+    () => (product?.id && product?.flow ? { productId: String(product.id), key: newViewKey(), unbranded: true } : null),
+    [product],
+  );
+
   if (missing) {
     return (
       <div className="ub-state">
@@ -212,6 +219,7 @@ export default function UnbrandedTour() {
       captions={view.captions}
       pins={view.pins}
       pinTrack={view.pinTrack}
+      attention={attention}
       background={p.background}
       showBrand={false}
       showLogo={false}

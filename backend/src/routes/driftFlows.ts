@@ -1,4 +1,4 @@
-import { Router, Response } from "express";
+import express, { Router, Response } from "express";
 import multer from "multer";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
@@ -22,6 +22,7 @@ import {
   submitEnquiry,
 } from "../services/driftEnquiries";
 import { enquirySettingsOf, parseEnquirySettings } from "../services/tourEnquirySettings";
+import { ensureReportLink, ownerReport, recordAttention, removeReportLink, tourInsights } from "../services/driftInsights";
 import {
   createClientPage,
   createProInvite,
@@ -867,6 +868,61 @@ router.post("/api/drift/my/flows/:id/unbranded", authenticateToken, async (req: 
     console.log(`[${NS}] flow ${flow.id}: unbranded link made`);
   }
   res.json({ code, path: `/u/${code}` });
+});
+
+// ── Insights: what visitors do inside a tour (services/driftInsights.ts) ──
+// The player's attention records (public). A beacon sends text/plain (no preflight); always 204,
+// so a dropped record never bothers the visitor.
+router.post(
+  "/api/drift/public/attention",
+  express.text({ type: "text/plain", limit: "16kb" }),
+  async (req: AuthenticatedRequest, res: Response) => {
+    await recordAttention(req.body, clientIp(req)).catch((err) =>
+      console.warn(`[${NS}] attention record dropped:`, err instanceof Error ? err.message : err),
+    );
+    res.status(204).end();
+  },
+);
+
+// The tour's Insights — everyone on the page (?days=7|30|90).
+router.get("/api/drift/my/flows/:id/insights", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "VIEW");
+  if (!orgId) return;
+  try {
+    res.json({ insights: await tourInsights(orgId, req.params.id, req.query.days) });
+  } catch (err) {
+    return handle(res, err);
+  }
+});
+
+// The owner report link (/report/{code}): made on first use, kept until it's turned off.
+router.post("/api/drift/my/flows/:id/report", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "EDIT");
+  if (!orgId) return;
+  try {
+    res.json(await ensureReportLink(orgId, req.params.id));
+  } catch (err) {
+    return handle(res, err);
+  }
+});
+
+router.delete("/api/drift/my/flows/:id/report", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "EDIT");
+  if (!orgId) return;
+  try {
+    await removeReportLink(orgId, req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    return handle(res, err);
+  }
+});
+
+// The owner report (public, read-only; counts only).
+router.get("/api/drift/public/reports/:code", async (req: AuthenticatedRequest, res: Response) => {
+  const report = await ownerReport(req.params.code, req.query.days);
+  if (!report) return res.status(404).json({ error: "Not found" });
+  res.set("Cache-Control", "no-store");
+  res.json({ report });
 });
 
 // A visit through a personal link (public): counts the open; an unknown link is ignored.

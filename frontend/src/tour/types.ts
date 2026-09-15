@@ -71,6 +71,8 @@ export type Flow = {
   publicPath: string;
   /** the unbranded (MLS-safe) link once it's been made: /u/{code} */
   unbrandedPath?: string | null;
+  /** the owner report link while it's on: /report/{code} */
+  reportPath?: string | null;
   entryProductId: string | null;
   entryPath: string | null;
   thumb: string | null;
@@ -215,6 +217,57 @@ export type Billing = {
   price: string;
   hostingDays: number;
   paymentsEnabled: boolean;
+};
+
+/** Tour Insights — one drift's numbers (backend services/driftInsights.ts). */
+export type DriftInsight = {
+  stepId: string;
+  productId: string;
+  name: string;
+  thumb: string | null;
+  /** 10 frames along the drift */
+  strip: string[];
+  views: number;
+  visitors: number;
+  /** the share of the period's visits that reached it */
+  reachedPct: number;
+  avgMs: number;
+  /** the average share of the footage a view reached */
+  explored: number;
+  lookedBackPct: number;
+  exits: number;
+  /** of the visits that reached it, the share that ended there */
+  exitPct: number;
+  /** time on each of 20 equal parts of the footage, 0–1 (1 = the most) */
+  heat: number[];
+  topPart: number | null;
+  pins: { title: string; taps: number }[];
+};
+
+/** Tour Insights for a period (the builder's Insights sheet and the owner report). */
+export type TourInsights = {
+  days: number;
+  from: string;
+  to: string;
+  countingSince: string | null;
+  visits: number;
+  totalMs: number;
+  avgVisitMs: number;
+  sawAllPct: number;
+  avgDriftsSeen: number;
+  driftCount: number;
+  enquiries: number;
+  /** where visits came from — team only (null on the owner report) */
+  sources: { direct: number; personal: number; unbranded: number } | null;
+  series: { date: string; visits: number }[];
+  drifts: DriftInsight[];
+};
+
+/** The owner report (/report/{code}): the tour, its page, and its Insights. */
+export type OwnerReport = {
+  tour: { title: string; description: string | null; thumb: string | null };
+  page: { name: string; logoUrl: string | null };
+  insights: TourInsights;
 };
 
 export const isReady = (s?: string | null) => s === "READY" || s === "PUBLISHED";

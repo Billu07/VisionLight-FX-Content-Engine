@@ -470,6 +470,8 @@ export function serializeFlow(f: any) {
     publicPath: flowPublicPath(kind, pageSlug, f.slug),
     /** the unbranded (MLS-safe) link, once made: /u/{code} */
     unbrandedPath: typeof settingsOf(f).unbrandedCode === "string" ? `/u/${settingsOf(f).unbrandedCode as string}` : null,
+    /** the owner report link while it's on: /report/{code} */
+    reportPath: typeof settingsOf(f).reportCode === "string" ? `/report/${settingsOf(f).reportCode as string}` : null,
     entryProductId: (entry?.id ?? null) as string | null,
     entryPath: entry ? (entry.playerPath as string) : null,
     thumb: (f.coverUrl || entry?.thumb || null) as string | null,

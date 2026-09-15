@@ -17,6 +17,7 @@ import { buildSpinFromVideo } from "../services/rotation3d/pipeline";
 import { enqueueProcessing, processingQueueDepth } from "../services/rotation3d/processingQueue";
 import { publicPins } from "../services/driftPins";
 import { publicEnquiry } from "../services/tourEnquirySettings";
+import { rateLimiter, visitorIp } from "../services/driftVisitors";
 import { buildShareCard } from "../services/rotation3d/shareCard";
 import { streamDriftExportZip, renderCaptionedFramePng } from "../services/driftExport";
 import {
@@ -93,6 +94,7 @@ const RESERVED_SLUGS = new Set([
   "tour", "view", "memory", "path", // drift.li creator suite (/{kind}/{slug})
   "start", "invite", "new", "edit", "login", "signup", "dashboard", "capture-guide", // /tour/{static} app routes (page slugs)
   "u", // unbranded (MLS-safe) tour links: /u/{code}
+  "report", // owner reports: /report/{code}
 ]);
 
 // Globally-unique vanity slug for an organization.
@@ -1381,7 +1383,9 @@ router.get(
   },
 );
 
-// Anonymous engagement events from the player.
+// Anonymous engagement events from the player. A generous per-visitor limit stops floods only;
+// meta is small context ({ which } / { link } / { unbranded }) — anything bigger is dropped.
+const allowPlayerEvent = rateLimiter(10 * 60 * 1000, 900);
 router.post("/api/drift/public/events", async (req: AuthenticatedRequest, res: Response) => {
   const productId = String(req.body?.productId || "");
   const type = String(req.body?.type || "").toUpperCase();
@@ -1389,18 +1393,21 @@ router.post("/api/drift/public/events", async (req: AuthenticatedRequest, res: R
   if (!productId || !allowed.includes(type)) {
     return res.status(400).json({ error: "Invalid event" });
   }
+  if (!allowPlayerEvent(visitorIp(req))) return res.status(429).json({ error: "Too many events" });
   const product = await prisma.driftProduct.findUnique({
     where: { id: productId },
     select: { organizationId: true },
   });
   if (!product) return res.status(404).json({ error: "Not found" });
 
+  const rawMeta = req.body?.meta && typeof req.body.meta === "object" && !Array.isArray(req.body.meta) ? req.body.meta : undefined;
+  const meta = rawMeta && JSON.stringify(rawMeta).length <= 1000 ? rawMeta : undefined;
   await prisma.driftEvent.create({
     data: {
       organizationId: product.organizationId,
       productId,
       type,
-      meta: req.body?.meta && typeof req.body.meta === "object" ? req.body.meta : undefined,
+      meta,
     },
   });
   res.json({ ok: true });

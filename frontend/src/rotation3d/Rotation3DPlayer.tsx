@@ -6,6 +6,7 @@ import { isSpinPlayerSite, isDriftSite, getPlayerBranding } from "../lib/brandin
 import { initMetaPixel, track } from "./metaPixel";
 import { resolveDriftTarget, prefetchDriftTargets, getCachedDrift, cacheDrift, driftKey, flowDriftKey, targetKey, combinedFrameSets } from "./driftNav";
 import { captureShareLink, shareLinkFor } from "./personalLink";
+import { newViewKey, type AttentionTarget } from "./attention";
 
 /**
  * Public Rotation3D player (rotation3d.com/p/:id and /embed/:id). Fetches the
@@ -319,6 +320,12 @@ export default function Rotation3DPlayer() {
     return { p, manifest, captions, pins, pinTrack };
   }, [data, drift]);
 
+  // Tour Insights: a recorder key per drift shown — tour drifts only, never the builder's /embed preview.
+  const attention = useMemo<AttentionTarget | null>(() => {
+    if (!drift || !data?.id || !data?.flow || window.location.pathname.startsWith("/embed/")) return null;
+    return { productId: String(data.id), key: newViewKey(), link: shareLinkFor(data.flow.id) };
+  }, [data, drift]);
+
   if (tourAlias) return <Navigate to={`/tour/${brandSlug}`} replace />;
 
   // vanity URLs are Rotation3D-host only — on other domains fall through to "/"
@@ -368,6 +375,7 @@ export default function Rotation3DPlayer() {
       captions={view.captions}
       pins={view.pins}
       pinTrack={view.pinTrack}
+      attention={attention}
       logoUrl={p.logoUrl}
       primaryColor={p.primaryColor}
       secondaryColor={p.secondaryColor}

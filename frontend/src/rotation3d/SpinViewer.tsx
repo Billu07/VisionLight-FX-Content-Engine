@@ -1,5 +1,6 @@
 import { holdForegroundLoad } from "./driftNav";
 import { pinPlacement, type PinTrack, type SpinPin } from "./pins";
+import { createAttention, type AttentionTarget } from "./attention";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { getPlayerBranding } from "../lib/branding";
 import DriftFormOverlay, { type OverlayForm, enquiryDefinition } from "./DriftFormOverlay";
@@ -155,6 +156,8 @@ export type SpinViewerProps = {
   pins?: SpinPin[];
   /** How the footage moves, for the pins (null → they follow their fine-tuning only). */
   pinTrack?: PinTrack;
+  /** Tour Insights: record where this visitor spends their time in the drift (tour drifts only). */
+  attention?: AttentionTarget | null;
   /** Loop on/off (per drift): true = dragging wraps end→start seamlessly;
    * false = dragging clamps at the first/last frame. Default true (360 spins). */
   loopScrub?: boolean;
@@ -256,6 +259,7 @@ export default function SpinViewer({
   captions,
   pins,
   pinTrack = null,
+  attention = null,
   loopScrub = true,
   driftDirection = "LTR",
 }: SpinViewerProps) {
@@ -313,6 +317,11 @@ export default function SpinViewer({
   const [openPin, setOpenPin] = useState<number | null>(null);
   const openPinRef = useRef<number | null>(null);
   openPinRef.current = openPin;
+  // Tour Insights: the recorder is made per drift in the render effect, from the latest target
+  // (kept in a ref, so a new target never re-inits the engine).
+  const attentionTargetRef = useRef<AttentionTarget | null>(attention);
+  attentionTargetRef.current = attention;
+  const attentionRef = useRef<ReturnType<typeof createAttention> | null>(null);
   useEffect(() => {
     pinsRef.current = pins;
     pinTrackRef.current = pinTrack;
@@ -466,6 +475,9 @@ export default function SpinViewer({
     let interacted = false;
     let raf = 0;
     let alive = true;
+    // Tour Insights: one recorder per drift shown; it sends its record when the drift goes.
+    const attn = driftMode && !hero && attentionTargetRef.current ? createAttention(attentionTargetRef.current, FRAMES, loopScrub) : null;
+    attentionRef.current = attn;
 
     // --- one-time intro gesture ("show, don't tell") ---
     // On a visitor's FIRST drift, a finger drags across the frame while the content
@@ -1070,6 +1082,8 @@ export default function SpinViewer({
         introHandRef.current.style.top = (vertical ? fy + along * fh : fy + fh * 0.52) + "px";
         introHandRef.current.style.opacity = String(Math.max(0, Math.min(1, introAlpha)));
       }
+      // Insights: the frame on screen, and whether the visitor has taken over from the intro.
+      if (attn) attn.sample(((Math.round(yaw / (TWO_PI / FRAMES)) % FRAMES) + FRAMES) % FRAMES, interacted && !introActive);
       raf = requestAnimationFrame(tick);
     };
 
@@ -1189,6 +1203,7 @@ export default function SpinViewer({
     };
 
     const onDown = (e: PointerEvent) => {
+      attn?.activity();
       userTookOver = true; // a touch before the demo starts cancels it too
       if (introActive) endIntro(); // the user is taking over — stop the demo
       if (isControl(e.target)) return;
@@ -1197,6 +1212,7 @@ export default function SpinViewer({
       if (pointers.size === 1) down(e);
     };
     const onMove = (e: PointerEvent) => {
+      attn?.activity();
       if (pointers.has(e.pointerId)) pointers.set(e.pointerId, e);
       if (pointers.size === 2) {
         const [a, b] = [...pointers.values()];
@@ -1233,6 +1249,7 @@ export default function SpinViewer({
       lastTap = now;
     };
     const onWheel = (e: WheelEvent) => {
+      attn?.activity();
       // Drift: never hijack the page scroll to zoom — the +/- buttons handle zoom.
       if (driftMode) return;
       e.preventDefault();
@@ -1240,6 +1257,7 @@ export default function SpinViewer({
       zoomTarget = clampZoom(zoomTarget * (e.deltaY < 0 ? 1.1 : 0.9));
     };
     const onKey = (e: KeyboardEvent) => {
+      attn?.activity();
       const step = TWO_PI / FRAMES;
       if (e.key === "ArrowRight" || e.key === "ArrowDown") { engage(); yaw += spin * step; }
       else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { engage(); yaw -= spin * step; }
@@ -1620,6 +1638,8 @@ export default function SpinViewer({
     return () => {
       alive = false;
       releaseForeground?.();
+      if (attentionRef.current === attn) attentionRef.current = null;
+      attn?.close();
       if (leaseTimer) clearTimeout(leaseTimer);
       if (revealTimer) clearTimeout(revealTimer);
       if (landscapeZoomTimer) clearTimeout(landscapeZoomTimer);
@@ -1823,7 +1843,10 @@ export default function SpinViewer({
               }}
               className={`r3d-pin ${openPin === i ? "r3d-pin-open" : ""}`}
               data-note={pin.note ? "1" : undefined}
-              onClick={() => pin.note && setOpenPin((cur) => (cur === i ? null : i))}
+              onClick={() => {
+                if (pin.id) attentionRef.current?.pin(pin.id);
+                if (pin.note) setOpenPin((cur) => (cur === i ? null : i));
+              }}
               aria-expanded={pin.note ? openPin === i : undefined}
               aria-label={pin.note ? `${pin.title}: ${pin.note}` : pin.title}
             >

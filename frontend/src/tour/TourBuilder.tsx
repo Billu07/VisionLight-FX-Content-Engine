@@ -8,6 +8,7 @@ import { canEditPage } from "./pageRoles";
 import { isReady } from "./types";
 import { ShareSheet } from "./ShareSheet";
 import { PinEditor } from "./PinEditor";
+import { TourInsights } from "./TourInsights";
 import { CAPTURE_GUIDE_SEEN_KEY, CaptureGuideSheet } from "./CaptureGuide";
 import { Spinner, StatusPill, TourShell, apiError, copyText, publicUrl, readClipDuration } from "./tourUi";
 import { TOUR_PAGE_STYLES } from "./tourPageStyles";
@@ -616,6 +617,7 @@ export default function TourBuilder({
   const [role, setRole] = useState<PageRole | null>(null);
   // The drift whose pins are being edited.
   const [pinStep, setPinStep] = useState<FlowStep | null>(null);
+  const [insightsOpen, setInsightsOpen] = useState(false);
   // "Path" = compact rows you expand one at a time (default); "Cards" = every drift open.
   const [viewMode, setViewMode] = useState<"path" | "cards">(() => {
     try {
@@ -974,6 +976,11 @@ export default function TourBuilder({
               {showSettings ? "Hide settings" : "Tour settings"}
             </button>
           )}
+          {(flow.status === "PUBLISHED" || flow.publishedAt) && (
+            <button className="d-btn" onClick={() => setInsightsOpen(true)} title="Where visitors spend their time">
+              Insights
+            </button>
+          )}
           {flow.status === "PUBLISHED" ? (
             <>
               <button className="d-btn primary" onClick={() => setShare("open")}>
@@ -1269,6 +1276,14 @@ export default function TourBuilder({
         />
       )}
       {showGuide && <CaptureGuideSheet onClose={() => setShowGuide(false)} />}
+      {insightsOpen && (
+        <TourInsights
+          flow={flow}
+          canManage={!readOnly}
+          onClose={() => setInsightsOpen(false)}
+          onReportPath={(reportPath) => setFlow((f) => (f ? { ...f, reportPath } : f))}
+        />
+      )}
     </>,
   );
 }

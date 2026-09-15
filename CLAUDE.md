@@ -278,6 +278,18 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   (flyer / window sign / 8 QR cards in mm, A4 or Letter, QR → tour or unbranded link). Printing renders a copy into a
   `.pk-portal` on `<body>`; print CSS hides everything else and sets `@page` — verified one page per sheet at the right
   size via headless Chrome. `u` is reserved in both slug lists.
+- **Insights + owner report** (2026-09-15, no schema change): the player records attention per tour drift view —
+  `rotation3d/attentionMeter.ts` (pure: time while active, time on 20 equal parts of the footage once the visitor
+  drags, parts reached, drag-backs, pin taps), wired into `SpinViewer` by the `attention` prop (`rotation3d/attention.ts`:
+  a key per drift shown from `Rotation3DPlayer` / `UnbrandedTour`, never the builder's `/embed` preview; a random per-tab
+  visit id, no cookies; a text/plain beacon on leave / hide) → `POST /api/drift/public/attention` → `DriftEvent` type
+  "DWELL" (`services/driftInsights.ts`: validated, per-IP limited, tour drifts only). `GET /api/drift/my/flows/:id/insights`
+  (VIEW, ?days=7|30|90) rolls it up (`rollUpInsights`, pure); builder "Insights" → `tour/TourInsights.tsx` over
+  `tour/InsightsView.tsx`. Owner report: `POST|DELETE /api/drift/my/flows/:id/report` (EDIT) keeps a code in
+  `DriftFlow.settings.reportCode` (`serializeFlow` → `reportPath`; never in `serializePublicFlow`); public
+  `GET /api/drift/public/reports/:code` (counts only — no names, messages or personal links) → `/report/{code}`
+  (`tour/OwnerReport.tsx`, noindex). The generic player events endpoint now drops meta over 1KB and rate-limits per IP
+  (`services/driftVisitors.ts`). `report` is reserved in both slug lists.
 - **Superadmin**: `X-Drift-Org` lets a superadmin act on any TOUR page ("Manage this page", `usePageAdmin`);
   back office = Admin → drift.li → Tour (`routes/driftTourAdmin.ts`, `DriftTourAdmin.tsx`).
 - **drift.li home** = `rotation3d/DriftHome.tsx` (2026-09-14 redesign per the client's `land.png`: the hero's

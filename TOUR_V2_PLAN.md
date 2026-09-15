@@ -374,7 +374,7 @@ Drift.li is a division of PicDrift
   noise and scene cuts are refused (pins then follow the fine-tuning only). Player: pulsing dot + label, tap for the
   note, dragging closes it. Also closed: tour Editors/Viewers could still write brand captions/thumbnails directly.
 - 2026-09-15 — Feature roadmap agreed (one phase at a time, review between): 1 pins ✅ · 2 enquiries + personal links ✅
-  · 3 print kit + MLS-safe link ✅ · 4 attention heatmap + owner report · 5 auto clean-up on upload · 6 shoot mode in the
+  · 3 print kit + MLS-safe link ✅ · 4 attention heatmap + owner report ✅ · 5 auto clean-up on upload · 6 shoot mode in the
   browser · 7 reel export · 8 Then & Now.
 - 2026-09-15 — Phase 2: enquiries + personal links (SCHEMA: `DriftShareLink` → db push). Page settings → "Enquiry
   button" (label presets Book a viewing / Ask a question / Request info / Get a quote, optional phone). Shown on the
@@ -394,3 +394,17 @@ Drift.li is a division of PicDrift
   save as PDF" uses the browser's dialog. Checked by rendering each sheet and printing it with headless Chrome: exactly
   one page each, A4 portrait 595×842pt / Letter landscape 792×612pt, the app hidden. Not yet run against the live DB:
   the unbranded endpoints (settings JSON-path lookup) — test after deploy.
+- 2026-09-15 — Phase 4: attention heatmap + owner report (NO schema change — backend + frontend rebuild only). Every
+  tour drift view (branded, personal-link and unbranded; never the builder's preview) sends one small anonymous record
+  when it's left or the page is hidden: time on the drift while the visitor is active (stops after 20s idle), where in
+  the footage they lingered once they started dragging (20 parts), how much of it they reached, drag-backs, pin taps
+  (DriftEvent "DWELL"; a random per-tab visit id, no cookies). Builder → "Insights" (everyone on the page; last 7 / 30 /
+  90 days): visits (with personal-link / unbranded counts), average visit, share who saw every drift, enquiries, visits
+  per day, up to three plain-language takeaways, and per drift a filmstrip with a heat strip (the ringed frame = the
+  longest look), reach, average time, explored, dragged back, ended here and pins tapped. "Owner report" → a live,
+  read-only `drift.li/report/{code}` for the owner or client (counts only — no names, messages or personal links;
+  Editors/Admins make it or turn it off; printable; noindex). Counts start at deploy; the team's own visits count too.
+  Also hardened: the generic player events endpoint drops meta over 1KB and has a generous per-IP limit. Verified: 15
+  meter checks (scripted 60fps drags — lingering, reach, reversals, loop wrap, fast flicks, idle, hidden tab, stalls) and
+  42 roll-up / validation checks against hand-computed numbers; the view rendered light, dark, empty and at phone width
+  in headless Chrome. Not yet run against the live DB: the new endpoints — test after deploy.

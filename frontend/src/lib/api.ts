@@ -490,6 +490,12 @@ export const apiEndpoints = {
   driftUnbrandedTour: (code: string) => api.get(`/api/drift/public/unbranded/${encodeURIComponent(code)}`),
   driftUnbrandedDrift: (code: string, index: number) =>
     api.get(`/api/drift/public/unbranded/${encodeURIComponent(code)}/drifts/${index}`),
+  // tour insights + the owner report
+  driftTourInsights: (id: string, days: number) => api.get(`/api/drift/my/flows/${id}/insights`, { params: { days } }),
+  driftCreateReportLink: (id: string) => api.post(`/api/drift/my/flows/${id}/report`),
+  driftDeleteReportLink: (id: string) => api.delete(`/api/drift/my/flows/${id}/report`),
+  driftOwnerReport: (code: string, days: number) =>
+    api.get(`/api/drift/public/reports/${encodeURIComponent(code)}`, { params: { days } }),
 
   // Brand-level drift settings (Meta Pixel default).
   driftBrandSettings: () => api.get("/api/drift/my/brand-settings"),
