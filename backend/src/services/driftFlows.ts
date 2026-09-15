@@ -362,6 +362,7 @@ const stepProductSelect = {
   paidAt: true,
   hostingExpiresAt: true,
   spin: { select: { frameCount: true, manifest: true } },
+  _count: { select: { pins: true } },
 };
 
 export const flowInclude = {
@@ -401,6 +402,7 @@ export function serializeStepProduct(p: any) {
     billingStatus: (p.billingStatus || "FREE") as string,
     paidAt: (p.paidAt ?? null) as Date | null,
     hostingExpiresAt: (p.hostingExpiresAt ?? null) as Date | null,
+    pinCount: (p._count?.pins ?? 0) as number,
     updatedAt: p.updatedAt as Date,
   };
 }

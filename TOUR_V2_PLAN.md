@@ -365,5 +365,12 @@ Drift.li is a division of PicDrift
   the page and role; email confirmation returns to the invite. Accepting turns the brand-new login's bare profile
   into its profile on that page (no stray "Personal Workspace"). Pages joined by invite and client pages aren't
   "own"; Dashboard opens the first own page. People with only joined pages get "+ Create your own page" in the page
-  switcher (/tour/start?create=1). No schema change. The home
+  switcher (/tour/start?create=1). No schema change.
+- 2026-09-15 — Tour pins (SCHEMA: `DriftPin`, `DriftProduct.pinTrack` → db push). "Pins" on a ready drift opens the
+  pin editor: + Add pin → tap a spot → label (≤40) + optional note (≤160); up to 12 per drift; play-through to check;
+  drag on another frame to fine-tune. The first open measures how the footage moves (~0.4s + frame downloads) and
+  saves it; pins follow their spot and show only while it's in view (fade at the edges). Verified on synthetic pans
+  from a real photo: ≤0.7px error on a 390px phone frame (clean, exposure drift + noise), ≤6px with a walking zoom;
+  noise and scene cuts are refused (pins then follow the fine-tuning only). Player: pulsing dot + label, tap for the
+  note, dragging closes it. Also closed: tour Editors/Viewers could still write brand captions/thumbnails directly. The home
   no longer downloads the player.

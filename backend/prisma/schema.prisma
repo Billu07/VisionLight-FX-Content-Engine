@@ -533,6 +533,7 @@ model DriftProduct {
   hideTitle       Boolean  @default(false) // hide the drift's own title/name (.r3d-name) in the platform player
   mobileZoom      Boolean  @default(false) // show the +/- zoom controls on mobile (off by default on phones)
   thumbnailUrl    String? // captioned-frame snapshot used as the poster (else the default frame)
+  pinTrack        Json? // tour pins: how the footage moves frame to frame { v, key, axis, shift[] } (services/driftPins.ts)
   metaPixelId     String? // per-drift Meta Pixel id — overrides the brand default
   background      String? // "transparent" | hex
   ctaPrimary      Json? // { label, url }
@@ -559,6 +560,7 @@ model DriftProduct {
   spin         DriftSpin?
   embed        DriftEmbed?
   captions     DriftCaption[]
+  pins         DriftPin[] // tour pins: labelled spots that follow the footage
   events       DriftEvent[]
   leads        DriftLead[]
   flowStep     DriftFlowStep? // the flow step this drift belongs to (its ctaPrimary is then flow-managed)
@@ -642,6 +644,26 @@ model DriftCaption {
   order      Int      @default(0)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  product DriftProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+// Tour pins: a labelled spot on a drift that follows its place in the footage (pinTrack on
+// the product) — placed on one frame, optionally fine-tuned on others.
+model DriftPin {
+  id        String   @id @default(uuid())
+  productId String
+  frame     Int      @default(0) // the frame it was placed on
+  x         Float    @default(0.5) // normalized 0..1 on that frame
+  y         Float    @default(0.5)
+  keys      Json? // fine-tuning: [{ f, x, y }] where the creator moved it on other frames
+  title     String
+  note      String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   product DriftProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
 

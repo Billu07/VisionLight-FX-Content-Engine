@@ -302,7 +302,10 @@ export default function Rotation3DPlayer() {
       ...(sets.framesMobile ? { framesMobile: sets.framesMobile } : {}),
       defaultFrame: p.defaultFrame ?? m.defaultFrame ?? 0,
     };
-    return { p, manifest, captions };
+    // Tour pins follow one clip's frames (a 2-clip drift has none).
+    const pins = drift && !framesB.length && Array.isArray(p.pins) && p.pins.length ? p.pins : undefined;
+    const pinTrack = pins ? p.pinTrack ?? null : null;
+    return { p, manifest, captions, pins, pinTrack };
   }, [data, drift]);
 
   if (tourAlias) return <Navigate to={`/tour/${brandSlug}`} replace />;
@@ -352,6 +355,8 @@ export default function Rotation3DPlayer() {
       driftDirection={drift ? p.driftDirection : undefined}
       driftMode={drift}
       captions={view.captions}
+      pins={view.pins}
+      pinTrack={view.pinTrack}
       logoUrl={p.logoUrl}
       primaryColor={p.primaryColor}
       secondaryColor={p.secondaryColor}

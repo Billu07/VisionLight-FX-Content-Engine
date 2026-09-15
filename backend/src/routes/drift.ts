@@ -15,6 +15,7 @@ import { AuthService } from "../services/auth";
 import { IMMUTABLE_CACHE_CONTROL, uploadManagedBuffer } from "../utils/managedStorage";
 import { buildSpinFromVideo } from "../services/rotation3d/pipeline";
 import { enqueueProcessing, processingQueueDepth } from "../services/rotation3d/processingQueue";
+import { publicPins } from "../services/driftPins";
 import { buildShareCard } from "../services/rotation3d/shareCard";
 import { streamDriftExportZip, renderCaptionedFramePng } from "../services/driftExport";
 import {
@@ -729,19 +730,25 @@ router.delete(
 
 // ─────────────────────────── BRAND ADMIN (org-scoped) ───────────────────────────
 
+// Tour page Editors and Viewers work through the creator API (driftFlows checks their
+// role); for them the brand tools here are read-only. Sends the 403 and returns true when
+// the request is blocked.
+const tourRoleReadOnly = (req: AuthenticatedRequest, res: Response): boolean => {
+  const tourRole = req.user?.tourRole;
+  if (tourRole && tourRole !== "ADMIN" && req.user?.role !== "SUPERADMIN" && !["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+    res.status(403).json({ error: "Your role on this page can't make that change.", code: "PAGE_ROLE" });
+    return true;
+  }
+  return false;
+};
+
 const requireOrg = (req: AuthenticatedRequest, res: Response): string | null => {
   const orgId = req.user?.organizationId;
   if (!orgId) {
     res.status(403).json({ error: "No organization on this account" });
     return null;
   }
-  // Tour page Editors and Viewers work through the creator API (driftFlows checks their
-  // role); for them these brand tools are read-only.
-  const tourRole = req.user?.tourRole;
-  if (tourRole && tourRole !== "ADMIN" && req.user?.role !== "SUPERADMIN" && !["GET", "HEAD", "OPTIONS"].includes(req.method)) {
-    res.status(403).json({ error: "Your role on this page can't make that change.", code: "PAGE_ROLE" });
-    return null;
-  }
+  if (tourRoleReadOnly(req, res)) return null;
   return orgId;
 };
 
@@ -876,6 +883,7 @@ router.put(
   "/api/drift/my/products/:id/captions",
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
+    if (tourRoleReadOnly(req, res)) return;
     const isSuper = req.user?.role === "SUPERADMIN";
     const orgId = req.user?.organizationId;
     const product = await prisma.driftProduct.findFirst({
@@ -1079,6 +1087,7 @@ const publicProductPayload = async (p: any, bc: any, orgName: string, captions: 
   manifest: p.spin?.manifest,
   secondManifest: p.spin?.secondManifest ?? null,
   captions,
+  ...(await publicPins(p)),
 });
 
 // Curated products for the drift.li landing showcase (superadmin picks).
@@ -1303,6 +1312,7 @@ router.post(
   "/api/drift/my/products/:id/thumbnail",
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
+    if (tourRoleReadOnly(req, res)) return;
     const isSuper = req.user?.role === "SUPERADMIN";
     const orgId = req.user?.organizationId;
     const product = await prisma.driftProduct.findFirst({
@@ -1345,6 +1355,7 @@ router.delete(
   "/api/drift/my/products/:id/thumbnail",
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
+    if (tourRoleReadOnly(req, res)) return;
     const isSuper = req.user?.role === "SUPERADMIN";
     const orgId = req.user?.organizationId;
     const product = await prisma.driftProduct.findFirst({

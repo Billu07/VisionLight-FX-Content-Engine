@@ -252,6 +252,15 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   profile in place (`driftCreator.untouchedProfile`). Pages are `own` unless joined by invite (accepted invite
   `acceptedByUserId`) or a Pro's client page; Dashboard = first own page. Someone with no own page gets
   "+ Create your own page" (PageSwitcher → `/tour/start?create=1` → signup API `ownPage: true`).
+- **Tour pins** (2026-09-15): `DriftPin` (placed on one `frame` at x/y, optional fine-tune `keys` [{f,x,y}], title,
+  note) + `DriftProduct.pinTrack` (how the footage moves: cumulative shift per frame along the drift axis,
+  `services/driftPins.ts` — ~30 sampled frames matched on grayscale copies, a confidence check refuses cuts /
+  featureless frames, keyed to the clip's frames so a replaced clip re-measures). One placement rule shared by
+  player + editor: `frontend/src/rotation3d/pins.ts` `pinPlacement()`. API: `GET|PUT
+  /api/drift/my/flows/:id/steps/:stepId/pins` (VIEW / EDIT); the public drift payload carries `pins` + `pinTrack`.
+  Player: `.r3d-pins` buttons positioned in `draw()` (excluded from drag via `isControl`). Builder: "Pins" on a
+  ready drift → `tour/PinEditor.tsx`. Brand caption/thumbnail writes also refuse tour Editors/Viewers
+  (`tourRoleReadOnly` in drift.ts).
 - **Superadmin**: `X-Drift-Org` lets a superadmin act on any TOUR page ("Manage this page", `usePageAdmin`);
   back office = Admin → drift.li → Tour (`routes/driftTourAdmin.ts`, `DriftTourAdmin.tsx`).
 - **drift.li home** = `rotation3d/DriftHome.tsx` (2026-09-14 redesign per the client's `land.png`: the hero's

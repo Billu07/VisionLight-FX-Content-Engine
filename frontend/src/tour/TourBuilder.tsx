@@ -7,6 +7,7 @@ import type { Billing, Flow, FlowStep, Page, PageRole, Quota } from "./types";
 import { canEditPage } from "./pageRoles";
 import { isReady } from "./types";
 import { ShareSheet } from "./ShareSheet";
+import { PinEditor } from "./PinEditor";
 import { CAPTURE_GUIDE_SEEN_KEY, CaptureGuideSheet } from "./CaptureGuide";
 import { Spinner, StatusPill, TourShell, apiError, copyText, publicUrl, readClipDuration } from "./tourUi";
 import { TOUR_PAGE_STYLES } from "./tourPageStyles";
@@ -94,6 +95,7 @@ function StepCard({
   onChanged,
   maxClip,
   readOnly = false,
+  onPins,
 }: {
   flow: Flow;
   step: FlowStep;
@@ -103,6 +105,8 @@ function StepCard({
   onChanged: (flow: Flow) => void;
   maxClip: number | null;
   readOnly?: boolean;
+  /** open the pin editor for this drift */
+  onPins?: () => void;
 }) {
   const p = step.product;
   const [name, setName] = useState(p?.name || "");
@@ -298,6 +302,11 @@ function StepCard({
               <a className="d-btn ghost sm" href={p.playerPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
                 Open
               </a>
+            )}
+            {!readOnly && onPins && isReady(status) && (
+              <button className="d-btn ghost sm" onClick={onPins} title="Label spots in this drift — each pin follows its spot as people drag">
+                Pins{p?.pinCount ? ` · ${p.pinCount}` : ""}
+              </button>
             )}
             {!readOnly && (
               <button className="d-btn ghost sm" onClick={remove}>
@@ -605,6 +614,8 @@ export default function TourBuilder({
   const [showGuide, setShowGuide] = useState(false);
   // The caller's page role (from the API): Viewers get the builder without its controls.
   const [role, setRole] = useState<PageRole | null>(null);
+  // The drift whose pins are being edited.
+  const [pinStep, setPinStep] = useState<FlowStep | null>(null);
   // "Path" = compact rows you expand one at a time (default); "Cards" = every drift open.
   const [viewMode, setViewMode] = useState<"path" | "cards">(() => {
     try {
@@ -880,6 +891,7 @@ export default function TourBuilder({
       onChanged={applyFlow}
       maxClip={maxClip}
       readOnly={readOnly}
+      onPins={() => setPinStep(s)}
     />
   );
 
@@ -1244,6 +1256,16 @@ export default function TourBuilder({
         </div>
       )}
       {share !== "none" && <ShareSheet flow={flow} celebrate={share === "celebrate"} onClose={() => setShare("none")} />}
+      {pinStep && (
+        <PinEditor
+          key={pinStep.id}
+          flowId={flow.id}
+          step={pinStep}
+          driftName={pinStep.product?.name || "Drift"}
+          onSaved={applyFlow}
+          onClose={() => setPinStep(null)}
+        />
+      )}
       {showGuide && <CaptureGuideSheet onClose={() => setShowGuide(false)} />}
     </>,
   );

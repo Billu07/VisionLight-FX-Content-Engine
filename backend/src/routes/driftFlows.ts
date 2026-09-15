@@ -11,6 +11,7 @@ import { IMMUTABLE_CACHE_CONTROL, uploadManagedBuffer } from "../utils/managedSt
 import { parseCtaPlacement, parseDirection, processClip, uniqueSlug } from "./drift";
 import { sendFlowCreatedNoticeEmail, sendFlowPublishedEmails, sendUpgradeNudgeEmail } from "../services/mail";
 import { billingSummary, confirmCheckoutSession, createFlowCheckout, storePendingClip } from "../services/driftBilling";
+import { MAX_PINS, ensurePinTrack, pinFrames, sanitizePins, serializePin } from "../services/driftPins";
 import {
   createClientPage,
   createProInvite,
@@ -1084,6 +1085,75 @@ router.delete(
     res.json({ flow: serializeFlow(await loadFlow(orgId, flow.id)) });
   },
 );
+
+// ───────────────────────────── pins ─────────────────────────────
+
+const pinStep = (orgId: string, flowId: string, stepId: string) =>
+  prisma.driftFlowStep.findFirst({
+    where: { id: stepId, flowId, flow: { organizationId: orgId } },
+    select: {
+      id: true,
+      flowId: true,
+      product: { select: { id: true, status: true, driftDirection: true, pinTrack: true, spin: { select: { manifest: true } } } },
+    },
+  });
+
+// A drift's pins for the pin editor, with the frames to place them on and the motion
+// track they follow (measured here the first time — a few seconds).
+router.get("/api/drift/my/flows/:id/steps/:stepId/pins", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "VIEW");
+  if (!orgId) return;
+  const step = await pinStep(orgId, req.params.id, req.params.stepId);
+  const product = step?.product;
+  if (!product) return res.status(404).json({ error: "Step not found" });
+  if (product.status !== "READY" && product.status !== "PUBLISHED") {
+    return res.status(409).json({ error: "Pins can be added once this drift is ready" });
+  }
+  const frames = pinFrames(product.spin?.manifest);
+  if (frames.length < 2) return res.status(409).json({ error: "This drift has no frames yet" });
+  const [track, pins] = await Promise.all([
+    ensurePinTrack(product),
+    prisma.driftPin.findMany({ where: { productId: product.id }, orderBy: { order: "asc" } }),
+  ]);
+  res.json({
+    frames,
+    track: track && Array.isArray(track.shift) && track.shift.length === frames.length ? { axis: track.axis, shift: track.shift } : null,
+    pins: pins.map(serializePin),
+    maxPins: MAX_PINS,
+  });
+});
+
+// Save a drift's pins (the whole set). They're live on the drift right away.
+router.put("/api/drift/my/flows/:id/steps/:stepId/pins", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "EDIT");
+  if (!orgId) return;
+  const step = await pinStep(orgId, req.params.id, req.params.stepId);
+  const product = step?.product;
+  if (!step || !product) return res.status(404).json({ error: "Step not found" });
+  const frames = pinFrames(product.spin?.manifest);
+  if (frames.length < 2) return res.status(409).json({ error: "This drift has no frames yet" });
+  const parsed = sanitizePins(req.body?.pins, frames.length);
+  if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+  await prisma.$transaction([
+    prisma.driftPin.deleteMany({ where: { productId: product.id } }),
+    ...(parsed.pins.length
+      ? [
+          prisma.driftPin.createMany({
+            data: parsed.pins.map((p) => ({
+              ...p,
+              productId: product.id,
+              keys: p.keys ? (p.keys as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
+            })),
+          }),
+        ]
+      : []),
+    // Touch the drift so open previews reload with the new pins.
+    prisma.driftProduct.update({ where: { id: product.id }, data: { updatedAt: new Date() } }),
+  ]);
+  const pins = await prisma.driftPin.findMany({ where: { productId: product.id }, orderBy: { order: "asc" } });
+  console.log(`[${NS}] product ${product.id}: ${pins.length} pin(s) saved`);
+  res.json({ pins: pins.map(serializePin), flow: serializeFlow(await loadFlow(orgId, step.flowId)) });
+});
 
 // ───────────────────────────── public ─────────────────────────────
 

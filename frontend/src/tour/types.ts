@@ -28,6 +28,8 @@ export type StepProduct = {
   billingStatus: string;
   paidAt: string | null;
   hostingExpiresAt: string | null;
+  /** tour pins on this drift */
+  pinCount?: number;
 };
 
 export type FlowStep = {

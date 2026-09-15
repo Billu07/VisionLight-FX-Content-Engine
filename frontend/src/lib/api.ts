@@ -384,6 +384,9 @@ export const apiEndpoints = {
   driftUpdateFlowStep: (id: string, stepId: string, data: Record<string, unknown>) =>
     api.patch(`/api/drift/my/flows/${id}/steps/${stepId}`, data),
   driftDeleteFlowStep: (id: string, stepId: string) => api.delete(`/api/drift/my/flows/${id}/steps/${stepId}`),
+  driftStepPins: (id: string, stepId: string) => api.get(`/api/drift/my/flows/${id}/steps/${stepId}/pins`),
+  driftSaveStepPins: (id: string, stepId: string, pins: unknown[]) =>
+    api.put(`/api/drift/my/flows/${id}/steps/${stepId}/pins`, { pins }),
   driftUploadFlowCover: (id: string, formData: FormData) =>
     api.post(`/api/drift/my/flows/${id}/cover`, formData, {
       headers: { "Content-Type": "multipart/form-data" },

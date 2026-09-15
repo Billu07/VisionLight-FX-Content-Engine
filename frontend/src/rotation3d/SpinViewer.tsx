@@ -1,4 +1,5 @@
 import { holdForegroundLoad } from "./driftNav";
+import { pinPlacement, type PinTrack, type SpinPin } from "./pins";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { getPlayerBranding } from "../lib/branding";
 import DriftFormOverlay, { type OverlayForm } from "./DriftFormOverlay";
@@ -147,6 +148,10 @@ export type SpinViewerProps = {
   driftMode?: boolean;
   /** Drift on-frame text overlays, shown while their frame range is active. */
   captions?: SpinCaption[];
+  /** Tour pins: labelled spots that follow their place in the footage (tap for the note). */
+  pins?: SpinPin[];
+  /** How the footage moves, for the pins (null → they follow their fine-tuning only). */
+  pinTrack?: PinTrack;
   /** Loop on/off (per drift): true = dragging wraps end→start seamlessly;
    * false = dragging clamps at the first/last frame. Default true (360 spins). */
   loopScrub?: boolean;
@@ -246,6 +251,8 @@ export default function SpinViewer({
   enableLoop = false,
   driftMode = false,
   captions,
+  pins,
+  pinTrack = null,
   loopScrub = true,
   driftDirection = "LTR",
 }: SpinViewerProps) {
@@ -296,6 +303,18 @@ export default function SpinViewer({
   useEffect(() => {
     captionsRef.current = captions;
   }, [captions]);
+  // Pins: DOM buttons positioned from the render loop (draw()); refs for the same reason.
+  const pinsRef = useRef<SpinPin[] | undefined>(pins);
+  const pinTrackRef = useRef<PinTrack>(pinTrack);
+  const pinEls = useRef<(HTMLButtonElement | null)[]>([]);
+  const [openPin, setOpenPin] = useState<number | null>(null);
+  const openPinRef = useRef<number | null>(null);
+  openPinRef.current = openPin;
+  useEffect(() => {
+    pinsRef.current = pins;
+    pinTrackRef.current = pinTrack;
+    setOpenPin(null);
+  }, [pins, pinTrack]);
   // Gate the drag helper BEFORE paint on mount and every drift swap, so it fades in
   // at its anchored spot instead of dropping from the CSS default. The render loop
   // removes the class once the helper is placed under a real frame. (Kept out of the
@@ -875,6 +894,27 @@ export default function SpinViewer({
         }
       }
 
+      // Tour pins: buttons over the frame that follow their spot through the drift and
+      // fade out as it leaves the frame.
+      const pinList = pinsRef.current;
+      if (pinList && pinList.length) {
+        for (let i = 0; i < pinList.length; i++) {
+          const el = pinEls.current[i];
+          if (!el) continue;
+          const pl = frameRect.w > 0 ? pinPlacement(pinList[i], frame, pinTrackRef.current ?? null, FRAMES) : null;
+          if (!pl || !pl.visible || pl.fade <= 0.01) {
+            el.style.visibility = "hidden";
+            continue;
+          }
+          const px = (frameRect.x + pl.x * frameRect.w) / DPR;
+          const py = (frameRect.y + pl.y * frameRect.h) / DPR;
+          el.style.visibility = "visible";
+          el.style.opacity = String(pl.fade);
+          el.style.transform = `translate3d(${px.toFixed(1)}px,${py.toFixed(1)}px,0)`;
+          el.dataset.flip = pl.x > 0.6 ? "1" : "0";
+        }
+      }
+
       // Drift scrub-progress: a hairline track on the frame's bottom edge — a faint
       // full-width rail, the "drifted" portion filled in the brand accent
       // (cyan→blue), and a small glowing head at the current position. The
@@ -1051,12 +1091,14 @@ export default function SpinViewer({
       t instanceof Element &&
       (t.closest(".r3d-iconbtn") ||
         t.closest(".r3d-cta") ||
+        t.closest(".r3d-pin") ||
         t.closest(".r3d-powered-badge") ||
         t.closest(".r3d-thumbs") ||
         t.closest(".r3d-media"));
 
     const down = (e: PointerEvent) => {
       dragging = true;
+      if (openPinRef.current !== null) setOpenPin(null); // dragging closes an open pin note
       engage(); // dismiss the "drag to rotate" hint the instant the player is touched
       idleSpin = false; // pause auto-rotate while actively dragging
       yawVel = 0;
@@ -1760,6 +1802,31 @@ export default function SpinViewer({
         )}
       </div>
 
+      {driftMode && pins && pins.length > 0 && (
+        <div className="r3d-pins">
+          {pins.map((pin, i) => (
+            <button
+              key={pin.id || i}
+              type="button"
+              ref={(el) => {
+                pinEls.current[i] = el;
+              }}
+              className={`r3d-pin ${openPin === i ? "r3d-pin-open" : ""}`}
+              data-note={pin.note ? "1" : undefined}
+              onClick={() => pin.note && setOpenPin((cur) => (cur === i ? null : i))}
+              aria-expanded={pin.note ? openPin === i : undefined}
+              aria-label={pin.note ? `${pin.title}: ${pin.note}` : pin.title}
+            >
+              <span className="r3d-pin-dot" aria-hidden />
+              <span className="r3d-pin-card">
+                <b>{pin.title}</b>
+                {pin.note && openPin === i && <span className="r3d-pin-note">{pin.note}</span>}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {driftMode && introHint && (
         <div className="r3d-intro" ref={introHandRef} aria-hidden>
           <span className="r3d-intro-ring" />
@@ -2024,6 +2091,27 @@ const R3D_CSS = `
 @keyframes r3dintropulse{0%,100%{transform:scale(.82);opacity:.55}50%{transform:scale(1.08);opacity:.95}}
 /* during the demo, hide the resting hint so there's just the one moving finger */
 .r3d-introing .r3d-hint{opacity:0!important}
+/* Tour pins: a pulsing dot on the spot with its label; tap one with a note to open it.
+   Position, visibility and edge fade are driven from the RAF loop (draw()). */
+.r3d-pins{position:absolute;inset:0;z-index:7;pointer-events:none;transition:opacity .25s ease}
+.r3d-introing .r3d-pins,.r3d-media-mode .r3d-pins{opacity:0}
+.r3d-pin{position:absolute;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;appearance:none;border:0;padding:0;margin:0;background:none;color:#fff;font:inherit;text-align:left;cursor:default;will-change:transform,opacity;-webkit-tap-highlight-color:transparent}
+.r3d-pin[data-note="1"]{cursor:pointer}
+.r3d-pin-dot{position:absolute;left:-12px;top:-12px;width:24px;height:24px;display:grid;place-items:center;pointer-events:auto}
+.r3d-pin-dot::before{content:"";width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 0 0 3px var(--r3d-primary,#22d3ee),0 2px 10px rgba(0,0,0,.55)}
+.r3d-pin-dot::after{content:"";position:absolute;inset:2px;border-radius:50%;border:2px solid var(--r3d-primary,#22d3ee);animation:r3dpinpulse 2.4s ease-out infinite}
+@keyframes r3dpinpulse{0%{transform:scale(.6);opacity:.85}100%{transform:scale(1.8);opacity:0}}
+.r3d-pin-card{position:absolute;left:16px;top:0;transform:translateY(-50%);pointer-events:auto;display:grid;gap:3px;width:max-content;max-width:min(230px,52vw);padding:6px 10px;border-radius:10px;background:rgba(8,12,20,.8);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.14);box-shadow:0 8px 24px -10px rgba(0,0,0,.65)}
+.r3d-pin[data-flip="1"] .r3d-pin-card{left:auto;right:16px}
+.r3d-pin-card b{font-size:clamp(11.5px,3.2vmin,13px);font-weight:700;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r3d-pin[data-note="1"] .r3d-pin-card b::after{content:" ›";opacity:.6}
+.r3d-pin-open{z-index:2}
+.r3d-pin-open .r3d-pin-card b{white-space:normal}
+.r3d-pin-open[data-note="1"] .r3d-pin-card b::after{content:""}
+.r3d-pin-note{font-size:clamp(11.5px,3.1vmin,12.5px);line-height:1.4;color:rgba(255,255,255,.85)}
+.r3d-pin:focus-visible{outline:none}
+.r3d-pin:focus-visible .r3d-pin-dot::before{box-shadow:0 0 0 3px #fff,0 0 0 6px var(--r3d-primary,#22d3ee)}
+@media (prefers-reduced-motion:reduce){.r3d-pin-dot::after{animation:none}}
 @media (prefers-reduced-motion:reduce){.r3d-intro-ring{animation:none}}
 /* Drift: "Powered By Drift Live Interactive" sits UNDER the player, above the CTA, a bit bigger. */
 .r3d-drift .r3d-powered-badge{top:auto;bottom:calc(36px + env(safe-area-inset-bottom));font-size:clamp(10px,3vmin,12px)}
