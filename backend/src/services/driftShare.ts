@@ -101,7 +101,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 const SITE_PAGES: Record<string, { card: SiteCardKey; title: string; description: string }> = {
   "/": {
     card: "home",
-    title: "drift.li — You Control the Movement",
+    title: "Drift Live Interactive",
     description: "Turn a few seconds of video into a Live Interactive you can explore. Tour · View · Memory · Path.",
   },
   "/tour": {
@@ -162,7 +162,8 @@ async function siteMeta(path: string, page: string, lookup: ShareLookup, opts: {
       page === "/" && !opts.noindex
         ? [
             { "@context": "https://schema.org", "@type": "Organization", name: "Drift Live Interactive", url: DRIFT_ORIGIN, logo: `${DRIFT_ORIGIN}/drift/icon-512.png` },
-            { "@context": "https://schema.org", "@type": "WebSite", name: "drift.li", url: DRIFT_ORIGIN },
+            // Google shows this as the site's name in search results.
+            { "@context": "https://schema.org", "@type": "WebSite", name: "Drift Live Interactive", alternateName: "drift.li", url: DRIFT_ORIGIN },
           ]
         : [],
   };

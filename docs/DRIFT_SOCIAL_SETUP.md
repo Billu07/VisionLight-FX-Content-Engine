@@ -10,7 +10,7 @@ reaches them.
 
 | Page | Preview title | Card |
 |---|---|---|
-| `drift.li` | drift.li — You Control the Movement | Home card: the client's headline, demo-tour frames on the grid |
+| `drift.li` | Drift Live Interactive | Home card: the client's headline, demo-tour frames on the grid |
 | `/tour`, `/tour/start` | Drift Tour — Show Any Space / Try Drift Tour Free | Tour card with demo frames |
 | `/view` `/memory` `/path` | Drift View / Memory / Path + the client's line | Each product's icon and colour (cyan / violet / emerald) |
 | `/tour/capture-guide` | Drift Capture Guide — For Best Results | Camera card |
