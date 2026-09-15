@@ -272,8 +272,12 @@ export type OwnerReport = {
   insights: TourInsights;
 };
 
-/** A tour's reel (vertical video): none yet, rendering, ready or failed. */
+/** Reel layouts: every drift filling the screen, or the whole shot over a blurred copy. */
+export type ReelLayout = "full" | "framed";
+
+/** A tour's reel (vertical video) in one layout: none yet, rendering, ready or failed. */
 export type TourReel = {
+  layout?: ReelLayout;
   status: "NONE" | "RENDERING" | "READY" | "FAILED";
   url?: string | null;
   seconds?: number | null;

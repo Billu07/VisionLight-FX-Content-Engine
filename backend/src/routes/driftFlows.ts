@@ -23,7 +23,7 @@ import {
 } from "../services/driftEnquiries";
 import { enquirySettingsOf, parseEnquirySettings } from "../services/tourEnquirySettings";
 import { ensureReportLink, ownerReport, recordAttention, removeReportLink, tourInsights } from "../services/driftInsights";
-import { startTourReel, streamTourReel, tourReel } from "../services/driftReel";
+import { parseReelLayout, startTourReel, streamTourReel, tourReel } from "../services/driftReel";
 import {
   createClientPage,
   createProInvite,
@@ -926,12 +926,12 @@ router.get("/api/drift/public/reports/:code", async (req: AuthenticatedRequest, 
   res.json({ report });
 });
 
-// ── Reel: the tour as a vertical video (services/driftReel.ts) ──
+// ── Reel: the tour as a vertical video (services/driftReel.ts); ?layout=full (default) | framed ──
 router.get("/api/drift/my/flows/:id/reel", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   const orgId = await requirePage(req, res, "VIEW");
   if (!orgId) return;
   try {
-    res.json({ reel: await tourReel(orgId, req.params.id) });
+    res.json({ reel: await tourReel(orgId, req.params.id, parseReelLayout(req.query.layout)) });
   } catch (err) {
     return handle(res, err);
   }
@@ -942,7 +942,7 @@ router.post("/api/drift/my/flows/:id/reel", authenticateToken, async (req: Authe
   const orgId = await requirePage(req, res, "EDIT");
   if (!orgId) return;
   try {
-    res.status(202).json({ reel: await startTourReel(orgId, req.params.id) });
+    res.status(202).json({ reel: await startTourReel(orgId, req.params.id, parseReelLayout(req.query.layout ?? req.body?.layout)) });
   } catch (err) {
     return handle(res, err);
   }
@@ -953,7 +953,7 @@ router.get("/api/drift/my/flows/:id/reel/file", authenticateToken, async (req: A
   const orgId = await requirePage(req, res, "VIEW");
   if (!orgId) return;
   try {
-    await streamTourReel(orgId, req.params.id, res);
+    await streamTourReel(orgId, req.params.id, parseReelLayout(req.query.layout), res);
   } catch (err) {
     if (res.headersSent) return void res.end();
     return handle(res, err);

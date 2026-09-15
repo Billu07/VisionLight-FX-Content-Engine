@@ -497,9 +497,11 @@ export const apiEndpoints = {
   driftOwnerReport: (code: string, days: number) =>
     api.get(`/api/drift/public/reports/${encodeURIComponent(code)}`, { params: { days } }),
   // tour reel (vertical video)
-  driftTourReel: (id: string) => api.get(`/api/drift/my/flows/${id}/reel`),
-  driftStartTourReel: (id: string) => api.post(`/api/drift/my/flows/${id}/reel`),
-  driftTourReelFile: (id: string) => api.get(`/api/drift/my/flows/${id}/reel/file`, { responseType: "blob", timeout: 180000 }),
+  driftTourReel: (id: string, layout: "full" | "framed") => api.get(`/api/drift/my/flows/${id}/reel`, { params: { layout } }),
+  driftStartTourReel: (id: string, layout: "full" | "framed") =>
+    api.post(`/api/drift/my/flows/${id}/reel`, null, { params: { layout } }),
+  driftTourReelFile: (id: string, layout: "full" | "framed") =>
+    api.get(`/api/drift/my/flows/${id}/reel/file`, { params: { layout }, responseType: "blob", timeout: 180000 }),
 
   // Brand-level drift settings (Meta Pixel default).
   driftBrandSettings: () => api.get("/api/drift/my/brand-settings"),

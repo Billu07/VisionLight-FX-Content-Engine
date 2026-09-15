@@ -17,12 +17,15 @@ if (ffmpegStatic) ffmpeg.setFfmpegPath(ffmpegStatic);
 
 /**
  * Tour reels (TOUR_V2_PLAN.md, phase 7): a published tour as a vertical 1080×1920 video for
- * Instagram Reels, TikTok and Shorts. An intro card (cover, page, title) → each drift playing
- * through over a blurred copy of itself, with its name, the page and a progress bar → an end
- * card with the tour's link and a QR code; slide transitions, no audio (the apps add music).
- * Rendered in one ffmpeg pass on the processing queue (so it never competes with clip builds),
- * uploaded to storage, and remembered in DriftFlow.settings.reel (no schema change) until the
- * tour changes.
+ * Instagram Reels, TikTok and Shorts. An intro card (cover, page, title) → each drift with its
+ * name, the page and a progress bar → an end card with the tour's link and a QR code; slide
+ * transitions, no audio (the apps add music). Two layouts:
+ * - full (default): every drift fills the screen — a portrait window of the full-resolution
+ *   footage that glides the way the camera pans, so the whole space passes by;
+ * - framed: the whole shot, over a blurred copy of itself.
+ * Rendered in one ffmpeg pass on the processing queue (never competing with clip builds),
+ * uploaded to storage, and remembered per layout in DriftFlow.settings (reelFull / reel — no
+ * schema change) until the tour changes.
  */
 
 const NS = "drift-reel";
@@ -30,6 +33,10 @@ const REEL_VERSION = 1;
 export const REEL_W = 1080;
 export const REEL_H = 1920;
 export const REEL_FPS = 30;
+export type ReelLayout = "full" | "framed";
+export const parseReelLayout = (v: unknown): ReelLayout => (v === "framed" ? "framed" : "full");
+/** where each layout's state lives in DriftFlow.settings (framed kept the key reels were first saved under) */
+const STATE_KEY: Record<ReelLayout, string> = { full: "reelFull", framed: "reel" };
 const INTRO_S = 2.2;
 /** each drift plays through in this long, with a short hold at each end */
 const DRIFT_S = 3.4;
@@ -54,7 +61,15 @@ export type ReelInput = {
   cover: string | null;
   /** the tour's public link (end card + QR) */
   link: string;
-  drifts: { name: string; frames: string[] }[];
+  drifts: {
+    name: string;
+    /** the lighter (mobile) frames — the framed layout */
+    frames: string[];
+    /** the full-resolution frames — the full-screen layout (falls back to `frames`) */
+    framesFull?: string[];
+    /** LTR | RTL | TTB | BTT — which way the full-screen window glides */
+    direction?: string | null;
+  }[];
 };
 
 type ReelState = {
@@ -168,7 +183,8 @@ async function endCard(input: ReelInput, cover: Buffer | null, logo: Buffer | nu
   const heading = wrapText("Walk through it yourself", 76, REEL_W - 160, 2);
   const title = wrapText(input.title, 44, REEL_W - 160, 2);
   const short = input.link.replace(/^https?:\/\//, "");
-  const linkLines = short.length <= 34 ? [short] : [short.slice(0, short.lastIndexOf("/", 34) > 8 ? short.lastIndexOf("/", 34) : 34), short.slice(short.lastIndexOf("/", 34) > 8 ? short.lastIndexOf("/", 34) : 34)].map((l) => (l.length > 40 ? `${l.slice(0, 39)}…` : l));
+  const cut = short.lastIndexOf("/", 34) > 8 ? short.lastIndexOf("/", 34) : 34;
+  const linkLines = (short.length <= 34 ? [short] : [short.slice(0, cut), short.slice(cut)]).map((l) => (l.length > 40 ? `${l.slice(0, 39)}…` : l));
   const svg = `<svg width="${REEL_W}" height="${REEL_H}" xmlns="http://www.w3.org/2000/svg">
     ${heading.map((l, k) => text(REEL_W / 2, 400 + k * 90, 76, "#ffffff", l, ' font-weight="800" text-anchor="middle"')).join("")}
     ${title.map((l, k) => text(REEL_W / 2, 400 + heading.length * 90 + 16 + k * 58, 44, "#cbd5e1", l, ' text-anchor="middle"')).join("")}
@@ -202,6 +218,28 @@ export function reelTimeline(driftCount: number) {
   return { segments, offsets, seconds: Math.round(total * 100) / 100 };
 }
 
+/**
+ * Full-screen layout: the portrait (9:16) window of a `srcW`×`srcH` frame for frame `j` of `n`.
+ * The window is as large as the frame allows and glides the way the camera pans (eased), so the
+ * reel sweeps across the whole space; across the pan it stays centred.
+ */
+export function fillWindow(srcW: number, srcH: number, j: number, n: number, direction?: string | null) {
+  const aspect = REEL_W / REEL_H;
+  const width = Math.min(srcW, srcW / srcH > aspect ? Math.round(srcH * aspect) : srcW);
+  const height = Math.min(srcH, srcW / srcH > aspect ? srcH : Math.round(srcW / aspect));
+  const t = n > 1 ? Math.min(1, Math.max(0, j / (n - 1))) : 0.5;
+  const eased = t * t * (3 - 2 * t);
+  const slackX = srcW - width;
+  const slackY = srcH - height;
+  let left = slackX / 2;
+  let top = slackY / 2;
+  if (direction === "LTR") left = slackX * eased;
+  else if (direction === "RTL") left = slackX * (1 - eased);
+  else if (direction === "TTB") top = slackY * eased;
+  else if (direction === "BTT") top = slackY * (1 - eased);
+  return { left: Math.round(left), top: Math.round(top), width, height };
+}
+
 const pickEvenly = <T>(items: T[], k: number): T[] =>
   items.length <= k ? items : Array.from({ length: k }, (_, j) => items[Math.round((j * (items.length - 1)) / (k - 1))]);
 
@@ -217,21 +255,27 @@ async function mapPool<T>(items: T[], concurrency: number, fn: (item: T, index: 
   );
 }
 
-/** The filter graph: intro, drifts (blurred backdrop + the footage + its overlay), end card, slides between. */
-function reelGraph(driftCount: number): string[] {
+/** The filter graph: intro, drifts (+ their overlays), end card, slides between. */
+function reelGraph(driftCount: number, layout: ReelLayout): string[] {
   const { offsets } = reelTimeline(driftCount);
   const seg = (label: string) => `fps=${REEL_FPS},format=yuv420p,settb=AVTB[${label}]`;
+  const hold = `fps=${REEL_FPS},tpad=start_duration=${HOLD_START_S}:start_mode=clone:stop_duration=${HOLD_END_S}:stop_mode=clone`;
   const lines = [`[0:v]scale=${REEL_W}:${REEL_H},setsar=1,${seg("s0")}`];
   for (let i = 0; i < driftCount; i++) {
     const frames = 1 + 2 * i;
     const overlay = 2 + 2 * i;
-    lines.push(
-      `[${frames}:v]fps=${REEL_FPS},tpad=start_duration=${HOLD_START_S}:start_mode=clone:stop_duration=${HOLD_END_S}:stop_mode=clone,split=2[bg${i}][fg${i}]`,
-      `[bg${i}]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,gblur=sigma=14,eq=brightness=-0.16:saturation=0.85,scale=${REEL_W}:${REEL_H},setsar=1[bb${i}]`,
-      `[fg${i}]scale=1016:1440:force_original_aspect_ratio=decrease,setsar=1[ff${i}]`,
-      `[bb${i}][ff${i}]overlay=(W-w)/2:(H-h)/2-40[c${i}]`,
-      `[c${i}][${overlay}:v]overlay=0:0:shortest=1,${seg(`s${i + 1}`)}`,
-    );
+    if (layout === "full") {
+      // The frames are already the moving portrait window at 1080×1920.
+      lines.push(`[${frames}:v]${hold},scale=${REEL_W}:${REEL_H},setsar=1[c${i}]`);
+    } else {
+      lines.push(
+        `[${frames}:v]${hold},split=2[bg${i}][fg${i}]`,
+        `[bg${i}]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,gblur=sigma=14,eq=brightness=-0.16:saturation=0.85,scale=${REEL_W}:${REEL_H},setsar=1[bb${i}]`,
+        `[fg${i}]scale=1016:1440:force_original_aspect_ratio=decrease,setsar=1[ff${i}]`,
+        `[bb${i}][ff${i}]overlay=(W-w)/2:(H-h)/2-40[c${i}]`,
+      );
+    }
+    lines.push(`[c${i}][${overlay}:v]overlay=0:0:shortest=1,${seg(`s${i + 1}`)}`);
   }
   lines.push(`[${1 + 2 * driftCount}:v]scale=${REEL_W}:${REEL_H},setsar=1,${seg(`s${driftCount + 1}`)}`);
   let prev = "s0";
@@ -245,7 +289,7 @@ function reelGraph(driftCount: number): string[] {
 }
 
 /** Renders a reel to `outFile` (MP4, H.264, no audio), working in `workDir`. */
-export async function renderReel(input: ReelInput, outFile: string, workDir: string): Promise<{ seconds: number }> {
+export async function renderReel(input: ReelInput, outFile: string, workDir: string, layout: ReelLayout = "full"): Promise<{ seconds: number }> {
   const drifts = input.drifts.filter((d) => d.frames.length >= 2).slice(0, REEL_MAX_DRIFTS);
   if (!drifts.length) throw new Error("No drifts to put in the reel");
   const [coverBuf, logoBuf] = await Promise.all([
@@ -263,24 +307,46 @@ export async function renderReel(input: ReelInput, outFile: string, workDir: str
 
   const counts: number[] = [];
   for (let i = 0; i < drifts.length; i++) {
+    const drift = drifts[i];
     const dir = path.join(workDir, `d${i}`);
     await fs.mkdir(dir, { recursive: true });
-    const picks = pickEvenly(drifts[i].frames, FRAMES_PER_DRIFT);
-    // Every frame of a drift at the first frame's size (the image sequence can't change size).
-    const first = await sharp(await loadImage(picks[0]))
-      .resize({ width: REEL_W, withoutEnlargement: true })
-      .flatten({ background: INK })
-      .jpeg({ quality: 88 })
-      .toBuffer({ resolveWithObject: true });
-    const w = first.info.width;
-    const h = first.info.height;
-    await fs.writeFile(path.join(dir, "f_0001.jpg"), first.data);
-    await mapPool(picks.slice(1), FETCH_CONCURRENCY, async (src, j) => {
-      const jpg = await sharp(await loadImage(src)).resize(w, h, { fit: "fill" }).flatten({ background: INK }).jpeg({ quality: 88 }).toBuffer();
-      await fs.writeFile(path.join(dir, `f_${String(j + 2).padStart(4, "0")}.jpg`), jpg);
-    });
-    counts.push(picks.length);
-    await fs.writeFile(path.join(workDir, `o${i}.png`), await driftOverlay(input, drifts[i].name, i, drifts.length, badge, badgeWidth));
+    const frameFile = (j: number) => path.join(dir, `f_${String(j + 1).padStart(4, "0")}.jpg`);
+    if (layout === "full") {
+      // Full screen: the sharpest frames, cut to the moving portrait window, at 1080×1920.
+      const source = drift.framesFull && drift.framesFull.length >= 2 ? drift.framesFull : drift.frames;
+      const picks = pickEvenly(source, FRAMES_PER_DRIFT);
+      await mapPool(picks, FETCH_CONCURRENCY, async (src, j) => {
+        const buf = await loadImage(src);
+        const meta = await sharp(buf).metadata();
+        if (!meta.width || !meta.height) throw new Error("A frame couldn't be read");
+        const region = fillWindow(meta.width, meta.height, j, picks.length, drift.direction);
+        const jpg = await sharp(buf)
+          .extract(region)
+          .resize(REEL_W, REEL_H, { fit: "fill", kernel: "lanczos3" })
+          .flatten({ background: INK })
+          .jpeg({ quality: 88 })
+          .toBuffer();
+        await fs.writeFile(frameFile(j), jpg);
+      });
+      counts.push(picks.length);
+    } else {
+      // Framed: every frame at the first frame's size (an image sequence can't change size).
+      const picks = pickEvenly(drift.frames, FRAMES_PER_DRIFT);
+      const first = await sharp(await loadImage(picks[0]))
+        .resize({ width: REEL_W, withoutEnlargement: true })
+        .flatten({ background: INK })
+        .jpeg({ quality: 88 })
+        .toBuffer({ resolveWithObject: true });
+      const w = first.info.width;
+      const h = first.info.height;
+      await fs.writeFile(frameFile(0), first.data);
+      await mapPool(picks.slice(1), FETCH_CONCURRENCY, async (src, j) => {
+        const jpg = await sharp(await loadImage(src)).resize(w, h, { fit: "fill" }).flatten({ background: INK }).jpeg({ quality: 88 }).toBuffer();
+        await fs.writeFile(frameFile(j + 1), jpg);
+      });
+      counts.push(picks.length);
+    }
+    await fs.writeFile(path.join(workDir, `o${i}.png`), await driftOverlay(input, drift.name, i, drifts.length, badge, badgeWidth));
   }
 
   const { seconds, segments } = reelTimeline(drifts.length);
@@ -294,7 +360,7 @@ export async function renderReel(input: ReelInput, outFile: string, workDir: str
       still(`o${i}.png`, segments[i + 1]);
     }
     still("end.png", END_S);
-    cmd.complexFilter(reelGraph(drifts.length), "out");
+    cmd.complexFilter(reelGraph(drifts.length, layout), "out");
     cmd.outputOptions([
       "-c:v", "libx264", "-preset", "veryfast", "-crf", "21", "-pix_fmt", "yuv420p",
       "-r", String(REEL_FPS), "-movflags", "+faststart", "-an", "-threads", "2", "-y",
@@ -329,22 +395,38 @@ export async function renderReel(input: ReelInput, outFile: string, workDir: str
 
 // ───────────────────────────── tour reels ─────────────────────────────
 
+/** renders running or queued, as `${flowId}:${layout}` */
 const rendering = new Set<string>();
 
 const settingsObj = (v: unknown): Record<string, unknown> =>
   v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 
-const reelStateOf = (settings: unknown): ReelState | null => {
-  const r = settingsObj(settings).reel as ReelState | undefined;
+const reelStateOf = (settings: unknown, layout: ReelLayout): ReelState | null => {
+  const r = settingsObj(settings)[STATE_KEY[layout]] as ReelState | undefined;
   return r && typeof r === "object" && typeof r.status === "string" && typeof r.hash === "string" ? r : null;
 };
 
-/** Writes only settings.reel (one atomic JSON update), so a render finishing never overwrites
- *  other tour settings saved meanwhile. */
-const saveReelState = (flowId: string, state: ReelState) =>
-  prisma.$executeRaw`UPDATE "DriftFlow" SET "settings" = jsonb_set(CASE WHEN jsonb_typeof("settings") = 'object' THEN "settings" ELSE '{}'::jsonb END, '{reel}', ${JSON.stringify(state)}::jsonb, true) WHERE "id" = ${flowId}`;
+/** Writes only this layout's reel state (one atomic JSON update), so a render finishing never
+ *  overwrites other tour settings saved meanwhile. */
+const saveReelState = (flowId: string, layout: ReelLayout, state: ReelState) =>
+  prisma.$executeRaw`UPDATE "DriftFlow" SET "settings" = jsonb_set(CASE WHEN jsonb_typeof("settings") = 'object' THEN "settings" ELSE '{}'::jsonb END, ARRAY[${STATE_KEY[layout]}::text], ${JSON.stringify(state)}::jsonb, true) WHERE "id" = ${flowId}`;
 
 const viewable = (status: string) => status === "READY" || status === "PUBLISHED";
+
+/** What a reel of this layout is made from; a change → the stored reel is stale. (The framed
+ *  hash is unchanged from the first version, so reels made before stay current.) */
+const hashFor = (input: ReelInput, layout: ReelLayout) => {
+  const content =
+    layout === "framed"
+      ? { v: REEL_VERSION, ...input, drifts: input.drifts.map((d) => [d.name, d.frames.length, d.frames[0]]) }
+      : {
+          v: REEL_VERSION,
+          layout,
+          ...input,
+          drifts: input.drifts.map((d) => [d.name, d.frames.length, d.frames[0], d.framesFull?.[0] ?? null, d.direction ?? null]),
+        };
+  return crypto.createHash("sha1").update(JSON.stringify(content)).digest("hex").slice(0, 16);
+};
 
 async function reelSource(orgId: string, flowId: string) {
   const flow = await prisma.driftFlow.findFirst({
@@ -360,7 +442,7 @@ async function reelSource(orgId: string, flowId: string) {
       const m = rawSteps.get(s.id)?.product?.spin?.manifest || {};
       const frames: string[] = Array.isArray(m.frames) ? m.frames : [];
       const small: string[] = Array.isArray(m.framesMobile) && m.framesMobile.length === frames.length ? m.framesMobile : frames;
-      return { name: s.product!.name, frames: small };
+      return { name: s.product!.name, frames: small, framesFull: frames, direction: s.product!.driftDirection };
     })
     .filter((d) => d.frames.length >= 2)
     .slice(0, REEL_MAX_DRIFTS);
@@ -373,20 +455,16 @@ async function reelSource(orgId: string, flowId: string) {
     link: `${APP_URL}${serialized.publicPath}`,
     drifts,
   };
-  const hash = crypto
-    .createHash("sha1")
-    .update(JSON.stringify({ v: REEL_VERSION, ...input, drifts: drifts.map((d) => [d.name, d.frames.length, d.frames[0]]) }))
-    .digest("hex")
-    .slice(0, 16);
-  return { flow, input, hash };
+  return { flow, input };
 }
 
-const present = (flowId: string, state: ReelState | null, hash: string, drifts: number) => {
-  if (!state) return { status: "NONE" as const, drifts };
-  if (state.status === "RENDERING" && !rendering.has(flowId)) {
-    return { status: "FAILED" as const, error: "The reel was interrupted — please make it again.", drifts };
+const present = (flowId: string, layout: ReelLayout, state: ReelState | null, hash: string, drifts: number) => {
+  if (!state) return { layout, status: "NONE" as const, drifts };
+  if (state.status === "RENDERING" && !rendering.has(`${flowId}:${layout}`)) {
+    return { layout, status: "FAILED" as const, error: "The reel was interrupted — please make it again.", drifts };
   }
   return {
+    layout,
     status: state.status,
     url: state.url ?? null,
     seconds: state.seconds ?? null,
@@ -398,36 +476,38 @@ const present = (flowId: string, state: ReelState | null, hash: string, drifts: 
   };
 };
 
-/** The tour's reel: none yet, rendering, ready (with its video) or failed. */
-export async function tourReel(orgId: string, flowId: string) {
-  const { flow, input, hash } = await reelSource(orgId, flowId);
-  return present(flow.id, reelStateOf(flow.settings), hash, input.drifts.length);
+/** The tour's reel in this layout: none yet, rendering, ready (with its video) or failed. */
+export async function tourReel(orgId: string, flowId: string, layout: ReelLayout) {
+  const { flow, input } = await reelSource(orgId, flowId);
+  return present(flow.id, layout, reelStateOf(flow.settings, layout), hashFor(input, layout), input.drifts.length);
 }
 
-/** Makes the reel (queued behind clip builds). An up-to-date reel is returned as it is. */
-export async function startTourReel(orgId: string, flowId: string) {
-  const { flow, input, hash } = await reelSource(orgId, flowId);
+/** Makes the reel in this layout (queued behind clip builds). An up-to-date reel is returned as it is. */
+export async function startTourReel(orgId: string, flowId: string, layout: ReelLayout) {
+  const { flow, input } = await reelSource(orgId, flowId);
   if (flow.status !== "PUBLISHED") throw new FlowError(409, "Publish the tour first — the reel ends with its link.");
   if (!input.drifts.length) throw new FlowError(409, "The tour needs a ready drift before it can have a reel.");
-  const current = reelStateOf(flow.settings);
-  if (rendering.has(flow.id)) return present(flow.id, current, hash, input.drifts.length);
-  if (current?.status === "READY" && current.hash === hash && current.url) return present(flow.id, current, hash, input.drifts.length);
+  const hash = hashFor(input, layout);
+  const key = `${flow.id}:${layout}`;
+  const current = reelStateOf(flow.settings, layout);
+  if (rendering.has(key)) return present(flow.id, layout, current, hash, input.drifts.length);
+  if (current?.status === "READY" && current.hash === hash && current.url) return present(flow.id, layout, current, hash, input.drifts.length);
 
   const state: ReelState = { status: "RENDERING", hash, startedAt: new Date().toISOString() };
-  rendering.add(flow.id);
+  rendering.add(key);
   try {
-    await saveReelState(flow.id, state);
+    await saveReelState(flow.id, layout, state);
   } catch (err) {
-    rendering.delete(flow.id);
+    rendering.delete(key);
     throw err;
   }
-  console.log(`[${NS}] flow ${flow.id}: reel queued (${input.drifts.length} drifts)`);
+  console.log(`[${NS}] flow ${flow.id}: ${layout} reel queued (${input.drifts.length} drifts)`);
   void enqueueProcessing(async () => {
     const work = await fs.mkdtemp(path.join(os.tmpdir(), "drift-reel-"));
     const started = Date.now();
     try {
       const out = path.join(work, "reel.mp4");
-      const { seconds } = await renderReel(input, out, work);
+      const { seconds } = await renderReel(input, out, work, layout);
       const url = await uploadManagedBuffer({
         buffer: await fs.readFile(out),
         contentType: "video/mp4",
@@ -435,29 +515,30 @@ export async function startTourReel(orgId: string, flowId: string) {
         fallbackExtension: "mp4",
         cacheControl: IMMUTABLE_CACHE_CONTROL,
       });
-      await saveReelState(flow.id, { status: "READY", hash, url, seconds, renderedAt: new Date().toISOString() });
-      console.log(`[${NS}] flow ${flow.id}: reel ready — ${seconds}s video rendered in ${Date.now() - started}ms`);
+      await saveReelState(flow.id, layout, { status: "READY", hash, url, seconds, renderedAt: new Date().toISOString() });
+      console.log(`[${NS}] flow ${flow.id}: ${layout} reel ready — ${seconds}s video rendered in ${Date.now() - started}ms`);
     } catch (err) {
-      console.error(`[${NS}] flow ${flow.id}: reel failed`, err);
-      await saveReelState(flow.id, { status: "FAILED", hash, error: "We couldn't make the reel — please try again." }).catch(() => undefined);
+      console.error(`[${NS}] flow ${flow.id}: ${layout} reel failed`, err);
+      await saveReelState(flow.id, layout, { status: "FAILED", hash, error: "We couldn't make the reel — please try again." }).catch(() => undefined);
     } finally {
-      rendering.delete(flow.id);
+      rendering.delete(key);
       await fs.rm(work, { recursive: true, force: true }).catch(() => undefined);
     }
   }).catch(() => undefined);
-  return present(flow.id, state, hash, input.drifts.length);
+  return present(flow.id, layout, state, hash, input.drifts.length);
 }
 
 /** Streams the ready reel as a download (the storage link opens in the browser instead). */
-export async function streamTourReel(orgId: string, flowId: string, res: Response) {
+export async function streamTourReel(orgId: string, flowId: string, layout: ReelLayout, res: Response) {
   const flow = await prisma.driftFlow.findFirst({ where: { id: flowId, organizationId: orgId }, select: { slug: true, settings: true } });
   if (!flow) throw new FlowError(404, "Flow not found");
-  const state = reelStateOf(flow.settings);
+  const state = reelStateOf(flow.settings, layout);
   if (state?.status !== "READY" || !state.url || !isManagedStorageUrl(state.url)) throw new FlowError(404, "There's no reel for this tour yet");
   const upstream = await axios.get(state.url, { responseType: "stream", timeout: 60000 });
+  const base = String(flow.slug || "tour").replace(/[^a-z0-9-]/gi, "") || "tour";
   res.setHeader("Content-Type", "video/mp4");
   const length = upstream.headers["content-length"];
   if (length) res.setHeader("Content-Length", String(length));
-  res.setHeader("Content-Disposition", `attachment; filename="${String(flow.slug || "tour").replace(/[^a-z0-9-]/gi, "") || "tour"}-reel.mp4"`);
+  res.setHeader("Content-Disposition", `attachment; filename="${base}-reel${layout === "framed" ? "-framed" : ""}.mp4"`);
   upstream.data.pipe(res);
 }

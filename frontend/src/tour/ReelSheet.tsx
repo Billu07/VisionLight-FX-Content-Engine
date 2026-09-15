@@ -1,23 +1,32 @@
 import { useEffect, useRef, useState } from "react";
 import { apiEndpoints } from "../lib/api";
 import { notify } from "../lib/notifications";
-import type { Flow, TourReel } from "./types";
+import type { Flow, ReelLayout, TourReel } from "./types";
 import { Spinner, apiError } from "./tourUi";
 import { timeAgo } from "./timeAgo";
 
 /**
- * The tour as a vertical video (Instagram Reels, TikTok, YouTube Shorts): make it, watch it,
- * download it or share it straight to an app. The server renders it (about a minute, longer
- * while clips are building); this sheet checks back while it's open, and closing it doesn't
- * stop the render.
+ * The tour as a vertical video (Instagram Reels, TikTok, YouTube Shorts), in two layouts:
+ * Full screen (every drift fills the phone, sweeping across the space) or Framed (the whole
+ * shot over a soft blurred background). Make it, watch it, download it or share it straight to
+ * an app. The server renders it (about a minute, longer while clips are building); this sheet
+ * checks back while it's open, and closing it doesn't stop the render.
  */
 
 const POLL_MS = 4000;
+
+const LAYOUTS: { value: ReelLayout; label: string; hint: string }[] = [
+  { value: "full", label: "Full screen", hint: "Every drift fills the phone screen, sweeping across the space the way the camera moves." },
+  { value: "framed", label: "Framed", hint: "The whole shot stays in view, over a soft blurred copy of itself." },
+];
 
 const REEL_CSS = `
 .rs-overlay{z-index:80}
 .t-sheet-card.rs-card{max-width:560px;max-height:94dvh;overflow:auto}
 .rs-head{padding-right:36px}
+.rs-layouts{display:grid;gap:6px}
+.rs-layouts .d-tabs{justify-self:start;max-width:100%}
+.rs-hint{font-size:12.5px;line-height:1.45}
 .rs-stage{display:grid;place-items:center;padding:12px;border-radius:18px;background:var(--surface-3)}
 .rs-frame{position:relative;width:min(100%,300px);max-height:62dvh;aspect-ratio:9/16;border-radius:14px;overflow:hidden;background:#0b0f19;display:grid;place-items:center;color:#cbd5e1;text-align:center}
 .rs-frame video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
@@ -28,21 +37,24 @@ const REEL_CSS = `
 `;
 
 export function ReelSheet({ flow, onClose }: { flow: Flow; onClose: () => void }) {
+  const [layout, setLayout] = useState<ReelLayout>("full");
   const [reel, setReel] = useState<TourReel | null>(null);
   const [pollKey, setPollKey] = useState(0);
   const [starting, setStarting] = useState(false);
   const [saving, setSaving] = useState<"download" | "share" | null>(null);
   const fileRef = useRef<File | null>(null);
   const canShareFiles = typeof navigator !== "undefined" && typeof navigator.canShare === "function";
-  const fileName = `${flow.slug || "tour"}-reel.mp4`;
+  const fileName = `${flow.slug || "tour"}-reel${layout === "framed" ? "-framed" : ""}.mp4`;
+  const hint = LAYOUTS.find((l) => l.value === layout)?.hint || "";
 
-  // Load the reel, and keep checking while it renders.
+  // Load this layout's reel, and keep checking while it renders.
   useEffect(() => {
     let alive = true;
     let timer = 0;
+    setReel(null);
     const poll = async () => {
       try {
-        const r = await apiEndpoints.driftTourReel(flow.id);
+        const r = await apiEndpoints.driftTourReel(flow.id, layout);
         if (!alive) return;
         const next: TourReel = r.data.reel;
         setReel(next);
@@ -56,7 +68,7 @@ export function ReelSheet({ flow, onClose }: { flow: Flow; onClose: () => void }
       alive = false;
       window.clearTimeout(timer);
     };
-  }, [flow.id, pollKey]);
+  }, [flow.id, layout, pollKey]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -64,15 +76,15 @@ export function ReelSheet({ flow, onClose }: { flow: Flow; onClose: () => void }
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // A new video → forget the one fetched for sharing.
+  // Another video (or layout) → forget the file fetched for sharing.
   useEffect(() => {
     fileRef.current = null;
-  }, [reel?.url]);
+  }, [reel?.url, layout]);
 
   const make = async () => {
     setStarting(true);
     try {
-      const r = await apiEndpoints.driftStartTourReel(flow.id);
+      const r = await apiEndpoints.driftStartTourReel(flow.id, layout);
       setReel(r.data.reel);
       setPollKey((k) => k + 1);
     } catch (e) {
@@ -84,7 +96,7 @@ export function ReelSheet({ flow, onClose }: { flow: Flow; onClose: () => void }
 
   const getFile = async () => {
     if (fileRef.current) return fileRef.current;
-    const r = await apiEndpoints.driftTourReelFile(flow.id);
+    const r = await apiEndpoints.driftTourReelFile(flow.id, layout);
     fileRef.current = new File([r.data as Blob], fileName, { type: "video/mp4" });
     return fileRef.current;
   };
@@ -144,6 +156,24 @@ export function ReelSheet({ flow, onClose }: { flow: Flow; onClose: () => void }
           </div>
         </div>
 
+        <div className="rs-layouts">
+          <div className="d-tabs" role="tablist" aria-label="Reel layout">
+            {LAYOUTS.map((l) => (
+              <button
+                key={l.value}
+                type="button"
+                role="tab"
+                aria-selected={layout === l.value}
+                className={`d-tab ${layout === l.value ? "active" : ""}`}
+                onClick={() => setLayout(l.value)}
+              >
+                {l.label}
+              </button>
+            ))}
+          </div>
+          <div className="d-faint rs-hint">{hint}</div>
+        </div>
+
         <div className="rs-stage">
           <div className="rs-frame">
             {status === "READY" && reel?.url ? (
@@ -167,7 +197,7 @@ export function ReelSheet({ flow, onClose }: { flow: Flow; onClose: () => void }
                     </>
                   ) : (
                     <>
-                      <b>No reel yet</b>
+                      <b>No {layout === "full" ? "full-screen" : "framed"} reel yet</b>
                       <span>
                         {reel.drifts} {reel.drifts === 1 ? "drift plays" : "drifts play"} through, one after another.
                       </span>

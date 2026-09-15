@@ -426,3 +426,11 @@ Drift.li is a division of PicDrift
   straight to an app from a phone. Verified: rendered from landscape, wide and portrait footage — 1080×1920, 30fps,
   yuv420p, length = timeline, no audio; stills checked. Not yet run on the VPS: making, storing and downloading a reel —
   test after deploy.
+- 2026-09-15 — Reel layouts (client feedback: "can't it be portrait fullscreen?"). The reel now comes two ways: Full
+  screen (the new default) — every drift fills the phone screen: the full-resolution footage cut to a portrait window
+  that glides across the shot the way the camera pans, so the whole space passes by — and Framed (the first version: the
+  whole shot over a blurred copy). Tabs in the Reel sheet; each layout is made on demand and kept separately
+  (settings.reelFull / settings.reel), so a framed reel made earlier stays as it was. Verified: both layouts rendered
+  from landscape, wide and portrait footage (1080×1920, 30fps, right length, no audio; the window maths unit-checked;
+  stills show the sweep). A 3-drift full-screen reel took ~31s on the dev machine (frames cut at full resolution),
+  framed ~23s.

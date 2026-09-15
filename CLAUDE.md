@@ -298,12 +298,15 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   unclear leaves the clip as uploaded (zooms, diagonals, noise, screen recordings). `buildSpinFromVideo({ cleanup })`
   applies it (`steadyCropFor`) and stores the report in `manifest.cleanup`; `processClip` sets `driftDirection` from it;
   the builder's step card shows "Auto clean-up: …" (`serializeStepProduct` → `cleanup`).
-- **Reel** (2026-09-15, no schema change): share sheet → "Reel" (`tour/ReelSheet.tsx`: make / watch / download / share
-  the file) → `GET|POST /api/drift/my/flows/:id/reel` (VIEW / EDIT) + `GET …/reel/file` (download stream).
-  `services/driftReel.ts` `renderReel` = one ffmpeg graph: 1080×1920 30fps — intro card → each ready drift (≤8, mobile
-  frames, ~3.4s + holds) over a blurred copy of itself with a name + progress overlay (sharp SVG; DejaVu Sans on the VPS)
-  → end card (link + QR), slideleft xfades, no audio. Runs on the processing queue, uploads to R2, and keeps its state in
-  `DriftFlow.settings.reel` via one atomic `jsonb_set` (a content hash → `stale` once the tour changes).
+- **Reel** (2026-09-15, no schema change): share sheet → "Reel" (`tour/ReelSheet.tsx`: Full screen | Framed tabs; make /
+  watch / download / share the file) → `GET|POST /api/drift/my/flows/:id/reel?layout=full|framed` (VIEW / EDIT) +
+  `GET …/reel/file?layout=` (download stream). `services/driftReel.ts` `renderReel` = one ffmpeg graph: 1080×1920 30fps —
+  intro card → each ready drift (≤8, ~3.4s + holds) with a name + progress overlay (sharp SVG; DejaVu Sans on the VPS) →
+  end card (link + QR), slideleft xfades, no audio. Layout `full` (default): the full-resolution frames cut to a 9:16
+  window that glides the way the camera pans (`fillWindow`, cut in sharp, so the frames arrive at 1080×1920); `framed`:
+  the mobile frames over a blurred copy. Runs on the processing queue, uploads to R2; state per layout in
+  `DriftFlow.settings.reelFull` / `settings.reel` (framed kept the first key) via one atomic `jsonb_set` (a content hash
+  → `stale` once the tour changes).
 - **Superadmin**: `X-Drift-Org` lets a superadmin act on any TOUR page ("Manage this page", `usePageAdmin`);
   back office = Admin → drift.li → Tour (`routes/driftTourAdmin.ts`, `DriftTourAdmin.tsx`).
 - **drift.li home** = `rotation3d/DriftHome.tsx` (2026-09-14 redesign per the client's `land.png`: the hero's
