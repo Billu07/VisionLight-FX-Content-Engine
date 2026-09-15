@@ -269,6 +269,15 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   Personal links: `DriftShareLink` per tour (`…?to={token}`, `services/driftEnquiries.ts`); `rotation3d/personalLink.ts`
   notes the token for the visit (open counted once, param dropped from the address) and the player tags VIEW events
   `meta.link`; the share sheet's `PersonalLinks` shows opens / drifts seen / enquiries.
+- **Print kit + unbranded link** (2026-09-15, no schema change): share sheet (Editors + Admins, published tours) →
+  "Unbranded link" = `/u/{code}` for listing sites (MLS) — `POST /api/drift/my/flows/:id/unbranded` (EDIT) makes a
+  10-char code once, kept in `DriftFlow.settings.unbrandedCode` (`serializeFlow` → `unbrandedPath`); public
+  `GET /api/drift/public/unbranded/:code` (+ `/drifts/:index`) in `routes/drift.ts` strip page name / logo / pixel /
+  forms / enquiry and rewrite every tour link to `/u/{code}?d={i}`; player `rotation3d/UnbrandedTour.tsx` (menu +
+  one mounted SpinViewer). "Print kit" = `tour/PrintKit.tsx` (picker + scaled preview) over `tour/printSheets.tsx`
+  (flyer / window sign / 8 QR cards in mm, A4 or Letter, QR → tour or unbranded link). Printing renders a copy into a
+  `.pk-portal` on `<body>`; print CSS hides everything else and sets `@page` — verified one page per sheet at the right
+  size via headless Chrome. `u` is reserved in both slug lists.
 - **Superadmin**: `X-Drift-Org` lets a superadmin act on any TOUR page ("Manage this page", `usePageAdmin`);
   back office = Admin → drift.li → Tour (`routes/driftTourAdmin.ts`, `DriftTourAdmin.tsx`).
 - **drift.li home** = `rotation3d/DriftHome.tsx` (2026-09-14 redesign per the client's `land.png`: the hero's

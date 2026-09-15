@@ -841,6 +841,34 @@ router.delete("/api/drift/my/flows/:id/links/:linkId", authenticateToken, async 
   }
 });
 
+// The tour's unbranded (MLS-safe) link, drift.li/u/{code} — made on first use, then kept.
+router.post("/api/drift/my/flows/:id/unbranded", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "EDIT");
+  if (!orgId) return;
+  const flow = await prisma.driftFlow.findFirst({ where: { id: req.params.id, organizationId: orgId }, select: { id: true, settings: true } });
+  if (!flow) return res.status(404).json({ error: "Flow not found" });
+  const settings: Record<string, unknown> =
+    flow.settings && typeof flow.settings === "object" ? { ...(flow.settings as Record<string, unknown>) } : {};
+  const current = typeof settings.unbrandedCode === "string" ? settings.unbrandedCode : "";
+  let code = /^[a-z0-9]{6,20}$/.test(current) ? current : "";
+  if (!code) {
+    const alphabet = "abcdefghijkmnopqrstuvwxyz23456789";
+    for (let attempt = 0; attempt < 5 && !code; attempt++) {
+      const candidate = Array.from(crypto.randomBytes(10), (x) => alphabet[x % alphabet.length]).join("");
+      const taken = await prisma.driftFlow.findFirst({
+        where: { settings: { path: ["unbrandedCode"], equals: candidate } },
+        select: { id: true },
+      });
+      if (!taken) code = candidate;
+    }
+    if (!code) return res.status(500).json({ error: "We couldn't make that link — please try again." });
+    settings.unbrandedCode = code;
+    await prisma.driftFlow.update({ where: { id: flow.id }, data: { settings: settings as Prisma.InputJsonValue } });
+    console.log(`[${NS}] flow ${flow.id}: unbranded link made`);
+  }
+  res.json({ code, path: `/u/${code}` });
+});
+
 // A visit through a personal link (public): counts the open; an unknown link is ignored.
 router.post("/api/drift/public/links/:token/open", async (req: AuthenticatedRequest, res: Response) => {
   const opened = await openShareLink(String(req.params.token || "")).catch(() => null);

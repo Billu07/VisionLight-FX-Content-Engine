@@ -69,6 +69,8 @@ export type Flow = {
   pagePath: string | null;
   /** the tour's main link — its pathway menu: /tour/{page}/{tour} */
   publicPath: string;
+  /** the unbranded (MLS-safe) link once it's been made: /u/{code} */
+  unbrandedPath?: string | null;
   entryProductId: string | null;
   entryPath: string | null;
   thumb: string | null;

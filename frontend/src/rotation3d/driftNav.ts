@@ -25,6 +25,7 @@ const RESERVED_SEG = new Set([
   "privacy", "demo", "rotation3d", "billing", "auth", "support-handoff",
   "reset-password", "api",
   "tour", "view", "memory", "path", // creator suite (/{kind}/{slug})
+  "u", // unbranded (MLS-safe) tour links: /u/{code}
 ]);
 
 export type DriftTarget =

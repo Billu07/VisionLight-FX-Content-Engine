@@ -468,6 +468,8 @@ export function serializeFlow(f: any) {
     pageName: (f.organization?.name ?? null) as string | null,
     pagePath: pageSlug ? pagePublicPath(pageSlug, kind) : null,
     publicPath: flowPublicPath(kind, pageSlug, f.slug),
+    /** the unbranded (MLS-safe) link, once made: /u/{code} */
+    unbrandedPath: typeof settingsOf(f).unbrandedCode === "string" ? `/u/${settingsOf(f).unbrandedCode as string}` : null,
     entryProductId: (entry?.id ?? null) as string | null,
     entryPath: entry ? (entry.playerPath as string) : null,
     thumb: (f.coverUrl || entry?.thumb || null) as string | null,

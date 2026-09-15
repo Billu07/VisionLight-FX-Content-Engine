@@ -164,4 +164,10 @@ export const TOUR_PAGE_STYLES = `
 .t-link-row b{font-size:13.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .t-link-row small{font-size:12px;color:var(--muted)}
 .t-link-row small.on{color:var(--ok)}
+/* Share sheet: unbranded link + print kit rows */
+.t-share-more{display:grid;gap:10px;padding-top:14px;border-top:1px solid var(--border)}
+.t-share-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.t-share-row .grow{flex:1 1 220px;min-width:0;display:grid;gap:2px}
+.t-share-row b{font-size:13.5px;color:var(--text)}
+.t-share-row small{font-size:12px;color:var(--muted);line-height:1.4}
 `;

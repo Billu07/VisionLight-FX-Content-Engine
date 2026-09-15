@@ -373,8 +373,8 @@ Drift.li is a division of PicDrift
   from a real photo: ≤0.7px error on a 390px phone frame (clean, exposure drift + noise), ≤6px with a walking zoom;
   noise and scene cuts are refused (pins then follow the fine-tuning only). Player: pulsing dot + label, tap for the
   note, dragging closes it. Also closed: tour Editors/Viewers could still write brand captions/thumbnails directly.
-- 2026-09-15 — Feature roadmap agreed (one phase at a time, review between): 1 pins ✅ · 2 enquiries + personal links
-  · 3 print kit + MLS-safe link · 4 attention heatmap + owner report · 5 auto clean-up on upload · 6 shoot mode in the
+- 2026-09-15 — Feature roadmap agreed (one phase at a time, review between): 1 pins ✅ · 2 enquiries + personal links ✅
+  · 3 print kit + MLS-safe link ✅ · 4 attention heatmap + owner report · 5 auto clean-up on upload · 6 shoot mode in the
   browser · 7 reel export · 8 Then & Now.
 - 2026-09-15 — Phase 2: enquiries + personal links (SCHEMA: `DriftShareLink` → db push). Page settings → "Enquiry
   button" (label presets Book a viewing / Ask a question / Request info / Get a quote, optional phone). Shown on the
@@ -384,3 +384,13 @@ Drift.li is a division of PicDrift
   person with opens, last opened, drifts seen of total and enquiries; removing a link stops tracking (the tour still
   opens). The home
   no longer downloads the player.
+- 2026-09-15 — Phase 3: print kit + MLS-safe link (NO schema change — backend + frontend rebuild only). Share sheet of
+  a published tour (Editors + Admins) gains two rows. "Unbranded link" → `drift.li/u/{code}`: the same tour with no
+  page name, logo, enquiry button, lead forms or pixel; every button and strip stays inside `/u/{code}` (drift `?d=i`),
+  so a listing site never sees a way back to the agent. The code is made on first request and kept (in the flow's
+  settings); unpublishing the tour closes it too. "Print kit": Flyer (cover photo, title, description, QR), Window
+  sign (landscape, big QR) and QR cards (8 per sheet); A4 or US Letter (Letter preselected for en-US / en-CA); the QR
+  opens the tour or the unbranded link (the unbranded version also drops the name and logo from the paper). "Print or
+  save as PDF" uses the browser's dialog. Checked by rendering each sheet and printing it with headless Chrome: exactly
+  one page each, A4 portrait 595×842pt / Letter landscape 792×612pt, the app hidden. Not yet run against the live DB:
+  the unbranded endpoints (settings JSON-path lookup) — test after deploy.

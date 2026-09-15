@@ -485,6 +485,11 @@ export const apiEndpoints = {
   driftDeleteFlowLink: (id: string, linkId: string) =>
     api.delete(`/api/drift/my/flows/${id}/links/${encodeURIComponent(linkId)}`),
   driftOpenShareLink: (token: string) => api.post(`/api/drift/public/links/${encodeURIComponent(token)}/open`),
+  // unbranded (MLS-safe) tour links
+  driftCreateUnbrandedLink: (id: string) => api.post(`/api/drift/my/flows/${id}/unbranded`),
+  driftUnbrandedTour: (code: string) => api.get(`/api/drift/public/unbranded/${encodeURIComponent(code)}`),
+  driftUnbrandedDrift: (code: string, index: number) =>
+    api.get(`/api/drift/public/unbranded/${encodeURIComponent(code)}/drifts/${index}`),
 
   // Brand-level drift settings (Meta Pixel default).
   driftBrandSettings: () => api.get("/api/drift/my/brand-settings"),

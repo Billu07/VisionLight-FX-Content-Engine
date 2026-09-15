@@ -92,6 +92,7 @@ const RESERVED_SLUGS = new Set([
   "drift", "api", "www", "b", "assets", "favicon",
   "tour", "view", "memory", "path", // drift.li creator suite (/{kind}/{slug})
   "start", "invite", "new", "edit", "login", "signup", "dashboard", "capture-guide", // /tour/{static} app routes (page slugs)
+  "u", // unbranded (MLS-safe) tour links: /u/{code}
 ]);
 
 // Globally-unique vanity slug for an organization.
@@ -1249,6 +1250,104 @@ router.get("/api/drift/public/products/:id", async (req: AuthenticatedRequest, r
   const payload = await loadPublicDrift(req.params.id);
   if (!payload) return res.status(404).json({ error: "Not found" });
   res.json({ product: payload });
+});
+
+// ── Unbranded (MLS-safe) tour links: drift.li/u/{code} ──
+// Listing services (MLS) often refuse tour links that show the agent, so this serves a
+// published tour with no page name, logo, contact or enquiry buttons — and points every
+// tour link inside it (Home, the next drift, the stop dots) at the one neutral address.
+const UNBRANDED_VIEWABLE = new Set(["READY", "PUBLISHED"]);
+const unbrandedFlow = (rawCode: string) => {
+  const code = String(rawCode || "").trim().toLowerCase();
+  if (!/^[a-z0-9]{6,20}$/.test(code)) return Promise.resolve(null);
+  return prisma.driftFlow.findFirst({
+    where: { status: "PUBLISHED", settings: { path: ["unbrandedCode"], equals: code } },
+    select: {
+      id: true,
+      name: true,
+      title: true,
+      description: true,
+      coverUrl: true,
+      steps: {
+        orderBy: { order: "asc" },
+        select: {
+          productId: true,
+          product: { select: { id: true, name: true, status: true, thumbnailUrl: true, defaultFrame: true, spin: { select: { manifest: true } } } },
+        },
+      },
+    },
+  });
+};
+const unbrandedThumb = (p: any): string | null => {
+  const m = p?.spin?.manifest;
+  const full: string[] = Array.isArray(m?.frames) ? m.frames : [];
+  const list: string[] = Array.isArray(m?.framesMobile) && m.framesMobile.length === full.length ? m.framesMobile : full;
+  return p?.thumbnailUrl || list[p?.defaultFrame ?? 0] || list[0] || null;
+};
+
+// The tour's menu: title, description, cover and its drifts in order.
+router.get("/api/drift/public/unbranded/:code", async (req: AuthenticatedRequest, res: Response) => {
+  const f = await unbrandedFlow(req.params.code);
+  if (!f) return res.status(404).json({ error: "Not found" });
+  const steps = f.steps.filter((s) => s.product && UNBRANDED_VIEWABLE.has(s.product.status));
+  res.json({
+    tour: {
+      title: f.title || f.name,
+      description: f.description ?? null,
+      thumb: f.coverUrl || unbrandedThumb(steps[0]?.product) || null,
+      steps: steps.map((s, i) => ({ index: i, name: s.product!.name, thumb: unbrandedThumb(s.product) })),
+    },
+  });
+});
+
+// One drift of it (by its position), with the page's branding taken out.
+router.get("/api/drift/public/unbranded/:code/drifts/:index", async (req: AuthenticatedRequest, res: Response) => {
+  const code = String(req.params.code || "").trim().toLowerCase();
+  const f = await unbrandedFlow(code);
+  if (!f) return res.status(404).json({ error: "Not found" });
+  const steps = f.steps.filter((s) => s.product && UNBRANDED_VIEWABLE.has(s.product.status));
+  const index = Number(req.params.index);
+  const step = Number.isInteger(index) && index >= 0 ? steps[index] : undefined;
+  if (!step?.productId) return res.status(404).json({ error: "Not found" });
+  const p: any = await loadPublicDrift(step.productId);
+  if (!p) return res.status(404).json({ error: "Not found" });
+  const base = `/u/${code}`;
+  const stops: any[] = p.flow?.stops || [];
+  const links = new Map<string, string>();
+  stops.forEach((s, i) => {
+    if (s.playerPath) links.set(s.playerPath, `${base}?d=${i}`);
+    if (s.productId) links.set(stepPlayerPath(s.productId), `${base}?d=${i}`);
+  });
+  const home: string | undefined = p.flow?.publicPath;
+  // Anything that isn't a stop of this tour opens its menu — never a branded address.
+  const neutral = (cta: any) =>
+    cta && typeof cta === "object" && typeof cta.url === "string"
+      ? { ...cta, url: home && cta.url === home ? base : links.get(cta.url) ?? base }
+      : cta;
+  res.json({
+    product: {
+      ...p,
+      brandName: "",
+      logoUrl: null,
+      metaPixelId: null,
+      forms: null,
+      ctaPrimary: neutral(p.ctaPrimary),
+      ctaSecondary: neutral(p.ctaSecondary),
+      flow: p.flow
+        ? {
+            ...p.flow,
+            pageSlug: null,
+            pageName: null,
+            pagePath: null,
+            enquiry: null,
+            publicPath: base,
+            entryPath: stops.length ? `${base}?d=0` : null,
+            stops: stops.map((s, i) => ({ ...s, playerPath: `${base}?d=${i}` })),
+          }
+        : null,
+      unbranded: true,
+    },
+  });
 });
 
 // One drift of a flow by its readable link: /{kind}/{page}/{flow}/{drift}. The drift
