@@ -926,7 +926,7 @@ router.get("/api/drift/public/reports/:code", async (req: AuthenticatedRequest, 
   res.json({ report });
 });
 
-// ── Reel: the tour as a vertical video (services/driftReel.ts); ?layout=full (default) | framed ──
+// ── Reel: the tour as a vertical video (services/driftReel.ts); ?layout=full (default, portrait) | landscape | framed ──
 router.get("/api/drift/my/flows/:id/reel", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   const orgId = await requirePage(req, res, "VIEW");
   if (!orgId) return;

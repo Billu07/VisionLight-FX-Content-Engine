@@ -434,3 +434,13 @@ Drift.li is a division of PicDrift
   from landscape, wide and portrait footage (1080×1920, 30fps, right length, no audio; the window maths unit-checked;
   stills show the sweep). A 3-drift full-screen reel took ~31s on the dev machine (frames cut at full resolution),
   framed ~23s.
+- 2026-09-16 — Landscape reels (client feedback: "the reel creation should support fullscreen landscape also, users can
+  decide … portrait clips will look good on portrait and so on"). A third layout: Landscape, 1920×1080 — every drift fills
+  a widescreen frame (the same gliding window at 16:9; portrait footage glides top to bottom on a vertical pan), with its
+  own intro, overlay and end-card arrangement (text left, QR right). The sheet's tabs are now Portrait | Landscape |
+  Framed and it opens on the full-screen layout that suits most of the tour's ready clips (measured from their
+  thumbnails), with a one-line suggestion; the choice is still the creator's. Kept in settings.reelLandscape; the
+  portrait and framed hashes are unchanged, so reels made before stay current. Download name `…-reel-landscape.mp4`.
+  Verified: all three layouts rendered from landscape, wide and portrait footage (right size, 30fps, yuv420p, length =
+  timeline, no audio; the 16:9 window maths unit-checked; stills checked — portrait output unchanged). A 3-drift
+  landscape reel took ~22s on the dev machine.

@@ -1,34 +1,38 @@
 import { useEffect, useRef, useState } from "react";
 import { apiEndpoints } from "../lib/api";
 import { notify } from "../lib/notifications";
-import type { Flow, ReelLayout, TourReel } from "./types";
+import { isReady, type Flow, type ReelLayout, type TourReel } from "./types";
 import { Spinner, apiError } from "./tourUi";
 import { timeAgo } from "./timeAgo";
 
 /**
- * The tour as a vertical video (Instagram Reels, TikTok, YouTube Shorts), in two layouts:
- * Full screen (every drift fills the phone, sweeping across the space) or Framed (the whole
- * shot over a soft blurred background). Make it, watch it, download it or share it straight to
- * an app. The server renders it (about a minute, longer while clips are building); this sheet
+ * The tour as a video, in three layouts: Portrait (every drift fills a phone screen — Reels,
+ * TikTok, Shorts), Landscape (every drift fills a widescreen frame — YouTube, Facebook, LinkedIn,
+ * websites) or Framed (portrait, the whole shot over a blurred copy). The sheet suggests the full
+ * screen layout that matches the tour's clips. Make it, watch it, download it or share it straight
+ * to an app. The server renders it (about a minute, longer while clips are building); this sheet
  * checks back while it's open, and closing it doesn't stop the render.
  */
 
 const POLL_MS = 4000;
 
 const LAYOUTS: { value: ReelLayout; label: string; hint: string }[] = [
-  { value: "full", label: "Full screen", hint: "Every drift fills the phone screen, sweeping across the space the way the camera moves." },
-  { value: "framed", label: "Framed", hint: "The whole shot stays in view, over a soft blurred copy of itself." },
+  { value: "full", label: "Portrait", hint: "9:16, full screen: every drift fills a phone screen. Best for Instagram Reels, TikTok and Shorts." },
+  { value: "landscape", label: "Landscape", hint: "16:9, full screen: every drift fills a widescreen frame. Best for YouTube, Facebook, LinkedIn and websites." },
+  { value: "framed", label: "Framed", hint: "9:16 with the whole shot in view, over a soft blurred copy of itself." },
 ];
 
 const REEL_CSS = `
 .rs-overlay{z-index:80}
-.t-sheet-card.rs-card{max-width:560px;max-height:94dvh;overflow:auto}
+.t-sheet-card.rs-card{max-width:600px;max-height:94dvh;overflow:auto}
 .rs-head{padding-right:36px}
 .rs-layouts{display:grid;gap:6px}
 .rs-layouts .d-tabs{justify-self:start;max-width:100%}
 .rs-hint{font-size:12.5px;line-height:1.45}
+.rs-suggest{font-size:12.5px;line-height:1.45;color:var(--accent)}
 .rs-stage{display:grid;place-items:center;padding:12px;border-radius:18px;background:var(--surface-3)}
 .rs-frame{position:relative;width:min(100%,300px);max-height:62dvh;aspect-ratio:9/16;border-radius:14px;overflow:hidden;background:#0b0f19;display:grid;place-items:center;color:#cbd5e1;text-align:center}
+.rs-frame.wide{width:100%;max-width:540px;max-height:none;aspect-ratio:16/9}
 .rs-frame video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
 .rs-cover{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.3}
 .rs-note{position:relative;display:grid;gap:8px;justify-items:center;padding:18px;font-size:13px;line-height:1.45}
@@ -36,16 +40,65 @@ const REEL_CSS = `
 .rs-meta{font-size:12.5px;color:var(--muted)}
 `;
 
+/** Which full-screen layout suits the tour: landscape when most of its ready drifts are wider than tall. */
+function useSuggestedLayout(flow: Flow): ReelLayout | null {
+  const thumbs = flow.steps
+    .map((s) => s.product)
+    .filter((p) => p && isReady(p.status) && p.thumb)
+    .slice(0, 6)
+    .map((p) => p!.thumb as string);
+  const key = thumbs.join("|");
+  const [suggested, setSuggested] = useState<ReelLayout | null>(null);
+  useEffect(() => {
+    if (!thumbs.length) return;
+    let alive = true;
+    Promise.all(
+      thumbs.map(
+        (src) =>
+          new Promise<number>((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(img.naturalWidth / Math.max(1, img.naturalHeight));
+            img.onerror = () => resolve(0);
+            img.src = src;
+          }),
+      ),
+    ).then((ratios) => {
+      if (!alive) return;
+      const known = ratios.filter((r) => r > 0);
+      if (!known.length) return;
+      const wide = known.filter((r) => r > 1.05).length;
+      setSuggested(wide > known.length / 2 ? "landscape" : "full");
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return suggested;
+}
+
 export function ReelSheet({ flow, onClose }: { flow: Flow; onClose: () => void }) {
+  const suggested = useSuggestedLayout(flow);
   const [layout, setLayout] = useState<ReelLayout>("full");
+  const picked = useRef(false);
   const [reel, setReel] = useState<TourReel | null>(null);
   const [pollKey, setPollKey] = useState(0);
   const [starting, setStarting] = useState(false);
   const [saving, setSaving] = useState<"download" | "share" | null>(null);
   const fileRef = useRef<File | null>(null);
   const canShareFiles = typeof navigator !== "undefined" && typeof navigator.canShare === "function";
-  const fileName = `${flow.slug || "tour"}-reel${layout === "framed" ? "-framed" : ""}.mp4`;
-  const hint = LAYOUTS.find((l) => l.value === layout)?.hint || "";
+  const fileName = `${flow.slug || "tour"}-reel${layout === "full" ? "" : `-${layout}`}.mp4`;
+  const current = LAYOUTS.find((l) => l.value === layout) ?? LAYOUTS[0];
+
+  // Until someone picks a layout, open on the one that suits the clips.
+  useEffect(() => {
+    if (suggested && !picked.current) setLayout(suggested);
+  }, [suggested]);
+
+  const pick = (value: ReelLayout) => {
+    picked.current = true;
+    setLayout(value);
+  };
 
   // Load this layout's reel, and keep checking while it renders.
   useEffect(() => {
@@ -140,6 +193,7 @@ export function ReelSheet({ flow, onClose }: { flow: Flow; onClose: () => void }
   };
 
   const status = reel?.status;
+  const wide = layout === "landscape";
 
   return (
     <div className="t-sheet rs-overlay" onClick={onClose} role="dialog" aria-modal aria-label="Tour reel">
@@ -152,7 +206,7 @@ export function ReelSheet({ flow, onClose }: { flow: Flow; onClose: () => void }
           <div className="d-eyebrow">Reel</div>
           <div className="t-sheet-title">{flow.title || flow.name}</div>
           <div className="d-sub" style={{ fontSize: 12.5 }}>
-            A vertical video of this tour for Instagram Reels, TikTok and YouTube Shorts. It ends with the tour's link and a QR code.
+            A video of this tour to post anywhere. It ends with the tour's link and a QR code.
           </div>
         </div>
 
@@ -165,17 +219,22 @@ export function ReelSheet({ flow, onClose }: { flow: Flow; onClose: () => void }
                 role="tab"
                 aria-selected={layout === l.value}
                 className={`d-tab ${layout === l.value ? "active" : ""}`}
-                onClick={() => setLayout(l.value)}
+                onClick={() => pick(l.value)}
               >
                 {l.label}
               </button>
             ))}
           </div>
-          <div className="d-faint rs-hint">{hint}</div>
+          <div className="d-faint rs-hint">{current.hint}</div>
+          {suggested && (
+            <div className="rs-suggest">
+              Your clips are mostly {suggested === "landscape" ? "landscape" : "portrait"} — {suggested === "landscape" ? "Landscape" : "Portrait"} suits them best.
+            </div>
+          )}
         </div>
 
         <div className="rs-stage">
-          <div className="rs-frame">
+          <div className={`rs-frame ${wide ? "wide" : ""}`}>
             {status === "READY" && reel?.url ? (
               <video key={reel.url} src={reel.url} controls playsInline muted loop preload="metadata" poster={flow.thumb || undefined} />
             ) : (
@@ -197,7 +256,7 @@ export function ReelSheet({ flow, onClose }: { flow: Flow; onClose: () => void }
                     </>
                   ) : (
                     <>
-                      <b>No {layout === "full" ? "full-screen" : "framed"} reel yet</b>
+                      <b>No {current.label.toLowerCase()} reel yet</b>
                       <span>
                         {reel.drifts} {reel.drifts === 1 ? "drift plays" : "drifts play"} through, one after another.
                       </span>

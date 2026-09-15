@@ -166,7 +166,7 @@ export function ShareSheet({
               <div className="t-share-row">
                 <span className="grow">
                   <b>Reel</b>
-                  <small>A vertical video of the tour for Instagram, TikTok and Shorts.</small>
+                  <small>A video of the tour: portrait for Reels, TikTok and Shorts, or landscape for YouTube and Facebook.</small>
                 </span>
                 <button type="button" className="d-btn sm" onClick={() => setReelOpen(true)}>
                   Open

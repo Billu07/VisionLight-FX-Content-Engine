@@ -272,8 +272,9 @@ export type OwnerReport = {
   insights: TourInsights;
 };
 
-/** Reel layouts: every drift filling the screen, or the whole shot over a blurred copy. */
-export type ReelLayout = "full" | "framed";
+/** Reel layouts: every drift filling a portrait (full) or widescreen (landscape) frame, or the
+ *  whole shot over a blurred copy (framed, portrait). */
+export type ReelLayout = "full" | "landscape" | "framed";
 
 /** A tour's reel (vertical video) in one layout: none yet, rendering, ready or failed. */
 export type TourReel = {

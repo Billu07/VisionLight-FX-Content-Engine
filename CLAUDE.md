@@ -306,15 +306,17 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   unclear leaves the clip as uploaded (zooms, diagonals, noise, screen recordings). `buildSpinFromVideo({ cleanup })`
   applies it (`steadyCropFor`) and stores the report in `manifest.cleanup`; `processClip` sets `driftDirection` from it;
   the builder's step card shows "Auto clean-up: …" (`serializeStepProduct` → `cleanup`).
-- **Reel** (2026-09-15, no schema change): share sheet → "Reel" (`tour/ReelSheet.tsx`: Full screen | Framed tabs; make /
-  watch / download / share the file) → `GET|POST /api/drift/my/flows/:id/reel?layout=full|framed` (VIEW / EDIT) +
-  `GET …/reel/file?layout=` (download stream). `services/driftReel.ts` `renderReel` = one ffmpeg graph: 1080×1920 30fps —
-  intro card → each ready drift (≤8, ~3.4s + holds) with a name + progress overlay (sharp SVG; DejaVu Sans on the VPS) →
-  end card (link + QR), slideleft xfades, no audio. Layout `full` (default): the full-resolution frames cut to a 9:16
-  window that glides the way the camera pans (`fillWindow`, cut in sharp, so the frames arrive at 1080×1920); `framed`:
-  the mobile frames over a blurred copy. Runs on the processing queue, uploads to R2; state per layout in
-  `DriftFlow.settings.reelFull` / `settings.reel` (framed kept the first key) via one atomic `jsonb_set` (a content hash
-  → `stale` once the tour changes).
+- **Reel** (2026-09-15, no schema change): share sheet → "Reel" (`tour/ReelSheet.tsx`: Portrait | Landscape | Framed
+  tabs, opening on the full-screen layout that matches most ready drifts' thumbnails; make / watch / download / share the
+  file) → `GET|POST /api/drift/my/flows/:id/reel?layout=full|landscape|framed` (VIEW / EDIT) + `GET …/reel/file?layout=`
+  (download stream). `services/driftReel.ts` `renderReel` = one ffmpeg graph at 30fps — intro card → each ready drift
+  (≤8, ~3.4s + holds) with a name + progress overlay (sharp SVG; DejaVu Sans on the VPS) → end card (link + QR),
+  slideleft xfades, no audio. Sizes in `REEL_SIZE`; the cards have a portrait and a widescreen arrangement. Layout `full`
+  (default, 1080×1920) and `landscape` (1920×1080, 2026-09-16): the full-resolution frames cut to a window at the reel's
+  aspect that glides the way the camera pans (`fillWindow(…, aspect)`, cut in sharp); `framed` (1080×1920): the mobile
+  frames over a blurred copy. Runs on the processing queue, uploads to R2; state per layout in
+  `DriftFlow.settings.reelFull` / `reelLandscape` / `reel` (framed kept the first key) via one atomic `jsonb_set` (a
+  content hash → `stale` once the tour changes; the full and framed hashes are unchanged, so existing reels stay current).
 - **Link previews + search** (2026-09-16, no schema change; runbook docs/DRIFT_SOCIAL_SETUP.md): drift.li pages get their
   `<head>` from the app — nginx sends non-file requests to `/__drift/html<path>`, `/og/*` → `/__drift/og/*`,
   `/robots.txt` + `/sitemap.xml` → `/__drift/*` (`routes/driftShare.ts`). `services/driftShare.ts` `resolveShare(path,

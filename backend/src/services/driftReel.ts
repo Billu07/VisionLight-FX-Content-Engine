@@ -16,16 +16,17 @@ import { IMMUTABLE_CACHE_CONTROL, isManagedStorageUrl, uploadManagedBuffer } fro
 if (ffmpegStatic) ffmpeg.setFfmpegPath(ffmpegStatic);
 
 /**
- * Tour reels (TOUR_V2_PLAN.md, phase 7): a published tour as a vertical 1080×1920 video for
- * Instagram Reels, TikTok and Shorts. An intro card (cover, page, title) → each drift with its
- * name, the page and a progress bar → an end card with the tour's link and a QR code; slide
- * transitions, no audio (the apps add music). Two layouts:
- * - full (default): every drift fills the screen — a portrait window of the full-resolution
- *   footage that glides the way the camera pans, so the whole space passes by;
- * - framed: the whole shot, over a blurred copy of itself.
+ * Tour reels (TOUR_V2_PLAN.md, phase 7): a published tour as a video. An intro card (cover,
+ * page, title) → each drift with its name, the page and a progress bar → an end card with the
+ * tour's link and a QR code; slide transitions, no audio (the apps add music). Three layouts,
+ * chosen per clip shape:
+ * - full (default): portrait 1080×1920 (Reels, TikTok, Shorts) — every drift fills the screen,
+ *   a portrait window of the full-resolution footage gliding the way the camera pans;
+ * - landscape: 1920×1080 (YouTube, Facebook, LinkedIn, websites) — the same, widescreen;
+ * - framed: portrait, the whole shot over a blurred copy of itself.
  * Rendered in one ffmpeg pass on the processing queue (never competing with clip builds),
- * uploaded to storage, and remembered per layout in DriftFlow.settings (reelFull / reel — no
- * schema change) until the tour changes.
+ * uploaded to storage, and remembered per layout in DriftFlow.settings (reelFull /
+ * reelLandscape / reel — no schema change) until the tour changes.
  */
 
 const NS = "drift-reel";
@@ -33,10 +34,16 @@ const REEL_VERSION = 1;
 export const REEL_W = 1080;
 export const REEL_H = 1920;
 export const REEL_FPS = 30;
-export type ReelLayout = "full" | "framed";
-export const parseReelLayout = (v: unknown): ReelLayout => (v === "framed" ? "framed" : "full");
+export type ReelLayout = "full" | "landscape" | "framed";
+export const parseReelLayout = (v: unknown): ReelLayout => (v === "framed" ? "framed" : v === "landscape" ? "landscape" : "full");
 /** where each layout's state lives in DriftFlow.settings (framed kept the key reels were first saved under) */
-const STATE_KEY: Record<ReelLayout, string> = { full: "reelFull", framed: "reel" };
+const STATE_KEY: Record<ReelLayout, string> = { full: "reelFull", landscape: "reelLandscape", framed: "reel" };
+type Size = { w: number; h: number };
+export const REEL_SIZE: Record<ReelLayout, Size> = {
+  full: { w: REEL_W, h: REEL_H },
+  landscape: { w: REEL_H, h: REEL_W },
+  framed: { w: REEL_W, h: REEL_H },
+};
 const INTRO_S = 2.2;
 /** each drift plays through in this long, with a short hold at each end */
 const DRIFT_S = 3.4;
@@ -65,7 +72,7 @@ export type ReelInput = {
     name: string;
     /** the lighter (mobile) frames — the framed layout */
     frames: string[];
-    /** the full-resolution frames — the full-screen layout (falls back to `frames`) */
+    /** the full-resolution frames — the full-screen layouts (fall back to `frames`) */
     framesFull?: string[];
     /** LTR | RTL | TTB | BTT — which way the full-screen window glides */
     direction?: string | null;
@@ -120,86 +127,138 @@ async function loadImage(src: string): Promise<Buffer> {
   return fs.readFile(src);
 }
 
-const blank = (alpha: number) =>
-  sharp({ create: { width: REEL_W, height: REEL_H, channels: 4, background: { r: 11, g: 15, b: 25, alpha } } });
+const blank = (size: Size, alpha: number) =>
+  sharp({ create: { width: size.w, height: size.h, channels: 4, background: { r: 11, g: 15, b: 25, alpha } } });
 
-async function introCard(input: ReelInput, count: number, cover: Buffer | null, logo: Buffer | null) {
-  const base = cover ? sharp(cover).resize(REEL_W, REEL_H, { fit: "cover" }) : blank(1);
-  const title = wrapText(input.title, 88, REEL_W - 160, 3);
-  const lastLine = 1590;
-  const firstLine = lastLine - (title.length - 1) * 98;
-  const svg = `<svg width="${REEL_W}" height="${REEL_H}" xmlns="http://www.w3.org/2000/svg">
-    <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+const shade = (size: Size) => `<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="${INK}" stop-opacity="0.6"/><stop offset="0.3" stop-color="${INK}" stop-opacity="0.08"/>
       <stop offset="0.58" stop-color="${INK}" stop-opacity="0.5"/><stop offset="1" stop-color="${INK}" stop-opacity="0.96"/>
     </linearGradient></defs>
-    <rect width="${REEL_W}" height="${REEL_H}" fill="url(#g)"/>
-    ${input.pageName ? text(80, logo ? 262 : 172, 40, "#e2e8f0", input.pageName, ' font-weight="700"') : ""}
-    ${text(80, firstLine - 112, 34, ACCENT, "INTERACTIVE TOUR", ' font-weight="700" letter-spacing="8"')}
-    ${title.map((l, k) => text(80, firstLine + k * 98, 88, "#ffffff", l, ' font-weight="800"')).join("")}
-    ${text(80, lastLine + 100, 40, "#cbd5e1", `${count} ${count === 1 ? "space" : "spaces"} to explore`)}
-  </svg>`;
+    <rect width="${size.w}" height="${size.h}" fill="url(#g)"/>`;
+
+async function introCard(input: ReelInput, count: number, cover: Buffer | null, logo: Buffer | null, size: Size) {
+  const base = cover ? sharp(cover).resize(size.w, size.h, { fit: "cover" }) : blank(size, 1);
+  const wide = size.w > size.h;
+  const spaces = `${count} ${count === 1 ? "space" : "spaces"} to explore`;
+  let body: string;
+  let logoAt: { top: number; left: number };
+  if (wide) {
+    const title = wrapText(input.title, 92, 1500, 2);
+    const lastLine = 896;
+    const firstLine = lastLine - (title.length - 1) * 102;
+    body = `${input.pageName ? text(96, logo ? 238 : 150, 40, "#e2e8f0", input.pageName, ' font-weight="700"') : ""}
+      ${text(96, firstLine - 116, 34, ACCENT, "INTERACTIVE TOUR", ' font-weight="700" letter-spacing="8"')}
+      ${title.map((l, k) => text(96, firstLine + k * 102, 92, "#ffffff", l, ' font-weight="800"')).join("")}
+      ${text(96, lastLine + 92, 40, "#cbd5e1", spaces)}`;
+    logoAt = { top: 90, left: 96 };
+  } else {
+    const title = wrapText(input.title, 88, size.w - 160, 3);
+    const lastLine = 1590;
+    const firstLine = lastLine - (title.length - 1) * 98;
+    body = `${input.pageName ? text(80, logo ? 262 : 172, 40, "#e2e8f0", input.pageName, ' font-weight="700"') : ""}
+      ${text(80, firstLine - 112, 34, ACCENT, "INTERACTIVE TOUR", ' font-weight="700" letter-spacing="8"')}
+      ${title.map((l, k) => text(80, firstLine + k * 98, 88, "#ffffff", l, ' font-weight="800"')).join("")}
+      ${text(80, lastLine + 100, 40, "#cbd5e1", spaces)}`;
+    logoAt = { top: 120, left: 80 };
+  }
+  const svg = `<svg width="${size.w}" height="${size.h}" xmlns="http://www.w3.org/2000/svg">${shade(size)}${body}</svg>`;
   const layers: sharp.OverlayOptions[] = [{ input: Buffer.from(svg), top: 0, left: 0 }];
-  if (logo) layers.push({ input: logo, top: 120, left: 80 });
+  if (logo) layers.push({ input: logo, ...logoAt });
   return base.composite(layers).png().toBuffer();
 }
 
-async function driftOverlay(input: ReelInput, name: string, index: number, count: number, badge: Buffer | null, badgeWidth: number) {
-  const lines = wrapText(name, 76, REEL_W - 160, 2);
-  const lastLine = 1640;
-  const firstLine = lastLine - (lines.length - 1) * 86;
-  const nameX = badge ? 80 + badgeWidth + 22 : 80;
-  const barW = REEL_W - 160;
+async function driftOverlay(input: ReelInput, name: string, index: number, count: number, badge: Buffer | null, badgeWidth: number, size: Size) {
+  const wide = size.w > size.h;
+  const margin = wide ? 96 : 80;
+  const lines = wrapText(name, wide ? 72 : 76, wide ? 1400 : size.w - 160, 2);
+  const lineHeight = wide ? 82 : 86;
+  const lastLine = wide ? 930 : 1640;
+  const firstLine = lastLine - (lines.length - 1) * lineHeight;
+  const barsY = wide ? 986 : 1712;
+  const nameX = badge ? margin + badgeWidth + 22 : margin;
+  const barW = size.w - margin * 2;
   const gap = 12;
   const seg = (barW - gap * (count - 1)) / count;
   const bars = Array.from({ length: count }, (_, k) => {
     const on = k <= index;
-    return `<rect x="${(80 + k * (seg + gap)).toFixed(1)}" y="1712" width="${seg.toFixed(1)}" height="10" rx="5" fill="${on ? ACCENT : "#ffffff"}" fill-opacity="${on ? 1 : 0.28}"/>`;
+    return `<rect x="${(margin + k * (seg + gap)).toFixed(1)}" y="${barsY}" width="${seg.toFixed(1)}" height="10" rx="5" fill="${on ? ACCENT : "#ffffff"}" fill-opacity="${on ? 1 : 0.28}"/>`;
   }).join("");
-  const svg = `<svg width="${REEL_W}" height="${REEL_H}" xmlns="http://www.w3.org/2000/svg">
+  const topScrim = wide ? 250 : 320;
+  const bottomScrim = wide ? 440 : 560;
+  const svg = `<svg width="${size.w}" height="${size.h}" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <linearGradient id="t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0.62"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient>
       <linearGradient id="b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.8"/></linearGradient>
     </defs>
-    <rect width="${REEL_W}" height="320" fill="url(#t)"/>
-    <rect y="${REEL_H - 560}" width="${REEL_W}" height="560" fill="url(#b)"/>
-    ${input.pageName ? text(nameX, 128, 32, "#e2e8f0", input.pageName, ' font-weight="700"') : ""}
-    ${text(80, input.pageName || badge ? 196 : 150, 42, "#ffffff", wrapText(input.title, 42, REEL_W - 160, 1)[0] || "", ' font-weight="800"')}
-    ${text(80, firstLine - 92, 36, ACCENT, `${index + 1} / ${count}`, ' font-weight="800" letter-spacing="2"')}
-    ${lines.map((l, k) => text(80, firstLine + k * 86, 76, "#ffffff", l, ' font-weight="800"')).join("")}
+    <rect width="${size.w}" height="${topScrim}" fill="url(#t)"/>
+    <rect y="${size.h - bottomScrim}" width="${size.w}" height="${bottomScrim}" fill="url(#b)"/>
+    ${input.pageName ? text(nameX, wide ? 116 : 128, 32, "#e2e8f0", input.pageName, ' font-weight="700"') : ""}
+    ${text(margin, input.pageName || badge ? (wide ? 180 : 196) : wide ? 130 : 150, 42, "#ffffff", wrapText(input.title, 42, wide ? 1500 : size.w - 160, 1)[0] || "", ' font-weight="800"')}
+    ${text(margin, firstLine - 92, 36, ACCENT, `${index + 1} / ${count}`, ' font-weight="800" letter-spacing="2"')}
+    ${lines.map((l, k) => text(margin, firstLine + k * lineHeight, wide ? 72 : 76, "#ffffff", l, ' font-weight="800"')).join("")}
     ${bars}
   </svg>`;
   const layers: sharp.OverlayOptions[] = [{ input: Buffer.from(svg), top: 0, left: 0 }];
-  if (badge) layers.push({ input: badge, top: 88, left: 80 });
-  return blank(0).composite(layers).png().toBuffer();
+  if (badge) layers.push({ input: badge, top: wide ? 76 : 88, left: margin });
+  return blank(size, 0).composite(layers).png().toBuffer();
 }
 
-async function endCard(input: ReelInput, cover: Buffer | null, logo: Buffer | null) {
-  const base = cover ? sharp(cover).resize(REEL_W, REEL_H, { fit: "cover" }).blur(40).modulate({ brightness: 0.32 }) : blank(1);
-  const qrSize = 440;
-  const panel = 520;
-  const panelTop = 700;
-  const qr = await QRCode.toBuffer(input.link, { errorCorrectionLevel: "M", margin: 1, width: qrSize, color: { dark: INK, light: "#ffffff" } });
-  const heading = wrapText("Walk through it yourself", 76, REEL_W - 160, 2);
-  const title = wrapText(input.title, 44, REEL_W - 160, 2);
+async function endCard(input: ReelInput, cover: Buffer | null, logo: Buffer | null, size: Size) {
+  const wide = size.w > size.h;
+  const base = cover ? sharp(cover).resize(size.w, size.h, { fit: "cover" }).blur(40).modulate({ brightness: 0.32 }) : blank(size, 1);
   const short = input.link.replace(/^https?:\/\//, "");
   const cut = short.lastIndexOf("/", 34) > 8 ? short.lastIndexOf("/", 34) : 34;
   const linkLines = (short.length <= 34 ? [short] : [short.slice(0, cut), short.slice(cut)]).map((l) => (l.length > 40 ? `${l.slice(0, 39)}…` : l));
-  const svg = `<svg width="${REEL_W}" height="${REEL_H}" xmlns="http://www.w3.org/2000/svg">
-    ${heading.map((l, k) => text(REEL_W / 2, 400 + k * 90, 76, "#ffffff", l, ' font-weight="800" text-anchor="middle"')).join("")}
-    ${title.map((l, k) => text(REEL_W / 2, 400 + heading.length * 90 + 16 + k * 58, 44, "#cbd5e1", l, ' text-anchor="middle"')).join("")}
-    <rect x="${(REEL_W - panel) / 2}" y="${panelTop}" width="${panel}" height="${panel}" rx="44" fill="#ffffff"/>
-    ${linkLines.map((l, k) => text(REEL_W / 2, panelTop + panel + 110 + k * 54, 42, ACCENT, l, ' font-weight="700" text-anchor="middle"')).join("")}
-    ${input.pageName ? text(REEL_W / 2, 1640, 38, "#e2e8f0", input.pageName, ' font-weight="700" text-anchor="middle"') : ""}
-    ${text(REEL_W / 2, 1830, 30, "#94a3b8", "Tour · Powered by Drift Live Interactive", ' text-anchor="middle"')}
-  </svg>`;
+  const footer = "Tour · Powered by Drift Live Interactive";
+  let svg: string;
+  let qrSize: number;
+  let qrAt: { top: number; left: number };
+  let logoAt: { top: number; center?: number; left?: number } | null = null;
+  if (wide) {
+    const panel = 560;
+    const panelLeft = size.w - 120 - panel;
+    const panelTop = Math.round((size.h - panel) / 2);
+    qrSize = 480;
+    qrAt = { top: panelTop + (panel - qrSize) / 2, left: panelLeft + (panel - qrSize) / 2 };
+    const heading = wrapText("Walk through it yourself", 84, 1000, 2);
+    const title = wrapText(input.title, 44, 1000, 2);
+    const titleTop = 260 + heading.length * 96 + 20;
+    const linkTop = titleTop + title.length * 58 + 56;
+    svg = `<svg width="${size.w}" height="${size.h}" xmlns="http://www.w3.org/2000/svg">
+      ${heading.map((l, k) => text(120, 260 + k * 96, 84, "#ffffff", l, ' font-weight="800"')).join("")}
+      ${title.map((l, k) => text(120, titleTop + k * 58, 44, "#cbd5e1", l)).join("")}
+      ${linkLines.map((l, k) => text(120, linkTop + k * 54, 42, ACCENT, l, ' font-weight="700"')).join("")}
+      ${input.pageName ? text(120, 912, 38, "#e2e8f0", input.pageName, ' font-weight="700"') : ""}
+      ${text(120, 1000, 28, "#94a3b8", footer)}
+      <rect x="${panelLeft}" y="${panelTop}" width="${panel}" height="${panel}" rx="44" fill="#ffffff"/>
+    </svg>`;
+    if (logo) logoAt = { top: 780, left: 120 };
+  } else {
+    const panel = 520;
+    const panelTop = 700;
+    qrSize = 440;
+    qrAt = { top: panelTop + (panel - qrSize) / 2, left: (size.w - qrSize) / 2 };
+    const heading = wrapText("Walk through it yourself", 76, size.w - 160, 2);
+    const title = wrapText(input.title, 44, size.w - 160, 2);
+    svg = `<svg width="${size.w}" height="${size.h}" xmlns="http://www.w3.org/2000/svg">
+      ${heading.map((l, k) => text(size.w / 2, 400 + k * 90, 76, "#ffffff", l, ' font-weight="800" text-anchor="middle"')).join("")}
+      ${title.map((l, k) => text(size.w / 2, 400 + heading.length * 90 + 16 + k * 58, 44, "#cbd5e1", l, ' text-anchor="middle"')).join("")}
+      <rect x="${(size.w - panel) / 2}" y="${panelTop}" width="${panel}" height="${panel}" rx="44" fill="#ffffff"/>
+      ${linkLines.map((l, k) => text(size.w / 2, panelTop + panel + 110 + k * 54, 42, ACCENT, l, ' font-weight="700" text-anchor="middle"')).join("")}
+      ${input.pageName ? text(size.w / 2, 1640, 38, "#e2e8f0", input.pageName, ' font-weight="700" text-anchor="middle"') : ""}
+      ${text(size.w / 2, 1830, 30, "#94a3b8", footer, ' text-anchor="middle"')}
+    </svg>`;
+    if (logo) logoAt = { top: 1500, center: size.w / 2 };
+  }
+  const qr = await QRCode.toBuffer(input.link, { errorCorrectionLevel: "M", margin: 1, width: qrSize, color: { dark: INK, light: "#ffffff" } });
   const layers: sharp.OverlayOptions[] = [
     { input: Buffer.from(svg), top: 0, left: 0 },
-    { input: qr, top: panelTop + (panel - qrSize) / 2, left: (REEL_W - qrSize) / 2 },
+    { input: qr, top: Math.round(qrAt.top), left: Math.round(qrAt.left) },
   ];
-  if (logo) {
+  if (logo && logoAt) {
     const meta = await sharp(logo).metadata();
-    layers.push({ input: logo, top: 1500, left: Math.round((REEL_W - (meta.width || 0)) / 2) });
+    const left = logoAt.center !== undefined ? Math.round(logoAt.center - (meta.width || 0) / 2) : logoAt.left || 0;
+    layers.push({ input: logo, top: logoAt.top, left });
   }
   return base.composite(layers).png().toBuffer();
 }
@@ -219,14 +278,15 @@ export function reelTimeline(driftCount: number) {
 }
 
 /**
- * Full-screen layout: the portrait (9:16) window of a `srcW`×`srcH` frame for frame `j` of `n`.
- * The window is as large as the frame allows and glides the way the camera pans (eased), so the
- * reel sweeps across the whole space; across the pan it stays centred.
+ * Full-screen layouts: the window of a `srcW`×`srcH` frame for frame `j` of `n`, at the reel's
+ * `aspect` (width / height; portrait by default). The window is as large as the frame allows and
+ * glides the way the camera pans (eased), so the reel sweeps across the whole space; across the
+ * pan it stays centred.
  */
-export function fillWindow(srcW: number, srcH: number, j: number, n: number, direction?: string | null) {
-  const aspect = REEL_W / REEL_H;
-  const width = Math.min(srcW, srcW / srcH > aspect ? Math.round(srcH * aspect) : srcW);
-  const height = Math.min(srcH, srcW / srcH > aspect ? srcH : Math.round(srcW / aspect));
+export function fillWindow(srcW: number, srcH: number, j: number, n: number, direction?: string | null, aspect = REEL_W / REEL_H) {
+  const wider = srcW / srcH > aspect;
+  const width = Math.min(srcW, wider ? Math.round(srcH * aspect) : srcW);
+  const height = Math.min(srcH, wider ? srcH : Math.round(srcW / aspect));
   const t = n > 1 ? Math.min(1, Math.max(0, j / (n - 1))) : 0.5;
   const eased = t * t * (3 - 2 * t);
   const slackX = srcW - width;
@@ -257,27 +317,30 @@ async function mapPool<T>(items: T[], concurrency: number, fn: (item: T, index: 
 
 /** The filter graph: intro, drifts (+ their overlays), end card, slides between. */
 function reelGraph(driftCount: number, layout: ReelLayout): string[] {
+  const { w, h } = REEL_SIZE[layout];
   const { offsets } = reelTimeline(driftCount);
   const seg = (label: string) => `fps=${REEL_FPS},format=yuv420p,settb=AVTB[${label}]`;
   const hold = `fps=${REEL_FPS},tpad=start_duration=${HOLD_START_S}:start_mode=clone:stop_duration=${HOLD_END_S}:stop_mode=clone`;
-  const lines = [`[0:v]scale=${REEL_W}:${REEL_H},setsar=1,${seg("s0")}`];
+  const lines = [`[0:v]scale=${w}:${h},setsar=1,${seg("s0")}`];
   for (let i = 0; i < driftCount; i++) {
     const frames = 1 + 2 * i;
     const overlay = 2 + 2 * i;
-    if (layout === "full") {
-      // The frames are already the moving portrait window at 1080×1920.
-      lines.push(`[${frames}:v]${hold},scale=${REEL_W}:${REEL_H},setsar=1[c${i}]`);
-    } else {
+    if (layout === "framed") {
+      const bw = Math.round(w / 4);
+      const bh = Math.round(h / 4);
       lines.push(
         `[${frames}:v]${hold},split=2[bg${i}][fg${i}]`,
-        `[bg${i}]scale=270:480:force_original_aspect_ratio=increase,crop=270:480,gblur=sigma=14,eq=brightness=-0.16:saturation=0.85,scale=${REEL_W}:${REEL_H},setsar=1[bb${i}]`,
-        `[fg${i}]scale=1016:1440:force_original_aspect_ratio=decrease,setsar=1[ff${i}]`,
+        `[bg${i}]scale=${bw}:${bh}:force_original_aspect_ratio=increase,crop=${bw}:${bh},gblur=sigma=14,eq=brightness=-0.16:saturation=0.85,scale=${w}:${h},setsar=1[bb${i}]`,
+        `[fg${i}]scale=${w - 64}:${h - 480}:force_original_aspect_ratio=decrease,setsar=1[ff${i}]`,
         `[bb${i}][ff${i}]overlay=(W-w)/2:(H-h)/2-40[c${i}]`,
       );
+    } else {
+      // Full screen: the frames are already the moving window at the reel's size.
+      lines.push(`[${frames}:v]${hold},scale=${w}:${h},setsar=1[c${i}]`);
     }
     lines.push(`[c${i}][${overlay}:v]overlay=0:0:shortest=1,${seg(`s${i + 1}`)}`);
   }
-  lines.push(`[${1 + 2 * driftCount}:v]scale=${REEL_W}:${REEL_H},setsar=1,${seg(`s${driftCount + 1}`)}`);
+  lines.push(`[${1 + 2 * driftCount}:v]scale=${w}:${h},setsar=1,${seg(`s${driftCount + 1}`)}`);
   let prev = "s0";
   offsets.forEach((offset, j) => {
     const last = j === offsets.length - 1;
@@ -290,6 +353,7 @@ function reelGraph(driftCount: number, layout: ReelLayout): string[] {
 
 /** Renders a reel to `outFile` (MP4, H.264, no audio), working in `workDir`. */
 export async function renderReel(input: ReelInput, outFile: string, workDir: string, layout: ReelLayout = "full"): Promise<{ seconds: number }> {
+  const size = REEL_SIZE[layout];
   const drifts = input.drifts.filter((d) => d.frames.length >= 2).slice(0, REEL_MAX_DRIFTS);
   if (!drifts.length) throw new Error("No drifts to put in the reel");
   const [coverBuf, logoBuf] = await Promise.all([
@@ -302,8 +366,8 @@ export async function renderReel(input: ReelInput, outFile: string, workDir: str
   const badge = logo ? await sharp(logo).resize({ width: 200, height: 60, fit: "inside" }).png().toBuffer() : null;
   const badgeWidth = badge ? (await sharp(badge).metadata()).width || 0 : 0;
 
-  await fs.writeFile(path.join(workDir, "intro.png"), await introCard(input, drifts.length, coverBuf, logo));
-  await fs.writeFile(path.join(workDir, "end.png"), await endCard(input, coverBuf, logo));
+  await fs.writeFile(path.join(workDir, "intro.png"), await introCard(input, drifts.length, coverBuf, logo, size));
+  await fs.writeFile(path.join(workDir, "end.png"), await endCard(input, coverBuf, logo, size));
 
   const counts: number[] = [];
   for (let i = 0; i < drifts.length; i++) {
@@ -311,25 +375,7 @@ export async function renderReel(input: ReelInput, outFile: string, workDir: str
     const dir = path.join(workDir, `d${i}`);
     await fs.mkdir(dir, { recursive: true });
     const frameFile = (j: number) => path.join(dir, `f_${String(j + 1).padStart(4, "0")}.jpg`);
-    if (layout === "full") {
-      // Full screen: the sharpest frames, cut to the moving portrait window, at 1080×1920.
-      const source = drift.framesFull && drift.framesFull.length >= 2 ? drift.framesFull : drift.frames;
-      const picks = pickEvenly(source, FRAMES_PER_DRIFT);
-      await mapPool(picks, FETCH_CONCURRENCY, async (src, j) => {
-        const buf = await loadImage(src);
-        const meta = await sharp(buf).metadata();
-        if (!meta.width || !meta.height) throw new Error("A frame couldn't be read");
-        const region = fillWindow(meta.width, meta.height, j, picks.length, drift.direction);
-        const jpg = await sharp(buf)
-          .extract(region)
-          .resize(REEL_W, REEL_H, { fit: "fill", kernel: "lanczos3" })
-          .flatten({ background: INK })
-          .jpeg({ quality: 88 })
-          .toBuffer();
-        await fs.writeFile(frameFile(j), jpg);
-      });
-      counts.push(picks.length);
-    } else {
+    if (layout === "framed") {
       // Framed: every frame at the first frame's size (an image sequence can't change size).
       const picks = pickEvenly(drift.frames, FRAMES_PER_DRIFT);
       const first = await sharp(await loadImage(picks[0]))
@@ -345,8 +391,26 @@ export async function renderReel(input: ReelInput, outFile: string, workDir: str
         await fs.writeFile(frameFile(j + 1), jpg);
       });
       counts.push(picks.length);
+    } else {
+      // Full screen: the sharpest frames, cut to the moving window, at the reel's size.
+      const source = drift.framesFull && drift.framesFull.length >= 2 ? drift.framesFull : drift.frames;
+      const picks = pickEvenly(source, FRAMES_PER_DRIFT);
+      await mapPool(picks, FETCH_CONCURRENCY, async (src, j) => {
+        const buf = await loadImage(src);
+        const meta = await sharp(buf).metadata();
+        if (!meta.width || !meta.height) throw new Error("A frame couldn't be read");
+        const region = fillWindow(meta.width, meta.height, j, picks.length, drift.direction, size.w / size.h);
+        const jpg = await sharp(buf)
+          .extract(region)
+          .resize(size.w, size.h, { fit: "fill", kernel: "lanczos3" })
+          .flatten({ background: INK })
+          .jpeg({ quality: 88 })
+          .toBuffer();
+        await fs.writeFile(frameFile(j), jpg);
+      });
+      counts.push(picks.length);
     }
-    await fs.writeFile(path.join(workDir, `o${i}.png`), await driftOverlay(input, drift.name, i, drifts.length, badge, badgeWidth));
+    await fs.writeFile(path.join(workDir, `o${i}.png`), await driftOverlay(input, drift.name, i, drifts.length, badge, badgeWidth, size));
   }
 
   const { seconds, segments } = reelTimeline(drifts.length);
@@ -414,7 +478,7 @@ const saveReelState = (flowId: string, layout: ReelLayout, state: ReelState) =>
 const viewable = (status: string) => status === "READY" || status === "PUBLISHED";
 
 /** What a reel of this layout is made from; a change → the stored reel is stale. (The framed
- *  hash is unchanged from the first version, so reels made before stay current.) */
+ *  and full hashes are unchanged from before, so reels made earlier stay current.) */
 const hashFor = (input: ReelInput, layout: ReelLayout) => {
   const content =
     layout === "framed"
@@ -539,6 +603,6 @@ export async function streamTourReel(orgId: string, flowId: string, layout: Reel
   res.setHeader("Content-Type", "video/mp4");
   const length = upstream.headers["content-length"];
   if (length) res.setHeader("Content-Length", String(length));
-  res.setHeader("Content-Disposition", `attachment; filename="${base}-reel${layout === "framed" ? "-framed" : ""}.mp4"`);
+  res.setHeader("Content-Disposition", `attachment; filename="${base}-reel${layout === "full" ? "" : `-${layout}`}.mp4"`);
   upstream.data.pipe(res);
 }
