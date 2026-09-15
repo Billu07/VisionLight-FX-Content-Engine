@@ -60,6 +60,14 @@ Server: `/var/www/myapp` on the VPS (IP `72.61.0.117`; shell prompt `root@srv111
 Backend `/var/www/myapp/backend`, frontend `/var/www/myapp/frontend`, pm2 process
 **`my-backend`**. The user runs these in their own SSH session; the agent only provides them.
 
+**nginx** (`/etc/nginx/sites-available/myapp`, symlinked in sites-enabled; upstream `myapp_backend`): one "Main app"
+server block serves picdrift.studio / visualfx.studio / byok.link / picdrift.app / visualfx.app / rotation3d.com from
+`frontend/dist` (+ `/api/` proxy, `snippets/spa-cache.conf`). **drift.li + www.drift.li have their OWN block at the end
+of the file** (2026-09-15, link previews): pages → `@drift_page` proxy to `/__drift/html$request_uri` (falls back to the
+static index.html on 5xx), `/og/` `/robots.txt` `/sitemap.xml` → `/__drift/*`, plus the same `/api/` proxy. A change
+meant for every domain must go in both blocks. Backup from before that change: `myapp.bak-previews`. Always
+`sudo nginx -t` before `sudo systemctl reload nginx`.
+
 **Standard deploy (manual, after every push to `main`)** — give the user only the parts that
 changed (skip `npm ci` when no dependency changed; skip the frontend block when only the
 backend changed):
