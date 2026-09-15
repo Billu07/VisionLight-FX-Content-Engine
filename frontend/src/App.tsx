@@ -60,6 +60,9 @@ const TourEditRedirect = lazyRoute(() => import("./tour/TourIndex").then((m) => 
 const TourPage = lazyRoute(loadTourPage);
 const TourPathway = lazyRoute(loadTourPathway);
 const TourInviteAccept = lazyRoute(() => import("./tour/TourInviteAccept"));
+const DriftViewLanding = lazyRoute(() => import("./rotation3d/DriftViewLanding"));
+const DriftMemoryLanding = lazyRoute(() => import("./rotation3d/DriftMemoryLanding"));
+const DriftPathLanding = lazyRoute(() => import("./rotation3d/DriftPathLanding"));
 
 // Shown only while a route's code loads on a first visit — in-app navigations keep the
 // current screen up meanwhile (router transitions). Blank for a beat, then a spinner.
@@ -407,6 +410,10 @@ function App() {
             <Route path="/tour/:page" element={<TourPage />} />
             <Route path="/tour/:page/:tour" element={<TourPathway />} />
             <Route path="/tour/:tourPage/:tourFlow/:tourDrift" element={<Rotation3DPlayer />} />
+            {/* drift.li product landings — coming soon, each with its wait list */}
+            <Route path="/view" element={<DriftViewLanding />} />
+            <Route path="/memory" element={<DriftMemoryLanding />} />
+            <Route path="/path" element={<DriftPathLanding />} />
             <Route
               path="/billing/return"
               element={<BillingReturn />}

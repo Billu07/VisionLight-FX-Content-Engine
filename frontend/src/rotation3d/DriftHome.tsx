@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
-import { useAuth } from "../hooks/useAuth";
-import { LoginModal } from "../components/LoginModal";
-import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "./driftUiTheme";
-import { TOUR_STYLES } from "../tour/tourUi";
 import { prefetchDriftPath } from "./driftNav";
 import { loadDriftPlayer } from "../routeChunks";
 import PerspectiveGrid from "./PerspectiveGrid";
+import { Arrow, DriftSiteShell, WaitlistDialog, useReducedMotion } from "./driftSite";
 
 /**
  * drift.li — the home, in the client's words (TOUR_V2_PLAN.md §6). "You Control the
@@ -16,7 +13,8 @@ import PerspectiveGrid from "./PerspectiveGrid";
  * through the tour over an orbit (visual only; "Take a Tour" starts it). Below: Tour
  * (available now) and View · Memory · Path (coming soon, each with a wait list), then
  * one closing call. On the drift design tokens — the glow is dark-theme only, light
- * stays flat. Login top right; signed in, it becomes Dashboard.
+ * stays flat. Header, footer and the wait-list dialog come from driftSite (shared with
+ * the /view, /memory and /path landings).
  */
 
 type Product = {
@@ -75,22 +73,6 @@ const PRODUCTS: Product[] = [
 ];
 
 const STYLES = `
-.dh{position:relative;isolation:isolate;background:var(--bg);color:var(--text);overflow-x:hidden}
-/* Dark only: a faint glow behind the hero (light mode stays flat paper). */
-.drift-ui[data-theme="dark"].dh::before{content:"";position:absolute;inset:0 0 auto 0;height:900px;z-index:-1;pointer-events:none;background:
-  radial-gradient(40% 50% at 78% 30%, rgba(34,211,238,.10), transparent 70%),
-  radial-gradient(34% 40% at 12% 12%, rgba(139,92,246,.07), transparent 70%)}
-
-.dh-top{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px clamp(16px,4vw,48px);background:color-mix(in srgb,var(--bg) 84%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
-.dh-logo{display:flex;align-items:center;gap:18px;text-decoration:none;min-width:0}
-.dh-logo .d-wordmark{font-size:24px}
-.dh-logo-sub{font-size:11.5px;font-weight:650;letter-spacing:.26em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
-@media(max-width:520px){.dh-logo-sub{display:none}}
-.dh-top-actions{display:flex;align-items:center;gap:10px}
-.dh-top-actions .d-icon-btn{border-radius:12px}
-.dh-top-actions .d-btn{border-radius:999px;padding:9px 18px;font-size:13px}
-.dh-main{max-width:1280px;margin:0 auto;padding:0 clamp(16px,4vw,48px)}
-
 /* ── Hero ── */
 .dh-hero{display:grid;gap:clamp(34px,6vw,56px);align-items:center;padding:clamp(34px,6vw,80px) 0 clamp(28px,4vw,52px)}
 @media(min-width:1024px){.dh-hero{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:44px}}
@@ -131,13 +113,13 @@ const STYLES = `
 .dh-card3d.empty .dh-card3d-in{background:var(--surface-2)}
 @keyframes dh-bob{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(0,-8px,0)}}
 
-/* The back row recedes toward the horizon (bases closer to it); the centre card stands
-   forward — out of the screen — with its base lowest on the floor. */
-.dh-card3d.l2{left:-2%;width:16%;aspect-ratio:3/4.4;bottom:34%;transform:rotateY(52deg) translateZ(-90px);opacity:.55}
-.dh-card3d.l1{left:9%;width:21%;aspect-ratio:3/4.2;bottom:29%;transform:rotateY(38deg) translateZ(-30px);opacity:.86}
-.dh-card3d.r1{left:70%;width:21%;aspect-ratio:3/4.2;bottom:29%;transform:rotateY(-38deg) translateZ(-30px);opacity:.86}
-.dh-card3d.r2{left:86%;width:16%;aspect-ratio:3/4.4;bottom:34%;transform:rotateY(-52deg) translateZ(-90px);opacity:.55}
-.dh-card3d.c{left:23%;width:54%;aspect-ratio:16/10.4;bottom:20%;z-index:3;transform:translateZ(70px) rotateX(3deg) rotateY(-5deg)}
+/* Upright cards, no tilt: depth comes from distance alone — the back row smaller,
+   fainter and closer to the horizon; the centre card stands forward, out of the screen. */
+.dh-card3d.l2{left:-2%;width:16%;aspect-ratio:3/4.4;bottom:34%;transform:translateZ(-90px);opacity:.55}
+.dh-card3d.l1{left:9%;width:21%;aspect-ratio:3/4.2;bottom:29%;transform:translateZ(-30px);opacity:.86}
+.dh-card3d.r1{left:70%;width:21%;aspect-ratio:3/4.2;bottom:29%;transform:translateZ(-30px);opacity:.86}
+.dh-card3d.r2{left:86%;width:16%;aspect-ratio:3/4.4;bottom:34%;transform:translateZ(-90px);opacity:.55}
+.dh-card3d.c{left:23%;width:54%;aspect-ratio:16/10.4;bottom:20%;z-index:3;transform:translateZ(70px)}
 .dh-card3d.l1 .dh-card3d-in,.dh-card3d.r1 .dh-card3d-in{animation-delay:-2.3s}
 .dh-card3d.l2 .dh-card3d-in,.dh-card3d.r2 .dh-card3d-in{animation-delay:-4.6s}
 .dh-card3d.c .dh-card3d-in{border-radius:14px}
@@ -211,21 +193,6 @@ a.dh-chip-explore:hover{background:var(--accent-soft)}
 .dh-close .dh-kinds{justify-content:center;margin-top:14px}
 .dh-h2{margin:0;font-size:clamp(30px,4.6vw,48px);line-height:1.05;letter-spacing:-.035em;font-weight:800;color:var(--text)}
 
-.dh-foot{display:grid;justify-items:center;gap:10px;margin-top:clamp(40px,7vw,80px);padding:30px 16px calc(34px + env(safe-area-inset-bottom));border-top:1px solid var(--border);text-align:center}
-.dh-foot-brand{display:flex;align-items:baseline;gap:10px}
-.dh-foot-brand span{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
-.dh-foot nav{display:flex;gap:10px;font-size:13px;color:var(--faint)}
-.dh-foot nav a{color:var(--muted);text-decoration:none}
-.dh-foot nav a:hover{color:var(--accent)}
-.dh-foot p{margin:0;font-size:12.5px;color:var(--faint)}
-
-.dh-modal{position:fixed;inset:0;z-index:60;display:grid;place-items:end center;background:rgba(4,8,16,.6);backdrop-filter:blur(6px)}
-@media(min-width:640px){.dh-modal{place-items:center;padding:20px}}
-.dh-modal-card{position:relative;width:100%;max-width:440px;display:grid;gap:12px;padding:26px 22px calc(24px + env(safe-area-inset-bottom));background:var(--surface);border:1px solid var(--border-strong);border-radius:26px 26px 0 0;box-shadow:0 40px 80px -30px rgba(0,0,0,.7)}
-@media(min-width:640px){.dh-modal-card{border-radius:26px;padding:28px}}
-.dh-modal-card h3{margin:0;font-size:22px;font-weight:800;letter-spacing:-.02em;color:var(--text)}
-.dh-modal-x{position:absolute;right:12px;top:12px}
-
 @media(prefers-reduced-motion:reduce){.dh-card3d-in,.dh-card3d.c img,.dh-shadow{animation:none}.dh-card:hover{transform:none}}
 `;
 
@@ -234,13 +201,6 @@ const Icon = ({ d }: { d: string[] }) => (
     {d.map((p) => (
       <path key={p} d={p} />
     ))}
-  </svg>
-);
-
-const Arrow = ({ size = 18 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    <path d="M5 12h14" />
-    <path d="M13 6l6 6-6 6" />
   </svg>
 );
 
@@ -255,20 +215,6 @@ const Kinds = () => (
     <span>Path</span>
   </div>
 );
-
-const useReducedMotion = () => {
-  const [reduce, setReduce] = useState(
-    () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
-  );
-  useEffect(() => {
-    const mq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    if (!mq) return;
-    const onChange = () => setReduce(mq.matches);
-    mq.addEventListener?.("change", onChange);
-    return () => mq.removeEventListener?.("change", onChange);
-  }, []);
-  return reduce;
-};
 
 // The centre panel steps through the tour's first few stops (images the side panels
 // already load, so the cycle costs no extra downloads).
@@ -386,80 +332,11 @@ function LiveView({ tour }: { tour: any }) {
   );
 }
 
-function WaitlistDialog({ product, onClose }: { product: Product; onClose: () => void }) {
-  const [email, setEmail] = useState("");
-  const [state, setState] = useState<"idle" | "busy" | "done">("idle");
-  const [error, setError] = useState("");
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const to = email.trim();
-    if (!to) return;
-    setState("busy");
-    setError("");
-    try {
-      await apiEndpoints.driftJoinWaitlist(to, product.key, "home");
-      setState("done");
-    } catch (err: any) {
-      setError(err?.message || "Something went wrong. Please try again.");
-      setState("idle");
-    }
-  };
-  return (
-    <div className="dh-modal" onClick={onClose} role="dialog" aria-modal aria-label={`Join the ${product.name} wait list`}>
-      <div className="dh-modal-card" onClick={(e) => e.stopPropagation()}>
-        <button className="d-x dh-modal-x" onClick={onClose} aria-label="Close">
-          ×
-        </button>
-        {state === "done" ? (
-          <>
-            <div className="d-eyebrow">{product.name}</div>
-            <h3>You're on the list</h3>
-            <p className="d-sub">We'll email {email.trim()} as soon as {product.name} opens.</p>
-            <button className="d-btn primary" onClick={onClose}>
-              Done
-            </button>
-          </>
-        ) : (
-          <form onSubmit={submit} style={{ display: "grid", gap: 12 }}>
-            <div className="d-eyebrow">{product.name} · Coming Soon</div>
-            <h3>Join the Wait List</h3>
-            <p className="d-sub">Be the first to know when {product.name} opens.</p>
-            <input
-              className="d-input"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              required
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoFocus
-            />
-            {error && <div className="d-banner err">{error}</div>}
-            <button className="d-btn primary" type="submit" disabled={state === "busy"} style={{ padding: "13px 18px", fontSize: 14.5 }}>
-              {state === "busy" ? "Joining…" : "Join Wait List"}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function DriftHome() {
-  const [theme, toggleTheme] = useDriftTheme();
-  const { user, profiles, profileSelectionRequired, checkAuth } = useAuth();
-  const [showLogin, setShowLogin] = useState(false);
   const [waitFor, setWaitFor] = useState<Product | null>(null);
   const [tour, setTour] = useState<any>(null);
 
   useEffect(() => {
-    checkAuth();
     let alive = true;
     // drift.li's demo tour (Admin → drift.li → Tour → Demo tour) fills the live view.
     apiEndpoints
@@ -469,41 +346,12 @@ export default function DriftHome() {
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const signedIn = !!user || profileSelectionRequired;
-  const hasTour = user?.view === "TOUR" || profiles.some((p) => p.view === "TOUR");
-  const dashboardPath = hasTour ? "/tour" : profileSelectionRequired ? "/studios" : "/app";
-
   return (
-    <div className="drift-ui d-page dh" data-theme={theme}>
-      <DriftThemeStyles />
-      <style>{TOUR_STYLES}</style>
+    <DriftSiteShell className="dh">
       <style>{STYLES}</style>
 
-      <header className="dh-top">
-        <Link to="/" className="dh-logo">
-          <span className="d-wordmark">
-            drift<i>.li</i>
-          </span>
-          <span className="dh-logo-sub">Drift Live Interactive</span>
-        </Link>
-        <div className="dh-top-actions">
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
-          {signedIn ? (
-            <Link className="d-btn primary" to={dashboardPath} style={{ textDecoration: "none" }}>
-              Dashboard
-            </Link>
-          ) : (
-            <button className="d-btn" onClick={() => setShowLogin(true)}>
-              Login
-            </button>
-          )}
-        </div>
-      </header>
-
-      <main className="dh-main">
         <section className="dh-hero t-rise">
           <div style={{ minWidth: 0 }}>
             <div className="dh-kicker">Drift Live Interactive</div>
@@ -571,25 +419,8 @@ export default function DriftHome() {
             <Arrow />
           </Link>
         </section>
-      </main>
 
-      <footer className="dh-foot">
-        <div className="dh-foot-brand">
-          <span className="d-wordmark">
-            drift<i>.li</i>
-          </span>
-          <span>Drift Live Interactive</span>
-        </div>
-        <nav aria-label="Legal">
-          <a href="/terms">Terms</a>
-          <span aria-hidden>·</span>
-          <a href="/privacy">Privacy</a>
-        </nav>
-        <p>Drift.li is a division of PicDrift</p>
-      </footer>
-
-      {waitFor && <WaitlistDialog product={waitFor} onClose={() => setWaitFor(null)} />}
-      <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
-    </div>
+      {waitFor && <WaitlistDialog product={waitFor} source="home" onClose={() => setWaitFor(null)} />}
+    </DriftSiteShell>
   );
 }

@@ -330,5 +330,9 @@ Drift.li is a division of PicDrift
   dark (flat in light). Copy and CTAs unchanged. TourShell header/background left for a later pass.
 - 2026-09-15 — Home live view loses its boxed frame: the demo tour's cards stand on the grid floor — the back
   row angled and receding to the horizon, the centre card forward (out of the screen) floating over its
-  shadow with a faint reflection, an orbit ring around its base. Labels float over the scene. Copy unchanged. The home
+  shadow with a faint reflection, an orbit ring around its base. Labels float over the scene. Copy unchanged.
+- 2026-09-15 — Home cards stand upright (no tilt — depth from distance only). New coming-soon landings at
+  `/view`, `/memory`, `/path` on a shared site kit (`rotation3d/driftSite.tsx`, which the home now uses for its
+  header/footer/wait list): same aesthetic, each with its own accent, layout and animated scene; Join Wait List +
+  Try Drift Tour. The home's coming-soon cards still only open the wait list (not linked to the landings yet). The home
   no longer downloads the player.

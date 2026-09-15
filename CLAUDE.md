@@ -245,6 +245,13 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   (`tour/TourLanding.tsx`, 2026-09-15) shares the look: its route animation (`PathArtH`) rides the same
   `rotation3d/PerspectiveGrid` floor under a horizon glow, spaced kickers, pill CTAs, glass sections in dark
   (flat in light) — copy verbatim. The shared TourShell header/background is not restyled yet.
+- **drift.li product landings** (2026-09-15): `/view`, `/memory`, `/path` → `rotation3d/Drift{View,Memory,Path}Landing.tsx`,
+  all on `rotation3d/driftSite.tsx` (shared with DriftHome: header/footer shell, `WaitlistDialog`, `DriftStage` =
+  horizon + PerspectiveGrid, `ProductHero` split/flip/stack, Steps, Card, ClosingCall, ICONS). Coming soon →
+  Join Wait List (source view/memory/path) + Try Drift Tour. Distinct but related: View (cyan, 180° arc with a
+  sweeping sightline), Memory (`ds-violet`, upright moment frames with a Private badge), Path (`ds-emerald`,
+  winding route through Drifts/Images/Video/Information/Links). Hero copy = the client's home-card lines
+  verbatim; supporting lines are new and short. No tilted cards anywhere (the user dislikes tilt).
 
 ## Transactional email — DONE (2026-09-06)
 
