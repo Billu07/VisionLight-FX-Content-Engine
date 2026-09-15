@@ -6,9 +6,8 @@ import { CAPTURE_GUIDE, CREATOR_HOME, CREATOR_START } from "./tourSession";
 
 /**
  * The Drift Capture Guide — the client's own words (verbatim), in the landing's card
- * language. Shown inline in the builder while a tour has no drifts, as a sheet the first
- * time a creator starts a tour (and from the builder's "Capture Guide" button), and as a
- * shareable page at /tour/capture-guide.
+ * language. Shown as a sheet the first time a creator starts a tour and from the builder's
+ * green "Capture Guide" button, and as a shareable page at /tour/capture-guide.
  */
 
 export const CAPTURE_GUIDE_SEEN_KEY = "drift_capture_guide_seen";

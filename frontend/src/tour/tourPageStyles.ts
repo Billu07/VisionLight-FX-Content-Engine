@@ -111,6 +111,12 @@ export const TOUR_PAGE_STYLES = `
 .t-checkout .d-btn{padding:12px 18px;font-size:14px}
 @media(max-width:640px){.t-checkout{position:sticky;bottom:calc(10px + env(safe-area-inset-bottom));z-index:15;box-shadow:0 18px 40px -18px rgba(0,0,0,.55)}.t-checkout .d-btn{width:100%}}
 .t-drop-note{margin-top:4px;font-size:12px;font-weight:650;color:var(--accent)}
+.t-drop.t-drop-more{padding:14px 12px;gap:2px;border-radius:14px}
+.t-drop.t-drop-more .big{font-size:14px}
+.t-drop-pick{margin-top:6px;pointer-events:none}
+.t-page .d-btn.t-guide{background:#1db954;border-color:#1db954;color:#04140a;font-weight:750}
+.t-page .d-btn.t-guide:hover{background:#1ed760;border-color:#1ed760}
+.drift-ui[data-theme="dark"] .d-btn.t-guide{box-shadow:0 8px 22px -10px rgba(30,215,96,.65)}
 .t-chain .loop{color:var(--accent);font-weight:700}
 /* ── Pro client pages + Invite a Pro ── */
 .tpg-clients{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}

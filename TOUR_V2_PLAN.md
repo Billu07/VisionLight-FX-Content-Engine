@@ -343,5 +343,9 @@ Drift.li is a division of PicDrift
   (Dashboard button top right of the tour header, post-login target, /app + /projects for tour users, drift.li
   home). Backend reserves `dashboard` and `capture-guide` page slugs. (4) Drift Capture Guide (client copy
   verbatim, `tour/CaptureGuide.tsx`): inline in the builder while a tour is empty, a sheet the first time + from
-  the builder's "Capture Guide" button, and a page at `/tour/capture-guide`. The home
+  the builder's "Capture Guide" button, and a page at `/tour/capture-guide`.
+- 2026-09-15 — Builder UX: clips queue — pick/drop more any time (even mid-upload), they upload in order
+  (a plan-limit error stops the queue with one message; leaving mid-upload asks first); "+ Create New Tour"
+  moved from under the slot to the top row ("+ New Tour" beside the back link); the inline Capture Guide is
+  gone — the header button is first and Spotify green. The home
   no longer downloads the player.

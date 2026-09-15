@@ -6,7 +6,7 @@ import { useAuth } from "../hooks/useAuth";
 import type { Billing, Flow, FlowStep, Page, Quota } from "./types";
 import { isReady } from "./types";
 import { ShareSheet } from "./ShareSheet";
-import { CAPTURE_GUIDE_SEEN_KEY, CaptureGuide, CaptureGuideSheet } from "./CaptureGuide";
+import { CAPTURE_GUIDE_SEEN_KEY, CaptureGuideSheet } from "./CaptureGuide";
 import { Spinner, StatusPill, TourShell, apiError, copyText, publicUrl, readClipDuration } from "./tourUi";
 import { TOUR_PAGE_STYLES } from "./tourPageStyles";
 
@@ -367,16 +367,44 @@ function UploadSlot({
   const [progress, setProgress] = useState<{ n: number; total: number; pct: number } | null>(null);
   const [over, setOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Clips wait in a queue: pick or drop more at any time — even mid-upload — and they
+  // upload one after another in the order chosen (phones stay responsive, drift order
+  // stays right). Each becomes a drift: building right away while free drifts last,
+  // otherwise saved for checkout. The server builds them one at a time.
+  const queueRef = useRef<File[]>([]);
+  const runningRef = useRef(false);
+  const aliveRef = useRef(true);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+      queueRef.current = [];
+    };
+  }, []);
 
-  // Clips upload one after another (phones stay responsive); each becomes a drift —
-  // building right away while free drifts last, otherwise saved for checkout.
-  const uploadAll = async (list: File[]) => {
-    const files = list.filter((f) => f.type.startsWith("video/") || /\.(mp4|mov|m4v|webm)$/i.test(f.name));
-    if (!files.length) return notify.error("Please choose video clips (MP4 or MOV)");
+  // Closing the tab mid-upload would drop the clips still in line — ask first.
+  const uploading = progress !== null;
+  useEffect(() => {
+    if (!uploading) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [uploading]);
+
+  const run = async () => {
+    runningRef.current = true;
+    let done = 0;
     let added = 0;
     let waiting = 0;
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    let nextNum = index + 1;
+    while (aliveRef.current && queueRef.current.length) {
+      const file = queueRef.current.shift()!;
+      done++;
+      const n = done;
+      setProgress({ n, total: n + queueRef.current.length, pct: 0 });
       const d = await readClipDuration(file);
       if (maxClip && d && d > maxClip + 0.5) {
         notify.error(`"${file.name}" is ${d.toFixed(1)}s — clips must be ${maxClip}s or shorter.`);
@@ -384,19 +412,28 @@ function UploadSlot({
       }
       const fd = new FormData();
       fd.append("video", file);
-      fd.append("name", `Drift ${index + added + 1}`);
-      setProgress({ n: i + 1, total: files.length, pct: 0 });
+      fd.append("name", `Drift ${nextNum}`);
       try {
         const r = await apiEndpoints.driftAddFlowStep(flow.id, fd, (e) => {
-          if (e.total) setProgress({ n: i + 1, total: files.length, pct: Math.round((e.loaded / e.total) * 100) });
+          if (e.total) setProgress({ n, total: n + queueRef.current.length, pct: Math.round((e.loaded / e.total) * 100) });
         });
         added++;
+        nextNum = (r.data.flow?.steps?.length ?? nextNum) + 1;
         if (r.data.step?.product?.status === "AWAITING_PAYMENT") waiting++;
         onAdded(r.data.flow, r.data.step?.id || null, r.data.billing);
       } catch (e) {
+        if ((e as any)?.response?.data?.code === "PLAN_LIMIT") {
+          // Out of room on this tour: stop, instead of failing every clip still in line.
+          const skipped = queueRef.current.length;
+          queueRef.current = [];
+          notify.error(`${apiError(e)}${skipped ? ` ${skipped} more clip${skipped === 1 ? " wasn't" : "s weren't"} uploaded.` : ""}`);
+          break;
+        }
         notify.error(`${file.name}: ${apiError(e)}`);
       }
     }
+    runningRef.current = false;
+    if (!aliveRef.current) return;
     setProgress(null);
     if (!added) return;
     const building = added - waiting;
@@ -409,6 +446,56 @@ function UploadSlot({
     }
   };
 
+  const enqueue = (list: File[]) => {
+    const files = list.filter((f) => f.type.startsWith("video/") || /\.(mp4|mov|m4v|webm)$/i.test(f.name));
+    if (!files.length) {
+      notify.error("Please choose video clips (MP4 or MOV)");
+      return;
+    }
+    queueRef.current.push(...files);
+    if (runningRef.current) {
+      setProgress((p) => (p ? { ...p, total: p.n + queueRef.current.length } : p));
+      notify.success(`${files.length} more clip${files.length === 1 ? "" : "s"} added to the queue`);
+      return;
+    }
+    void run();
+  };
+
+  const pick = () => inputRef.current?.click();
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      pick();
+    }
+  };
+  const drop = {
+    onDragOver: (e: React.DragEvent) => {
+      e.preventDefault();
+      setOver(true);
+    },
+    onDragLeave: () => setOver(false),
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      setOver(false);
+      const list = Array.from(e.dataTransfer.files || []);
+      if (list.length) enqueue(list);
+    },
+  };
+  const input = (
+    <input
+      ref={inputRef}
+      type="file"
+      accept="video/*"
+      multiple
+      hidden
+      onChange={(e) => {
+        const list = Array.from(e.target.files || []);
+        e.target.value = "";
+        if (list.length) enqueue(list);
+      }}
+    />
+  );
+
   const note =
     !billing || billing.unlimited
       ? ""
@@ -417,8 +504,10 @@ function UploadSlot({
         : `${billing.price} per drift — you check out before they're built`;
 
   if (progress) {
+    const inLine = progress.total - progress.n;
     return (
       <div className="d-card d-card-pad t-route-item is-drop" data-n={index + 1} style={{ display: "grid", gap: 10, ["--n" as any]: index }}>
+        {input}
         <div className="t-inline" style={{ justifyContent: "space-between" }}>
           <div className="d-h2">
             Uploading {progress.total > 1 ? `clip ${progress.n} of ${progress.total}` : "your clip"}
@@ -430,6 +519,13 @@ function UploadSlot({
         </div>
         <div className="d-faint" style={{ fontSize: 12 }}>
           {progress.pct >= 100 ? "Checking the clip…" : "Keep this page open until the uploads finish."}
+          {inLine > 0 && ` ${inLine} more in line.`}
+        </div>
+        <div className={`t-drop t-drop-more ${over ? "over" : ""}`} onClick={pick} onKeyDown={onKey} role="button" tabIndex={0} {...drop}>
+          <span className="big">+ Add more clips</span>
+          <span className="d-faint" style={{ fontSize: 12 }}>
+            They upload next, in the order you pick them
+          </span>
         </div>
       </div>
     );
@@ -440,42 +536,24 @@ function UploadSlot({
       className={`t-drop t-route-item is-drop ${over ? "over" : ""}`}
       data-n={index + 1}
       style={{ ["--n" as any]: index }}
-      onClick={() => inputRef.current?.click()}
-      onDragOver={(e) => {
-        e.preventDefault();
-        setOver(true);
-      }}
-      onDragLeave={() => setOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setOver(false);
-        const list = Array.from(e.dataTransfer.files || []);
-        if (list.length) uploadAll(list);
-      }}
+      onClick={pick}
+      onKeyDown={onKey}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && inputRef.current?.click()}
+      {...drop}
     >
-      <input
-        ref={inputRef}
-        type="file"
-        accept="video/*"
-        multiple
-        hidden
-        onChange={(e) => {
-          const list = Array.from(e.target.files || []);
-          e.target.value = "";
-          if (list.length) uploadAll(list);
-        }}
-      />
+      {input}
       <div className="ico" aria-hidden>
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4" /><path d="M6 10l6-6 6 6" /><path d="M4 20h16" /></svg>
       </div>
       <div className="d-eyebrow">Drift {index + 1}</div>
-      <div className="big">{index === 0 ? "Upload your clips" : "+ Add to Tour"}</div>
+      <div className="big">{index === 0 ? "Upload your clips" : "+ Add more clips"}</div>
       <div className="d-sub" style={{ fontSize: 13 }}>
-        One clip or several · {maxClip ? `up to ${maxClip}s each · ` : ""}a slow pan or tilt of each space
+        Select several at once · {maxClip ? `up to ${maxClip}s each · ` : ""}each clip becomes a drift, in order
       </div>
+      <span className="d-btn primary sm t-drop-pick" aria-hidden>
+        Select clips
+      </span>
       {note && <div className="t-drop-note">{note}</div>}
     </div>
   );
@@ -787,9 +865,14 @@ export default function TourBuilder({
 
   return shell(
     <>
-      <Link to={homePath} className="t-back" style={{ marginBottom: 12 }}>
-        ← {page.name} Tours
-      </Link>
+      <div className="t-inline" style={{ justifyContent: "space-between", marginBottom: 12 }}>
+        <Link to={homePath} className="t-back">
+          ← {page.name} Tours
+        </Link>
+        <button className="d-btn ghost sm" onClick={() => navigate(`${homePath}?new=1`)} title="Start a separate tour on this page">
+          + New Tour
+        </button>
+      </div>
 
       <div className="t-head t-rise" style={{ marginTop: 6 }}>
         <div style={{ flex: "1 1 320px", minWidth: 0 }}>
@@ -825,14 +908,15 @@ export default function TourBuilder({
           </div>
         </div>
         <div className="t-actions">
+          <button className="d-btn t-guide" onClick={() => setShowGuide(true)} title="How to film a great drift">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" /></svg>
+            Capture Guide
+          </button>
           {flow.entryPath && (
             <a className="d-btn" href={flow.entryPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
               ▶ Start Tour
             </a>
           )}
-          <button className="d-btn" onClick={() => setShowGuide(true)} title="How to film a great drift">
-            Capture Guide
-          </button>
           <button className="d-btn" onClick={onPublicView} title="See this pathway the way visitors do">
             Public view
           </button>
@@ -1058,6 +1142,7 @@ export default function TourBuilder({
               })}
 
           <UploadSlot
+            key={flow.id}
             flow={flow}
             index={flow.steps.length}
             maxClip={maxClip}
@@ -1069,17 +1154,6 @@ export default function TourBuilder({
             }}
           />
 
-          <div className="tpw-admin-foot">
-            <button className="d-btn" onClick={() => navigate(`${homePath}?new=1`)}>
-              + Create New Tour
-            </button>
-          </div>
-
-          {flow.steps.length === 0 && (
-            <div className="d-card d-card-pad">
-              <CaptureGuide compact />
-            </div>
-          )}
         </div>
 
         <aside className="t-preview">
