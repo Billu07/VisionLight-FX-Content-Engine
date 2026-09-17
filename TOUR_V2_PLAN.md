@@ -444,3 +444,16 @@ Drift.li is a division of PicDrift
   Verified: all three layouts rendered from landscape, wide and portrait footage (right size, 30fps, yuv420p, length =
   timeline, no audio; the 16:9 window maths unit-checked; stills checked — portrait output unchanged). A 3-drift
   landscape reel took ~22s on the dev machine.
+- 2026-09-17 — The home hero's animation (client feedback: the drift.li animation "is aesthetically different
+  than the variants … as it is the parent page, the right side animation needs to be something cool that
+  represents the variant in the best creative way possible"). The demo-tour photo cards are replaced by
+  `rotation3d/DriftHomeScene.tsx`: one Drift frame standing on the same grid floor the product landings use,
+  with the four worlds drawn side by side inside it and a playhead travelling the rail beneath — Tour (a room
+  and its stops), View (a horizon with a sweeping sightline), Memory (moment frames and a Private badge), Path
+  (a route through Drift · Image · Video · Link), each in its landing's colour, captioned with that product's
+  own card title and status. On a mouse or pen the pointer takes the playhead over; touch keeps scrolling the
+  page; reduced motion holds a world and the pointer steps between them. Drawn art, so the hero no longer
+  depends on a demo tour being picked (the "Take a Tour" chip still appears when there is one). Verified in
+  headless Chrome over CDP (scratchpad/shot.js): all four worlds, light + dark, 1440 / 1024 / 412 wide,
+  pointer control, reduced motion; no console errors. Open question for the client: the hero no longer shows
+  real tour photos — say the word and the Tour world can carry the demo tour's frames.

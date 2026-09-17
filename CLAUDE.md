@@ -331,12 +331,20 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   drift.li card; nginx falls back to the static file. The Cloudflare OG worker is no longer needed.
 - **Superadmin**: `X-Drift-Org` lets a superadmin act on any TOUR page ("Manage this page", `usePageAdmin`);
   back office = Admin → drift.li → Tour (`routes/driftTourAdmin.ts`, `DriftTourAdmin.tsx`).
-- **drift.li home** = `rotation3d/DriftHome.tsx` (2026-09-14 redesign per the client's `land.png`: the hero's
-  right side is a NON-interactive "live view" — drift.li's DEMO TOUR standing on the `PerspectiveGrid` floor,
-  no box: stops as free-standing 3D cards, the centre card forward "out of the screen" (floats over its
-  shadow, steps through the first stops), orbit at its base, horizon glow; glow in dark theme only; "Take a Tour" starts the
-  tour — never label the visual as draggable; no demo set → empty panels); headline on two lines on desktop; four product cards). The
-  client's copy and CTAs stay exactly as written (Tour: Try it Free + Learn More; the rest: Join Wait List →
+- **drift.li home** = `rotation3d/DriftHome.tsx` (2026-09-14 redesign per the client's `land.png`; headline on
+  two lines on desktop, four product cards). The hero's right side is **`rotation3d/DriftHomeScene.tsx`**
+  (2026-09-17): this is the parent page, so one Drift frame stands on the shared `DriftStage` floor with all
+  four worlds drawn side by side inside it (Tour room + stops · View horizon + sightline · Memory frames +
+  Private badge · Path route + nodes), each in its product colour (cyan / cyan / violet / emerald), while a
+  playhead travels the rail below (hold 2.6s, glide 1.15s, turns around at the ends) and a caption names the
+  world with the card's own title + status. Drawn art, NOT photos — it matches the product landings and never
+  depends on the demo tour. On a mouse or pen the pointer takes the playhead over (`follow`/`release`: this is
+  "You Control the Movement" for real, so never *label* the visual as draggable); touch is left alone so the
+  page scrolls; reduced motion holds a world and the pointer steps between them; the rAF loop stops when the
+  tab is hidden or the hero scrolls off (IntersectionObserver). "Take a Tour" over the scene (the client's
+  CTA, `TakeATour` in DriftHome) still starts the demo tour and warms its first drift + the player chunk; no
+  demo tour set → no chip, the scene is unaffected. The client's copy and CTAs stay exactly as written (Tour:
+  Try it Free + Learn More; the rest: Join Wait List →
   `DriftWaitlist`) — restyle freely, don't reword. It no longer loads the player. Brand custom
   domains keep the full-screen `HeroLanding` (SpinViewer loaded lazily there). The **/tour landing**
   (`tour/TourLanding.tsx`, 2026-09-15) shares the look: its route animation (`PathArtH`) rides the same
