@@ -110,6 +110,20 @@ export function parseCreatorCta(raw: unknown): CtaParse {
   return { ok: true, cta: { label, url } };
 }
 
+/** Who made a tour saved to the Drift channel (DriftFlow.settings.credit; services/driftChannel.ts). */
+export type TourCredit = { flowId: string; pageId: string; pageName: string; pageSlug: string | null; savedAt: string };
+
+export const creditOf = (settings: unknown): TourCredit | null => {
+  const c = settings && typeof settings === "object" ? (settings as Record<string, any>).credit : null;
+  return c && typeof c === "object" && typeof c.pageName === "string" && c.pageName ? (c as TourCredit) : null;
+};
+
+/** What a saved tour's pathway shows: "Tour by {creator}" → their page. */
+export const publicCredit = (settings: unknown): { name: string; path: string | null } | null => {
+  const c = creditOf(settings);
+  return c ? { name: c.pageName, path: c.pageSlug ? pagePublicPath(c.pageSlug) : null } : null;
+};
+
 /** A tour drift's background until its creator picks one: drift.li's own dark ground. */
 export const TOUR_DEFAULT_BACKGROUND = "#0d1119";
 
@@ -521,6 +535,8 @@ export function serializePublicFlow(f: any) {
     coverUrl: full.coverUrl,
     settings: full.settings,
     hidden: full.hidden,
+    // saved to the Drift channel: who made it
+    credit: publicCredit(f.settings),
     pageSlug: full.pageSlug,
     pageName: full.pageName,
     pagePath: full.pagePath,

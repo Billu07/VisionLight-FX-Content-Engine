@@ -1,7 +1,8 @@
 import { Router, Response } from "express";
 import { prisma } from "../services/database";
 import { authenticateToken, requireSuperAdmin, type AuthenticatedRequest } from "../middleware/auth";
-import { flowInclude, flowPublicPath, pagePublicPath, serializeFlow } from "../services/driftFlows";
+import { FlowError, flowInclude, flowPublicPath, pagePublicPath, serializeFlow } from "../services/driftFlows";
+import { channelStatus, ensureChannel, saveToChannel } from "../services/driftChannel";
 import { DRIFT_PRICE_CENTS, formatMoney, stripeConfigured, stripeWebhookConfigured } from "../services/driftBilling";
 import { memberRole, parseAccountType } from "../services/driftTourAccounts";
 import { sendWaitlistNoticeEmail } from "../services/mail";
@@ -236,6 +237,35 @@ router.put("/api/drift/admin/tour/demo", ...guard, async (req: AuthenticatedRequ
 });
 
 // Checkout orders, newest first.
+// ── The Drift channel (drift.li/tour/drift): set it up, save creators' tours to its library ──
+const flowErr = (res: Response, err: unknown) => {
+  if (err instanceof FlowError) return res.status(err.status).json({ error: err.message });
+  console.error(`[${NS}] channel:`, err);
+  return res.status(500).json({ error: "Something went wrong" });
+};
+
+router.get("/api/drift/admin/tour/channel", ...guard, async (_req: AuthenticatedRequest, res: Response) => {
+  res.json(await channelStatus());
+});
+
+router.post("/api/drift/admin/tour/channel", ...guard, async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    await ensureChannel();
+    res.json(await channelStatus());
+  } catch (err) {
+    flowErr(res, err);
+  }
+});
+
+// Copy a tour into the channel's library (its Hidden Tours) — idempotent per tour.
+router.post("/api/drift/admin/tour/flows/:id/save-to-channel", ...guard, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    res.json(await saveToChannel(req.params.id, req.user?.id || null));
+  } catch (err) {
+    flowErr(res, err);
+  }
+});
+
 router.get("/api/drift/admin/tour/orders", ...guard, async (_req: AuthenticatedRequest, res: Response) => {
   const orders = await prisma.driftTourOrder.findMany({
     orderBy: { createdAt: "desc" },

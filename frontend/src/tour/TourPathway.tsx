@@ -11,6 +11,9 @@ import { captureShareLink } from "../rotation3d/personalLink";
 import { EnquiryButton } from "./EnquirySheet";
 import { lazyRoute } from "../lib/lazyRoute";
 
+/** drift.li's own page: the Drift channel (backend services/driftChannel.ts). */
+const CHANNEL_SLUG = "drift";
+
 // The builder is for page admins only — visitors never download it.
 const TourBuilder = lazyRoute(() => import("./TourBuilder"));
 
@@ -46,14 +49,23 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
   }, []);
   return (
     <div className="tpw t-rise">
-      {/* A demo tour stands on its own — no way back to (or messages for) the page it lives on. */}
-      {!flow.isDemo && (
+      {/* A demo tour stands on its own — no way back to (or messages for) the page it lives on —
+          unless it lives on the Drift channel, drift.li's own page. */}
+      {(!flow.isDemo || page.slug === CHANNEL_SLUG) && (
         <>
           <div className="tpw-top">
             <Link className="t-back" to={home}>
               ← {page.name} Tours
             </Link>
             <span className="t-inline">
+              {flow.credit &&
+                (flow.credit.path ? (
+                  <Link className="d-btn sm tpw-credit" to={flow.credit.path} title={`See more from ${flow.credit.name}`}>
+                    Tour by <b>{flow.credit.name}</b>
+                  </Link>
+                ) : (
+                  <span className="d-pill tpw-credit">Tour by {flow.credit.name}</span>
+                ))}
               <EnquiryButton page={page} flowId={flow.id} className="d-btn primary sm" />
               <ContactButton page={page} flowId={flow.id} className="d-btn sm" />
             </span>
@@ -100,7 +112,7 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
         ))}
       </ol>
 
-      {!flow.isDemo && (
+      {(!flow.isDemo || page.slug === CHANNEL_SLUG) && (
         <div className="tpw-foot">
           <EnquiryButton page={page} flowId={flow.id} />
           <ContactButton page={page} flowId={flow.id} />

@@ -645,6 +645,20 @@ export default function TourBuilder({
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [coverBusy, setCoverBusy] = useState(false);
   const [demoSaving, setDemoSaving] = useState(false);
+  const [librarySaving, setLibrarySaving] = useState(false);
+  // Superadmin: copy this tour into the Drift channel's library (drift.li/tour/drift).
+  const saveToLibrary = async () => {
+    if (!flow) return;
+    setLibrarySaving(true);
+    try {
+      const r = await apiEndpoints.driftTourAdminSaveToChannel(flow.id);
+      notify.success(r.data.existing ? "Already in the Drift Library" : "Saved to the Drift Library — Feature It From the Channel");
+    } catch (e) {
+      notify.error(apiError(e));
+    } finally {
+      setLibrarySaving(false);
+    }
+  };
   const coverRef = useRef<HTMLInputElement>(null);
   const routeRef = useRef<HTMLDivElement>(null);
   const slugRef = useRef<string | null>(null);
@@ -1091,6 +1105,16 @@ export default function TourBuilder({
                 />
                 <span className="d-sub">Use as drift.li's demo tour (every page's "View Demo" by default) — superadmin only.</span>
               </label>
+              {page.slug !== "drift" && (
+                <div className="t-settings-row">
+                  <span className="d-sub" style={{ fontSize: 12.5 }}>
+                    Copy this tour into the Drift channel's library, credited to {page.name}. Changes here won't touch the copy.
+                  </span>
+                  <button className="d-btn sm" onClick={() => void saveToLibrary()} disabled={librarySaving || flow.counts.ready === 0}>
+                    {librarySaving ? "Saving…" : "Save to Drift Library"}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

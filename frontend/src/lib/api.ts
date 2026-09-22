@@ -441,6 +441,12 @@ export const apiEndpoints = {
   driftTourAdminUpdatePage: (id: string, data: Record<string, unknown>) => api.patch(`/api/drift/admin/tour/pages/${id}`, data),
   driftTourAdminDemo: () => api.get("/api/drift/admin/tour/demo"),
   driftTourAdminSetDemo: (flowId: string | null) => api.put("/api/drift/admin/tour/demo", { flowId }),
+  // The Drift channel (drift.li/tour/drift) and its library of saved tours
+  driftTourAdminChannel: () => api.get("/api/drift/admin/tour/channel"),
+  driftTourAdminSetupChannel: () => api.post("/api/drift/admin/tour/channel"),
+  driftTourAdminSaveToChannel: (flowId: string) => api.post(`/api/drift/admin/tour/flows/${encodeURIComponent(flowId)}/save-to-channel`),
+  // A page's Featured Tours order
+  driftSetTourOrder: (flowIds: string[]) => api.put("/api/drift/my/page/tour-order", { flowIds }),
   driftTourAdminOrders: () => api.get("/api/drift/admin/tour/orders"),
   driftAdminWaitlist: () => api.get("/api/drift/admin/waitlist"),
   driftJoinWaitlist: (email: string, product: string, source?: string) =>

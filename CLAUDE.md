@@ -355,6 +355,20 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   with `via: "contact"` → the lead's button reads "Contact {page}"); only a page with neither falls back to
   "Contact PicDrift". `EnquirySheet` portals into the `.drift-ui.d-page` root (animated `.t-rise` sections are their own
   layer and painted over it). /tour/start (Try It Free) has an × (back, or the Tour landing) and is dark only.
+- **Drift channel + featured library** (2026-09-22, no schema change; `services/driftChannel.ts`): drift.li/tour/drift =
+  drift.li's own TOUR page "Drift" (slug `drift`, already in RESERVED_SLUGS, so only `ensureChannel` can create it —
+  Admin → drift.li → Tour → **Drift Channel** tab → "Set Up the Drift Channel"). A superadmin **saves** any creator's tour
+  to its library (back office: Pages → a page → a tour → Save to Library; or the builder's Tour Settings) → `saveToChannel`
+  makes a **copy** in one transaction: a new DriftFlow on the channel (hidden = the library, PUBLISHED, its own slug —
+  tour slugs are site-wide unique), only READY/PUBLISHED drifts, each a new DriftProduct (+ spin manifest, pins, pinTrack,
+  cover/thumbnail — the SAME R2 frames; drift deletes never purge R2, so the copy survives the original), billing COMP,
+  the creator's pixel/billing/showcase flags dropped, reel/unbranded/report settings dropped, then `relinkFlow`. Saving the
+  same tour again returns the existing copy (`settings.credit.flowId`). `settings.credit` {flowId, pageId, pageName,
+  pageSlug} → `serializePublicFlow.credit` → the pathway shows **"Tour by {creator}"** top right (always) linking to their
+  page; back link = "← Drift Tours". On the channel page, Hidden Tours read **Library** and Unhide/Hide read
+  **Feature / Move to Library**. Any page's Featured Tours can be ordered (↑ ↓, `PUT /api/drift/my/page/tour-order`,
+  EDIT) — `DriftFlow.order`, which the public page already sorts by. A demo tour on the channel keeps its back link.
+  Verified against a throwaway Docker Postgres (schema from `prisma migrate diff`, never `db push`): 27 checks.
 - **Superadmin**: `X-Drift-Org` lets a superadmin act on any TOUR page ("Manage this page", `usePageAdmin`);
   back office = Admin → drift.li → Tour (`routes/driftTourAdmin.ts`, `DriftTourAdmin.tsx`).
 - **drift.li home** = `rotation3d/DriftHome.tsx` (2026-09-14 redesign per the client's `land.png`; headline on

@@ -102,6 +102,24 @@ function PageDetailView({ detail, onSaved }: { detail: PageDetail; onSaved: (d: 
   const [accountType, setAccountType] = useState(p.accountType || "GENERAL");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<Msg>(null);
+  // Copy a tour into the Drift channel's library (drift.li/tour/drift).
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [tourMsg, setTourMsg] = useState<Msg>(null);
+  const saveToLibrary = async (flowId: string) => {
+    setSavingId(flowId);
+    setTourMsg(null);
+    try {
+      const r = await apiEndpoints.driftTourAdminSaveToChannel(flowId);
+      setTourMsg({
+        kind: "ok",
+        text: r.data.existing ? "Already in the Drift Library." : "Saved to the Drift Library — feature it from the channel (Drift Channel tab).",
+      });
+    } catch (e) {
+      setTourMsg({ kind: "err", text: errText(e, "Couldn't save the tour") });
+    } finally {
+      setSavingId(null);
+    }
+  };
   const dirty = freeDrifts !== String(p.freeDrifts) || maxClip !== String(p.maxClipSeconds) || accountType !== (p.accountType || "GENERAL");
 
   const save = async () => {
@@ -185,6 +203,7 @@ function PageDetailView({ detail, onSaved }: { detail: PageDetail; onSaved: (d: 
             {detail.flows.length}
           </span>
         </div>
+        <Banner msg={tourMsg} onClose={() => setTourMsg(null)} />
         {detail.flows.length === 0 ? (
           <p className="d-faint" style={{ fontSize: 12.5, margin: 0 }}>
             No tours yet.
@@ -205,6 +224,11 @@ function PageDetailView({ detail, onSaved }: { detail: PageDetail; onSaved: (d: 
                   </div>
                 </div>
                 <div className="d-actions">
+                  {p.slug !== "drift" && f.counts.ready > 0 && (
+                    <button className="d-btn sm" onClick={() => void saveToLibrary(f.id)} disabled={savingId === f.id} title="Copy it into the Drift channel's library">
+                      {savingId === f.id ? "Saving…" : "Save to Library"}
+                    </button>
+                  )}
                   <a className="d-btn sm" href={onDrift(f.publicPath)} target="_blank" rel="noopener noreferrer">
                     Open ↗
                   </a>
@@ -615,8 +639,84 @@ function Waitlist() {
   );
 }
 
+type ChannelInfo = { channel: { id: string; name: string; slug: string; path: string } | null; featured: number; library: number };
+
+/** drift.li/tour/drift: drift.li's own page for demos and tours saved from creators. */
+function DriftChannel() {
+  const [data, setData] = useState<ChannelInfo | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<Msg>(null);
+  const load = async () => {
+    try {
+      const r = await apiEndpoints.driftTourAdminChannel();
+      setData(r.data);
+    } catch (e) {
+      setMsg({ kind: "err", text: errText(e, "Couldn't load the channel") });
+      setData({ channel: null, featured: 0, library: 0 });
+    }
+  };
+  useEffect(() => {
+    load();
+  }, []);
+  const setUp = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await apiEndpoints.driftTourAdminSetupChannel();
+      setData(r.data);
+      setMsg({ kind: "ok", text: "The Drift channel is ready." });
+    } catch (e) {
+      setMsg({ kind: "err", text: errText(e, "Couldn't set up the channel") });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="d-card d-card-pad">
+      <div className="d-head">
+        <div style={{ minWidth: 0 }}>
+          <div className="d-h2">Drift Channel</div>
+          <p className="d-sub" style={{ fontSize: 12.5, maxWidth: "64ch" }}>
+            drift.li/tour/drift — drift.li's own page for demos and tours saved from creators. A saved tour is a copy: the creator
+            can change or delete theirs, and the channel's stays as it was, credited to them.
+          </p>
+        </div>
+        {data?.channel && (
+          <a className="d-btn primary sm" href={onDrift(data.channel.path)} target="_blank" rel="noopener noreferrer">
+            Open the Channel ↗
+          </a>
+        )}
+      </div>
+      <Banner msg={msg} onClose={() => setMsg(null)} />
+      {data === null ? (
+        <div className="py-6 text-center">
+          <LoadingSpinner size="sm" />
+        </div>
+      ) : data.channel ? (
+        <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+          <div className="d-meta">
+            <span className="d-pill ok">{data.featured} Featured</span>
+            <span className="d-pill">{data.library} in the Library</span>
+          </div>
+          <ol className="d-sub" style={{ fontSize: 12.5, margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+            <li>Save a tour: Pages → a page → its tours → Save to Library (or in the tour's Tour Settings).</li>
+            <li>Feature it: open the channel → Manage This Page → Library → Feature.</li>
+            <li>Order the Featured Tours there with ↑ ↓ — visitors see that order.</li>
+          </ol>
+        </div>
+      ) : (
+        <div style={{ marginTop: 12 }}>
+          <button className="d-btn primary" onClick={() => void setUp()} disabled={busy}>
+            {busy ? "Setting Up…" : "Set Up the Drift Channel"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DriftTourAdmin() {
-  const [tab, setTab] = useState<"pages" | "demo" | "orders" | "waitlist">("pages");
+  const [tab, setTab] = useState<"pages" | "channel" | "demo" | "orders" | "waitlist">("pages");
   const [status, setStatus] = useState<{ payments: boolean; webhook: boolean; price: string } | null>(null);
   useEffect(() => {
     apiEndpoints
@@ -626,6 +726,7 @@ export default function DriftTourAdmin() {
   }, []);
   const tabs = [
     ["pages", "Pages"],
+    ["channel", "Drift Channel"],
     ["demo", "Demo tour"],
     ["orders", "Orders"],
     ["waitlist", "Wait list"],
@@ -649,7 +750,7 @@ export default function DriftTourAdmin() {
           </span>
         )}
       </div>
-      {tab === "pages" ? <Pages /> : tab === "demo" ? <DemoTour /> : tab === "orders" ? <Orders /> : <Waitlist />}
+      {tab === "pages" ? <Pages /> : tab === "channel" ? <DriftChannel /> : tab === "demo" ? <DemoTour /> : tab === "orders" ? <Orders /> : <Waitlist />}
     </div>
   );
 }

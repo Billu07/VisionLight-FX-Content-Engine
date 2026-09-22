@@ -201,6 +201,8 @@ export type PublicFlow = {
   hidden: boolean;
   /** the site's demo tour or the page's own "View Demo" (only on the pathway endpoint) */
   isDemo?: boolean;
+  /** saved to the Drift channel: who made it (their page) */
+  credit?: { name: string; path: string | null } | null;
   pageSlug: string | null;
   pageName: string | null;
   pagePath: string | null;

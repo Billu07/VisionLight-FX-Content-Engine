@@ -563,7 +563,9 @@ export default function TourPage() {
   const setHidden = async (f: Flow, hidden: boolean) => {
     try {
       await apiEndpoints.driftUpdateFlow(f.id, { hidden });
-      notify.success(hidden ? "Moved to Hidden Tours" : "Back in Featured Tours");
+      notify.success(
+        pub?.page.slug === "drift" ? (hidden ? "Moved to the Library" : "Featured on the Channel") : hidden ? "Moved to Hidden Tours" : "Back in Featured Tours",
+      );
       loadAdmin();
     } catch (e) {
       notify.error(apiError(e));
@@ -638,10 +640,39 @@ export default function TourPage() {
   const hiddenTours = editing ? flows.filter((f) => f.hidden).map(fromAdmin) : [];
   const initial = (page.name || "?").trim().charAt(0);
 
+  // The channel (drift.li/tour/drift): Hidden Tours are its library of saved tours.
+  const isChannel = page.slug === "drift";
+  // Featured Tours order: move one up or down; saved at once, the public page follows.
+  const moveTour = async (flowId: string, delta: -1 | 1) => {
+    const ids = featured.map((t) => t.flow!.id);
+    const i = ids.indexOf(flowId);
+    const j = i + delta;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    const rank = new Map(ids.map((id, k) => [id, k]));
+    setFlows((all) => [...all].sort((a, b) => (rank.get(a.id) ?? 1e6) - (rank.get(b.id) ?? 1e6)));
+    try {
+      await apiEndpoints.driftSetTourOrder(ids);
+    } catch (e) {
+      notify.error(apiError(e));
+      loadAdmin();
+    }
+  };
   const adminActions = (it: TourItem) => {
     const f = it.flow!;
+    const at = f.hidden ? -1 : featured.findIndex((t) => t.flow?.id === f.id);
     return (
       <>
+        {canEdit && at >= 0 && featured.length > 1 && (
+          <span className="t-arrows">
+            <button className="d-btn sm" onClick={() => moveTour(f.id, -1)} disabled={at === 0} title="Move Up" aria-label="Move up">
+              ↑
+            </button>
+            <button className="d-btn sm" onClick={() => moveTour(f.id, 1)} disabled={at === featured.length - 1} title="Move Down" aria-label="Move down">
+              ↓
+            </button>
+          </span>
+        )}
         <Link className="d-btn soft sm" to={it.path} style={{ textDecoration: "none" }}>
           Open
         </Link>
@@ -651,8 +682,8 @@ export default function TourPage() {
           </button>
         )}
         {canEdit && (
-          <button className="d-btn sm" onClick={() => setHidden(f, !f.hidden)}>
-            {f.hidden ? "Unhide" : "Hide"}
+          <button className={`d-btn sm ${isChannel && f.hidden ? "primary" : ""}`} onClick={() => setHidden(f, !f.hidden)}>
+            {isChannel ? (f.hidden ? "Feature" : "Move to Library") : f.hidden ? "Unhide" : "Hide"}
           </button>
         )}
         {canAdmin && (
@@ -846,8 +877,12 @@ export default function TourPage() {
       {editing && hiddenTours.length > 0 && (
         <section className="tpg-section">
           <div className="tpg-bar">
-            <h2>Hidden Tours</h2>
-            <span className="d-faint">Only this page's team sees these. Their links still work.</span>
+            <h2>{isChannel ? "Library" : "Hidden Tours"}</h2>
+            <span className="d-faint">
+              {isChannel
+                ? "Tours saved from creators' pages. Feature one to put it on the channel."
+                : "Only this page's team sees these. Their links still work."}
+            </span>
           </div>
           <TourPathList items={hiddenTours} renderActions={adminActions} />
         </section>

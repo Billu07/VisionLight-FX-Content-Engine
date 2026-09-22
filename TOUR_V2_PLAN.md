@@ -488,3 +488,13 @@ Drift.li is a division of PicDrift
   stop getting notifications but still get invites and receipts. New model `EmailOptOut` — **needs `prisma db push`
   before the backend restart.** Verified against a fake local SMTP server (scratchpad/mail-test.ts: 24 checks — one
   message per person, footer, own link, headers, tampered links refused, GET never unsubscribes).
+- 2026-09-22 — The Drift channel + featured library (client: "a superadmin save tour from any user for featuring library";
+  "Drift.li/tour/drift will be our Drift channel"; account name Drift). drift.li/tour/drift is drift.li's own tour page,
+  set up once from Admin → drift.li → Tour → Drift Channel. A superadmin saves any creator's tour to the channel's library
+  — a copy, decided by the user (the creator can change or delete theirs; the saved one stays as it was, reusing the same
+  frames, so nothing is re-built or re-stored). Library = the channel's hidden tours; "Feature" puts one on the channel;
+  Featured Tours can be ordered with ↑ ↓ on any page (the client: "organizing the path order of the featured posts on a
+  profile"). A saved tour's pathway goes back to the channel and credits the creator top right — always shown, decided by
+  the user ("Tour by Harbour Homes" → their page). No schema change. Not built (the user didn't ask): an email to the
+  creator when their tour is featured. Verified: 27 checks against a throwaway Docker Postgres; screens against the
+  mocked API (channel pathway with credit, channel admin with Library / Feature / order, builder save button).

@@ -1197,6 +1197,21 @@ router.post(
   },
 );
 
+// A page's Featured Tours order: body { flowIds: [...] } in the new order (Editors + Admins).
+// The public page and the admin view both list tours by this order.
+router.put("/api/drift/my/page/tour-order", authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  const orgId = await requirePage(req, res, "EDIT");
+  if (!orgId) return;
+  const ids: string[] | null = Array.isArray(req.body?.flowIds)
+    ? [...new Set<string>(req.body.flowIds.map((s: unknown) => String(s)).filter(Boolean))].slice(0, 500)
+    : null;
+  if (!ids || !ids.length) return res.status(400).json({ error: "flowIds must list the tours in order" });
+  const own = await prisma.driftFlow.count({ where: { organizationId: orgId, id: { in: ids } } });
+  if (own !== ids.length) return res.status(404).json({ error: "Some of those tours aren't on this page" });
+  await prisma.$transaction(ids.map((id, i) => prisma.driftFlow.update({ where: { id }, data: { order: i } })));
+  res.json({ ok: true });
+});
+
 // Reorder: body { stepIds: [...] } in the new order → orders + links re-derived
 // in one transaction. Registered BEFORE /steps/:stepId so "reorder" isn't an id.
 router.patch(
