@@ -1,4 +1,4 @@
-import { holdForegroundLoad } from "./driftNav";
+import { framesReady, holdForegroundLoad, markFramesIn } from "./driftNav";
 import { pinPlacement, type PinTrack, type SpinPin } from "./pins";
 import { createAttention, type AttentionTarget } from "./attention";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
@@ -519,18 +519,13 @@ export default function SpinViewer({
     };
 
     // --- frame images (real mode) ---
-    // On phones, prefer the lighter mobile frame set (much smaller download →
-    // buffers fast) when the product has one. Desktop and legacy products use
-    // the full-resolution set.
-    const isMobileViewport =
-      typeof window !== "undefined" &&
-      (Math.min(window.innerWidth, window.innerHeight) <= 820 ||
-        !!window.matchMedia?.("(pointer: coarse)").matches);
-    const usingMobileFrames =
-      isMobileViewport &&
-      Array.isArray(manifest.framesMobile) &&
-      manifest.framesMobile.length > 0;
-    const urls = usingMobileFrames ? manifest.framesMobile : manifest.frames;
+    // EVERY device plays the lighter 1080px set when the product has one (desktop too): a
+    // drift is drawn a few hundred pixels wide to about a laptop's width, so the 2048px set
+    // mostly bought bytes and decode time — a 180-frame drift ran to tens of megabytes, which
+    // made a tour slow to open, heavy to drag and left the next drift cold. Products without
+    // the lighter set (made before it existed) still use the full one.
+    const urls =
+      Array.isArray(manifest.framesMobile) && manifest.framesMobile.length > 0 ? manifest.framesMobile : manifest.frames;
     const realMode = Array.isArray(urls) && urls.length > 0;
     let revealTimer: ReturnType<typeof setTimeout> | null = null;
     let releaseForeground: (() => void) | null = null;
@@ -729,7 +724,9 @@ export default function SpinViewer({
       // read as "zoomed in" next to a landscape stop). Landscape content is still
       // capped exactly as before, so brand drifts don't change size.
       const bandTop = 56 * DPR;
-      const bandBottom = (W / DPR <= 560 ? 150 : 140) * DPR;
+      // Room under the footage for the drag cue, the buttons and the badge. A tall (portrait)
+      // clip is height-bound, so this is exactly what keeps it off the buttons.
+      const bandBottom = (W / DPR <= 560 ? 150 : 162) * DPR;
       const bandH = Math.max(H * 0.6, H - bandTop - bandBottom);
       const bandCy = bandTop + bandH / 2;
       if (capFit) {
@@ -752,7 +749,10 @@ export default function SpinViewer({
               : Math.min(bandH, availW / ar0, legacyCap);
           // Tour stops (uniformSize) on desktop: one zoom step bigger — they have no
           // headline to make room for — still the same size stop to stop.
-          if (bigDesktop && uniformSize) boxMax = Math.min(boxMax * TOUR_DESKTOP_ZOOM, ar0 >= 1 ? availW : H * 0.98);
+          // Only wide footage has room for the extra step: a tall (portrait) clip is already
+          // as tall as the band, and zooming it to 98% of the canvas ran it under the top bar
+          // and over the buttons, the hand and the cue.
+          if (bigDesktop && uniformSize) boxMax = ar0 >= 1 ? Math.min(boxMax * TOUR_DESKTOP_ZOOM, availW) : Math.min(boxMax, bandH);
           base = boxMax / 4.2;
         }
       }
@@ -837,7 +837,11 @@ export default function SpinViewer({
         // Keeps the text/arrow off the product without dragging the hand down.
         if (cueRef.current) {
           const naturalCueTop = topPx + handH + 7; // 7px column gap (see .r3d-drift .r3d-hint)
-          const cueTop = Math.max(naturalCueTop, frameBottomCss + 16);
+          // …but never into the buttons: with a tall clip the cue would land on the CTA row,
+          // so it stops just above it (riding onto the footage, as it does on phones).
+          const ctaBox = ctasRef.current?.getBoundingClientRect();
+          const ctaLimit = ctaBox && ctaBox.height > 0 ? ctaBox.top - stage.getBoundingClientRect().top - cueH - 8 : Infinity;
+          const cueTop = Math.min(Math.max(naturalCueTop, frameBottomCss + 16), Math.max(naturalCueTop - handH, ctaLimit));
           cueRef.current.style.marginTop = cueTop - naturalCueTop + "px";
           // Mobile bottom stack (phones only): the CTA row is bottom-anchored, so a
           // fixed CSS offset can't track the frame/cue (they scale with the viewport +
@@ -1510,6 +1514,7 @@ export default function SpinViewer({
         }
         if (!alive) return;
         imgs[i] = im;
+        markFramesIn([urls![i]]); // revisiting this drift can skip the loader
         dirty = true; // repaint once a frame is decoded (no auto-spin to do it)
         loaded++;
         setProgress((loaded / n) * 100);
@@ -1533,7 +1538,7 @@ export default function SpinViewer({
       // spin is still usable, and keeps sharpening as frames arrive).
       revealTimer = setTimeout(() => {
         if (!revealed) { revealed = true; finishLoad(); }
-      }, flowNav ? 20000 : 1500); // tours: never hold the loader past 20s on a slow link
+      }, flowNav ? 8000 : 1500); // tours: never hold the loader past 8s on a slow link
     } else {
       // synthetic: simulate a short preload so the UX matches real mode
       let p = 0;
@@ -1553,6 +1558,11 @@ export default function SpinViewer({
     // under the new frame, so the hand fades in at its spot rather than dropping. ---
     const isSwap = swappedRef.current;
     swappedRef.current = true;
+    // Skipping the loader is only honest when this drift's frames are already in (prefetched
+    // or seen before). A swap used to hide it either way, so the next stop of a tour opened on
+    // frames that were still downloading — that's what made dragging feel laggy with no sign
+    // of loading. Not ready → the loader shows its progress over the crossfade.
+    const framesAreIn = realMode && framesReady(urls!, flowNav ? undefined : Math.min(urls!.length, 36));
     // Directional handoff (tour stops only): the OUTGOING drift slides on the way its
     // own footage travelled while the next one settles in from the far side — LTR
     // exits left and enters from the right, TTB exits upward and enters from below.
@@ -1567,7 +1577,8 @@ export default function SpinViewer({
     const inT = shift(4);
     const EASE = "cubic-bezier(.2,.7,.2,1)";
     if (instant || isSwap) {
-      loaderRef.current?.classList.add("r3d-gone");
+      if (framesAreIn) loaderRef.current?.classList.add("r3d-gone");
+      else loaderRef.current?.classList.remove("r3d-gone"); // still loading — show the progress
       let crossfaded = false;
       if (isSwap && xfadeRef.current) {
         // Crossfade: snapshot the OUTGOING frame (still on the canvas — before fit()

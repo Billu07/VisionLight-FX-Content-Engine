@@ -153,9 +153,22 @@ Env changes need `--update-env`. Read a boot check with e.g. `pm2 logs my-backen
     a deploy); shared loaders live in `routeChunks.ts` and `TourShell` preloads the player chunk on idle.
     Vendor chunks (`vendor-react`, `vendor-supabase`) are set in `vite.config.ts`. Don't add static
     imports of route pages elsewhere — it pulls them back into the entry.
-  - Phones play `manifest.framesMobile` (1080px). Build every player manifest with
-    `driftNav.combinedFrameSets()` so the mobile set is never dropped (it was: phones downloaded and
-    decoded 180 × 2048px frames per drift → stutter).
+  - **Every device** plays `manifest.framesMobile` (1080px) when the product has one — desktop too
+    (2026-09-22): a drift is drawn a few hundred px wide up to about a laptop's width, so the 2048px set
+    mostly bought bytes and decode time (180 × 2048px ≈ tens of MB per drift → a tour opened slowly, dragged
+    heavily, and the next drift was never warm in time). `driftNav.playerFrames()` and SpinViewer pick the
+    same set; build every player manifest with `driftNav.combinedFrameSets()` so the light set is never
+    dropped. Products from before the light set still use the full one.
+  - **The loader is only skipped when the frames are actually in** (2026-09-22): `driftNav` tracks every
+    frame URL it has warmed or a player has decoded (`markFramesIn` / `framesReady`); `Rotation3DPlayer`'s
+    `instant` and SpinViewer's swap path both check it. Before that, a cached *payload* (prefetch) and every
+    drift→drift swap hid the loader while the frames were still downloading — you landed on an unloaded
+    drift and dragging stuttered with no sign of loading. Tour drifts still reveal at 100% (cap now 8s).
+  - **Portrait footage keeps its chrome clear** (2026-09-22): the frame is fitted into the band between the
+    top bar and the bottom stack (`bandTop` / `bandBottom`, 162px on desktop). A tall clip is height-bound,
+    so the tour desktop zoom step (`TOUR_DESKTOP_ZOOM`) only applies to wide footage — it used to cap
+    portrait at 98% of the canvas, which ran the frame under the top bar and over the buttons, the hand and
+    the cue. The cue is also clamped above the CTA row.
   - `driftNav` warms the next drift's WHOLE frame set (6 at a time, the device's set, coarse-only on
     data-saver/2G) once the drift on screen has every frame: SpinViewer holds `holdForegroundLoad()` while
     it loads (25s safety release). Tour drifts reveal only at 100% (20s fallback); brand drifts keep the

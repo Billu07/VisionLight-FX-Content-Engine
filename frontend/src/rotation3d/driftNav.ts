@@ -80,8 +80,7 @@ export const cacheDrift = (key: string, product: any) => {
 
 // ───────────────────────────── frame sets ─────────────────────────────
 
-/** Phones and touch tablets play the lighter mobile frame set — the same rule
- *  SpinViewer applies when it picks `manifest.framesMobile`. */
+/** A phone-sized viewport (kept for callers that size things by device, not bytes). */
 export const prefersMobileFrames = () =>
   typeof window !== "undefined" &&
   (Math.min(window.innerWidth, window.innerHeight) <= 820 ||
@@ -104,10 +103,33 @@ export function combinedFrameSets(product: any, withSecond = true): { frames: st
   };
 }
 
-/** Exactly the URLs this device's player will load for a payload. */
-const deviceFrames = (product: any): string[] => {
+/** Exactly the URLs the player will load for a payload — the lighter 1080px set whenever the
+ *  product has one, on every device (SpinViewer picks the same). A drift is drawn a few hundred
+ *  pixels wide to about a laptop's width, so the 2048px set mostly bought bytes and decode time:
+ *  a 180-frame drift was tens of megabytes, which is why a tour felt heavy and the next drift
+ *  was never warm in time. */
+export const playerFrames = (product: any): string[] => {
   const { frames, framesMobile } = combinedFrameSets(product);
-  return framesMobile && prefersMobileFrames() ? framesMobile : frames;
+  return framesMobile && framesMobile.length ? framesMobile : frames;
+};
+const deviceFrames = playerFrames;
+
+// Frames known to be in the browser's cache: warmed here, or loaded by a player. A drift
+// swaps in without its loader only when its frames are already in (see SpinViewer).
+const framesIn = new Set<string>();
+
+/** A player tells us the frames it has decoded, so revisiting the drift is instant. */
+export const markFramesIn = (urls: string[]) => {
+  for (const u of urls) if (u) framesIn.add(u);
+};
+
+/** Are this payload's frames ready to play (all of them, or `need` of them)? */
+export const framesReady = (urls: string[], need?: number): boolean => {
+  if (!urls.length) return false;
+  const want = Math.min(need ?? urls.length, urls.length);
+  let have = 0;
+  for (const u of urls) if (framesIn.has(u) && ++have >= want) return true;
+  return false;
 };
 
 // ───────────────────────────── background warm queue ─────────────────────────────
@@ -133,7 +155,12 @@ const pumpWarm = () => {
     warmActive++;
     const img = new Image();
     img.decoding = "async";
-    img.onload = img.onerror = () => {
+    img.onload = () => {
+      framesIn.add(url);
+      warmActive--;
+      pumpWarm();
+    };
+    img.onerror = () => {
       warmActive--;
       pumpWarm();
     };

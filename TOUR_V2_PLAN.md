@@ -498,3 +498,16 @@ Drift.li is a division of PicDrift
   the user ("Tour by Harbour Homes" → their page). No schema change. Not built (the user didn't ask): an email to the
   creator when their tour is featured. Verified: 27 checks against a throwaway Docker Postgres; screens against the
   mocked API (channel pathway with credit, channel admin with Library / Feature / order, builder save button).
+- 2026-09-22 — Player smoothness (user: a tour opened with no loader "straight to the frame", navigation "super
+  laggy", portrait clips on a PC overlapping the buttons, hand and cue). Three causes, all fixed:
+  (1) desktop loaded the 2048px frames — 180 of them is tens of megabytes per drift, so a drift was slow to open,
+  heavy to drag and the next one was never warm; every device now plays the 1080px set (it has existed since
+  2026-07, so tours made before today get it without rebuilding), and `driftNav.playerFrames` warms the same set;
+  (2) the loader was hidden whenever the tour data was prefetched or the drift was a swap — so you landed on a
+  drift whose frames were still downloading; the player now tracks which frames are really in
+  (`markFramesIn` / `framesReady`) and only skips the loader then (tour reveal cap 20s → 8s);
+  (3) a portrait clip on desktop was zoomed to 98% of the canvas, past the band that keeps the top bar and the
+  bottom stack clear — the tour zoom step now applies to wide footage only, the band reserves 162px, and the drag
+  cue is clamped above the buttons. Verified in headless Chrome against a mocked tour with portrait and landscape
+  drifts: portrait/landscape/phone layouts, and (with the frames delayed and the cache off) the loader showing its
+  progress both on open and on the next drift.

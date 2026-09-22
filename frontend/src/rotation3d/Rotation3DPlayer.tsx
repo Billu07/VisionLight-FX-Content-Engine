@@ -4,7 +4,7 @@ import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
 import { isSpinPlayerSite, isDriftSite, getPlayerBranding } from "../lib/branding";
 import { initMetaPixel, track } from "./metaPixel";
-import { resolveDriftTarget, prefetchDriftTargets, getCachedDrift, cacheDrift, driftKey, flowDriftKey, targetKey, combinedFrameSets } from "./driftNav";
+import { resolveDriftTarget, prefetchDriftTargets, getCachedDrift, cacheDrift, driftKey, flowDriftKey, targetKey, combinedFrameSets, framesReady, playerFrames } from "./driftNav";
 import { captureShareLink, shareLinkFor } from "./personalLink";
 import { newViewKey, type AttentionTarget } from "./attention";
 
@@ -186,7 +186,13 @@ export default function Rotation3DPlayer() {
   const [error, setError] = useState<"not_found" | "error" | undefined>(undefined);
   // True when the FIRST drift shown was already prefetched (from the landing or a
   // previous drift): SpinViewer then skips its loader and just fades the drift in.
-  const [instant] = useState(() => (isDemo || !drift ? false : !!getCachedDrift(cacheKey)));
+  // Skip the loader only when the drift is cached AND its frames are already in — a cached
+  // payload alone used to hide it while the frames were still downloading.
+  const [instant] = useState(() => {
+    if (isDemo || !drift) return false;
+    const cached = getCachedDrift(cacheKey);
+    return !!cached && framesReady(playerFrames(cached));
+  });
 
   // Prefetch every drift a CTA points at (drift only), so its click is an instant swap.
   const prefetchNeighbors = (product: any) => {
