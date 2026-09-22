@@ -42,6 +42,7 @@ import {
 import {
   CLIP_DURATION_TOLERANCE_S,
   FlowError,
+  STEP_INGEST_FPS,
   STEP_MIN_FRAMES,
   STEP_TARGET_FRAMES,
   createDriftStep,
@@ -276,8 +277,9 @@ async function validateClip(
     });
     return null;
   }
-  // Every source frame up to the cap: no duplicated frames, no wasted storage.
-  const sourceFrames = Math.round(info.duration * (info.fps || 30));
+  // The clip at STEP_INGEST_FPS (never more than its own rate, so no duplicated frames), up to the cap.
+  const sampleFps = Math.min(STEP_INGEST_FPS, info.fps || STEP_INGEST_FPS);
+  const sourceFrames = Math.round(info.duration * sampleFps);
   const frameCount = Math.min(STEP_TARGET_FRAMES, Math.max(STEP_MIN_FRAMES, sourceFrames));
   return { frameCount, duration: info.duration };
 }
@@ -993,7 +995,9 @@ router.get("/api/drift/public/pages/:page/flows/:slug", async (req: Authenticate
     include: flowInclude,
   });
   if (!flow) return res.status(404).json({ error: "Not found", page: serializePage(org) });
-  res.json({ page: serializePage(org), flow: serializePublicFlow(flow) });
+  // A demo (the site's, or this page's own "View Demo") is shown without the page's back link.
+  const isDemo = flow.isDemo || pageSettingsOf(org).demoFlowId === flow.id;
+  res.json({ page: serializePage(org), flow: { ...serializePublicFlow(flow), isDemo } });
 });
 
 // ───────────────────────────── steps ─────────────────────────────

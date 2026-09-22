@@ -34,11 +34,13 @@ import {
   isFlowStepProduct,
   pagePublicPath,
   parseFlowKind,
+  pickedTourBackground,
   relinkFlow,
   stepDriftSlugs,
   stepFlowIdForProduct,
   stepNoun,
   stepPlayerPath,
+  TOUR_DEFAULT_BACKGROUND,
 } from "../services/driftFlows";
 
 // Drift (drift.li) — a separate product line running the same interactive
@@ -223,23 +225,30 @@ export const processClip = (opts: {
       });
 
       if (clip === "A") {
+        // Keep a background the creator/brand already chose (flow steps set it at
+        // upload). Otherwise a brand drift takes the colour detected from the frames,
+        // and a tour drift stays unset — it plays on drift.li's dark ground. (A tour
+        // drift's colour that was only the previous clip's detected one isn't a choice.)
+        const existing = await prisma.driftProduct.findUnique({
+          where: { id: productId },
+          select: { background: true, spin: { select: { manifest: true } } },
+        });
+        const tourStep = await isFlowStepProduct(productId).catch(() => false);
+        const previousBg = (existing?.spin?.manifest as any)?.detectedBg ?? null;
+        const background = tourStep
+          ? pickedTourBackground(existing?.background, previousBg)
+          : existing?.background || (manifest.detectedBg ?? null);
         await prisma.driftSpin.upsert({
           where: { productId },
           create: { productId, frameCount: manifest.frameCount, manifest: manifest as any, status: "READY" },
           update: { frameCount: manifest.frameCount, manifest: manifest as any, status: "READY" },
-        });
-        // Keep a background the creator/brand already chose (flow steps set it at
-        // upload); otherwise use the colour detected from the frames.
-        const existing = await prisma.driftProduct.findUnique({
-          where: { id: productId },
-          select: { background: true },
         });
         await prisma.driftProduct.update({
           where: { id: productId },
           data: {
             status: "READY",
             defaultFrame: manifest.defaultFrame,
-            background: existing?.background || (manifest.detectedBg ?? null),
+            background,
             // The clean-up measured which way the footage pans.
             ...(manifest.cleanup?.direction ? { driftDirection: manifest.cleanup.direction } : {}),
           },
@@ -1088,7 +1097,8 @@ const publicProductPayload = async (p: any, bc: any, orgName: string, captions: 
   mobileZoom: p.mobileZoom,
   thumbnailUrl: p.thumbnailUrl,
   metaPixelId: p.metaPixelId || orgPixelId || null,
-  background: p.background,
+  // Tour drifts: the creator's pick, else drift.li's dark ground.
+  background: p.flowStep ? pickedTourBackground(p.background, p.spin?.manifest?.detectedBg) || TOUR_DEFAULT_BACKGROUND : p.background,
   ctaPrimary: p.ctaPrimary,
   ctaSecondary: p.ctaSecondary,
   forms: await resolveCtaForms(p),

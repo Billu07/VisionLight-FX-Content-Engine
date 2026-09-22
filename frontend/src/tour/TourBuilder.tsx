@@ -29,6 +29,8 @@ const DIRECTIONS = [
   { value: "BTT", glyph: "↑", short: "B→T", title: "Bottom to top" },
 ] as const;
 const COVER_LABELS = ["Start", "Middle", "End"];
+/** A tour drift plays on drift.li's dark ground until its creator picks a colour. */
+const TOUR_DEFAULT_BG = "#0d1119";
 // The auto clean-up, in words (the step card's note under a ready drift).
 const cleanupText = (c: NonNullable<NonNullable<FlowStep["product"]>["cleanup"]>) =>
   [
@@ -337,7 +339,7 @@ function StepCard({
             <div className="t-color">
               <input
                 type="color"
-                value={/^#[0-9a-f]{6}$/i.test(bg) ? bg : "#101418"}
+                value={/^#[0-9a-f]{6}$/i.test(bg) ? bg : TOUR_DEFAULT_BG}
                 onChange={(e) => setBg(e.target.value)}
                 aria-label="Background colour"
                 disabled={readOnly}
@@ -345,10 +347,14 @@ function StepCard({
               <button className={`d-btn sm ${bg === "transparent" ? "soft" : ""}`} onClick={() => setBg(bg === "transparent" ? "" : "transparent")} disabled={readOnly}>
                 Transparent
               </button>
-              {bg && (
-                <button className="d-btn ghost sm" onClick={() => setBg("")} disabled={readOnly}>
-                  Auto
+              {bg ? (
+                <button className="d-btn ghost sm" onClick={() => setBg("")} disabled={readOnly} title="Back to drift.li's dark background">
+                  Default
                 </button>
+              ) : (
+                <span className="d-faint" style={{ fontSize: 12 }}>
+                  Default · drift.li Dark
+                </span>
               )}
             </div>
           </div>
@@ -632,14 +638,6 @@ export default function TourBuilder({
   // The drift whose pins are being edited.
   const [pinStep, setPinStep] = useState<FlowStep | null>(null);
   const [insightsOpen, setInsightsOpen] = useState(false);
-  // "Path" = compact rows you expand one at a time (default); "Cards" = every drift open.
-  const [viewMode, setViewMode] = useState<"path" | "cards">(() => {
-    try {
-      return localStorage.getItem("drift_builder_view") === "cards" ? "cards" : "path";
-    } catch {
-      return "path";
-    }
-  });
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
@@ -650,14 +648,6 @@ export default function TourBuilder({
   const coverRef = useRef<HTMLInputElement>(null);
   const routeRef = useRef<HTMLDivElement>(null);
   const slugRef = useRef<string | null>(null);
-  const switchView = (m: "path" | "cards") => {
-    setViewMode(m);
-    try {
-      localStorage.setItem("drift_builder_view", m);
-    } catch {
-      /* ignore */
-    }
-  };
 
   // Tour-level fields follow the server copy only while they're not being edited.
   const flowServerRef = useRef<{ name: string; description: string } | null>(null);
@@ -863,7 +853,7 @@ export default function TourBuilder({
   };
 
   const shell = (body: React.ReactNode) => (
-    <TourShell>
+    <TourShell view={{ value: "admin", onChange: (v) => v === "public" && onPublicView() }}>
       <style>{TOUR_PAGE_STYLES}</style>
       {body}
     </TourShell>
@@ -895,7 +885,7 @@ export default function TourBuilder({
   const selected = flow.steps.find((s) => s.id === selectedId) || null;
   const selectedProduct = selected?.product || null;
   // Anything that moves a pin re-inks the rail.
-  const routeDep = [viewMode, expandedId, flow.counts.awaiting, ...flow.steps.map((s) => `${s.id}:${s.product?.status || ""}`)].join("|");
+  const routeDep = [expandedId, flow.counts.awaiting, ...flow.steps.map((s) => `${s.id}:${s.product?.status || ""}`)].join("|");
   const renderCard = (s: FlowStep, i: number) => (
     <StepCard
       key={s.id}
@@ -924,17 +914,13 @@ export default function TourBuilder({
         )}
       </div>
 
-      {readOnly && (
-        <div className="tpg-note">
-          <span>View only — you can look through this tour, but not change it.</span>
-        </div>
-      )}
 
       <div className="t-head t-rise" style={{ marginTop: 6 }}>
         <div style={{ flex: "1 1 320px", minWidth: 0 }}>
           <div className="d-eyebrow" style={{ marginBottom: 6 }}>
             Tour · <StatusPill status={flow.status} flow />
             {flow.hidden && <span className="d-pill" style={{ marginLeft: 6 }}>Hidden</span>}
+            {readOnly && <span className="d-pill" style={{ marginLeft: 6 }}>View Only</span>}
           </div>
           <div className="t-inline">
             <input
@@ -954,6 +940,10 @@ export default function TourBuilder({
             <span>
               {flow.counts.ready}/{flow.counts.steps} drifts ready
             </span>
+            <button className="d-btn ghost sm t-guide" onClick={() => setShowGuide(true)} title="How to film a great drift">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" /></svg>
+              Capture Guide
+            </button>
             <span className="t-link" style={{ padding: "4px 8px" }}>
               <code>{publicUrl(flow.publicPath).replace(/^https?:\/\//, "")}</code>
               {flow.status === "PUBLISHED" && (
@@ -965,47 +955,25 @@ export default function TourBuilder({
           </div>
         </div>
         <div className="t-actions">
-          <button className="d-btn t-guide" onClick={() => setShowGuide(true)} title="How to film a great drift">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M23 7l-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" /></svg>
-            Capture Guide
-          </button>
           {flow.entryPath && (
-            <a className="d-btn" href={flow.entryPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+            <a className="d-btn ghost" href={flow.entryPath} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
               ▶ Start Tour
             </a>
-          )}
-          <button className="d-btn" onClick={onPublicView} title="See this pathway the way visitors do">
-            Public view
-          </button>
-          <div className="d-tabs" role="tablist" aria-label="Builder view">
-            <button role="tab" aria-selected={viewMode === "path"} className={`d-tab ${viewMode === "path" ? "active" : ""}`} onClick={() => switchView("path")}>
-              Path
-            </button>
-            <button role="tab" aria-selected={viewMode === "cards"} className={`d-tab ${viewMode === "cards" ? "active" : ""}`} onClick={() => switchView("cards")}>
-              Cards
-            </button>
-          </div>
-          {!readOnly && (
-            <button className="d-btn" onClick={() => setShowSettings((v) => !v)}>
-              {showSettings ? "Hide settings" : "Tour settings"}
-            </button>
           )}
           {(flow.status === "PUBLISHED" || flow.publishedAt) && (
             <button className="d-btn" onClick={() => setInsightsOpen(true)} title="Where visitors spend their time">
               Insights
             </button>
           )}
+          {!readOnly && (
+            <button className={`d-btn ${showSettings ? "soft" : ""}`} onClick={() => setShowSettings((v) => !v)} aria-expanded={showSettings}>
+              {showSettings ? "Close Settings" : "Tour Settings"}
+            </button>
+          )}
           {flow.status === "PUBLISHED" ? (
-            <>
-              <button className="d-btn primary" onClick={() => setShare("open")}>
-                Share
-              </button>
-              {!readOnly && (
-                <button className="d-btn" onClick={() => publish(false)} disabled={publishing}>
-                  Unpublish
-                </button>
-              )}
-            </>
+            <button className="d-btn primary" onClick={() => setShare("open")}>
+              Share
+            </button>
           ) : !readOnly ? (
             <button
               className="d-btn primary"
@@ -1021,7 +989,7 @@ export default function TourBuilder({
 
       {showSettings && !readOnly && (
         <div className="d-card d-card-pad" style={{ marginBottom: 18 }}>
-          <div className="d-eyebrow" style={{ marginBottom: 12 }}>Tour settings</div>
+          <div className="d-eyebrow" style={{ marginBottom: 12 }}>Tour Settings</div>
           <div className="t-cover">
             <div className="t-cover-current">{flow.thumb ? <img src={flow.thumb} alt="" /> : <span>No cover yet</span>}</div>
             <div className="t-cover-controls">
@@ -1060,11 +1028,11 @@ export default function TourBuilder({
                   }}
                 />
                 <button className="d-btn sm" onClick={() => coverRef.current?.click()} disabled={coverBusy}>
-                  {coverBusy ? "Working…" : "Upload image"}
+                  {coverBusy ? "Working…" : "Upload Image"}
                 </button>
                 {flow.coverUrl && (
                   <button className="d-btn ghost sm" onClick={() => setCover(null)} disabled={coverBusy}>
-                    Use first drift
+                    Use First Drift
                   </button>
                 )}
               </div>
@@ -1084,12 +1052,22 @@ export default function TourBuilder({
           </div>
           <div className="t-actions" style={{ marginTop: 12 }}>
             <button className="d-btn primary" onClick={saveSettings} disabled={settingsSaving || description === (flow.description || "")}>
-              {settingsSaving ? "Saving…" : "Save settings"}
+              {settingsSaving ? "Saving…" : "Save Settings"}
             </button>
             <span className="d-faint" style={{ fontSize: 12 }}>
               Buttons are automatic: Home, and the next drift's name. The last drift loops back to #1.
             </span>
           </div>
+          {flow.status === "PUBLISHED" && (
+            <div className="t-settings-row">
+              <span className="d-sub" style={{ fontSize: 12.5 }}>
+                Unpublishing takes the tour's link offline until you publish again.
+              </span>
+              <button className="d-btn ghost sm" onClick={() => publish(false)} disabled={publishing}>
+                {publishing ? "Working…" : "Unpublish Tour"}
+              </button>
+            </div>
+          )}
           {superAdmin && (
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
               <label className="t-inline" style={{ gap: 8, cursor: "pointer" }}>
@@ -1142,9 +1120,7 @@ export default function TourBuilder({
       <div className="t-builder">
         <div className="t-steps t-route has-ink" ref={routeRef}>
           <RouteInk host={routeRef} dep={routeDep} />
-          {viewMode === "cards"
-            ? flow.steps.map((s, i) => renderCard(s, i))
-            : flow.steps.map((s, i) => {
+          {flow.steps.map((s, i) => {
                 const open = expandedId === s.id;
                 const st = s.product?.status || "DRAFT";
                 return (

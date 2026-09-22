@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
-import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "../rotation3d/driftUiTheme";
+import { DriftThemeStyles } from "../rotation3d/driftUiTheme";
 import type { OwnerReport as Report } from "./types";
 import { TOUR_STYLES } from "./tourUi";
 import { INSIGHTS_CSS, InsightsView, RangeTabs } from "./InsightsView";
@@ -29,7 +29,6 @@ const REPORT_CSS = `
 
 export default function OwnerReport() {
   const { code = "" } = useParams();
-  const [theme, toggleTheme] = useDriftTheme();
   const [days, setDays] = useState(7);
   const [report, setReport] = useState<Report | null>(null);
   const [state, setState] = useState<"loading" | "ok" | "missing" | "error">("loading");
@@ -118,7 +117,7 @@ export default function OwnerReport() {
   }
 
   return (
-    <div className="drift-ui d-page t-page" data-theme={theme}>
+    <div className="drift-ui d-page t-page" data-theme="dark">
       <DriftThemeStyles />
       <style>{TOUR_STYLES + INSIGHTS_CSS + REPORT_CSS}</style>
       <header className="d-topbar">
@@ -132,7 +131,6 @@ export default function OwnerReport() {
               Print
             </button>
           )}
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
         </div>
       </header>
       <main className="d-main">

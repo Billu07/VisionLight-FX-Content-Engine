@@ -5,7 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import { confirmAction, notify } from "../lib/notifications";
 import type { ClientPage, Demo, Flow, Page, PageRef, PageRole, PublicFlow } from "./types";
 import { isReady } from "./types";
-import { StatusPill, TourShell, apiError, copyText, publicUrl } from "./tourUi";
+import { StatusPill, TourShell, apiError, copyText, publicUrl, type ShellView } from "./tourUi";
 import { TOUR_PAGE_STYLES } from "./tourPageStyles";
 import { ContactButton, PathArtH } from "./tourPageParts";
 import { usePageAdmin } from "./usePageAdmin";
@@ -38,7 +38,6 @@ type TourItem = {
   flow?: Flow;
 };
 
-const VIEW_KEY = "drift_page_view";
 const ENQUIRY_PRESETS = ["Book a viewing", "Ask a question", "Request info", "Get a quote"];
 
 const fromPublic = (f: PublicFlow): TourItem => ({
@@ -70,59 +69,13 @@ const fromAdmin = (f: Flow): TourItem => ({
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-function ViewToggle({ view, onChange }: { view: "cards" | "path"; onChange: (v: "cards" | "path") => void }) {
-  return (
-    <div className="d-tabs" role="tablist" aria-label="How to show the tours">
-      <button role="tab" aria-selected={view === "cards"} className={`d-tab ${view === "cards" ? "active" : ""}`} onClick={() => onChange("cards")}>
-        Cards
-      </button>
-      <button role="tab" aria-selected={view === "path"} className={`d-tab ${view === "path" ? "active" : ""}`} onClick={() => onChange("path")}>
-        Path
-      </button>
-    </div>
-  );
-}
+const GearIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+  </svg>
+);
 
-function TourCards({ items, renderActions }: { items: TourItem[]; renderActions?: (it: TourItem) => React.ReactNode }) {
-  const navigate = useNavigate();
-  return (
-    <div className="th-grid">
-      {items.map((it) => (
-        <article key={it.id} className="th-item" onClick={() => navigate(it.path)}>
-          <div className="th-thumb">
-            {it.thumb ? <img src={it.thumb} alt="" loading="lazy" /> : <div className="ph">No drifts yet</div>}
-            <div className="th-glass">
-              <span className="th-name" title={it.name}>
-                {it.name}
-              </span>
-              {it.status && <StatusPill status={it.status} flow />}
-            </div>
-          </div>
-          <div className="th-body">
-            <div className="t-muted-row">
-              <span>{plural(it.total, "drift")}</span>
-              {!!it.building && <span className="d-pill warn">building {it.building}</span>}
-              {!!it.failed && <span className="d-pill err">{it.failed} failed</span>}
-              {!!it.awaiting && <span className="d-pill warn">{it.awaiting} to check out</span>}
-            </div>
-            <div className="t-card-actions" onClick={(e) => e.stopPropagation()}>
-              {renderActions
-                ? renderActions(it)
-                : it.startPath && (
-                    <Link className="d-btn soft sm" to={it.startPath} style={{ textDecoration: "none" }}>
-                      ▶ Start Tour
-                    </Link>
-                  )}
-            </div>
-          </div>
-        </article>
-      ))}
-    </div>
-  );
-}
-
-// Path view: the tours on one straight rail — each tour is a single step, its drifts
-// laid out horizontally on their own straight line.
 function TourPathList({ items, renderActions }: { items: TourItem[]; renderActions?: (it: TourItem) => React.ReactNode }) {
   const navigate = useNavigate();
   return (
@@ -497,21 +450,6 @@ export default function TourPage() {
   const [pub, setPub] = useState<{ page: Page; demo: Demo; flows: PublicFlow[] } | null>(null);
   const [missing, setMissing] = useState(false);
   const [preview, setPreview] = useState(false);
-  const [view, setViewState] = useState<"cards" | "path">(() => {
-    try {
-      return localStorage.getItem(VIEW_KEY) === "path" ? "path" : "cards";
-    } catch {
-      return "cards";
-    }
-  });
-  const setView = (v: "cards" | "path") => {
-    setViewState(v);
-    try {
-      localStorage.setItem(VIEW_KEY, v);
-    } catch {
-      /* ignore */
-    }
-  };
   const [flows, setFlows] = useState<Flow[]>([]);
   const [manager, setManager] = useState<PageRef | null>(null);
   const [adminLoaded, setAdminLoaded] = useState(false);
@@ -599,7 +537,11 @@ export default function TourPage() {
 
   const startCreate = () => {
     setCreating(true);
-    setTimeout(() => document.getElementById("new-tour-name")?.focus(), 60);
+    setTimeout(() => {
+      const input = document.getElementById("new-tour-name");
+      input?.scrollIntoView({ behavior: "smooth", block: "center" });
+      input?.focus({ preventScroll: true });
+    }, 60);
   };
 
   const create = async () => {
@@ -655,8 +597,15 @@ export default function TourPage() {
     }
   };
 
+  // The page's team switches between their admin view and what visitors see in the header;
+  // a superadmin on someone else's page starts on the public side ("Admin" = manage it).
+  const shellView: ShellView | undefined = admin.isAdmin
+    ? { value: preview ? "public" : "admin", onChange: (v) => setPreview(v === "public") }
+    : admin.canManage
+      ? { value: "public", onChange: () => admin.setManage(true) }
+      : undefined;
   const shell = (body: React.ReactNode) => (
-    <TourShell>
+    <TourShell view={shellView}>
       <style>{TOUR_PAGE_STYLES}</style>
       {body}
     </TourShell>
@@ -715,50 +664,6 @@ export default function TourPage() {
 
   return shell(
     <>
-      {admin.canManage && (
-        <div className="tpg-note">
-          <span>
-            You're viewing <b>{page.name}</b> as a visitor.
-          </span>
-          <button className="d-btn sm" onClick={() => admin.setManage(true)}>
-            Manage this page
-          </button>
-        </div>
-      )}
-      {admin.isAdmin && (
-        <div className="tpg-note">
-          <span>
-            {preview
-              ? "This is what visitors see."
-              : role === "VIEWER"
-                ? "You can see every tour on this page, drafts included — ask an admin if you need to make changes."
-                : role === "EDITOR"
-                  ? "You can build and publish tours on this page. Visitors never see the admin tools."
-                  : "You're editing your page. Visitors never see the admin tools."}
-            {manager && manager.path && (
-              <>
-                {" "}
-                Managed by{" "}
-                <Link to={manager.path} style={{ color: "var(--accent)", fontWeight: 700 }}>
-                  {manager.name}
-                </Link>
-                .
-              </>
-            )}
-          </span>
-          <div className="t-actions">
-            {!preview && role && role !== "ADMIN" && !admin.managing && (
-              <button className="d-btn ghost sm" onClick={leave}>
-                Leave page
-              </button>
-            )}
-            <button className="d-btn sm" onClick={() => setPreview((v) => !v)}>
-              {preview ? "Back to editing" : "View as visitor"}
-            </button>
-          </div>
-        </div>
-      )}
-
       <section className="tpg-hero t-rise">
         <div style={{ minWidth: 0 }}>
           <div className="tpg-brand">
@@ -768,35 +673,69 @@ export default function TourPage() {
               <h1 className="tpg-title">{page.name}</h1>
             </div>
           </div>
-          <p className="tpg-sub">Interactive tours you explore with a finger — pick one to start.</p>
-          <div className="tpg-cta">
-            {canEdit && (
-              <button className="d-btn primary" onClick={startCreate}>
-                + Create New Tour
-              </button>
-            )}
-            {pub.demo && (
-              <Link className="d-btn" to={pub.demo.path} style={{ textDecoration: "none" }}>
-                ▶ View Demo
-              </Link>
-            )}
-            {!editing && <EnquiryButton page={page} />}
-            <ContactButton page={page} />
-            {canAdmin && (
-              <button className="d-btn ghost" onClick={() => setShowSettings((v) => !v)}>
-                {showSettings ? "Close settings" : "Page settings"}
-              </button>
-            )}
-          </div>
-          {editing && page.path && (
-            <div className="tpg-linkrow">
-              <span className="t-link">
-                <code>{publicUrl(page.path).replace(/^https?:\/\//, "")}</code>
-                <button className="d-btn ghost sm" onClick={() => copy(page.path!)}>
-                  Copy
-                </button>
-              </span>
-            </div>
+          {editing ? (
+            <>
+              {(role === "VIEWER" || (manager && manager.path)) && (
+                <p className="tpg-sub tpg-meta-line">
+                  {role === "VIEWER" && <span className="d-pill">View Only</span>}
+                  {manager && manager.path && (
+                    <span>
+                      Managed By{" "}
+                      <Link to={manager.path} style={{ color: "var(--accent)", fontWeight: 700 }}>
+                        {manager.name}
+                      </Link>
+                    </span>
+                  )}
+                </p>
+              )}
+              {(canEdit || canAdmin || (role && role !== "ADMIN" && !admin.managing)) && (
+                <div className="tpg-cta">
+                  {canEdit && (
+                    <button className="d-btn primary" onClick={startCreate}>
+                      + Create New Tour
+                    </button>
+                  )}
+                  {canAdmin && (
+                    <button
+                      className={`d-btn tpg-settings-btn ${showSettings ? "on" : ""}`}
+                      onClick={() => setShowSettings((v) => !v)}
+                      aria-expanded={showSettings}
+                    >
+                      <GearIcon />
+                      {showSettings ? "Close Settings" : "Page Settings"}
+                    </button>
+                  )}
+                  {role && role !== "ADMIN" && !admin.managing && (
+                    <button className="d-btn ghost" onClick={leave}>
+                      Leave Page
+                    </button>
+                  )}
+                </div>
+              )}
+              {page.path && (
+                <div className="tpg-linkrow">
+                  <span className="t-link">
+                    <code>{publicUrl(page.path).replace(/^https?:\/\//, "")}</code>
+                    <button className="d-btn ghost sm" onClick={() => copy(page.path!)}>
+                      Copy
+                    </button>
+                  </span>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="tpg-sub">Interactive tours you explore with a finger — pick one to start.</p>
+              <div className="tpg-cta">
+                {pub.demo && (
+                  <Link className="d-btn" to={pub.demo.path} style={{ textDecoration: "none" }}>
+                    ▶ View Demo
+                  </Link>
+                )}
+                <EnquiryButton page={page} />
+                <ContactButton page={page} />
+              </div>
+            </>
           )}
         </div>
         <div className="tpg-art" aria-hidden>
@@ -820,31 +759,38 @@ export default function TourPage() {
       )}
 
       {canEdit && creating && (
-        <div className="d-card d-card-pad t-rise" style={{ marginBottom: 22, display: "grid", gap: 10 }}>
-          <div className="d-eyebrow">New tour</div>
-          <label className="d-label" htmlFor="new-tour-name">
-            What is this tour of?
-          </label>
-          <div className="t-inline">
-            <input
-              id="new-tour-name"
-              className="d-input"
-              style={{ flex: "1 1 260px" }}
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && create()}
-              placeholder="e.g. 45 Birch"
-              maxLength={80}
-            />
-            <button className="d-btn primary" onClick={create} disabled={busy || !newName.trim()}>
-              {busy ? "Creating…" : "Create"}
-            </button>
-            <button className="d-btn ghost" onClick={() => setCreating(false)} disabled={busy}>
-              Cancel
-            </button>
+        <div className="tpg-new t-rise">
+          <div className="tpg-new-head">
+            <span className="tpg-new-mark" aria-hidden>
+              +
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <div className="d-eyebrow">New Tour</div>
+              <h2>Name Your Tour</h2>
+            </div>
           </div>
-          <div className="d-faint" style={{ fontSize: 12 }}>
-            The name becomes the tour's link. You'll add the clips next.
+          <label className="d-label" htmlFor="new-tour-name">
+            What Is This Tour Of?
+          </label>
+          <input
+            id="new-tour-name"
+            className="d-input tpg-new-input"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && create()}
+            placeholder="e.g. 45 Birch Lane"
+            maxLength={80}
+          />
+          <div className="tpg-new-foot">
+            <span className="d-faint">The Name Becomes the Tour's Link — You'll Add the Clips Next.</span>
+            <div className="t-actions">
+              <button className="d-btn ghost" onClick={() => setCreating(false)} disabled={busy}>
+                Cancel
+              </button>
+              <button className="d-btn primary" onClick={create} disabled={busy || !newName.trim()}>
+                {busy ? "Creating…" : "Create Tour"}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -852,7 +798,6 @@ export default function TourPage() {
       <section className="tpg-section t-rise t-rise-2">
         <div className="tpg-bar">
           <h2>Featured Tours</h2>
-          {featured.length > 0 && <ViewToggle view={view} onChange={setView} />}
         </div>
         {editing && !adminLoaded ? (
           <div className="d-faint" style={{ fontSize: 13 }}>
@@ -861,7 +806,7 @@ export default function TourPage() {
         ) : featured.length === 0 ? (
           canEdit ? (
             <div className="tpg-empty">
-              <h3>Build your first tour</h3>
+              <h3>Build Your First Tour</h3>
               <p className="d-sub" style={{ margin: 0, maxWidth: "46ch" }}>
                 Take a slow pan or tilt video of each space on your phone, upload the clips, and share one link.
               </p>
@@ -874,10 +819,8 @@ export default function TourPage() {
           ) : (
             <div className="tpg-empty">No tours here yet — check back soon.</div>
           )
-        ) : view === "path" ? (
-          <TourPathList items={featured} renderActions={editing ? adminActions : undefined} />
         ) : (
-          <TourCards items={featured} renderActions={editing ? adminActions : undefined} />
+          <TourPathList items={featured} renderActions={editing ? adminActions : undefined} />
         )}
       </section>
 
@@ -904,11 +847,7 @@ export default function TourPage() {
             <h2>Hidden Tours</h2>
             <span className="d-faint">Only this page's team sees these. Their links still work.</span>
           </div>
-          {view === "path" ? (
-            <TourPathList items={hiddenTours} renderActions={adminActions} />
-          ) : (
-            <TourCards items={hiddenTours} renderActions={adminActions} />
-          )}
+          <TourPathList items={hiddenTours} renderActions={adminActions} />
         </section>
       )}
     </>,

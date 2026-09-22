@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import { LoginModal } from "../components/LoginModal";
-import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "./driftUiTheme";
+import { DriftThemeStyles } from "./driftUiTheme";
 import { TOUR_STYLES } from "../tour/tourUi";
 import PerspectiveGrid from "./PerspectiveGrid";
 
@@ -172,7 +172,6 @@ export const useReducedMotion = () => {
 
 /** Header (wordmark, theme, Login → Dashboard), main and footer for drift.li's public pages. */
 export function DriftSiteShell({ children, className = "" }: { children: ReactNode; className?: string }) {
-  const [theme, toggleTheme] = useDriftTheme();
   const { user, profiles, profileSelectionRequired, checkAuth } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
 
@@ -186,7 +185,7 @@ export function DriftSiteShell({ children, className = "" }: { children: ReactNo
   const dashboardPath = hasTour ? "/tour/dashboard" : profileSelectionRequired ? "/studios" : "/app";
 
   return (
-    <div className={`drift-ui d-page ds ${className}`} data-theme={theme}>
+    <div className={`drift-ui d-page ds ${className}`} data-theme="dark">
       <DriftThemeStyles />
       <style>{TOUR_STYLES}</style>
       <style>{SITE_STYLES}</style>
@@ -199,7 +198,6 @@ export function DriftSiteShell({ children, className = "" }: { children: ReactNo
           <span className="dh-logo-sub">Drift Live Interactive</span>
         </Link>
         <div className="dh-top-actions">
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
           {signedIn ? (
             <Link className="d-btn primary" to={dashboardPath} style={{ textDecoration: "none" }}>
               Dashboard

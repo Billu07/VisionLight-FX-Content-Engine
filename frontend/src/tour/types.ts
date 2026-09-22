@@ -198,6 +198,8 @@ export type PublicFlow = {
   coverUrl: string | null;
   settings: { nextLabel: string | null };
   hidden: boolean;
+  /** the site's demo tour or the page's own "View Demo" (only on the pathway endpoint) */
+  isDemo?: boolean;
   pageSlug: string | null;
   pageName: string | null;
   pagePath: string | null;

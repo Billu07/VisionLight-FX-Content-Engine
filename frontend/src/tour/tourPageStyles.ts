@@ -14,29 +14,47 @@ export const TOUR_PAGE_STYLES = `
 @media(min-width:640px){.t-route::before{background:var(--accent);opacity:.35}}
 
 /* ── Page hero ── */
-.tpg-hero{display:grid;gap:22px;align-items:center;margin-bottom:30px}
+.tpg-hero{display:grid;gap:26px;align-items:center;margin-bottom:40px}
 @media(min-width:900px){.tpg-hero{grid-template-columns:minmax(0,1.05fr) minmax(320px,.95fr);gap:44px}}
 .tpg-brand{display:flex;align-items:center;gap:14px;min-width:0}
 .tpg-logo{width:58px;height:58px;border-radius:16px;object-fit:contain;background:var(--surface);border:1px solid var(--border);padding:6px;flex:none}
 .tpg-mark{width:58px;height:58px;border-radius:16px;display:grid;place-items:center;background:var(--accent-soft);border:1px solid var(--accent-border);color:var(--accent);font-weight:800;font-size:23px;flex:none;text-transform:uppercase}
 .tpg-title{margin:0;font-size:clamp(28px,4.8vw,44px);line-height:1.04;letter-spacing:-.03em;font-weight:800;color:var(--text);overflow-wrap:anywhere}
 .tpg-sub{margin:12px 0 0;font-size:15px;line-height:1.55;color:var(--muted);max-width:50ch}
-.tpg-cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.tpg-cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:26px}
 .tpg-cta .d-btn{padding:12px 18px;font-size:14px}
-.tpg-linkrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:14px}
+.tpg-linkrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:18px}
 .tpg-art{height:220px;display:none}
 @media(min-width:900px){.tpg-art{display:block}}
 .tpg-note{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-radius:14px;border:1px solid var(--border);background:var(--surface-2);font-size:13px;color:var(--muted);margin-bottom:18px}
 .tpg-note b{color:var(--text)}
-.tpg-section{margin-top:30px}
-.tpg-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.tpg-section{margin-top:48px}
+.tpg-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:20px}
 .tpg-bar h2{margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em;color:var(--text)}
 .tpg-bar .d-faint{font-size:12.5px}
 .tpg-empty{border:1.5px dashed var(--border-strong);border-radius:20px;padding:36px 20px;text-align:center;color:var(--muted);display:grid;gap:12px;justify-items:center}
 .tpg-empty h3{margin:0;font-size:18px;font-weight:800;color:var(--text)}
 
+/* Admin: who runs the page, the Page Settings button, the new-tour card. */
+.tpg-meta-line{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.tpg-settings-btn{display:inline-flex;align-items:center;gap:8px;color:var(--accent);border-color:var(--accent-border)}
+.tpg-settings-btn:hover,.tpg-settings-btn.on{background:var(--accent-soft);border-color:var(--accent-border)}
+.tpg-new{display:grid;gap:14px;margin:0 0 36px;padding:clamp(20px,3.4vw,30px);border-radius:24px;
+  border:1.5px solid var(--accent-border);background:color-mix(in srgb,var(--accent) 6%,var(--surface));
+  box-shadow:0 0 0 5px var(--accent-soft),0 30px 70px -40px color-mix(in srgb,var(--accent) 60%,transparent)}
+.tpg-new-head{display:flex;align-items:center;gap:14px}
+.tpg-new-head h2{margin:2px 0 0;font-size:clamp(22px,3vw,28px);font-weight:800;letter-spacing:-.02em;color:var(--text)}
+.tpg-new-mark{width:46px;height:46px;flex:none;border-radius:14px;display:grid;place-items:center;font-size:24px;font-weight:700;color:var(--accent-ink);background:var(--accent)}
+.tpg-new .d-label{margin:4px 0 -4px}
+.tpg-new-input{font-size:18px;padding:15px 16px;border-radius:14px}
+.tpg-new-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.tpg-new-foot .d-faint{font-size:12.5px}
+
+/* Builder: the settings panel's footer row (Unpublish). */
+.t-settings-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+
 /* ── Featured Tours · Path view: a straight rail, each tour one step laid out horizontally ── */
-.tpg-rail{list-style:none;margin:0;padding:0;display:grid;gap:14px;position:relative}
+.tpg-rail{list-style:none;margin:0;padding:0;display:grid;gap:18px;position:relative}
 @media(min-width:640px){
   .tpg-rail{padding-left:42px}
   .tpg-rail::before{content:"";position:absolute;left:14px;top:34px;bottom:34px;width:2px;border-radius:2px;background:var(--accent);opacity:.35}

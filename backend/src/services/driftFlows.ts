@@ -19,9 +19,13 @@ export const parseFlowKind = (v: unknown): FlowKind | null => {
   return (FLOW_KINDS as readonly string[]).includes(k) ? (k as FlowKind) : null;
 };
 
-/** Frames per step clip: every source frame, capped here (smooth scrubbing). */
+/** Frames per step clip: the clip sampled at STEP_INGEST_FPS, capped here (smooth scrubbing). */
 export const STEP_TARGET_FRAMES = 180;
 export const STEP_MIN_FRAMES = 12;
+/** Tour clips are sampled at this rate: a 60 fps phone clip keeps every other frame — half the
+ *  frames to build, store and download, and the drift looks the same under a finger. At 30 fps the
+ *  180-frame cap is 6 seconds of footage. Env TOUR_INGEST_FPS overrides it (10–60). */
+export const STEP_INGEST_FPS = Math.min(60, Math.max(10, Number(process.env.TOUR_INGEST_FPS) || 30));
 /** Slack over Organization.maxClipSeconds so a "5.2s" phone clip isn't rejected. */
 export const CLIP_DURATION_TOLERANCE_S = 0.5;
 
@@ -105,6 +109,14 @@ export function parseCreatorCta(raw: unknown): CtaParse {
   }
   return { ok: true, cta: { label, url } };
 }
+
+/** A tour drift's background until its creator picks one: drift.li's own dark ground. */
+export const TOUR_DEFAULT_BACKGROUND = "#0d1119";
+
+/** The colour a creator picked for a tour drift, or null for the default. Builds before 2026-09-22
+ *  filled the colour auto-detected from the frames in on processing — that counts as not picked. */
+export const pickedTourBackground = (background: unknown, detectedBg: unknown): string | null =>
+  typeof background === "string" && background && background !== detectedBg ? background : null;
 
 /** Player background: "transparent", a hex colour, or rgb()/rgba(). */
 const BACKGROUND_RE = /^(transparent|#[0-9a-f]{3,8}|rgba?\([0-9., %]+\))$/i;
@@ -399,7 +411,8 @@ export function serializeStepProduct(p: any) {
     titleEnd: (p.titleEnd ?? null) as string | null,
     description: (p.description ?? null) as string | null,
     descriptionEnd: (p.descriptionEnd ?? null) as string | null,
-    background: (p.background ?? null) as string | null,
+    // the creator's pick (null = drift.li's dark ground)
+    background: pickedTourBackground(p.background, m.detectedBg),
     status: p.status as string,
     defaultFrame: (p.defaultFrame ?? 0) as number,
     loopEnabled: !!p.loopEnabled,

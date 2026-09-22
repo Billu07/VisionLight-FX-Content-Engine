@@ -12,7 +12,19 @@ import { CREATOR_START } from "./tourSession";
  * "Create your own page". Opening a page activates its profile (usePageAdmin). Hidden
  * when there's nothing to switch to or create.
  */
-export function PageSwitcher({ identityKey, otherWorkspaces }: { identityKey: string; otherWorkspaces: boolean }) {
+export function PageSwitcher({
+  identityKey,
+  otherWorkspaces,
+  email,
+  onLogout,
+}: {
+  identityKey: string;
+  otherWorkspaces: boolean;
+  /** shown at the foot of the menu, above Log Out */
+  email?: string;
+  /** given → the menu is also the account menu (always shown, ends with Log Out) */
+  onLogout?: () => void;
+}) {
   const [pages, setPages] = useState<MyPage[]>([]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -50,7 +62,7 @@ export function PageSwitcher({ identityKey, otherWorkspaces }: { identityKey: st
   }, [open]);
 
   const canCreate = pages.length > 0 && !pages.some((p) => p.own);
-  if (pages.length < 2 && !otherWorkspaces && !canCreate) return null;
+  if (!onLogout && pages.length < 2 && !otherWorkspaces && !canCreate) return null;
   const current = pages.find((p) => p.path && (location.pathname === p.path || location.pathname.startsWith(`${p.path}/`)));
 
   return (
@@ -61,14 +73,14 @@ export function PageSwitcher({ identityKey, otherWorkspaces }: { identityKey: st
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        title="Switch page"
+        title={onLogout ? "Your pages and account" : "Switch page"}
       >
-        <span className="t-switch-name">{current ? current.name : "Pages"}</span>
+        <span className="t-switch-name">{current ? current.name : pages.length ? "Your Pages" : "Account"}</span>
         <span aria-hidden>▾</span>
       </button>
       {open && (
         <div className="t-switch-menu" role="menu">
-          {pages.length > 0 && <div className="t-switch-label">Your pages</div>}
+          {pages.length > 0 && <div className="t-switch-label">Your Pages</div>}
           {pages.map((p) => (
             <button
               key={p.profileId}
@@ -91,13 +103,21 @@ export function PageSwitcher({ identityKey, otherWorkspaces }: { identityKey: st
           ))}
           {canCreate && (
             <Link to={`${CREATOR_START}?create=1`} role="menuitem" className="t-switch-item t-switch-foot">
-              + Create your own page
+              + Create Your Own Page
             </Link>
           )}
           {otherWorkspaces && (
             <Link to="/studios" role="menuitem" className="t-switch-item t-switch-foot">
-              Other workspaces →
+              Other Workspaces →
             </Link>
+          )}
+          {onLogout && (
+            <>
+              {email && <div className="t-switch-me">Signed in as {email}</div>}
+              <button type="button" role="menuitem" className="t-switch-item t-switch-out" onClick={onLogout}>
+                Log Out
+              </button>
+            </>
           )}
         </div>
       )}

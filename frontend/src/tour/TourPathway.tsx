@@ -2,7 +2,7 @@ import { Suspense, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiEndpoints } from "../lib/api";
 import type { Page, PublicFlow } from "./types";
-import { TourShell } from "./tourUi";
+import { TourShell, type ShellView } from "./tourUi";
 import { TOUR_PAGE_STYLES } from "./tourPageStyles";
 import { ContactButton } from "./tourPageParts";
 import { usePageAdmin } from "./usePageAdmin";
@@ -46,19 +46,24 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
   }, []);
   return (
     <div className="tpw t-rise">
-      <div className="tpw-top">
-        <Link className="t-back" to={home}>
-          ← {page.name} Tours
-        </Link>
-        <span className="t-inline">
-          <EnquiryButton page={page} flowId={flow.id} className="d-btn primary sm" />
-          <ContactButton page={page} className="d-btn sm" />
-        </span>
-      </div>
-      <Link to={home} className="tpw-brand">
-        {page.logoUrl ? <img src={page.logoUrl} alt="" /> : null}
-        <span>{page.name}</span>
-      </Link>
+      {/* A demo tour stands on its own — no way back to (or messages for) the page it lives on. */}
+      {!flow.isDemo && (
+        <>
+          <div className="tpw-top">
+            <Link className="t-back" to={home}>
+              ← {page.name} Tours
+            </Link>
+            <span className="t-inline">
+              <EnquiryButton page={page} flowId={flow.id} className="d-btn primary sm" />
+              <ContactButton page={page} className="d-btn sm" />
+            </span>
+          </div>
+          <Link to={home} className="tpw-brand">
+            {page.logoUrl ? <img src={page.logoUrl} alt="" /> : null}
+            <span>{page.name}</span>
+          </Link>
+        </>
+      )}
       <div className="d-eyebrow">Tour</div>
       <h1 className="tpw-title">{flow.title || flow.name}</h1>
       {flow.description && <p className="tpw-desc">{flow.description}</p>}
@@ -95,10 +100,12 @@ function PublicPathway({ page, flow }: { page: Page; flow: PublicFlow }) {
         ))}
       </ol>
 
-      <div className="tpw-foot">
-        <EnquiryButton page={page} flowId={flow.id} />
-        <ContactButton page={page} />
-      </div>
+      {!flow.isDemo && (
+        <div className="tpw-foot">
+          <EnquiryButton page={page} flowId={flow.id} />
+          <ContactButton page={page} />
+        </div>
+      )}
     </div>
   );
 }
@@ -176,8 +183,26 @@ export default function TourPathway() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [admin.isAdmin, tourSlug]);
 
+  // The page's team: Admin View (the builder) / Public View in the header.
+  const shellView: ShellView | undefined = admin.isAdmin
+    ? {
+        value: mode === "edit" ? "admin" : "public",
+        onChange: (v) => {
+          if (v === "public") setReload((n) => n + 1);
+          setMode(v === "public" ? "public" : "edit");
+        },
+      }
+    : admin.canManage
+      ? {
+          value: "public",
+          onChange: () => {
+            admin.setManage(true);
+            setMode("edit");
+          },
+        }
+      : undefined;
   const shell = (body: React.ReactNode) => (
-    <TourShell>
+    <TourShell view={shellView}>
       <style>{TOUR_PAGE_STYLES}</style>
       {body}
     </TourShell>
@@ -219,30 +244,6 @@ export default function TourPathway() {
 
   return shell(
     <>
-      {admin.canManage && (
-        <div className="tpg-note tpw">
-          <span>
-            You're viewing <b>{page.name}</b> as a visitor.
-          </span>
-          <button
-            className="d-btn sm"
-            onClick={() => {
-              admin.setManage(true);
-              setMode("edit");
-            }}
-          >
-            Manage this tour
-          </button>
-        </div>
-      )}
-      {admin.isAdmin && mode === "public" && (
-        <div className="tpg-note tpw">
-          <span>This is what visitors see.</span>
-          <button className="d-btn sm" onClick={() => setMode("edit")}>
-            Back to editing
-          </button>
-        </div>
-      )}
       {flowState === "missing" || !flow ? (
         <div className="tpw">
           <Link className="t-back" to={page.path || "/tour"}>

@@ -329,6 +329,25 @@ Organization (`productLine "TOUR"`, its own line like ROTATION3D vs DRIFT) + ADM
   pulls the DOM lib and breaks Node's Blob typing). Card URLs carry a content version (`CARD_VERSION` refreshes all).
   drift.li icons: frontend/public/drift/* + drift.webmanifest. Any lookup failure serves the plain index.html and a
   drift.li card; nginx falls back to the static file. The Cloudflare OG worker is no longer needed.
+- **Ingestion + UI pass** (2026-09-22, client meeting; no schema change): tour clips are sampled at
+  `STEP_INGEST_FPS` = 30 (services/driftFlows.ts, env `TOUR_INGEST_FPS` 10–60; `validateClip` in routes/driftFlows.ts:
+  frames = duration × min(30, source fps), 12–180) — a 60 fps phone clip keeps every other frame, half the load; 180
+  frames = 6 s at 30 fps. drift.li surfaces are **dark only** (TourShell, DriftSiteShell, OwnerReport, AuthCallback,
+  CreatorRoute set `data-theme="dark"`; no theme picker — the admin panels keep theirs). Header (`TourShell`): "drift.li"
+  → the drift.li home, "tour" → /tour; pages the viewer can manage pass `view` (`ShellView`) → an **Admin View /
+  Public View** switch in the header (replaces the old "You're editing / viewing as a visitor" strips on the page,
+  pathway and builder; a superadmin not yet managing sees Public, "Admin" = Manage). `PageSwitcher` is also the account
+  menu (pages · Signed in as · Log Out); Dashboard hides when the view switch shows. The page and the builder show
+  **Path only** (Cards removed). Page: admin view = Create New Tour + Page Settings (accent) + Leave Page (members) +
+  the link; public view = View Demo / enquiry / contact. New-tour card = `.tpg-new` (accent, big input, scrolls into
+  view). Builder toolbar: Start Tour · Insights · Tour Settings · Share|Publish (Unpublish lives in Tour Settings,
+  Capture Guide in the meta row). A tour drift's background defaults to drift.li's dark ground
+  (`TOUR_DEFAULT_BACKGROUND` #0d1119): processing no longer fills the detected colour in for tour steps, and
+  `pickedTourBackground` treats a stored colour equal to the manifest's `detectedBg` (older builds) as not picked —
+  the public payload serves the default, the builder shows "Default · drift.li Dark". A demo tour (the site's
+  `isDemo`, or the page's own `demoFlowId`) comes back with `isDemo` on the public pathway → no page back link, brand,
+  enquiry or contact. The client wants **Title Case** on UI text ("That Sounds Good") — new strings follow it; a full
+  pass is owed.
 - **Superadmin**: `X-Drift-Org` lets a superadmin act on any TOUR page ("Manage this page", `usePageAdmin`);
   back office = Admin → drift.li → Tour (`routes/driftTourAdmin.ts`, `DriftTourAdmin.tsx`).
 - **drift.li home** = `rotation3d/DriftHome.tsx` (2026-09-14 redesign per the client's `land.png`; headline on

@@ -457,3 +457,19 @@ Drift.li is a division of PicDrift
   headless Chrome over CDP (scratchpad/shot.js): all four worlds, light + dark, 1440 / 1024 / 412 wide,
   pointer control, reduced motion; no console errors. Open question for the client: the hero no longer shows
   real tour photos — say the word and the Tour world can carry the demo tour's frames.
+- 2026-09-22 — Client meeting (Sep 15) → phase 1: speed + a cleaner admin. Tour clips are now ingested at 30 fps
+  (`STEP_INGEST_FPS`, env `TOUR_INGEST_FPS`): a 60 fps phone clip keeps every other frame, so a 3 s clip is 90 frames
+  instead of 180 — half to build, store and download before a drift reveals; the 180-frame cap is 6 s at 30 fps.
+  Existing drifts keep their frames (re-uploading a clip re-samples it). UI (the user's list): "drift.li" and "tour" in
+  the header link to the drift.li home and the Tour landing; no theme picker on drift.li (dark only); the Admin View /
+  Public View strip moved into the header as a switch; Cards/Path toggles removed (Path only); Page Settings is an
+  accent button next to Create New Tour; the new-tour name card is a large accent card that scrolls into view; the
+  builder toolbar is Start Tour · Insights · Tour Settings · Share|Publish (Unpublish moved into Tour Settings, Capture
+  Guide into the meta row); Log Out moved into the page menu; tour drifts default to drift.li's dark ground (the
+  per-drift colour control stays; older auto-detected colours count as unpicked); a demo tour's pathway has no page
+  back link, brand, enquiry or contact (was "← Kazi Tuhin Tours"). Verified against a mocked API in headless Chrome
+  over CDP (scratchpad/ui-shots.js): page admin / new tour / settings / account menu / public toggle / visitor,
+  builder (+ an open drift), public pathway, demo pathway, at 1440 and 412 wide. Meeting items not in this phase are
+  listed as the proposed next phases in the session reply (capitalization pass, drag-direction learning, mobile zoom /
+  rotation fixes, try-it-free ×, contact label = page owner, email compliance footer, tour renewal toggle, in-app
+  notifications, checkout trust signals, Pro invite visibility, new house media).

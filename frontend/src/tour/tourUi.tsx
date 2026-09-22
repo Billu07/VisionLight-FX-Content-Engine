@@ -2,7 +2,8 @@ import { useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { loadDriftPlayer, preloadWhenIdle } from "../routeChunks";
 import { useAuth } from "../hooks/useAuth";
-import { DriftThemeStyles, ThemeToggle, useDriftTheme } from "../rotation3d/driftUiTheme";
+import { DriftThemeStyles } from "../rotation3d/driftUiTheme";
+import { isDriftHost } from "../lib/branding";
 import { CREATOR_HOME, CREATOR_LANDING, CREATOR_START } from "./tourSession";
 import { PageSwitcher } from "./PageSwitcher";
 import { invalidateMyPages } from "./myPages";
@@ -328,13 +329,67 @@ export const TOUR_STYLES = `
 .t-switch-text small{font-size:11.5px;color:var(--muted)}
 .t-switch-foot{justify-content:center;font-size:12.5px;color:var(--muted);border-top:1px solid var(--border);border-radius:0 0 11px 11px;margin-top:4px}
 @media(max-width:560px){.t-switch-menu{position:fixed;left:16px;right:16px;top:64px;width:auto}}
+.t-switch-me{padding:10px 10px 4px;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-top:1px solid var(--border);margin-top:4px}
+.t-switch-out{color:var(--muted)}
+/* ── Header: "drift.li" → the drift.li home, "tour" → the Tour landing; the page's view switch ── */
+.t-brandrow{display:flex;align-items:center;gap:16px;min-width:0}
+.t-wordmark{display:inline-flex;align-items:baseline;white-space:nowrap}
+.t-wordmark a{color:inherit;text-decoration:none}
+.t-wordmark a:hover{opacity:.82}
+.t-wordmark a.t-kind{color:var(--accent)}
+.t-view{flex:none}
+.t-view .d-tab{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:650}
+.t-view svg{flex:none}
+@media(max-width:700px){.t-view-x{display:none}}
+@media(max-width:460px){.t-brandrow{gap:10px}.t-view .d-tab{padding:7px 10px}.t-view svg{display:none}.t-switch-btn{max-width:132px}}
 `;
 
-/** Page chrome: the wordmark, the theme toggle and the account actions (visitors get
- *  Log in + Try It Free), plus the "Tour · Powered by" footer with Terms · Privacy. */
-export function TourShell({ children }: { children: React.ReactNode }) {
+/** Which side of a page its team is looking at — the switch in the header. */
+export type ShellView = { value: "admin" | "public"; onChange: (next: "admin" | "public") => void };
+
+const ViewGlyph = ({ kind }: { kind: "admin" | "public" }) => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    {kind === "admin" ? (
+      <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+    ) : (
+      <>
+        <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" />
+        <circle cx="12" cy="12" r="2.6" />
+      </>
+    )}
+  </svg>
+);
+
+function ViewSwitch({ view }: { view: ShellView }) {
+  const tab = (value: "admin" | "public", label: string) => (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={view.value === value}
+      className={`d-tab ${view.value === value ? "active" : ""}`}
+      onClick={() => view.value !== value && view.onChange(value)}
+    >
+      <ViewGlyph kind={value} />
+      <span>
+        {label}
+        <span className="t-view-x"> View</span>
+      </span>
+    </button>
+  );
+  return (
+    <div className="d-tabs t-view" role="tablist" aria-label="Admin or public view">
+      {tab("admin", "Admin")}
+      {tab("public", "Public")}
+    </div>
+  );
+}
+
+/** Page chrome: the wordmark ("drift.li" → the drift.li home, "tour" → the Tour landing), the
+ *  Admin View / Public View switch on pages the viewer can manage (`view`), and the account
+ *  actions (the page menu carries Log Out; visitors get Log In + Try It Free), plus the
+ *  "Tour · Powered by" footer with Terms · Privacy. drift.li is dark — no theme picker. */
+export function TourShell({ children, view }: { children: React.ReactNode; view?: ShellView }) {
   const { user, profiles, logout } = useAuth();
-  const [theme, toggleTheme] = useDriftTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const canSwitch = profiles.length > 1;
@@ -342,6 +397,7 @@ export function TourShell({ children }: { children: React.ReactNode }) {
   const hasTour = user?.view === "TOUR" || profiles.some((p) => p.view === "TOUR");
   const otherWorkspaces = profiles.some((p) => p.view !== "TOUR");
   const here = encodeURIComponent(location.pathname + location.search);
+  const onDrift = typeof window !== "undefined" && isDriftHost(window.location.hostname);
   // Every tour page leads into the player — fetch its code while the visitor browses.
   useEffect(() => preloadWhenIdle(loadDriftPlayer), []);
   const out = async () => {
@@ -351,37 +407,56 @@ export function TourShell({ children }: { children: React.ReactNode }) {
     navigate(CREATOR_LANDING, { replace: true });
   };
   return (
-    <div className="drift-ui d-page t-page" data-theme={theme}>
+    <div className="drift-ui d-page t-page" data-theme="dark">
       <DriftThemeStyles />
       <style>{TOUR_STYLES}</style>
       <header className="d-topbar">
-        <Link to={CREATOR_LANDING} className="d-wordmark" style={{ textDecoration: "none" }}>
-          drift<i>.li</i>
-          <span className="t-kind">tour</span>
-        </Link>
+        <div className="t-brandrow">
+          <span className="d-wordmark t-wordmark">
+            {onDrift ? (
+              <Link to="/" title="drift.li">
+                drift<i>.li</i>
+              </Link>
+            ) : (
+              <a href="https://drift.li/" title="drift.li">
+                drift<i>.li</i>
+              </a>
+            )}
+            <Link to={CREATOR_LANDING} className="t-kind" title="Drift Tour">
+              tour
+            </Link>
+          </span>
+          {view && <ViewSwitch view={view} />}
+        </div>
         <div className="t-topactions">
           {user ? (
             <>
-              <span className="d-faint hidden text-xs sm:inline">{user.email}</span>
-              <ThemeToggle theme={theme} onToggle={toggleTheme} />
               {isSuperAdmin && (
                 <Link to="/admin" className="d-btn sm" style={{ textDecoration: "none" }} title="Open the admin panel">
                   Admin
                 </Link>
               )}
               {hasTour ? (
-                <PageSwitcher identityKey={user.email} otherWorkspaces={canSwitch && otherWorkspaces} />
+                <PageSwitcher
+                  identityKey={user.email}
+                  otherWorkspaces={canSwitch && otherWorkspaces}
+                  email={user.email}
+                  onLogout={out}
+                />
               ) : (
-                canSwitch && (
-                  <button onClick={() => navigate("/studios")} className="d-btn sm" title="Choose another workspace">
-                    Switch studio
+                <>
+                  {canSwitch && (
+                    <button onClick={() => navigate("/studios")} className="d-btn sm" title="Choose another workspace">
+                      Switch Studio
+                    </button>
+                  )}
+                  <button onClick={out} className="d-btn ghost sm">
+                    Log Out
                   </button>
-                )
+                </>
               )}
-              <button onClick={out} className="d-btn ghost sm">
-                Log out
-              </button>
-              {hasTour && (
+              {/* On a page they run, the header's view switch is their dashboard. */}
+              {hasTour && !view && (
                 <Link to={CREATOR_HOME} className="d-btn primary sm" style={{ textDecoration: "none" }} title="Your page">
                   Dashboard
                 </Link>
@@ -389,9 +464,8 @@ export function TourShell({ children }: { children: React.ReactNode }) {
             </>
           ) : (
             <>
-              <ThemeToggle theme={theme} onToggle={toggleTheme} />
               <Link to={`${CREATOR_START}?mode=login&next=${here}`} className="d-btn ghost sm" style={{ textDecoration: "none" }}>
-                Log in
+                Log In
               </Link>
               <Link to={CREATOR_START} className="d-btn primary sm" style={{ textDecoration: "none" }}>
                 Try It Free

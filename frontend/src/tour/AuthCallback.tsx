@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import { DriftThemeStyles, useDriftTheme } from "../rotation3d/driftUiTheme";
+import { DriftThemeStyles } from "../rotation3d/driftUiTheme";
 import {
   CREATOR_START,
   ensureCreatorProfile,
@@ -54,7 +54,6 @@ const waitForSession = (ms: number): Promise<Session | null> =>
 
 export default function AuthCallback() {
   const navigate = useNavigate();
-  const [theme] = useDriftTheme();
   const [error, setError] = useState("");
   const [confirm, setConfirm] = useState<{ email: string; name: string; accountType?: AccountType } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -96,7 +95,7 @@ export default function AuthCallback() {
   }, []);
 
   return (
-    <div className="drift-ui d-page" data-theme={theme}>
+    <div className="drift-ui d-page" data-theme="dark">
       <DriftThemeStyles />
       <div style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: 20 }}>
         {confirm ? (

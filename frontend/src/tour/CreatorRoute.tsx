@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { setActiveProfile } from "../lib/api";
-import { DriftThemeStyles, useDriftTheme } from "../rotation3d/driftUiTheme";
+import { DriftThemeStyles } from "../rotation3d/driftUiTheme";
 import { CREATOR_START, ensureCreatorProfile, errorMessage } from "./tourSession";
 
 /**
@@ -15,7 +15,6 @@ import { CREATOR_START, ensureCreatorProfile, errorMessage } from "./tourSession
 export default function CreatorRoute({ children }: { children: React.ReactNode }) {
   const { user, profiles, isLoading, profileSelectionRequired, checkAuth } = useAuth();
   const location = useLocation();
-  const [theme] = useDriftTheme();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const activating = useRef(false);
@@ -40,7 +39,7 @@ export default function CreatorRoute({ children }: { children: React.ReactNode }
 
   if (isLoading || (profileSelectionRequired && creatorProfile)) {
     return (
-      <div className="drift-ui d-page" data-theme={theme}>
+      <div className="drift-ui d-page" data-theme="dark">
         <DriftThemeStyles />
         <div style={{ minHeight: "100dvh", display: "grid", placeItems: "center" }}>
           <div className="d-faint" style={{ fontSize: 13 }}>Loading your space…</div>
@@ -70,7 +69,7 @@ export default function CreatorRoute({ children }: { children: React.ReactNode }
     }
   };
   return (
-    <div className="drift-ui d-page" data-theme={theme}>
+    <div className="drift-ui d-page" data-theme="dark">
       <DriftThemeStyles />
       <main className="d-main" style={{ maxWidth: 520 }}>
         <div className="d-card d-card-pad" style={{ display: "grid", gap: 14 }}>
