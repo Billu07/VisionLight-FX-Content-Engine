@@ -4,7 +4,7 @@ import SpinViewer from "./SpinViewer";
 import { apiEndpoints } from "../lib/api";
 import { isSpinPlayerSite, isDriftSite, getPlayerBranding } from "../lib/branding";
 import { initMetaPixel, track } from "./metaPixel";
-import { resolveDriftTarget, prefetchDriftTargets, getCachedDrift, cacheDrift, driftKey, flowDriftKey, targetKey, combinedFrameSets, framesReady, playerFrames } from "./driftNav";
+import { resolveDriftTarget, prefetchDriftTargets, warmFlowAhead, getCachedDrift, cacheDrift, driftKey, flowDriftKey, targetKey, combinedFrameSets, framesReady, playerFrames } from "./driftNav";
 import { captureShareLink, shareLinkFor } from "./personalLink";
 import { newViewKey, type AttentionTarget } from "./attention";
 
@@ -194,9 +194,13 @@ export default function Rotation3DPlayer() {
     return !!cached && framesReady(playerFrames(cached));
   });
 
-  // Prefetch every drift a CTA points at (drift only), so its click is an instant swap.
+  // Load ahead so the next tap is an instant swap: every drift a CTA points at, and — on a
+  // tour — the next stop in the tour's own order plus a coarse spread of the one after it.
+  // (CTAs alone miss the loop back to #1, and never reached two stops ahead.)
   const prefetchNeighbors = (product: any) => {
-    if (drift) prefetchDriftTargets(product);
+    if (!drift) return;
+    prefetchDriftTargets(product); // also drops warms for the drift just left
+    warmFlowAhead(product?.flow);
   };
 
   // A tour drift opened by its id (/p/{id}, older links) shows its readable address

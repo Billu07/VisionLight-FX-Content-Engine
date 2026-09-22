@@ -7,10 +7,14 @@ import { apiEndpoints } from "../lib/api";
  * a spread of its frames warmed) ahead of the click — the next drift then swaps in
  * INSTANTLY, with no loader, and (because we navigate in-app) fullscreen survives.
  *
- * Warming waits until the drift on screen has loaded ALL of its own frames (the player
- * holds a foreground lease while it loads), then fetches the next drift's whole frame
- * set — the set THIS device will play (the lighter mobile set on phones) — so the swap
- * is instant and smooth. On data-saver / 2G links it only warms what a first paint needs.
+ * How the loading ahead is paced (the way a video player loads the next segment):
+ *   1. the drift on screen owns the network while it is still opening (no warming at all),
+ *   2. once it is playable it keeps filling in, and the NEXT drift trickles in behind it on
+ *      two connections at LOW fetch priority, so the frames the visitor is dragging win,
+ *   3. when it is complete, warming runs at full width,
+ *   4. a finger on the drift pauses new background requests until it lifts.
+ * Depth: the next stop in full, the one after it as a coarse spread — enough to open
+ * instantly and sharpen. On data-saver / 2G links only the essentials are warmed.
  */
 
 // Session caches: drift product payloads by key, and frame URLs we've warmed.
@@ -135,12 +139,18 @@ export const framesReady = (urls: string[], need?: number): boolean => {
 // ───────────────────────────── background warm queue ─────────────────────────────
 
 const WARM_CONCURRENCY = 6;
+// How many connections the next drift may use while the one on screen is still filling in.
+const WARM_TRICKLE = 2;
 const WARM_DELAY_MS = 250;
-// Players still loading their own frames (see holdForegroundLoad).
+// Players whose drift is not playable yet (see holdForegroundLoad) — nothing warms while
+// one of these is open — and players still filling in a playable drift (warming trickles).
 let foregroundLeases = 0;
+let trickleLeases = 0;
 const warmQueue: string[] = [];
 let warmActive = 0;
 let warmTimer: number | null = null;
+let warmPaused = false;
+let warmPauseTimer: number | null = null;
 
 /** Data saver or a 2G link: warm only what an instant first paint needs. */
 const constrainedNetwork = () => {
@@ -148,13 +158,24 @@ const constrainedNetwork = () => {
   return !!c && (!!c.saveData || /(^|-)2g$/.test(String(c.effectiveType || "")));
 };
 
+/** How much of the network background loading may take right now. */
+const warmWidth = () => {
+  if (warmPaused) return 0; // a finger is on the drift
+  if (foregroundLeases > 0) return 0; // a drift is still opening — it comes first
+  if (trickleLeases > 0) return constrainedNetwork() ? 0 : WARM_TRICKLE; // behind the one playing
+  return WARM_CONCURRENCY;
+};
+
 const pumpWarm = () => {
-  if (foregroundLeases > 0) return; // the drift on screen comes first
-  while (warmActive < WARM_CONCURRENCY && warmQueue.length) {
+  const width = warmWidth();
+  while (warmActive < width && warmQueue.length) {
     const url = warmQueue.shift()!;
     warmActive++;
     const img = new Image();
     img.decoding = "async";
+    // Low priority: the browser serves the frames of the drift on screen first, so loading
+    // ahead never costs the visitor a stutter (Chrome/Safari; ignored elsewhere).
+    (img as any).fetchPriority = "low";
     img.onload = () => {
       framesIn.add(url);
       warmActive--;
@@ -178,17 +199,47 @@ const scheduleWarm = () => {
   }, WARM_DELAY_MS);
 };
 
-/** A player calls this when it starts loading a drift's frames and calls the returned
- *  release when they're all in (or it unmounts): warming waits for every lease. */
-export function holdForegroundLoad(): () => void {
+/** The visitor is dragging a drift: hold new background requests so the frames being
+ *  scrubbed get the network and the main thread. Auto-resumes if a pointer-up is missed. */
+export const setWarmPaused = (on: boolean) => {
+  if (typeof window === "undefined") return;
+  if (warmPauseTimer !== null) {
+    clearTimeout(warmPauseTimer);
+    warmPauseTimer = null;
+  }
+  warmPaused = on;
+  if (on) {
+    warmPauseTimer = window.setTimeout(() => {
+      warmPauseTimer = null;
+      warmPaused = false;
+      if (warmQueue.length) scheduleWarm();
+    }, 5000);
+  } else if (warmQueue.length) scheduleWarm();
+};
+
+/** A player takes one of these while it loads a drift's frames:
+ *   - `usable()` when the drift can be played (its coarse ring is in) — the next drift may
+ *     start trickling in behind it,
+ *   - `release()` when every frame is in, or the player unmounts — warming runs full width.
+ *  Both are idempotent, and release works whether or not usable was called. */
+export function holdForegroundLoad(): { usable: () => void; release: () => void } {
   foregroundLeases++;
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
+  let state: "opening" | "playing" | "done" = "opening";
+  const usable = () => {
+    if (state !== "opening") return;
+    state = "playing";
     foregroundLeases = Math.max(0, foregroundLeases - 1);
-    if (foregroundLeases === 0 && warmQueue.length) scheduleWarm();
+    trickleLeases++;
+    if (warmQueue.length) scheduleWarm();
   };
+  const release = () => {
+    if (state === "done") return;
+    if (state === "opening") foregroundLeases = Math.max(0, foregroundLeases - 1);
+    else trickleLeases = Math.max(0, trickleLeases - 1);
+    state = "done";
+    if (warmQueue.length) scheduleWarm();
+  };
+  return { usable, release };
 }
 
 const enqueueWarm = (url?: string) => {
@@ -263,4 +314,17 @@ export function prefetchDriftTargets(product: any) {
 export function prefetchDriftPath(path: string | null | undefined, opts: { full?: boolean } = { full: false }) {
   const t = resolveDriftTarget(path);
   if (t) prefetchTarget(t, opts);
+}
+
+/** Load ahead along a tour: the stop the visitor will most likely open next in full, the one
+ *  after it as a coarse spread. Uses the tour's OWN order, so the last stop correctly warms
+ *  #1 again (its "next" button loops), which CTA links alone never told us. */
+export function warmFlowAhead(flow: any) {
+  const stops: any[] = Array.isArray(flow?.stops) ? flow.stops : [];
+  const at = Number(flow?.index);
+  if (stops.length < 2 || !Number.isFinite(at)) return;
+  prefetchDriftPath(stops[(at + 1) % stops.length]?.playerPath, { full: true });
+  if (stops.length > 2 && !constrainedNetwork()) {
+    prefetchDriftPath(stops[(at + 2) % stops.length]?.playerPath, { full: false });
+  }
 }

@@ -1,4 +1,4 @@
-import { framesReady, holdForegroundLoad, markFramesIn } from "./driftNav";
+import { framesReady, holdForegroundLoad, markFramesIn, setWarmPaused } from "./driftNav";
 import { pinPlacement, type PinTrack, type SpinPin } from "./pins";
 import { createAttention, type AttentionTarget } from "./attention";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
@@ -528,7 +528,7 @@ export default function SpinViewer({
       Array.isArray(manifest.framesMobile) && manifest.framesMobile.length > 0 ? manifest.framesMobile : manifest.frames;
     const realMode = Array.isArray(urls) && urls.length > 0;
     let revealTimer: ReturnType<typeof setTimeout> | null = null;
-    let releaseForeground: (() => void) | null = null;
+    let foreground: { usable: () => void; release: () => void } | null = null;
     let leaseTimer: ReturnType<typeof setTimeout> | null = null;
     const imgs: (HTMLImageElement | null)[] = realMode
       ? new Array(urls!.length).fill(null)
@@ -1208,6 +1208,7 @@ export default function SpinViewer({
 
     const onDown = (e: PointerEvent) => {
       attn?.activity();
+      setWarmPaused(true); // the drag owns the network and the main thread
       userTookOver = true; // a touch before the demo starts cancels it too
       if (introActive) endIntro(); // the user is taking over — stop the demo
       if (isControl(e.target)) return;
@@ -1228,6 +1229,7 @@ export default function SpinViewer({
     };
     let lastTap = 0;
     const onUp = (e: PointerEvent) => {
+      setWarmPaused(false); // finger up — carry on loading ahead
       pointers.delete(e.pointerId);
       if (pointers.size < 2) pinchD = 0;
       if (!pointers.size) up();
@@ -1480,10 +1482,11 @@ export default function SpinViewer({
 
     if (realMode) {
       const n = urls!.length;
-      // Hold the network for this drift; the next one warms once every frame is in.
-      releaseForeground = holdForegroundLoad();
+      // Hold the network for this drift: nothing loads ahead until it can be played, then
+      // the next stop trickles in behind it, and it warms at full width once complete.
+      foreground = holdForegroundLoad();
       // A hung frame request must not block warming forever.
-      leaseTimer = setTimeout(() => releaseForeground?.(), 25000);
+      leaseTimer = setTimeout(() => foreground?.release(), 25000);
       // Progressive density: load an evenly-spread coarse ring first so the
       // whole 360 is usable within ~a second, then keep filling the gaps so the
       // spin sharpens toward full frame count — no waiting for all 120/180.
@@ -1502,9 +1505,12 @@ export default function SpinViewer({
       // thread. That was the 5-10s of "bogging" before the spin smoothed out.
       // Bounded + pre-decoded keeps the turn smooth from the first second.
       const LOAD_CONCURRENCY = 8;
-      const loadOne = async (i: number) => {
+      const loadOne = async (i: number, rank: number) => {
         const im = new Image();
         im.decoding = "async";
+        // The coarse ring is what the visitor is waiting for, so ask for it first; the
+        // frames that sharpen it underneath (and anything loading ahead) come after.
+        (im as any).fetchPriority = rank < COARSE ? "high" : "auto";
         im.src = urls![i];
         try {
           if (im.decode) await im.decode();
@@ -1525,11 +1531,15 @@ export default function SpinViewer({
           revealed = true;
           finishLoad();
         }
-        if (loaded >= n) releaseForeground?.(); // complete → the next drift can warm
+        // Playable → the next stop may start trickling in behind this one (low priority,
+        // two connections), instead of waiting for the last frame of a 180-frame drift.
+        if (loaded >= COARSE) foreground?.usable();
+        if (loaded >= n) foreground?.release(); // complete → load ahead at full width
       };
       const worker = async () => {
         while (alive && cursor < seq.length) {
-          await loadOne(seq[cursor++]);
+          const rank = cursor++;
+          await loadOne(seq[rank], rank);
         }
       };
       for (let w = 0; w < Math.min(LOAD_CONCURRENCY, seq.length); w++) void worker();
@@ -1648,9 +1658,10 @@ export default function SpinViewer({
 
     return () => {
       alive = false;
-      releaseForeground?.();
+      foreground?.release();
       if (attentionRef.current === attn) attentionRef.current = null;
       attn?.close();
+      setWarmPaused(false); // never leave the queue paused behind an unmounted player
       if (leaseTimer) clearTimeout(leaseTimer);
       if (revealTimer) clearTimeout(revealTimer);
       if (landscapeZoomTimer) clearTimeout(landscapeZoomTimer);

@@ -86,11 +86,16 @@ export default function UnbrandedTour() {
         if (!alive) return;
         setProduct(p);
         if (p?.id) apiEndpoints.driftTrackEvent(p.id, "VIEW", { unbranded: true }).catch(() => undefined);
-        // The likeliest next tap: fetch the next drift and warm its frames now.
+        // The likeliest next taps: the next drift in full, the one after it coarse.
         const total = p?.flow?.stops?.length || 0;
         if (total > 1) {
           loadDrift((index + 1) % total)
             .then((n) => warmFrames(n))
+            .catch(() => undefined);
+        }
+        if (total > 2) {
+          loadDrift((index + 2) % total)
+            .then((n) => warmFrames(n, { full: false }))
             .catch(() => undefined);
         }
       })
